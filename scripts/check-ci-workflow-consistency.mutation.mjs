@@ -95,6 +95,34 @@ for (const [name, change] of NATIVE_CACHE_CASES) {
   });
 }
 
+// The PDFium archive cache is written by one job (pdfium-cache) on a push, a manual run or the nightly run only; the
+// build jobs restore it and pass the directory to the script that re-checks it. native and bundle-smoke sit before
+// a pinned step and pdfium-cache is pinned at its last step, so a change to any of these lines is a changed job.
+const replaceFirst = (text, from, to) => { assert.ok(text.includes(from), `missing: ${from}`); return text.replace(from, to); };
+const replaceLast = (text, from, to) => { const at = text.lastIndexOf(from); assert.ok(at !== -1, `missing: ${from}`); return text.slice(0, at) + to + text.slice(at + from.length); };
+const PDFIUM_KEY = "pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}";
+const PDFIUM_CACHE_CASES = [
+  ["native", "the fetch step no longer passes the cache directory", (text) => replaceFirst(text, '\n          --cache-dir "$RUNNER_TEMP/pdfium-archive" ${{ github.event_name == \'push\' && \'--strict-cache\' || \'\' }}', "")],
+  ["native", "the strict flag dropped on a master push", (text) => replaceFirst(text, " ${{ github.event_name == 'push' && '--strict-cache' || '' }}", "")],
+  ["native", "a key that does not hold the lock's hash", (text) => replaceFirst(text, PDFIUM_KEY, "pdfium-archive-v1-${{ runner.os }}")],
+  ["bundle-smoke", "a restore-keys fallback", (text) => replaceLast(text, "          key: " + PDFIUM_KEY + "\n      - name: Fetch pinned PDFium for the MCPB", "          key: " + PDFIUM_KEY + "\n          restore-keys: pdfium-archive-\n      - name: Fetch pinned PDFium for the MCPB")],
+  ["native", "a save step added after the pinned step", (text) => replaceFirst(text, "      - name: Prove the approval-seam scan sees a test build\n        shell: bash\n        run: node scripts/check-no-test-seam.mjs --test-harness\n", "      - name: Prove the approval-seam scan sees a test build\n        shell: bash\n        run: node scripts/check-no-test-seam.mjs --test-harness\n      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0\n        with:\n          path: ${{ runner.temp }}/pdfium-archive\n          key: " + PDFIUM_KEY + "\n")],
+  ["bundle-smoke", "a save step added to the build job", (text) => replaceLast(text, "      - name: Fetch pinned PDFium for the MCPB", "      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0\n        with:\n          path: ${{ runner.temp }}/pdfium-archive\n          key: " + PDFIUM_KEY + "\n      - name: Fetch pinned PDFium for the MCPB")],
+  ["pdfium-cache", "a pull request may write the archive", (text) => replaceFirst(text, "    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 15", "    if: ${{ github.event_name != 'merge_group' }}\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 15")],
+  ["pdfium-cache", "the fetch step without --strict-cache", (text) => replaceFirst(text, ' --cache-dir "$RUNNER_TEMP/pdfium-archive" --strict-cache\n      - name: Save', ' --cache-dir "$RUNNER_TEMP/pdfium-archive"\n      - name: Save')],
+  ["pdfium-cache", "a wider save condition", (text) => replaceFirst(text, "        if: ${{ steps.pdfium-cache.outputs.cache-hit != 'true' }}\n        uses: actions/cache/save", "        if: ${{ always() }}\n        uses: actions/cache/save")],
+  ["pdfium-cache", "a step added after the save", (text) => replaceFirst(text, PDFIUM_KEY + "\n\n  required-checks:", PDFIUM_KEY + "\n      - run: node scripts/anything.mjs\n\n  required-checks:")],
+  ["pdfium-cache", "a write permission", (text) => replaceLast(text, "    timeout-minutes: 15\n    permissions:\n      contents: read\n", "    timeout-minutes: 15\n    permissions:\n      contents: write\n")],
+];
+for (const [job, name, change] of PDFIUM_CACHE_CASES) {
+  // native and bundle-smoke fail on their digest; pdfium-cache fails on its digest, on its pinned step's shape, or
+  // (a step added after it) on the rule that the pinned step is the job's last.
+  const messages = { "a wider save condition": "pdfium-cache: step \"- name: Save the PDFium archive\" changed shape", "a step added after the save": "pdfium-cache: the pinned step must be the job's last step", "a save step added after the pinned step": "ci.yml has 5 actions/cache/save steps, expected 4" };
+  test(`${job}: PDFium archive cache: ${name} is refused`, () => {
+    refused(withChange(CI_FILE, change), messages[name] ?? `${job} changed before`);
+  });
+}
+
 // The digest of a pinned job covers it only up to the pinned step, so a job-level key written after the
 // steps would be outside the pinned text: `steps:` must be the job's last key.
 for (const [file, job] of PINNED) {

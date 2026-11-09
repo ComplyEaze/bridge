@@ -140,6 +140,9 @@ impl Server {
                 )
                 .map_err(|error| {
                     match error {
+                        crate::tally::VerifiedCompanyIdentityError::InvalidCompanyName => {
+                            "company_name_invalid"
+                        }
                         crate::tally::VerifiedCompanyIdentityError::InvalidCompanyNumber => {
                             "company_number_invalid"
                         }

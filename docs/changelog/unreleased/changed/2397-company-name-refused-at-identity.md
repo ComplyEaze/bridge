@@ -1,0 +1,1 @@
+- A company whose name Bridge cannot send to Tally (empty, over 255 bytes, or holding a control character) is now refused once, when it is selected, with `company_name_invalid`, instead of being admitted and then refused by a later read under another code (#2397).

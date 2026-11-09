@@ -33,19 +33,39 @@ pub use xml_parser::{TallyCompany, TallyLedger};
 /// company-scoped read after a year-end split.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedCompanyIdentity {
-    display_name: String,
+    /// The name byte-exact as Tally reported it, admitted once here as the
+    /// type every request builder takes, so no identity holds a name Bridge
+    /// cannot send (#2397).
+    name: bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName,
     company_guid: bridge_tally_core::company_guid::CompanyGuid,
     company_number: ObservedCompanyNumber,
     books_from_yyyymmdd: bridge_tally_core::TallyDate,
 }
 
+/// Carries no observed text: neither form below can print a company name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerifiedCompanyIdentityError {
+    /// The observed name is not one a request can carry: empty after trim,
+    /// over 255 bytes, or holding a control character (#2397).
+    InvalidCompanyName,
     InvalidCompanyNumber,
     InvalidBooksFrom,
     Missing,
     DuplicateTuple,
     DisplayScopeAmbiguous,
+}
+
+impl std::fmt::Display for VerifiedCompanyIdentityError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::InvalidCompanyName => "the observed company name cannot be sent to Tally",
+            Self::InvalidCompanyNumber => "the observed company number is invalid",
+            Self::InvalidBooksFrom => "the observed books-from date is invalid",
+            Self::Missing => "the company tuple was not observed",
+            Self::DuplicateTuple => "the company tuple was observed more than once",
+            Self::DisplayScopeAmbiguous => "a same-GUID company shares the display scope",
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,6 +97,11 @@ impl VerifiedCompanyIdentity {
         books_from_yyyymmdd: String,
         companies: &[TallyCompany],
     ) -> Result<Self, VerifiedCompanyIdentityError> {
+        // First, before the tuple and ambiguity checks, so a name no request
+        // can carry is refused as that and never as a scope fault.
+        let name =
+            bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(display_name)
+                .map_err(|_| VerifiedCompanyIdentityError::InvalidCompanyName)?;
         let company_number = ObservedCompanyNumber::parse(company_number)?;
         let books_from_yyyymmdd = bridge_tally_core::TallyDate::parse(books_from_yyyymmdd)
             .map_err(|_| VerifiedCompanyIdentityError::InvalidBooksFrom)?;
@@ -85,7 +110,7 @@ impl VerifiedCompanyIdentity {
         // the ASCII-insensitive contract that company-list and extent
         // comparisons use across a read bracket.
         let identity = Self {
-            display_name,
+            name,
             company_guid,
             company_number,
             books_from_yyyymmdd,
@@ -113,7 +138,10 @@ impl VerifiedCompanyIdentity {
         company_guid: impl Into<String>,
     ) -> Self {
         Self {
-            display_name: display_name.into(),
+            name: bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+                display_name.into(),
+            )
+            .expect("a test fixture company name is one a request can carry"),
             company_guid: test_company_guid(&company_guid.into()),
             company_number: ObservedCompanyNumber::parse("1".to_string())
                 .expect("fixed fixture company number is valid"),
@@ -123,7 +151,15 @@ impl VerifiedCompanyIdentity {
     }
 
     pub(crate) fn display_name(&self) -> &str {
-        &self.display_name
+        self.name.as_str()
+    }
+
+    /// The name as the type a read profile takes; constructing the identity
+    /// already admitted it.
+    pub(crate) fn company_name(
+        &self,
+    ) -> &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName {
+        &self.name
     }
 
     pub(crate) fn company_guid(&self) -> &str {
@@ -150,7 +186,7 @@ impl VerifiedCompanyIdentity {
         bridge_tally_protocol::outstandings_shared::CompanyBookExtentExpectationError,
     > {
         bridge_tally_protocol::outstandings_shared::CompanyBookExtentExpectation::new(
-            self.display_name.clone(),
+            self.name.as_str().to_owned(),
             self.company_guid.as_str().to_owned(),
             self.company_number.as_str().to_owned(),
             self.books_from_yyyymmdd.as_str().to_owned(),
@@ -158,7 +194,7 @@ impl VerifiedCompanyIdentity {
     }
 
     pub(crate) fn matches_observed_company(&self, company: &TallyCompany) -> bool {
-        company.name == self.display_name
+        company.name == self.name.as_str()
             && company
                 .guid
                 .as_deref()
@@ -175,7 +211,7 @@ impl VerifiedCompanyIdentity {
             && company
                 .name
                 .trim()
-                .eq_ignore_ascii_case(self.display_name.trim())
+                .eq_ignore_ascii_case(self.name.as_str().trim())
             && !self.matches_observed_company(company)
     }
 }

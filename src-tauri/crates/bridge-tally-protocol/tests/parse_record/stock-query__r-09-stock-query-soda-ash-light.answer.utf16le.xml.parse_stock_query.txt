@@ -1,0 +1,27 @@
+# fixture: tests/fixtures/stock-query/r-09-stock-query-soda-ash-light.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "1350.000",
+                ),
+                unit: "Kgs",
+            },
+        },
+        StockQueryLine {
+            godown: "Factory Floor",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "-50.000",
+                ),
+                unit: "Kgs",
+            },
+        },
+    ],
+))

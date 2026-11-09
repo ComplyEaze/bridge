@@ -86,6 +86,21 @@ async fn voucher_selector_catalogue_contributes_to_final_wire_evidence() {
         // census of the window (#1029), then the window, which ten vouchers
         // keep whole.
         plans.extend(cycle[10..16].iter().cloned());
+        // Its census is spanned to the mark (#2145), so the mark read here is raised to the
+        // readback's AlterIDs (12 and 13); the import cycle's other reads keep its mark of 10.
+        for marks in [11, 13] {
+            let body = plans[marks].fixture.body();
+            assert_eq!(
+                body.matches("<ALTVCHID>10</ALTVCHID>").count(),
+                1,
+                "plan {marks}"
+            );
+            plans[marks] = ScenarioPlan::new(Fixture::SyntheticXml(
+                body.replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>13</ALTVCHID>"),
+            ))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_framing(ResponseFraming::ContentLength);
+        }
         let readback = cycle[27].clone();
         for _ in 0..2 {
             plans.extend([

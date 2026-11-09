@@ -1,0 +1,29 @@
+# fixture: tests/fixtures/stock-query/r-03-stock-query-cleaning-kit-a.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "25",
+                ),
+                unit: "Nos",
+            },
+        },
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Named(
+                "K-2504-A",
+            ),
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "-13",
+                ),
+                unit: "Nos",
+            },
+        },
+    ],
+))

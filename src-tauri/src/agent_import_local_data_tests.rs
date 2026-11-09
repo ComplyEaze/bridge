@@ -1,4 +1,8 @@
 //! The local-data report reads and never writes (#local-data slice 1).
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: the report command is run as a process of its own"
+)]
 use super::*;
 use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
 
@@ -11,7 +15,7 @@ fn write(path: &Path, bytes: &[u8]) {
 }
 
 /// A minimal journal: one built batch, optionally sent.
-fn journal(sent: bool) -> Vec<u8> {
+pub(in crate::agent::agent_import) fn journal(sent: bool) -> Vec<u8> {
     let line: super::super::ImportLedgerLine = serde_json::from_value(serde_json::json!({
         "batch_id":"b1","company_guid":"synthetic-guid","company":null,
         "txn_ids":["txn"],"date_from":"20260901","date_to":"20260901",
@@ -19,8 +23,8 @@ fn journal(sent: bool) -> Vec<u8> {
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn","date":"20260901","voucher_type":"Journal",
             "narration":"n","reference":null,"voucher_number":null,"entries":[
-                {"ledger":"Cash","amount":"1","side":"Dr"},
-                {"ledger":"Synthetic Ledger","amount":"1","side":"Cr"}]}]
+                {"ledger":"Cash","amount":"1.00","side":"Dr"},
+                {"ledger":"Synthetic Ledger","amount":"1.00","side":"Cr"}]}]
     }))
     .unwrap();
     let mut bytes = serde_json::to_vec(&line).unwrap();
@@ -288,7 +292,9 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_no_response: 1,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -302,7 +308,9 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 1
         })
     );
@@ -321,7 +329,9 @@ fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 0,
+        unsettled_restored: 0,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -366,18 +376,47 @@ fn no_path_is_in_the_json_unless_asked() {
     let root = directory.path();
     write(&root.join("imports/b.xml"), b"<x/>");
     let report = build(root, &[]);
-    let plain = to_json(&report, SystemTime::now(), None).to_string();
+    let plain_value = to_json(&report, SystemTime::now(), None);
+    assert!(plain_value.get("package_copies").is_none(), "{plain_value}");
+    let plain = plain_value.to_string();
     assert!(!names_the_path(&plain, root), "{plain}");
     assert!(!plain.contains("path"), "{plain}");
     // The value, not the serialized text: on Windows the text doubles every
     // backslash of the path, so a substring check on it proves nothing.
     let shown = to_json(&report, SystemTime::now(), Some((root, &[root])));
     let path = root.display().to_string();
+    // each folder as built (#1459): its own final path is not trusted
     assert_eq!(shown["folder_path"], path, "{shown}");
     assert_eq!(shown["lock_folder_path"], path, "{shown}");
     assert_eq!(
         shown["lock_folder_paths"],
         serde_json::json!([path]),
+        "{shown}"
+    );
+    // no file directly in the folder (imports is a folder); no lease folder
+    assert_eq!(
+        shown["folder_file_locations"],
+        serde_json::json!({"folders": [], "files_read": 0, "files": 0, "listing_capped": false}),
+        "{shown}"
+    );
+    // package copies are looked for only on Windows, under %LOCALAPPDATA%
+    #[cfg(not(windows))]
+    assert!(shown.get("package_copies").is_none(), "{shown}");
+    #[cfg(windows)]
+    {
+        let copies = &shown["package_copies"];
+        assert!(
+            copies
+                .as_array()
+                .is_some_and(|all| all.iter().all(serde_json::Value::is_string))
+                || copies == "not_listed"
+                || copies == "not_under_local_app_data",
+            "{shown}"
+        );
+    }
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!(["not_listed"]),
         "{shown}"
     );
     // two lock folders: the first is still lock_folder_path, both are listed in order
@@ -394,6 +433,338 @@ fn no_path_is_in_the_json_unless_asked() {
         "{two}"
     );
     assert!(names_the_path(&shown.to_string(), root), "{shown}");
+    assert!(shown.get("journal_path").is_none(), "{shown}");
+}
+
+/// #1459, #1584: a path is shown where the operating system reports each file
+/// to be, never where the folder resolves. The resolver stands in for Windows
+/// as the lab observed it inside a Store install's package once the real folder
+/// also existed: the folder names the real one, while a file the package's copy
+/// holds names that copy, the journal included, even where the real folder
+/// holds a file of the same name.
+#[test]
+fn a_folder_is_shown_by_where_its_files_are_not_where_it_resolves() {
+    let directory = tempfile::tempdir().unwrap();
+    let local = directory.path().join("local");
+    let root = local.join("Bridge").join("agent");
+    let locks = directory.path().join("locks");
+    write(&root.join("agent-import-ledger.jsonl"), &journal(true));
+    write(&root.join("terms-acceptance.jsonl"), b"{}\n");
+    write(&locks.join("native-dispatch-leases").join("a.lock"), b"");
+    // one package holds a copy of the data folder, another does not
+    let copy = local
+        .join("Packages")
+        .join("Store.App_1")
+        .join("LocalCache")
+        .join("Local")
+        .join("Bridge")
+        .join("agent");
+    fs::create_dir_all(&copy).unwrap();
+    fs::create_dir_all(
+        local
+            .join("Packages")
+            .join("Other.App_2")
+            .join("LocalCache"),
+    )
+    .unwrap();
+    let package = PathBuf::from("/package/agent");
+    let real = PathBuf::from("/real/agent");
+    let leases = PathBuf::from("/package/leases");
+    let resolve = |path: &Path| -> VisiblePath {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        match name.as_str() {
+            "a.lock" => VisiblePath::Resolved(leases.join(&name)),
+            _ if path.is_file() => VisiblePath::Resolved(package.join(&name)),
+            _ => VisiblePath::Resolved(real.clone()),
+        }
+    };
+    let report = build(&root, &[]);
+    let shown = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&root, &[locks.as_path()])),
+        &resolve,
+        Some(&local),
+    );
+    assert_eq!(shown["folder_path"], root.display().to_string(), "{shown}");
+    // the journal by its own location, not the resolved folder plus its name
+    assert_eq!(
+        shown["journal_path"],
+        package
+            .join("agent-import-ledger.jsonl")
+            .display()
+            .to_string(),
+        "{shown}"
+    );
+    assert_eq!(shown["journal_path_state"], "resolved", "{shown}");
+    // two files in one copy: that copy once, and both files read
+    assert_eq!(
+        shown["folder_file_locations"],
+        serde_json::json!({
+            "folders": [{"path": package.display().to_string(), "state": "resolved"}],
+            "files_read": 2,
+            "files": 2,
+            "listing_capped": false,
+        }),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!([{
+            "folders": [{"path": leases.display().to_string(), "state": "resolved"}],
+            "files_read": 1,
+            "files": 1,
+            "listing_capped": false,
+        }]),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_path"],
+        locks.display().to_string(),
+        "{shown}"
+    );
+    // the copy a process on the other side of the package would not see
+    assert_eq!(
+        shown["package_copies"],
+        serde_json::json!([copy.display().to_string()]),
+        "{shown}"
+    );
+    // a data folder set outside %LOCALAPPDATA% has no package copy to look for
+    let elsewhere = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&locks, &[locks.as_path()])),
+        &resolve,
+        Some(&local),
+    );
+    assert_eq!(
+        elsewhere["package_copies"], "not_under_local_app_data",
+        "{elsewhere}"
+    );
+
+    // a data folder that could not be read: no journal path, whatever is there
+    let not_a_folder = root.join("agent-import-ledger.jsonl");
+    let unreadable = build(&not_a_folder, &[]);
+    assert!(matches!(unreadable.root, Root::Unreadable));
+    let shown = to_json_resolving(
+        &unreadable,
+        SystemTime::now(),
+        Some((&not_a_folder, &[locks.as_path()])),
+        &resolve,
+        None,
+    );
+    assert!(shown.get("journal_path").is_none(), "{shown}");
+}
+
+/// Files that resolve to two folders list both, in the order of the files'
+/// names, each once (the lab did not observe this from either side: each side
+/// saw its own copy only).
+#[test]
+fn files_in_two_folders_list_both_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    for name in ["a.jsonl", "b.jsonl", "c.jsonl"] {
+        write(&root.join(name), b"");
+    }
+    let resolve = |path: &Path| -> VisiblePath {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let folder = if name == "b.jsonl" { "/two" } else { "/one" };
+        VisiblePath::Resolved(PathBuf::from(folder).join(&name))
+    };
+    assert_eq!(
+        file_locations(root, &resolve),
+        serde_json::json!({
+            "folders": [
+                {"path": PathBuf::from("/one").display().to_string(), "state": "resolved"},
+                {"path": PathBuf::from("/two").display().to_string(), "state": "resolved"},
+            ],
+            "files_read": 3,
+            "files": 3,
+            "listing_capped": false,
+        })
+    );
+}
+
+/// The listing stops at its cap and says so; the files past it are not counted.
+#[test]
+fn a_listing_past_its_cap_says_so() {
+    let directory = tempfile::tempdir().unwrap();
+    for n in 0..5 {
+        write(&directory.path().join(format!("f{n}")), b"");
+    }
+    let resolve = |path: &Path| VisiblePath::Resolved(path.to_path_buf());
+    let capped = file_locations_capped(directory.path(), &resolve, 3);
+    assert_eq!(capped["files"], 3, "{capped}");
+    assert_eq!(capped["listing_capped"], true, "{capped}");
+    let whole = file_locations_capped(directory.path(), &resolve, 5);
+    assert_eq!(whole["files"], 5, "{whole}");
+    assert_eq!(whole["listing_capped"], false, "{whole}");
+}
+
+/// A data folder under `%LOCALAPPDATA%` is matched as Windows matches a path:
+/// without regard to letter case; another folder is not.
+#[test]
+fn a_folder_is_matched_under_local_app_data_without_regard_to_case() {
+    // an absolute base on each platform (Windows needs a drive)
+    let root = if cfg!(windows) { "C:\\" } else { "/" };
+    let base = PathBuf::from(root)
+        .join("srv")
+        .join("Profile")
+        .join("AppData")
+        .join("Local");
+    let lower = PathBuf::from(base.display().to_string().to_lowercase());
+    assert_eq!(
+        relative_to(&base, &lower.join("Bridge").join("agent")),
+        Some(PathBuf::from("Bridge").join("agent"))
+    );
+    let sibling = base.parent().unwrap().join("LocalLow").join("Bridge");
+    assert_eq!(relative_to(&base, &sibling), None);
+    assert_eq!(relative_to(&base, base.parent().unwrap()), None);
+    assert_eq!(relative_to(&base, &base), Some(PathBuf::new()));
+    // a remainder that climbs out of the base, or a base that is not absolute,
+    // names no folder inside it
+    assert_eq!(relative_to(&base, &base.join("Bridge").join("..")), None);
+    assert_eq!(
+        relative_to(&base, &base.join("..").join("..").join("Bridge")),
+        None
+    );
+    assert_eq!(relative_to(Path::new(""), &base), None);
+    assert_eq!(
+        relative_to(Path::new("Local"), &Path::new("Local").join("Bridge")),
+        None
+    );
+}
+
+/// `package_copies` finds a copy of a data folder whose `%LOCALAPPDATA%` part
+/// differs only in letter case, and none for `%LOCALAPPDATA%` itself.
+#[test]
+fn package_copies_match_without_regard_to_case() {
+    let directory = tempfile::tempdir().unwrap();
+    let base = directory.path().join("Local");
+    let copy = base
+        .join("Packages")
+        .join("Store.App_1")
+        .join("LocalCache")
+        .join("Local")
+        .join("Bridge")
+        .join("agent");
+    fs::create_dir_all(&copy).unwrap();
+    let shouted = PathBuf::from(base.display().to_string().to_uppercase())
+        .join("Bridge")
+        .join("agent");
+    assert_eq!(
+        package_copies(&base, &shouted),
+        serde_json::json!([copy.display().to_string()])
+    );
+    assert_eq!(package_copies(&base, &base), "not_under_local_app_data");
+    // a folder spelled with `..` below the base is not a package copy's name
+    assert_eq!(
+        package_copies(&base, &base.join("Bridge").join("..")),
+        "not_under_local_app_data"
+    );
+}
+
+/// A data folder that is a link (a folder moved to another disk) is followed,
+/// as the report counts it, so where its files are is still shown.
+#[cfg(unix)]
+#[test]
+fn a_data_folder_that_is_a_link_is_still_located() {
+    let directory = tempfile::tempdir().unwrap();
+    let moved = directory.path().join("moved");
+    write(&moved.join("terms-acceptance.jsonl"), b"{}\n");
+    let root = directory.path().join("agent");
+    std::os::unix::fs::symlink(&moved, &root).unwrap();
+    let resolve = |path: &Path| VisiblePath::Resolved(path.to_path_buf());
+    let shown = to_json_resolving(
+        &build(&root, &[]),
+        SystemTime::now(),
+        Some((&root, &[])),
+        &resolve,
+        None,
+    );
+    assert_eq!(shown["folder_file_locations"]["files"], 1, "{shown}");
+}
+
+/// A lease folder that is itself a link is not entered, and a journal file
+/// that is itself a link is not resolved; a link above them is followed (see
+/// `a_data_folder_that_is_a_link_is_still_located`).
+#[cfg(unix)]
+#[test]
+fn a_link_is_not_followed_for_a_path_shown() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("agent");
+    let elsewhere = directory.path().join("elsewhere");
+    write(&elsewhere.join("agent-import-ledger.jsonl"), &journal(true));
+    write(&elsewhere.join("a.lock"), b"");
+    fs::create_dir_all(&root).unwrap();
+    std::os::unix::fs::symlink(
+        elsewhere.join("agent-import-ledger.jsonl"),
+        root.join("agent-import-ledger.jsonl"),
+    )
+    .unwrap();
+    let locks = directory.path().join("locks");
+    fs::create_dir_all(&locks).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, locks.join("native-dispatch-leases")).unwrap();
+    let resolve = |path: &Path| {
+        VisiblePath::Resolved(PathBuf::from("/followed").join(path.file_name().unwrap()))
+    };
+    let report = build(&root, &[]);
+    assert!(matches!(report.root, Root::Present));
+    let shown = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&root, &[locks.as_path()])),
+        &resolve,
+        None,
+    );
+    assert_eq!(shown["journal_path_state"], "link_not_followed", "{shown}");
+    assert_eq!(
+        shown["journal_path"],
+        root.join("agent-import-ledger.jsonl").display().to_string(),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!(["link_not_followed"]),
+        "{shown}"
+    );
+}
+
+/// The locations come from the first `FILE_LOCATION_SAMPLE` files by name,
+/// whatever order the folder lists them in, and the JSON says how many were read.
+#[test]
+fn the_sample_is_the_first_files_by_name() {
+    let names: Vec<PathBuf> = (0..FILE_LOCATION_SAMPLE + 6)
+        .rev()
+        .map(|n| PathBuf::from(format!("f{n:03}")))
+        .collect();
+    let sample = file_sample(names);
+    assert_eq!(sample.len(), FILE_LOCATION_SAMPLE);
+    assert_eq!(sample[0], PathBuf::from("f000"));
+    assert_eq!(
+        sample[FILE_LOCATION_SAMPLE - 1],
+        PathBuf::from(format!("f{:03}", FILE_LOCATION_SAMPLE - 1))
+    );
+    // through the folder: a file past the sample does not show its folder
+    let directory = tempfile::tempdir().unwrap();
+    for n in 0..=FILE_LOCATION_SAMPLE {
+        write(&directory.path().join(format!("f{n:03}")), b"");
+    }
+    let last = format!("f{FILE_LOCATION_SAMPLE:03}");
+    let resolve = |path: &Path| -> VisiblePath {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let folder = if name == last { "/late" } else { "/early" };
+        VisiblePath::Resolved(PathBuf::from(folder).join(&name))
+    };
+    assert_eq!(
+        file_locations(directory.path(), &resolve),
+        serde_json::json!({
+            "folders": [{"path": PathBuf::from("/early").display().to_string(), "state": "resolved"}],
+            "files_read": FILE_LOCATION_SAMPLE,
+            "files": FILE_LOCATION_SAMPLE + 1,
+            "listing_capped": false,
+        })
+    );
 }
 
 fn server_over(directory: &Path) -> crate::agent::Server {
@@ -537,6 +908,98 @@ fn a_half_written_last_line_is_read_again_once() {
         Journal::Read(_)
     ));
     assert!(!waited);
+}
+
+/// A line whose amount is not an import amount (#1872) is a line the report cannot read: the
+/// journal is shown as invalid, as for any other record the build refuses, and it is read twice
+/// before it is said.
+#[test]
+fn a_journal_line_with_a_signed_amount_is_shown_as_invalid() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let whole = String::from_utf8(journal(true)).unwrap();
+    assert_eq!(whole.matches("\"amount\":\"1.00\"").count(), 2, "{whole}");
+    write(
+        &path,
+        whole
+            .replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1)
+            .as_bytes(),
+    );
+    let mut waited = false;
+    assert_eq!(
+        read_journal(directory.path(), || waited = true),
+        Journal::NotRead(JOURNAL_INVALID)
+    );
+    assert!(waited);
+}
+
+/// A line whose ledger binding disagrees with its cash projection is refused by its own code
+/// (#1761), and the report shows it as it shows an invalid line, naming that line.
+#[test]
+fn the_report_names_the_line_of_a_binding_that_disagrees_with_its_projection() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let first = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| first.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    assert_eq!(first.matches("\"vouchers\":").count(), 1, "{first}");
+    let projection = format!(
+        "\"cash_projection\":{{\"ledgers\":[\"Cash\"],\"from\":\"20260901\",\
+         \"to\":\"20270331\",\"book_sha256\":\"{}\"}},\"vouchers\":",
+        "0".repeat(64)
+    );
+    let bad = with_id("b2").replacen("\"vouchers\":", &projection, 1);
+    let journal_text = format!("{first}{bad}{}", with_id("b3"));
+    assert_eq!(
+        super::super::ledger::settlement(std::io::Cursor::new(journal_text.as_bytes())).map(drop),
+        Err(super::super::IMPORT_LEDGER_BINDING_MISMATCH.to_string())
+    );
+    write(&path, journal_text.as_bytes());
+    assert_eq!(
+        read_journal_at(directory.path(), || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(2))
+    );
+}
+
+/// The report names the line it refused, and only the report does (#1872). A bad amount sits
+/// between two good lines; the field is the 1-based line, and a journal that reads has none.
+/// A half-written last line is named too: it is the line after the last whole one.
+#[test]
+fn the_report_names_the_line_of_a_bad_amount_between_two_good_ones() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let first = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| first.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    let bad = with_id("b2").replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1);
+    write(&path, format!("{first}{bad}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert_eq!(report.journal, Journal::NotRead(JOURNAL_INVALID));
+    assert_eq!(report.journal_line, Some(2));
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(shown["journal"]["state"], "not_read");
+    assert_eq!(shown["journal"]["reason"], "journal_invalid");
+    assert_eq!(shown["journal"]["line"], 2);
+    // Without the bad line the journal reads and names no line.
+    write(&path, format!("{first}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert!(matches!(report.journal, Journal::Read(_)), "{report:?}");
+    assert_eq!(report.journal_line, None);
+    assert!(to_json(&report, SystemTime::now(), None)["journal"]["line"].is_null());
+    // A half-written last line is the line after the last whole one.
+    let mut cut = format!("{first}{}", with_id("b3")).into_bytes();
+    cut.extend_from_slice(b"{\"record_type\":\"dispat");
+    write(&path, &cut);
+    assert_eq!(
+        read_journal_at(directory.path(), || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(3))
+    );
+    // Another reason a journal is not read names no line.
+    let missing = tempfile::tempdir().unwrap();
+    assert_eq!(
+        read_journal_at(missing.path(), || {}),
+        (Journal::Absent, None)
+    );
 }
 
 /// A folder that exists but cannot be listed is named, not read as empty. A file
@@ -880,14 +1343,42 @@ fn a_reviewed_batch_is_its_own_class_of_unsettled_batch() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 1,
+        unsettled_restored: 0,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
     assert_eq!(journal["not_settled"], 4);
     assert_eq!(journal["not_settled_reviewed_not_attributed"], 1);
+    assert_eq!(journal["not_settled_restored"], 0);
     assert_eq!(journal["not_settled_binding_refused"], 1);
     assert_eq!(journal["not_settled_not_verified"], 1);
+}
+
+/// Native posts a recorded restore covers are reported in their own count,
+/// and `not_settled_not_verified` holds only what no other count does (#1050).
+#[test]
+fn restored_posts_are_their_own_class_of_unsettled_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 6,
+        sent_or_found: 6,
+        unsettled: 5,
+        unsettled_no_response: 1,
+        unsettled_binding_refused: 0,
+        unsettled_reviewed: 0,
+        unsettled_restored: 2,
+        settled_by_person: 0,
+        released_by_person: 0,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 5);
+    assert_eq!(journal["not_settled_restored"], 2);
+    assert_eq!(journal["not_settled_no_response"], 1);
+    assert_eq!(journal["not_settled_not_verified"], 2);
 }
 
 /// A batch a person settled after Tally answered that its post created none
@@ -903,11 +1394,1111 @@ fn a_settled_batch_is_reported_outside_not_settled() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 0,
+        unsettled_restored: 0,
         settled_by_person: 2,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
     assert_eq!(journal["not_settled"], 3);
     assert_eq!(journal["settled_by_person"], 2);
     assert_eq!(journal["not_settled_not_verified"], 1);
+}
+
+/// A restored batch whose rows a person released is reported in its own
+/// count, outside `not_settled` and `not_settled_restored` (#1038).
+#[test]
+fn a_released_batch_is_reported_outside_not_settled() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 4,
+        sent_or_found: 4,
+        unsettled: 2,
+        unsettled_no_response: 0,
+        unsettled_binding_refused: 0,
+        unsettled_reviewed: 0,
+        unsettled_restored: 1,
+        settled_by_person: 0,
+        released_by_person: 2,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 2);
+    assert_eq!(journal["not_settled_restored"], 1);
+    assert_eq!(journal["released_by_person"], 2);
+    assert_eq!(journal["settled_by_person"], 0);
+    assert_eq!(journal["not_settled_not_verified"], 1);
+}
+
+// The tests below hold what the #2058 mutation record of this file shows the
+// ones above leave open. Each says which kind of change it catches.
+use serde_json::json;
+
+/// Set the modification time of the file at `path` to `seconds` after the epoch.
+fn set_mtime(path: &Path, seconds: u64) {
+    fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(seconds))
+        .unwrap();
+}
+
+/// A report of nothing, to account into by hand.
+fn empty_report(directory: &Path) -> Report {
+    build(&directory.join("absent"), &[])
+}
+
+/// A folder made unreadable or unsearchable for the length of a test; the
+/// mode it had comes back when this is dropped, even by a failed assertion.
+#[cfg(unix)]
+struct Restricted {
+    path: PathBuf,
+    mode: u32,
+}
+
+#[cfg(unix)]
+impl Restricted {
+    fn new(path: &Path, mode: u32) -> Self {
+        use std::os::unix::fs::PermissionsExt;
+        let before = fs::metadata(path).unwrap().permissions().mode();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+        Self {
+            path: path.to_path_buf(),
+            mode: before,
+        }
+    }
+}
+
+#[cfg(unix)]
+impl Drop for Restricted {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&self.path, fs::Permissions::from_mode(self.mode));
+    }
+}
+
+/// Every suffix `import_class` knows gives its class, and the suffix cut short
+/// gives none: a suffix changed, dropped or joined to the others by the wrong
+/// operator moves a name from one class to another.
+#[test]
+fn each_import_file_suffix_has_its_class_and_a_near_miss_has_none() {
+    let suffixes = [
+        (".xml", "import_files"),
+        (".proof.json", "proofs"),
+        (".proof.md", "proofs"),
+        (".approval_lapse.json", "approval_notes"),
+        (".masters_check.json", "review_records"),
+        (".masters_doubt.json", "review_records"),
+        (".masters_ack.json", "review_records"),
+        (".batch_step_doubt.json", "review_records"),
+        (".batch_step_ack.json", "review_records"),
+        (".masters_verdict.json", "review_records"),
+        (".baseline.json", "review_records"),
+    ];
+    for (suffix, class) in suffixes {
+        assert_eq!(import_class(&format!("b{suffix}")), class, "{suffix}");
+        let cut = &suffix[..suffix.len() - 1];
+        assert_eq!(import_class(&format!("b{cut}")), "other", "{cut}");
+    }
+    // A saved proof carries a stamp between `.proof.` and its type.
+    assert_eq!(import_class("b.proof.2026-stamp.json"), "proofs");
+    assert_eq!(import_class("b.proof.2026-stamp.md"), "proofs");
+    // `.proof.` is the marker, not `.proof`.
+    assert_eq!(import_class("b.proofread.json"), "other");
+    assert_eq!(import_class("b.proofread.md"), "other");
+}
+
+/// `<batch>.baseline.<n>.json` is a baseline addition when `<n>` is one or more
+/// decimal digits, and nothing else is.
+#[test]
+fn a_baseline_addition_is_a_batch_baseline_and_decimal_digits() {
+    let names = [
+        ("b.baseline.1.json", true),
+        ("b.baseline.12.json", true),
+        ("b.baseline.json", false),
+        ("b.other.1.json", false),
+        ("b.baseline..json", false),
+        ("b.baseline.1x.json", false),
+        ("b.baseline.x1.json", false),
+        ("b.baseline.a.json", false),
+        ("b.baseline.1.txt", false),
+    ];
+    for (name, expected) in names {
+        assert_eq!(is_baseline_addition(name), expected, "{name}");
+        assert_eq!(
+            import_class(name),
+            if expected || name == "b.baseline.json" {
+                "review_records"
+            } else {
+                "other"
+            },
+            "{name}"
+        );
+    }
+}
+
+/// An empty folder lists every class, each at zero: a class the report never
+/// names is not a class with nothing in it.
+#[test]
+fn an_empty_folder_lists_all_ten_classes_at_zero() {
+    let directory = tempfile::tempdir().unwrap();
+    let report = build(directory.path(), &[]);
+    assert_eq!(
+        report.classes.keys().copied().collect::<Vec<_>>(),
+        [
+            "approval_notes",
+            "bank_statements",
+            "egress_log",
+            "import_files",
+            "journal",
+            "lab",
+            "locks",
+            "other",
+            "proofs",
+            "review_records"
+        ]
+    );
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(shown["classes"].as_object().unwrap().len(), 10, "{shown}");
+}
+
+/// The oldest time of a class is the smallest of its files', whichever file is
+/// met first.
+#[test]
+fn the_oldest_time_of_a_class_is_the_smallest_whichever_file_is_met_first() {
+    let directory = tempfile::tempdir().unwrap();
+    let old = directory.path().join("old");
+    let new = directory.path().join("new");
+    write(&old, b"1");
+    write(&new, b"22");
+    set_mtime(&old, 1_000_000);
+    set_mtime(&new, 2_000_000);
+    for order in [[&old, &new], [&new, &old]] {
+        let mut report = empty_report(directory.path());
+        for path in order {
+            report.account("lab", path);
+        }
+        assert_eq!(
+            report.oldest["lab"],
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000)
+        );
+        assert_eq!(*class(&report, "lab"), Class { files: 2, bytes: 3 });
+    }
+}
+
+/// A path whose metadata cannot be read is one unreadable entry: not a file,
+/// not a link, not a special file, and counted once.
+#[test]
+fn a_path_whose_metadata_cannot_be_read_is_one_unreadable_entry() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = empty_report(directory.path());
+    report.account("lab", &directory.path().join("gone"));
+    assert_eq!(
+        (report.unreadable, report.links, report.special_files),
+        (1, 0, 0)
+    );
+    assert_eq!(*class(&report, "lab"), Class::default());
+    assert!(report.oldest.is_empty());
+}
+
+/// A publication folder of either kind is an interrupted write wherever it is
+/// found, and is not an unknown folder.
+#[test]
+fn an_interrupted_proof_or_build_publication_folder_is_counted_where_it_is_found() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    fs::create_dir_all(root.join(".build-publication")).unwrap();
+    fs::create_dir_all(root.join("imports/.proof-publication")).unwrap();
+    fs::create_dir_all(root.join("imports/.build-publication")).unwrap();
+    let report = build(root, &[]);
+    assert_eq!(report.interrupted_writes, 3);
+    assert_eq!(report.other_directories, 0);
+}
+
+/// Each scan knows only the folders it is given: a folder of another name, in
+/// the data folder, in each of its subfolders, in the lease folder, in a kept
+/// audit read and in its parts, is counted and not entered.
+#[test]
+fn a_subfolder_is_unknown_to_every_scan_that_does_not_name_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let read = root.join("lab").join("audit-reads").join("r");
+    for folder in [
+        root.join("imports/x"),
+        root.join("bank-statements/x"),
+        root.join("lab/x"),
+        root.join("native-dispatch-leases/x"),
+        read.join("x"),
+        read.join("parts").join("x"),
+    ] {
+        fs::create_dir_all(folder).unwrap();
+    }
+    let report = build(root, &[]);
+    assert_eq!(report.other_directories, 6);
+    assert_eq!(report.incomplete_reason(), None);
+}
+
+/// A kept audit read is counted whatever is in it: a file straight in
+/// `audit-reads`, two files straight in a read, and its parts.
+#[test]
+fn a_file_among_the_kept_audit_reads_and_two_in_a_read_are_all_lab_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let reads = directory.path().join("lab").join("audit-reads");
+    write(&reads.join("stray.txt"), b"1");
+    write(&reads.join("r").join("manifest.json"), b"22");
+    write(&reads.join("r").join("notes.json"), b"333");
+    write(&reads.join("r").join("parts").join("p.xml"), b"4444");
+    let report = build(directory.path(), &[]);
+    assert_eq!(
+        *class(&report, "lab"),
+        Class {
+            files: 4,
+            bytes: 10
+        }
+    );
+    assert_eq!(*class(&report, "other"), Class::default());
+    assert!(!report.entry_cap_reached);
+    assert!(report.folders_not_read.is_empty());
+}
+
+/// The cap is 100,000 entries of one folder: a kept-reads folder with that many
+/// is complete and one more is capped, with the first 100,000 counted. (The
+/// same constant caps every listing the report makes.)
+#[test]
+fn a_folder_of_exactly_the_entry_cap_is_complete_and_one_more_is_capped() {
+    let directory = tempfile::tempdir().unwrap();
+    let reads = directory.path().join("lab").join("audit-reads");
+    fs::create_dir_all(&reads).unwrap();
+    for n in 0..100_000 {
+        fs::File::create(reads.join(n.to_string())).unwrap();
+    }
+    let whole = build(directory.path(), &[]);
+    assert!(!whole.entry_cap_reached);
+    assert_eq!(class(&whole, "lab").files, 100_000);
+    assert_eq!(whole.incomplete_reason(), None);
+    fs::File::create(reads.join("one-more")).unwrap();
+    let capped = build(directory.path(), &[]);
+    assert!(capped.entry_cap_reached);
+    assert_eq!(class(&capped, "lab").files, 100_000);
+    assert_eq!(capped.incomplete_reason(), Some("entry_cap_reached"));
+}
+
+/// A lease folder is counted whole: two locks in it are two, and the listing
+/// is not capped at one.
+#[test]
+fn two_locks_in_a_lease_folder_are_two_files_and_no_cap() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    write(&root.join("native-dispatch-leases/a.lock"), b"");
+    write(&root.join("native-dispatch-leases/b.lock"), b"");
+    let report = build(root, &[]);
+    assert_eq!(class(&report, "locks").files, 2);
+    assert!(!report.entry_cap_reached);
+}
+
+/// One lease folder reached by two spellings is scanned once: the folders are
+/// told apart by their canonical path.
+#[test]
+fn a_lease_folder_reached_by_two_spellings_is_counted_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("data");
+    write(&root.join("native-dispatch-leases/a.lock"), b"");
+    fs::create_dir_all(root.join("sub")).unwrap();
+    let spelled = root.join("sub").join("..");
+    let report = build(&root, &[spelled.as_path()]);
+    assert_eq!(class(&report, "locks").files, 1);
+}
+
+/// A lease folder that is not a folder cannot be listed, and is named as the
+/// lock folder, not as another.
+#[cfg(unix)]
+#[test]
+fn a_lease_folder_that_is_a_file_is_named_as_the_lock_folder() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    write(&root.join("native-dispatch-leases"), b"not a folder");
+    let report = build(root, &[]);
+    assert_eq!(report.folders_not_read, ["lock_folder"]);
+}
+
+/// A coordination folder that is a link to a folder that is there is not a
+/// dangling link: its leases are read, and nothing is named as not listed.
+#[cfg(unix)]
+#[test]
+fn a_coordination_folder_that_is_a_working_link_is_read_and_not_dangling() {
+    let directory = tempfile::tempdir().unwrap();
+    let real = directory.path().join("real");
+    write(&real.join("native-dispatch-leases/a.lock"), b"");
+    let link = directory.path().join("shared");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    let report = build(&directory.path().join("data"), &[link.as_path()]);
+    assert_eq!(class(&report, "locks").files, 1);
+    assert!(report.folders_not_read.is_empty());
+    assert_eq!(report.incomplete_reason(), None);
+}
+
+/// A folder the report listed but cannot look inside (read, not searched):
+/// each entry is one unreadable entry, and no file of the class.
+#[cfg(unix)]
+#[test]
+fn entries_of_a_folder_that_cannot_be_searched_are_each_one_unreadable_entry() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join("closed");
+    write(&folder.join("a"), b"1");
+    write(&folder.join("b"), b"22");
+    let _closed = Restricted::new(&folder, 0o444);
+    if fs::symlink_metadata(folder.join("a")).is_ok() {
+        // A user who reads through any mode (root) cannot make the case.
+        return;
+    }
+    let mut listed = empty_report(directory.path());
+    scan_directory(&mut listed, "lab", &folder, |_| "lab", &[], ENTRY_CAP);
+    assert_eq!(listed.unreadable, 2);
+    assert_eq!(*class(&listed, "lab"), Class::default());
+    assert!(listed.folders_not_read.is_empty());
+    // The same below `audit-reads`.
+    let mut reads = empty_report(directory.path());
+    scan_audit_reads(&mut reads, &folder);
+    assert_eq!(reads.unreadable, 2);
+    assert_eq!(*class(&reads, "lab"), Class::default());
+    assert!(reads.folders_not_read.is_empty());
+}
+
+/// Whatever keeps a kept audit read from being listed is named `lab`, and only
+/// that: `audit-reads` itself, a read, and its parts.
+#[cfg(unix)]
+#[test]
+fn a_kept_audit_read_that_cannot_be_listed_is_named_lab_and_nothing_else() {
+    // `audit-reads` is a file.
+    let directory = tempfile::tempdir().unwrap();
+    write(&directory.path().join("lab/audit-reads"), b"not a folder");
+    let report = build(directory.path(), &[]);
+    assert_eq!(report.folders_not_read, ["lab"]);
+    // `parts` is a file.
+    let directory = tempfile::tempdir().unwrap();
+    let read = directory.path().join("lab/audit-reads/r");
+    write(&read.join("manifest.json"), b"1");
+    write(&read.join("parts"), b"not a folder");
+    let report = build(directory.path(), &[]);
+    assert_eq!(report.folders_not_read, ["lab"]);
+    assert_eq!(class(&report, "lab").files, 2);
+    // A read that cannot be listed.
+    let directory = tempfile::tempdir().unwrap();
+    let read = directory.path().join("lab/audit-reads/r");
+    write(&read.join("manifest.json"), b"1");
+    let _closed = Restricted::new(&read, 0o000);
+    if fs::read_dir(&read).is_ok() {
+        return;
+    }
+    let report = build(directory.path(), &[]);
+    assert_eq!(report.folders_not_read, ["lab"]);
+}
+
+/// Links in the kept audit reads are counted and never followed: not
+/// `audit-reads` as a link, not a link standing for a read, not a `parts` link,
+/// and a dangling one is a link, not an unreadable entry.
+#[cfg(unix)]
+#[test]
+fn links_among_the_kept_audit_reads_are_counted_and_never_entered() {
+    let outside = tempfile::tempdir().unwrap();
+    write(&outside.path().join("r").join("manifest.json"), b"1");
+    write(&outside.path().join("p.xml"), b"22");
+    // `audit-reads` itself is a link.
+    let directory = tempfile::tempdir().unwrap();
+    fs::create_dir_all(directory.path().join("lab")).unwrap();
+    std::os::unix::fs::symlink(
+        outside.path(),
+        directory.path().join("lab").join("audit-reads"),
+    )
+    .unwrap();
+    let report = build(directory.path(), &[]);
+    assert_eq!(*class(&report, "lab"), Class::default());
+    assert_eq!(report.links, 1);
+    // A link for a read, a dangling one, and a read whose `parts` is a link.
+    let directory = tempfile::tempdir().unwrap();
+    let reads = directory.path().join("lab").join("audit-reads");
+    fs::create_dir_all(&reads).unwrap();
+    std::os::unix::fs::symlink(outside.path().join("r"), reads.join("linked")).unwrap();
+    std::os::unix::fs::symlink(outside.path().join("gone"), reads.join("dangling")).unwrap();
+    write(&reads.join("real").join("manifest.json"), b"333");
+    std::os::unix::fs::symlink(outside.path(), reads.join("real").join("parts")).unwrap();
+    let report = build(directory.path(), &[]);
+    assert_eq!(*class(&report, "lab"), Class { files: 1, bytes: 3 });
+    assert_eq!(report.links, 3);
+    assert_eq!(report.unreadable, 0);
+    assert!(report.folders_not_read.is_empty());
+}
+
+/// A link standing for a lock folder or a file in `--show-paths` is shown as
+/// the files directly in a folder, not as whatever a link points at.
+#[cfg(unix)]
+#[test]
+fn a_link_among_the_files_of_a_folder_is_not_a_file_of_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    write(&outside.path().join("real.jsonl"), b"1");
+    std::os::unix::fs::symlink(
+        outside.path().join("real.jsonl"),
+        directory.path().join("link.jsonl"),
+    )
+    .unwrap();
+    let resolve = |path: &Path| VisiblePath::AsIs(path.to_path_buf());
+    let shown = file_locations(directory.path(), &resolve);
+    assert_eq!(shown["files"], 0, "{shown}");
+    assert_eq!(shown["files_read"], 0, "{shown}");
+}
+
+/// The cap counts every entry of the folder, a subfolder as much as a file.
+#[test]
+fn the_listing_cap_counts_folders_as_well_as_files() {
+    let directory = tempfile::tempdir().unwrap();
+    for name in ["a", "b"] {
+        write(&directory.path().join(name), b"");
+    }
+    for name in ["c", "d"] {
+        fs::create_dir(directory.path().join(name)).unwrap();
+    }
+    let resolve = |path: &Path| VisiblePath::AsIs(path.to_path_buf());
+    let capped = file_locations_capped(directory.path(), &resolve, 3);
+    assert_eq!(capped["listing_capped"], true, "{capped}");
+    let whole = file_locations_capped(directory.path(), &resolve, 4);
+    assert_eq!(whole["listing_capped"], false, "{whole}");
+    assert_eq!(whole["files"], 2, "{whole}");
+}
+
+/// The folder of a file with no parent is shown as no folder, and a folder is
+/// listed once for each way it is found (its state is part of the key).
+#[test]
+fn a_parentless_path_is_shown_with_no_folder_and_a_state_is_part_of_the_key() {
+    let directory = tempfile::tempdir().unwrap();
+    write(&directory.path().join("a"), b"");
+    let bare = |_: &Path| VisiblePath::AsIs(PathBuf::new());
+    assert_eq!(
+        file_locations(directory.path(), &bare)["folders"],
+        json!([{"path": "", "state": "as_is"}])
+    );
+    write(&directory.path().join("b"), b"");
+    let folder = PathBuf::from("/one");
+    let mixed = |path: &Path| {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if name == "a" {
+            VisiblePath::Resolved(folder.join(&name))
+        } else {
+            VisiblePath::Unresolved(folder.join(&name))
+        }
+    };
+    assert_eq!(
+        file_locations(directory.path(), &mixed)["folders"],
+        json!([
+            {"path": folder.display().to_string(), "state": "resolved"},
+            {"path": folder.display().to_string(), "state": "unresolved"},
+        ])
+    );
+}
+
+/// The sample is 64 files: of seventy, 64 are read.
+#[test]
+fn of_seventy_files_the_locations_of_sixty_four_are_read() {
+    let directory = tempfile::tempdir().unwrap();
+    for n in 0..70 {
+        write(&directory.path().join(format!("f{n:03}")), b"");
+    }
+    let resolve = |path: &Path| VisiblePath::AsIs(path.to_path_buf());
+    let shown = file_locations(directory.path(), &resolve);
+    assert_eq!(shown["files_read"], 64, "{shown}");
+    assert_eq!(shown["files"], 70, "{shown}");
+}
+
+/// A package copy is a folder; a file of that name is none. The copies come in
+/// name order, not the order the folder lists them in.
+#[test]
+fn package_copies_are_folders_and_come_in_name_order() {
+    let directory = tempfile::tempdir().unwrap();
+    let local = directory.path().join("Local");
+    let tail = |package: &str| {
+        local
+            .join("Packages")
+            .join(package)
+            .join("LocalCache")
+            .join("Local")
+            .join("Bridge")
+    };
+    let names: Vec<String> = (0..12).map(|n| format!("Store.App_{n:02}")).collect();
+    for name in names.iter().rev() {
+        fs::create_dir_all(tail(name).join("agent")).unwrap();
+    }
+    write(
+        &tail("Store.App_file").join("agent"),
+        b"a file, not a folder",
+    );
+    let folder = local.join("Bridge").join("agent");
+    let expected: Vec<PathBuf> = names.iter().map(|name| tail(name).join("agent")).collect();
+    assert_eq!(
+        package_copy_folders(&local, &folder),
+        PackageCopies::Found(expected.clone())
+    );
+    assert_eq!(
+        package_copies(&local, &folder),
+        json!(expected
+            .iter()
+            .map(|copy| copy.display().to_string())
+            .collect::<Vec<_>>())
+    );
+}
+
+/// A packages folder that cannot be listed is said so: a copy may exist.
+#[cfg(unix)]
+#[test]
+fn a_packages_folder_that_cannot_be_listed_is_not_listed() {
+    let directory = tempfile::tempdir().unwrap();
+    let local = directory.path().join("Local");
+    write(&local.join("Packages"), b"not a folder");
+    let folder = local.join("Bridge").join("agent");
+    assert_eq!(
+        package_copy_folders(&local, &folder),
+        PackageCopies::NotListed
+    );
+    assert_eq!(package_copies(&local, &folder), json!("not_listed"));
+    // No packages folder at all is no copy, not an unknown.
+    let bare = directory.path().join("Bare");
+    fs::create_dir_all(&bare).unwrap();
+    assert_eq!(
+        package_copy_folders(&bare, &bare.join("Bridge")),
+        PackageCopies::Found(Vec::new())
+    );
+}
+
+/// How old a file is counts whole days to the second, and `to_json` counts them
+/// from the time it is given.
+#[test]
+fn an_age_changes_on_the_second_a_day_is_complete_and_to_json_uses_its_clock() {
+    let now = SystemTime::now();
+    let ago = |seconds| now - Duration::from_secs(seconds);
+    assert_eq!(age_days(ago(86_399), now), 0);
+    assert_eq!(age_days(ago(86_400), now), 1);
+    assert_eq!(age_days(ago(172_799), now), 1);
+    assert_eq!(age_days(ago(172_800), now), 2);
+    let directory = tempfile::tempdir().unwrap();
+    let file = directory.path().join("agent-egress.jsonl");
+    write(&file, b"1");
+    let modified = fs::metadata(&file).unwrap().modified().unwrap();
+    let report = build(directory.path(), &[]);
+    let later = modified + Duration::from_secs(5 * 86_400 + 3_600);
+    let shown = to_json(&report, later, None);
+    assert_eq!(shown["classes"]["egress_log"]["oldest_days"], 5, "{shown}");
+}
+
+/// The root is `present`, `missing` or `unreadable` in the JSON, and a folder
+/// that is missing or unreadable has no journal line.
+#[test]
+fn the_folder_word_says_present_missing_or_unreadable() {
+    let directory = tempfile::tempdir().unwrap();
+    let present = build(directory.path(), &[]);
+    assert_eq!(
+        to_json(&present, SystemTime::now(), None)["folder"],
+        "present"
+    );
+    let missing = empty_report(directory.path());
+    assert_eq!(missing.root, Root::Missing);
+    assert_eq!(missing.journal_line, None);
+    assert_eq!(missing.master_journal, MasterJournal::Absent);
+    assert_eq!(
+        to_json(&missing, SystemTime::now(), None)["folder"],
+        "missing"
+    );
+}
+
+/// A data folder that cannot be listed: the report says so for both journals,
+/// names no line, and still counts the user's own lock folder.
+#[cfg(unix)]
+#[test]
+fn an_unlistable_data_folder_says_so_for_both_journals_and_still_counts_the_locks() {
+    let directory = tempfile::tempdir().unwrap();
+    let not_a_folder = directory.path().join("Bridge");
+    fs::write(&not_a_folder, b"x").unwrap();
+    let coordination = directory.path().join("shared");
+    write(&coordination.join("native-dispatch-leases/a.lock"), b"");
+    let report = build(&not_a_folder, &[coordination.as_path()]);
+    assert_eq!(report.root, Root::Unreadable);
+    assert_eq!(report.journal_line, None);
+    assert_eq!(
+        report.master_journal,
+        MasterJournal::NotRead(DATA_FOLDER_UNREADABLE)
+    );
+    assert_eq!(class(&report, "locks").files, 1);
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(shown["folder"], "unreadable");
+    let reason = json!({"state": "not_read", "reason": "data_folder_unreadable"});
+    assert_eq!(shown["journal"], reason);
+    assert_eq!(shown["master_journal"], reason);
+}
+
+/// Each count is shown under its own key, and a key that is not one of them
+/// shows nothing.
+#[test]
+fn each_count_is_shown_under_its_own_key() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.links = 1;
+    report.special_files = 2;
+    report.other_directories = 3;
+    report.interrupted_writes = 4;
+    report.unreadable = 5;
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(shown["symlinks_not_followed"], 1, "{shown}");
+    assert_eq!(shown["special_files_not_counted"], 2, "{shown}");
+    assert_eq!(shown["other_directories_not_entered"], 3, "{shown}");
+    assert_eq!(shown["interrupted_write_folders"], 4, "{shown}");
+    assert_eq!(shown["entries_that_could_not_be_read"], 5, "{shown}");
+    assert_eq!(shown["folders_that_could_not_be_listed"], json!([]));
+}
+
+/// A journal that is read is shown with each of its counts under its own key.
+#[test]
+fn a_journal_that_is_read_shows_each_count_under_its_own_key() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 30,
+        sent_or_found: 29,
+        unsettled: 28,
+        unsettled_no_response: 2,
+        unsettled_binding_refused: 3,
+        unsettled_reviewed: 4,
+        unsettled_restored: 5,
+        settled_by_person: 7,
+        released_by_person: 8,
+        no_dispatch_never_verified: 9,
+    });
+    report.master_journal = MasterJournal::Read(super::super::master_ledger::MasterSummary {
+        batches: 13,
+        dispatched: 11,
+        not_settled: 6,
+    });
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(
+        shown["journal"],
+        json!({
+            "state": "read",
+            "batches": 30,
+            "sent_or_found_posted": 29,
+            "not_settled": 28,
+            "not_settled_no_response": 2,
+            "not_settled_binding_refused": 3,
+            "not_settled_reviewed_not_attributed": 4,
+            "not_settled_restored": 5,
+            "settled_by_person": 7,
+            "released_by_person": 8,
+            "not_settled_not_verified": 14,
+            "no_dispatch_never_verified": 9,
+        })
+    );
+    assert_eq!(
+        shown["master_journal"],
+        json!({"state": "read", "batches": 13, "dispatched": 11, "not_settled": 6})
+    );
+}
+
+/// A journal that is not read is shown with its reason, and with its line only
+/// when it was refused as invalid and the line is known.
+#[test]
+fn a_journal_that_is_not_read_shows_its_reason_and_a_line_only_for_an_invalid_one() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::NotRead(JOURNAL_UNREADABLE);
+    report.master_journal = MasterJournal::NotRead(JOURNAL_READ_FAILED);
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(
+        shown["journal"],
+        json!({"state": "not_read", "reason": "journal_unreadable"})
+    );
+    assert_eq!(
+        shown["master_journal"],
+        json!({"state": "not_read", "reason": "journal_read_failed"})
+    );
+    // A line is known for an invalid journal; the other reasons show none.
+    report.journal_line = Some(7);
+    report.journal = Journal::NotRead(JOURNAL_READ_FAILED);
+    report.master_journal = MasterJournal::NotRead(JOURNAL_INVALID);
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(
+        shown["journal"],
+        json!({"state": "not_read", "reason": "journal_read_failed"})
+    );
+    assert_eq!(
+        shown["master_journal"],
+        json!({"state": "not_read", "reason": "journal_invalid"})
+    );
+    report.journal = Journal::NotRead(JOURNAL_INVALID);
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(
+        shown["journal"],
+        json!({"state": "not_read", "reason": "journal_invalid", "line": 7})
+    );
+    // An invalid journal with no known line shows none either.
+    report.journal_line = None;
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(
+        shown["journal"],
+        json!({"state": "not_read", "reason": "journal_invalid"})
+    );
+}
+
+/// Each reason a journal is not read is its own word, from a real file: a
+/// folder where the journal should be cannot be opened, and text that is not
+/// UTF-8 cannot be read as text.
+#[test]
+fn each_reason_a_journal_is_not_read_is_its_own_word_from_a_real_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    fs::create_dir(root.join("agent-import-ledger.jsonl")).unwrap();
+    write(&root.join("agent-master-ledger.jsonl"), b"\xff\xfe\n");
+    let shown = to_json(&build(root, &[]), SystemTime::now(), None);
+    assert_eq!(
+        shown["journal"],
+        json!({"state": "not_read", "reason": "journal_unreadable"})
+    );
+    assert_eq!(
+        shown["master_journal"],
+        json!({"state": "not_read", "reason": "journal_invalid"})
+    );
+    fs::remove_dir(root.join("agent-import-ledger.jsonl")).unwrap();
+    fs::remove_file(root.join("agent-master-ledger.jsonl")).unwrap();
+    write(&root.join("agent-import-ledger.jsonl"), b"\xff\xfe\n");
+    fs::create_dir(root.join("agent-master-ledger.jsonl")).unwrap();
+    let shown = to_json(&build(root, &[]), SystemTime::now(), None);
+    assert_eq!(
+        shown["journal"],
+        json!({"state": "not_read", "reason": "journal_read_failed"})
+    );
+    assert_eq!(
+        shown["master_journal"],
+        json!({"state": "not_read", "reason": "journal_unreadable"})
+    );
+}
+
+/// A journal that cannot be opened is not read a second time, and names no
+/// line; one the report reads as text it cannot is read again and names none;
+/// the first line refused is line 1; and the line of the second read is the
+/// one reported.
+#[test]
+fn the_journal_retry_follows_why_it_was_not_read_and_reports_the_second_line() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let path = root.join("agent-import-ledger.jsonl");
+    fs::create_dir(&path).unwrap();
+    let mut waited = false;
+    assert_eq!(
+        read_journal_at(root, || waited = true),
+        (Journal::NotRead(JOURNAL_UNREADABLE), None)
+    );
+    assert!(!waited, "a journal that cannot be opened is not read again");
+    fs::remove_dir(&path).unwrap();
+    write(&path, b"\xff\xfe\n");
+    assert_eq!(
+        read_journal_at(root, || waited = true),
+        (Journal::NotRead(JOURNAL_READ_FAILED), None)
+    );
+    assert!(waited);
+    write(&path, b"not json\n");
+    assert_eq!(
+        read_journal_at(root, || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(1))
+    );
+    // Refused at line 2 the first time, and at line 3 the second.
+    let good = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| good.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    let bad = with_id("b2").replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1);
+    write(&path, format!("{good}{bad}").as_bytes());
+    let longer = format!("{good}{}{bad}", with_id("b3"));
+    assert_eq!(
+        read_journal_at(root, || fs::write(&path, &longer).unwrap()),
+        (Journal::NotRead(JOURNAL_INVALID), Some(3))
+    );
+}
+
+/// The master journal is read as the voucher journal is: once when it is whole,
+/// absent or cannot be opened; again after a refusal a write in progress could
+/// explain; and the second read is the one reported.
+#[test]
+fn the_master_journal_is_read_again_only_after_a_refusal_a_write_could_explain() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let path = root.join("agent-master-ledger.jsonl");
+    let mut waited = false;
+    assert_eq!(
+        read_master_journal(root, || waited = true),
+        MasterJournal::Absent
+    );
+    assert!(!waited);
+    write(&path, master_journal_text(false, false).as_bytes());
+    assert!(matches!(
+        read_master_journal(root, || waited = true),
+        MasterJournal::Read(_)
+    ));
+    assert!(!waited, "a whole journal is read once");
+    // A half-written last line: read again, and healed if the writer finished.
+    write(&path, master_journal_text(false, true).as_bytes());
+    let healed = read_master_journal(root, || {
+        fs::write(&path, master_journal_text(false, false)).unwrap();
+    });
+    assert!(matches!(healed, MasterJournal::Read(_)), "{healed:?}");
+    // One that stays refused is said invalid, after the wait.
+    write(&path, master_journal_text(false, true).as_bytes());
+    assert_eq!(
+        read_master_journal(root, || waited = true),
+        MasterJournal::NotRead(JOURNAL_INVALID)
+    );
+    assert!(waited);
+    // One that cannot be opened is not read again.
+    fs::remove_file(&path).unwrap();
+    fs::create_dir(&path).unwrap();
+    waited = false;
+    assert_eq!(
+        read_master_journal(root, || waited = true),
+        MasterJournal::NotRead(JOURNAL_UNREADABLE)
+    );
+    assert!(!waited);
+}
+
+/// The exit status is 1 whenever the report could not be printed, whatever it
+/// says of the folder.
+#[test]
+fn a_report_that_could_not_be_printed_exits_one_whatever_it_says() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.root = Root::Unreadable;
+    assert_eq!(exit_status(&report, false), 1);
+    report.root = Root::Present;
+    report.unreadable = 1;
+    assert_eq!(exit_status(&report, false), 1);
+}
+
+/// The environment variable that names the child's work.
+const CHILD_MODE: &str = "BRIDGE_LOCAL_DATA_REPORT_TEST_CHILD";
+
+/// Run this test binary again, running only [`local_data_report_child`] in
+/// `mode`, and return what it printed and how it ended. The report command
+/// prints and exits, so it is run in a process of its own.
+fn run_child(
+    mode: &str,
+    configure: impl FnOnce(&mut std::process::Command),
+) -> std::process::Output {
+    let module = module_path!()
+        .strip_prefix(concat!(env!("CARGO_CRATE_NAME"), "::"))
+        .expect("crate module prefix");
+    let mut command = std::process::Command::new(std::env::current_exe().expect("test executable"));
+    command
+        .arg("--exact")
+        .arg(format!("{module}::local_data_report_child"))
+        .arg("--nocapture")
+        .env(CHILD_MODE, mode);
+    configure(&mut command);
+    command.output().expect("local data report child")
+}
+
+/// The JSON a child printed: the test harness's own first lines come before it.
+fn child_json(output: &std::process::Output) -> (serde_json::Value, String) {
+    let text = String::from_utf8(output.stdout.clone()).unwrap();
+    let start = text
+        .find('{')
+        .unwrap_or_else(|| panic!("no report on stdout: {text}"));
+    let body = text[start..].to_string();
+    let value = serde_json::from_str(&body).unwrap_or_else(|error| panic!("{error}: {text}"));
+    (value, body)
+}
+
+/// The child: with [`CHILD_MODE`] set, does what the report command does (or
+/// reports what a Windows-only helper finds) and ends the process; without it,
+/// it does nothing, and passes.
+#[test]
+fn local_data_report_child() {
+    let Ok(mode) = std::env::var(CHILD_MODE) else {
+        return;
+    };
+    match mode.as_str() {
+        "plain" => std::process::exit(run(false)),
+        "paths" => std::process::exit(run(true)),
+        "local_app_data" => {
+            println!(
+                "{}",
+                json!({"local_app_data": local_app_data().map(|path| path.display().to_string())})
+            );
+            std::process::exit(0);
+        }
+        other => panic!("unknown mode {other}"),
+    }
+}
+
+/// The report command prints the report to stdout, pretty, and a note to
+/// stderr; it reads the folder named by `BRIDGE_AGENT_DATA_DIR`, counts ages
+/// from the present, names no path, and ends with a status that says whether
+/// the report is complete.
+#[test]
+fn the_report_command_prints_the_report_and_a_note_and_ends_with_a_status() {
+    let directory = tempfile::tempdir().unwrap();
+    let data = directory.path().join("data");
+    write(&data.join("agent-egress.jsonl"), b"abcd");
+    fs::File::options()
+        .write(true)
+        .open(data.join("agent-egress.jsonl"))
+        .unwrap()
+        .set_modified(SystemTime::now() - Duration::from_secs(40 * 86_400 + 3_600))
+        .unwrap();
+    let output = run_child("plain", |command| {
+        command.env("BRIDGE_AGENT_DATA_DIR", &data);
+    });
+    let (shown, body) = child_json(&output);
+    assert!(
+        body.contains("\n  \"folder\": \"present\""),
+        "pretty: {body}"
+    );
+    assert_eq!(
+        shown["classes"]["egress_log"],
+        json!({"files": 1, "bytes": 4, "oldest_days": 40}),
+        "{shown}"
+    );
+    assert!(shown.get("folder_path").is_none(), "{shown}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .lines()
+            .any(|line| line == "Nothing was changed or deleted."),
+        "{:?}",
+        output.stderr
+    );
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("Nothing was changed"));
+    // 0 for a complete report; 3 when the user's own lease folder, which this
+    // read also covers, is the incomplete part. Never 1: it was printed.
+    assert!(
+        matches!(output.status.code(), Some(0 | 3)),
+        "{:?}",
+        output.status
+    );
+}
+
+/// A data folder that cannot be listed ends the command with status 2.
+#[cfg(unix)]
+#[test]
+fn the_report_command_ends_with_two_for_a_data_folder_it_cannot_list() {
+    let directory = tempfile::tempdir().unwrap();
+    let data = directory.path().join("data");
+    fs::write(&data, b"not a folder").unwrap();
+    let output = run_child("plain", |command| {
+        command.env("BRIDGE_AGENT_DATA_DIR", &data);
+    });
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(child_json(&output).0["folder"], "unreadable");
+}
+
+/// With `--show-paths` the command names the data folder it was given and every
+/// coordination folder, ahead of the default; without a data folder named, it
+/// uses the platform's default under the user's profile.
+#[test]
+fn the_report_command_names_the_folders_it_read_only_when_asked() {
+    let directory = tempfile::tempdir().unwrap();
+    let data = directory.path().join("data");
+    let profile = directory.path().join("profile");
+    fs::create_dir_all(&data).unwrap();
+    fs::create_dir_all(&profile).unwrap();
+    let with_profile = |command: &mut std::process::Command| {
+        command
+            .env("HOME", &profile)
+            .env("LOCALAPPDATA", &profile)
+            .env("APPDATA", &profile);
+    };
+    let output = run_child("paths", |command| {
+        with_profile(command);
+        command.env("BRIDGE_AGENT_DATA_DIR", &data);
+    });
+    let (shown, _) = child_json(&output);
+    assert_eq!(shown["folder_path"], data.display().to_string(), "{shown}");
+    // Every folder the locks are taken under, as the default resolves them.
+    let expected: Vec<String> = crate::local_files::paths::coordination_roots()
+        .into_iter()
+        .flatten()
+        .map(|folder| folder.display().to_string())
+        .collect();
+    assert!(!expected.is_empty());
+    assert_eq!(shown["lock_folder_paths"], json!(expected), "{shown}");
+    assert_eq!(shown["lock_folder_path"], json!(expected[0]), "{shown}");
+    // Package copies are looked for under %LOCALAPPDATA%, on Windows only.
+    #[cfg(windows)]
+    assert_eq!(
+        shown["package_copies"], "not_under_local_app_data",
+        "{shown}"
+    );
+    #[cfg(not(windows))]
+    assert!(shown.get("package_copies").is_none(), "{shown}");
+    // No data folder named: the platform's default, inside the profile.
+    // (Where the default is under the temporary folder, that moves too.)
+    let output = run_child("paths", |command| {
+        with_profile(command);
+        command
+            .env("TMPDIR", &profile)
+            .env("TMP", &profile)
+            .env("TEMP", &profile)
+            .env_remove("BRIDGE_AGENT_DATA_DIR");
+    });
+    let (shown, _) = child_json(&output);
+    let default = PathBuf::from(shown["folder_path"].as_str().unwrap());
+    assert!(default.starts_with(&profile), "{shown}");
+}
+
+/// On Windows `%LOCALAPPDATA%` is the variable of that name, as it stands: a
+/// folder as given, nothing when it is not set, and not `%APPDATA%`.
+#[cfg(windows)]
+#[test]
+fn on_windows_local_app_data_is_the_variable_of_that_name_and_no_other() {
+    let directory = tempfile::tempdir().unwrap();
+    let local = directory.path().join("Local");
+    let roaming = directory.path().join("Roaming");
+    let found = run_child("local_app_data", |command| {
+        command.env("LOCALAPPDATA", &local).env("APPDATA", &roaming);
+    });
+    assert_eq!(
+        child_json(&found).0["local_app_data"],
+        local.display().to_string()
+    );
+    let unset = run_child("local_app_data", |command| {
+        command.env_remove("LOCALAPPDATA").env("APPDATA", &roaming);
+    });
+    assert!(child_json(&unset).0["local_app_data"].is_null());
+}
+
+/// The file locations of the lock folders come in the order of the folders, the
+/// order the locks are taken in.
+#[test]
+fn the_file_locations_of_the_lock_folders_come_in_the_order_the_locks_are_taken() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("data");
+    let first = directory.path().join("first");
+    let second = directory.path().join("second");
+    write(&second.join("native-dispatch-leases/a.lock"), b"");
+    let locks = [first.as_path(), second.as_path()];
+    let report = build(&root, &locks);
+    let resolve = |path: &Path| VisiblePath::AsIs(path.to_path_buf());
+    let shown = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&root, &locks)),
+        &resolve,
+        None,
+    );
+    let leases = second.join("native-dispatch-leases");
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        json!([
+            "not_listed",
+            {
+                "folders": [{"path": leases.display().to_string(), "state": "as_is"}],
+                "files_read": 1,
+                "files": 1,
+                "listing_capped": false,
+            }
+        ]),
+        "{shown}"
+    );
 }

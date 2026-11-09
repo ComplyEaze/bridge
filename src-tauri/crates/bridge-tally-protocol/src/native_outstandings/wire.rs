@@ -33,13 +33,16 @@ use crate::{PartyLedgerMasterFieldObservation, TallyNamedMaster};
 
 use super::date::{parse_native_bill_date, parse_native_due_date};
 use super::group_name_index::NameShape;
-use super::model::{LedgerSnapshotEntry, NativeBillRow, NativeOutstandingsError};
+use super::model::{
+    BillClosing, LedgerSnapshotEntry, NativeBillRow, NativeOutstandingsError, UnadmittedBillRow,
+    UnadmittedBillRows,
+};
 
 struct PendingBillRow {
     party: String,
     reference: String,
     bill_date_raw: String,
-    closing_balance: Option<ExactDecimal>,
+    closing_balance: Option<BillClosing>,
     due_date_raw: Option<String>,
     overdue_seen: bool,
     overdue: Option<i64>,
@@ -54,6 +57,18 @@ pub fn parse_native_bill_rows(
     books_from: &bridge_tally_primitives::TallyDate,
     as_of: &bridge_tally_primitives::TallyDate,
 ) -> Result<Vec<NativeBillRow>, NativeOutstandingsError> {
+    parse_native_bill_rows_unadmitted(xml, books_from, as_of)?.admit_all()
+}
+
+/// [`parse_native_bill_rows`] with each row's closing amount not yet
+/// admitted, so a caller that sets parties aside can drop their rows before an
+/// empty `BILLCL` refuses the read (bridge#2071). Every other check is made
+/// here, on every row.
+pub fn parse_native_bill_rows_unadmitted(
+    xml: &str,
+    books_from: &bridge_tally_primitives::TallyDate,
+    as_of: &bridge_tally_primitives::TallyDate,
+) -> Result<UnadmittedBillRows, NativeOutstandingsError> {
     let sanitized = sanitize_invalid_numeric_references(xml);
     let mut reader = Reader::from_str(&sanitized);
     reader.config_mut().trim_text(true);
@@ -121,10 +136,14 @@ pub fn parse_native_bill_rows(
                             )
                             .in_row(row_number));
                         }
-                        row.closing_balance =
-                            Some(ExactDecimal::parse(text.trim()).map_err(|_| {
+                        let text = text.trim();
+                        row.closing_balance = Some(if text.is_empty() {
+                            BillClosing::Empty
+                        } else {
+                            BillClosing::Amount(ExactDecimal::parse(text).map_err(|_| {
                                 NativeOutstandingsError::InvalidAmount.in_row(row_number)
-                            })?);
+                            })?)
+                        });
                     }
                     b"BILLDUE" => {
                         let text = read_element_text(&mut reader, element.name())?;
@@ -222,9 +241,11 @@ pub fn parse_native_bill_rows(
         .into_iter()
         .enumerate()
         .map(|(index, row)| {
-            finalize_bill_row(row, books_from, as_of).map_err(|error| error.in_row(index + 1))
+            finalize_bill_row(row, index + 1, books_from, as_of)
+                .map_err(|error| error.in_row(index + 1))
         })
-        .collect()
+        .collect::<Result<_, _>>()
+        .map(UnadmittedBillRows)
 }
 
 fn set_bill_overdue(row: &mut PendingBillRow, text: &str) -> Result<(), NativeOutstandingsError> {
@@ -248,10 +269,11 @@ fn set_bill_overdue(row: &mut PendingBillRow, text: &str) -> Result<(), NativeOu
 
 fn finalize_bill_row(
     row: PendingBillRow,
+    row_number: usize,
     books_from: &bridge_tally_primitives::TallyDate,
     as_of: &bridge_tally_primitives::TallyDate,
-) -> Result<NativeBillRow, NativeOutstandingsError> {
-    let closing_balance = row
+) -> Result<UnadmittedBillRow, NativeOutstandingsError> {
+    let closing = row
         .closing_balance
         .ok_or(NativeOutstandingsError::InvalidResponse(
             "bills_fixed_row_missing_billcl",
@@ -268,12 +290,13 @@ fn finalize_bill_row(
     }
     let bill_date = parse_native_bill_date(&row.bill_date_raw, books_from, as_of)?;
     let due_date = parse_native_due_date(&due_date_raw, &bill_date)?;
-    Ok(NativeBillRow {
+    Ok(UnadmittedBillRow {
+        row: row_number,
         party: row.party,
         reference: row.reference,
         bill_date,
         due_date,
-        closing_balance,
+        closing,
         tally_overdue_days: row.overdue,
     })
 }
@@ -2057,3 +2080,7 @@ mod group_tests;
 #[cfg(test)]
 #[path = "wire_unspaced_tests.rs"]
 mod unspaced_tests;
+
+#[cfg(test)]
+#[path = "wire_settled_bill_tests.rs"]
+mod settled_bill_tests;

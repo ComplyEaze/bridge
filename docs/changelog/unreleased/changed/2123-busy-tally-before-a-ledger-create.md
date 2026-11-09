@@ -1,0 +1,1 @@
+- A ledger create refused because Tally did not answer a read before the create within the time limit, as happens while Tally is busy with another long request, now names that as its cause (`request_deadline_exceeded`) and says to post again once Tally is idle, where it showed only `company_collection_invalid` with no next step (#2123).

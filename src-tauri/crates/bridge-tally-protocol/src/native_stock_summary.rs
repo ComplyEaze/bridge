@@ -847,6 +847,28 @@ pub enum NativeStockReport {
     Empty,
 }
 
+/// A line the exploded Stock Summary writes after an item that sits directly
+/// under the root: one `SSBATCHNAME` (`SSBATCH`, `SSGODOWN`) and the
+/// `DSPSTKINFO` after it, the item's closing in that godown (§12a.24).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeReportSubLine {
+    /// The `SSBATCH` text; `None` where it was empty, as on every capture.
+    pub batch: Option<String>,
+    pub godown: String,
+    pub quantity: NativeQuantityRead,
+    pub amount: Option<ExactDecimal>,
+}
+
+/// One line of the Stock Summary with the explode flag, and the sub-lines Tally
+/// wrote after it. The answer is flat, so a group's line, an item inside it
+/// and an item under the root differ only by position (§12a.13); only the
+/// sub-lines name a godown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeExplodedLine {
+    pub line: NativeReportLine,
+    pub sub_lines: Vec<NativeReportSubLine>,
+}
+
 /// Parses the Stock Summary response (§12a.1, §12a.13): no `HEADER` or `STATUS`;
 /// top-level children alternate `DSPACCNAME` then `DSPSTKINFO` and nothing else;
 /// each `DSPSTKINFO` holds one `DSPSTKCL` whose `DSPCLAMTA` is a plain signed
@@ -854,20 +876,67 @@ pub enum NativeStockReport {
 /// `RESPONSE` (Tally did not recognise the report name, §12a.1), as the
 /// statements parser refuses it; an empty envelope is an answer
 /// ([`NativeStockReport::Empty`]). The total is written at the scale of the
-/// amounts it adds.
+/// amounts it adds. An `SSBATCHNAME`, which only the exploded report writes,
+/// refuses.
 pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport, NativeStockError> {
+    let lines = read_report_lines(xml, false)?;
+    if lines.is_empty() {
+        return Ok(NativeStockReport::Empty);
+    }
+    let lines: Vec<NativeReportLine> = lines.into_iter().map(|exploded| exploded.line).collect();
+    let amounts: Vec<&ExactDecimal> = lines
+        .iter()
+        .filter_map(|line| line.amount.as_ref())
+        .collect();
+    Ok(NativeStockReport::Lines {
+        total: if amounts.is_empty() {
+            None
+        } else {
+            Some(sum_at_scale(amounts.iter().copied())?)
+        },
+        present: amounts.len(),
+        empty: lines.len() - amounts.len(),
+        lines,
+    })
+}
+
+/// Parses the Stock Summary read with the explode flag (§12a.13, §12a.24): the
+/// plain report's grammar, where a line may be followed by sub-lines, each an
+/// `SSBATCHNAME` holding one `SSBATCH` and one non-blank `SSGODOWN`, then a
+/// `DSPSTKINFO`. An empty envelope is `None`, never an answer of no lines. No
+/// total is formed: a group's line and its items' lines are siblings here, so
+/// adding them would count the same stock twice.
+pub fn parse_native_stock_summary_exploded(
+    xml: &str,
+) -> Result<Option<Vec<NativeExplodedLine>>, NativeStockError> {
+    let lines = read_report_lines(xml, true)?;
+    Ok((!lines.is_empty()).then_some(lines))
+}
+
+/// What the reader expects next among the envelope's children.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReportNext {
+    Name,
+    Info,
+    SubLineInfo,
+}
+
+/// The lines of a Stock Summary answer in document order, with their sub-lines
+/// where `sub_lines` admits them; none for an empty envelope.
+fn read_report_lines(
+    xml: &str,
+    sub_lines: bool,
+) -> Result<Vec<NativeExplodedLine>, NativeStockError> {
     let sanitized = sanitize_invalid_numeric_references(xml);
     let mut reader = Reader::from_str(&sanitized);
     // Not trimmed: an entity splits a name into several text events.
     reader.config_mut().trim_text(false);
     let mut root_seen = false;
     let mut envelope_closed = false;
-    let mut expect_info = false;
-    let mut pairs = 0_usize;
-    let mut amounts = Vec::<ExactDecimal>::new();
-    let mut empty = 0_usize;
-    let mut lines = Vec::<NativeReportLine>::new();
+    let mut next = ReportNext::Name;
+    let mut lines = Vec::<NativeExplodedLine>::new();
     let mut line_name = String::new();
+    let mut sub_line = (None, String::new());
     loop {
         match reader.read_event().map_err(|_| malformed_xml())? {
             Event::Start(element) => {
@@ -884,24 +953,39 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
                     return Err(report_shape("stock_report_trailing_content"));
                 }
                 refuse_error_element(&name)?;
-                match name.as_slice() {
-                    b"DSPACCNAME" if !expect_info => {
+                match (name.as_slice(), next) {
+                    (b"DSPACCNAME", ReportNext::Name) => {
                         line_name = read_report_name(&mut reader)?;
-                        expect_info = true;
+                        next = ReportNext::Info;
                     }
-                    b"DSPSTKINFO" if expect_info => {
+                    (b"DSPSTKINFO", ReportNext::Info) => {
                         let (quantity, amount) = read_report_info(&mut reader)?;
-                        match &amount {
-                            Some(amount) => amounts.push(amount.clone()),
-                            None => empty += 1,
-                        }
-                        lines.push(NativeReportLine {
-                            name: std::mem::take(&mut line_name),
-                            quantity,
-                            amount,
+                        lines.push(NativeExplodedLine {
+                            line: NativeReportLine {
+                                name: std::mem::take(&mut line_name),
+                                quantity,
+                                amount,
+                            },
+                            sub_lines: Vec::new(),
                         });
-                        pairs += 1;
-                        expect_info = false;
+                        next = ReportNext::Name;
+                    }
+                    (b"SSBATCHNAME", ReportNext::Name) if sub_lines && !lines.is_empty() => {
+                        sub_line = read_report_sub_line_name(&mut reader)?;
+                        next = ReportNext::SubLineInfo;
+                    }
+                    (b"DSPSTKINFO", ReportNext::SubLineInfo) => {
+                        let (quantity, amount) = read_report_info(&mut reader)?;
+                        let (batch, godown) = std::mem::take(&mut sub_line);
+                        if let Some(owner) = lines.last_mut() {
+                            owner.sub_lines.push(NativeReportSubLine {
+                                batch,
+                                godown,
+                                quantity,
+                                amount,
+                            });
+                        }
+                        next = ReportNext::Name;
                     }
                     _ => return Err(report_shape("stock_report_unexpected_element")),
                 }
@@ -938,27 +1022,58 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
     if !root_seen || !envelope_closed {
         return Err(report_shape("stock_report_envelope_unterminated"));
     }
-    if expect_info {
-        return Err(report_shape("stock_report_name_without_info"));
+    match next {
+        ReportNext::Name => Ok(lines),
+        ReportNext::Info => Err(report_shape("stock_report_name_without_info")),
+        ReportNext::SubLineInfo => Err(report_shape("stock_report_sub_line_without_info")),
     }
-    Ok(if pairs == 0 {
-        NativeStockReport::Empty
-    } else {
-        NativeStockReport::Lines {
-            total: if amounts.is_empty() {
-                None
-            } else {
-                Some(sum_at_scale(amounts.iter())?)
-            },
-            present: amounts.len(),
-            empty,
-            lines,
-        }
-    })
 }
 
 fn report_shape(code: &'static str) -> NativeStockError {
     NativeStockError::Malformed(code)
+}
+
+/// `SSBATCHNAME` holding exactly one `SSBATCH` and one `SSGODOWN`; returns the
+/// batch (`None` when empty) and the godown, which must not be blank. Both are
+/// trimmed and held to the name bound.
+fn read_report_sub_line_name(
+    reader: &mut Reader<&[u8]>,
+) -> Result<(Option<String>, String), NativeStockError> {
+    let (mut batch, mut godown) = (None::<String>, None::<String>);
+    loop {
+        let (name, text) = match reader.read_event().map_err(|_| malformed_xml())? {
+            Event::Start(element) => {
+                let name = upper(element.name());
+                refuse_error_element(&name)?;
+                (name, read_text(reader, element.name())?)
+            }
+            Event::Empty(element) => {
+                let name = upper(element.name());
+                refuse_error_element(&name)?;
+                (name, String::new())
+            }
+            Event::End(element) if upper(element.name()) == b"SSBATCHNAME" => {
+                let godown = godown.ok_or_else(|| report_shape("stock_report_sub_line_shape"))?;
+                if godown.is_empty() {
+                    return Err(report_shape("stock_report_sub_line_godown_empty"));
+                }
+                let batch = batch.ok_or_else(|| report_shape("stock_report_sub_line_shape"))?;
+                return Ok(((!batch.is_empty()).then_some(batch), godown));
+            }
+            Event::Text(text) => {
+                refuse_stray_text(&text)?;
+                continue;
+            }
+            _ => return Err(report_shape("stock_report_sub_line_shape")),
+        };
+        let text = text.trim().to_string();
+        within_name_bound(&text)?;
+        match name.as_slice() {
+            b"SSBATCH" if batch.is_none() => batch = Some(text),
+            b"SSGODOWN" if godown.is_none() => godown = Some(text),
+            _ => return Err(report_shape("stock_report_sub_line_shape")),
+        }
+    }
 }
 
 /// `DSPACCNAME` holding exactly one non-blank `DSPDISPNAME` text element;
@@ -1133,7 +1248,7 @@ fn present_closing_value_sum(items: &[NativeStockItem]) -> Result<ExactDecimal, 
 /// The signed sum of `values`, written with as many decimal places as the
 /// widest of them: `2500.00` and `500.00` are `3000.00`, not `3000`. No value
 /// at all sums to `0`.
-fn sum_at_scale<'a>(
+pub(crate) fn sum_at_scale<'a>(
     values: impl Iterator<Item = &'a ExactDecimal>,
 ) -> Result<ExactDecimal, NativeStockError> {
     let decimals = |text: &str| {

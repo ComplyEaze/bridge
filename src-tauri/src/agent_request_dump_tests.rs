@@ -17,7 +17,9 @@
 //! `BRIDGE_DUMP_COMPANY="..." BRIDGE_DUMP_FROM=YYYYMMDD BRIDGE_DUMP_TO=YYYYMMDD
 //!  BRIDGE_DUMP_DIR=... cargo test -p bridge --lib request_dump -- --ignored --nocapture`
 //! Optional, both or neither: `BRIDGE_DUMP_SPAN_AFTER` and
-//! `BRIDGE_DUMP_SPAN_THROUGH` also write a census narrowed to that AlterID span.
+//! `BRIDGE_DUMP_SPAN_THROUGH` also write the census of that AlterID span. Every
+//! census the product sends is spanned (#2145): a book whose mark fits one
+//! census is counted in the span from 0 to its mark.
 use super::*;
 use bridge_tally_protocol::xml_read_profiles::{
     ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange,
@@ -54,8 +56,8 @@ fn id_names_its_collection(xml: &str) -> Result<(), String> {
 }
 
 /// The product's renderings for one company and window, checked: the shipped
-/// voucher read, the tax-audit voucher profile (the baseline of #681) and the
-/// census, with an optional AlterID span.
+/// voucher read, the tax-audit voucher profile (the baseline of #681) and, when
+/// a span is given, the census of that AlterID span.
 fn rendered(
     company: &str,
     from: &str,
@@ -78,10 +80,6 @@ fn rendered(
             }
             .render(),
         },
-        Dumped {
-            name: "c01-census-unspanned.xml",
-            xml: render_agent_voucher_census(company, &from_date, &to_date, None)?,
-        },
     ];
     if let Some((after, through)) = span {
         all.push(Dumped {
@@ -90,7 +88,7 @@ fn rendered(
                 company,
                 &from_date,
                 &to_date,
-                Some(AlterIdSpan { after, through }),
+                AlterIdSpan { after, through },
             )?,
         });
     }
@@ -178,12 +176,14 @@ fn the_dumped_requests_are_checked_and_unedited() {
     );
     assert!(by_name("v01-vouchers-wildcard.xml").contains("ALLLEDGERENTRIES.*"));
     assert!(!by_name("a01-vouchers-audit-profile.xml").contains("BILLALLOCATIONS"));
-    assert!(by_name("c01-census-unspanned.xml").contains("Bridge Agent Voucher Census"));
-    assert!(by_name("c02-census-span.xml").contains("$AlterID"));
+    assert!(by_name("c02-census-span.xml").contains("Bridge Agent Voucher Census"));
+    assert!(by_name("c02-census-span.xml").contains("$AlterID &gt; 10 AND $AlterID &lt;= 20"));
+    // No census without its span: the product sends none (#2145).
+    assert_eq!(requests.len(), 3);
     let directory = tempfile::tempdir().unwrap();
     let target = directory.path().join("dump");
     let manifest = write_all(&target, &requests).unwrap();
-    assert_eq!(manifest.lines().count(), 4);
+    assert_eq!(manifest.lines().count(), 3);
     let bytes = std::fs::read(target.join("v01-vouchers-wildcard.xml")).unwrap();
     assert_eq!(
         &bytes[..2],

@@ -1,0 +1,49 @@
+# fixture: tests/fixtures/opening-stock-tieout-e/r3-w2-bs.utf16le.xml
+# parser: parse_native_statement(BalanceSheet)
+# source: captured
+Ok(NativeStatement {
+    kind: BalanceSheet,
+    lines: [
+        NativeStatementLine {
+            name: "Capital Account",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "50000.00",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Loans (Liability)",
+            sub: Empty,
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Current Liabilities",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "5150.00",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Profit & Loss A/c",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "2361.18",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Current Assets",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "-57511.18",
+                ),
+            ),
+        },
+    ],
+})

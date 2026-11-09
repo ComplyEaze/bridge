@@ -37,7 +37,9 @@ pub mod canonical;
 pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
+pub mod clause16_credits;
 pub mod clause21a_candidates;
+pub mod clause42_sft;
 pub mod clause44;
 pub mod compare;
 pub mod counter_cheques_40a3;
@@ -70,6 +72,7 @@ pub mod statutory_dues_43b;
 pub mod stock;
 pub mod stock_read;
 mod support;
+pub mod tds_interest_201;
 pub mod tds_payees;
 pub mod tds_tcs_26as;
 pub mod tds_tranches;
@@ -529,9 +532,9 @@ pub struct TdsConfig {
     /// `[tds_payees].gst_separate_by_agreement`: payees (ledger or alias) whose agreement states
     /// GST separately. Empty when absent.
     pub gst_separate: BTreeSet<String>,
-    /// `[tds_payees.foreseeability]`'s names (its values are checked; only the names reach
-    /// `tds_payees`, which reports a name matching no payee).
-    pub foreseeability_names: BTreeSet<String>,
+    /// `[tds_payees.foreseeability]`'s names and values: `tds_payees` reports a name matching no
+    /// payee, and `tds_interest_201` reads the values. The names are not bound.
+    pub foreseeability: BTreeMap<String, tds_payees::Foreseeability>,
     /// `[[tds.challans]]`: `None` when absent (deposit not verified); an empty list means
     /// "recorded: none deposited".
     pub challans: Option<Vec<tds_payees::Challan>>,
@@ -911,7 +914,7 @@ not YYYY-MM-DD"
                     s194j_category_by_ledger,
                     reversals: lists.reversals,
                     gst_separate: lists.gst_separate,
-                    foreseeability_names: lists.foreseeability_names,
+                    foreseeability: lists.foreseeability,
                     challans: lists.challans,
                     form_26a: lists.form_26a,
                     turnover_is_placeholder: lists.turnover_is_placeholder,
@@ -1652,6 +1655,34 @@ pub fn clause21a_candidates_on(
     canonical::canonical_test_result(book, &result, None)
 }
 
+/// Run `clause16_credits` on a book and return its canonical parity dump, with the cash and bank
+/// ledgers under the engagement's groups as money. A crate-first test, with no reference module.
+pub fn clause16_credits_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let cash = book.ledgers_under_any(&bound.cash_groups);
+    let bank = book.ledgers_under_any(&bound.bank_groups);
+    let money = clause16_credits::money_ledgers(book, &cash, &bank);
+    let result = clause16_credits::run(book, rules, &money)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `clause42_sft` on a book and return its canonical parity dump: the vendored limit, and the
+/// cash ledgers under the engagement's cash groups. A crate-first test, with no reference module.
+pub fn clause42_sft_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let cash = book.ledgers_under_any(&bound.cash_groups);
+    let result = clause42_sft::run(book, rules, clause42_sft::Limit::vendored()?, &cash)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
 /// Run `read_scope` on a book and return its canonical parity dump. The reference module has no
 /// `check_invariants`, so the dump's module invariants are empty on both sides.
 pub fn read_scope_on(book: &book::Book, rules: &Rules) -> Result<serde_json::Value> {
@@ -2087,6 +2118,49 @@ pub fn specified_persons_40a2b_on(
     let result = specified_persons_40a2b::run(rules, entity_type, table, &related)?;
     let module_check =
         specified_persons_40a2b::check_invariants(rules, entity_type, table, &related, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `tds_interest_201` on an already-built book: `tds_payees` and `partners_40b_194t` first, as
+/// [`tds_payees_on`] and [`partners_40b_194t_on`] run them, the rows assembled from their results
+/// and tranches, then this test at the rules' audit-report date, with its module check (TDSI-1).
+/// Refuses without `[client].entity_type` or a `[tds]` table, as those two runners need them.
+pub fn tds_interest_201_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let entity_type = engagement.entity_type.clone().ok_or_else(|| {
+        AuditError::Config("tds_interest_201 needs [client].entity_type".to_string())
+    })?;
+    let (bound, _report) = engagement.bind(book)?;
+    let tds = bound
+        .tds
+        .as_ref()
+        .ok_or_else(|| AuditError::Config("tds_interest_201 needs a [tds] table".to_string()))?;
+    let inputs = tds_payees_inputs(&bound)?;
+    let (payees, payee_tranches) =
+        tds_payees::run_with_tranches(book, rules, &entity_type, tds, &inputs)?;
+    let (partners, partner_tranches) = partners_40b_194t::run_with_tranches(
+        book,
+        rules,
+        &engagement.period,
+        &entity_type,
+        &bound.partners,
+        &tds_payable_ledgers(&bound)?,
+    )?;
+    let flag = tds_interest_201::deductor_uncertain(&payees, tds.turnover_is_placeholder)?;
+    let rows = tds_interest_201::assemble_rows(
+        rules,
+        &payees,
+        &payee_tranches,
+        &partners,
+        &partner_tranches,
+        flag,
+        &tds.foreseeability,
+    )?;
+    let result = tds_interest_201::run(rules, &rows, &rules.due_date_audit_report)?;
+    let module_check = tds_interest_201::check_invariants(&result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 

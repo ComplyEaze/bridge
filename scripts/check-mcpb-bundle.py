@@ -40,6 +40,8 @@ DEFAULT_TOOLS = {
     "read_evidence",
     "sales_register",
     "statement_tie_out",
+    "stock_by_batch",
+    "stock_by_godown",
     "stock_summary",
     "tally_status",
     "trial_balance",

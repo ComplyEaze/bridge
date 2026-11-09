@@ -1,6 +1,6 @@
 //! Open local artifact leaves without following aliases or mutating them first.
 use std::fs::{File, OpenOptions};
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
 
 pub(crate) fn open_local_file(path: &Path, writable: bool) -> io::Result<File> {
@@ -97,6 +97,31 @@ pub(crate) fn create_new_local_file(path: &Path) -> io::Result<File> {
     options.open(path)
 }
 
+/// Write a whole file readable only by this user, replacing what `path` held.
+/// A link or alias at `path` is refused, as by [`open_local_file`].
+pub(crate) fn write_private_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut file = open_local_file(path, true)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    file.set_len(0)?;
+    file.write_all(bytes)?;
+    file.sync_all()
+}
+
+/// Write `bytes` privately to `staged`, then rename it onto `path`, so a reader
+/// finds the old file or the whole new one and never a part. The stage is a
+/// sibling of `path` that the caller names. It is removed if the rename fails.
+pub(crate) fn replace_private_file(staged: &Path, path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let replaced = write_private_file(staged, bytes).and_then(|()| std::fs::rename(staged, path));
+    if replaced.is_err() {
+        let _ = std::fs::remove_file(staged);
+    }
+    replaced
+}
+
 /// Rename `from` to `to` only if nothing holds `to`, in one step, so a record
 /// never has two names (a second link makes `open_local_file` refuse it); a
 /// taken `to` fails with `AlreadyExists` and both files stay as they were.
@@ -175,4 +200,51 @@ pub(crate) fn lock_error(error: std::fs::TryLockError) -> String {
         std::fs::TryLockError::Error(_) => "import_admission_lock_unavailable",
     }
     .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_replacement_that_cannot_land_leaves_no_stage_and_the_old_name_as_it_was() {
+        let directory = tempfile::tempdir().unwrap();
+        let taken = directory.path().join("record");
+        std::fs::create_dir(&taken).unwrap();
+        std::fs::write(taken.join("inside"), b"kept").unwrap();
+        let staged = directory.path().join("record.next");
+
+        assert!(replace_private_file(&staged, &taken, b"new").is_err());
+
+        assert!(!staged.exists());
+        assert_eq!(std::fs::read(taken.join("inside")).unwrap(), b"kept");
+    }
+
+    #[test]
+    fn a_longer_stage_left_by_an_earlier_write_does_not_trail_the_new_bytes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("record");
+        let staged = directory.path().join("record.next");
+        std::fs::write(&staged, b"an earlier, longer record").unwrap();
+
+        replace_private_file(&staged, &path, b"new").unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), b"new");
+        assert!(!staged.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_replaced_file_is_private_whatever_the_old_one_was() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("record");
+        std::fs::write(&path, b"old").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        replace_private_file(&directory.path().join("record.next"), &path, b"new").unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
 }

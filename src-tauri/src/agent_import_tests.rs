@@ -184,10 +184,10 @@ fn saved(wire: &ImportPayload<String>) -> ImportPayload {
         vouchers: wire
             .vouchers
             .iter()
-            .cloned()
             .map(|voucher| {
                 let date = normalized_date(&voucher.date).expect("a valid sample date");
-                voucher.dated(date)
+                let entries = voucher.parsed_entries().expect("a sample amount");
+                voucher.admitted(date, entries)
             })
             .collect(),
         amends_batch_id: wire.amends_batch_id.clone(),
@@ -481,7 +481,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
     };
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -607,7 +607,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -666,7 +666,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     let input = admitted_payload();
     payload_verdict(&input).expect("valid payload");
     let mut unbalanced = input.clone();
-    unbalanced.vouchers[0].entries[1].amount = "12.49".to_string();
+    unbalanced.vouchers[0].entries[1].amount = ImportAmount::parse("12.49").unwrap();
     assert_eq!(
         payload_verdict(&unbalanced),
         Err("voucher_not_balanced".to_string())
@@ -745,7 +745,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -851,7 +851,7 @@ fn duplicate_detection_uses_stable_voucher_identity_independently_of_remote_id()
 fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -943,7 +943,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
 fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1121,7 +1121,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
     });
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1159,7 +1159,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
 fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1268,6 +1268,17 @@ fn the_markdown_proof_follows_the_verification_status() {
     );
     assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
     assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
+    // #2152: the saved proof's note that no dispatch is on record is shown, and
+    // it is a line, not a banner.
+    assert!(!clean.contains("Dispatch record"), "{clean}");
+    let mut unsent = proof(Some("posted_verified"), json!([]));
+    verification::mark_found_not_sent(&mut unsent);
+    let unsent = render_proof_markdown(&unsent);
+    assert!(
+        unsent.contains("- Dispatch record: none on this computer — found in the book, not sent by ComplyEaze Bridge\n"),
+        "{unsent}"
+    );
+    assert!(!unsent.contains(banner), "{unsent}");
     // Not verified with no duplicates, or no status at all, is not clean either:
     // the banner follows the status, not the duplicate list. With no dispatch
     // record Bridge did not send the batch, so the banner forbids no resend.
@@ -1384,7 +1395,7 @@ fn the_markdown_proof_fences_the_company_name() {
 fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1480,7 +1491,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
 fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1547,13 +1558,108 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     assert_eq!(verification_status(&after, 1), "verification_incomplete");
 }
 
+/// The content-only review box for a one-voucher batch whose only match is a
+/// voucher the verifier read with the batch's content after its build, so not
+/// shown to be this post's, with the given cancelled and optional flags. The
+/// box is given what production gives it: the unpaged result, with `vouchers`.
+fn content_only_box(cancelled: bool, optional: bool) -> String {
+    let input = admitted_payload();
+    let line = ImportLedgerLine {
+        binding: LedgerBinding::Unbound,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "batch-review-box".to_string(),
+        company_guid: GUID.to_string(),
+        company: None,
+        txn_ids: vec!["txn-001".to_string()],
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
+        sha256: "hash".to_string(),
+        built_at: now(),
+        status: "built".to_string(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".to_string(),
+            value: Some(10),
+            master_value: Some(10),
+        },
+        vouchers: vec![input.vouchers[0].clone()],
+    };
+    let observed = |cancelled, optional| ReadVoucher {
+        remote_id: None,
+        guid: Some("review-box-guid".to_string()),
+        alter_id: Some(11),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
+        voucher_type: Some("Payment".to_string()),
+        narration: None,
+        voucher_number: None,
+        master_id: None,
+        cancelled: Some(cancelled),
+        optional: Some(optional),
+        effective_date: None,
+        entries: vec![
+            ReadEntry {
+                ledger: "Expense".to_string(),
+                amount: "-12.50".to_string(),
+                is_deemed_positive: "Yes".to_string(),
+            },
+            ReadEntry {
+                ledger: "Bank".to_string(),
+                amount: "12.50".to_string(),
+                is_deemed_positive: "No".to_string(),
+            },
+        ],
+    };
+    let result = verify_observed_batch(&line, &[observed(cancelled, optional)])
+        .expect("verification result");
+    // The tally of rows by status still has the match, in the accounts or not.
+    assert_eq!(result["counts"]["matching_content_observed"], 1, "{result}");
+    assert_eq!(
+        result["vouchers"][0]["accounting_effective"],
+        !cancelled && !optional,
+        "{result}"
+    );
+    content_review::review_preview(&line, ledger::ReviewedBinding::Refused, &result)
+        .replace('\n', " ")
+}
+
+/// #2261: the box says a voucher is in the book only for a match that is in
+/// the accounts. A cancelled match is not.
+#[test]
+fn the_content_review_box_does_not_count_a_cancelled_match_as_in_the_book() {
+    let text = content_only_box(true, false);
+    assert!(
+        text.contains("found, for 0 of the 1 voucher sent,"),
+        "{text}"
+    );
+    let live = content_only_box(false, false);
+    assert!(
+        live.contains("found, for 1 of the 1 voucher sent,"),
+        "{live}"
+    );
+}
+
+/// #2261: the same for an optional match.
+#[test]
+fn the_content_review_box_does_not_count_an_optional_match_as_in_the_book() {
+    let text = content_only_box(false, true);
+    assert!(
+        text.contains("found, for 0 of the 1 voucher sent,"),
+        "{text}"
+    );
+}
+
 #[test]
 fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
     let input = admitted_payload();
     let mut duplicate = input.vouchers[0].clone();
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1620,7 +1726,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
     let mut duplicate = input.vouchers[0].clone();
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let mut line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1694,7 +1800,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
 fn narration_tag_verification_requires_a_post_mark_voucher() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1760,11 +1866,11 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
 fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let mut input = admitted_payload();
     for entry in &mut input.vouchers[0].entries {
-        entry.amount = "0012.50".to_string();
+        entry.amount = ImportAmount::parse("0012.50").unwrap();
     }
     payload_verdict(&input).expect("leading zeros satisfy the input contract");
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1822,13 +1928,49 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let result = verify_observed_batch(&line, &[divergent]).expect("numeric divergence");
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
     assert_eq!(result["vouchers"][0]["alter_id"], 11);
+    // The entry differences show the batch's amount in canonical form, as the book's side is
+    // (#1872): `0012.50` is `12.5` there, not the text it was saved with.
+    let diffs = result["vouchers"][0]["diffs"].as_array().unwrap();
+    let entries = diffs
+        .iter()
+        .find_map(|diff| diff.get("entries"))
+        .expect("the entries differ");
+    assert_eq!(entries["expected"][0]["amount"], "12.5");
+    assert_eq!(entries["expected"][1]["amount"], "12.5");
+}
+
+/// The fingerprint production matches by is the canonical one (#1872): a batch voucher saved
+/// with `0012.50` is `12.5`, signed as a debit `-12.5`, and equals the same voucher saved as
+/// `12.50`. The pin in `agent_import_amount_pin_tests.rs` holds the received-text function
+/// beside it.
+#[test]
+fn a_batch_voucher_is_matched_by_the_canonical_form_of_its_amounts() {
+    let voucher = |amount: &str| {
+        let mut voucher = admitted_payload().vouchers[0].clone();
+        for entry in &mut voucher.entries {
+            entry.amount = ImportAmount::parse(amount).unwrap();
+        }
+        voucher
+    };
+    assert_eq!(
+        canonical_entry_fingerprint(&voucher("0012.50")),
+        ["Bank|12.5|No", "Expense|-12.5|Yes"]
+    );
+    assert_eq!(
+        canonical_entry_fingerprint(&voucher("0012.50")),
+        canonical_entry_fingerprint(&voucher("12.50"))
+    );
+    assert_ne!(
+        canonical_entry_fingerprint(&voucher("12.50")),
+        canonical_entry_fingerprint(&voucher("12.51"))
+    );
 }
 
 #[test]
 fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -2434,39 +2576,302 @@ fn utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// DERIVED, not Tally's bytes: the answer to the rates read the code sends
-/// (`pilot-lab-ledger-rates-scoped-hsn`, which the lab answered on 21 Oct 2026
-/// for the book as it then stood), for the book of
-/// the lab's W18 sittings (`pilot-lab-w18`), which the lab was not asked the
-/// scoped rates request on either. The rows are the lab's W16 answer's rows of
-/// the ledgers that the W18 catalogue holds under the four parents (the two
-/// books hold the same 18 ledgers), counted and asserted equal, name for name.
+/// DERIVED, not Tally's bytes: the answer to the rates read the code sends for
+/// the invoice of the lab's W18 sittings (`pilot-lab-w18`), which names
+/// `BRIDGE Svc 4D 5%` where `BP/26-27/0010` names `BRIDGE Svc 998313 5%`. The
+/// W18 catalogue is byte-equal to the catalogue the lab read with the
+/// four-parent answer on 21 Oct 2026 and again on 31 Oct 2026, when that answer
+/// came back byte for byte the same (`pilot-lab-ledger-rates-scoped-hsn`), so
+/// this is that answer cut to the invoice's six ledgers by [`rates_cut_to`].
 pub(super) fn w18_scoped_rates_hsn() -> String {
-    let catalogue = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"));
-    let mut wanted = Vec::new();
-    let mut rest = catalogue.as_str();
-    while let Some(at) = rest.find("<LEDGER NAME=\"") {
-        let from = at + "<LEDGER NAME=\"".len();
-        let end = from + rest[from..].find("</LEDGER>").unwrap();
-        let row = &rest[from..end];
-        if SCOPE_PARENTS
-            .iter()
-            .any(|parent| row.contains(&format!(">{parent}</PARENT>")))
-        {
-            wanted.push(row[..row.find('"').unwrap()].to_string());
-        }
-        rest = &rest[end..];
-    }
-    derived_scoped_rates_hsn(&wanted)
+    rates_cut_to(
+        &utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml")),
+        &W18_INVOICE_LEGS,
+    )
 }
 
-/// The four parents of the lab invoices' ledgers.
-const SCOPE_PARENTS: [&str; 4] = [
-    "Duties &amp; Taxes",
-    "Indirect Expenses",
-    "Sales Accounts",
-    "Sundry Debtors",
+/// The ledgers of the W18 invoice `BP/26-27/0040`.
+pub(super) const W18_INVOICE_LEGS: [&str; 6] = [
+    "BRIDGE Walk-in",
+    "BRIDGE Svc 4D 5%",
+    "BRIDGE Svc 998314 5%",
+    "BRIDGE CGST 2.5%",
+    "BRIDGE SGST 2.5%",
+    "BRIDGE Round Off",
 ];
+
+/// DERIVED, not Tally's bytes: `answer` with every ledger row whose name is not
+/// in `names` removed, with the whitespace after it. That is what the rate read
+/// restricted to those ledgers by GUID (#1331) answers on the book that gave
+/// `answer`: on 31 Oct 2026 the lab's answers to it, for five and for four of an
+/// invoice's ledgers, were byte for byte its answer to the four-parent read cut
+/// this way (`a_guid_answer_is_the_parent_answer_cut_to_the_named_rows`). Each
+/// name keeps exactly one row.
+pub(super) fn rates_cut_to(answer: &str, names: &[&str]) -> String {
+    let mut out = answer.to_string();
+    let mut kept = Vec::new();
+    let mut at = 0;
+    while let Some(start) = out[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
+        let end = start + out[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+        let name = ledger_row_names(&out[start..end]).remove(0);
+        if names.contains(&name.as_str()) {
+            kept.push(name);
+            at = end;
+        } else {
+            let rest = &out[end..];
+            let after = end + rest.len() - rest.trim_start_matches([' ', '\r', '\n', '\t']).len();
+            out.replace_range(start..after, "");
+            at = start;
+        }
+    }
+    let mut wanted = names.iter().map(ToString::to_string).collect::<Vec<_>>();
+    wanted.sort();
+    wanted.dedup();
+    kept.sort();
+    assert_eq!(kept, wanted, "each named ledger keeps exactly one row");
+    out
+}
+
+/// The ledgers of the lab invoice `BP/26-27/0010`: the customer, two sales
+/// ledgers, the two tax ledgers and the round off.
+pub(super) const LAB_INVOICE_LEGS: [&str; 6] = [
+    "BRIDGE Walk-in",
+    "BRIDGE Svc 998313 5%",
+    "BRIDGE Svc 998314 5%",
+    "BRIDGE CGST 2.5%",
+    "BRIDGE SGST 2.5%",
+    "BRIDGE Round Off",
+];
+
+/// DERIVED, not Tally's bytes: the lab's answer of 21 Oct 2026 to the
+/// four-parent rates read with the HSN/SAC fields
+/// (`pilot-lab-ledger-rates-scoped-hsn`), cut to the six ledgers of
+/// `BP/26-27/0010` by [`rates_cut_to`]: the answer to the read the code sends
+/// for that invoice, which names them by GUID. UTF-16LE, as the lab's answers
+/// are stored.
+pub(super) fn lab_invoice_rates_hsn() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    BYTES.get_or_init(|| {
+        let answer = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"));
+        rates_cut_to(&answer, &LAB_INVOICE_LEGS)
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect()
+    })
+}
+
+/// DERIVED, not Tally's bytes: a compliance answer of the whole book cut to an
+/// invoice's ledgers by [`rates_cut_to`], the answer to the listing the code reads
+/// for them by GUID (#1331). On 31 Oct 2026 the lab's answers to those two
+/// requests, for five ledgers of this company at 18, 10,018 and 20,018 ledgers,
+/// held exactly those rows, each equal to its row of the whole read at 18
+/// (`lab/1331-scoped-masters-answers`, g4 and g5). Those answers are not in this
+/// tree, so no test holds the cut to them.
+fn listing_cut_to(
+    cell: &'static std::sync::OnceLock<Vec<u8>>,
+    answer: &[u8],
+    legs: &[&str],
+) -> &'static [u8] {
+    cell.get_or_init(|| {
+        rates_cut_to(&utf16le(answer), legs)
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect()
+    })
+}
+
+/// The compliance master answer for `BP/26-27/0010` ([`listing_cut_to`]).
+pub(super) fn lab_invoice_listing() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
+        &LAB_INVOICE_LEGS,
+    )
+}
+
+/// DERIVED, not Tally's bytes: [`lab_invoice_listing`], as text, with the one
+/// dated registration row of `BRIDGE Walk-in` made Regular under `gstin`. The
+/// `GSTIN` element is put after `PLACEOFSUPPLY`, where Tally returned it for a
+/// Regular customer seeded on the same book (`lab/2162-s13a2-answers`, the
+/// `a-s3r-Q-rates` answer). Nothing else in the answer differs.
+pub(super) fn lab_invoice_listing_with_walk_in_gstin(gstin: &str) -> String {
+    let listing = utf16le(lab_invoice_listing());
+    let start = listing.find("<LEDGER NAME=\"BRIDGE Walk-in\"").unwrap();
+    let end = start + listing[start..].find("</LEDGER>").unwrap();
+    let mut row = listing[start..end].to_string();
+    for (from, to) in [
+        (
+            "<GSTREGISTRATIONTYPE TYPE=\"String\">Unregistered/Consumer</GSTREGISTRATIONTYPE>",
+            "<GSTREGISTRATIONTYPE TYPE=\"String\">Regular</GSTREGISTRATIONTYPE>".to_string(),
+        ),
+        (
+            "<PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY>",
+            format!(
+                "<PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><GSTIN TYPE=\"String\">{gstin}</GSTIN>"
+            ),
+        ),
+    ] {
+        assert_eq!(row.matches(from).count(), 1, "{from}");
+        row = row.replace(from, &to);
+    }
+    format!("{}{row}{}", &listing[..start], &listing[end..])
+}
+
+/// The compliance balance answer for `BP/26-27/0010` ([`listing_cut_to`]).
+pub(super) fn lab_invoice_balances() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
+        &LAB_INVOICE_LEGS,
+    )
+}
+
+/// The compliance master answer for the W18 invoice ([`listing_cut_to`]).
+pub(super) fn w18_invoice_listing() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml"),
+        &W18_INVOICE_LEGS,
+    )
+}
+
+/// The compliance balance answer for the W18 invoice ([`listing_cut_to`]).
+pub(super) fn w18_invoice_balances() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-paired.utf16le.xml"),
+        &W18_INVOICE_LEGS,
+    )
+}
+
+/// The sha256 of the rates read the code sends for `BP/26-27/0010`: the request
+/// the lab answered on 31 Oct 2026 (`pilot-lab-ledger-rates-guid.request`) with
+/// only its GUIDs changed to the six ledgers' (DERIVED: the shape is the lab's;
+/// the request with these GUIDs was not sent).
+pub(super) const LAB_INVOICE_GUID_RATES_SHA256: &str =
+    "182f598aafaf333bc8284b6976e664cee00af1eadb5a29bd4f73c295f8601e08";
+
+/// The same for the W18 invoice's six ledgers ([`W18_INVOICE_LEGS`]).
+pub(super) const W18_INVOICE_GUID_RATES_SHA256: &str =
+    "a7ced791a7af67b3bcda6de614970891ebfb1ff82da8b9a580fafc6e12b654b2";
+
+#[test]
+fn the_lab_invoice_rates_request_is_the_captured_one_with_its_guids() {
+    let captured = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.request.utf16le.xml"));
+    let formula = |suffixes: &[&str]| {
+        suffixes
+            .iter()
+            .map(|suffix| format!("$GUID = \"6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000{suffix}\""))
+            .collect::<Vec<_>>()
+            .join(" OR ")
+    };
+    let five = formula(&["00d0", "00d3", "00d5", "00d7", "00d8"]);
+    assert_eq!(captured.matches(&five).count(), 1);
+    for (suffixes, pinned) in [
+        (
+            ["00d0", "00d1", "00d2", "00d4", "00d6", "00d8"],
+            LAB_INVOICE_GUID_RATES_SHA256,
+        ),
+        (
+            ["00d0", "00d2", "00d4", "00d6", "00d8", "00e5"],
+            W18_INVOICE_GUID_RATES_SHA256,
+        ),
+    ] {
+        let six = captured.replace(&five, &formula(&suffixes));
+        let bytes = six
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>();
+        assert_eq!(crate::agent::sha256_hex(&bytes), pinned);
+    }
+}
+
+/// The sha256 of the number reads the code sends for `BP/26-27/0010`,
+/// `BP/26-27/0001` and the W18 invoice's `BP/26-27/0040`: the lab's
+/// `r09-number-new-invoice.xml`, `r10-number-control-k0.xml` and
+/// `w18-number-0040.xml` with `IRN, IRNACKNO, IRNACKDATE` added to the
+/// fetch list (DERIVED: the requests with those words were not sent to this
+/// book, and the answers replayed to them were captured without them; on
+/// another book the words changed nothing else in the answer,
+/// `lab/2162-irn-read-answers` R1, #2162 item 8).
+pub(super) const LAB_NUMBER_NEW_INVOICE_SHA256: &str =
+    "fa77d18300e04e0aeb542c664aa4f1390e43a5c08442d6329f6a0352714c3e9d";
+pub(super) const LAB_NUMBER_CONTROL_SHA256: &str =
+    "9750f0fffe721ba905ffaeb9ebf2e3b84d503eebe39112fcb400393bdeac6b49";
+pub(super) const W18_NUMBER_SHA256: &str =
+    "ec2a6c29deb324d0c14302ff4456b8a28a8f5e12cfab5b358a5ee9265f0e3726";
+
+#[test]
+fn the_lab_number_reads_are_the_sent_ones_with_the_e_invoice_words() {
+    let window = (stored_date("20260401"), stored_date("20270331"));
+    let sha256 = |request: &str| {
+        let sent = [0xFF, 0xFE]
+            .into_iter()
+            .chain(request.encode_utf16().flat_map(u16::to_le_bytes))
+            .collect::<Vec<u8>>();
+        crate::agent::sha256_hex(&sent)
+    };
+    for (number, sent, pinned) in [
+        (
+            "BP/26-27/0010",
+            "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985",
+            LAB_NUMBER_NEW_INVOICE_SHA256,
+        ),
+        (
+            "BP/26-27/0001",
+            "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6",
+            LAB_NUMBER_CONTROL_SHA256,
+        ),
+        (
+            "BP/26-27/0040",
+            "84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8",
+            W18_NUMBER_SHA256,
+        ),
+    ] {
+        let rendered = invoice::render_invoice_number_request(
+            "BRIDGE PILOT LAB",
+            &invoice::InvoiceNumber::parse(number).unwrap(),
+            (&window.0, &window.1),
+        );
+        let words = ", IRN, IRNACKNO, IRNACKDATE</FETCH>";
+        assert_eq!(rendered.matches(words).count(), 1, "{number}");
+        assert_eq!(
+            sha256(&rendered.replace(words, "</FETCH>")),
+            sent,
+            "{number}"
+        );
+        assert_eq!(sha256(&rendered), pinned, "{number}");
+    }
+}
+
+/// The cut [`rates_cut_to`] makes is, on the lab's own bytes, Tally's answer to
+/// the read by GUID: the four-parent answer of 31 Oct 2026 cut to the lab
+/// invoice's five ledgers, and to four of them, equals the answers the lab gave
+/// that day to the GUID filter naming those ledgers (the four-ledger request
+/// also named a GUID the book does not hold, which added nothing).
+#[test]
+fn a_guid_answer_is_the_parent_answer_cut_to_the_named_rows() {
+    let parents = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"));
+    let five = [
+        "BRIDGE Walk-in",
+        "BRIDGE Goods 18%",
+        "BRIDGE CGST 9%",
+        "BRIDGE SGST 9%",
+        "BRIDGE Round Off",
+    ];
+    assert_eq!(
+        rates_cut_to(&parents, &five),
+        utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.utf16le.xml"))
+    );
+    assert_eq!(
+        rates_cut_to(&parents, &five[..4]),
+        utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-one-absent.utf16le.xml"))
+    );
+}
 
 /// The names of the `<LEDGER NAME="…">` rows of an answer, in answer order.
 fn ledger_row_names(xml: &str) -> Vec<String> {
@@ -2478,41 +2883,6 @@ fn ledger_row_names(xml: &str) -> Vec<String> {
         rest = &rest[from..];
     }
     out
-}
-
-/// The lab's W16 answer (the unrestricted rates read with the HSN/SAC fields)
-/// with every ledger row removed whose name is not in `wanted`; the removal is
-/// counted, each row left is under one of the four parents, and the rows left
-/// are `wanted`, name for name.
-fn derived_scoped_rates_hsn(wanted: &[String]) -> String {
-    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
-    let mut kept = whole.clone();
-    let mut removed = 0;
-    let mut at = 0;
-    while let Some(start) = kept[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
-        let end = start + kept[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
-        let name = ledger_row_names(&kept[start..end]).remove(0);
-        if wanted.contains(&name) {
-            assert!(
-                SCOPE_PARENTS
-                    .iter()
-                    .any(|parent| kept[start..end].contains(&format!(">{parent}</PARENT>"))),
-                "{name} is under none of the four parents"
-            );
-            at = end;
-        } else {
-            kept.replace_range(start..end, "");
-            removed += 1;
-            at = start;
-        }
-    }
-    assert_eq!(
-        removed,
-        ledger_row_names(&whole).len() - wanted.len(),
-        "rows removed"
-    );
-    assert_eq!(&ledger_row_names(&kept), wanted, "the rows left are wanted");
-    kept
 }
 
 /// BRIDGE PILOT LAB's GUID, from its captured company list.
@@ -3687,6 +4057,9 @@ mod mode_tests;
 #[path = "agent_import_invoice_admission_tests.rs"]
 mod invoice_admission_tests;
 
+#[path = "agent_import_amount_pin_tests.rs"]
+mod amount_pin_tests;
+
 #[test]
 fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_periods() {
     // The recorded Education refusal affected ##SVFromDate/##SVToDate predicates.
@@ -3747,10 +4120,13 @@ mod verify_mode_tests;
 mod identity_tests;
 
 #[path = "agent_import_amend_tests.rs"]
-mod amend_tests;
+pub(super) mod amend_tests;
 
 #[path = "agent_import_text_tests.rs"]
 mod text_tests;
+
+#[path = "agent_import_rebuild_warning_tests.rs"]
+pub(super) mod rebuild_warning_tests;
 
 #[tokio::test]
 async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads() {
@@ -3775,7 +4151,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -4867,6 +5243,7 @@ fn a_name_folding_equal_to_two_live_ledgers_is_reported_whichever_it_names() {
                 requested: requested.to_string(),
                 live,
                 through_alias: Default::default(),
+                has_alias: false,
             }],
             "{requested:?}"
         );
@@ -4931,6 +5308,100 @@ fn a_twin_needing_both_folds_is_still_found() {
         );
         assert_eq!(twins.len(), 1, "{requested:?}");
         assert_eq!(twins[0].live.len(), 2, "{requested:?}");
+    }
+}
+
+/// #626: a pair is admitted only when it is two ledgers differing by exactly a
+/// trailing CR LF, the name equals one of them byte for byte, the batch does not
+/// name the other, no alias folds equal, and both groups were read.
+#[test]
+fn only_one_exact_name_with_one_line_break_twin_is_a_line_break_pair() {
+    fn pair(
+        requested: &str,
+        batch: &[&str],
+        catalogue: &[(&str, Option<&str>)],
+        aliases: &[(&str, &str)],
+    ) -> Option<LineBreakTwin> {
+        let batch = batch.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let twins = folded_twins(
+            &[requested.to_string()],
+            catalogue.iter().copied(),
+            aliases.iter().copied(),
+        );
+        let found = twins.first().expect("a family");
+        let admitted = found.line_break_twin(&batch);
+        assert_eq!(
+            refused_twins(twins.clone(), &batch).is_empty(),
+            admitted.is_some()
+        );
+        admitted
+    }
+    let plain = ("Cash", Some("Cash-in-Hand"));
+    let broken = ("Cash\r\n", Some("Bank Accounts"));
+    for catalogue in [[plain, broken], [broken, plain]] {
+        assert_eq!(
+            pair("Cash", &["Cash"], &catalogue, &[]),
+            Some(LineBreakTwin {
+                named: "Cash".into(),
+                named_group: "Cash-in-Hand".into(),
+                other: "Cash\r\n".into(),
+                other_group: "Bank Accounts".into(),
+            })
+        );
+        assert_eq!(
+            pair("Cash\r\n", &["Cash\r\n"], &catalogue, &[]),
+            Some(LineBreakTwin {
+                named: "Cash\r\n".into(),
+                named_group: "Bank Accounts".into(),
+                other: "Cash".into(),
+                other_group: "Cash-in-Hand".into(),
+            })
+        );
+    }
+    type Row<'a> = (
+        &'a str,
+        &'a [&'a str],
+        &'a [(&'a str, Option<&'a str>)],
+        &'a [(&'a str, &'a str)],
+    );
+    let refused: [Row; 8] = [
+        // Equal to neither ledger: only a fold reaches them.
+        ("CASH", &["CASH"], &[plain, broken], &[]),
+        // The batch names both, so no line can say which one it uses.
+        ("Cash", &["Cash", "Cash\r\n"], &[plain, broken], &[]),
+        // A third ledger in the family.
+        ("Cash", &["Cash"], &[plain, broken, ("CASH", None)], &[]),
+        // The two differ by more than the line break.
+        (
+            "Cash",
+            &["Cash"],
+            &[plain, ("cash\r\n", Some("Bank Accounts"))],
+            &[],
+        ),
+        // Neither is a plain name, so "no line break" would be false of both.
+        (
+            "Cash\r\n",
+            &["Cash\r\n"],
+            &[broken, ("Cash\r\n\r\n", Some("Bank Accounts"))],
+            &[],
+        ),
+        // An alias of a member, and a ledger in the family through an alias.
+        ("Cash", &["Cash"], &[plain, broken], &[("Cash", "CASH")]),
+        (
+            "Cash",
+            &["Cash"],
+            &[plain, ("Other", Some("Bank Accounts"))],
+            &[("Other", "Cash\r\n")],
+        ),
+        // A group that was not read cannot be shown.
+        ("Cash", &["Cash"], &[plain, ("Cash\r\n", None)], &[]),
+    ];
+    for (requested, batch, catalogue, aliases) in refused {
+        assert_eq!(
+            pair(requested, batch, catalogue, aliases),
+            None,
+            "{requested:?} {batch:?} {catalogue:?} {aliases:?}"
+        );
     }
 }
 
@@ -5295,7 +5766,7 @@ fn shipped_write_path_round_trips_a_party_ledger_crlf() {
 fn divergent_verification() -> Value {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -5376,7 +5847,7 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
     // first sales line names a group source, which no capture fills.
     let readback = String::from_utf16(
         &include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
         )
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
@@ -6088,6 +6559,40 @@ async fn numbered_journal_built_against(plans: Vec<ScenarioPlan>) -> (Value, usi
     )
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, a build is refused under the admission lock: it writes no file and
+/// no journal record, and the copy is left as it was.
+#[tokio::test]
+async fn a_build_beside_a_second_journal_is_refused_and_writes_nothing() {
+    use super::split_journal::{tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA};
+    let at = layout();
+    let other = at.copy.join(super::local_data::JOURNAL_FILE);
+    fs::write(&other, super::local_data::tests::journal(true)).unwrap();
+    let simulator =
+        SequenceSimulator::spawn(whole_build(build_numbering_plans(&[]))).expect("build plan");
+    let server = numbering_server(&at.data, simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    input.vouchers[0].voucher_number = Some("TEST-1".into());
+    let failure = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            server.build_import_xml(&serde_json::to_value(input).unwrap()),
+        )
+        .await
+        .err()
+        .expect("refused");
+    simulator.cancel();
+    assert_eq!(failure.code, IMPORT_JOURNAL_SPLIT);
+    assert_eq!(failure.cause, Some(SplitJournal::OtherHoldsBatches.cause()));
+    assert_eq!(written_files(&at.data), 0);
+    assert!(!at.data.join(super::local_data::JOURNAL_FILE).exists());
+    assert_eq!(
+        fs::read(&other).unwrap(),
+        super::local_data::tests::journal(true)
+    );
+}
+
 /// The numbering read with the Journal type numbered Manual and its series'
 /// duplicate setting read as prevented (the capture reads it as not).
 fn manual_journal_preventing_duplicates() -> Vec<ScenarioPlan> {
@@ -6361,11 +6866,11 @@ async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
             assert!(next_step.starts_with("Tell the user that this connection cannot post."));
             for text in [first, next_step] {
                 assert!(
-                    text.contains("once this batch is posted, do not import this file"),
+                    text.contains("Once this batch is posted, do not import this file"),
                     "{text}"
                 );
                 assert!(
-                    text.contains("once this file is imported, do not post this batch"),
+                    text.contains("If this file is imported first, post_import"),
                     "{text}"
                 );
             }
@@ -6416,9 +6921,68 @@ fn a_folded_twin_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
             ("Profit &amp; Loss A/c".to_string(), None),
         ],
         through_alias: Default::default(),
+        has_alias: false,
     };
     let shown = folded_live_ledgers_json(&twins);
     assert_eq!(shown[0]["parent"], "&#4; Primary");
     assert_eq!(shown[1]["parent"], "Primary");
     assert_eq!(shown[2]["parent"], Value::Null);
+}
+
+/// Tally's own import catalogue of a book whose ledgers carry aliases, after the aliases keyed on
+/// its screen and after two ledgers were created with one each by import (`alias-lab-1688`).
+fn alias_lab_catalogue(bytes: &[u8]) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .expect("UTF-16LE");
+    crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+        &xml,
+        "BRIDGE ALIAS LAB",
+        "021bda0c-b1b1-44c8-8279-5212ce87c9c7",
+    )
+    .expect("the captured import catalogue parses")
+}
+
+/// On the captured catalogues, each alias names its ledger in `alias_of` as Tally lists it, at both
+/// points the lab read; the screen's alias typed in capitals names none.
+#[test]
+fn each_captured_alias_names_its_ledger_and_a_case_variant_names_none() {
+    let screen = alias_lab_catalogue(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml"
+    ));
+    let imported = alias_lab_catalogue(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml"
+    ));
+    let screen_rows = [
+        ("Lab Plain Alias", Some("Lab Plain Ledger"), "near_miss"),
+        ("Lab Other First", Some("Lab Other Ledger"), "near_miss"),
+        ("Lab Other Second", Some("Lab Other Ledger"), "near_miss"),
+        ("Lab Caf\u{e9} Sales", Some("Lab Sales"), "near_miss"),
+        ("LAB PLAIN ALIAS", None, "near_miss"),
+    ];
+    let imported_rows = [
+        ("Lab Shape Alias", Some("Lab Alias Shape"), "near_miss"),
+        (
+            "\u{932}\u{948}\u{92c} \u{916}\u{93e}\u{924}\u{93e}",
+            Some("Lab Alias Script"),
+            "missing",
+        ),
+    ];
+    for (catalogue, rows) in [
+        (&screen, &screen_rows[..]),
+        (&imported, &screen_rows[..]),
+        (&imported, &imported_rows[..]),
+    ] {
+        let names = rows.iter().map(|(name, _, _)| *name).collect::<Vec<_>>();
+        let report = alias_report(&names, catalogue.catalog());
+        assert_eq!(report.len(), rows.len());
+        for ((name, owner, state), entry) in rows.iter().zip(&report) {
+            assert_eq!(alias_of(entry), *owner, "{name}: {entry}");
+            assert_eq!(entry["match_state"], *state, "{name}: {entry}");
+        }
+    }
 }

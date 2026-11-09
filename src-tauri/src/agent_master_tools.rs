@@ -47,13 +47,14 @@ use super::post::{refusal_cause, refusal_code, ApprovalTarget, Entry, Pass, Step
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::agent::read_profiles::{ledger_name_index_read, native_group_snapshot_read};
+use crate::agent::shown_cause;
 use crate::tally::approved_import::{
     ApprovedImportAdmissionError, BeforeDispatchError, PendingPostApproval, PostKind,
     UnderLockRefusal,
 };
 use crate::tally::ledger_create_item::{
-    AdmittedDutyHead, AdmittedLedgerKind, GstinError, LedgerCreateItem, MasterName,
-    MasterNameError, PartySide, VerifiedGstin,
+    AdmittedDutyHead, AdmittedLedgerKind, GstinError, LedgerCreateBatch, LedgerCreateBatchError,
+    LedgerCreateItem, MasterName, MasterNameError, PartySide, VerifiedGstin,
 };
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
@@ -71,6 +72,8 @@ use verify::{
 
 /// What a caller is told after a ledger is prepared.
 const PREPARED_NEXT_STEP: &str = "Nothing was written to Tally. To create this ledger, call post_ledger_creates with this batch_id: the local user must approve it in a native dialog first.";
+/// The same after several ledgers are prepared in one batch.
+const PREPARED_BATCH_NEXT_STEP: &str = "Nothing was written to Tally. To create these ledgers, call post_ledger_creates with this batch_id: the local user must approve them, all together, in a native dialog first. They are sent to Tally in one request.";
 
 /// What a caller is told after the one POST when Tally answered and the answer
 /// could not be appended to the journal, whatever stopped the append (its code
@@ -192,6 +195,34 @@ fn parse_ledger_item(ledger: &Value) -> Result<LedgerCreateItem, String> {
     Ok(LedgerCreateItem::new(name, kind))
 }
 
+/// The code a refused batch answers with. `TooMany` cannot come from the tool,
+/// whose published schema caps `ledgers` at the same limit; it is the code of a
+/// stored batch re-read with more ledgers than a request may carry
+/// ([`creates_from_batch`]).
+fn batch_code(error: LedgerCreateBatchError) -> &'static str {
+    match error {
+        LedgerCreateBatchError::Empty => "argument_invalid:ledgers",
+        LedgerCreateBatchError::TooMany => "master_batch_too_large",
+        LedgerCreateBatchError::MixedParents => "master_batch_mixed_parents",
+        LedgerCreateBatchError::NamesMayBeOneMaster => "master_batch_names_may_be_one_master",
+    }
+}
+
+/// The caller's ledgers, `ledger` (one) or `ledgers` (one or more) and never
+/// both, parsed item by item and then admitted as one batch.
+fn parse_ledger_creates(args: &Value) -> Result<LedgerCreateBatch, String> {
+    let items = match (args.get("ledger"), args.get("ledgers")) {
+        (Some(one), None) => vec![parse_ledger_item(one)?],
+        (None, Some(Value::Array(list))) => list
+            .iter()
+            .map(parse_ledger_item)
+            .collect::<Result<Vec<_>, _>>()?,
+        (None, None) => return Err("ledger_required".into()),
+        _ => return Err("argument_invalid:ledgers".into()),
+    };
+    LedgerCreateBatch::new(items).map_err(|error| batch_code(error).to_string())
+}
+
 /// The record of `item` the journal keeps.
 fn stored_from_item(item: &LedgerCreateItem) -> StoredLedgerCreate {
     let (kind, bill_wise, party_gstin, gst_duty_head) = match item.kind() {
@@ -225,14 +256,27 @@ fn stored_from_item(item: &LedgerCreateItem) -> StoredLedgerCreate {
     }
 }
 
-/// The one item of a stored batch, parsed through the same constructors as a
-/// caller's input: a record that no longer parses as an admitted ledger is
-/// refused, not sent.
-fn item_from_batch(batch: &MasterBatch) -> Result<LedgerCreateItem, String> {
+/// Every item of a stored batch, parsed through the same constructors as a
+/// caller's input and admitted as one batch again: a record that no longer
+/// parses as an admitted batch is refused, not sent.
+fn creates_from_batch(batch: &MasterBatch) -> Result<LedgerCreateBatch, String> {
+    let items = batch
+        .items
+        .iter()
+        .map(item_from_stored)
+        .collect::<Result<Vec<_>, _>>()?;
+    LedgerCreateBatch::new(items).map_err(|error| {
+        match error {
+            LedgerCreateBatchError::TooMany => batch_code(error),
+            _ => "master_batch_invalid",
+        }
+        .to_string()
+    })
+}
+
+/// One stored item, parsed as a caller's input is.
+fn item_from_stored(stored: &StoredLedgerCreate) -> Result<LedgerCreateItem, String> {
     let refused = || "master_batch_invalid".to_string();
-    let [stored] = batch.items.as_slice() else {
-        return Err(refused());
-    };
     let name = MasterName::new(&stored.name).map_err(|_| refused())?;
     let party = |side| -> Result<AdmittedLedgerKind, String> {
         Ok(AdmittedLedgerKind::Party {
@@ -270,8 +314,9 @@ fn item_from_batch(batch: &MasterBatch) -> Result<LedgerCreateItem, String> {
     Ok(item)
 }
 
-/// Enforces the published `inputSchema` on the nested `ledger` object, so its
-/// bounds live in one place.
+/// Enforces the published `inputSchema` on the nested `ledger` object and the
+/// `ledgers` list, each item of which is held to the `ledger` object's schema,
+/// so their bounds live in one place.
 fn enforce_published_schema(args: &Value) -> Result<(), String> {
     let definitions = super::super::catalog::registered_tool_definitions(true, true);
     let schema = definitions
@@ -283,12 +328,19 @@ fn enforce_published_schema(args: &Value) -> Result<(), String> {
         })
         .map(|tool| tool["inputSchema"].clone())
         .ok_or_else(|| "tool_not_found".to_string())?;
-    if let Some(value) = args.get("ledger") {
-        super::super::catalog::validate_against_schema(
-            value,
-            &schema["properties"]["ledger"],
-            "ledger",
-        )?;
+    for key in ["ledger", "ledgers"] {
+        if let Some(value) = args.get(key) {
+            super::super::catalog::validate_against_schema(value, &schema["properties"][key], key)?;
+        }
+    }
+    if let Some(Value::Array(items)) = args.get("ledgers") {
+        for item in items {
+            super::super::catalog::validate_against_schema(
+                item,
+                &schema["properties"]["ledger"],
+                "ledgers",
+            )?;
+        }
     }
     Ok(())
 }
@@ -341,6 +393,7 @@ fn verdict_state_code(state: super::master_ledger::MasterVerdictState) -> &'stat
         MasterVerdictState::MasterWriteLocatedElsewhere => "master_write_located_elsewhere",
         MasterVerdictState::ConfirmedAbsent => "confirmed_absent",
         MasterVerdictState::PostedUnattributed => "posted_unattributed",
+        MasterVerdictState::ConfirmedAbsentAfterChange => "confirmed_absent_after_change",
     }
 }
 
@@ -483,10 +536,7 @@ impl Server {
     ) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
         enforce_published_schema(args)?;
-        let item = parse_ledger_item(
-            args.get("ledger")
-                .ok_or_else(|| "ledger_required".to_string())?,
-        )?;
+        let creates = parse_ledger_creates(args)?;
         let (company, identity, identity_evidence) = self.verified_company(guid).await?;
         let mut accumulated = identity_evidence;
         let origin = super::super::canonical_loopback_origin(&self.settings.endpoint)
@@ -505,13 +555,13 @@ impl Server {
             .await?;
         accumulated = combine_evidence(accumulated, evidence);
         require_licensed_mode(profile)?;
-        check_name_free(&ledgers, &groups, &item, identity.company_guid())
+        check_name_free(&ledgers, &groups, &creates, identity.company_guid())
             .map_err(|error| name_check_failure(&error))?;
-        let request = MasterPostRequest::render(item.clone(), &identity);
+        let request = MasterPostRequest::render(creates.clone(), &identity);
         let preview = if self.settings.redaction == super::super::Redaction::MaskParties {
-            masked_review_text(&item, &identity, &origin)
+            masked_review_text(&creates, &identity, &origin)
         } else {
-            master_review_text(&item, &identity, &origin)
+            master_review_text(&creates, &identity, &origin)
         }
         .map_err(|error| ToolFailure::from(error.code().to_string()))?;
         let batch = MasterBatch {
@@ -524,7 +574,7 @@ impl Server {
                 number: identity.company_number().to_string(),
                 books_from: identity.books_from_yyyymmdd().to_string(),
             },
-            items: vec![stored_from_item(&item)],
+            items: creates.items().iter().map(stored_from_item).collect(),
         };
         {
             let lock = ExclusiveAdmission::acquire(&self.settings.data_dir)?;
@@ -539,8 +589,13 @@ impl Server {
             payload: json!({"result":{
                 "batch_id": batch.batch_id,
                 "preview": preview,
-                "parent": item.parent(),
-                "next_step": PREPARED_NEXT_STEP,
+                "parent": creates.parent(),
+                "ledger_count": creates.len(),
+                "next_step": if creates.len() == 1 {
+                    PREPARED_NEXT_STEP
+                } else {
+                    PREPARED_BATCH_NEXT_STEP
+                },
             }}),
             evidence: accumulated,
             company_guid: Some(batch.company.guid),
@@ -646,12 +701,12 @@ impl Server {
                         .await,
                 )));
             }
-            let item = item_from_batch(&batch)?;
+            let creates = creates_from_batch(&batch)?;
             let target = ApprovalTarget {
                 tool: "post_ledger_creates",
                 batch_id,
                 guid: &guid,
-                vouchers: 1,
+                vouchers: creates.len(),
             };
             // A dialog or approval an earlier call left for this batch (#725).
             let redeeming = match self
@@ -674,7 +729,7 @@ impl Server {
             }
             // Rendered once. Its digest must be the batch's, so a record the
             // journal holds that no longer renders to its own digest is not sent.
-            let request = MasterPostRequest::render(item.clone(), &identity);
+            let request = MasterPostRequest::render(creates.clone(), &identity);
             if request.sha256() != batch.batch_sha256 {
                 return Err("import_batch_changed".to_string().into());
             }
@@ -694,7 +749,7 @@ impl Server {
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             require_licensed_mode(profile)?;
-            check_name_free(&ledgers, &groups, &item, identity.company_guid())
+            check_name_free(&ledgers, &groups, &creates, identity.company_guid())
                 .map_err(|error| name_check_failure(&error))?;
             // A name an open dispatch holds is refused before the person is
             // asked, whether this pass asks or redeems an approval given
@@ -725,17 +780,17 @@ impl Server {
                     ))));
                 }
             }
-            let preview = master_review_text(&item, &identity, &origin)
+            let preview = master_review_text(&creates, &identity, &origin)
                 .map_err(|error| ToolFailure::from(error.code().to_string()))?;
             let company_marks_request = crate::tally::agent_read_request::AgentReadRequest::parse(
                 super::super::read_profiles::render_agent_company_high_water(&company.name),
             )
             .map_err(|error| error.to_string())?;
             let binding =
-                ApprovalBinding::masters(&batch.batch_sha256, &origin, &identity, &item, &preview);
+                ApprovalBinding::masters(&batch.batch_sha256, &origin, &identity, &creates, &preview);
             if !redeeming {
                 let asked = PendingPostApproval::ask_masters(
-                    item.clone(),
+                    creates.clone(),
                     identity.clone(),
                     preview.clone(),
                     company_marks_request,
@@ -1181,6 +1236,11 @@ impl Server {
             }
             (None, None) => {}
         }
+        // A settled absent state says what it rests on here too, as the call
+        // that judged it did.
+        if verdict.is_some_and(|verdict| verdict.state().is_absent()) {
+            result["verification"]["basis"] = json!("read_after_send_order");
+        }
         ToolOutcome {
             payload: json!({ "result": result }),
             evidence,
@@ -1457,14 +1517,35 @@ fn master_next_step(code: &str) -> Option<&'static str> {
             "Nothing was sent: the approval box closed unanswered when its time ran out. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         ),
         "master_review_too_large" => Some(
-            "Nothing was sent: the approval box's text was over its limit, or on Windows the box did not fit the screen whole. A larger or less scaled screen helps with the second; then call post_ledger_creates with this batch_id again. If it is refused the same way, call prepare_ledger_creates for a new batch with a shorter ledger name.",
+            "Nothing was sent: the approval box's text was over its limit, or the box would not fit the screen whole. A larger or less scaled screen helps with the second, and on a Mac so does moving the Dock to the side or hiding it; then call post_ledger_creates with this batch_id again. If it is refused the same way, call prepare_ledger_creates for a new batch with fewer ledgers, or shorter ledger names.",
         ),
         "master_approval_declined" => Some(
             "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         ),
+        // #2142: the lock was refused before anything was recorded or sent.
+        "tally_endpoint_draining" => Some(
+            "Nothing was sent: Tally was still busy with an earlier request that did not finish. Call post_ledger_creates with this batch_id again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. That call opens a new approval box.",
+        ),
         "master_pre_image_remove_failed" => Some(
             "Nothing was sent. A working file of ComplyEaze Bridge for this batch could not be removed from its local folder; do not retry this batch. Call prepare_ledger_creates for a new batch.",
         ),
+        _ => None,
+    }
+}
+
+/// The step when nothing was sent because a read before the create was cut at the request limit
+/// (#2123): what a busy gateway gives, observed while another call's long read held Tally for the
+/// whole limit. The approval this call was to use is withdrawn with the refusal, so the next call
+/// asks again.
+const NEXT_TALLY_BUSY: &str = "Nothing was sent: Tally did not answer a read made before the create within the time ComplyEaze Bridge waits for one, which is what happens while Tally is busy with another long request. Once Tally is idle and answering, call post_ledger_creates with this batch_id again; that call opens a new approval box. Do not repeat the call in a loop while Tally is busy.";
+
+/// The next step for a refusal with nothing sent whose code has none of its own, by why its
+/// request was not answered: only a read cut at the limit has one here. The steps the other tools
+/// give for an unanswered request name the endpoint in the refusal, which these refusals do not
+/// carry, so they are not borrowed.
+fn master_unanswered_next_step(reason: &str) -> Option<&'static str> {
+    match reason {
+        "request_deadline_exceeded" => Some(NEXT_TALLY_BUSY),
         _ => None,
     }
 }
@@ -1519,15 +1600,19 @@ fn master_failure_outcome(
         Some(true) => "The create may have been sent to Tally. Do not send this batch again: check the company's ledgers in Tally.",
         None => "Whether the create was sent to Tally is not known: the journal could not be read just now. Check the company's ledgers in Tally.",
     }});
-    if let Some(cause) = failure.cause {
+    if let Some(cause) = shown_cause(&failure.code, failure.cause, failure.unanswered) {
         error["cause"] = json!(cause);
     }
-    if failure.code == "tally_endpoint_busy" {
-        error["retry_after_s"] = json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+    if let Some(after) = crate::endpoint_wire::wire_retry_after_s(&failure.code) {
+        error["retry_after_s"] = json!(after);
     }
     match attempted {
         Some(false) => {
-            if let Some(next_step) = master_next_step(&failure.code) {
+            if let Some(next_step) = master_next_step(&failure.code).or_else(|| {
+                failure
+                    .unanswered
+                    .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
+            }) {
                 error["next_step"] = json!(next_step);
             }
         }

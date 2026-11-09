@@ -239,6 +239,21 @@ const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repos
 if (reuseScriptDigest !== "fed907ab68fe52ebd7eb227a377f546a51127303eef48d6cee560fa6e2560c6a") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
+// The merge gate's test (about 6.5 of the Workflow consistency job's 7.5 minutes) runs on a pull request only when the diff
+// touches what it reads, which the merge-gate-scope step decides; the test step must stay wired to that output and nothing
+// else, or the test silently stops running on every event, the merge queue included. The step's two env lines are pinned
+// too: a base taken from anywhere but the pull request's base (its head, say) gives an empty diff and skips the test.
+{
+  const consistencyJob = jobBlock(workflow, "workflow-consistency");
+  const wiring = "      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py\n";
+  if ((consistencyJob + "\n").split(wiring).length !== 2 || (consistencyJob.match(/^ *(?:- )?run: .*merge-gate\.test\.py/gm) ?? []).length !== 1 || (consistencyJob.match(/^      - id: merge-gate-scope$/gm) ?? []).length !== 1) {
+    failures.push("the merge gate's test must run once, exactly when the merge-gate-scope step says so");
+  }
+  const scopeEnv = "      - id: merge-gate-scope\n        env:\n          EVENT_NAME: ${{ github.event_name }}\n          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}\n";
+  if (consistencyJob.split(scopeEnv).length !== 2) {
+    failures.push("the merge-gate-scope step must read the event name and the pull request's base SHA");
+  }
+}
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
@@ -545,8 +560,8 @@ const expectedChanges = [
   "          # bundle job runs: fetch-pdfium, capture-package-log, check-mcpb-bundle, package-mcpb, check-license-metadata,",
   "          # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests. Also what",
   "          # pins the bundler and the build: pnpm-lock.yaml, .node-version, rust-toolchain.toml, .cargo/ and",
-  "          # src-tauri/Cargo.lock, Cargo.toml and .cargo/.",
-  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|pnpm-lock\\.yaml$|\\.node-version$|rust-toolchain\\.toml$|\\.cargo/|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$|Cargo\\.(lock|toml)$|\\.cargo/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$)'",
+  "          # src-tauri/Cargo.lock, Cargo.toml and .cargo/, and the Rust port of check-mcpb-bundle in src-tauri/examples/.",
+  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|pnpm-lock\\.yaml$|\\.node-version$|rust-toolchain\\.toml$|\\.cargo/|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$|Cargo\\.(lock|toml)$|\\.cargo/|examples/check_mcpb_bundle\\.rs$)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$)'",
   "",
   "          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready",
   "          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this",
@@ -589,7 +604,9 @@ const expectedChanges = [
   "            if [[ \"$lookup_status\" -ne 0 ]]; then decision=''; fi",
   "            printf '%s\\n' \"$decision\"",
   "            { echo '### Master push reuse'; echo '```'; printf '%s\\n' \"$decision\"; echo '```'; echo \"Lookup exit status: $lookup_status\"; } >> \"$GITHUB_STEP_SUMMARY\"",
-  "            reused() { printf '%s\\n' \"$decision\" | head -n 2 | grep -qx \"reuse_$1=true\"; }",
+  "            # The first two lines are read with no pipe: under pipefail, a reader that stops at its match could end",
+  "            # a writer still writing, and the step then read a reuse line as none.",
+  "            reused() { local first='' second=''; { IFS= read -r first; IFS= read -r second; } <<< \"$decision\" || true; [[ \"$first\" == \"reuse_$1=true\" || \"$second\" == \"reuse_$1=true\" ]]; }",
   "            packaging=true",
   "            if [[ -n \"$BEFORE_SHA\" && ! \"$BEFORE_SHA\" =~ ^0+$ ]] && pushed_files=\"$(git diff --name-only --no-renames -z \"$BEFORE_SHA\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\" && ! grep -Eq \"$packaging_paths\" <<< \"$pushed_files\"; then",
   "              packaging=false",
@@ -655,7 +672,7 @@ const expectedChanges = [
   "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
-  "          if [[ \"$draft\" == false ]] && grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
+  "          if [[ \"$draft\" == false ]] && grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|examples/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",

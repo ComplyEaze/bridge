@@ -220,7 +220,7 @@ impl Inputs {
     /// Type the two ledger maps (keys already bound), refusing the first offending entry of a
     /// table, registration types first, with [`AuditError::ConfigValueRefused`] naming the table
     /// and the ledger, whether or not a line reaches it. A registration type must be text that is
-    /// one of [`REGISTRATION_TYPES`] once stripped and case-folded; a money category must be text
+    /// one of `REGISTRATION_TYPES` once stripped and case-folded; a money category must be text
     /// that is exactly one of the five (no strip, no case fold, no blank). The reference refuses
     /// the same values, and before this it read a mistyped one as no status or no category.
     pub fn new(

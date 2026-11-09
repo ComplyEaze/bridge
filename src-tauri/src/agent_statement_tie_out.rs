@@ -300,8 +300,10 @@ fn recorded_window(document: &Value) -> Result<Result<Edges, NotEstablished>, St
     match tie_out.get("state").and_then(Value::as_str) {
         Some("established")
             if tie_out.len() == 6
-                && tie_out.get("basis").and_then(Value::as_str)
-                    == Some(bank_statement::TIE_OUT_BASIS) =>
+                && matches!(
+                    tie_out.get("basis").and_then(Value::as_str),
+                    Some(bank_statement::TIE_OUT_BASIS | bank_statement::TIE_OUT_BASIS_VALUE_DATE)
+                ) =>
         {
             let (first, last) = (
                 day(tie_out.get("first_date"))?,

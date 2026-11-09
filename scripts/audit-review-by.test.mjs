@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // `.cargo/audit.toml` cannot hold a review date as a field (cargo-audit refuses unknown keys), so each ignore entry
-// carries `Review-by: YYYY-MM-DD` in its comment. Nothing else reads it, and `cargo audit` prints nothing for an
-// ignored id, so without this test an accepted advisory would stay accepted after the day it was to be looked at
-// again. Once a date has passed the test fails for everyone, which is the point: re-run the entry's checks, then
+// carries `Review-by: YYYY-MM-DD` in its comment. `cargo audit` prints nothing for an ignored id, and the scheduled
+// audit's tracking issue only lists the date (scripts/audit-tracking-issue.mjs), so without this test an accepted
+// advisory would stay accepted after the day it was to be looked at again. Once a date has passed the test fails for everyone, which is the point: re-run the entry's checks, then
 // either remove the entry or renew its date with the new finding written in its tracking issue (#2432 for
 // RUSTSEC-2026-0459). It reads dates only; whether the reason still holds is a human's call.
 import assert from "node:assert/strict";

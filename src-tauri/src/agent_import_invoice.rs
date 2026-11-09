@@ -34,6 +34,12 @@ pub(in crate::agent) use wire::{
     render_invoice_window_numbers_request, render_ledger_rates_request_for_ledgers,
     render_voucher_types_request, VoucherTypeGuid,
 };
+// Retired from the build (#2162 item 11), and kept for the tests that pin its
+// bytes: the request-byte table of #2417 imports it from here. Until that
+// table lands nothing on this path uses it, hence the allow.
+#[cfg(test)]
+#[allow(unused_imports)]
+pub(in crate::agent) use wire::render_invoice_number_request;
 
 /// What an invoice voucher carries besides its entries.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

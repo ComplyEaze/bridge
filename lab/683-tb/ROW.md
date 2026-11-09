@@ -38,17 +38,21 @@ Check every file against `SHA256.txt` first, and each send's request file again 
 **How the request bytes were made: a lab-only render test, not a template edit.** `src-tauri/crates/bridge-tally-protocol/tests/lab_683_tb_render.rs` on this branch, one `#[ignore]` test, run once in a build slot:
 `LAB_683_TB_OUT=<this folder> cargo test -p bridge-tally-protocol --test lab_683_tb_render -- --ignored --exact lab_683_tb_renders_the_row_requests`. It calls the builder with the book's name and the dates, and writes each request as the build sends it, UTF-16LE with a BOM. Before writing, it checks the 1 to 30 April render byte for byte against the request of 29 Oct. That shows the encoding and the builder equal, and the builder's text has not changed since that build (`git diff af4a0dbf ae38a75c` on `native_trial_balance/mod.rs` touches no renderer). The test is on this branch only and is never merged.
 
+**`tb.py` mirrors master's parse, rule for rule:** its composite check is `is_currency_composite` and `is_unspaced_currency_composite` (`currency_composite.rs`) written out in Python, each value is classed on its text as sent (never trimmed), and it stops where `parse_envelope` and `parse_native_trial_balance_with_currency` (`native_trial_balance/wire.rs`) refuse the whole answer. Its header lists every STOP.
+
 **`tb.py` was tried:**
-- **On master's fixture `trial_balance_currency_forex_live`** (7.1, another book, with `BASE` set to that book's `I₹` in a scratch copy): FOREIGN 3, MIXED 3, PLAIN 4. These are the same ledgers that master's parse record for that fixture sets aside and keeps (`tests/parse_record/trial_balance_currency_forex_live.utf16le.xml.parse_native_trial_balance_with_currency.txt`).
+- **On master's fixture `trial_balance_currency_forex_live`** (7.1, another book, with `BOOK` and `BASE` set to that book's GUID and `I₹` in a scratch copy): FOREIGN 3, MIXED 3, PLAIN 4. These are the same ledgers that master's parse record for that fixture sets aside and keeps (`tests/parse_record/trial_balance_currency_forex_live.utf16le.xml.parse_native_trial_balance_with_currency.txt`).
 - **On this book's 29 Oct answer** (`lab/2071-forex-rerun-answers` 0d7eb0bf, `raw/tb-currency.response`, four vouchers then): MIXED `BRIDGE Export Sales`, `BRIDGE Lab Bank`, `BRIDGE USD Customer` and `Profit & Loss A/c`, and PLAIN `Cash`. `--question` gave COMPOSITE (DEBITTOTALS, CREDITTOTALS, TBALCLOSING).
-- **On copies of that answer:**
-  - one composite made plain: the row stays MIXED on its other values;
-  - a composite with the wrong base symbol: OTHER on that value;
-  - `Cash`'s debit written `-1,000.00`: UNREAD;
-  - one `CURRENCYNAME` made `$`: FOREIGN, and `--sets` against the original gave SETS DIFFER naming that ledger, while the original against itself gave SETS SAME;
-  - the USD Customer row renamed: QUESTION: NOT ANSWERED;
-  - no COLLECTION: STOP (exit 1);
-  - bytes that are not UTF-16LE: STOP (exit 1).
+- **On copies of that answer**, the question ledger's row unless named:
+  - its three composites made plain: NO COMPOSITE;
+  - then one of them written `87 008.00`, or with Arabic-Indic digits in its rate, or a 7.2 composite with one decimal, or a value with a leading space: OTHER, UNREAD, and NOT ANSWERED (OTHER in that field);
+  - a 7.1 composite with three spaces before `=`, a 7.1 composite with no decimals and a rate of `87.5`, or a symbol `US.$`: COMPOSITE;
+  - one composite made plain, the others kept: still COMPOSITE on those;
+  - its `CURRENCYNAME` made `$`: FOREIGN ('$'), and `--sets` against the original gave SETS DIFFER naming it, while the original against itself gave SETS SAME;
+  - `Cash`'s debit written `-1,000.00`: UNREAD, with the line that master refuses the answer;
+  - the row renamed: NOT ANSWERED (no row);
+  - its GUID's book part in capitals: read as the book's, as master compares it;
+  - each a STOP (exit 1): its GUID one digit off the book's, `Cash` given its GUID in capitals, `Cash` renamed to it in capitals, its `CURRENCYNAME` or `TBALOPENING` removed, STATUS `0`, a LINEERROR added, every LEDGER row removed, no COLLECTION, an unclosed tag, bytes that are not UTF-16LE.
 
 ## Screens and prompts
 This row opens no master, voucher or report screen, and expects no prompt. The screen paths are row 683-LM's, which loaded and closed this book that way with no prompt (`lab/683-lm-answers` `RESULTS.md`, steps 0 and 9):
@@ -106,7 +110,7 @@ Steps 2 to 4 never stop the row on an answer that differs from EXPECT: each is a
 Press no key, screenshot the whole window, and report before anything else is pressed or sent, if:
 - a dialog or prompt appears, or a second `tally.exe` starts;
 - the gateway stops answering, or a send passes the wedge rule's 5 minutes;
-- `run.py`, `lm.py` or `tb.py` stops;
+- `run.py`, `lm.py` or `tb.py` stops (`tb.py`: an answer that does not decode or parse, carries a DOCTYPE, LINEERROR or ERROR, has a STATUS other than one `1`, not one COLLECTION or no LEDGER row, a row without NAME, CURRENCYNAME or one of the four values, a GUID that is not the book's, two rows with one GUID or one name in any case, two of one child element in a row, or no row in the base currency);
 - m0 is not one row, the book's, V 11, M 214;
 - m1 differs from m0.
 
@@ -128,8 +132,9 @@ Press no key, screenshot the whole window, and report before anything else is pr
 
 ## Decides
 - **QUESTION: COMPOSITE:** rule 1 sees a dollar balance carried into a window with no entry in it, on this book, release and window: PARTIAL. A build may then lift the several-currency refusal for a `from` after the book's start, with these answers as fixtures.
-- **QUESTION: NO COMPOSITE:** rule 1 misses that ledger. The build keeps refusing a several-currency book for a `from` after the book's start.
-- **QUESTION: NOT ANSWERED:** the answer has no `BRIDGE USD Customer` row. Record it; the decision waits, and nothing is built on it.
+- **QUESTION: NO COMPOSITE** (its currency the base and all four values plain or empty): rule 1 misses that ledger. The build keeps refusing a several-currency book for a `from` after the book's start.
+- **QUESTION: NOT ANSWERED:** the answer has no `BRIDGE USD Customer` row, or a value on it is neither a plain figure nor a composite. Record it; the decision waits, and nothing is built on it.
+- **QUESTION: FOREIGN:** `trial_balance` sets the ledger aside by its currency, so rule 1 still sees it. But every ledger read `₹` on 2 Nov, so it decides nothing until that is explained.
 - **Any UNREAD in `tb2`:** master's parse would refuse that Trial Balance whole. Record the text for #683.
 - **`tb1` not as EXPECT:** the book or the script reads differently from 2 Nov. `tb2` is recorded, but it decides nothing until that is explained.
 - **`BRIDGE USD Supplier` and `BRIDGE Lab Bank`:** recorded, and they decide nothing alone. USD Supplier's dollar part is $0.00, so a plain row there is not a miss.

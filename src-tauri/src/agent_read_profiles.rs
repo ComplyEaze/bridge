@@ -699,6 +699,25 @@ pub(super) fn invoice_readback_read(
     ))
 }
 
+/// A posted invoice's e-invoice details, read over its one date by the window read with the
+/// e-invoice words: byte for byte the request a `vouchers` call with `include_e_invoice` sends for
+/// a window it reads whole (§8.2j, measured on `BRIDGE EINVOICE LAB`), so no new request shape is
+/// sent. Only an invoice that carries details sends it (#2162 item 9).
+pub(super) fn invoice_e_invoice_read(
+    company: &str,
+    date: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_named_vouchers_in_span(
+        company,
+        date,
+        date,
+        None,
+        NamedVoucherFields::E_INVOICE_ONLY,
+        false,
+    )
+    .map(ReadRequest)
+}
+
 /// The ledger listing with each ledger's GST rate and rounding, for the tax
 /// check of an invoice, restricted to the ledgers the invoice names, by GUID
 /// (#1331). Its window is the invoice's financial year start and the invoice

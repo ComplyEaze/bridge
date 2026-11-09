@@ -2804,6 +2804,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                 voucher_type_name: _,
                 place_of_supply: _,
                 round_off_ledger: _,
+                e_invoice: _,
                 observed:
                     Some(super::super::invoice::InvoiceObserved {
                         voucher_type_guid: _,
@@ -4694,6 +4695,42 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
         )
     );
     assert_eq!(preview.lines().count(), 23, "{preview}");
+    // E-invoice details add the IRN as one line under the registration and the acknowledgement
+    // after the bill allocation, so the five-leg invoice with a round off still fits (#2162
+    // item 9; the details are row 2162-IRN9's, as Tally stored them).
+    let mut detailed = line.clone();
+    detailed.vouchers[0].invoice.as_mut().unwrap().e_invoice = Some(
+        serde_json::from_value(json!({
+            "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+            "ack_no": "445566",
+            "ack_date": "2025-04-03"
+        }))
+        .unwrap(),
+    );
+    let with_details = review_preview_for(&detailed, &endpoint, PostScope::Vouchers)
+        .expect("a five-leg invoice with e-invoice details fits the dialog");
+    let mut expected = text(
+        [
+            "Dr 11200.40  \"Customer A\"",
+            "Cr 10000.00  \"Sales\"",
+            "Cr 600.00  \"Output CGST\"",
+            "Cr 600.00  \"Output SGST\"",
+            "Cr 0.40  \"Round Off\"",
+        ],
+        "",
+    );
+    let allocation = expected
+        .iter()
+        .position(|shown| shown == "Bill allocation: New Ref \"278\"")
+        .unwrap();
+    expected[allocation].push_str("  E-invoice ack: 445566 of 2025-04-03");
+    expected.insert(
+        allocation,
+        "E-invoice IRN: c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0"
+            .to_string(),
+    );
+    assert_eq!(with_details.lines().collect::<Vec<_>>(), expected);
+    assert_eq!(with_details.lines().count(), 24, "{with_details}");
     // A leg the batch records as approved On Account is marked on its own line
     // and on no other, and the legend takes the blank line's place: the dialog
     // still fits with a round off.

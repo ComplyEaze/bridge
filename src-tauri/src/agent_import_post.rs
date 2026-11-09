@@ -3617,6 +3617,19 @@ fn invoice_review_preview(
     } else {
         format!("{legend}\n")
     };
+    // The e-invoice details, when the invoice carries them (#2162 item 9): the IRN on a line of
+    // its own under the customer's registration, and the acknowledgement after the bill
+    // allocation, so a five-leg invoice still fits the dialog. That line is at most 97
+    // characters: the longer allocation (46), two spaces, and an acknowledgement of a 20-digit
+    // number (49).
+    let (e_invoice_irn, e_invoice_ack) = detail
+        .e_invoice
+        .as_ref()
+        .map(|details| {
+            let [irn, ack] = details.review_lines();
+            (format!("{irn}\n"), format!("  {ack}"))
+        })
+        .unwrap_or_default();
     let warned = observed
         .hsn_warnings
         .iter()
@@ -3628,7 +3641,7 @@ fn invoice_review_preview(
     } else {
         invoice_checked_hsn_line(warned)
     };
-    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{checked}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\n{e_invoice_irn}Bill allocation: {allocation}{e_invoice_ack}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{checked}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         quoted(&company.name), company.guid, company.company_number, shown_date(company.books_from.as_str()),
         quoted(&detail.voucher_type_name), shown_date(voucher.date.as_str()), quoted(number),
         quoted(party), detail.place_of_supply, entries, line.batch_id);

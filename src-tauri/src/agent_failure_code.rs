@@ -68,6 +68,20 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The differences an invoice's e-invoice read gives that name no element (#2162 item 9).
+    pub(crate) enum EInvoiceReadbackCode {
+        /// The read was not answered, or its request could not be built.
+        ReadFailed = "e_invoice_readback_failed",
+        /// The answer did not parse as a vouchers read.
+        Unreadable = "e_invoice_readback_unreadable",
+        /// No voucher of the invoice's date carries the GUID its read-back returned.
+        NotFound = "e_invoice_not_found",
+        /// More than one voucher carries that GUID.
+        NotUnique = "e_invoice_not_unique",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

@@ -16,3 +16,5 @@ Item 1 is done: `lab/2074-2214-w4-answers` at a16b7cc7, gate PASS.
 8. `lab/2162-bc-sheet` at e2b1ca82, right after item 7 in the same pilot sitting. It writes to `BRIDGE PILOT LAB` only: take BK first (C5), restore at the end (C6), and check the COMPANY row's marks equal step 1's. Answers on `lab/2162-bc-answers`.
 Done so far: item 6 at a3611599, item 4 at e870ba8c. Both gate PASS.
 Item 5: use the queue's branch name, `lab/2162-class-answers`. Where the sheet says otherwise, the queue wins.
+9. `lab/2390-crt-sheet` at 94a6089e (reads only: no Tally, no install, no download). Check `SHA256.txt` first. Run it on the built bundle already on the lab PC. If the 0.7.0 `.mcpb` file is already on the lab PC, also list its entries (names and sizes). Do not download it if it is not there. Answers on `lab/2390-crt-answers`. Run it after item 8, or in any wait inside the pilot sitting.
+Item 5 is done: `lab/2162-class-answers` at dddb633d.

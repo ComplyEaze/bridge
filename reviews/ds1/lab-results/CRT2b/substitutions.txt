@@ -1,0 +1,2 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed:
+scripts/s0-s2.ps1: original 3451 B sha256 8f729cb67938eab81f68ea2b5a38a4c371a596038c60c0b899742e4eb4c5ebd3 (kept on the lab PC); 3 x the lab folder -> <lab folder>

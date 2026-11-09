@@ -1,0 +1,12 @@
+date UTC 2026-11-09T11:03:34Z
+
+
+Caption        : Microsoft Windows 10 Home Single Language
+Version        : 10.0.19045
+BuildNumber    : 19045
+OSArchitecture : 64-bit
+
+
+
+artifact zip 60181141 B sha256 d5bc5aed099b3720d65242fb816443a50dfb470b21b2c685db9e8328df376924 ; queue (item 16's full value) d5bc5aed099b3720d65242fb816443a50dfb470b21b2c685db9e8328df376924 ; equal True
+handed mcpb 16635419 B sha256 f52d8315278220ac698399287b09d2ec029f008da037aed11d2f15ded84920dd ; queue (item 16's full value) f52d8315278220ac698399287b09d2ec029f008da037aed11d2f15ded84920dd ; equal True

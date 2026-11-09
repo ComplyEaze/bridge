@@ -1,0 +1,4 @@
+run A new 28 old 29 new-only [] old-only ['VCRUNTIME140.dll']
+run B new 27 old 28 new-only [] old-only ['VCRUNTIME140.dll']
+new file, A only ['apphelp.dll'] B only []
+0.7.0, A only ['apphelp.dll'] B only []

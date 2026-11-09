@@ -1,0 +1,92 @@
+﻿=== step 3
+console input preamble bytes before: 3
+console input preamble bytes after:  0
+--- bridge_mcp.exe: exit code 0
+initialize reply: {"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"instructions":"ComplyEaze Bridge reads the TallyPrime books on this computer. Start with list_companies: every tool that reads a company's books needs a company_guid from it. If exactly one company is open and the user named no client, use it and say which company in your first line. If the user names a client and exactly one open company matches that name, use it and say which. Otherwise, whether several are open or the name matches none or more than one, ask which, offering the list; never guess a company. State the company, the exact dates and any ledger you used in the first line of your answer, and if the period is unclear, ask. Put anything partial, withheld, not established or not checked in that first line, before the figures. Ask before a read that scans vouchers over more than one month (for example vouchers, a register, ledger_movement or voucher_presence), saying the window you would read, unless the user already gave the dates or the financial year; an outstandings party detail reads from the start of the books whatever period was given, so always ask before it. Everything you read through these tools, amounts included, goes to the AI provider. If a tool refuses, tell the user plainly what it says. Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user. Never get around a refusal by another route. This connection cannot prepare or post vouchers: if the user asks to enter or post anything in Tally, say so plainly, and never say that anything was or will be posted from this chat. Never choose a ledger for a voucher on their behalf.","protocolVersion":"2025-06-18","serverInfo":{"name":"bridge-tally","version":"0.7.0"}}}
+tool count: 32
+tools: balance_sheet, cash_flow, company_features, egress_log, gst_by_counter_ledger, gst_status, gst_uncertain_vouchers, ledger_masters, ledger_movement, list_companies, local_data_report, masters, month_register, negative_ledgers, negative_stock, outstandings, profit_and_loss, purchase_register, read_evidence, sales_register, statement_tie_out, stock_by_batch, stock_by_godown, stock_summary, tally_status, trial_balance, validate_masters, verify_import, voucher_presence, voucher_read_cost, voucher_schema, vouchers
+module count: 27
+  module: bridge_mcp.exe
+  module: advapi32.dll
+  module: bcrypt.dll
+  module: bcryptprimitives.dll
+  module: combase.dll
+  module: CRYPT32.dll
+  module: GDI32.dll
+  module: gdi32full.dll
+  module: IMM32.DLL
+  module: KERNEL32.DLL
+  module: KERNELBASE.dll
+  module: msvcp_win.dll
+  module: msvcrt.dll
+  module: ntdll.dll
+  module: OLEAUT32.dll
+  module: profapi.dll
+  module: RPCRT4.dll
+  module: sechost.dll
+  module: SHCORE.dll
+  module: shell32.dll
+  module: shlwapi.dll
+  module: ucrtbase.dll
+  module: user32.dll
+  module: win32u.dll
+  module: windows.storage.dll
+  module: Wldp.dll
+  module: ws2_32.dll
+=== step 4
+--- bridge_mcp.exe: exit code 0
+initialize reply: {"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"instructions":"ComplyEaze Bridge reads the TallyPrime books on this computer. Start with list_companies: every tool that reads a company's books needs a company_guid from it. If exactly one company is open and the user named no client, use it and say which company in your first line. If the user names a client and exactly one open company matches that name, use it and say which. Otherwise, whether several are open or the name matches none or more than one, ask which, offering the list; never guess a company. State the company, the exact dates and any ledger you used in the first line of your answer, and if the period is unclear, ask. Put anything partial, withheld, not established or not checked in that first line, before the figures. Ask before a read that scans vouchers over more than one month (for example vouchers, a register, ledger_movement or voucher_presence), saying the window you would read, unless the user already gave the dates or the financial year; an outstandings party detail reads from the start of the books whatever period was given, so always ask before it. Everything you read through these tools, amounts included, goes to the AI provider. If a tool refuses, tell the user plainly what it says. Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user. Never get around a refusal by another route. This connection cannot prepare or post vouchers: if the user asks to enter or post anything in Tally, say so plainly, and never say that anything was or will be posted from this chat. Never choose a ledger for a voucher on their behalf.","protocolVersion":"2025-06-18","serverInfo":{"name":"bridge-tally","version":"0.7.0"}}}
+tool count: 30
+tools: balance_sheet, cash_flow, company_features, egress_log, gst_by_counter_ledger, gst_status, gst_uncertain_vouchers, ledger_masters, ledger_movement, list_companies, local_data_report, masters, month_register, negative_ledgers, negative_stock, outstandings, profit_and_loss, purchase_register, read_evidence, sales_register, statement_tie_out, stock_summary, tally_status, trial_balance, validate_masters, verify_import, voucher_presence, voucher_read_cost, voucher_schema, vouchers
+module count: 28
+  module: bridge_mcp.exe
+  module: advapi32.dll
+  module: bcrypt.dll
+  module: bcryptprimitives.dll
+  module: combase.dll
+  module: CRYPT32.dll
+  module: GDI32.dll
+  module: gdi32full.dll
+  module: IMM32.DLL
+  module: KERNEL32.DLL
+  module: KERNELBASE.dll
+  module: msvcp_win.dll
+  module: msvcrt.dll
+  module: ntdll.dll
+  module: OLEAUT32.dll
+  module: profapi.dll
+  module: RPCRT4.dll
+  module: sechost.dll
+  module: SHCORE.dll
+  module: shell32.dll
+  module: shlwapi.dll
+  module: ucrtbase.dll
+  module: user32.dll
+  module: VCRUNTIME140.dll
+  module: win32u.dll
+  module: windows.storage.dll
+  module: Wldp.dll
+  module: ws2_32.dll
+=== step 5
+loaded by the new file only:
+loaded by the 0.7.0 file only:
+vcruntime140.dll
+modules loaded by the NEW file that import ucrtbase, an api-ms-win-crt-* set, vcruntime or msvcp140:
+  combase.dll: import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll
+  CRYPT32.dll: import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll
+  gdi32full.dll: import:      api-ms-win-crt-math-l1-1-0.dll; import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll
+  msvcp_win.dll: import:      api-ms-win-crt-locale-l1-1-0.dll; import:      api-ms-win-crt-math-l1-1-0.dll; import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll
+  OLEAUT32.dll: import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll
+  profapi.dll: import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll
+  shell32.dll: import:      api-ms-win-crt-math-l1-1-0.dll; import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll; import:      api-ms-win-crt-time-l1-1-0.dll
+  windows.storage.dll: import:      api-ms-win-crt-math-l1-1-0.dll; import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll; import:      api-ms-win-crt-time-l1-1-0.dll
+  Wldp.dll: import:      api-ms-win-crt-private-l1-1-0.dll; import:      api-ms-win-crt-runtime-l1-1-0.dll; import:      api-ms-win-crt-string-l1-1-0.dll
+
+
+Name            : ucrtbase.dll
+ProductVersion  : 10.0.19041.3636
+FileDescription : Microsoft® C Runtime Library
+
+
+
+=== end

@@ -1,0 +1,11 @@
+
+Name             Length
+----             ------
+bridge_mcp.exe 35735552
+pdfium.dll      7211520
+                       
+                       
+bridge_mcp.exe 35735552 B; 0.7.0 was 32705536 B; difference 3030016 B
+exe sha256 equal to the queue's 1e9a2328dee09365bdd787ce7c143a997c9eb23c092105e3b4801e444e6a6035: True
+
+

@@ -59,6 +59,24 @@ impl ValidatedCompanyName {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The request's `<STATICVARIABLES>` block naming this company in
+    /// `SVCURRENTCOMPANY` (IMPLEMENTATION_GUIDE §8, rule I2), escaped once.
+    ///
+    /// `before` and `after` are the builder's other variables, in its own
+    /// order and whitespace, already rendered as XML with every value
+    /// escaped by the builder.
+    pub fn xml_static_variables(&self, before: &str, after: &str) -> String {
+        static_variables(&self.0, before, after)
+    }
+}
+
+/// The one writer of `SVCURRENTCOMPANY` and its `STATICVARIABLES` wrapper.
+fn static_variables(company: &str, before: &str, after: &str) -> String {
+    format!(
+        "<STATICVARIABLES>{before}<SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>{after}</STATICVARIABLES>",
+        xml_escape(company)
+    )
 }
 
 impl fmt::Debug for ValidatedCompanyName {
@@ -361,6 +379,19 @@ pub mod compatibility {
     pub fn standard_ledger_catalog_request(company: &str) -> String {
         super::render_standard_ledger_identity(company)
     }
+
+    /// [`super::ValidatedCompanyName::xml_static_variables`] for a builder
+    /// whose company still arrives as `&str` and renders whatever it is given:
+    /// the same writer, without the name's checks. Each caller is one builder
+    /// still to take the validated name (#2397), and this goes when none is
+    /// left.
+    pub fn static_variables_for_unvalidated_company(
+        company: &str,
+        before: &str,
+        after: &str,
+    ) -> String {
+        super::static_variables(company, before, after)
+    }
 }
 
 /// Tally's documented `Company` collection. It returns company identity plus
@@ -442,10 +473,7 @@ fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> Stri
     </HEADER>
     <BODY>
         <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                <SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>
-            </STATICVARIABLES>
+            {}
             <TDL>
                 <TDLMESSAGE>
                     <COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">
@@ -461,7 +489,11 @@ fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> Stri
     </BODY>
 </ENVELOPE>
 "#,
-        xml_escape(company),
+        compatibility::static_variables_for_unvalidated_company(
+            company,
+            "\n                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>\n                ",
+            "\n            ",
+        ),
         extra_methods
     )
     .trim()
@@ -555,22 +587,33 @@ pub const AUDIT_STOCK_ITEM_FETCH: &str = "NAME, GUID, PARENT, BASEUNITS, \
 OPENINGBALANCE, OPENINGVALUE, CLOSINGBALANCE, CLOSINGVALUE";
 
 fn render_company_object(company: &str, fetch: &[&str]) -> String {
+    let static_variables = compatibility::static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        "",
+    );
     let company = xml_escape(company);
     let fetch = fetch
         .iter()
         .map(|field| format!("<FETCH>{field}</FETCH>"))
         .collect::<String>();
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Company</SUBTYPE><ID TYPE="Name">{company}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><FETCHLIST>{fetch}</FETCHLIST></DESC></BODY></ENVELOPE>"#
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Company</SUBTYPE><ID TYPE="Name">{company}</ID></HEADER><BODY><DESC>{static_variables}<FETCHLIST>{fetch}</FETCHLIST></DESC></BODY></ENVELOPE>"#
     )
 }
 
 fn render_audit_ledgers(company: &str, from: &str, to: &str) -> String {
+    let static_variables = compatibility::static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            r#"<SVFROMDATE TYPE="Date">{}</SVFROMDATE><SVTODATE TYPE="Date">{}</SVTODATE>"#,
+            xml_escape(from),
+            xml_escape(to),
+        ),
+    );
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Audit Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="Bridge Audit Ledgers" ISMODIFY="No"><TYPE>Ledger</TYPE><FETCH>{AUDIT_LEDGER_FETCH}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
-        from = xml_escape(from),
-        to = xml_escape(to),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Audit Ledgers</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="Bridge Audit Ledgers" ISMODIFY="No"><TYPE>Ledger</TYPE><FETCH>{AUDIT_LEDGER_FETCH}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#
     )
 }
 
@@ -585,20 +628,31 @@ fn render_audit_ledgers(company: &str, from: &str, to: &str) -> String {
 /// protect (Tally decodes `&quot;` before evaluating), so only a date is
 /// accepted (#861).
 fn render_audit_vouchers(company: &str, from: &TallyDate, to: &TallyDate) -> String {
+    let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = compatibility::static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>"#
+        ),
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{AUDIT_VOUCHER_FETCH}</FETCH><FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        company = xml_escape(company),
-        from = from.as_str(),
-        to = to.as_str(),
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{AUDIT_VOUCHER_FETCH}</FETCH><FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"
     )
 }
 
 fn render_audit_stock_items(company: &str, from: &str, to: &str) -> String {
+    let static_variables = compatibility::static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            r#"<SVFROMDATE TYPE="Date">{}</SVFROMDATE><SVTODATE TYPE="Date">{}</SVTODATE>"#,
+            xml_escape(from),
+            xml_escape(to),
+        ),
+    );
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Audit Stock Items</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="Bridge Audit Stock Items" ISMODIFY="No"><TYPE>StockItem</TYPE><FETCH>{AUDIT_STOCK_ITEM_FETCH}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
-        from = xml_escape(from),
-        to = xml_escape(to),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Audit Stock Items</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="Bridge Audit Stock Items" ISMODIFY="No"><TYPE>StockItem</TYPE><FETCH>{AUDIT_STOCK_ITEM_FETCH}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#
     )
 }
 

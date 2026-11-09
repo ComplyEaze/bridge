@@ -752,6 +752,33 @@ fn an_unallocated_row_carries_its_composition_and_opening_through_the_json_and_r
     assert_ne!(json["party"], "Synthetic Debtor");
 }
 
+/// The `detail` parameter's own text names every value its schema admits (#2377), so a
+/// value added to the enum, as `open_bills` was, cannot be left out of the line an agent
+/// reads beside it.
+#[test]
+fn the_detail_parameter_text_names_every_detail_value() {
+    let definitions = tool_definitions(true, false);
+    let detail = &definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "outstandings"))
+        .expect("outstandings tool definition")["inputSchema"]["properties"]["detail"];
+    let text = detail["description"]
+        .as_str()
+        .expect("detail parameter text");
+    let values = detail["enum"].as_array().expect("detail enum");
+    assert!(values
+        .iter()
+        .any(|value| value == super::super::party_bills::OPEN_BILLS_DETAIL));
+    // Whole words, so a value that is only part of another word is not taken as named.
+    let words = text
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .collect::<Vec<_>>();
+    for value in values {
+        let value = value.as_str().expect("detail value");
+        assert!(words.contains(&value), "{value}: {text}");
+    }
+}
+
 #[test]
 fn the_outstandings_description_says_what_decides_receivable_and_payable() {
     // Tally's Bills Receivable and Bills Payable reports scope by the sign of each

@@ -1,0 +1,4 @@
+HEADER/STATUS: ['1']; BODY/DATA/COLLECTION: 1; rows: 45; row tags: ['LEDGER']
+rows with one GUID: 45; of those, beginning with 3a6bd6e1-b835-4bff-89dd-8a6af138c346-: 45
+rows with BRIDGECOMPANYGUID equal to 3a6bd6e1-b835-4bff-89dd-8a6af138c346: 45; distinct BRIDGECOMPANYGUID values: ['3a6bd6e1-b835-4bff-89dd-8a6af138c346']
+CMPINFO: 35 counts, 35 of them 0; the others: none

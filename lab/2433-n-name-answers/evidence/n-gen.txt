@@ -1,0 +1,4 @@
+pattern: 300 characters, sha256 1d6366e1ccaa762b2da904319dc3a5385513fc401f1c814bb7a16bb0a03e433e
+L-ledgers-shape-lab.utf16le.xml: 1736 bytes, sha256 61c9b17f265e3f1e9dc9d6997488dc41e65ae49a2850233e16df523abd041373
+L-ledgers-long.utf16le.xml: 2304 bytes, sha256 e67d87a89fa67027f3895b3683cb639a1852ec568c73d428325b2964d6b782a5, name 300 characters
+L-ledgers-prefix255.utf16le.xml: 2214 bytes, sha256 d356f8dcd04e3b6e9af7a944e15d23e5e76b6b36cf063c17264ade52aa58bcc7, name 255 characters

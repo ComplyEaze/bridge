@@ -1,0 +1,3 @@
+BODY/DATA/COLLECTION: 1; COMPANY rows: 1
+NAME attribute: "BRIDGE SHAPE LAB"; chars 16; utf8_bytes 16; first4 42 52 49 44; last4 20 4c 41 42; sha256 54510f216f9b0854d58ad42e7d5b7fbbc38b130d9a6038ae89aab528dc1e3f7b
+NAME element 1: "BRIDGE SHAPE LAB"; chars 16; utf8_bytes 16; first4 42 52 49 44; last4 20 4c 41 42; sha256 54510f216f9b0854d58ad42e7d5b7fbbc38b130d9a6038ae89aab528dc1e3f7b

@@ -84,11 +84,13 @@ No other ComplyEaze Bridge may make a call against port 9001 during the row, and
 
 ### Step 1: load and read, before any write
 Load BRIDGE EINVOICE LAB alone, as C2 says (its GET /status checks stay). Record the period and Tally's current date. Then `s1`: `M-marks.xml O-company.xml K-sales.xml K-customer.xml K-cgst.xml K-sgst.xml`, and `count8.py` on each answer. EXPECT:
-- M: one COMPANY row, with the book's GUID. Record ALTVCHID and ALTMSTID.
-- O: the book's GUID; `ISGSTCLASSIFON` No; a `CMPGSTDETAILS.LIST` whose `APPLICABLEFROM` is on or before 20250403, with `HSNSOURCEPRIORITY` Ledger and `HSNAPPLICABLESECTION` All Sections.
+- M: one COMPANY row, and `count8.py` printing `GUID is the book's: yes`. Record ALTVCHID and ALTMSTID.
+- O: `GUID is the book's: yes`; `ISGSTCLASSIFON` No; a `CMPGSTDETAILS.LIST` whose `APPLICABLEFROM` is on or before 20250403, with `HSNSOURCEPRIORITY` Ledger and `HSNAPPLICABLESECTION` All Sections.
 - K-sales: one LEDGER row, `BRIDGE IRN Sales`, with an IGST rate of 18 and HSN 998313.
 - K-customer, K-cgst, K-sgst: 0 LEDGER rows each.
 - Tally's current date 3-Apr-2025, the period 1-Apr-25 to 31-Mar-26.
+
+**The book is pinned by GUID.** The book's GUID is the one row 2162-IRN10 recorded for BRIDGE EINVOICE LAB, held as `BOOK` in `count8.py`, unchanged from that row's `count.py`. `GUID is the book's: no` on M or O, or more than one COMPANY row, = STOP before any write, whatever name the company shows. Then `--before-write` holds every later write to that same GUID.
 
 Anything else: record it and STOP before any write. The build cannot admit an invoice on this book without a change to its company settings, and this row makes none. That is a result for the run coordinator, not a failure of the row.
 
@@ -129,7 +131,7 @@ The book: the masters of steps 3 to 5 added; no voucher.
 ### Step 6: step 0
 1. LAB-COMMON C2 step 0 with the book loaded alone, without its MARKS request. Record the process list and that `BRIDGE_AGENT_ENABLE_WRITES` is present. Hash the exe against the build line.
 2. `tools/list`: record the answer whole. EXPECT `build_import_xml` whose input schema holds `e_invoice` under `invoice`, requiring `irn`, `ack_no` and `ack_date`; `post_import`; `verify_import`; and `vouchers` with `include_e_invoice`. Any missing = STOP (not this build, or posting is off).
-3. `list_companies`: EXPECT exactly BRIDGE EINVOICE LAB. Record its GUID; every later call passes it as `company_guid`.
+3. `list_companies`: EXPECT exactly BRIDGE EINVOICE LAB, with the GUID `count8.py` holds as `BOOK` (compare them character by character, case aside). Another GUID = STOP before any build or post, whatever its name. Every later call passes that GUID as `company_guid`.
 4. MARKS: M6 and V6. EXPECT M6 and V6 equal to `s5r`'s ALTMSTID and ALTVCHID.
 5. `masters` with `kind` `voucher_types`: record the `BRIDGE CP Sales` row whole. EXPECT one series, numbering manual, prevent-duplicates on. Otherwise record it and go to step 11.
 

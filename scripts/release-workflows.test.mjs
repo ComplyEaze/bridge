@@ -491,7 +491,7 @@ test("publication workflow checks reject disabled or misplaced controls", async 
 });
 
 test("the MCPB smoke binds initialize serverInfo.version to the archived manifest", async () => {
-  const smoke = await readFile(new URL("../src-tauri/examples/check_mcpb_bundle.rs", import.meta.url), "utf8");
+  const smoke = await readFile(new URL("../src-tauri/crates/bridge-mcpb-check/examples/check_mcpb_bundle.rs", import.meta.url), "utf8");
   assert.match(smoke, /server_version_mismatch/);
   assert.match(smoke, /validate_server_version\(&replies\[0\], &manifest\)/);
 });

@@ -19,7 +19,7 @@ const requiredResources = [
 // from the pinned archive and staged at the bundle root.
 export const pdfiumNotice = "THIRD_PARTY_LICENSES_PDFIUM.txt";
 // The extension's icon (a 512 px PNG the owner supplied) is copied from packaging/mcpb byte for
-// byte and named by the manifest; src-tauri/examples/check_mcpb_bundle.rs compares the archive's copy to it.
+// byte and named by the manifest; src-tauri/crates/bridge-mcpb-check/examples/check_mcpb_bundle.rs compares the archive's copy to it.
 export const mcpbIcon = "icon.png";
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const hostTargets = {

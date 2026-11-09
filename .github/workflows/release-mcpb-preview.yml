@@ -115,7 +115,7 @@ jobs:
           npx --yes @anthropic-ai/mcpb@2.1.2 pack packaging/mcpb/stage "release-assets/$asset"
           # Built after the archive is packed, and started directly, so the server it starts sees no
           # environment cargo would add. Its tests run in CI's native job, not here.
-          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --example check_mcpb_bundle
+          cargo build --locked --release --manifest-path src-tauri/Cargo.toml -p bridge-mcpb-check --example check_mcpb_bundle
           "src-tauri/target/release/examples/check_mcpb_bundle${{ runner.os == 'Windows' && '.exe' || '' }}" "release-assets/$asset" --output "release-assets/$asset.smoke.json"
           node scripts/write-mcpb-release-metadata.mjs "release-assets/$asset" "$RELEASE_TAG" "$PLATFORM" "$GITHUB_SHA"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

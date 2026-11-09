@@ -4,7 +4,7 @@
 //! Ported from the Python check it replaced (#1810 step 6): every check, its order and its diagnostic
 //! code are the Python's, and so is the report, field for field and byte for byte, which CI compared on
 //! both systems before the Python was deleted. A comment that cites Python names the behaviour it keeps.
-//! It reads the archive with the `zip` crate the `bridge` package already depends on.
+//! It reads the archive with the `zip` crate. It lives in its own package so that building it never compiles `bridge`.
 //!
 //! Usage: `check_mcpb_bundle <archive> [--output <file>]`. The report goes to stdout (and the file); a
 //! failure prints `MCPB smoke failed: <code>` on stderr and exits 1.
@@ -1228,10 +1228,11 @@ pub fn report_text(report: &Report) -> Checked<String> {
     Ok(text)
 }
 
-/// The repository this example was built from: `src-tauri/..`.
+/// The repository this example was built from: `src-tauri/crates/bridge-mcpb-check/../../..`.
 fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
+        .ancestors()
+        .nth(3)
         .map_or_else(|| PathBuf::from("."), Path::to_path_buf)
 }
 

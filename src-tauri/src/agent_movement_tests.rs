@@ -89,6 +89,17 @@ fn movement_uses_observed_period_opening_without_inferring_account_classificatio
     }
 }
 
+/// A row the voucher source returned that does not read as a movement voucher refuses the
+/// window by the movement's own read code.
+#[test]
+fn an_unreadable_movement_row_refuses_by_the_movement_read_code() {
+    let result = parse_movement_rows(vec![json!("20260901")], "20260901", "20260902");
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some(MovementCode::ReadFailed.as_str().to_string())
+    );
+}
+
 /// Renamed rather than relabelled: this used to assert the window was refused.
 /// A Stock Journal legitimately carries no accounting entries, so refusing lost
 /// the whole window over a voucher that is exactly right -- five of twelve
@@ -129,7 +140,10 @@ fn an_unbalanced_voucher_is_still_refused() {
         "20260901",
         "20260902",
     );
-    assert_eq!(result.err(), Some("voucher_entries_unbalanced".into()));
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some("voucher_entries_unbalanced".into())
+    );
 }
 
 #[test]
@@ -161,6 +175,7 @@ fn movement_balance_is_exact_per_active_voucher() {
     assert_eq!(
         parse_movement_rows(scaled, "20260801", "20260802")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some("voucher_entries_unbalanced")
     );
@@ -171,6 +186,7 @@ fn movement_balance_is_exact_per_active_voucher() {
     assert_eq!(
         parse_movement_rows(offsetting, "20260801", "20260802")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some("voucher_entries_unbalanced")
     );
@@ -180,6 +196,7 @@ fn movement_balance_is_exact_per_active_voucher() {
         assert_eq!(
             parse_movement_rows(omitted.clone(), "20260801", "20260802")
                 .err()
+                .map(|failure| failure.code)
                 .as_deref(),
             Some("voucher_entries_unbalanced")
         );
@@ -214,11 +231,11 @@ fn movement_snapshot_rejects_renames_even_when_the_selected_name_returns() {
     let renamed = vec![ledger("New Cash"), ledger("Sales")];
     assert_eq!(
         validate_movement_snapshot(&opening, &renamed, &vouchers("New Cash")),
-        Err("ledger_snapshot_drifted".into())
+        Err(ReadCode::LedgerSnapshotDrifted.into())
     );
     assert_eq!(
         validate_movement_snapshot(&opening, &opening, &vouchers("New Cash")),
-        Err("ledger_snapshot_drifted".into())
+        Err(ReadCode::LedgerSnapshotDrifted.into())
     );
     // Known entries outside the selected Cash ledger remain admissible.
     assert_eq!(
@@ -229,7 +246,7 @@ fn movement_snapshot_rejects_renames_even_when_the_selected_name_returns() {
     changed_opening[0].opening_balance = Some("1".into());
     assert_eq!(
         validate_movement_snapshot(&opening, &changed_opening, &vouchers("Cash")),
-        Err("ledger_snapshot_drifted".into())
+        Err(ReadCode::LedgerSnapshotDrifted.into())
     );
 }
 
@@ -436,6 +453,7 @@ fn a_ledger_scoped_row_without_a_line_on_the_ledger_refuses_the_read() {
             "20250531"
         )
         .err()
+        .map(|failure| failure.code)
         .as_deref(),
         Some(LEDGER_SCOPE_ROW_WITHOUT_LINE)
     );
@@ -455,6 +473,7 @@ fn a_ledger_scoped_row_with_no_entries_at_all_is_refused_too() {
     assert_eq!(
         parse_scoped_movement_rows(rows, WindowScope::Ledger(&party), "20250501", "20250531")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some(LEDGER_SCOPE_ROW_WITHOUT_LINE)
     );

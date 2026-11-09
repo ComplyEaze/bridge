@@ -50,7 +50,7 @@ fn gaps_of(
     file: &StatementFile,
     reads: &[LedgerRead; 3],
     partly_posted: bool,
-) -> Result<Gaps, String> {
+) -> Result<Gaps, FailureCode> {
     gaps(
         stage,
         file.window.as_ref().unwrap(),
@@ -296,7 +296,8 @@ fn a_negative_amount_on_the_bank_ledger_is_refused_by_the_reader() {
             "-1.00",
             side,
         )])]))
-        .err();
+        .err()
+        .map(|code| code.as_str().to_string());
         assert_eq!(
             refused,
             Some("proposals_file_invalid".to_string()),
@@ -324,7 +325,9 @@ fn a_statement_of_one_day_is_a_whole_window_and_a_reversed_one_is_refused() {
     let mut reversed = document(vec![]);
     reversed["window"] = json!({"first_row_date": "2026-08-02", "last_row_date": "2026-08-01", "whole_statement": true});
     assert_eq!(
-        StatementFile::read(&reversed).err(),
+        StatementFile::read(&reversed)
+            .err()
+            .map(|code| code.as_str().to_string()),
         Some("proposals_file_invalid".to_string())
     );
 }
@@ -348,7 +351,11 @@ fn only_an_exact_bank_ledger_name_counts() {
 
 #[test]
 fn a_file_that_cannot_be_read_fails_closed_with_a_typed_error() {
-    let refused = |document: Value| StatementFile::read(&document).err();
+    let refused = |document: Value| {
+        StatementFile::read(&document)
+            .err()
+            .map(|code| code.as_str().to_string())
+    };
     let invalid = Some("proposals_file_invalid".to_string());
     // A side that is neither Dr nor Cr.
     assert_eq!(
@@ -430,7 +437,9 @@ fn a_window_that_is_present_but_malformed_is_refused() {
     let refused = |window: Value| {
         let mut bad = document(vec![]);
         bad["window"] = window;
-        StatementFile::read(&bad).err()
+        StatementFile::read(&bad)
+            .err()
+            .map(|code| code.as_str().to_string())
     };
     let invalid = Some("proposals_file_invalid".to_string());
     assert_eq!(refused(json!("2026-08-01")), invalid);
@@ -558,7 +567,9 @@ fn a_tie_out_window_that_is_half_present_or_inconsistent_is_refused() {
     let refused = |change: &dyn Fn(&mut Value)| {
         let mut window = august("1000.00", "1179.50");
         change(&mut window);
-        StatementFile::read(&with_window(carried(), window)).err()
+        StatementFile::read(&with_window(carried(), window))
+            .err()
+            .map(|code| code.as_str().to_string())
     };
     type Change<'a> = &'a dyn Fn(&mut Value);
     let cases: [(&str, Change); 16] = [
@@ -636,7 +647,9 @@ fn a_tie_out_window_that_is_half_present_or_inconsistent_is_refused() {
 fn edges_that_the_files_own_vouchers_do_not_account_for_are_refused() {
     let edited = with_window(carried(), august("1000.00", "1179.51"));
     assert_eq!(
-        StatementFile::read(&edited).err(),
+        StatementFile::read(&edited)
+            .err()
+            .map(|code| code.as_str().to_string()),
         Some("proposals_file_invalid".to_string())
     );
     // With a row the file carries no voucher for, the vouchers need not add up.
@@ -761,11 +774,15 @@ fn a_catalogue_opening_that_is_missing_or_not_a_decimal_is_an_error_not_a_figure
         opening_balance: opening.map(str::to_string),
     };
     assert_eq!(
-        LedgerRead::of(&[ledger(None)], "Bank").err(),
+        LedgerRead::of(&[ledger(None)], "Bank")
+            .err()
+            .map(|code| code.as_str().to_string()),
         Some("ledger_opening_missing".to_string())
     );
     assert_eq!(
-        LedgerRead::of(&[ledger(Some("1,500.00 Dr"))], "Bank").err(),
+        LedgerRead::of(&[ledger(Some("1,500.00 Dr"))], "Bank")
+            .err()
+            .map(|code| code.as_str().to_string()),
         Some("ledger_opening_invalid".to_string())
     );
 }
@@ -787,7 +804,9 @@ fn a_ledger_named_twice_in_one_catalogue_is_refused() {
     );
     let twice = [ledger("Bank", "-1.00"), ledger("Bank", "-2.00")];
     assert_eq!(
-        LedgerRead::of(&twice, "Bank").err(),
+        LedgerRead::of(&twice, "Bank")
+            .err()
+            .map(|code| code.as_str().to_string()),
         Some("ledger_name_duplicated_in_catalogue".to_string())
     );
 }

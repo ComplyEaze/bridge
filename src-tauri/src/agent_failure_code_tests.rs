@@ -25,6 +25,22 @@ const READ: &[(ReadCode, &str)] = &[
     (ReadCode::WindowNotHonoured, "window_not_honoured"),
     (ReadCode::CurrentDateInvalid, "current_date_invalid"),
     (ReadCode::InvalidAsOf, "invalid_as_of"),
+    (
+        ReadCode::CompanyIdentityIncomplete,
+        "company_identity_incomplete",
+    ),
+    (ReadCode::CompanyNameInvalid, "company_name_invalid"),
+    (ReadCode::InvalidDate, "invalid_date"),
+    (
+        ReadCode::VoucherEntriesUnbalanced,
+        "voucher_entries_unbalanced",
+    ),
+];
+
+const PROPOSALS: &[(ProposalsCode, &str)] = &[
+    (ProposalsCode::FileInvalid, "proposals_file_invalid"),
+    (ProposalsCode::IdRequired, "proposals_id_required"),
+    (ProposalsCode::VouchersRequired, "vouchers_required"),
 ];
 
 const GST_STATUS: &[(GstStatusCode, &str)] = &[
@@ -64,6 +80,47 @@ const OUTSTANDINGS: &[(OutstandingsCode, &str)] = &[
     ),
 ];
 
+const MOVEMENT: &[(MovementCode, &str)] = &[
+    (
+        MovementCode::VoucherSnapshotDrifted,
+        "voucher_snapshot_drifted",
+    ),
+    (
+        MovementCode::OpeningBalanceNotObserved,
+        "opening_balance_not_observed",
+    ),
+    (MovementCode::ReadFailed, "ledger_movement_read_failed"),
+];
+
+const PRESENCE: &[(PresenceCode, &str)] = &[
+    (
+        PresenceCode::LedgerCatalogueIncomplete,
+        "ledger_catalogue_incomplete",
+    ),
+    (
+        PresenceCode::NumberingMethodDiffers,
+        "presence_numbering_method_differs_from_book",
+    ),
+    (PresenceCode::NumberingRequired, "numbering_required"),
+    (
+        PresenceCode::ImportIdentityIncomplete,
+        "presence_import_identity_incomplete",
+    ),
+];
+
+const TIE_OUT: &[(TieOutCode, &str)] = &[
+    (
+        TieOutCode::ArithmeticOutOfRange,
+        "tie_out_arithmetic_out_of_range",
+    ),
+    (TieOutCode::LedgerOpeningInvalid, "ledger_opening_invalid"),
+    (TieOutCode::LedgerOpeningMissing, "ledger_opening_missing"),
+    (
+        TieOutCode::LedgerNameDuplicated,
+        "ledger_name_duplicated_in_catalogue",
+    ),
+];
+
 /// Every pin of every enum, as the failure code its variant makes, beside the pinned string.
 fn pinned() -> Vec<(FailureCode, &'static str)> {
     fn of<C: Copy + Into<FailureCode>>(
@@ -76,10 +133,14 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     [
         of(GST_UNCERTAIN),
         of(READ),
+        of(PROPOSALS),
         of(GST_STATUS),
         of(GST_BY_LEDGER),
         of(REGISTER),
         of(OUTSTANDINGS),
+        of(MOVEMENT),
+        of(PRESENCE),
+        of(TIE_OUT),
     ]
     .concat()
 }
@@ -92,10 +153,14 @@ fn declared() -> Vec<FailureCode> {
     [
         of(GstUncertainCode::ALL),
         of(ReadCode::ALL),
+        of(ProposalsCode::ALL),
         of(GstStatusCode::ALL),
         of(GstByLedgerCode::ALL),
         of(RegisterCode::ALL),
         of(OutstandingsCode::ALL),
+        of(MovementCode::ALL),
+        of(PresenceCode::ALL),
+        of(TieOutCode::ALL),
     ]
     .concat()
 }
@@ -113,6 +178,10 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(GST_BY_LEDGER), GstByLedgerCode::ALL);
     assert_eq!(variants(REGISTER), RegisterCode::ALL);
     assert_eq!(variants(OUTSTANDINGS), OutstandingsCode::ALL);
+    assert_eq!(variants(PROPOSALS), ProposalsCode::ALL);
+    assert_eq!(variants(MOVEMENT), MovementCode::ALL);
+    assert_eq!(variants(PRESENCE), PresenceCode::ALL);
+    assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -143,6 +212,10 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(GST_BY_LEDGER, GstByLedgerCode::as_str);
     check_pins(REGISTER, RegisterCode::as_str);
     check_pins(OUTSTANDINGS, OutstandingsCode::as_str);
+    check_pins(PROPOSALS, ProposalsCode::as_str);
+    check_pins(MOVEMENT, MovementCode::as_str);
+    check_pins(PRESENCE, PresenceCode::as_str);
+    check_pins(TIE_OUT, TieOutCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -160,7 +233,7 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    assert_eq!(codes.len(), 21, "the declared codes");
+    assert_eq!(codes.len(), 39, "the declared codes");
     for code in codes {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");

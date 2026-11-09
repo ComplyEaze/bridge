@@ -85,6 +85,67 @@ failure_codes! {
         CurrentDateInvalid = "current_date_invalid",
         /// No `as_of` was given and the host's current date, which stands in for it, is not a date.
         InvalidAsOf = "invalid_as_of",
+        /// The verified company's identity lacks a part the read needs.
+        CompanyIdentityIncomplete = "company_identity_incomplete",
+        /// The company's name is not one a request can carry.
+        CompanyNameInvalid = "company_name_invalid",
+        /// A date is not a date.
+        InvalidDate = "invalid_date",
+        /// A voucher's entries do not sum to zero.
+        VoucherEntriesUnbalanced = "voucher_entries_unbalanced",
+    }
+}
+
+failure_codes! {
+    /// Codes about a saved proposals file, or the vouchers a tool is given, that several tools
+    /// write for the same failure.
+    pub(crate) enum ProposalsCode {
+        /// The proposals file does not read as the shape it was written in.
+        FileInvalid = "proposals_file_invalid",
+        /// No `proposals_id` was given.
+        IdRequired = "proposals_id_required",
+        /// No `vouchers` were given.
+        VouchersRequired = "vouchers_required",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `ledger_movement` itself.
+    pub(crate) enum MovementCode {
+        /// The vouchers changed between the reads the movement is built from.
+        VoucherSnapshotDrifted = "voucher_snapshot_drifted",
+        /// The ledger's opening balance was not observed, so the answer is partial.
+        OpeningBalanceNotObserved = "opening_balance_not_observed",
+        /// The ledger's movement read failed.
+        ReadFailed = "ledger_movement_read_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `voucher_presence` itself.
+    pub(crate) enum PresenceCode {
+        /// The ledger catalogue the check needs was not read whole.
+        LedgerCatalogueIncomplete = "ledger_catalogue_incomplete",
+        /// The numbering the check was given differs from the book's.
+        NumberingMethodDiffers = "presence_numbering_method_differs_from_book",
+        /// No `numbering` was given.
+        NumberingRequired = "numbering_required",
+        /// A voucher to check lacks a part of its import identity.
+        ImportIdentityIncomplete = "presence_import_identity_incomplete",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `statement_tie_out` itself.
+    pub(crate) enum TieOutCode {
+        /// A sum or difference of the tie-out's amounts is out of range.
+        ArithmeticOutOfRange = "tie_out_arithmetic_out_of_range",
+        /// The ledger's opening balance is not an exact decimal.
+        LedgerOpeningInvalid = "ledger_opening_invalid",
+        /// The ledger's opening balance is missing.
+        LedgerOpeningMissing = "ledger_opening_missing",
+        /// The ledger catalogue names the ledger more than once.
+        LedgerNameDuplicated = "ledger_name_duplicated_in_catalogue",
     }
 }
 

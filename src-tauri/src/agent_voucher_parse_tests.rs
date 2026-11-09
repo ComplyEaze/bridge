@@ -902,6 +902,7 @@ fn captured_voucher_guids_must_bind_every_row_to_the_selected_company() {
                 CAPTURED_VOUCHER_COMPANY_GUID
             )
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
             Some("voucher_company_identity_invalid")
         );

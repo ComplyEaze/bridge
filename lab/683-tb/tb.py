@@ -1,45 +1,56 @@
 #!/usr/bin/env python3
 # tb.py: row 683-TB's counter for a currency Trial Balance answer (a-<label>-T-<request>). It reads the answer by an
 # XML parser (LAB-COMMON C4), never a text search, and prints never more than CAP lines per call (AGENTS.md P5).
-# It mirrors master's Trial Balance with currency (native_trial_balance/wire.rs, parse_native_trial_balance_with_currency
-# and parse_envelope) and master's composite check (currency_composite.rs, is_balance_composite). Each value is classed
-# on its text exactly as sent, never trimmed, as master reads it.
+# It follows master's Trial Balance with currency (native_trial_balance/wire.rs, parse_native_trial_balance_with_currency,
+# parse_envelope, parse_row and admit_plain_row; scalar.rs) and master's composite check (currency_composite.rs,
+# is_balance_composite). Each value is classed on its text exactly as sent, never trimmed, as master reads it. A numeric
+# reference to a character XML forbids becomes U+FFFD #n; and a raw one U+FFFD, so it stays in the value, as master's
+# sanitizer keeps it (tolerant_xml.rs), and never makes a value plain.
 # STOP, exit 1, never "0 rows", for an answer master's parse refuses as a whole before any row is classed:
 #   it does not decode as UTF-16LE or does not parse; it carries a DOCTYPE, or any LINEERROR, ERROR or DOCTYPE element;
-#   its root is not ENVELOPE, or HEADER, BODY or BODY/DATA is missing;
+#   its root is not ENVELOPE, or HEADER, BODY or BODY/DATA is missing or appears twice;
 #   HEADER/STATUS is absent, appears twice, is empty, or is not 1;
 #   BODY/DATA/COLLECTION is missing or appears twice; it has no LEDGER row;
-#   a LEDGER row has no NAME attribute, or no GUID, or a GUID that is not the book's (BOOK, any case, "-", eight hex
-#   digits), or two of one child element;
+#   a STATUS, GUID, PARENT, CURRENCYNAME or amount element holds anything but text (an element, a comment, CDATA) or
+#   a reference other than &amp; &lt; &gt; &quot; &apos;;
+#   a LEDGER row has no NAME attribute or an empty one, or no GUID, or a GUID that is not the book's (BOOK, any case,
+#   "-", eight hex digits), or two of one child element;
 #   two rows share a GUID (any case) or a name (any case);
 #   a row has no CURRENCYNAME, or an empty one; no row's CURRENCYNAME is BASE;
-#   a row lacks any of TBALOPENING, DEBITTOTALS, CREDITTOTALS and TBALCLOSING.
+#   a row lacks any of TBALOPENING, DEBITTOTALS, CREDITTOTALS and TBALCLOSING, or one of them has no TYPE, two, or a
+#   TYPE other than Amount (on every row, as master checks it as it reads the row).
+# It is stricter than master in a few places, and stops where master reads on: an element or NAME key in another case,
+# an error element inside a row, text after the envelope, a DOCTYPE inside a comment, and perhaps a reference to an
+# ordinary character inside a value (&#49;), whose reading by master is not checked. That costs a re-run, never a
+# wrong answer.
 # For every LEDGER row: NAME, CURRENCYNAME, then the four values exactly as sent, each with its class:
 #   EMPTY      the element is present with no text;
-#   PLAIN      an exact decimal as master's ExactDecimal admits it: -?[0-9]+(.[0-9]+)?, ASCII digits only;
+#   PLAIN      an exact decimal as master's ExactDecimal admits it: -?[0-9]+(.[0-9]+)?, ASCII digits only, at most
+#              256 bytes;
 #   COMPOSITE  master's is_currency_composite (the 7.1 layout) or is_unspaced_currency_composite (the 7.2 layout);
 #   OTHER      anything else, a space included.
 # and the row's verdict, as master sets rows aside:
 #   FOREIGN    CURRENCYNAME is not BASE (its values are not read);
 #   MIXED      not FOREIGN, and any of the four values is COMPOSITE;
-#   PLAIN      every value PLAIN or EMPTY;
-#   UNREAD     anything else: master's parse refuses the whole answer on it.
-# A PLAIN row is also checked by master for its TYPE attributes, its movement's sign and its opening-plus-movement
-# equation, which this script does not repeat. The verdict is this script's reading of the shape. Master's own parser
-# is run on the answer when it becomes a fixture, and that run is the one that counts.
+#   PLAIN      every value PLAIN or EMPTY, a debit zero or below, a credit zero or above, and, when all four are
+#              PLAIN, opening + debit + credit = closing (admit_plain_row);
+#   UNREAD     anything else, with its reason: master's parse refuses the whole answer on it.
+# The verdict is this script's reading of the shape. Master's own parser is run on the answer when it becomes a
+# fixture, and that run is the one that counts.
 # Modes:
 #   tb.py ANSWER...            the lines above for each answer, then one SET line per verdict.
 #   --question ANSWER          the lines above and the SET lines, then for each ledger in WATCH its verdict and the
 #                              classes of its four values, and one last line for QUESTION_LEDGER:
-#                                QUESTION: COMPOSITE (<fields>)       a value on its row is a composite;
-#                                QUESTION: NO COMPOSITE               its CURRENCYNAME is BASE and all four values are
-#                                                                     PLAIN or EMPTY;
+#                                QUESTION: NOT ANSWERED (<why>)       any row is UNREAD (master refuses the answer), or
+#                                                                     no row has that name;
 #                                QUESTION: FOREIGN (<CURRENCYNAME>)   its row is set aside by its currency, values unread;
-#                                QUESTION: NOT ANSWERED (<why>)       no row has that name, or a value is OTHER.
+#                                QUESTION: COMPOSITE (<fields>)       a value on its row is a composite;
+#                                QUESTION: NO COMPOSITE               its row is PLAIN: the base currency, all four
+#                                                                     values PLAIN or EMPTY, sign and equation hold.
 #   --sets A B                 the SET lines of each answer, then each ledger whose verdict differs, and one last line:
 #                              SETS SAME or SETS DIFFER.
 # Example: python3 -I tb.py a-tb1-T-tb1-20250401-20250430.xml
-import pathlib, re, sys
+import decimal, pathlib, re, sys
 import xml.etree.ElementTree as ET
 BOOK = "1bb48be5-baba-45b2-90d8-7593244915a9"  # BRIDGE FOREXGROUP LAB, as forex-register-book-extent reads it
 BASE = "₹"  # the book's base currency master NAME, as row 683-LM's cur answer read it
@@ -48,8 +59,14 @@ WATCH = ("BRIDGE USD Customer", "BRIDGE USD Supplier", "BRIDGE Lab Bank")
 FIELDS = ("TBALOPENING", "DEBITTOTALS", "CREDITTOTALS", "TBALCLOSING")
 ONCE = ("GUID", "PARENT", "CURRENCYNAME") + FIELDS
 CAP = 400
-FORBIDDEN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]|&#(?:x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));", re.I)
+FORBIDDEN = re.compile(r"&#(?:x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));", re.I)
 PLAIN = re.compile(r"-?[0-9]+(?:\.[0-9]+)?")
+MAX_DECIMAL_BYTES = 256  # bridge-tally-primitives MAX_EXACT_DECIMAL_BYTES
+decimal.getcontext().prec = 1000  # exact for any sum of four PLAIN values, as master's exact arithmetic is
+RAW_C0 = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+SCALARS = ("STATUS", "GUID", "PARENT", "CURRENCYNAME") + FIELDS
+SCALAR = re.compile(r"<(" + "|".join(SCALARS) + r")(\s[^>]*)?>(.*?)</\1\s*>", re.S)
+NAMED_REF = re.compile(r"&(?:amp|lt|gt|quot|apos);")
 HEX8 = re.compile(r"[0-9A-Fa-f]{8}")
 lines = 0
 NO_ROW = (None, None, None, "no row")
@@ -149,8 +166,13 @@ def load(path):
         stop(f"{path} does not decode as UTF-16LE: {error}")
     if "<!DOCTYPE" in text.upper():
         stop(f"{path} carries a DOCTYPE")
+    text = RAW_C0.sub("\ufffd", FORBIDDEN.sub(lambda m: f"\ufffd#{reference_number(m.group(0))};", text))
+    for match in SCALAR.finditer(text):
+        inner = match.group(3)
+        if "<" in inner or NAMED_REF.sub("", inner).count("&"):
+            stop(f"{path}: a {match.group(1)} element holds more than text: {inner[:60]!r}")
     try:
-        root = ET.fromstring(FORBIDDEN.sub("", text))
+        root = ET.fromstring(text)
     except ET.ParseError as error:
         stop(f"{path} does not parse: {error}")
     statuses = root.findall("HEADER/STATUS")
@@ -161,8 +183,9 @@ def load(path):
         print(f"  {error.tag} {error.text!r}")
     if errors:
         stop(f"{path} carries {len(errors)} LINEERROR, ERROR or DOCTYPE element(s): the request failed")
-    if root.tag != "ENVELOPE" or root.find("HEADER") is None or root.find("BODY/DATA") is None:
-        stop(f"{path}: root {root.tag!r}, or no HEADER or BODY/DATA: not a complete envelope")
+    if (root.tag != "ENVELOPE" or len(root.findall("HEADER")) != 1 or len(root.findall("BODY")) != 1
+            or len(root.findall("BODY/DATA")) != 1):
+        stop(f"{path}: root {root.tag!r}, or not one HEADER, BODY and BODY/DATA: not a complete envelope")
     if len(statuses) != 1:
         stop(f"{path}: {len(statuses)} HEADER/STATUS elements, not one")
     status = (statuses[0].text or "").strip()
@@ -175,6 +198,25 @@ def load(path):
         stop(f"{path}: {len(collections)} BODY/DATA/COLLECTION elements, not one: the request failed")
     return collections[0]
 
+def reference_number(reference):  # &#n; or &#xh; as its decimal number
+    body = reference[2:-1]
+    return int(body[1:], 16) if body[:1] in "xX" else int(body)
+
+def attribute(element, key):  # master's required_attribute: the key in any case, once, not empty
+    found = [value for name, value in element.attrib.items() if name.lower() == key.lower()]
+    return found[0] if len(found) == 1 and found[0] != "" else None
+
+def admit(values):  # master's admit_plain_row on a row whose four values are PLAIN or EMPTY: its sign and equation
+    amounts = {field: None if text == "" else decimal.Decimal(text) for field, text in values.items()}
+    debit, credit = amounts["DEBITTOTALS"], amounts["CREDITTOTALS"]
+    if debit is not None and debit > 0:
+        return "a debit above zero"
+    if credit is not None and credit < 0:
+        return "a credit below zero"
+    if None not in amounts.values() and (amounts["TBALOPENING"] + debit + credit) != amounts["TBALCLOSING"]:
+        return "opening + debit + credit is not the closing"
+    return None
+
 def rows(path, show=True):
     out = {}
     guids = set()
@@ -183,9 +225,9 @@ def rows(path, show=True):
     if not found:
         stop(f"{path}: no LEDGER row")
     for row in found:
-        name = row.get("NAME")
+        name = attribute(row, "NAME")
         if name is None:
-            stop(f"{path}: a LEDGER row has no NAME attribute")
+            stop(f"{path}: a LEDGER row has no NAME attribute, an empty one, or two")
         for tag in ONCE:
             if len(row.findall(tag)) > 1:
                 stop(f"{path}: ledger {name!r} has {tag} twice")
@@ -208,17 +250,22 @@ def rows(path, show=True):
         for field in FIELDS:
             if children[field] is None:
                 stop(f"{path}: ledger {name!r} has no {field}")
+            if attribute(children[field], "TYPE") != "Amount":
+                stop(f"{path}: ledger {name!r} {field} has no TYPE, two, or one other than Amount")
         values = {field: children[field].text or "" for field in FIELDS}
         classes = {field: shape(text) for field, text in values.items()}
+        why = None
         if currency != BASE:
             verdict = "FOREIGN"
         elif "COMPOSITE" in classes.values():
             verdict = "MIXED"
         elif all(c in ("PLAIN", "EMPTY") for c in classes.values()):
-            verdict = "PLAIN"
+            why = admit(values)
+            verdict = "UNREAD" if why else "PLAIN"
         else:
+            why = "a value neither plain nor a composite"
             verdict = "UNREAD"
-        out[name] = (currency, values, classes, verdict)
+        out[name] = (currency, values, classes, verdict if why is None else f"{verdict} ({why})")
     if not any(row[0] == BASE for row in out.values()):
         stop(f"{path}: no row's CURRENCYNAME is {BASE!r}")
     if show:
@@ -232,7 +279,7 @@ def rows(path, show=True):
 def shape(text):
     if text == "":
         return "EMPTY"
-    if PLAIN.fullmatch(text):
+    if PLAIN.fullmatch(text) and len(text.encode()) <= MAX_DECIMAL_BYTES:
         return "PLAIN"
     if is_balance_composite(text):
         return "COMPOSITE"
@@ -240,12 +287,17 @@ def shape(text):
 
 def sets(table):
     for verdict in ("FOREIGN", "MIXED", "PLAIN", "UNREAD"):
-        names = sorted(name for name, row in table.items() if row[3] == verdict)
+        names = sorted(name for name, row in table.items() if row[3].split(" ")[0] == verdict)
         say(f"SET {verdict} ({len(names)}): {names}")
-    if any(row[3] == "UNREAD" for row in table.values()):
+    if unread(table):
         say("UNREAD rows present: master's parse refuses this answer as a whole")
 
+def unread(table):
+    return sorted(name for name, row in table.items() if row[3].startswith("UNREAD"))
+
 def question(table):
+    if unread(table):
+        return f"NOT ANSWERED (master refuses this answer: UNREAD {unread(table)})"
     if QUESTION_LEDGER not in table:
         return "NOT ANSWERED (no row)"
     currency, values, classes, verdict = table[QUESTION_LEDGER]
@@ -256,7 +308,7 @@ def question(table):
         return f"COMPOSITE ({', '.join(hits)})"
     if verdict == "PLAIN":
         return "NO COMPOSITE"
-    return f"NOT ANSWERED (OTHER in {', '.join(f for f in FIELDS if classes[f] == 'OTHER')})"
+    return f"NOT ANSWERED ({verdict})"
 
 args = sys.argv[1:]
 if not args:

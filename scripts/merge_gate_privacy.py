@@ -35,6 +35,18 @@ UUID_OR_DIGEST_RE = re.compile(
 # a-f, up to 16 characters: a digit run of up to 15, or a lowercase PAN whose letters are all a-f.
 RECORD_LINE_RE = re.compile(r'^[ \t]*"[A-Za-z0-9_-]{1,32}": \{"commit": "[0-9a-f]{40}"[^\n]*', re.M)
 RECORD_DIGEST_RE = re.compile(r'("(?:mutation|crate_tree)": ")(?=[0-9a-f]{0,15}[a-f])[0-9a-f]{16}(")')
+# #2367: a registry integrity value in a JavaScript lockfile is base64, so the hex digest mask above never covers it, and
+# its random body can hold an identifier-shaped run that no change in the pull request can alter. It is masked as a digest
+# only where three things hold: the added line belongs to the repository's one lockfile, at exactly the path in
+# LOCKFILE_PATHS (a file of that name anywhere else is scanned as before, so a new lockfile cannot carry an exemption in);
+# the value is in the exact form pnpm writes, `resolution: {integrity: <value>`, and is followed by `}` or `,`; and the value is `sha512-` with its 86 base64 characters and
+# `==`, or `sha256-` with 43 and `=`. Anything else in a lockfile, and any such text in another file, is scanned as before.
+LOCKFILE_PATHS = frozenset(("pnpm-lock.yaml",))
+LOCKFILE_INTEGRITY_RE = re.compile(
+    r"(?<=resolution: \{integrity: )"
+    r"(?:sha512-[A-Za-z0-9+/]{86}==|sha256-[A-Za-z0-9+/]{43}=)"
+    r"(?=[},])"
+)
 ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
 # Boundaries include ordinary words plus snake/kebab field names and the first
@@ -508,6 +520,29 @@ def mask_record_digests(text):
     return RECORD_LINE_RE.sub(on_line, text), masked
 
 
+def is_lockfile(path):
+    """Whether `path` is exactly one of LOCKFILE_PATHS, the repository's own lockfile."""
+    return path in LOCKFILE_PATHS
+
+
+def mask_lockfile_integrity(path, text):
+    """Mask each lockfile integrity value of `text` (LOCKFILE_INTEGRITY_RE) when `path` is a lockfile; return text and count."""
+    if not is_lockfile(path):
+        return text, 0
+    return LOCKFILE_INTEGRITY_RE.subn("<digest>", text)
+
+
+def mask_lockfile_payload(added):
+    """The added lines with lockfile integrity values masked, and how many were. `added` is [{"path", "text"}]."""
+    lines = []
+    masked = 0
+    for item in added:
+        line, count = mask_lockfile_integrity(item["path"], item["text"])
+        lines.append(line)
+        masked += count
+    return lines, masked
+
+
 def scan(text, head, fixture_provenance=None):
     record = result_record()
     decoded, utf16_runs = decode_utf16_runs(text)
@@ -597,7 +632,7 @@ def explain(document, head, fixture_provenance=None):
         for number, line in enumerate(source["text"].split("\n"), 1):
             check(_where(source["label"], number), line)
     for item in document["added"]:
-        check(_where(item["path"], item["line"]), item["text"])
+        check(_where(item["path"], item["line"]), mask_lockfile_integrity(item["path"], item["text"])[0])
     return {"hits": hits, "truncated": truncated}
 
 
@@ -616,6 +651,11 @@ def main(argv=None):
         "(never the values) of the lines that trip the scan. Needs --head.",
     )
     parser.add_argument(
+        "--mask-lockfile-integrity", action="store_true",
+        help="Read {\"added\": [{\"path\", \"text\"}]} on stdin and print {\"payload\": [...], \"masked\": N}: "
+        "the added lines with lockfile integrity values masked.",
+    )
+    parser.add_argument(
         "--redact-public-agent-attribution-messages", action="store_true",
         help="Read a JSON array of commit messages and redact only the known public-agent address in exact Git trailers.",
     )
@@ -626,6 +666,19 @@ def main(argv=None):
         except UnicodeError:
             return 0
         sys.stdout.write(redact_shapes(text))
+        return 0
+    if args.mask_lockfile_integrity:
+        try:
+            document = json.load(sys.stdin)
+        except (UnicodeError, ValueError) as error:
+            parser.error(str(error))
+        added = document.get("added") if isinstance(document, dict) else None
+        if not isinstance(added, list) or not all(
+            isinstance(x, dict) and isinstance(x.get("path"), str) and isinstance(x.get("text"), str) for x in added
+        ):
+            parser.error("mask input is malformed")
+        lines, masked = mask_lockfile_payload(added)
+        print(json.dumps({"payload": lines, "masked": masked}))
         return 0
     if args.redact_public_agent_attribution_messages:
         try:

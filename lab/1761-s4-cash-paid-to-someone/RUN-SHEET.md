@@ -9,7 +9,7 @@ Not for merge. One row, on one NEW synthetic company. `LAB-COMMON.md` in this fo
 A Payment whose payee's cash in a day comes to more than 10,000.00 is tagged in its narration for the CA (s.40A(3)). The pull request is tested only against a simulator. This row is its live evidence (P1). It checks:
 - that Tally accepts the pair in one batch;
 - that each voucher lands with its ledgers, amounts and narration intact, the tag included;
-- that the build refuses a cash ledger outside Cash-in-Hand by reading the book's groups.
+- that the build refuses a bank ledger named as the cash ledger, by reading the book's groups.
 
 **WRITES.**
 - Masters are keyed BY HAND on Tally's screen.
@@ -62,12 +62,13 @@ BRIDGE CASHPAY LAB: books beginning 2025-04-01, no inventory, no GST. If a compa
 | --- | --- | --- |
 | Cash (Tally's own) | Cash-in-Hand | none |
 | BRIDGE Bank A | Bank Accounts | 50,000.00 Dr |
-| BRIDGE Contractor A | Sundry Creditors | none |
+| BRIDGE Bank B | Bank Accounts | none |
+| BRIDGE Contractor A | Sundry Creditors, "Maintain balances bill-by-bill" No | none |
 | BRIDGE Wages | Indirect Expenses | none |
 | BRIDGE Suspense | Suspense A/c | none |
 | BRIDGE Capital | Capital Account | 50,000.00 Cr |
 
-Take a screenshot of each ledger's screen before its accept. After the last one, leave the creation screen as C7 says, then take a screenshot of the Gateway with THE COMPANY loaded and no dialog. Do not change the Payment or Contra voucher types.
+Take a screenshot of each ledger's screen before its accept. BRIDGE Contractor A's screenshot must show "Maintain balances bill-by-bill" reading No; if it reads Yes, or the field is not on the screen, STOP before step 0 (the build would refuse the Payment as a bill-wise party, `bill_wise_party_unapproved`, and step 3 would test nothing). After the last one, leave the creation screen as C7 says, then take a screenshot of the Gateway with THE COMPANY loaded and no dialog. Do not change the Payment or Contra voucher types.
 
 ## Step 0
 1. LAB-COMMON C2 step 0 with THE COMPANY loaded alone, without its MARKS request (its GET /status checks stay). Record the process list and that `BRIDGE_AGENT_ENABLE_WRITES` is present. Hash the exe against the build line.
@@ -99,18 +100,21 @@ These are the answers the parse gave at #2407's head `f8f9cf3f`, run on a Mac wi
 
 The book: unchanged.
 
-## Step 2: a cash ledger outside Cash-in-Hand, refused at build (reads only)
+## Step 2: a bank ledger named as the cash ledger, refused at build (reads only)
 1. The same parse, with `cash_answers`:
-   - `{"bridge_txn_id": "st-20250408-be621b1463b52f1b", "answer": "paid_to_someone", "ledger": "BRIDGE Contractor A", "cash_ledger": "BRIDGE Wages"}`;
+   - `{"bridge_txn_id": "st-20250408-be621b1463b52f1b", "answer": "paid_to_someone", "ledger": "BRIDGE Contractor A", "cash_ledger": "BRIDGE Bank B"}`;
    - `{"bridge_txn_id": "st-20250409-ef7d14f34a7b0412", "answer": "paid_to_someone", "ledger": "BRIDGE Wages", "cash_ledger": "Cash"}`.
 
    EXPECT `vouchers` 4 and `cash_questions_open` 0 (the parse does not read the book). Record `proposals_id` and `sha256` as P2.
 2. `build_import_xml` with `company_guid`, `proposals_id` and `proposals_sha256` of P2. EXPECT:
    - `result.state` `refused` and `result.reason` `cash_ledger_not_cash_in_hand`;
-   - `result.refused_ledgers` holding exactly one row, with `requires` `cash_in_hand`, and `result.refused_ledgers_omitted` 0;
+   - `result.refused_ledgers` holding exactly one row: `ledger` BRIDGE Bank B (plain or as its redaction marker; record which), `requires` `cash_in_hand`, `state` `cash_bank`, `reserved_group` naming Bank Accounts and `first_bridge_txn_id` `st-20250408-be621b1463b52f1b`;
+   - `result.refused_ledgers_omitted` 0;
    - no `batch_id` and no file written.
 
-   Record the answer whole. A file built = STOP: that is a FINDING, and the file is never sent.
+   Record the answer whole. Any other reason (`cash_bank_ledger_not_established` included) or another row is a FINDING, not a pass: record it and go on to step 3. A file built = STOP: that is a FINDING, and the file is never sent.
+
+   BRIDGE Bank B sits under Bank Accounts, so it passes the build's earlier check that each cash or bank leg reaches Cash-in-Hand or Bank Accounts, and is refused only by the check that a ledger answered as cash in hand is one. BRIDGE Wages, the second row's payee, is not a cash ledger here.
 3. MARKS: M and V equal to M0b and V0b.
 
 The book: unchanged.
@@ -172,6 +176,7 @@ The book: as at BK1, the masters only.
 ## Not covered by this row
 - A deposit, and any cash answer other than `paid_to_someone`.
 - The over-limit sum across several Payments to one payee in a day: here each payee has one Payment. The tag on exactly 10,000.00, and cash paid outside this file. The unit tests of #2407 carry these.
+- A ledger outside both Cash-in-Hand and Bank Accounts named as the cash ledger (an earlier check refuses it with another reason). A bill-wise payee.
 - A cash ledger other than Tally's own Cash, and a PDF statement. This row parses the CSV edge only; the voucher shapes are the same.
 - Any TallyPrime release other than the one recorded.
 

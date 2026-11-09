@@ -19,7 +19,10 @@
 //! headline: the headline types hold counts, dates and enums, and one
 //! [`CompanyName`].
 use super::*;
+// Characters that draw nothing but can change how the text around them reads: the same test
+// company names are shown by (#2449).
 use crate::reports::statements::{Established, NotEstablishedReason};
+use bridge_tally_protocol::xml_read_profiles::is_invisible_format;
 use serde::Deserialize;
 
 /// The company a headline names, as Tally spells it, made safe to quote.
@@ -54,19 +57,6 @@ impl CompanyName {
 /// Longest company name a headline carries. The `company` block beside it
 /// has the whole name.
 const MAX_COMPANY_NAME_CHARS: usize = 200;
-
-/// Characters that draw nothing but can change how the text around them reads:
-/// Unicode General_Category Cf and Default_Ignorable_Code_Point (the same rule
-/// the native approval screen applies to the names it shows), so U+061C, the
-/// tag characters and every future format character are covered without a list.
-pub(super) fn is_invisible_format(character: char) -> bool {
-    use icu_properties::{
-        props::{DefaultIgnorableCodePoint, GeneralCategory},
-        CodePointMapData, CodePointSetData,
-    };
-    CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(character)
-        || CodePointMapData::<GeneralCategory>::new().get(character) == GeneralCategory::Format
-}
 
 /// A date as a person reads it: `1 Apr 2026`, never `01/04/2026`.
 pub(super) fn plain_date(date: &bridge_tally_core::TallyDate) -> String {

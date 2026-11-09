@@ -1,6 +1,7 @@
 //! Company for the local MCP adapter.
 use super::*;
 use bridge_tally_core::{CapabilityFeatureId, CapabilityState, EvidenceConfidence};
+use bridge_tally_protocol::xml_read_profiles::ShownCompanyName;
 
 impl Server {
     pub(super) async fn status(&self) -> Result<(Value, Evidence), ToolFailure> {
@@ -234,44 +235,17 @@ pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Valu
         .company_number
         .as_deref()
         .is_some_and(|value| !crate::tally::validators::is_valid_company_number(value));
-    // A name is shown with each control or invisible format character written
-    // as `\u{..}`, so a name holding one never draws like the same name without
-    // it, no text is hidden in it and none reorders the text around it. A
-    // sendable name keeps the zero-width joiner and non-joiner, anywhere: they
-    // are part of how Indic and Persian names are written, so a name made of
-    // them alone draws as nothing. A backslash is not escaped, so a name that
-    // spells a `\u{..}` code out as text draws like one holding the character
-    // (#2433).
-    let name_refusal = ValidatedCompanyName::refusal(&company.name);
-    let name = match name_refusal {
-        Some(_) => escaped_company_name(&company.name, |character| {
-            character.is_control() || super::headline::is_invisible_format(character)
-        }),
-        None => escaped_company_name(&company.name, |character| {
-            !matches!(character, '\u{200c}' | '\u{200d}')
-                && super::headline::is_invisible_format(character)
-        }),
-    };
+    // The one display rule for a company name, and its two limits, are
+    // `ShownCompanyName`'s (#2433, #2449).
+    let shown = ShownCompanyName::of(&company.name);
+    let name_refusal = shown.refusal();
+    let name = shown.into_text();
     let mut row = json!({"name": name, "guid": guid, "company_number": company.company_number, "books_from": company.books_from, "identity_state": if duplicate_guid {"ambiguous_duplicate_guid"} else if missing.is_some() {"incomplete_tuple"} else if invalid_guid {"invalid_guid"} else if invalid_number {"invalid_company_number"} else if invalid_books_from {"invalid_books_from"} else {"verified_tuple"}, "missing_field": missing});
     // Only a marked row carries the key, so every other company block is unchanged.
     if let Some(refusal) = name_refusal {
         row["name_refusal"] = json!(refusal.code());
     }
     row
-}
-
-/// The name byte for byte, except that each character `escape` picks becomes
-/// its `\u{..}` code.
-fn escaped_company_name(name: &str, escape: impl Fn(char) -> bool) -> String {
-    name.chars()
-        .map(|character| {
-            if escape(character) {
-                format!("\\u{{{:04x}}}", u32::from(character))
-            } else {
-                character.to_string()
-            }
-        })
-        .collect()
 }
 
 #[cfg(test)]

@@ -14,6 +14,7 @@ import {
 } from "./tally-company-selection";
 import { recoverSnapshotJob } from "./snapshot-job-recovery";
 import { TallyReadinessFlow } from "./TallyReadinessFlow";
+import { DiscoveredCompanyOptions, type UntrustedCompanyCandidate } from "./DiscoveredCompanyOptions";
 import {
   OutstandingsExportNotice,
   OutstandingsScreen,
@@ -58,9 +59,6 @@ import {
 } from "./tally-mirror-contract";
 import "./styles.css";
 
-type UntrustedCompanyCandidate = {
-  name: string;
-};
 
 type TallyProbeResult = {
   review_id: string;
@@ -156,7 +154,7 @@ function App() {
   // `untrustedDiscoveredCompanies`, which is deliberately cleared once a
   // company verifies -- clearing that list is what made the other open books
   // disappear from the UI the moment one was chosen.
-  const [openCompanyNames, setOpenCompanyNames] = React.useState<string[]>([]);
+  const [openCompanies, setOpenCompanies] = React.useState<UntrustedCompanyCandidate[]>([]);
   const mergePersistedCompanyProfiles = React.useCallback((profiles: TallyCompany[]) => {
     setCompanies((current) => mergeTallyCompanies(profiles, current));
   }, []);
@@ -458,7 +456,7 @@ function App() {
     setReviewCommitmentSha256(null);
     setPassportSnapshotId(null);
     setLiveCompanyKeys([]);
-    setOpenCompanyNames([]);
+    setOpenCompanies([]);
     setUntrustedDiscoveredCompanies([]);
     setUntrustedDiscoveryError(null);
     setCompanyError(null);
@@ -529,7 +527,7 @@ function App() {
   }
 
   function selectClientFromShell(key: string) {
-    const unverified = otherOpenCompanies.find((company, index) => `unverified:${company.name}:${index}` === key);
+    const unverified = switchableOpenCompanies.find((company, index) => `unverified:${company.name}:${index}` === key);
     if (unverified) {
       if (savedCompanySelectionLocked) return;
       clearSelectedCompanyScope();
@@ -619,7 +617,7 @@ function App() {
         );
         setSelectedCompany(selection.selectedCompany);
         void refreshPersistedCompanyProfiles();
-        setOpenCompanyNames([]);
+        setOpenCompanies([]);
         setUntrustedDiscoveredCompanies([]);
         setUntrustedDiscoveryError(null);
       }
@@ -633,7 +631,7 @@ function App() {
         setReviewCommitmentSha256(null);
         setPassportSnapshotId(null);
         setLiveCompanyKeys([]);
-        setOpenCompanyNames([]);
+        setOpenCompanies([]);
         setUntrustedDiscoveredCompanies([]);
         setUntrustedDiscoveryError(null);
         setDashboardError(toOperatorError(error));
@@ -654,7 +652,7 @@ function App() {
       const discovered = await invoke<UntrustedCompanyCandidate[]>("fetch_tally_companies", { config });
       if (resultsVersion === tallyResultsVersion.current) {
         setUntrustedDiscoveredCompanies(discovered);
-        setOpenCompanyNames(discovered.map((candidate) => candidate.name));
+        setOpenCompanies(discovered);
       }
     } catch (error) {
       if (resultsVersion === tallyResultsVersion.current) {
@@ -1074,9 +1072,10 @@ function App() {
   // name because a discovered candidate has no GUID until it is verified --
   // establishing that GUID is exactly what choosing it does.
   const verifiedCompanyNames = new Set(currentProbeCompanyList.map((company) => company.name));
-  const otherOpenCompanies = openCompanyNames
-    .filter((name) => !verifiedCompanyNames.has(name))
-    .map((name) => ({ name }));
+  const otherOpenCompanies = openCompanies.filter((company) => !verifiedCompanyNames.has(company.name));
+  // The client switcher offers only a company that can be verified; a marked one
+  // is listed, with its reason, in the setup picker below (#2449).
+  const switchableOpenCompanies = otherOpenCompanies.filter((company) => !company.name_refusal);
   const savedCompanyList = companies.filter((company) => Boolean(company.mirror_company_id));
   const setupConnectionComplete = Boolean(status?.reachable && passport);
   const selectedCompanyReady = tallyReadinessState({
@@ -1135,12 +1134,12 @@ function App() {
             : "verification_required" as const,
       };
     }),
-    ...otherOpenCompanies.map((company, index) => ({
+    ...switchableOpenCompanies.map((company, index) => ({
       key: `unverified:${company.name}:${index}`,
-      name: company.name,
+      name: company.shown_name,
       summaryDiscriminator: "Identity not verified yet",
       identityDiscriminator: "Identity not verified yet",
-      searchText: company.name,
+      searchText: company.shown_name,
       state: "verification_required" as const,
     })),
   ];
@@ -1718,15 +1717,12 @@ function App() {
                     </div>
                   </>
                 ) : untrustedDiscoveredCompanies.length > 0 ? (
-                  <div className="company-options" role="list" aria-label="Companies to verify">
-                    {untrustedDiscoveredCompanies.slice(0, TABLE_PREVIEW_LIMIT).map((company, index) => (
-                      <button className="company-option" type="button" key={`${company.name}-${index}`} onClick={() => void bootstrapDirectCompany(company.name)} disabled={savedCompanySelectionLocked}>
-                        <Building2 size={20} />
-                        <span>{company.name}</span>
-                        <small>{tallyAction === "bootstrap" ? "Checking…" : "Use this company"}</small>
-                      </button>
-                    ))}
-                  </div>
+                  <DiscoveredCompanyOptions
+                    companies={untrustedDiscoveredCompanies.slice(0, TABLE_PREVIEW_LIMIT)}
+                    disabled={savedCompanySelectionLocked}
+                    checking={tallyAction === "bootstrap"}
+                    onChoose={(name) => void bootstrapDirectCompany(name)}
+                  />
                 ) : (
                   <div className="setup-empty-state">
                     <Building2 size={28} />
@@ -1749,21 +1745,14 @@ function App() {
                   <div className="company-more">
                     <h3>Other companies open in Tally</h3>
                     <p>ComplyEaze Bridge verifies a company&rsquo;s identity when you choose it.</p>
-                    <div className="company-options" role="list" aria-label="Other companies open in Tally">
-                      {otherOpenCompanies.slice(0, TABLE_PREVIEW_LIMIT).map((company, index) => (
-                        <button
-                          className="company-option"
-                          type="button"
-                          key={`other-${company.name}-${index}`}
-                          onClick={() => void bootstrapDirectCompany(company.name)}
-                          disabled={savedCompanySelectionLocked}
-                        >
-                          <Building2 size={20} />
-                          <span>{company.name}</span>
-                          <small>{tallyAction === "bootstrap" ? "Checking…" : "Switch to this company"}</small>
-                        </button>
-                      ))}
-                    </div>
+                    <DiscoveredCompanyOptions
+                      companies={otherOpenCompanies.slice(0, TABLE_PREVIEW_LIMIT)}
+                      disabled={savedCompanySelectionLocked}
+                      checking={tallyAction === "bootstrap"}
+                      onChoose={(name) => void bootstrapDirectCompany(name)}
+                      label="Other companies open in Tally"
+                      actionText="Switch to this company"
+                    />
                   </div>
                 )}
                 <div className="setup-company-footer">

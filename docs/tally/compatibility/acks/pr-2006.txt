@@ -1,0 +1,11 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md
+scripts/ledger-entries-ui.test.mjs
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_register.rs
+src-tauri/src/agent_voucher_bank_allocations.rs
+src-tauri/src/agent_voucher_bank_allocations_tests.rs
+src-tauri/src/agent_voucher_parse.rs
+src-tauri/src/agent_vouchers.rs
+reviewer: lamemustafa

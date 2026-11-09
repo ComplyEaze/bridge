@@ -14,8 +14,7 @@
 
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
 use crate::tally::approved_import::{
-    ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheck, InvoicePrecheckInput,
-    InvoiceReadPlan,
+    ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheckInput, InvoiceReadPlan,
 };
 use bridge_tally_core::TallyDate;
 use serde::{Deserialize, Serialize};
@@ -32,7 +31,7 @@ pub(super) use wire::HsnWarning;
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request_for_parents,
+    render_invoice_readback_request, render_ledger_rates_request_for_ledgers,
     render_voucher_types_request, VoucherTypeGuid,
 };
 
@@ -323,7 +322,7 @@ pub(super) fn gstin_state(gstin: &str) -> Option<&'static str> {
     state_name_for_code(gstin.get(..2)?)
 }
 
-/// Paise of a plain two-decimal amount (`valid_2dp_amount` has run).
+/// Paise of a plain two-decimal amount (an `ImportAmount` has been parsed).
 fn paise(amount: &str) -> Option<i128> {
     let (whole, fraction) = amount.split_once('.')?;
     if fraction.len() != 2 {
@@ -333,15 +332,6 @@ fn paise(amount: &str) -> Option<i128> {
     let fraction: i128 = fraction.parse().ok()?;
     whole.checked_mul(100)?.checked_add(fraction)
 }
-
-/// The largest company master mark (an upper bound on its ledgers) a v0
-/// invoice is built or posted on. Each invoice reads the whole compliance
-/// listing at least four times (the build, before the dialog, after it, and in
-/// the endpoint queue, #1337; a redeemed approval enters again from the top and
-/// repeats the two re-reads); above this the read is refused rather than risk a
-/// large book's gateway. The bound is provisional: no read of a book near it
-/// has been measured.
-const INVOICE_MAX_MASTER_MARK: u64 = 5_000;
 
 /// The largest voucher mark (an upper bound on the book's vouchers) a v0
 /// invoice is built or posted on. PROVISIONAL: formula-filtered voucher reads
@@ -362,43 +352,14 @@ fn voucher_mark_refusal(mark: Option<u64>) -> Option<InvoiceRefusal> {
     }
 }
 
-/// Whether the master mark alone admits a book.
-fn mark_admits(mark: u64) -> bool {
-    mark <= INVOICE_MAX_MASTER_MARK
-}
-
-/// What a book above that mark may hold, by the company's own ledger count,
-/// and still be built on: the whole compliance listing is a few kilobytes a
-/// ledger, so this keeps one read of it to a few megabytes. The listing's own
-/// size gate stays in front of it. The rate read is already narrowed to the named
-/// ledgers' parent groups (#1331); narrowing this listing the same way, so that
-/// large books can be admitted, waits for its own measurement.
-const INVOICE_MAX_LEDGERS: u64 = 2_000;
-
-/// Why a book over the mark is refused on the company's own ledger count, or
-/// `None` when the count admits it. A count Tally did not give never admits,
-/// and is refused as unknown, not as large.
-fn ledger_count_refusal(ledgers: Option<u64>, mark: u64) -> Option<InvoiceRefusal> {
-    match ledgers {
-        Some(ledgers) if ledgers <= INVOICE_MAX_LEDGERS => None,
-        Some(ledgers) => Some(refuse_value(
-            "invoice_book_too_large",
-            format!("{ledgers} ledgers"),
-        )),
-        // Not known to be large: the count did not come back, and the mark alone
-        // does not admit the book.
-        None => Some(refuse_value(
-            "invoice_book_size_unknown",
-            format!("master mark {mark}"),
-        )),
-    }
-}
-
 /// The most legs an invoice may carry: the customer, up to three Sales Accounts
 /// ledgers, the two tax heads (or two sales ledgers, the heads and a round off).
 /// What the approval window can show, with its blank line dropped when nothing
-/// stands under the entries.
-const MAX_INVOICE_ENTRIES: usize = 6;
+/// stands under the entries. It is the bound of the ledger part the rate read
+/// names (#1331), so every ledger an admitted invoice names fits one read; the
+/// part's own documentation says what has been sent live.
+const MAX_INVOICE_ENTRIES: usize =
+    bridge_tally_protocol::ledger_guid_part::LEDGER_GUID_PART_MAX_GUIDS;
 
 /// The IGST rates GST has, in thousandths of a percent: the slab list the check
 /// admitted before it read ledgers (5, 12, 18, 28 and 40 percent). A ledger at
@@ -452,9 +413,11 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
             _ => "invoice_sales_ledger_rate_history_unmeasured",
         });
     };
-    if !gst.applicable_from.as_deref().is_some_and(|from| {
-        from.len() == 8 && from.bytes().all(|byte| byte.is_ascii_digit()) && from <= as_of
-    }) {
+    if !gst
+        .applicable_from
+        .as_deref()
+        .is_some_and(|from| TallyDate::parse(from).is_ok() && from <= as_of)
+    {
         return Err("invoice_sales_ledger_rate_not_in_force");
     }
     if gst.unmeasured {
@@ -527,9 +490,12 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
 }
 
 /// What a tax ledger must say for the invoice to be checked against its rate:
-/// its own rate of tax is the one the sales ledgers give, and it rounds
-/// nothing (the measured ledgers read "Not Applicable" and 0). A ledger that
-/// reads anything else, or nothing, was not measured.
+/// its own rate of tax is the one the sales ledgers give, it rounds nothing
+/// (the measured ledgers read "Not Applicable" and 0), and its GST rows carry
+/// no rate. No tax ledger in a capture has a rate in those rows, so how Tally
+/// reads one beside the ledger's own rate is not known; a row of elements the
+/// lab did not read could hold one. A ledger that reads anything else, or
+/// nothing, was not measured.
 fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'static str> {
     let own = row.rate_of_tax_calculation.as_deref().and_then(rate_milli);
     if own != Some(half_milli) {
@@ -539,6 +505,17 @@ fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'s
         || row.rounding_limit.as_deref() != Some("0")
     {
         return Some("invoice_tax_ledger_rounding_unsupported");
+    }
+    let rated = |gst: &wire::GstRow| {
+        gst.unmeasured
+            || gst
+                .states
+                .iter()
+                .flat_map(|state| &state.heads)
+                .any(|head| head.rate.is_some())
+    };
+    if row.gst_rows.iter().any(rated) {
+        return Some("invoice_tax_ledger_gst_rate_unmeasured");
     }
     None
 }
@@ -597,7 +574,9 @@ impl InvoiceNumber {
 /// What Tally returned is the build's to record, never the caller's: refused
 /// on the way in. A saved batch carries it (and `admit_saved` requires it), so
 /// this runs only on a caller's payload.
-pub(super) fn refuse_supplied_observed<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
+pub(super) fn refuse_supplied_observed<D: super::PayloadDate>(
+    vouchers: &[ImportVoucher<D>],
+) -> Result<(), String> {
     if vouchers.iter().any(|voucher| {
         voucher
             .invoice
@@ -624,7 +603,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
-pub(super) fn validate_invoice_voucher<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
+pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
     if !voucher.voucher_type.is_invoice() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
@@ -893,9 +872,17 @@ pub(super) fn classify_sales_invoice(
             }
             // A New Ref is written exactly when the party is bill-wise and never
             // otherwise (an allocation on a non-bill-wise ledger is dropped
-            // silently). So the flag must be known, but either value admits.
-            if fact.bill_wise.is_none() {
-                refusals.push(refuse_ledger("invoice_party_bill_wise_unknown", name));
+            // silently). So the flag must be known, and only a party that is
+            // not bill-wise admits: Tally applies a New Ref to a bill of the
+            // same name the customer already holds, settled ones included, and
+            // the build does not read those bills (voucher-writes reference
+            // §9.16, "A bill of the same name").
+            match fact.bill_wise {
+                None => refusals.push(refuse_ledger("invoice_party_bill_wise_unknown", name)),
+                Some(true) => {
+                    refusals.push(refuse_ledger("invoice_party_bill_wise_not_supported", name))
+                }
+                Some(false) => {}
             }
         }
     }
@@ -908,7 +895,7 @@ pub(super) fn classify_sales_invoice(
         cgst_index.expect("checked"),
         state_index.expect("checked"),
     );
-    let amount = |index: usize| paise(&voucher.entries[index].amount);
+    let amount = |index: usize| paise(voucher.entries[index].amount.as_str());
     let lines = sales
         .iter()
         .map(|index| amount(*index))
@@ -1039,6 +1026,15 @@ fn failed(code: &'static str) -> InvoiceAdmission {
     failed_with(code.to_string())
 }
 
+/// What a verdict is when the answers it needed are already in hand.
+fn admission_of(verdict: Verdict) -> InvoiceAdmission {
+    match verdict {
+        Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
+        Verdict::Failed(code) => failed_with(code),
+        Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
+    }
+}
+
 fn failed_with(code: String) -> InvoiceAdmission {
     InvoiceAdmission::Failed(super::super::ToolFailure::from(code))
 }
@@ -1154,19 +1150,20 @@ pub(super) fn queued_invoice_for<'a>(
 
 /// Whether the plan the queue sent is the one this invoice calls for. Every
 /// part of it is a function of the invoice and the clock alone (the company,
-/// the date the listing is read as of, and each request, the ledger count's
-/// among them) apart from the number's control, which is the journal's, and the
-/// rates request, which is also a function of the catalogue: it names the
-/// parents of the ledgers the invoice names (#1331). A plan that differs in the
+/// the date the listing is read as of, and each request) apart from the
+/// number's control, which is the journal's, and the
+/// rates request and its ledgers' parents, which are also functions of the
+/// catalogue: the request names the invoice's ledgers by GUID, and the plan
+/// records the parent the catalogue gave each (#1331). A plan that differs in the
 /// company or in any other request is a wiring fault. A listing date that is
 /// not the queue's day is not a fault but a clock that moved since the plan
 /// (midnight fell between the last re-read before the queue, which made the
 /// plan, and the queue's judgement; midnight while the dialog was open does
 /// not), a control that moved since the plan is a change,
-/// and so is a rates request that differs when every request the
-/// invoice alone decides is equal (a named ledger regrouped, or its group
-/// renamed, since the plan's catalogue was read): each is named by its own
-/// cause. The precheck is the invoice module's own function; the judge decides
+/// and so is a rates request or a ledger's parent that differs when every
+/// request the invoice alone decides is equal (a named ledger replaced under
+/// its name, regrouped, or its group renamed, since the plan's catalogue was
+/// read): each is named by its own cause. The precheck is the invoice module's own function; the judge decides
 /// again whatever it answered.
 pub(super) fn fit_plan(
     wanted: &InvoiceReadPlan,
@@ -1176,8 +1173,9 @@ pub(super) fn fit_plan(
         company_name,
         listing_as_of,
         precheck: _,
-        ledger_count,
+        listing_ledgers,
         rates,
+        ledger_parents,
         voucher_types,
         number,
         number_control,
@@ -1186,7 +1184,6 @@ pub(super) fn fit_plan(
         group_hsn,
     } = wanted;
     if *company_name != carried.company_name
-        || *ledger_count != carried.ledger_count
         || *voucher_types != carried.voucher_types
         || *number != carried.number
         || *registration != carried.registration
@@ -1205,7 +1202,10 @@ pub(super) fn fit_plan(
             field: "number_control",
         });
     }
-    if *rates != carried.rates {
+    if *rates != carried.rates
+        || *listing_ledgers != carried.listing_ledgers
+        || *ledger_parents != carried.ledger_parents
+    {
         return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
             field: "ledger_scope",
         });
@@ -1220,12 +1220,11 @@ pub(super) fn fit_plan(
 /// calls for (a wiring fault); a plan made on another day than `today`, named
 /// by its date; a number control, or a ledger scope (a named ledger regrouped
 /// since the plan's catalogue was read), that moved since the plan; the judge's
-/// own refusal; and an observation that differs from the recorded one, naming the first field that does. The size limits and the
+/// own refusal; and an observation that differs from the recorded one, naming the first field that does. The size limit and the
 /// currency were judged before the plan's reads were sent.
 pub(super) fn admit_queued_invoice(
     voucher: &ImportVoucher,
-    company_name: &str,
-    company_guid: &str,
+    identity: &crate::tally::VerifiedCompanyIdentity,
     catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
     control: &super::ledger::NumberControl,
     today: &bridge_tally_core::TallyDate,
@@ -1237,8 +1236,7 @@ pub(super) fn admit_queued_invoice(
         .as_mut()
         .and_then(|detail| detail.observed.take());
     let judge = InvoiceJudge {
-        company_name,
-        company_guid,
+        identity,
         voucher: &fresh,
         catalogue,
         control,
@@ -1453,7 +1451,7 @@ fn invoice_readback_differences(
         .entries
         .iter()
         .map(|entry| {
-            let value = paise(&entry.amount).unwrap_or(i128::MIN);
+            let value = paise(entry.amount.as_str()).unwrap_or(i128::MIN);
             match entry.side {
                 EntrySide::Dr => key(&entry.ledger, -value, true),
                 EntrySide::Cr => key(&entry.ledger, value, false),
@@ -1483,7 +1481,7 @@ fn invoice_readback_differences(
         .entries
         .iter()
         .find(|entry| entry.ledger == party)
-        .and_then(|entry| paise(&entry.amount))
+        .and_then(|entry| paise(entry.amount.as_str()))
         .map(|value| -value);
     let allocation_ok = read.legs.iter().all(|leg| {
         if leg.ledger == party && observed.party_bill_wise {
@@ -1609,6 +1607,8 @@ enum GstStatusDifference {
     Excluded,
     /// All three flags No: the return does not list it at all.
     NotInReturn,
+    /// Tally marks it post-dated, whatever its three flags state.
+    PostDated,
     /// A person accepted it as it stands (Accept As Is).
     Overridden,
     /// The flags came back in a combination that states no status.
@@ -1623,6 +1623,7 @@ impl GstStatusDifference {
             Self::Uncertain => "gst_status_uncertain",
             Self::Excluded => "gst_status_excluded",
             Self::NotInReturn => "gst_status_not_in_return",
+            Self::PostDated => "gst_status_post_dated",
             Self::Overridden => "gst_status_overridden",
             Self::Unreadable => "gst_status_unreadable",
             Self::NotReported => "gst_status_not_reported",
@@ -1641,31 +1642,34 @@ impl GstStatusDifference {
 }
 
 /// What Tally's own GSTR-1 says of the posted invoice, through the GST status
-/// read's own readings of the four flags (`status_of_flags`, `overridden_of`).
-/// Only an invoice the return lists as included, and that no one accepted as
-/// it stands, is clean (§9.16). A flag that did not come back is never a pass.
+/// read's own reading of the voucher (`status_of_voucher`, `overridden_of`).
+/// Only an invoice the return lists as included, that is not post-dated, and
+/// that no one accepted as it stands, is clean (§9.16). A flag that did not
+/// come back is never a pass.
 fn gst_status_differences(fields: &BTreeMap<String, String>) -> Vec<GstStatusDifference> {
-    use super::super::gst_status::{overridden_of, status_of_flags, FlagStatus};
+    use super::super::gst_status::{overridden_of, status_of_voucher, GstStatus};
     let flag = |name: &str| fields.get(name).map(String::as_str);
-    // `status_of_flags` reads the three status flags only, so it never states a cancelled,
-    // optional or post-dated invoice (the status tool decides those from `ISCANCELLED`,
-    // `ISOPTIONAL` and `ISPOSTDATED` first). A cancelled or optional invoice is refused
-    // earlier, by the field comparison, which wants both flags `No`. A post-dated one is
-    // not: the read-back does not fetch `ISPOSTDATED`, so an invoice a person marks
-    // post-dated after the post reads included here and stays verified (on master's status
-    // read the flag reads Yes on such a voucher and its three flags still read included).
-    // Fetching it changes the request the lab answered, so it needs a lab answer first: the
-    // follow-up fetches `ISPOSTDATED` and decides the state with `status_of_voucher`.
-    let status = match status_of_flags(
-        flag("VCHGSTSTATUSISINCLUDED"),
-        flag("VCHGSTSTATUSISUNCERTAIN"),
-        flag("VCHGSTSTATUSISEXCLUDED"),
-    ) {
-        Ok(FlagStatus::Included) => None,
-        Ok(FlagStatus::Uncertain) => Some(GstStatusDifference::Uncertain),
-        Ok(FlagStatus::Excluded) => Some(GstStatusDifference::Excluded),
-        Ok(FlagStatus::NotInReturn) => Some(GstStatusDifference::NotInReturn),
-        Err(code) => Some(GstStatusDifference::unread(code)),
+    // A post-dated invoice reads its three flags included (lab, 3 Nov 2026), so the state
+    // comes from `ISPOSTDATED` first. A cancelled or optional invoice is refused by the
+    // field comparison, which wants both flags `No`, so it adds no second finding here.
+    // The request names `ISPOSTDATED`, so an answer without it did not report the state.
+    let status = match flag("ISPOSTDATED").map(|_| {
+        status_of_voucher(
+            flag("ISCANCELLED"),
+            flag("ISOPTIONAL"),
+            flag("ISPOSTDATED"),
+            flag("VCHGSTSTATUSISINCLUDED"),
+            flag("VCHGSTSTATUSISUNCERTAIN"),
+            flag("VCHGSTSTATUSISEXCLUDED"),
+        )
+    }) {
+        None => Some(GstStatusDifference::NotReported),
+        Some(Ok(GstStatus::Included | GstStatus::Cancelled | GstStatus::Optional)) => None,
+        Some(Ok(GstStatus::Uncertain)) => Some(GstStatusDifference::Uncertain),
+        Some(Ok(GstStatus::Excluded)) => Some(GstStatusDifference::Excluded),
+        Some(Ok(GstStatus::NotInReturn)) => Some(GstStatusDifference::NotInReturn),
+        Some(Ok(GstStatus::PostDated)) => Some(GstStatusDifference::PostDated),
+        Some(Err(code)) => Some(GstStatusDifference::unread(code)),
     };
     let overridden = match overridden_of(flag("ISGSTOVERRIDDEN")) {
         Ok(false) => None,
@@ -1856,6 +1860,10 @@ pub(super) fn party_bill_wise_in(
 /// The party ledger of an invoice that will carry a New Ref. Its entry is
 /// written with a bill allocation, so it does not land On Account and needs
 /// no On Account approval (#1234); every other leg is judged as before.
+/// Since `classify_sales_invoice` refuses a bill-wise party, this, the New Ref
+/// render and the read-back's bill-wise branch serve only batches saved before
+/// that refusal, which the re-judge then refuses; they stay for a later read
+/// of the customer's bills.
 pub(super) fn new_ref_party(voucher: &ImportVoucher) -> Option<&str> {
     // Only an invoice has one, whatever detail another voucher may carry.
     if !voucher.voucher_type.is_invoice() {
@@ -1945,7 +1953,6 @@ fn duty_head_of(observation: &bridge_tally_protocol::GstDutyHeadObservation) -> 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Need {
     Marks,
-    LedgerCount,
     Listing,
     Rates,
     VoucherTypes,
@@ -1982,8 +1989,7 @@ fn unusable(code: &'static str) -> Verdict {
 /// invoice, the catalogue its party's bill-wise flag is read from, and the
 /// number control the journal offers.
 pub(super) struct InvoiceJudge<'a> {
-    pub(super) company_name: &'a str,
-    pub(super) company_guid: &'a str,
+    pub(super) identity: &'a crate::tally::VerifiedCompanyIdentity,
     pub(super) voucher: &'a ImportVoucher,
     pub(super) catalogue: &'a bridge_tally_protocol::StandardLedgerCatalogV2,
     pub(super) control: &'a super::ledger::NumberControl,
@@ -1996,17 +2002,13 @@ fn admitted(
         .map_err(|error| Verdict::Failed(error.to_string()))
 }
 
-/// The size limits on a book, judged on its marks (and its ledger count when
-/// the master mark is over the gate's mark): the marks it admits, a refusal,
-/// or `Need::LedgerCount`. The build's judge and the queue's precheck both call
-/// it, so the limits have one copy and are decided before the listing is read
-/// (#1337).
-fn size_gate(
-    marks: &str,
-    ledger_count: Option<&str>,
-    company_name: &str,
-    company_guid: &str,
-) -> Result<super::PreImportMark, Verdict> {
+/// The size limit on a book, judged on its marks: the marks it admits or a
+/// refusal. The build's judge and the queue's precheck both call it, so the
+/// limit has one copy and is decided before the listing is read (#1337). The
+/// masters' mark limits nothing: the listing names the invoice's ledgers
+/// (#1331), and the listing's own read refuses a book that gives no master
+/// mark. A voucher mark Tally did not give never admits.
+fn size_gate(marks: &str, company_guid: &str) -> Result<super::PreImportMark, Verdict> {
     let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
     // The duplicate-number read and the read-back each walk the book's
     // vouchers (a formula decides the rows, so Tally evaluates every
@@ -2017,49 +2019,21 @@ fn size_gate(
     if let Some(refusal) = voucher_mark_refusal(mark.value) {
         return Err(refusing(refusal));
     }
-    match mark.master_value {
-        Some(value) if mark_admits(value) => {}
-        // The mark counts every master alteration, so a long-lived or
-        // stock-heavy book is over it whatever its ledger count: the
-        // company's own count of its ledgers can admit such a book.
-        Some(value) => {
-            let Some(body) = ledger_count else {
-                return Err(Verdict::Need(Need::LedgerCount));
-            };
-            let count = bridge_tally_protocol::outstandings_shared::parse_company_ledger_count(
-                body,
-                company_name,
-                company_guid,
-            )
-            .map_err(|_| unusable("invoice_book_size_unreadable"))?;
-            if let Some(refusal) = ledger_count_refusal(count.map(|count| count.get()), value) {
-                return Err(refusing(refusal));
-            }
-        }
-        None => return Err(refusing(refuse("invoice_book_size_unknown"))),
-    }
     Ok(mark)
 }
 
 /// What the endpoint queue asks before it sends any read of an invoice's
-/// masters (#1337): the company's currency, then the size limits, judged on the
+/// masters (#1337): the company's currency, then the size limit, judged on the
 /// marks and currencies it has already read. A book the limits or the currency
 /// refuse is refused with none of the listing, rates, voucher types, number or
 /// registration reads sent, as the build refuses it.
 pub(super) fn queued_precheck(
     input: &InvoicePrecheckInput<'_>,
-) -> Result<InvoicePrecheck, ApprovedImportAdmissionError> {
+) -> Result<(), ApprovedImportAdmissionError> {
     super::post::admit_post_currency(input.currencies)?;
-    match size_gate(
-        input.marks,
-        input.ledger_count,
-        input.company_name,
-        input.company_guid,
-    ) {
-        Ok(_) => Ok(InvoicePrecheck::Admitted),
-        Err(Verdict::Need(Need::LedgerCount)) => Ok(InvoicePrecheck::NeedsLedgerCount),
-        Err(verdict) => Err(queued_refusal(verdict)),
-    }
+    size_gate(input.marks, input.company_guid)
+        .map(|_| ())
+        .map_err(queued_refusal)
 }
 
 /// What a judge's verdict is as a refusal in the queue: the admission's own
@@ -2094,10 +2068,9 @@ impl InvoiceJudge<'_> {
             .collect()
     }
 
-    /// The rate read asks only for the ledgers under the parents of the
-    /// ledgers this invoice names. The scope is planned from the catalogue the
-    /// caller has just read, so every refusal of it comes before any request
-    /// to Tally (#1331).
+    /// The rate read asks only for the ledgers this invoice names, by the GUID
+    /// the catalogue the caller has just read gave each, so every refusal of
+    /// the scope comes before any request to Tally (#1331).
     fn scope(&self) -> Result<scope::InvoiceLedgerScope, Verdict> {
         scope::InvoiceLedgerScope::from_catalogue(self.catalogue.catalog(), &self.named())
             .map_err(refusing)
@@ -2115,17 +2088,16 @@ impl InvoiceJudge<'_> {
         &self,
         need: Need,
     ) -> Result<crate::tally::agent_read_request::AgentReadRequest, Verdict> {
-        let company = self.company_name;
+        let company = self.identity.display_name();
         match need {
-            Need::LedgerCount => admitted(super::super::invoice_ledger_count_read(company)),
             Need::VoucherTypes => admitted(super::super::invoice_voucher_types_read(company)),
             Need::Registration => {
                 admitted(super::super::invoice_company_registration_read(company))
             }
             Need::GroupHsn => admitted(super::super::invoice_group_hsn_read(company)),
             Need::CompanyHsn => {
-                crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn_named(
-                    company,
+                crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn(
+                    self.identity,
                 )
                 .map_err(|error| Verdict::Failed(error.to_string()))
             }
@@ -2171,26 +2143,25 @@ impl InvoiceJudge<'_> {
             return Err(unusable("invoice_number_control_unreadable"));
         };
         admitted(super::super::invoice_number_read(
-            self.company_name,
+            self.identity.display_name(),
             &number,
             (&window.0, &window.1),
         ))
         .map(Some)
     }
 
-    /// The plan of an admission: every request fixed from the invoice, the
-    /// ledger count's included, which the queue sends only when its precheck
-    /// asks for it.
+    /// The plan of an admission: every request fixed from the invoice.
     pub(super) fn plan(
         &self,
         listing_as_of: bridge_tally_core::TallyDate,
     ) -> Result<InvoiceReadPlan, Verdict> {
         Ok(InvoiceReadPlan {
-            company_name: self.company_name.to_string(),
+            company_name: self.identity.display_name().to_string(),
             listing_as_of,
             precheck: queued_precheck,
-            ledger_count: self.request(Need::LedgerCount)?,
+            listing_ledgers: self.scope()?.part().clone(),
             rates: self.request(Need::Rates)?,
+            ledger_parents: self.scope()?.parents(),
             voucher_types: self.request(Need::VoucherTypes)?,
             number: self.request(Need::Number)?,
             number_control: self.number_control_request()?,
@@ -2217,24 +2188,17 @@ impl InvoiceJudge<'_> {
             .ok_or_else(|| refusing(refuse("invoice_party_missing")))?;
         let scope = self.scope()?;
 
-        // 0. Refuse large books: the whole ledger compliance listing is read
-        // at least four times for one invoice (build, before the dialog, after
-        // it, and in the endpoint queue; a redeemed approval repeats the two
-        // re-reads).
+        // 0. Refuse a book whose vouchers are too many for the number read.
         let Some(marks) = answers.marks.as_deref() else {
             return Err(Verdict::Need(Need::Marks));
         };
-        let mark = size_gate(
-            marks,
-            answers.ledger_count.as_deref(),
-            self.company_name,
-            self.company_guid,
-        )?;
+        let mark = size_gate(marks, self.identity.company_guid())?;
 
         // 1. The compliance listing.
         let Some(listing) = answers.listing.as_ref() else {
             return Err(Verdict::Need(Need::Listing));
         };
+        scope.prove_listing(listing).map_err(refusing)?;
         let index =
             bridge_tally_protocol::group_ancestry::GroupIndex::build(listing.groups.clone());
         // 1b. Each ledger's GST rate and rounding, from the same listing with
@@ -2243,11 +2207,14 @@ impl InvoiceJudge<'_> {
         let Some(rates_body) = answers.rates.as_deref() else {
             return Err(Verdict::Need(Need::Rates));
         };
-        let (rates, listed) =
-            wire::parse_ledger_rates_and_rows(rates_body, self.company_guid, &self.named())
-                .map_err(|code| Verdict::Failed(code.to_string()))?;
-        // A scoped read is believed only when its rows are exactly the
-        // catalogue's ledgers under those parents.
+        let (rates, listed) = wire::parse_ledger_rates_and_rows(
+            rates_body,
+            self.identity.company_guid(),
+            &self.named(),
+        )
+        .map_err(|code| Verdict::Failed(code.to_string()))?;
+        // A scoped read is believed only when its rows are exactly the named
+        // ledgers, with the catalogue's names and parents.
         scope.prove(&listed).map_err(refusing)?;
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {
@@ -2322,10 +2289,14 @@ impl InvoiceJudge<'_> {
             .map_err(|code| Verdict::Failed(code.to_string()))?
             != 0
         {
-            return Err(refusing(refuse_value(
-                "invoice_number_already_used",
-                &number,
-            )));
+            let code = if wire::sales_holder_has_irn(number_body)
+                .map_err(|code| Verdict::Failed(code.to_string()))?
+            {
+                "invoice_number_already_used_with_irn"
+            } else {
+                "invoice_number_already_used"
+            };
+            return Err(refusing(refuse_value(code, &number)));
         }
         // 3c. "No voucher carries this number" is believed only beside a
         // control: the same read for an invoice this company is known to hold
@@ -2364,17 +2335,29 @@ impl InvoiceJudge<'_> {
         let Some(registration_body) = answers.registration.as_deref() else {
             return Err(Verdict::Need(Need::Registration));
         };
-        let company_state =
-            wire::parse_company_registration(registration_body, self.company_guid, &as_of)
-                .map_err(|outcome| match outcome {
-                    wire::RegistrationOutcome::Refused(code) => refusing(refuse(code)),
-                    wire::RegistrationOutcome::Failed(code) => unusable(code),
-                })?
-                .state;
+        let registration = wire::parse_company_registration(
+            registration_body,
+            self.identity.company_guid(),
+            &as_of,
+        )
+        .map_err(|outcome| match outcome {
+            wire::RegistrationOutcome::Refused(code) => refusing(refuse(code)),
+            wire::RegistrationOutcome::Failed(code) => unusable(code),
+        })?;
 
-        let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
+        let roles = classify_sales_invoice(voucher, &facts, &registration.state, &as_of)
             .map_err(Verdict::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
+        // A customer holding the company's own GSTIN: Tally lists such an
+        // invoice as uncertain (section 9.16). Both GSTINs are valid here (the
+        // classification checked the party's), so equal means byte-equal.
+        if matches!(&facts[party].gstin, GstinEvidence::InForce(gstin) if *gstin == registration.gstin)
+        {
+            return Err(refusing(refuse_ledger(
+                "invoice_party_gstin_is_company_own",
+                party,
+            )));
+        }
         let sales_ledgers: Vec<String> = roles
             .sales
             .iter()
@@ -2396,7 +2379,7 @@ impl InvoiceJudge<'_> {
             &facts[party].gstin,
             resolved.guid,
             bill_wise,
-            company_state,
+            registration.state,
             sales_ledgers,
             hsn_warnings,
         ))
@@ -2422,7 +2405,7 @@ impl InvoiceJudge<'_> {
         let Some(company_body) = answers.company_hsn.as_deref() else {
             return Err(Verdict::Need(Need::CompanyHsn));
         };
-        let company = wire::parse_company_hsn(company_body, self.company_guid)
+        let company = wire::parse_company_hsn(company_body, self.identity.company_guid())
             .map_err(|code| Verdict::Failed(code.to_string()))?;
         // The build reads the groups only when a sales ledger's own row defers
         // to them. The queue's `read_invoice_plan` always reads them, and an
@@ -2431,7 +2414,7 @@ impl InvoiceJudge<'_> {
         // (`InvoiceReadUnusable`, before any intent), never the build.
         let groups = match answers.group_hsn.as_deref() {
             Some(body) => Some(
-                wire::parse_group_hsn(body, self.company_guid)
+                wire::parse_group_hsn(body, self.identity.company_guid())
                     .map_err(|code| Verdict::Failed(code.to_string()))?,
             ),
             None => None,
@@ -2469,9 +2452,9 @@ impl InvoiceJudge<'_> {
 impl super::super::Server {
     /// Read what the masters say about one Sales invoice, classify every leg,
     /// and record what was observed on the voucher. The reads: the company's
-    /// marks (and its ledger count when the master mark is high), the ledger
-    /// compliance listing (reserved group ancestry, duty head, the GSTIN in
-    /// force on the invoice date), the same listing with each ledger's GST
+    /// marks, the ledger compliance listing of the invoice's ledgers (reserved
+    /// group ancestry, duty head, the GSTIN in force on the invoice date), the
+    /// same listing with each ledger's GST
     /// rate and rounding (the tax is worked out from it), the voucher types (the named type, its
     /// class and its series-level numbering), the vouchers carrying the number
     /// and the company's GST registration in force on the invoice date. The
@@ -2525,8 +2508,7 @@ impl super::super::Server {
         let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today())
             .map_err(|_| failed("current_date_invalid"))?;
         let judge = InvoiceJudge {
-            company_name: company.name.as_str(),
-            company_guid: identity.company_guid(),
+            identity,
             voucher: &*voucher,
             catalogue,
             control: &control,
@@ -2562,12 +2544,13 @@ impl super::super::Server {
                         note(&mut evidence, read);
                     }
                     Need::Listing => {
+                        let ledgers = judge.scope().map_err(admission_of)?.part().clone();
                         let listing =
-                            Box::pin(self.runtime.fetch_agent_party_ledger_masters_with_evidence(
+                            Box::pin(self.runtime.fetch_named_ledger_masters_with_evidence(
                                 self.tally_config(),
                                 identity,
                                 today.clone(),
-                                crate::tally::connection::ComplianceRead::Standard,
+                                ledgers,
                             ))
                             .await
                             .map_err(|error| {
@@ -2582,22 +2565,16 @@ impl super::super::Server {
                         );
                         answers.listing = Some(listing);
                     }
-                    Need::LedgerCount
-                    | Need::CompanyHsn
+                    Need::CompanyHsn
                     | Need::Rates
                     | Need::VoucherTypes
                     | Need::Number
                     | Need::NumberControl
                     | Need::GroupHsn
                     | Need::Registration => {
-                        let request = judge.request(need).map_err(|verdict| match verdict {
-                            Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
-                            Verdict::Failed(code) => failed_with(code),
-                            Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
-                        })?;
+                        let request = judge.request(need).map_err(admission_of)?;
                         let (xml, read, _) = self.post_admitted_read(identity, request).await?;
                         let slot = match need {
-                            Need::LedgerCount => &mut answers.ledger_count,
                             Need::Rates => &mut answers.rates,
                             Need::VoucherTypes => &mut answers.voucher_types,
                             Need::Number => &mut answers.number,
@@ -2612,11 +2589,7 @@ impl super::super::Server {
                 },
             }
         };
-        let plan = judge.plan(today).map_err(|verdict| match verdict {
-            Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
-            Verdict::Failed(code) => failed_with(code),
-            Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
-        })?;
+        let plan = judge.plan(today).map_err(admission_of)?;
         if let Some(detail) = voucher.invoice.as_mut() {
             detail.observed = Some(observed);
         }
@@ -2693,16 +2666,14 @@ pub(super) fn render_sales_invoice_xml(
     remote_id: Uuid,
     date: &str,
     narration: &str,
+    action: super::VoucherAction,
 ) -> Option<String> {
     let detail = voucher.invoice.as_ref()?;
     let observed = detail.observed.as_ref()?;
     let number = voucher.voucher_number.as_deref()?;
     let party_entry = party_entry(voucher)?;
     let leg = |entry: &ImportEntry, bill: bool| {
-        let signed = match entry.side {
-            EntrySide::Dr => format!("-{}", entry.amount),
-            EntrySide::Cr => entry.amount.clone(),
-        };
+        let signed = entry.amount.signed_lexeme(&entry.side);
         let allocation = if bill {
             format!(
                 "<BILLALLOCATIONS.LIST><NAME>{}</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>{signed}</AMOUNT></BILLALLOCATIONS.LIST>",
@@ -2726,6 +2697,7 @@ pub(super) fn render_sales_invoice_xml(
         legs.push_str(&leg(entry, false));
     }
     let type_name = xml_escape(&detail.voucher_type_name);
+    let action = action.as_str();
     let party = xml_escape(&party_entry.ledger);
     let gstin = observed
         .party_gstin
@@ -2733,7 +2705,7 @@ pub(super) fn render_sales_invoice_xml(
         .map(|gstin| format!("<PARTYGSTIN>{}</PARTYGSTIN>", xml_escape(gstin)))
         .unwrap_or_default();
     Some(format!(
-        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{narration}{legs}</VOUCHER></TALLYMESSAGE>",
+        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"{action}\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{narration}{legs}</VOUCHER></TALLYMESSAGE>",
         xml_escape(number),
         xml_escape(number),
         xml_escape(&observed.party_state),

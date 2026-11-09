@@ -23,6 +23,7 @@ DEFAULT_TOOLS = {
     "cash_flow",
     "company_features",
     "egress_log",
+    "gst_by_counter_ledger",
     "gst_status",
     "gst_uncertain_vouchers",
     "ledger_masters",
@@ -31,6 +32,7 @@ DEFAULT_TOOLS = {
     "local_data_report",
     "masters",
     "month_register",
+    "negative_ledgers",
     "negative_stock",
     "outstandings",
     "profit_and_loss",
@@ -38,6 +40,8 @@ DEFAULT_TOOLS = {
     "read_evidence",
     "sales_register",
     "statement_tie_out",
+    "stock_by_batch",
+    "stock_by_godown",
     "stock_summary",
     "tally_status",
     "trial_balance",
@@ -55,6 +59,7 @@ DEFAULT_TOOLS = {
 IMPORT_TOOLS = {
     "build_import_xml",
     "parse_bank_statement",
+    "parse_bank_statement_csv",
 }
 POSTING_TOOLS = {
     "acknowledge_post_review",

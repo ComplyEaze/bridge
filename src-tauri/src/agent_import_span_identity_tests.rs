@@ -46,7 +46,7 @@ fn target_mark(bytes: &[u8]) -> u64 {
 fn entry(ledger: &str, side: EntrySide, amount: &str) -> ImportEntry {
     ImportEntry {
         ledger: ledger.into(),
-        amount: amount.into(),
+        amount: ImportAmount::parse(amount).unwrap(),
         side,
     }
 }
@@ -323,6 +323,34 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     );
 }
 
+/// A wrapped reply that reports `STATUS=0` failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6), so no span is bound from it, with or
+/// without a mark read after the post (#2008).
+#[test]
+fn a_reply_reporting_status_zero_binds_no_span_whatever_its_counters() {
+    let before = PreMark::recorded(1795);
+    let failed = |status: &str| {
+        bridge_tally_protocol::parse_import_outcome(&format!(
+            "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1733</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>"
+        ))
+        .unwrap()
+    };
+    // The same counters under STATUS=1 make a span: only the status differs.
+    assert!(PostSpan::after_clean_post(before, 1805, &failed("1"), 10).is_ok());
+    assert!(matches!(
+        PostSpan::after_clean_post(before, 1805, &failed("0"), 10),
+        Err(BindError::Refused(SpanRefusal::StatusFailure))
+    ));
+    assert_eq!(
+        PostSpan::after_clean_response(before, &failed("0"), 10),
+        Err(SpanRefusal::StatusFailure)
+    );
+    assert_eq!(
+        SpanRefusal::StatusFailure.code(),
+        "span_response_status_failure"
+    );
+}
+
 /// Verification treats an absent `EFFECTIVEDATE` as not observed, so the
 /// binding is decided again by the next read, never refused for good. A real
 /// difference later in the span still refuses: the absence, met first, never
@@ -427,7 +455,7 @@ fn content_that_differs_from_what_was_sent_refuses_at_its_position() {
     // The seventh amount changed by one paisa.
     let mut reamounted = sent();
     for entry in &mut reamounted[6].entries {
-        entry.amount = "99.01".into();
+        entry.amount = ImportAmount::parse("99.01").unwrap();
     }
     assert_eq!(
         refusal(bind(
@@ -681,6 +709,24 @@ fn sent_journals() -> Vec<ImportVoucher> {
     ]
 }
 
+/// #2062: the cancel candidate of each captured request (Payment, Receipt and
+/// Contra; Journal) is that request with only each voucher's `ACTION` changed.
+#[test]
+fn the_cancel_candidate_of_each_captured_request_changes_only_its_actions() {
+    let journal_ids = JOURNAL_IMPORT
+        .split("REMOTEID=\"")
+        .skip(1)
+        .map(|rest| Uuid::parse_str(&rest[..36]).unwrap())
+        .collect::<Vec<_>>();
+    for (vouchers, ids) in [
+        (sent(), captured_remote_ids()),
+        (sent_journals(), journal_ids),
+    ] {
+        let pairs = vouchers.iter().zip(ids).collect::<Vec<_>>();
+        super::super::cancel::tests::assert_cancel_changes_only_the_action(COMPANY, &pairs);
+    }
+}
+
 #[test]
 fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
     let ids = JOURNAL_IMPORT
@@ -729,6 +775,14 @@ fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
 /// The ten captured vouchers saved as one batch on a server of its own, with
 /// the journal on disk that `decide_post_span` records its verdict in.
 fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, ImportLedgerLine) {
+    journaled_batch_answered(directory, outcome())
+}
+
+/// [`journaled_batch`], with `answer` as the post's recorded response.
+fn journaled_batch_answered(
+    directory: &std::path::Path,
+    answer: bridge_tally_protocol::TallyImportOutcome,
+) -> (crate::agent::Server, ImportLedgerLine) {
     let server = crate::agent::Server::new(crate::agent::Settings {
         endpoint: bridge_tally_transport::TallyEndpointConfig {
             host: "127.0.0.1".into(),
@@ -740,6 +794,7 @@ fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, Import
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let batch_id = "bridge-00000000-0000-4000-8000-000000001055";
@@ -782,12 +837,88 @@ fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, Import
                     request_sha256: native.request_sha256.clone(),
                     response_sha256: crate::agent::sha256_hex(RESPONSE),
                     bytes: RESPONSE.len(),
-                    outcome: Some(outcome()),
+                    outcome: Some(answer),
                 },
             ))
             .unwrap();
     }
     (server, line)
+}
+
+/// The decision on the captured post answered `STATUS=0` with `CREATED` 10, by
+/// a check that reads the company's mark where it stood before the post, with
+/// no mark read after it; `bound`, when given, stands in for the journal's
+/// verdict. Returns the decision and the pre-POST mark.
+fn status_zero_decision(
+    bound: Option<Vec<PostedVoucherIdentity>>,
+) -> (super::super::PostSpanDecision, u64) {
+    let failed = bridge_tally_protocol::parse_import_outcome(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1805</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
+    )
+    .unwrap();
+    assert_eq!(failed.counters().created, 10);
+    assert_eq!(
+        failed.application_status(),
+        bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let (server, line) = journaled_batch_answered(directory.path(), failed);
+    let snapshot = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.span_verdict, None);
+    let response = snapshot.response.expect("the post's recorded response");
+    let before = snapshot
+        .pre_post_voucher_mark
+        .expect("the recorded pre-POST mark");
+    let decision = server.decide_post_span(
+        &line,
+        PreMark::recorded(before),
+        bound.map(super::super::ledger::PostSpanVerdict::Bound),
+        Some(&response),
+        &span_read(),
+        None,
+        before,
+        snapshot.generation,
+    );
+    (decision, before)
+}
+
+/// A recorded answer that reported `STATUS=0` proves no voucher landed
+/// (#2035): the book is not read as rolled back, and the binding refuses the
+/// answer (#2008).
+#[test]
+fn a_status_zero_answer_does_not_read_an_unchanged_book_as_rolled_back() {
+    let (decision, _) = status_zero_decision(None);
+    assert!(!decision.rolled_back, "{}", decision.report);
+    assert_eq!(
+        decision.report,
+        json!({"state": "refused", "code": SpanRefusal::StatusFailure.code()})
+    );
+}
+
+/// The vouchers a post bound outrank its answer in the floor, as in the
+/// journal's own floor: the same mark reads as rolled back when the post is
+/// bound, whatever its answer's status (#2035). No build since #2008 binds
+/// from such an answer; the verdict stands in for one journaled earlier.
+#[test]
+fn a_bound_post_keeps_its_floor_whatever_its_answers_status() {
+    let bound = bind(
+        &span(),
+        COMPANY_GUID,
+        &sent(),
+        &span_read(),
+        &BTreeSet::new(),
+    )
+    .unwrap();
+    assert_eq!(bound.len(), 10);
+    let (decision, before) = status_zero_decision(Some(bound));
+    assert!(decision.rolled_back, "{}", decision.report);
+    assert_eq!(
+        decision.report,
+        json!({"state": "book_rolled_back", "current_mark": before, "expected_at_least": before + 10})
+    );
 }
 
 /// One verification's decision on the captured post, as `verify_import` makes
@@ -902,4 +1033,232 @@ fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
             "{spelling}"
         );
     }
+}
+
+/// #626: a voucher that landed on the other ledger of a line-break pair does
+/// not match what was sent, in either direction, so it cannot read verified.
+#[test]
+fn a_read_back_on_the_other_ledger_of_a_line_break_pair_does_not_match() {
+    let rows =
+        parse_import_voucher_rows(&captured(LINE_BREAK_READ), LINE_BREAK_COMPANY_GUID).unwrap();
+    let read = |ledger: &str| {
+        let mut row = rows[0].clone();
+        row.entries[0].ledger = ledger.to_string();
+        actual_entry_fingerprint(&row)
+    };
+    assert_eq!(
+        read("Lab Line Break Ledger\r\n"),
+        actual_entry_fingerprint(&rows[0])
+    );
+    assert_ne!(
+        read("Lab Line Break Ledger"),
+        actual_entry_fingerprint(&rows[0])
+    );
+}
+
+/// #1633: only a mark that moved by more than the post created, or a span that
+/// later held another number of vouchers, says another change was made during
+/// the post. The match has no wildcard, so a new refusal must be sorted here.
+#[test]
+fn only_the_step_and_count_refusals_name_a_concurrent_change() {
+    fn names_concurrent_change(refusal: &SpanRefusal) -> bool {
+        match refusal {
+            SpanRefusal::StepNotCreated { .. } | SpanRefusal::SpanCount { .. } => true,
+            // A reply reporting `STATUS=0` says Tally failed the post: it is no
+            // evidence of another change, and the line's "Tally reported
+            // creating each voucher once" would not be true of it (#2008).
+            SpanRefusal::EmptyBatch
+            | SpanRefusal::StatusFailure
+            | SpanRefusal::CountersNotClean
+            | SpanRefusal::CreatedNotCount { .. }
+            | SpanRefusal::LastVchIdAbsent
+            | SpanRefusal::MarkWentBack
+            | SpanRefusal::Position { .. }
+            | SpanRefusal::Content { .. }
+            | SpanRefusal::NotEffective { .. }
+            | SpanRefusal::MasterIdNotInSequence { .. }
+            | SpanRefusal::GuidNotMasterId { .. }
+            | SpanRefusal::IdentityReused { .. } => false,
+        }
+    }
+    let every = [
+        SpanRefusal::EmptyBatch,
+        SpanRefusal::StatusFailure,
+        SpanRefusal::CountersNotClean,
+        SpanRefusal::CreatedNotCount {
+            created: 1,
+            count: 2,
+        },
+        SpanRefusal::LastVchIdAbsent,
+        SpanRefusal::MarkWentBack,
+        SpanRefusal::StepNotCreated {
+            step: 4,
+            created: 1,
+        },
+        SpanRefusal::SpanCount {
+            expected: 1,
+            observed: 2,
+        },
+        SpanRefusal::Position { position: 0 },
+        SpanRefusal::Content {
+            position: 0,
+            fields: vec!["date"],
+        },
+        SpanRefusal::NotEffective { position: 0 },
+        SpanRefusal::MasterIdNotInSequence { position: 0 },
+        SpanRefusal::GuidNotMasterId { position: 0 },
+        SpanRefusal::IdentityReused { position: 0 },
+    ];
+    for refusal in &every {
+        assert_eq!(
+            concurrent_change_line_for(refusal.code()),
+            names_concurrent_change(refusal).then_some(CONCURRENT_CHANGE_LINE),
+            "{}",
+            refusal.code()
+        );
+    }
+    assert_eq!(concurrent_change_line_for("span_unknown_code"), None);
+}
+
+/// Sign-rule site 4 (#1872): the span identity compares what was sent with the row in canonical
+/// form, so the sixth captured voucher (3450.50) written `03450.50` still binds, and one paisa
+/// more does not. The batch-side text is a lexeme; the comparison is not.
+#[test]
+fn a_padded_amount_binds_against_the_row_tally_holds() {
+    let span = span();
+    let read = span_read();
+    let mut padded = sent();
+    for entry in &mut padded[5].entries {
+        assert_eq!(entry.amount.as_str(), "3450.50");
+        entry.amount = ImportAmount::parse("03450.50").unwrap();
+    }
+    let bound = bind(&span, COMPANY_GUID, &padded, &read, &BTreeSet::new()).unwrap();
+    assert_eq!(bound.len(), 10);
+    let mut paisa = sent();
+    for entry in &mut paisa[5].entries {
+        entry.amount = ImportAmount::parse("03450.51").unwrap();
+    }
+    assert_eq!(
+        refusal(bind(&span, COMPANY_GUID, &paisa, &read, &BTreeSet::new())),
+        SpanRefusal::Content {
+            position: 5,
+            fields: vec!["entries"]
+        }
+    );
+}
+
+/// What the amount type does with the 256-byte amount here (#1872): nothing. A debit is
+/// compared signed, and the signed text of the longest amount is 257 bytes, one over what
+/// `ExactDecimal` holds, so the comparison errors and is read as a difference in the entries,
+/// as it was before the type. The book's row holds that amount too, and its debit is also 257
+/// bytes signed, so the read side fails on its own: this test cannot tell which side refused,
+/// and the outcome is the same either way. The row is built here from the sixth captured one
+/// with its amounts replaced; no Tally capture holds such a voucher.
+#[test]
+fn a_256_byte_debit_cannot_be_matched_because_its_signed_text_is_257_bytes() {
+    let span = span();
+    let longest = format!("{}.99", "9".repeat(253));
+    assert_eq!(longest.len(), 256);
+    let mut rows = parse_import_voucher_rows(&captured(SPAN_READ), COMPANY_GUID).unwrap();
+    let position = rows
+        .iter()
+        .position(|row| {
+            row.entries
+                .iter()
+                .any(|entry| entry.amount.ends_with("3450.50"))
+        })
+        .expect("the sixth captured voucher");
+    for entry in &mut rows[position].entries {
+        entry.amount = if entry.is_deemed_positive == "Yes" {
+            format!("-{longest}")
+        } else {
+            longest.clone()
+        };
+    }
+    let read = ImportReadSource::admit(rows).unwrap();
+    let mut long = sent();
+    for entry in &mut long[5].entries {
+        entry.amount = ImportAmount::parse(&longest).unwrap();
+    }
+    assert_eq!(
+        long[5].entries[0]
+            .amount
+            .signed_lexeme(&EntrySide::Dr)
+            .len(),
+        257
+    );
+    assert_eq!(
+        refusal(bind(&span, COMPANY_GUID, &long, &read, &BTreeSet::new())),
+        SpanRefusal::Content {
+            position: 5,
+            fields: vec!["entries"]
+        }
+    );
+}
+
+/// A padded debit that is 256 bytes (`000…12.50`) signs to 257 bytes, so it cannot bind by span,
+/// where its canonical form (`12.5`) would, and a book row holding `-12.50` is the same figure.
+/// That is how it was before the type (#1872), because the sign goes on the text as received.
+/// The same row binds the plain `12.50`, which shows the row is the right one. This guards a
+/// later change of the span identity to `signed_canonical`.
+#[test]
+fn a_padded_256_byte_debit_cannot_bind_although_its_canonical_form_would() {
+    let span = span();
+    let padded = format!("{}12.50", "0".repeat(251));
+    assert_eq!(padded.len(), 256);
+    let mut rows = parse_import_voucher_rows(&captured(SPAN_READ), COMPANY_GUID).unwrap();
+    let position = rows
+        .iter()
+        .position(|row| {
+            row.entries
+                .iter()
+                .any(|entry| entry.amount.ends_with("3450.50"))
+        })
+        .expect("the sixth captured voucher");
+    for entry in &mut rows[position].entries {
+        entry.amount = if entry.is_deemed_positive == "Yes" {
+            "-12.50".to_string()
+        } else {
+            "12.50".to_string()
+        };
+    }
+    let read = ImportReadSource::admit(rows).unwrap();
+    let with_amount = |text: &str| {
+        let mut sent = sent();
+        for entry in &mut sent[5].entries {
+            entry.amount = ImportAmount::parse(text).unwrap();
+        }
+        sent
+    };
+    assert_eq!(
+        bind(
+            &span,
+            COMPANY_GUID,
+            &with_amount("12.50"),
+            &read,
+            &BTreeSet::new()
+        )
+        .unwrap()
+        .len(),
+        10
+    );
+    let long = with_amount(&padded);
+    assert_eq!(
+        long[5].entries[0]
+            .amount
+            .signed_lexeme(&EntrySide::Dr)
+            .len(),
+        257
+    );
+    assert_eq!(
+        long[5].entries[0].amount.signed_canonical(&EntrySide::Dr),
+        "-12.5"
+    );
+    assert_eq!(
+        refusal(bind(&span, COMPANY_GUID, &long, &read, &BTreeSet::new())),
+        SpanRefusal::Content {
+            position: 5,
+            fields: vec!["entries"]
+        }
+    );
 }

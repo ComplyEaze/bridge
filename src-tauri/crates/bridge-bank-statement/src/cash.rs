@@ -98,8 +98,9 @@ pub enum CashAnswer {
     /// W3: paid straight to someone. Needs a cash Payment to that party too;
     /// not built yet, so refused.
     PaidToSomeone,
-    /// D1: from our own cash box. A Contra that can drive the cash book
-    /// negative, so refused until the cash-book projection is built.
+    /// D1: from our own cash box. Contra, Dr bank, Cr the named cash ledger.
+    /// It can drive the cash book negative, so the build projects that ledger
+    /// first and refuses unless the projection is established (#1761).
     OwnCashBox,
     /// D2: cash sales not yet recorded. Refused; `dont_know` instead.
     UnbookedCashSales,
@@ -161,13 +162,11 @@ impl CashAnswer {
     /// posts to, named in the answer.
     pub fn ledger_prompt(self) -> Option<&'static str> {
         match self {
-            Self::BusinessCash => Some("the cash-in-hand ledger"),
+            Self::BusinessCash | Self::OwnCashBox => Some("the cash-in-hand ledger"),
             Self::OwnerUse => Some("the drawings or capital ledger"),
             Self::CustomerPaidIn => Some("the customer's ledger"),
             Self::OwnerBroughtIn => Some("the capital ledger"),
-            Self::PaidToSomeone | Self::OwnCashBox | Self::UnbookedCashSales | Self::DontKnow => {
-                None
-            }
+            Self::PaidToSomeone | Self::UnbookedCashSales | Self::DontKnow => None,
         }
     }
 
@@ -177,11 +176,8 @@ impl CashAnswer {
             Self::PaidToSomeone => Some(
                 "cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
             ),
-            Self::OwnCashBox => Some(
-                "a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
-            ),
             Self::UnbookedCashSales => Some(
-                "the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales, or the Contra from the cash box, yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
+                "the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
             ),
             _ => None,
         }

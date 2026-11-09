@@ -26,7 +26,9 @@ use crate::{
     native_cash_flow::{
         parse_native_cash_flow, CashFlowMonth, NativeCashFlowError, WholeMonthWindow,
     },
-    native_statement_reports::{render_built_in_report_request, NativeStatementAmount},
+    native_statement_reports::{
+        render_built_in_report_request, BuiltInReport, NativeStatementAmount,
+    },
 };
 
 /// Which month-wise register: each is Tally's own report, by its name.
@@ -40,9 +42,15 @@ pub enum MonthRegisterKind {
 impl MonthRegisterKind {
     /// The report name Tally's gateway accepted (live capture, 13 Oct 2026).
     pub fn report_id(self) -> &'static str {
-        match self {
-            Self::Sales => "Sales Register",
-            Self::Purchase => "Purchase Register",
+        BuiltInReport::from(self).id()
+    }
+}
+
+impl From<MonthRegisterKind> for BuiltInReport {
+    fn from(kind: MonthRegisterKind) -> Self {
+        match kind {
+            MonthRegisterKind::Sales => Self::SalesRegister,
+            MonthRegisterKind::Purchase => Self::PurchaseRegister,
         }
     }
 }
@@ -54,7 +62,7 @@ pub fn render_native_month_register_request(
     company: &str,
     window: &WholeMonthWindow,
 ) -> String {
-    render_built_in_report_request(kind.report_id(), company, window.period())
+    render_built_in_report_request(kind.into(), company, window.period())
 }
 
 /// One month's row, each column exactly as Tally printed it under its own

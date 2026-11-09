@@ -1,0 +1,1 @@
+- When the connection check gets an answer that is not a Tally company list, it says so in a sentence and names the port as the thing to check, in place of a raw reason code (#1872).

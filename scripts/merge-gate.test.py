@@ -82,7 +82,7 @@ class MergeGateControls(unittest.TestCase):
         # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
         cls.repo = cls.bin / "gate-repo"
         (cls.repo / "scripts").mkdir(parents=True)
-        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json"):
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json", "check-ai-attribution.mjs"):
             shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
         os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
         cls.origin = cls.bin / "origin.git"
@@ -119,6 +119,17 @@ class MergeGateControls(unittest.TestCase):
             "exec " + shlex.quote(real_node) + ' "$@"\n'
         )
         node.chmod(node.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        # The pin-list retry waits between tries (#2179). With GATE_SLEEPS set, a wait is recorded there instead of slept.
+        real_sleep = shutil.which("sleep")
+        if not real_sleep:
+            raise RuntimeError("sleep is required for merge-gate controls")
+        sleep = cls.bin / "sleep"
+        sleep.write_text(
+            "#!/usr/bin/env bash\n"
+            'if [ -n "${GATE_SLEEPS:-}" ]; then printf \'%s\\n\' "$*" >>"$GATE_SLEEPS"; exit 0; fi\n'
+            "exec " + shlex.quote(real_sleep) + ' "$@"\n'
+        )
+        sleep.chmod(sleep.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     @classmethod
     def git_in_repo(cls, *args):
@@ -172,10 +183,11 @@ class MergeGateControls(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge"):
+    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge", env_extra=None):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
+        env.update(env_extra or {})
         return subprocess.run(
             [str(self.script), "321", "--repo", repo, *extra_args],
             cwd=str(cwd) if cwd else ROOT,
@@ -226,7 +238,9 @@ class MergeGateControls(unittest.TestCase):
     # -- Compatibility-surface schema (schema 3 at head; 2 or 3 at the base) --
 
     def test_surface_fetch_failure_is_indeterminate(self):
-        self.assert_indeterminate("surface-fetch-fail", "could not read and validate compatibility surface at " + SHORT)
+        result = self.assert_indeterminate("surface-fetch-fail", "could not read and validate compatibility surface at " + SHORT)
+        # A failure with no HTTP status is not tried again, and the line names the commit and the error.
+        self.assertIn(SHORT + " (commit " + HEAD[:12] + ", after 1 try: controlled surface read failure)", result.stdout)
 
     def test_surface_malformed_is_indeterminate(self):
         self.assert_indeterminate("surface-malformed", "could not read and validate compatibility surface at " + SHORT)
@@ -316,7 +330,8 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("ack-path-not-a-repository-path", "has a line that is not a repository path")
 
     def test_an_unreadable_ack_is_indeterminate(self):
-        self.assert_indeterminate("ack-unreadable", "could not read " + ACK_PATH)
+        result = self.assert_indeterminate("ack-unreadable", "could not read " + ACK_PATH)
+        self.assertIn(SHORT + " (commit " + HEAD[:12] + ", after 1 try: controlled acknowledgement read failure)", result.stdout)
 
     def test_an_ack_with_no_pinned_path_touched_blocks(self):
         self.assert_blocked("ack-without-pinned-change", "no pinned path is touched, so no acknowledgement may be added")
@@ -380,7 +395,112 @@ class MergeGateControls(unittest.TestCase):
         self.assert_pass("history-out-of-order-then-dropped-declared", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_an_unreadable_pin_list_in_the_branch_history_is_indeterminate(self):
-        self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        result = self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        # A failure with no HTTP status is not tried again, and the line names the commit and the error.
+        self.assertIn("(commit c1c1c1c1c1c1, after 1 try: controlled history surface read failure)", result.stdout)
+
+    # -- A pin-list read that fails and is tried again (#2179) ----------------------
+
+    def run_flaky(self, scenario):
+        """Run a flaky-read scenario; return the result, the waits the gate asked for, and the reads of the flaky commit."""
+        with tempfile.TemporaryDirectory(prefix="merge-gate-flaky-") as folder:
+            state, sleeps = Path(folder) / "calls", Path(folder) / "sleeps"
+            result = self.run_gate(scenario, env_extra={"GATE_STATE": str(state), "GATE_SLEEPS": str(sleeps)})
+            waits = sleeps.read_text().split() if sleeps.exists() else []
+            calls = int(state.read_text()) if state.exists() else 0
+        return result, waits, calls
+
+    def assert_flaky_passes(self, scenario):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("INDETERMINATE", result.stdout)
+        self.assertEqual((waits, calls), (["2"], 2), "one failed read, one wait of 2 s, then the read that answered")
+
+    def assert_flaky_not_retried(self, scenario, phrase):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn(phrase, result.stdout)
+        self.assertEqual((waits, calls), ([], 1), "a failure a second try cannot cure is not tried again")
+
+    def test_a_server_error_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-502-once")
+
+    def test_a_secondary_rate_limit_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-rate-limit-once")
+
+    def test_a_404_for_one_of_the_prs_own_commits_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-404-own-commit-once")
+
+    def test_three_failed_reads_stay_indeterminate_and_name_the_commit_and_the_status(self):
+        result, waits, calls = self.run_flaky("history-flaky-502-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("MAY MERGE", result.stdout)
+        self.assertIn("could not read and parse the pin list at every commit of the PR", result.stdout)
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
+
+    def test_a_rate_limit_that_persists_names_its_first_error_line_with_the_account_id_masked(self):
+        result, waits, calls = self.run_flaky("history-flaky-rate-limit-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        # the error's first line is blank: the next one is printed, and its long digit run is masked
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 403, after 3 tries: gh: You have exceeded a secondary rate limit for user ID <n>. (HTTP 403))", result.stdout)
+        self.assertNotIn("12345678", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3))
+
+    def test_a_403_that_is_not_a_rate_limit_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-403-not-a-rate-limit", "(commit c1c1c1c1c1c1, HTTP 403, after 1 try: ")
+
+    def test_a_404_for_a_commit_outside_the_pr_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-404-outside-the-pr", "(commit d2d2d2d2d2d2, HTTP 404, after 1 try: gh: Not Found (HTTP 404))")
+
+    # -- The other contents reads, tried again the same way (#2179) ------------------
+
+    # Each read: the commit it names (12 characters), the line that reports it, and how many times a run
+    # that passes reads that file at that commit (the branch history check reads the head's and the base
+    # tip's pin lists once more, and those reads answer at once).
+    OTHER_READS = {
+        "head-surface": (HEAD[:12], "could not read and validate compatibility surface at " + SHORT, 3),
+        "base-surface": ("a" * 12, "could not read and validate compatibility surface at base aaaaaaa", 3),
+        "merge-base-surface": ("b" * 12, "could not read and validate compatibility surface at merge base bbbbbbb", 2),
+        "ack": (HEAD[:12], "could not read " + ACK_PATH + " at " + SHORT, 2),
+    }
+
+    def assert_other_read_passes(self, read, kind):
+        result, waits, calls = self.run_flaky(read + "-flaky-" + kind)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("INDETERMINATE", result.stdout)
+        self.assertEqual((waits, calls), (["2"], self.OTHER_READS[read][2]), "one failed read, one wait of 2 s, then reads that answered")
+
+    def test_a_server_error_on_any_other_contents_read_is_tried_again_and_passes(self):
+        for read in self.OTHER_READS:
+            with self.subTest(read=read):
+                self.assert_other_read_passes(read, "502-once")
+
+    def test_a_404_at_the_head_is_tried_again_and_passes(self):
+        for read in ("head-surface", "ack"):
+            with self.subTest(read=read):
+                self.assert_other_read_passes(read, "404-once")
+
+    def test_a_server_error_that_persists_on_any_other_contents_read_stays_indeterminate_and_names_it(self):
+        for read, (ref, line, _) in self.OTHER_READS.items():
+            with self.subTest(read=read):
+                result, waits, calls = self.run_flaky(read + "-flaky-502-always")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn("MAY MERGE", result.stdout)
+                self.assertIn(line + " (commit " + ref + ", HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
+                self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
+
+    def test_a_404_at_the_base_tip_or_the_merge_base_is_not_tried_again(self):
+        for read in ("base-surface", "merge-base-surface"):
+            ref, line, _ = self.OTHER_READS[read]
+            with self.subTest(read=read):
+                result, waits, calls = self.run_flaky(read + "-flaky-404-once")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn("MAY MERGE", result.stdout)
+                self.assertIn(line + " (commit " + ref + ", HTTP 404, after 1 try: gh: Not Found (HTTP 404))", result.stdout)
+                self.assertEqual((waits, calls), ([], 1), "a 404 for a commit outside the PR is not tried again")
 
     def test_removed_pin_line_for_a_pin_that_is_kept_blocks(self):
         self.assert_blocked("pin-removed-line-for-a-kept-pin", "has removed-pin line(s) for pin(s) the PR does not remove: src/other.rs")
@@ -508,6 +628,60 @@ class MergeGateControls(unittest.TestCase):
 
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    # -- AI attribution is a note, never a block (owner practice of 25 Oct 2026) ------------
+
+    def assert_noted(self, scenario, text):
+        result = self.run_gate(scenario)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("BLOCK", result.stdout)
+        self.assertIn("AI attribution: " + text, result.stdout)
+        return result
+
+    def test_a_generated_with_line_in_the_title_or_body_is_a_note_in_each_form(self):
+        for scenario in ("attribution-body-plain", "attribution-body-link", "attribution-body-comment", "attribution-title", "attribution-body-markdown"):
+            with self.subTest(scenario=scenario):
+                self.assert_noted(scenario, "")
+
+    def test_a_coauthor_line_in_the_body_is_a_note_that_says_a_squash_copies_the_body(self):
+        self.assert_noted("attribution-body-trailer", "body: a Co-authored-by line")
+
+    def test_the_body_is_noted_even_when_the_commit_list_is_not_proven(self):
+        result = self.run_gate("attribution-body-with-unproven-commits")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("AI attribution: body: a \"Generated with\" line", result.stdout)
+        self.assertIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_a_trailer_on_a_commit_whatever_its_date_is_a_note_that_says_a_squash_can_copy_it(self):
+        for scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated"):
+            with self.subTest(scenario=scenario):
+                result = self.assert_noted(scenario, "commit ")
+                self.assertIn("a squash merge can copy it into the commit on master", result.stdout)
+
+    def test_a_committer_identity_naming_an_assistant_is_a_note(self):
+        self.assert_noted("attribution-identity", "commit ")
+
+    def test_a_check_that_crashes_is_not_a_pass(self):
+        # The helper exits 1 with nothing on stdout (a crash, an old node): no answer, so the gate must say it could not determine.
+        copy = self.private_copy("attribution-crash")
+        for source in ("process.exit(1);\n", "process.exit(0);\n", "throw new Error('boom');\n", "console.log('REFUSE x');\nconsole.log('CHECKED 1');\nprocess.exit(0);\n",
+                       "console.log('NOTE x');\nconsole.log('CHECKED 0');\nprocess.exit(1);\n", "console.log('CHECKED 9');\nprocess.exit(0);\n",
+                       "console.log('CHECKED 1');\nconsole.log('NOTE after');\nprocess.exit(0);\n"):
+            (copy / "scripts" / "check-ai-attribution.mjs").write_text(source)
+            self.git_copy(copy, "add", "-A")
+            self.git_copy(copy, "commit", "-q", "-m", "a broken helper")
+            self.git_copy(copy, "push", "-q", "origin", "master")
+            for scenario in ("attribution-trailer-after", "pass"):
+                with self.subTest(scenario=scenario, helper=source):
+                    result = self.run_copy(copy, scenario)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertNotIn("MAY MERGE", result.stdout)
+                    self.assertIn("could not run the AI attribution check", result.stdout)
+
+    def test_a_human_coauthor_after_the_rule_passes_and_a_clean_pull_request_says_so(self):
+        self.assert_pass("attribution-trailer-human-after", "no AI attribution in the title, body or commits")
+        self.assert_pass("pass", "no AI attribution in the title, body or commits")
 
     def test_arbitrary_customer_address_in_a_coauthor_trailer_still_blocks(self):
         self.assert_blocked("customer-coauthor-trailer", "customer email shape")
@@ -654,6 +828,16 @@ class MergeGateControls(unittest.TestCase):
         self.assertIn("at docs/example.md:5: privacy scan found 0 identifier shape(s) and 1 unexplained long digit run(s)", result.stdout)
         self.assertNotIn("12345" + "678901", result.stdout + result.stderr)
         self.assertNotIn("harmless", result.stdout)
+
+    def test_a_lockfile_integrity_value_is_masked_as_a_digest(self):
+        # #2367: the gate's own exit code is the finding's kind (0 passes, 1 blocks).
+        result = self.assert_pass("lockfile-integrity")
+        self.assertIn("1 lockfile integrity value(s) were masked as generated digests", result.stdout)
+
+    def test_the_same_integrity_line_outside_a_lockfile_still_blocks(self):
+        result = self.run_gate("lockfile-integrity-outside-lockfile")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn("lockfile integrity value(s) were masked", result.stdout)
 
     def test_a_privacy_hit_in_pr_metadata_is_located_by_source_and_line(self):
         result = self.assert_blocked("privacy-email-blocker", "customer email shape")
@@ -1247,7 +1431,7 @@ class MergeGateControls(unittest.TestCase):
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
-                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier", "changes-the-lab-manifest"):
+                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier", "changes-the-lab-manifest", "changes-the-attribution-check"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 
@@ -1261,10 +1445,11 @@ class MergeGateControls(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("unknown option", result.stderr)
 
-    def run_copy(self, copy, scenario="pass", script_dir="scripts"):
+    def run_copy(self, copy, scenario="pass", script_dir="scripts", env_extra=None):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
+        env.update(env_extra or {})
         return subprocess.run([str(copy / script_dir / "merge-gate.sh"), "321", "--repo", "lamemustafa/bridge"], env=env, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
 
@@ -1282,6 +1467,66 @@ class MergeGateControls(unittest.TestCase):
         self.git_copy(copy, "push", "-q", "origin", "master")
         self.git_copy(copy, "fetch", "-q", "origin", "master")
         return copy
+
+    def rev(self, copy, ref="HEAD"):
+        return subprocess.run(["git", "-C", str(copy), "rev-parse", ref], check=True, capture_output=True, text=True).stdout.strip()
+
+    def pr_head_copy(self, name, text):
+        """A private copy with a real pull request head: one commit over master adding docs/example.md (the file the
+        fake's changed-files list names, one line). The checkout is left on master. Returns the copy, master and the head."""
+        copy = self.private_copy(name)
+        base = self.rev(copy)
+        self.git_copy(copy, "checkout", "-q", "-b", "pr")
+        (copy / "docs").mkdir(exist_ok=True)
+        (copy / "docs" / "example.md").write_text(text)
+        self.git_copy(copy, "add", "-A")
+        self.git_copy(copy, "commit", "-q", "-m", "pull request head")
+        head = self.rev(copy)
+        self.git_copy(copy, "checkout", "-q", "master")
+        return copy, base, head
+
+    def test_a_diff_github_will_not_serve_is_built_here_from_the_head_and_the_merge_base(self):
+        # GitHub refuses a diff over 20000 lines; the gate fetches refs/pull/<n>/head and diffs it against the merge base it read
+        for name, text, code, phrase in (
+            ("clean", "Safe content line.\n", 0, "MAY MERGE"),
+            # the address is joined at run time, so this pull request's own privacy scan does not stop on its test
+            ("email", "Contact: " + "@".join(("customer", "company.test")) + "\n", 1, "customer email shape"),
+        ):
+            with self.subTest(case=name):
+                copy, base, head = self.pr_head_copy("local-diff-" + name, text)
+                self.git_copy(copy, "push", "-q", "origin", head + ":refs/pull/321/head")
+                result = self.run_copy(copy, "diff-refused", env_extra={"GATE_HEAD": head, "GATE_BASE_TIP": base})
+                self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+                self.assertIn(phrase, result.stdout)
+                self.assertIn("GitHub served no diff (could not find pull request diff: HTTP 406", result.stdout)
+                self.assertIn(f"it was built here from merge base {base[:7]} and head {head[:7]}", result.stdout)
+                self.assertNotIn("could not read diff", result.stdout)
+                self.assertNotIn("was read from GitHub", result.stdout)
+
+    def test_the_output_names_github_as_the_diff_source_when_github_served_it(self):
+        result = self.assert_pass("pass", "the diff for the privacy scan was read from GitHub")
+        self.assertNotIn("built here", result.stdout)
+
+    def test_a_diff_that_cannot_be_built_here_is_indeterminate_never_empty(self):
+        for how, phrase in (
+            ("not-pushed", "the head could not be fetched"),
+            ("other-head", "the fetched head is not"),
+            ("not-an-ancestor", "the merge base {} is not an ancestor of the head"),
+        ):
+            with self.subTest(how=how):
+                copy, base, head = self.pr_head_copy("local-diff-" + how, "Safe content line.\n")
+                if how == "other-head":
+                    self.git_copy(copy, "push", "-q", "origin", base + ":refs/pull/321/head")
+                elif how == "not-an-ancestor":
+                    self.git_copy(copy, "push", "-q", "origin", head + ":refs/pull/321/head")
+                    self.git_copy(copy, "checkout", "-q", "-b", "side", base)
+                    self.git_copy(copy, "commit", "-q", "--allow-empty", "-m", "a commit the head does not contain")
+                    base = self.rev(copy)
+                    self.git_copy(copy, "checkout", "-q", "master")
+                result = self.run_copy(copy, "diff-refused", env_extra={"GATE_HEAD": head, "GATE_BASE_TIP": base})
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("INDETERMINATE could not read diff for the privacy scan: GitHub served none, and it could not be built here (" + phrase.format(base[:7]), result.stdout)
+                self.assertNotIn("MAY MERGE", result.stdout)
 
     def test_the_gate_refuses_to_run_from_a_tree_that_is_not_origin_masters(self):
         for how in ("edit", "committed-edit", "untracked-file", "remote-has-moved", "stale-tracking-ref", "tag-named-master", "script-elsewhere", "no-remote"):
@@ -1399,6 +1644,20 @@ class MergeGateControls(unittest.TestCase):
         # the whole commit-metadata fetch and the PR went INDETERMINATE.
         result = self.assert_pass("author-email-localhost")
         self.assertNotIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_2388_github_bot_noreply_author_email_is_accepted(self):
+        # Dependabot authors as <digits>+dependabot[bot]@users.noreply.github.com. The
+        # plain email class admits no bracket, so every Dependabot PR went INDETERMINATE.
+        result = self.assert_pass("author-email-bot-noreply")
+        self.assertNotIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_2388_a_bracket_outside_the_bot_noreply_form_is_refused(self):
+        for scenario in ("author-email-bracket-elsewhere", "author-email-bot-other-domain"):
+            with self.subTest(scenario=scenario):
+                self.assert_indeterminate(scenario, "could not prove complete head-bound PR commit metadata")
+
+    def test_2388_an_empty_author_email_is_refused(self):
+        self.assert_indeterminate("author-email-empty", "could not prove complete head-bound PR commit metadata")
 
     def test_finding374_helpers_resolve_relative_to_the_script(self):
         """#374: the gate must locate its own helper scripts by $script_dir.
@@ -2757,6 +3016,195 @@ class MergeWrapperControls(unittest.TestCase):
                 result, calls = self.run_wrapper(args=args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertEqual(calls, [])
+
+
+class PrivacyMutationRecordDigests(unittest.TestCase):
+    """A tax-audit mutation record's `"mutation"` and `"crate_tree"` values, 16 lowercase hex with at least one letter,
+    are masked before the counts, on a line that starts as the runner writes a record and on no other line. Any other
+    key, length or case, an all-digit value, and any other shape on the line are still scanned. Every value is built at
+    run time."""
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+        self.mobile = "".join(str(9 - index) for index in range(10))  # a ten-digit run led by a 9
+        self.with_phone = "a" + self.mobile + "bcdef"
+        self.with_run = run_of(12) + "abcd"
+
+    def line(self, mutation, crate_tree=None, key="mutation", extra=""):
+        crate_tree = self.with_run if crate_tree is None else crate_tree
+        return (
+            '  "C42-01": {"commit": "%s", "crate_tree": "%s", "killers": ["tests/registry.rs::a_test"], '
+            '"mode": "proof", "%s": "%s", "time": "2026-11-04T10:00:00+00:00", "verdict": "killed"%s},'
+            % (HEAD, crate_tree, key, mutation, extra)
+        )
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def assert_blocked(self, text):
+        blockers = self.blockers(text)
+        self.assertTrue(any("long digit run" in b or "identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_a_records_line_with_digit_runs_in_both_digests_is_clean(self):
+        for text in (self.line(self.with_phone), self.line(self.with_run, self.with_phone)):
+            record = self.privacy.scan(text, HEAD)
+            self.assertEqual(record["blockers"] + record["indeterminate"], [], text)
+            self.assertIn("2 mutation-record digest(s) were masked", record["notes"])
+
+    def test_explain_locates_nothing_on_a_records_line_and_still_locates_another_key(self):
+        document = {"sources": [], "added": [
+            {"path": "parity/mutation-results.json", "line": 1, "text": self.line(self.with_phone)},
+            {"path": "parity/mutation-results.json", "line": 2, "text": self.line(self.with_phone, key="note")},
+        ]}
+        hits = self.privacy.explain(document, HEAD)["hits"]
+        self.assertEqual([hit["where"] for hit in hits], ["parity/mutation-results.json:2"], hits)
+
+    def test_a_phone_alone_in_a_mutation_field_still_blocks(self):
+        self.assert_blocked(self.line(self.mobile))
+
+    def test_an_all_digit_sixteen_character_value_still_blocks(self):
+        self.assert_blocked(self.line(run_of(16)))
+        self.assert_blocked(self.line(self.with_phone, run_of(16)))
+        self.assert_blocked(self.line(self.mobile + run_of(6)))
+
+    def test_the_same_value_under_another_key_or_in_another_form_still_blocks(self):
+        for text in (
+            self.line(self.with_phone, key="note"),
+            self.line(self.with_phone, key="mutations"),
+            self.line(self.with_phone.upper()),
+            self.line(self.with_phone + "0"),
+            self.line(self.with_phone[:-1]),
+            self.line(self.with_phone).replace('"mutation": "', '"mutation":"'),
+            self.line(self.with_phone).replace('"mutation": "', 'mutation: "'),
+            '{"mutation": "%s" }' % self.with_phone.replace("b", "", 1),
+            "mutation digest " + self.with_phone,
+        ):
+            self.assert_blocked(text)
+
+    def test_a_pan_or_gstin_elsewhere_on_the_line_still_blocks(self):
+        pan = "ABCDE" + "1234" + "F"
+        for extra in (', "party": "%s"' % pan, ', "gstin": "%s"' % ("07" + pan + "1Z5")):
+            text = self.line(self.with_phone, self.with_phone, extra=extra)
+            blockers = self.blockers(text)
+            self.assertTrue(any("1 identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_the_same_key_and_value_off_a_records_line_still_blocks(self):
+        pair = '"mutation": "%s"' % self.with_phone
+        for text in (
+            "Mask %s in the records (#2352)" % pair,  # a pull request title
+            "Regenerate the records\n\nThe record now reads %s." % pair,  # a commit message
+            "    let record = r#\"{%s}\"#;" % pair,  # a Rust string literal
+            "docs/%s.md" % pair.replace('"', ""),  # a path
+            "docs/{%s}.md" % pair,  # a path keeping the quotes
+        ):
+            self.assert_blocked(text)
+            self.assertNotIn("1 mutation-record digest(s) were masked", self.privacy.scan(text, HEAD)["notes"], text)
+
+    def test_only_a_line_that_starts_as_a_record_is_masked(self):
+        record = self.line(self.with_phone, self.with_phone)
+        for text in (
+            "x" + record,  # text before the record id
+            record.replace(HEAD, HEAD[:-1]),  # a 39-hex commit
+            record.replace(HEAD, HEAD.upper()),  # an uppercase commit
+            record.replace('{"commit": ', '{ "commit": '),
+            record.replace('"C42-01": ', '"C42-01" : '),
+        ):
+            self.assert_blocked(text)
+        # Each line is anchored on its own: a record line after a title is masked, the title is not.
+        title = 'Mask "mutation": "%s" (#2352)' % self.with_phone
+        record_hits = self.privacy.scan(title + "\n" + record, HEAD)
+        self.assertIn("2 mutation-record digest(s) were masked", record_hits["notes"])
+        self.assert_blocked(title + "\n" + record)
+        self.assertEqual(self.blockers(record + "\n" + record), [])
+
+    def test_a_lowercase_pan_of_a_to_f_letters_is_masked_on_a_records_line_only(self):
+        pan = "abcde" + "1234" + "f" + "0" * 6  # a PAN's shape, lowercase, letters a-f only, padded to 16
+        self.assertEqual(self.blockers(self.line(pan, self.with_run)), [])
+        for text in (self.line(pan, self.with_run, key="note"), "party %s" % pan):
+            blockers = self.blockers(text)
+            self.assertTrue(any("identifier shape" in b for b in blockers), (text, blockers))
+
+
+class PrivacyLockfileIntegrity(unittest.TestCase):
+    """#2367: a registry integrity value in a JavaScript lockfile is masked as a generated digest, only in a lockfile and
+    only in the exact form the lockfile writes; anything else in a lockfile, and the same text elsewhere, is scanned as
+    before. Each assertion is on the kind of finding (the record's buckets), never on message text. The identifier-shaped
+    run is built from parts, because this file is scanned like any other added text."""
+
+    RUN = "AB" + "CDE" + "12" + "34" + "F"
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+
+    def body(self, length=86):
+        return "Q" * 30 + self.RUN + "Q" * (length - 30 - len(self.RUN))
+
+    def pnpm_line(self):
+        return "    resolution: {integrity: sha512-" + self.body() + "==}"
+
+    def record(self, path, text):
+        lines, masked = self.privacy.mask_lockfile_payload([{"path": path, "text": text}])
+        return self.privacy.scan("\n".join(lines), HEAD), masked
+
+    def assert_clean(self, record):
+        self.assertEqual((record["blockers"], record["indeterminate"]), ([], []), record)
+
+    def assert_blocks(self, record):
+        self.assertTrue(record["blockers"], record)
+        self.assertEqual(record["indeterminate"], [], record)
+
+    def test_the_unmasked_integrity_line_blocks_as_the_issue_reports(self):
+        self.assert_blocks(self.privacy.scan(self.pnpm_line(), HEAD))
+
+    def test_a_pnpm_integrity_value_in_a_pnpm_lockfile_passes(self):
+        record, masked = self.record("pnpm-lock.yaml", self.pnpm_line())
+        self.assert_clean(record)
+        self.assertEqual(masked, 1)
+
+    def test_an_npm_integrity_value_is_not_masked(self):
+        # Only pnpm's root lockfile is exempt: npm's form is scanned as before, in any file.
+        line = '      "integrity": "sha512-' + self.body() + '==",'
+        for path in ("package-lock.json", "web/npm-shrinkwrap.json", "pnpm-lock.yaml"):
+            record, masked = self.record(path, line)
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, path)
+
+    def test_the_same_line_outside_a_lockfile_still_blocks(self):
+        for path in ("docs/notes.md", "pnpm-lock.yaml.md", "scripts/pnpm-lock.yaml.bak", "sub/pnpm-lock.yaml", "frontend/pnpm-lock.yaml", "./pnpm-lock.yaml"):
+            record, masked = self.record(path, self.pnpm_line())
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, path)
+
+    def test_an_identifier_shape_in_another_lockfile_field_still_blocks(self):
+        for line in ("    version: " + self.RUN, "    tarball: " + self.RUN):
+            record, masked = self.record("pnpm-lock.yaml", line)
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, line)
+
+    def test_a_value_not_in_the_exact_form_still_blocks(self):
+        for line in (
+            "    resolution: {integrity: sha512-" + self.body(85) + "==}",  # one character short
+            "    resolution: {integrity: sha512-" + self.body() + "==QQ}",  # runs past the value
+            "    resolution: {integrity: sha1-" + self.body() + "==}",  # another algorithm
+            "    integrity: sha512-" + self.body() + "==",  # not inside the resolution form
+        ):
+            record, masked = self.record("pnpm-lock.yaml", line)
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, line)
+
+    def test_the_rest_of_an_integrity_line_is_still_scanned(self):
+        line = self.pnpm_line()[:-1] + ", tarball: " + self.RUN + "}"
+        record, masked = self.record("pnpm-lock.yaml", line)
+        self.assert_blocks(record)
+        self.assertEqual(masked, 1)
+
+    def test_explain_masks_by_each_line_s_own_path(self):
+        document = {"sources": [], "added": [
+            {"path": "pnpm-lock.yaml", "line": 7, "text": self.pnpm_line()},
+            {"path": "docs/notes.md", "line": 3, "text": self.pnpm_line()},
+        ]}
+        located = self.privacy.explain(document, HEAD)
+        self.assertEqual([hit["where"] for hit in located["hits"]], ["docs/notes.md:3"])
 
 
 if __name__ == "__main__":

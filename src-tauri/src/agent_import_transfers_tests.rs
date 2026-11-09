@@ -1,10 +1,11 @@
 //! The transfer section and the checks around it, on invented facts: what it
 //! lists and in what order, within what budget, and what it never says.
 use super::*;
+use crate::agent::transfer_pairing::transfer_pairing_view_with;
 use crate::agent::transfer_pairing::{
     BatchId, BatchStatus, CompanyGuid, ContraFact, ContraKey, ContraLeg, Coverage, Direction,
     DoubleBooked, EndpointOrigin, LedgerGuid, LineageId, ParseWindow, Side, SkipFact, SkipKey,
-    StatementRowId, TxnId,
+    StatementRowId, TallyDays, TxnId,
 };
 use bridge_bank_statement::bank::BankReference;
 use statement_facts::HeldSkip;
@@ -111,6 +112,27 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
 }
 
 fn summary_of(facts: &TransferFacts) -> TransferSummary {
+    // every skip's own day counts as read whole, so that these tests keep asking
+    // what the summary does with each state; production reads days only for a
+    // build's tally_unchecked rows (#1392)
+    let tally = TallyDays::clean_for(&facts.skips);
+    let view = transfer_pairing_view_with(
+        &facts.skips,
+        &facts.contras,
+        &facts.coverage,
+        &tally,
+        TRANSFER_K_DAYS,
+    )
+    .unwrap();
+    TransferSummary::of(facts, &view)
+}
+
+/// The summary when no day of Tally has been read (the admission view, and
+/// verify_import's section): a row no statement carries is `tally_unchecked`,
+/// never `not_found`.
+#[test]
+fn without_a_read_of_tally_a_row_no_statement_carries_is_tally_unchecked() {
+    let facts = facts_of(vec![skip("st-1", "20260107", "500.00")], Vec::new());
     let view = transfer_pairing_view(
         &facts.skips,
         &facts.contras,
@@ -118,7 +140,19 @@ fn summary_of(facts: &TransferFacts) -> TransferSummary {
         TRANSFER_K_DAYS,
     )
     .unwrap();
-    TransferSummary::of(facts, &view)
+    let summary = TransferSummary::of(&facts, &view);
+    assert_eq!(
+        rows_of(&summary),
+        vec![(
+            "st-1".to_string(),
+            "20260107".to_string(),
+            "tally_unchecked",
+            None
+        )]
+    );
+    let section = summary.render(usize::MAX);
+    assert!(section["next_steps"]["tally_unchecked"].is_string());
+    assert!(section["next_steps"].get("not_found").is_none());
 }
 
 /// An open row as the summary lists it: id, date, state label and batch.
@@ -485,7 +519,7 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
     );
 }
 
-const EVERY_OPEN_STATE: [OpenState; 10] = [
+const EVERY_OPEN_STATE: [OpenState; 11] = [
     OpenState::NotFound,
     OpenState::Ambiguous,
     OpenState::OtherSideUnverified,
@@ -496,6 +530,7 @@ const EVERY_OPEN_STATE: [OpenState; 10] = [
     OpenState::HeldElsewhere,
     OpenState::DoubleBooked,
     OpenState::PostedAgainstSkip,
+    OpenState::TallyUnchecked,
 ];
 
 /// Each state, read from its place in `EVERY_OPEN_STATE`. A state added to
@@ -514,6 +549,7 @@ fn from_the_list(state: OpenState) -> OpenState {
         OpenState::HeldElsewhere => EVERY_OPEN_STATE[7],
         OpenState::DoubleBooked => EVERY_OPEN_STATE[8],
         OpenState::PostedAgainstSkip => EVERY_OPEN_STATE[9],
+        OpenState::TallyUnchecked => EVERY_OPEN_STATE[10],
     }
 }
 
@@ -554,8 +590,38 @@ fn each_next_step_says_what_was_decided() {
         .contains("Run verify_import on every batch named for this row"));
     assert!(step(OpenState::OtherSideUnverified)
         .contains(" again only if every batch named for this row "));
-    assert!(step(OpenState::NotFound).contains("withdraw the skip on exactly one side"));
-    assert!(step(OpenState::NotFound).contains("Do not enter this transfer in Tally by hand"));
+    // a row found nowhere in its window is still kept until the person
+    // confirms, on one side only (#1392)
+    let not_found = step(OpenState::NotFound);
+    assert!(not_found.contains("keep the skip; withdraw it on one side only"));
+    assert!(not_found
+        .contains("only when the person confirms that no entry in Tally carries this transfer"));
+    assert!(not_found.contains("Do not enter this transfer in Tally by hand"));
+    assert!(not_found.contains(
+        "read every voucher of this date and of the day either side in Tally and found no entry on the other account's ledger"
+    ));
+    assert!(!not_found.contains("build it"));
+    // the unchecked row is kept until the person confirms, the check names what
+    // `vouchers` returns, and the one-side and double-booking warnings stay
+    let unchecked = step(OpenState::TallyUnchecked);
+    assert!(unchecked
+        .contains("did not read every voucher of this date and of the day either side in Tally"));
+    assert!(unchecked
+        .contains("look for a voucher of the Contra voucher class, or of any other type such as a Journal, Payment or Receipt"));
+    assert!(unchecked.contains(
+        "a voucher dated further away, or booked against another ledger, is not looked for"
+    ));
+    assert!(unchecked.contains("a masked ledger name can read like another"));
+    assert!(unchecked.contains("where it was not dropped"));
+    assert!(!unchecked.contains("where it is not masked"));
+    assert!(!unchecked.contains("banks often"));
+    assert!(unchecked.contains("keep the skip"));
+    assert!(unchecked.contains("withdraw the skip on one side only"));
+    assert!(unchecked.contains("would book it twice"));
+    assert!(unchecked.contains("withdraw_skips only when the person confirms"));
+    assert!(!unchecked.contains("bank_allocations"));
+    assert!(!unchecked.contains("by hand"));
+    assert!(step(OpenState::NotFound).contains("withdraw_skips only when the person confirms"));
     assert!(step(OpenState::Ambiguous).contains("does not choose"));
     let reversed = step(OpenState::ReversedSameDay);
     assert!(reversed.contains("a reversal and a pair of real transfers look alike"));
@@ -580,6 +646,12 @@ fn each_next_step_says_what_was_decided() {
     ));
     assert!(held.contains("If the batch named does name this row, send it and verify it"));
     assert!(!held.contains(". Do not send"), "{held}");
+    // a send of the batch named is refused only once the skip is live; an
+    // only-built skip lets it through, so both outcomes are named
+    assert!(held.contains(
+        "do not send the batch named or import its file: found posted, either leaves the row as posted_against_skip, and once a build that skips the row has been sent or found posted, or a skip-only record holds the skip, post_import refuses that send as skip_row_paired_elsewhere"
+    ));
+    assert!(!held.contains("sending it gives"), "{held}");
     // and what the route costs
     assert!(held.contains(
         "A batch left unsent blocks the days of its rows for the other account's coverage until it is verified, and no step inside ComplyEaze Bridge clears that"
@@ -641,14 +713,17 @@ fn many_open(count: usize) -> TransferSummary {
                 restored: false,
             })
             .collect(),
+        day_reads: None,
     }
 }
 
 #[test]
 fn a_budget_cuts_the_open_rows_and_counts_what_it_left_out() {
-    let summary = many_open(30);
+    // enough rows that they, not the frame's steps, are most of the section
+    const ROWS: usize = 120;
+    let summary = many_open(ROWS);
     let everything = summary.render(usize::MAX);
-    assert_eq!(everything["open"].as_array().unwrap().len(), 30);
+    assert_eq!(everything["open"].as_array().unwrap().len(), ROWS);
     assert_eq!(everything["open_omitted"], 0);
     assert!(everything["next_steps"].get("open_omitted").is_none());
     let full = everything.to_string().len();
@@ -656,8 +731,8 @@ fn a_budget_cuts_the_open_rows_and_counts_what_it_left_out() {
     for available in [full / 2, full / 3, full / 4] {
         let section = summary.render(available);
         let listed = section["open"].as_array().unwrap().len();
-        assert!(listed > 0 && listed < 30, "{available}: {listed}");
-        assert_eq!(section["open_omitted"], 30 - listed);
+        assert!(listed > 0 && listed < ROWS, "{available}: {listed}");
+        assert_eq!(section["open_omitted"], ROWS - listed);
         assert!(section.to_string().len() <= available, "{available}");
         // the rows kept are the first in order, not any that happened to fit
         assert_eq!(
@@ -665,13 +740,13 @@ fn a_budget_cuts_the_open_rows_and_counts_what_it_left_out() {
             format!("st-20260105-{:016x}", listed - 1)
         );
         // the count of open skips is not cut, only the list
-        assert_eq!(section["skips_open"], 30);
+        assert_eq!(section["skips_open"], ROWS);
         let step = section["next_steps"]["open_omitted"].as_str().unwrap();
         assert!(step.contains("BRIDGE_AGENT_MAX_BYTES"), "{step}");
     }
     let none = summary.render(0);
     assert_eq!(none["open"], json!([]));
-    assert_eq!(none["open_omitted"], 30);
+    assert_eq!(none["open_omitted"], ROWS);
     assert!(none["next_steps"]["open_omitted"].is_string());
 }
 
@@ -1018,17 +1093,21 @@ fn every_sentence_to_follow() -> Vec<String> {
 /// somewhere in a sentence is not enough.
 #[test]
 fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read() {
-    const READS: [&str; 7] = [
+    const READS: [&str; 8] = [
         "Check in Tally whether that batch's voucher for the row is there, and tell the person",
         "Check in Tally which rows are transfers",
+        "Name the row in withdraw_skips only when the person confirms that no entry in Tally carries this transfer",
         "If verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet",
         "Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not",
         "This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended",
         "check in Tally which Contra carries this transfer",
         "if verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet",
     ];
-    const NEGATIONS_AND_DISCLOSURES: [&str; 13] = [
+    const NEGATIONS_AND_DISCLOSURES: [&str; 16] = [
         "A Contra in a batch not yet verified is not in Tally until that batch is imported and verified",
+        "Do not book this transfer in Tally another way, and withdraw the skip on one side only: a later post of the other statement would book it twice",
+        "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, and ComplyEaze Bridge read every voucher of this date and of the day either side in Tally and found no entry on the other account's ledger, in a voucher of any type",
+        "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date and of the day either side in Tally, or could not find the other account's ledger, or a ledger an entry of those days names, in the ledger list it read, or read them all and found an entry on the other account's ledger within a day of this date, which it does not compare with this row, so a Contra entered in Tally directly is not ruled out",
         "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally",
         "A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked",
         "A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet",
@@ -1350,7 +1429,14 @@ fn a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build() {
     }
     for (reason, step) in steps {
         assert!(step.starts_with(NOTHING_SENT), "{reason}: {step}");
-        assert!(step.ends_with(SEND_ENDING), "{reason}: {step}");
+        // a refused withdrawal names the build it means, since its carrier
+        // steps may speak of building the other account's statement
+        let ending = if reason == "withdraw_skip_paired" {
+            "This batch cannot be sent as built: build this statement again with the rows in paired_rows still skipped, not named in withdraw_skips."
+        } else {
+            SEND_ENDING
+        };
+        assert!(step.ends_with(ending), "{reason}: {step}");
         for wording in build_wording {
             assert!(!step.contains(wording), "{reason}: {wording}: {step}");
         }
@@ -1389,4 +1475,65 @@ fn the_unreadable_view_refusal_at_send_has_no_build_again_ending() {
     ] {
         assert!(!step.contains(wording), "{wording}: {step}");
     }
+}
+
+/// A ledger catalogue of the lab book, as `(name, GUID)` rows under the group
+/// Bank Accounts.
+///
+/// The section a build returns once its rows' windows are read (#1392), with
+/// the rows' ledgers named through the catalogue the build read: the lab run's
+/// captured catalogue and its 12 to 14 April. 13 April holds one Contra, Cash
+/// and Bank A. The row on Bank A's statement against Bank B is `not_found`; the
+/// mirrored row against Bank A stays `tally_unchecked`; and the section shows
+/// what the reads yielded.
+#[tokio::test]
+async fn a_build_names_the_rows_ledgers_from_its_catalogue_for_the_days_it_reads() {
+    use crate::agent::transfer_pairing::tests::whole_day::{
+        identity, run_catalogue, run_covered, run_days, run_skip, Captured, BANK_A, BANK_B, LAB,
+        T_CAT2,
+    };
+    use crate::agent::transfer_pairing::PairingInput;
+    let mut facts = facts_of(
+        vec![
+            run_skip("st-a13", "20260413", BANK_A, BANK_B),
+            run_skip("st-b13", "20260413", BANK_B, BANK_A),
+        ],
+        Vec::new(),
+    );
+    facts.coverage = run_covered();
+    let input = PairingInput::new(&facts.skips, &facts.contras, &facts.coverage).unwrap();
+    let row = |id: &str, state| (id.to_string(), "20260413".to_string(), state, None);
+
+    let reader = Captured::of(run_days(&[14, 13, 12]));
+    let before = local_evidence("call");
+    let mut evidence = before.clone();
+    let summary = Admitted(Some(Box::new((facts, input))))
+        .summary_with_days_read(
+            &reader,
+            &identity(),
+            LAB,
+            run_catalogue(T_CAT2).catalog(),
+            Some(12),
+            &mut evidence,
+        )
+        .await;
+    assert_eq!(reader.left(), 0, "the window was read, and nothing else");
+    assert_ne!(
+        evidence.response_sha256, before.response_sha256,
+        "the reads are in the call's evidence"
+    );
+    assert_eq!(
+        rows_of(&summary),
+        vec![row("st-a13", "not_found"), row("st-b13", "tally_unchecked")]
+    );
+    let section = summary.render(64 * 1024);
+    assert_eq!(
+        section["day_reads"],
+        json!({"whole": 1, "empty": 2, "kept": []})
+    );
+    // the section is cut to its counts with what the reads yielded still in it
+    assert_eq!(
+        counts_only_section(&section)["day_reads"],
+        section["day_reads"]
+    );
 }

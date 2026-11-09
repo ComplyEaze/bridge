@@ -1,0 +1,58 @@
+# fixture: agent/gst-ledger-l1/s6-16nov-w-1.utf16le.xml
+# parser: parse_agent_rows(GST_LEDGER_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(12),
+        "amounts": Array [
+            Object {
+                "amount": String("1180.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1180.00"),
+                        "bill_date": String("20251116"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("V14"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SYN GS1 Customer"),
+            },
+            Object {
+                "amount": String("-1000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("GS1 Discount Allowed"),
+            },
+            Object {
+                "amount": String("-90.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Output CGST"),
+            },
+            Object {
+                "amount": String("-90.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Output SGST"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20251116"),
+        "guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-0000000c"),
+        "is_invoice": Bool(false),
+        "master_id": String("12"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("SYN GS1 Customer"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Credit Note"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Credit Note"),
+        "voucher_type_guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-00000028"),
+        "voucher_type_reserved_name": String("Credit Note"),
+    },
+])

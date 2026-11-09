@@ -35,8 +35,10 @@ impl Server {
             .fetch_statements(self.tally_config(), &identity, period, kind)
             .await
             .map_err(|error| {
+                let row = ToolFailure::inconsistent_row(&error);
                 ToolFailure::from_runtime(&format!("{tool}_read_failed"), error)
                     .with_prior_evidence(prior.clone())
+                    .with_inconsistent_row(row)
             })?;
         let trial_balance = read.trial_balance;
         let evidence = combine_evidence(prior, evidence_from_runtime_read(trial_balance.evidence));
@@ -99,6 +101,10 @@ impl Server {
         if matches!(derived.closing_stock, ClosingStockUse::Applied { .. }) {
             statement_basis = statement_basis.with_closing_stock_from_tally();
         }
+        if let Some(sides) = &derived.tally_balance_sheet_sides {
+            statement_basis = statement_basis
+                .with_tally_balance_sheet_sides(sides.credits.as_str(), sides.debits.as_str());
+        }
         // One decision: the lines are withheld exactly when the headline says so.
         let lines = (!statement_basis.lines_withheld()).then_some(lines);
         let outcome = match kind {
@@ -146,12 +152,22 @@ impl Server {
                         "lines is null while this tool's result is not established, so a derived line is never shown as the statement; balance_sheet_gate and tie_out then show how each of Tally's own lines compared",
                         "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; with stock items it refuses unless Tally's own closing stock is used, as closing_stock says (one integrated book measured)",
                         "A book with more than one currency master is refused before the Trial Balance is read",
-                        "A Tally line the derivation has no counterpart for, such as a heading with an amount or a difference in opening balances, refuses the results rather than being guessed at",
+                        "A Tally line the derivation has no counterpart for, such as a heading with an amount, refuses the results rather than being guessed at",
+                        "On the one book measured (TallyPrime 7.2) Tally's own Balance Sheet export left out the Difference in opening balances line its screen showed: when the export's lines do not sum to zero no result is established, and tally_balance_sheet_sides gives the credit and debit totals",
                         "Tally's own statements carry no company identity; they are bound only by the company, mode and book-extent checks around the read",
                         "The Balance Sheet gate has been measured over one full year on one book and one month on another; a window spanning more than one financial year is unmeasured",
                         "Not voucher-level reconciliation or an atomic snapshot",
                     ],
         });
+        // Only when Tally's own Balance Sheet does not balance: every other answer keeps its keys.
+        if let (Some(sides), Some(result)) =
+            (&derived.tally_balance_sheet_sides, result.as_object_mut())
+        {
+            result.insert(
+                "tally_balance_sheet_sides".to_string(),
+                json!({"credits": sides.credits, "debits": sides.debits}),
+            );
+        }
         // The reason a caller reads beside the state is the one the nested result carries.
         if let (Some(reason), Some(result)) = (top_level(outcome).1, result.as_object_mut()) {
             result.insert("reason".to_string(), json!(reason));

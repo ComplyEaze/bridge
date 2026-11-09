@@ -107,8 +107,8 @@ applies those that still fit, and reports the rest without applying them. No dec
    A view is final only when no decision it was given needs attention and no ledger is excluded. An applied
    decision whose ledger moved between subgroups keeps the view final, but the sheet then says that, and names
    how many, instead of "Nothing needs attention." It is printed as NOT FINAL, not withheld, so the CA can see
-   what to resolve. Two decisions for one ledger in one year are an error: the export
-   fails rather than render.
+   what to resolve. Two decisions for one ledger in one year are an error: the decisions are read as
+   unreadable, and the export says "Could not be read: ... NOT FINAL" (point 7), never that none were applied.
 5. **Amounts are not an input.**
    - A decision moves a row index between lines, and every line total is summed from the read's own rows. Amounts
      therefore conserve by construction.

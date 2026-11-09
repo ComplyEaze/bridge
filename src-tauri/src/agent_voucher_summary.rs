@@ -37,6 +37,9 @@ pub(super) enum SummaryGroup {
     Group,
     /// One bucket per group directly under the reserved root, keyed by its `RESERVEDNAME`.
     PrimaryGroup,
+    /// One bucket per cost centre under each cost category, from the entries' cost-centre
+    /// allocations (#1231).
+    CostCentre,
 }
 
 impl SummaryGroup {
@@ -49,6 +52,7 @@ impl SummaryGroup {
             Some("voucher_type") => Ok(Some(Self::VoucherType)),
             Some("group") => Ok(Some(Self::Group)),
             Some("primary_group") => Ok(Some(Self::PrimaryGroup)),
+            Some("cost_centre") => Ok(Some(Self::CostCentre)),
             Some(_) => Err(ToolFailure::from("summarise_by_invalid".to_string())),
         }
     }
@@ -60,12 +64,19 @@ impl SummaryGroup {
             Self::VoucherType => "voucher_type",
             Self::Group => "group",
             Self::PrimaryGroup => "primary_group",
+            Self::CostCentre => "cost_centre",
         }
     }
 
     /// Whether the grouping needs each ledger's place in the group tree.
     pub(super) fn needs_placements(self) -> bool {
         matches!(self, Self::Group | Self::PrimaryGroup)
+    }
+
+    /// Whether a window narrowed to one ledger adds only that ledger's entries. A ledger or
+    /// group bucket of such a window holds every entry of its vouchers.
+    fn counts_selected_ledger_only(self) -> bool {
+        matches!(self, Self::Month | Self::VoucherType | Self::CostCentre)
     }
 }
 
@@ -82,7 +93,8 @@ pub(super) struct SummaryRequest {
 /// One summarised window: the buckets in presentation order and what stands behind them.
 pub(super) struct Summary {
     pub(super) buckets: Vec<Value>,
-    /// Vouchers that fed a bucket.
+    /// Vouchers kept for the buckets: not cancelled, optional or without entries. Under `cost_centre`
+    /// a kept voucher with no allocation feeds no bucket; its entries are in `entries_unallocated`.
     pub(super) vouchers_summarised: usize,
     /// Vouchers in the window left out of every bucket, by cause.
     pub(super) excluded: Value,
@@ -105,6 +117,13 @@ pub(super) struct Summary {
     /// are. They overlap (a ledger counts under every group above it), so they do not add up to `totals`.
     pub(super) subtree_totals: Vec<Value>,
     pub(super) subtree_total_count: usize,
+    /// For a `cost_centre` summary: each cost category's totals over the entries it allocates. The
+    /// categories overlap (one entry can be allocated in full under several), so they do not add up
+    /// to `totals`, which counts each allocated entry once.
+    pub(super) category_totals: Vec<Value>,
+    /// For a `cost_centre` summary: the entries of the summarised vouchers that carry no allocation
+    /// (`entries`, `debit`, `credit`). With `totals` they make up every counted entry.
+    pub(super) entries_unallocated: Value,
 }
 
 /// How a bucket of a group grouping is shown: its label and the fields that say which group it is.
@@ -271,6 +290,109 @@ fn entry_amount(entry: &Value) -> Result<EntryAmount<'_>, String> {
     })
 }
 
+/// A debit and a credit total, as the buckets keep them.
+struct Sums {
+    entries: usize,
+    debit: String,
+    credit: String,
+}
+
+impl Sums {
+    fn new() -> Self {
+        Self {
+            entries: 0,
+            debit: "0".to_string(),
+            credit: "0".to_string(),
+        }
+    }
+
+    /// Adds one entry, or one allocation of an entry.
+    fn add(&mut self, debit: Option<&String>, credit: Option<&String>) -> Result<(), String> {
+        self.entries += 1;
+        if let Some(debit) = debit {
+            self.debit = add_decimal(&self.debit, debit)?;
+        }
+        if let Some(credit) = credit {
+            self.credit = add_decimal(&self.credit, credit)?;
+        }
+        Ok(())
+    }
+}
+
+/// One cost-centre allocation of an entry, on the side its own amount's sign gives (the entry's
+/// flag only for a zero), as an entry's side is read.
+struct Allocation<'a> {
+    category: &'a str,
+    centre: &'a str,
+    debit: Option<String>,
+    credit: Option<String>,
+}
+
+/// An entry's cost-centre allocations, or `None` when it carries none.
+///
+/// An entry whose allocations could not be read refuses the summary, with the entry's reason, and
+/// so does one where a category's allocations do not add up to the entry's amount: a centre's total
+/// short of a part it could not read, or holding a part that is not the entry's, would mislead.
+/// Every category was measured to allocate the whole entry (#1231): two categories on one entry
+/// each held its full amount.
+fn allocations_of(entry: &Value) -> Result<Option<Vec<Allocation<'_>>>, String> {
+    if let Some(reason) = entry["cost_centre_allocations_unreadable"].as_str() {
+        return Err(format!("summary_cost_centre_unreadable:{reason}"));
+    }
+    let Some(rows) = entry["cost_centre_allocations"]
+        .as_array()
+        .filter(|rows| !rows.is_empty())
+    else {
+        return Ok(None);
+    };
+    let invalid = || "voucher_amount_invalid".to_string();
+    let entry_amount = bridge_tally_core::ExactDecimal::parse(
+        entry["amount"].as_str().ok_or_else(invalid)?.to_string(),
+    )
+    .map_err(|_| invalid())?;
+    let deemed_positive = entry["is_deemed_positive"].as_str() == Some("Yes");
+    let mut by_category: BTreeMap<&str, String> = BTreeMap::new();
+    let mut allocations = Vec::with_capacity(rows.len());
+    for row in rows {
+        let (Some(category), Some(centre), Some(amount)) = (
+            row["category"].as_str(),
+            row["cost_centre"].as_str(),
+            row["amount"].as_str(),
+        ) else {
+            return Err(invalid());
+        };
+        let sum = by_category
+            .entry(category)
+            .or_insert_with(|| "0".to_string());
+        *sum = add_decimal(sum, amount)?;
+        let parsed =
+            bridge_tally_core::ExactDecimal::parse(amount.to_string()).map_err(|_| invalid())?;
+        let (is_debit, magnitude) = movement_entry_effect(&parsed, deemed_positive);
+        allocations.push(if is_debit {
+            Allocation {
+                category,
+                centre,
+                debit: Some(format!("-{magnitude}")),
+                credit: None,
+            }
+        } else {
+            Allocation {
+                category,
+                centre,
+                debit: None,
+                credit: Some(magnitude),
+            }
+        });
+    }
+    for sum in by_category.into_values() {
+        let sum = bridge_tally_core::ExactDecimal::parse(sum).map_err(|_| invalid())?;
+        if !sum.numeric_eq(&entry_amount) {
+            return Err("summary_cost_centre_allocation_mismatch".to_string());
+        }
+    }
+    Ok(Some(allocations))
+}
+
 fn voucher_ref(row: &Value) -> Value {
     json!({
         "date": row["date"], "voucher_type": row["voucher_type"],
@@ -287,6 +409,31 @@ fn month_of(date: &str) -> Result<String, String> {
     }
 }
 
+/// Adds an entry's part in a bucket to the member ledger it is on.
+fn add_member(
+    bucket: &mut Bucket,
+    ledger: &str,
+    debit: Option<&String>,
+    credit: Option<&String>,
+) -> Result<(), String> {
+    let seen = bucket.members.len();
+    let member = bucket
+        .members
+        .entry(ledger.to_string())
+        .or_insert_with(|| Member {
+            first_seen: seen,
+            debit: "0".to_string(),
+            credit: "0".to_string(),
+        });
+    if let Some(debit) = debit {
+        member.debit = add_decimal(&member.debit, debit)?;
+    }
+    if let Some(credit) = credit {
+        member.credit = add_decimal(&member.credit, credit)?;
+    }
+    Ok(())
+}
+
 /// Sums the rows into buckets.
 ///
 /// Cancelled and optional vouchers, and vouchers with no accounting entry, are left out the way
@@ -300,6 +447,10 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
     let mut vouchers_summarised = 0usize;
     let (mut post_dated_included, mut post_dated_flag_absent) = (0usize, 0usize);
     let (mut total_debit, mut total_credit) = ("0".to_string(), "0".to_string());
+    // A `cost_centre` summary's categories, in the order they were first met, and its entries that
+    // carry no allocation.
+    let mut categories: BTreeMap<String, (usize, Sums)> = BTreeMap::new();
+    let mut unallocated = Sums::new();
     for row in rows {
         if row["cancelled"].as_bool() == Some(true) {
             cancelled += 1;
@@ -336,15 +487,18 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             Some(false) => {}
             None => post_dated_flag_absent += 1,
         }
-        let counted = |amount: &EntryAmount<'_>| match (&request.selected_ledger, request.group) {
-            (Some(selected), SummaryGroup::Month | SummaryGroup::VoucherType) => {
+        let counted = |amount: &EntryAmount<'_>| match &request.selected_ledger {
+            Some(selected) if request.group.counts_selected_ledger_only() => {
                 amount.ledger == selected
             }
             _ => true,
         };
         let mut touched: BTreeSet<String> = BTreeSet::new();
         let voucher_key = match request.group {
-            SummaryGroup::Ledger | SummaryGroup::Group | SummaryGroup::PrimaryGroup => None,
+            SummaryGroup::Ledger
+            | SummaryGroup::Group
+            | SummaryGroup::PrimaryGroup
+            | SummaryGroup::CostCentre => None,
             SummaryGroup::Month => Some(month_of(row["date"].as_str().unwrap_or_default())?),
             SummaryGroup::VoucherType => Some(
                 row["voucher_type"]
@@ -353,7 +507,71 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
                     .to_string(),
             ),
         };
-        for amount in amounts.iter().filter(|amount| counted(amount)) {
+        for (entry, amount) in entries
+            .iter()
+            .zip(&amounts)
+            .filter(|(_, amount)| counted(amount))
+        {
+            if request.group == SummaryGroup::CostCentre {
+                let Some(allocations) = allocations_of(entry)? else {
+                    unallocated.add(amount.debit.as_ref(), amount.credit.as_ref())?;
+                    continue;
+                };
+                if let Some(debit) = &amount.debit {
+                    total_debit = add_decimal(&total_debit, debit)?;
+                }
+                if let Some(credit) = &amount.credit {
+                    total_credit = add_decimal(&total_credit, credit)?;
+                }
+                // Each category holds the whole entry once (`allocations_of` checked it).
+                let mut entry_categories: BTreeSet<&str> = BTreeSet::new();
+                for allocation in &allocations {
+                    if entry_categories.insert(allocation.category) {
+                        let seen = categories.len();
+                        categories
+                            .entry(allocation.category.to_string())
+                            .or_insert_with(|| (seen, Sums::new()))
+                            .1
+                            .add(amount.debit.as_ref(), amount.credit.as_ref())?;
+                    }
+                    // A centre's name may repeat under another category, never within one.
+                    let key = format!("{}\u{0}{}", allocation.category, allocation.centre);
+                    let first_seen = buckets.len();
+                    let bucket = buckets.entry(key.clone()).or_insert_with(|| {
+                        let mut fields = serde_json::Map::new();
+                        fields.insert(
+                            "category".to_string(),
+                            party_name_value(allocation.category.to_string()),
+                        );
+                        Bucket::new(
+                            first_seen,
+                            Some(GroupMeta {
+                                label: allocation.centre.to_string(),
+                                fields,
+                            }),
+                        )
+                    });
+                    add_member(
+                        bucket,
+                        amount.ledger,
+                        allocation.debit.as_ref(),
+                        allocation.credit.as_ref(),
+                    )?;
+                    if let Some(debit) = &allocation.debit {
+                        bucket.debit = add_decimal(&bucket.debit, debit)?;
+                    }
+                    if let Some(credit) = &allocation.credit {
+                        bucket.credit = add_decimal(&bucket.credit, credit)?;
+                    }
+                    if touched.insert(key) {
+                        bucket.vouchers += 1;
+                        if bucket.refs.len() < MAX_VOUCHER_REFS_PER_BUCKET {
+                            bucket.refs.push(voucher_ref(row));
+                        }
+                    }
+                }
+                continue;
+            }
             let placement = if request.group.needs_placements() {
                 Some(placement_of(request, amount.ledger)?)
             } else {
@@ -394,21 +612,12 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
                 }
             }
             if request.group.needs_placements() {
-                let seen = bucket.members.len();
-                let member = bucket
-                    .members
-                    .entry(amount.ledger.to_string())
-                    .or_insert_with(|| Member {
-                        first_seen: seen,
-                        debit: "0".to_string(),
-                        credit: "0".to_string(),
-                    });
-                if let Some(debit) = &amount.debit {
-                    member.debit = add_decimal(&member.debit, debit)?;
-                }
-                if let Some(credit) = &amount.credit {
-                    member.credit = add_decimal(&member.credit, credit)?;
-                }
+                add_member(
+                    bucket,
+                    amount.ledger,
+                    amount.debit.as_ref(),
+                    amount.credit.as_ref(),
+                )?;
             }
             if let Some(debit) = &amount.debit {
                 bucket.debit = add_decimal(&bucket.debit, debit)?;
@@ -440,6 +649,13 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             )?;
             let group = match request.group {
                 SummaryGroup::Ledger => party_name_value(key.clone()),
+                // A cost centre can carry a party's name, as the masters tool masks it.
+                SummaryGroup::CostCentre => party_name_value(
+                    bucket
+                        .meta
+                        .as_ref()
+                        .map_or(key.clone(), |meta| meta.label.clone()),
+                ),
                 SummaryGroup::Month | SummaryGroup::VoucherType => json!(key),
                 // A group's name is shown as the book has it, like `parent` in `ledger_masters`.
                 SummaryGroup::Group | SummaryGroup::PrimaryGroup => json!(bucket
@@ -484,6 +700,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
         });
     }
     let (subtree_totals, subtree_total_count) = subtree_totals_shown(subtrees)?;
+    let category_totals = category_totals_shown(categories)?;
     Ok(Summary {
         // `position` is the bucket's place in the whole ordering, so two buckets whose labels
         // read alike under masking can still be told apart and paged without a repeat.
@@ -502,10 +719,14 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
         vouchers_summarised,
         excluded: json!({"cancelled": cancelled, "optional": optional, "no_accounting_entries": no_entries}),
         totals: json!({"debit": total_debit, "credit": total_credit}),
-        entries_counted: match (&request.selected_ledger, request.group) {
-            (Some(_), SummaryGroup::Month | SummaryGroup::VoucherType) => "selected_ledger",
+        entries_counted: match &request.selected_ledger {
+            Some(_) if request.group.counts_selected_ledger_only() => "selected_ledger",
             _ => "all_entries",
         },
+        category_totals,
+        entries_unallocated: json!({
+            "entries": unallocated.entries, "debit": unallocated.debit, "credit": unallocated.credit,
+        }),
     })
 }
 
@@ -550,6 +771,45 @@ fn subtree_totals_shown(
         })
         .collect::<Result<Vec<_>, String>>()?;
     Ok((shown, count))
+}
+
+/// The categories of a `cost_centre` summary: the larger movement first, then in the order they were
+/// first met, never by name (a masked name must not reveal the alphabetical order).
+fn category_totals_shown(
+    categories: BTreeMap<String, (usize, Sums)>,
+) -> Result<Vec<Value>, String> {
+    let mut ranked = categories
+        .into_iter()
+        .map(|(category, (first_seen, sums))| {
+            let gross = add_decimal(
+                &sums.credit,
+                bridge_tally_core::ExactDecimal::parse(sums.debit.clone())
+                    .map_err(|_| "voucher_amount_invalid".to_string())?
+                    .magnitude()
+                    .as_str(),
+            )?;
+            Ok((first_seen, gross, category, sums))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    ranked.sort_by(|left, right| {
+        let by_gross = bridge_tally_core::ExactDecimal::parse(right.1.clone())
+            .and_then(|right_gross| {
+                bridge_tally_core::ExactDecimal::parse(left.1.clone())
+                    .map(|left_gross| right_gross.cmp_magnitude(&left_gross))
+            })
+            .unwrap_or(std::cmp::Ordering::Equal);
+        by_gross.then_with(|| left.0.cmp(&right.0))
+    });
+    ranked
+        .into_iter()
+        .map(|(_, _, category, sums)| {
+            let net = add_decimal(&sums.debit, &sums.credit)?;
+            Ok(json!({
+                "category": party_name_value(category), "entries": sums.entries,
+                "debit": sums.debit, "credit": sums.credit, "net": net,
+            }))
+        })
+        .collect()
 }
 
 /// The member ledgers of a group bucket, the largest movement first and then in the order they first

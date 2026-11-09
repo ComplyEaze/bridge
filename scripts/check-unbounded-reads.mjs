@@ -103,7 +103,9 @@ function loadAllowed(repositoryRoot) {
 
 // Tracked `.rs` files the scan does not read, each with why. Tests are not listed here: the path
 // rule below excludes them wherever they are.
-export const UNSCANNED_RS_FILES = new Map([["src-tauri/build.rs", "build script, no external input"]]);
+export const UNSCANNED_RS_FILES = new Map([
+  ["src-tauri/build.rs", "build script, no external input"],
+]);
 export const TESTS_EXCLUDED_REASON = "tests are excluded by rule";
 
 export class UnscannedSourceFileError extends Error {

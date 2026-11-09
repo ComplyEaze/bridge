@@ -1,11 +1,26 @@
 //! Voucher parse for the local MCP adapter.
 use super::*;
 
+#[path = "agent_voucher_bank_allocations.rs"]
+mod bank_allocations;
 #[path = "agent_voucher_cost_centres.rs"]
 mod cost_centres;
+#[path = "agent_voucher_entry_gst.rs"]
+mod entry_gst;
+#[path = "agent_voucher_goods_lines.rs"]
+mod goods_lines;
 #[path = "agent_voucher_scalars.rs"]
 mod scalars;
+use bank_allocations::BankAllocationCollector;
+use bridge_tally_core::ExactDecimal;
+use bridge_tally_protocol::currency_composite::{
+    is_balance_composite, parse_currency_composite, CurrencyComposite, Side,
+};
+use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
 use cost_centres::CostCentreCollector;
+pub(super) use cost_centres::CostCentreProblem;
+use entry_gst::EntryGstCollector;
+use goods_lines::{GoodsLineCollector, GoodsLineList, GoodsLineProblem, STOCK_LINE_LIST};
 pub(super) use scalars::*;
 
 /// Shares the native collection boundary used by the protocol crate: CMPINFO
@@ -53,6 +68,33 @@ impl NativeCollectionScope {
             tail.first()
                 .is_some_and(|c| c == "CATEGORYALLOCATIONS.LIST")
         })
+    }
+    /// Whether the element being read lies inside a `BANKALLOCATIONS.LIST`.
+    pub(super) fn in_bank_allocations(&self) -> bool {
+        self.entry_tail()
+            .is_some_and(|tail| tail.first().is_some_and(|c| c == "BANKALLOCATIONS.LIST"))
+    }
+    /// The path below the current `VOUCHER`, for a voucher's own stock lines: `None` outside a
+    /// voucher and inside any other list of it, such as a Stock Journal's in and out sides, which
+    /// repeat the same lines without their godowns (protocol reference §8.2i).
+    pub(super) fn stock_line_tail(&self) -> Option<&[String]> {
+        (self.path.len() >= 5
+            && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
+            && self.path.get(5).is_none_or(|c| c == STOCK_LINE_LIST))
+        .then(|| &self.path[5..])
+    }
+    /// Whether the element being read lies inside an `INVENTORYALLOCATIONS.LIST`.
+    pub(super) fn in_goods_lines(&self) -> bool {
+        self.entry_tail().is_some_and(|tail| {
+            tail.first()
+                .is_some_and(|c| c == "INVENTORYALLOCATIONS.LIST")
+        })
+    }
+    /// Whether the element being read is a child of a voucher's Delivery Note entry.
+    fn delivery_note_field(&self) -> bool {
+        self.path.len() == 7
+            && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
+            && self.path[5] == DELIVERY_NOTE_LIST
     }
     pub(super) fn bill_allocation(&self) -> bool {
         self.path.len() == 7
@@ -118,6 +160,8 @@ pub(super) fn parse_import_verification_rows(
         true,
         company_guid,
         CompositePolicy::Refuse,
+        GstDetailsShown::Withheld,
+        (NamedVoucherFields::NOT_ASKED, StockLines::NotAsked),
     )?)
 }
 
@@ -132,6 +176,28 @@ pub(super) fn parse_agent_rows_with_accounting_state(
         false,
         company_guid,
         CompositePolicy::Refuse,
+        GstDetailsShown::Withheld,
+        (NamedVoucherFields::NOT_ASKED, StockLines::NotAsked),
+    )?)
+}
+
+/// [`parse_agent_rows`], reading each entry's GST details (#2027) only when `gst` asks for them,
+/// so that every read that does not ask holds and returns exactly what it did before.
+pub(super) fn parse_agent_rows_reading_gst(
+    xml: &str,
+    company_guid: &str,
+    gst: GstDetailsShown,
+    named: NamedVoucherFields,
+    stock: StockLines,
+) -> Result<Vec<Value>, String> {
+    refused_composites(parse_voucher_rows(
+        xml,
+        false,
+        false,
+        company_guid,
+        CompositePolicy::Refuse,
+        gst,
+        (named, stock),
     )?)
 }
 
@@ -140,22 +206,374 @@ pub(super) fn parse_agent_rows_with_accounting_state(
 /// instead of failing the window. Every other check still applies to it, and
 /// any other bad amount still fails the window. Nothing that sums, matches or
 /// verifies amounts reads through here.
+#[cfg(test)]
 pub(super) fn parse_agent_rows_withholding(
     xml: &str,
     company_guid: &str,
 ) -> Result<Vec<VoucherRow>, String> {
-    Ok(
-        parse_voucher_rows(xml, false, false, company_guid, CompositePolicy::Withhold)?
-            .into_iter()
-            .map(|(row, withheld)| {
-                if withheld {
-                    VoucherRow::Withheld(WithheldVoucher::from_parsed(row))
-                } else {
-                    VoucherRow::Read(row)
-                }
-            })
-            .collect(),
+    parse_agent_rows_withholding_reading_gst(
+        xml,
+        company_guid,
+        GstDetailsShown::Withheld,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
     )
+}
+
+/// The `vouchers` rows, withheld as `parse_agent_rows_withholding` withholds them, with each
+/// entry's GST details read only when `gst` shows them (#2027).
+pub(super) fn parse_agent_rows_withholding_reading_gst(
+    xml: &str,
+    company_guid: &str,
+    gst: GstDetailsShown,
+    named: NamedVoucherFields,
+    stock: StockLines,
+) -> Result<Vec<VoucherRow>, String> {
+    Ok(parse_voucher_rows(
+        xml,
+        false,
+        false,
+        company_guid,
+        CompositePolicy::Withhold,
+        gst,
+        (named, stock),
+    )?
+    .into_iter()
+    .map(|(row, withheld)| {
+        if withheld {
+            VoucherRow::Withheld(WithheldVoucher::from_parsed(row))
+        } else {
+            VoucherRow::Read(row)
+        }
+    })
+    .collect())
+}
+
+/// One detail of a voucher that its read named, as that read found it.
+enum VoucherDetail<'row> {
+    Present(&'row str),
+    /// Tally sent the element, empty: the voucher does not carry this detail.
+    Absent,
+    /// Tally did not send the element, so this book or release does not say.
+    NotReported,
+}
+
+impl<'row> VoucherDetail<'row> {
+    fn of(row: &'row BTreeMap<String, String>, element: &str) -> Self {
+        match row.get(element).map(|value| value.trim()) {
+            None => Self::NotReported,
+            Some("") => Self::Absent,
+            Some(value) => Self::Present(value),
+        }
+    }
+
+    /// A present value of an element Tally types as a date must be one, or the read is refused.
+    fn require_date(&self, refusal: &str) -> Result<(), String> {
+        if let Self::Present(date) = self {
+            bridge_tally_core::TallyDate::parse((*date).to_string())
+                .map_err(|_| refusal.to_string())?;
+        }
+        Ok(())
+    }
+
+    fn to_json(&self) -> Value {
+        match self {
+            Self::Present(value) => json!({"state": "present", "value": value}),
+            Self::Absent => json!({"state": "absent"}),
+            Self::NotReported => json!({"state": "not_reported"}),
+        }
+    }
+}
+
+/// A row says named details only for an invoice, or a voucher that carries one of them.
+fn row_says_details(row: &BTreeMap<String, String>, details: &[&VoucherDetail]) -> bool {
+    details
+        .iter()
+        .any(|detail| matches!(detail, VoucherDetail::Present(_)))
+        || row.get("ISINVOICE").map(|value| value.trim()) == Some("Yes")
+}
+
+/// Whether a read's fetch list named the e-invoice details (#1378). Absent is said only when they
+/// were asked for, so a read that did not ask returns exactly the rows it did before.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum EInvoiceFields {
+    Asked,
+    NotAsked,
+}
+
+impl EInvoiceFields {
+    /// From the `include_e_invoice` argument: absent or false does not ask.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "include_e_invoice")? {
+            Some(true) => Self::Asked,
+            Some(false) | None => Self::NotAsked,
+        })
+    }
+
+    /// An invoice's details, or a voucher's if it carries any (protocol reference §8.2j).
+    fn details(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
+        if self == Self::NotAsked {
+            return Ok(None);
+        }
+        let irn = VoucherDetail::of(row, "IRN");
+        let ack_no = VoucherDetail::of(row, "IRNACKNO");
+        let ack_date = VoucherDetail::of(row, "IRNACKDATE");
+        ack_date.require_date("voucher_irn_ack_date_invalid")?;
+        if !row_says_details(row, &[&irn, &ack_no, &ack_date]) {
+            return Ok(None);
+        }
+        Ok(Some(json!({
+            "irn": irn.to_json(),
+            "ack_no": ack_no.to_json(),
+            "ack_date": ack_date.to_json(),
+        })))
+    }
+}
+
+/// Whether a `vouchers` call read each voucher's stock lines in place of its ledger entries
+/// (#2016).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum StockLines {
+    Asked,
+    NotAsked,
+}
+
+/// What needs a voucher's ledger entries, which the stock-line request does not return: each
+/// would answer empty or wrong without saying so, so it is refused with this argument.
+const NEEDS_LEDGER_ENTRIES: [&str; 8] = [
+    "ledger",
+    "amount",
+    "suspense_tagged",
+    "summarise_by",
+    "bank_allocations",
+    "goods_lines",
+    "include_gst_details",
+    "include_e_invoice",
+];
+
+/// The voucher types whose stock lines were captured on this request (protocol reference §8.2i).
+/// A type the user made under one has no reserved name, so it is not among them.
+const STOCK_LINE_RESERVED_TYPES: [&str; 4] = [
+    "Stock Journal",
+    "Delivery Note",
+    "Receipt Note",
+    CREDIT_NOTE_RESERVED_TYPE,
+];
+/// The one read type that can be accounts only, so it alone may answer no stock line.
+const CREDIT_NOTE_RESERVED_TYPE: &str = "Credit Note";
+
+impl StockLines {
+    /// From the `stock_lines` argument: absent or false does not ask.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        if optional_bool(args, "stock_lines")? != Some(true) {
+            return Ok(Self::NotAsked);
+        }
+        match NEEDS_LEDGER_ENTRIES.iter().find(|name| {
+            args.get(**name)
+                .is_some_and(|value| !value.is_null() && *value != Value::Bool(false))
+        }) {
+            Some(name) => Err(format!("voucher_stock_lines_excludes_{name}")),
+            None => Ok(Self::Asked),
+        }
+    }
+
+    /// Whether this request's lines are read for a voucher of `kind`, resolved by Tally in the
+    /// same response. A kind no capture covers is named, never read on trust.
+    fn covers(kind: Option<&ResolvedVoucherType>) -> bool {
+        kind.is_some_and(|kind| STOCK_LINE_RESERVED_TYPES.contains(&kind.reserved_name.as_str()))
+    }
+
+    /// Whether a voucher of `kind`, read here, must hold a line: one that exists only to move
+    /// stock and answers none is a read that failed, never a voucher that moved nothing. A
+    /// cancelled one is taken to keep no line: a cancelled Delivery Note answered an empty list
+    /// (protocol reference §8.2i); a cancelled Stock Journal or Receipt Note is unverified.
+    fn needs_a_line(kind: Option<&ResolvedVoucherType>, cancelled: bool) -> bool {
+        !cancelled && kind.is_some_and(|kind| kind.reserved_name != CREDIT_NOTE_RESERVED_TYPE)
+    }
+}
+
+/// Whether a read's fetch list named a voucher's GST and note details (#2027). Absent is said only
+/// when they were asked for, as for [`EInvoiceFields`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum VoucherGstFields {
+    Asked,
+    NotAsked,
+}
+
+impl VoucherGstFields {
+    /// A call that shows each entry's GST details asks for these as well.
+    pub(super) const fn following(shown: GstDetailsShown) -> Self {
+        match shown {
+            GstDetailsShown::Shown => Self::Asked,
+            GstDetailsShown::Withheld => Self::NotAsked,
+        }
+    }
+
+    /// An invoice's details, or a voucher's if it carries any (protocol reference §8.2k).
+    fn details(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
+        if self == Self::NotAsked {
+            return Ok(None);
+        }
+        let place_of_supply = VoucherDetail::of(row, "PLACEOFSUPPLY");
+        let party_state = VoucherDetail::of(row, "STATENAME");
+        let registration_type = VoucherDetail::of(row, "GSTREGISTRATIONTYPE");
+        let note_reason = VoucherDetail::of(row, "GSTNATUREOFRETURN");
+        let party_note_number = VoucherDetail::of(row, "VATPARTYTRANSRETURNNUMBER");
+        let party_note_date = VoucherDetail::of(row, "VATPARTYTRANSRETURNDATE");
+        party_note_date.require_date("voucher_party_note_date_invalid")?;
+        let details = [
+            &place_of_supply,
+            &party_state,
+            &registration_type,
+            &note_reason,
+            &party_note_number,
+            &party_note_date,
+        ];
+        if !row_says_details(row, &details) {
+            return Ok(None);
+        }
+        Ok(Some(json!({
+            "place_of_supply": place_of_supply.to_json(),
+            "party_state": party_state.to_json(),
+            "registration_type": registration_type.to_json(),
+            "note_reason": note_reason.to_json(),
+            "party_note_number": party_note_number.to_json(),
+            "party_note_date": party_note_date.to_json(),
+        })))
+    }
+
+    /// An invoice's dispatch details, or a voucher's if it carries any, each named after the field
+    /// of Tally's form whose value the lab found in it, and its Delivery Notes as
+    /// [`DeliveryNoteCollector::finish`] gives them (protocol reference §8.2l).
+    fn dispatch(
+        self,
+        row: &BTreeMap<String, String>,
+        delivery_notes: Option<Vec<Value>>,
+    ) -> Result<Option<Value>, String> {
+        if self == Self::NotAsked {
+            return Ok(None);
+        }
+        let doc_no = VoucherDetail::of(row, "BASICSHIPDOCUMENTNO");
+        let dispatched_through = VoucherDetail::of(row, "BASICSHIPPEDBY");
+        let destination = VoucherDetail::of(row, "BASICFINALDESTINATION");
+        let carrier = VoucherDetail::of(row, "EICHECKPOST");
+        let lading_no = VoucherDetail::of(row, "BILLOFLADINGNO");
+        let lading_date = VoucherDetail::of(row, "BILLOFLADINGDATE");
+        let vehicle_no = VoucherDetail::of(row, "BASICSHIPVESSELNO");
+        lading_date.require_date("voucher_lading_date_invalid")?;
+        let details = [
+            &doc_no,
+            &dispatched_through,
+            &destination,
+            &carrier,
+            &lading_no,
+            &lading_date,
+            &vehicle_no,
+        ];
+        let carries_a_note = delivery_notes
+            .as_ref()
+            .is_some_and(|notes| !notes.is_empty());
+        if !carries_a_note && !row_says_details(row, &details) {
+            return Ok(None);
+        }
+        Ok(Some(json!({
+            "doc_no": doc_no.to_json(),
+            "dispatched_through": dispatched_through.to_json(),
+            "destination": destination.to_json(),
+            "carrier": carrier.to_json(),
+            "lading_no": lading_no.to_json(),
+            "lading_date": lading_date.to_json(),
+            "vehicle_no": vehicle_no.to_json(),
+            "delivery_notes": match delivery_notes {
+                None => json!({"state": "not_reported"}),
+                Some(notes) if notes.is_empty() => json!({"state": "absent"}),
+                Some(notes) => json!({"state": "present", "value": notes}),
+            },
+        })))
+    }
+}
+
+/// The list a voucher keeps its Delivery Notes in, one entry each.
+const DELIVERY_NOTE_LIST: &str = "INVOICEDELNOTES.LIST";
+
+/// The two children a [`DELIVERY_NOTE_LIST`] entry was measured with: a note's number and its date.
+const DELIVERY_NOTE_FIELDS: [&str; 2] = ["BASICSHIPDELIVERYNOTE", "BASICSHIPPINGDATE"];
+
+/// A voucher's Delivery Notes, read only when the GST details are asked for (#2027). Each entry of
+/// [`DELIVERY_NOTE_LIST`] holds one note's number in `BASICSHIPDELIVERYNOTE` and its date in
+/// `BASICSHIPPINGDATE`, in the order keyed, and a voucher with none sends one entry with no children
+/// (protocol reference §8.2l).
+#[derive(Default)]
+struct DeliveryNoteCollector {
+    /// `None` until the voucher sends the list.
+    notes: Option<Vec<Value>>,
+    entry: Option<BTreeMap<String, String>>,
+}
+
+impl DeliveryNoteCollector {
+    fn start_entry(&mut self) {
+        self.notes.get_or_insert_with(Vec::new);
+        self.entry = Some(BTreeMap::new());
+    }
+
+    /// A child of an entry is one of the two measured, read once, as a voucher field is. Any other
+    /// refuses the read, so a note under an unmeasured element is never said to be no note.
+    fn start_field(&mut self, tag: &str) -> Result<(), String> {
+        match self.entry.as_mut() {
+            Some(entry) if DELIVERY_NOTE_FIELDS.contains(&tag) && !entry.contains_key(tag) => {
+                entry.insert(tag.to_string(), String::new());
+                Ok(())
+            }
+            _ => Err("voucher_delivery_note_invalid".to_string()),
+        }
+    }
+
+    fn text(&mut self, tag: &str, value: String) {
+        if let Some(entry) = self.entry.as_mut() {
+            append_agent_text(entry, tag, value);
+        }
+    }
+
+    /// Only an entry with no children is the empty one; any other is a note, each half stated.
+    fn end_entry(&mut self) -> Result<(), String> {
+        let entry = self.entry.take().unwrap_or_default();
+        if entry.is_empty() {
+            return Ok(());
+        }
+        let number = VoucherDetail::of(&entry, DELIVERY_NOTE_FIELDS[0]);
+        let date = VoucherDetail::of(&entry, DELIVERY_NOTE_FIELDS[1]);
+        date.require_date("voucher_delivery_note_date_invalid")?;
+        self.notes
+            .get_or_insert_with(Vec::new)
+            .push(json!({"number": number.to_json(), "date": date.to_json()}));
+        Ok(())
+    }
+
+    /// The voucher's notes: `None` if it sent no list, empty if the list held none.
+    fn finish(&mut self) -> Option<Vec<Value>> {
+        self.entry = None;
+        self.notes.take()
+    }
+}
+
+/// The voucher fields a read's fetch list names beyond the plain list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct NamedVoucherFields {
+    pub(super) e_invoice: EInvoiceFields,
+    pub(super) gst: VoucherGstFields,
+}
+
+impl NamedVoucherFields {
+    pub(super) const NOT_ASKED: Self = Self {
+        e_invoice: EInvoiceFields::NotAsked,
+        gst: VoucherGstFields::NotAsked,
+    };
+
+    /// Whether the list names anything: a const `self != Self::NOT_ASKED`.
+    pub(super) const fn names_any(self) -> bool {
+        matches!(self.e_invoice, EInvoiceFields::Asked)
+            || matches!(self.gst, VoucherGstFields::Asked)
+    }
 }
 
 /// What an amount that is not a plain decimal does to its voucher.
@@ -169,10 +587,57 @@ enum CompositePolicy {
 
 impl CompositePolicy {
     fn withholds(self, amount: &str) -> bool {
-        self == Self::Withhold
-            && bridge_tally_protocol::currency_composite::is_currency_composite(amount)
-            && composite_signs_agree(amount)
+        self == Self::Withhold && is_balance_composite(amount) && composite_signs_agree(amount)
     }
+}
+
+/// A voucher with an amount Tally stored as a composite, read with the base amount as `amount`
+/// and the foreign amount, its currency and the rate apart under `foreign` (#683). `None`, so the
+/// voucher stays withheld, for a composite [`parse_currency_composite`] refuses or that writes no
+/// amount, a foreign symbol that is not one of the book's masters, or base entries that do not
+/// net to zero.
+fn read_composites(row: &Value, book: &IdentifiedBaseCurrency) -> Option<Value> {
+    let mut row = row.clone();
+    let mut net = ExactDecimal::zero();
+    for entry in row["amounts"].as_array_mut()? {
+        read_composite_amount(entry, book)?;
+        for allocation in entry["bill_allocations"].as_array_mut()? {
+            read_composite_amount(allocation, book)?;
+        }
+        let amount = ExactDecimal::parse(entry["amount"].as_str()?.to_string()).ok()?;
+        // A composite parsed to no amount, so the parser could not compare it.
+        if !tally_entry_polarity_agrees(&amount, entry["is_deemed_positive"] == "Yes") {
+            entry["polarity_disagrees_with_amount"] = Value::Bool(true);
+        }
+        net = net.checked_add(&amount).ok()?;
+    }
+    net.is_zero().then_some(row)
+}
+
+fn read_composite_amount(holder: &mut Value, book: &IdentifiedBaseCurrency) -> Option<()> {
+    let amount = holder["amount"].as_str()?;
+    if ExactDecimal::parse(amount.to_string()).is_ok() {
+        return Some(());
+    }
+    let CurrencyComposite::Valued(composite) =
+        parse_currency_composite(amount, book.base()).ok()?
+    else {
+        return None;
+    };
+    if !book.is_foreign_master(composite.foreign_symbol()) {
+        return None;
+    }
+    let sign = match composite.side() {
+        Side::Positive => "",
+        Side::Negative => "-",
+    };
+    holder["amount"] = json!(format!("{sign}{}", composite.base().magnitude().as_str()));
+    holder["foreign"] = json!({
+        "currency": composite.foreign_symbol(),
+        "amount": format!("{sign}{}", composite.foreign().magnitude().as_str()),
+        "rate": composite.rate().as_str(),
+    });
+    Some(())
 }
 
 /// A voucher entry's composite carries one sign on both amounts, as every
@@ -186,10 +651,11 @@ fn composite_signs_agree(composite: &str) -> bool {
     let Some((_, base)) = rest.split_once(" = ") else {
         return false;
     };
+    // The amount follows its symbol, with a space in the 7.1 layout and none in the 7.2 one.
     let foreign_is_zero = foreign
-        .trim_start_matches('-')
-        .split_once(' ')
-        .is_some_and(|(_, digits)| digits.bytes().all(|b| b == b'0' || b == b'.'));
+        .rsplit(|c: char| !c.is_ascii_digit() && c != '.')
+        .next()
+        .is_some_and(|digits| digits.bytes().all(|b| b == b'0' || b == b'.'));
     foreign_is_zero || foreign.starts_with('-') == base.starts_with('-')
 }
 
@@ -208,8 +674,9 @@ fn refused_composites(rows: Vec<(Value, bool)>) -> Result<Vec<Value>, String> {
 }
 
 /// A `vouchers` row: read in full, or withheld because an amount was stored as
-/// a foreign-currency composite (#674). A withheld voucher carries no amount,
-/// so no path that sums, matches or verifies amounts can take one.
+/// a foreign-currency composite (#674). A withheld voucher shows no amount,
+/// so no path that sums, matches or verifies amounts can take one, until
+/// [`Self::read_under`] has read it.
 #[derive(Debug, Clone)]
 pub(super) enum VoucherRow {
     Read(Value),
@@ -217,9 +684,24 @@ pub(super) enum VoucherRow {
 }
 
 /// A withheld voucher: its identity, type fields and entry ledgers, never an
-/// amount. The field is private; [`Self::filter_view`] is the only way out.
-#[derive(Debug, Clone)]
-pub(super) struct WithheldVoucher(Value);
+/// amount. The fields are private; [`Self::filter_view`] is the only way out
+/// but for [`VoucherRow::read_under`].
+#[derive(Clone)]
+pub(super) struct WithheldVoucher {
+    view: Value,
+    /// The parsed voucher, composites as Tally wrote them.
+    parsed: Value,
+}
+
+/// The view alone, so no debug output shows an amount this type withholds.
+impl std::fmt::Debug for WithheldVoucher {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("WithheldVoucher")
+            .field(&self.view)
+            .finish()
+    }
+}
 
 /// Why a voucher is withheld; the only cause so far.
 pub(super) const WITHHELD_FOREIGN_CURRENCY: &str = "foreign_currency_amount_unparsed";
@@ -228,7 +710,8 @@ pub(super) const WITHHELD_FOREIGN_CURRENCY: &str = "foreign_currency_amount_unpa
 pub(super) const WITHHELD_MARKER: &str = "withheld_cause";
 
 impl WithheldVoucher {
-    fn from_parsed(mut row: Value) -> Self {
+    fn from_parsed(parsed: Value) -> Self {
+        let mut row = parsed.clone();
         // Keep each entry's ledger (the ledger filter reads it) and drop
         // everything that carries an amount.
         let ledgers = row["amounts"]
@@ -242,7 +725,7 @@ impl WithheldVoucher {
             .unwrap_or_default();
         row["amounts"] = Value::Array(ledgers);
         row[WITHHELD_MARKER] = json!(WITHHELD_FOREIGN_CURRENCY);
-        Self(row)
+        Self { view: row, parsed }
     }
 
     /// The row as the date, ledger and voucher-type filters read it: the parsed
@@ -250,7 +733,7 @@ impl WithheldVoucher {
     /// amount. The view never leaves the tool: `vouchers` lists a withheld
     /// voucher by GUID, date, type, number and cause only.
     pub(super) fn filter_view(&self) -> Value {
-        self.0.clone()
+        self.view.clone()
     }
 }
 
@@ -272,6 +755,22 @@ impl super::voucher_window::WindowRow for VoucherRow {
 impl VoucherRow {
     /// The row the date, ledger and voucher-type filters read: a read voucher
     /// whole, a withheld one as its [`WithheldVoucher::filter_view`].
+    pub(super) fn is_withheld(&self) -> bool {
+        matches!(self, Self::Withheld(_))
+    }
+
+    /// A withheld voucher read in a book whose base and masters are known, or left withheld
+    /// where [`read_composites`] will not read it.
+    pub(super) fn read_under(self, book: &IdentifiedBaseCurrency) -> Self {
+        match self {
+            Self::Withheld(withheld) => match read_composites(&withheld.parsed, book) {
+                Some(row) => Self::Read(row),
+                None => Self::Withheld(withheld),
+            },
+            read => read,
+        }
+    }
+
     pub(super) fn into_filter_row(self) -> Value {
         match self {
             Self::Read(row) => row,
@@ -282,7 +781,7 @@ impl VoucherRow {
     fn row(&self) -> &Value {
         match self {
             Self::Read(row) => row,
-            Self::Withheld(WithheldVoucher(row)) => row,
+            Self::Withheld(withheld) => &withheld.view,
         }
     }
 }
@@ -293,7 +792,14 @@ fn parse_voucher_rows(
     include_effective_date: bool,
     company_guid: &str,
     composites: CompositePolicy,
+    gst_details: GstDetailsShown,
+    (named, stock): (NamedVoucherFields, StockLines),
 ) -> Result<Vec<(Value, bool)>, String> {
+    // An entry's GST details are read only for a call that shows them (#2027): a read that does
+    // not ask holds, sizes and returns exactly the rows it did before.
+    let read_gst = gst_details == GstDetailsShown::Shown;
+    let read_stock = stock == StockLines::Asked;
+    let read_notes = named.gst == VoucherGstFields::Asked;
     // Tally's collection XML varies by release; use a deliberately conservative
     // extractor and never infer a missing field. Malformed rows fail before
     // optional selectors can hide them as an apparently complete empty result.
@@ -310,6 +816,11 @@ fn parse_voucher_rows(
     let mut entries = Vec::<Value>::new();
     let mut allocations = Vec::<Value>::new();
     let mut cost = CostCentreCollector::default();
+    let mut bank = BankAllocationCollector::default();
+    let mut goods = GoodsLineCollector::default();
+    let mut stock_lines = GoodsLineCollector::of_list(GoodsLineList::VoucherStockLines);
+    let mut gst = EntryGstCollector::default();
+    let mut notes = DeliveryNoteCollector::default();
     let mut current_tag = String::new();
     let mut scope = NativeCollectionScope::default();
     // Set by a composite amount under `CompositePolicy::Withhold`, per voucher.
@@ -340,14 +851,28 @@ fn parse_voucher_rows(
                     current = Some(row);
                     entries.clear();
                     withheld = false;
+                    stock_lines.reset();
+                    notes = DeliveryNoteCollector::default();
+                }
+                if read_notes {
+                    start_delivery_note_element(&scope, &tag, &mut notes)?;
                 }
                 if tag == "ALLLEDGERENTRIES.LIST" && scope.row("VOUCHER") {
                     entry = Some(BTreeMap::new());
                     allocations.clear();
                     cost.reset();
+                    bank.reset();
+                    goods.reset();
+                    gst.reset();
                 }
                 if let Some(tail) = scope.entry_tail() {
                     cost.start(tail, &tag);
+                    bank.start(tail, &tag);
+                    goods.start(tail, &tag);
+                    gst.start(tail, &tag);
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.start(tail, &tag);
                 }
                 if tag == "BILLALLOCATIONS.LIST" && scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST")
                 {
@@ -367,12 +892,43 @@ fn parse_voucher_rows(
                 current_tag = tag;
             }
             Ok(quick_xml::events::Event::Text(text)) => {
+                if read_notes && scope.delivery_note_field() {
+                    notes.text(&current_tag, decoded_agent_text(text.clone())?);
+                }
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => gst.text(tail, &current_tag, &value),
+                        Err(_) => gst.undecodable(tail),
+                    }
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => stock_lines.text(tail, &current_tag, &value),
+                        Err(_) => stock_lines.undecodable(),
+                    }
+                }
                 if scope.in_cost_centres() {
                     match decoded_agent_text(text.clone()) {
                         Ok(value) => {
                             cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
                         }
                         Err(_) => cost.undecodable(),
+                    }
+                }
+                if scope.in_bank_allocations() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => {
+                            bank.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => bank.undecodable(),
+                    }
+                }
+                if scope.in_goods_lines() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => {
+                            goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => goods.undecodable(),
                     }
                 }
                 if let Some(row) = allocation
@@ -388,8 +944,23 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::CData(text)) => {
                 let value = text.to_string();
+                if read_notes && scope.delivery_note_field() {
+                    notes.text(&current_tag, value.clone());
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.text(tail, &current_tag, &value);
+                }
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
+                    gst.text(tail, &current_tag, &value);
+                }
                 if scope.in_cost_centres() {
                     cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
+                }
+                if scope.in_bank_allocations() {
+                    bank.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
+                }
+                if scope.in_goods_lines() {
+                    goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
                 }
                 if let Some(row) = allocation
                     .as_mut()
@@ -403,12 +974,43 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::GeneralRef(reference)) => {
+                if read_notes && scope.delivery_note_field() {
+                    notes.text(&current_tag, decoded_agent_reference(reference.clone())?);
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => stock_lines.text(tail, &current_tag, &value),
+                        Err(_) => stock_lines.undecodable(),
+                    }
+                }
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => gst.text(tail, &current_tag, &value),
+                        Err(_) => gst.undecodable(tail),
+                    }
+                }
                 if scope.in_cost_centres() {
                     match decoded_agent_reference(reference.clone()) {
                         Ok(value) => {
                             cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
                         }
                         Err(_) => cost.undecodable(),
+                    }
+                }
+                if scope.in_bank_allocations() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => {
+                            bank.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => bank.undecodable(),
+                    }
+                }
+                if scope.in_goods_lines() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => {
+                            goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => goods.undecodable(),
                     }
                 }
                 if let Some(row) = allocation
@@ -424,8 +1026,17 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::End(event)) => {
                 let end = event.name().as_ref().to_ascii_uppercase();
+                if read_notes && scope.child("VOUCHER", DELIVERY_NOTE_LIST) {
+                    notes.end_entry()?;
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.end(tail);
+                }
                 if let Some(tail) = scope.entry_tail() {
                     cost.end(tail);
+                    bank.end(tail);
+                    goods.end(tail);
+                    gst.end(tail);
                 }
                 if scope.bill_allocation() {
                     if let Some(allocation_row) = allocation.take().filter(|row| !row.is_empty()) {
@@ -581,6 +1192,36 @@ fn parse_voucher_rows(
                                     json!(problem.reason());
                             }
                         }
+                        // The same for bank allocations (five fields, each absent, empty or a
+                        // value); an entry with no populated allocation has no key. Every answer
+                        // removes them unless `vouchers` was asked for them (#1231).
+                        match bank.finish() {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => parsed_entry["bank_allocations"] = Value::Array(rows),
+                            Err(problem) => {
+                                parsed_entry["bank_allocations_unreadable"] =
+                                    json!(problem.reason());
+                            }
+                        }
+                        // The same for goods lines (#2015): an invoice's item lines with their
+                        // godown and batch split, withheld unless `vouchers` asks for them.
+                        match goods.finish() {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => parsed_entry["goods_lines"] = Value::Array(rows),
+                            Err(problem) => {
+                                parsed_entry["goods_lines_unreadable"] = json!(problem.reason());
+                            }
+                        }
+                        // The same for the entry's GST details (#2027): its rates, taxability and
+                        // type of supply as Tally sent them, withheld unless `vouchers` asks.
+                        match gst.finish() {
+                            _ if !read_gst => {}
+                            Ok(None) => {}
+                            Ok(Some(details)) => parsed_entry["gst_details"] = details,
+                            Err(problem) => {
+                                parsed_entry["gst_details_unreadable"] = json!(problem.reason());
+                            }
+                        }
                         if parsed_amount.as_ref().is_some_and(|parsed| {
                             !tally_entry_polarity_agrees(parsed, is_deemed_positive)
                         }) {
@@ -623,7 +1264,31 @@ fn parse_voucher_rows(
                         let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": master_id, "amounts": amounts});
                         // Present only when the read asked Tally to resolve the
                         // row's voucher type (bridge#625).
-                        if let Some(resolved) = resolve_row_voucher_type(&row, company_guid)? {
+                        let kind = resolve_row_voucher_type(&row, company_guid)?;
+                        let cancelled = required_tally_bool(row.get("ISCANCELLED"))?;
+                        if read_stock {
+                            if !StockLines::covers(kind.as_ref()) {
+                                parsed["stock_lines_not_read"] = Value::Bool(true);
+                            } else {
+                                match stock_lines.finish() {
+                                    Ok(lines)
+                                        if lines.is_empty()
+                                            && StockLines::needs_a_line(
+                                                kind.as_ref(),
+                                                cancelled,
+                                            ) =>
+                                    {
+                                        parsed["stock_lines_unreadable"] =
+                                            json!(GoodsLineProblem::StockLineMissing.reason());
+                                    }
+                                    Ok(lines) => parsed["stock_lines"] = Value::Array(lines),
+                                    Err(problem) => {
+                                        parsed["stock_lines_unreadable"] = json!(problem.reason());
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(resolved) = kind {
                             parsed["voucher_type_guid"] = json!(resolved.guid);
                             parsed["voucher_type_reserved_name"] = json!(resolved.reserved_name);
                             parsed["voucher_class"] =
@@ -646,8 +1311,7 @@ fn parse_voucher_rows(
                                 parsed["effective_date"] = json!(effective);
                             }
                         }
-                        parsed["cancelled"] =
-                            Value::Bool(required_tally_bool(row.get("ISCANCELLED"))?);
+                        parsed["cancelled"] = Value::Bool(cancelled);
                         parsed["optional"] =
                             Value::Bool(required_tally_bool(row.get("ISOPTIONAL"))?);
                         // Unlike ISCANCELLED/ISOPTIONAL, ISPOSTDATED is left out by a source
@@ -736,6 +1400,15 @@ fn parse_voucher_rows(
                         {
                             parsed["party_gstin"] = json!(party_gstin);
                         }
+                        if let Some(details) = named.e_invoice.details(&row)? {
+                            parsed["e_invoice"] = details;
+                        }
+                        if let Some(details) = named.gst.details(&row)? {
+                            parsed["voucher_gst"] = details;
+                        }
+                        if let Some(details) = named.gst.dispatch(&row, notes.finish())? {
+                            parsed["dispatch"] = details;
+                        }
                         rows.push((parsed, withheld));
                     }
                 }
@@ -750,6 +1423,9 @@ fn parse_voucher_rows(
                 if scope.collection() {
                     return Err("agent_read_protocol_invalid".to_string());
                 }
+                if read_notes {
+                    start_delivery_note_element(&scope, &name, &mut notes)?;
+                }
                 claim_voucher_scalar(
                     &scope,
                     &name,
@@ -759,6 +1435,12 @@ fn parse_voucher_rows(
                 )?;
                 if let Some(tail) = scope.entry_tail() {
                     cost.start(tail, &name);
+                    bank.start(tail, &name);
+                    goods.start(tail, &name);
+                    gst.start(tail, &name);
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.start(tail, &name);
                 }
                 scope.start(name.clone());
                 if scope.repeated_collection {
@@ -766,6 +1448,15 @@ fn parse_voucher_rows(
                 }
                 if let Some(tail) = scope.entry_tail() {
                     cost.end(tail);
+                    bank.end(tail);
+                    goods.end(tail);
+                    gst.end(tail);
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.end(tail);
+                }
+                if read_notes && scope.child("VOUCHER", DELIVERY_NOTE_LIST) {
+                    notes.end_entry()?;
                 }
                 scope.end(&name)?;
             }
@@ -810,6 +1501,25 @@ fn credit_period_json(text: &str) -> Value {
             }
             period
         }
+    }
+}
+
+/// Starts a Delivery Note entry, or a field of one; an element inside a field is refused, as one
+/// inside a voucher field is.
+fn start_delivery_note_element(
+    scope: &NativeCollectionScope,
+    tag: &str,
+    notes: &mut DeliveryNoteCollector,
+) -> Result<(), String> {
+    if scope.delivery_note_field() {
+        Err("voucher_delivery_note_invalid".to_string())
+    } else if scope.row("VOUCHER") && tag == DELIVERY_NOTE_LIST {
+        notes.start_entry();
+        Ok(())
+    } else if scope.child("VOUCHER", DELIVERY_NOTE_LIST) {
+        notes.start_field(tag)
+    } else {
+        Ok(())
     }
 }
 
@@ -869,6 +1579,70 @@ pub(super) fn required_tally_bool(value: Option<&String>) -> Result<bool, String
         Some("No") => Ok(false),
         _ => Err("voucher_accounting_state_not_observed".to_string()),
     }
+}
+
+#[cfg(test)]
+pub(super) const FOREX_72_COMPANY_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+
+#[cfg(test)]
+pub(super) fn decoded_utf16le(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The 7.2 lab book's answer of one day: eleven vouchers, eight with composites
+/// (fixtures/agent/vouchers-forex-unspaced-20250401.PROVENANCE.md).
+#[cfg(test)]
+pub(super) fn captured_72_vouchers() -> String {
+    decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml"
+    ))
+}
+
+/// The registers' class-entry window of the same day (`forex-register`, #683), each voucher as
+/// the window parse leaves it before the book's base is read, in the shape the date, ledger and
+/// class checks read: every voucher with a composite is withheld.
+#[cfg(test)]
+pub(super) fn captured_72_register_window() -> Vec<Value> {
+    let shape = super::voucher_window::VoucherReadShape::ClassEntryWildcard;
+    parse_agent_rows_withholding_reading_gst(
+        &decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-window.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        shape.named_fields(),
+        shape.stock_lines(),
+    )
+    .expect("the captured register window parses")
+    .into_iter()
+    .map(VoucherRow::into_filter_row)
+    .collect()
+}
+
+/// That book's base and masters, from its own captured currency reads.
+#[cfg(test)]
+pub(super) fn captured_72_book() -> IdentifiedBaseCurrency {
+    use bridge_tally_protocol::native_outstandings::{
+        parse_company_currency_name, parse_currency_master_list,
+    };
+    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml"
+    )))
+    .unwrap();
+    let company = parse_company_currency_name(
+        &decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+    )
+    .unwrap();
+    masters.identify_base(Some(&company)).unwrap()
 }
 
 /// Synthetic mutation for tests (#674): the captured three-voucher window
@@ -936,5 +1710,14 @@ pub(super) fn window_with_composite_vouchers(count: usize) -> String {
 mod boundary_tests;
 
 #[cfg(test)]
+#[path = "agent_voucher_bank_allocations_tests.rs"]
+mod bank_allocation_tests;
+#[cfg(test)]
 #[path = "agent_voucher_cost_centres_tests.rs"]
 mod cost_centre_tests;
+#[cfg(test)]
+#[path = "agent_voucher_entry_gst_tests.rs"]
+mod entry_gst_tests;
+#[cfg(test)]
+#[path = "agent_voucher_goods_lines_tests.rs"]
+mod goods_line_tests;

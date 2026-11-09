@@ -240,6 +240,9 @@ pub(super) struct TrialBalanceBasis {
     from: bridge_tally_core::TallyDate,
     to: bridge_tally_core::TallyDate,
     completeness: Completeness,
+    /// How many of the read's ledgers have a closing that is not their opening plus their
+    /// debit and credit totals (`movements_differ_by` on the row).
+    movements_differ: usize,
 }
 
 impl TrialBalanceBasis {
@@ -252,7 +255,14 @@ impl TrialBalanceBasis {
             from,
             to,
             completeness,
+            movements_differ: 0,
         }
+    }
+
+    /// Records how many ledgers of the whole read do not add up, so every page says so.
+    pub(super) fn with_movements_differ(mut self, count: usize) -> Self {
+        self.movements_differ = count;
+        self
     }
 
     /// The headline of one page of this trial balance.
@@ -263,7 +273,7 @@ impl TrialBalanceBasis {
             plain_date(&self.from),
             plain_date(&self.to)
         );
-        let lead = if self.completeness.is_whole() {
+        let mut lead = if self.completeness.is_whole() {
             format!("{}: read for every ledger.", capitalised(&subject))
         } else {
             // The first sentence says it is partial and what that costs; the
@@ -273,6 +283,17 @@ impl TrialBalanceBasis {
             let detail = gaps.iter().map(Gap::detail).collect::<Vec<_>>().join(" ");
             format!("Partial {subject}: {short}. {detail}")
         };
+        if self.movements_differ > 0 {
+            let count = self.movements_differ;
+            let (noun, verb) = if count == 1 {
+                ("ledger", "does")
+            } else {
+                ("ledgers", "do")
+            };
+            lead.push_str(&format!(
+                " {count} {noun} {verb} not add up: the closing is not the opening plus the debit and credit totals (see movements_differ_by); each is shown as Tally sent it."
+            ));
+        }
         Headline {
             lead,
             rows: Some(page.sentence()),
@@ -352,6 +373,9 @@ fn reason_words(reason: NotEstablishedReason) -> &'static str {
         NotEstablishedReason::TallyProfitAndLossDiffers => {
             "Tally's own Profit and Loss differs from the derived lines"
         }
+        NotEstablishedReason::TallyBalanceSheetDoesNotBalance => {
+            "Tally's own Balance Sheet does not balance"
+        }
     }
 }
 
@@ -373,6 +397,9 @@ fn reason_next_step(reason: NotEstablishedReason) -> &'static str {
         NotEstablishedReason::TallyProfitAndLossDiffers => {
             "See tie_out in the result for the lines that differ, and tell the user."
         }
+        NotEstablishedReason::TallyBalanceSheetDoesNotBalance => {
+            "Tell the user the two sides of Tally's Balance Sheet export differ, so no figure can be given from it. Ask them to open Tally's own Balance Sheet for the same period and to check the book's opening balances there; on the one book measured, Tally showed this gap as Difference in opening balances and left it out of the export."
+        }
     }
 }
 
@@ -389,6 +416,8 @@ pub(super) struct StatementBasis {
     read_tally_profit_and_loss: bool,
     /// Whether the results were established with Tally's own closing stock.
     closing_stock_from_tally: bool,
+    /// The two sides of Tally's own Balance Sheet export, as text, when they differ.
+    tally_sides: Option<(String, String)>,
 }
 
 impl StatementBasis {
@@ -406,7 +435,15 @@ impl StatementBasis {
             parts,
             read_tally_profit_and_loss,
             closing_stock_from_tally: false,
+            tally_sides: None,
         }
+    }
+
+    /// Tally's own Balance Sheet export does not balance: the headline then says
+    /// by how much, from the two sides' totals.
+    pub(super) fn with_tally_balance_sheet_sides(mut self, credits: &str, debits: &str) -> Self {
+        self.tally_sides = Some((credits.to_string(), debits.to_string()));
+        self
     }
 
     /// The results were established with Tally's own closing stock, which the
@@ -502,8 +539,18 @@ impl StatementBasis {
             } else {
                 ""
             };
+            // Whatever the reason above, the two sides of Tally's own export are said when they differ.
+            let sides = match &self.tally_sides {
+                Some((credits, debits)) => format!(
+                    " Tally's own Balance Sheet export does not balance (its credit lines add to {credits} and its debit lines to {debits}); on the one book measured, Tally's screen showed such a gap as Difference in opening balances and the export left it out."
+                ),
+                None => String::new(),
+            };
             // One next step for each distinct reason, in the order they appear.
             let mut reasons = Vec::new();
+            if self.tally_sides.is_some() {
+                reasons.push(NotEstablishedReason::TallyBalanceSheetDoesNotBalance);
+            }
             for (_, outcome) in &self.parts {
                 if let PartOutcome::NotEstablished { reason, .. } = outcome {
                     if !reasons.contains(reason) {
@@ -516,7 +563,7 @@ impl StatementBasis {
                 .map(|reason| reason_next_step(*reason))
                 .collect::<Vec<_>>()
                 .join(" ");
-            format!("Not established: the {subject}. {sentences}{withheld} {next}")
+            format!("Not established: the {subject}. {sentences}{sides}{withheld} {next}")
         };
         Headline {
             lead,
@@ -666,6 +713,83 @@ impl CompanyFeaturesBasis {
             )),
             NativeCurrencySymbol::NotReported => lead.push_str(" Tally sent no currency symbol."),
         }
+        Headline {
+            lead,
+            rows: None,
+            page: None,
+            batch: None,
+        }
+    }
+}
+
+/// What a stock-by-batch read found (#2018), as counts of each item's state, held for its
+/// headline. It carries no item, godown or batch name and no quantity.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(super) struct StockByBatchBasis {
+    pub(super) requested: usize,
+    pub(super) tied: usize,
+    pub(super) differs: usize,
+    pub(super) not_comparable: usize,
+    pub(super) no_stock: usize,
+    pub(super) no_movement: usize,
+    pub(super) refused: usize,
+    pub(super) item_not_found: usize,
+    pub(super) name_unmeasured: usize,
+    pub(super) not_read: usize,
+    pub(super) not_sent: usize,
+    pub(super) batch_wise_off: bool,
+}
+
+impl StockByBatchBasis {
+    /// Whether every item asked for was read: no send failed.
+    pub(super) fn whole(&self) -> bool {
+        self.not_read == 0 && self.not_sent == 0
+    }
+
+    pub(super) fn headline(
+        &self,
+        company: &CompanyName,
+        as_of: &bridge_tally_core::TallyDate,
+    ) -> Headline {
+        let items = |count: usize| if count == 1 { "item" } else { "items" };
+        let mut lead = format!(
+            "Stock per godown and batch for {} at {}, from Tally's own Stock Query, quantities only: {} {} asked for.",
+            company.quoted(),
+            plain_date(as_of),
+            self.requested,
+            items(self.requested),
+        );
+        if !self.whole() {
+            lead.push_str(&format!(
+                " Partial: a send to Tally failed, so {} {} not read and {} not sent, and the book was not checked for change after the items that were read.",
+                self.not_read,
+                if self.not_read == 1 { "was" } else { "were" },
+                self.not_sent,
+            ));
+        }
+        let clauses = [
+            (self.tied, "tie to the closing quantity in Tally's stock item list"),
+            (self.differs, "differ from that closing quantity, and neither side is adjusted"),
+            (self.not_comparable, "could not be compared with it (another unit, or an alternate unit)"),
+            (self.no_stock, "hold no stock: Tally's list gives a closing of zero"),
+            (self.no_movement, "show no movement: Tally's list gives no closing, which is not the same as no stock"),
+            (self.refused, "were refused: their answer could not be read"),
+            (self.item_not_found, "were not found in the company"),
+            (self.name_unmeasured, "were not asked for, because their names hold characters not yet measured"),
+        ]
+        .into_iter()
+        .filter(|(count, _)| *count > 0)
+        .map(|(count, words)| format!("{count} {words}"))
+        .collect::<Vec<_>>();
+        if !clauses.is_empty() {
+            lead.push_str(&format!(" Of these, {}.", clauses.join("; ")));
+        }
+        if self.batch_wise_off {
+            lead.push_str(
+                " Batch-wise stock is off for this company, so every line reads Primary Batch.",
+            );
+        }
+        lead.push_str(" No value or rate is read.");
         Headline {
             lead,
             rows: None,

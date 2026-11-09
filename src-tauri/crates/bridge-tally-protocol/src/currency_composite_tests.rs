@@ -497,7 +497,7 @@ fn the_shapes_admitted_without_a_capture_are_pinned() {
         panic!("a valued composite");
     };
     assert_eq!(valued.foreign_symbol(), "US$");
-    // a rate with one to three decimals (the captured ones have none or four)
+    // a rate with one to three decimals (the captured 7.1 ones have none or four)
     for rate in ["86.5", "86.50", "86.500"] {
         let text = format!("$ 100.00 @ I\u{20b9} {rate}/$  = I\u{20b9} 8650.00");
         let CurrencyComposite::Valued(valued) = parse(&text).unwrap() else {
@@ -565,4 +565,264 @@ fn a_digit_grouped_composite_is_accepted_by_the_loose_classifier_and_not_the_str
     assert!(!is_currency_composite(&grouped), "{grouped}");
     // The typed parse has no layout for it either: it is refused, never read.
     assert!(parse(&grouped).is_err(), "{grouped}");
+}
+
+// ---- the 7.2 layout (#683, #2071) ----------------------------------------------------------
+
+fn decode_72(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// Every value in the two 7.2 captures that holds an ` @ `.
+fn composites_of_the_72_captures() -> Vec<String> {
+    composites_of(
+        include_bytes!(
+            "../tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml"
+        ),
+        include_bytes!(
+            "../tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml"
+        ),
+    )
+}
+
+/// Every value in the two 7.2 captures of the later sitting (#2071) that holds an ` @ `.
+fn composites_of_the_72_decimal_rate_captures() -> Vec<String> {
+    composites_of(
+        include_bytes!("../tests/fixtures/native/ledger_snapshot_forex_decimal_rate.utf16le.xml"),
+        include_bytes!("../tests/fixtures/native/trial_balance_forex_decimal_rate.utf16le.xml"),
+    )
+}
+
+/// Every value holding an ` @ ` in a ledger snapshot and a Trial Balance capture.
+fn composites_of(snapshot: &[u8], trial_balance: &[u8]) -> Vec<String> {
+    let mut found = Vec::new();
+    for (capture, tags) in [
+        (
+            decode_72(snapshot),
+            &["OPENINGBALANCE", "CLOSINGBALANCE"][..],
+        ),
+        (
+            decode_72(trial_balance),
+            &["TBALOPENING", "DEBITTOTALS", "CREDITTOTALS", "TBALCLOSING"][..],
+        ),
+    ] {
+        for tag in tags {
+            for tail in capture.split(&format!("<{tag} ")).skip(1) {
+                let (Some(start), Some(end)) = (tail.find('>'), tail.find(&format!("</{tag}>")))
+                else {
+                    continue;
+                };
+                let text = &tail[start + 1..end];
+                if text.contains(" @ ") {
+                    found.push(text.to_string());
+                }
+            }
+        }
+    }
+    found
+}
+
+/// Each composite the two 7.2 captures hold is the 7.2 layout and not the 7.1 one, is a balance
+/// composite, and is nothing a voucher's amount is read through.
+#[test]
+fn every_composite_in_the_72_captures_is_the_unspaced_layout_and_only_that() {
+    let found = composites_of_the_72_captures();
+    // Four closing balances of the snapshot and eight values of the Trial Balance.
+    assert_eq!(found.len(), 12, "{found:?}");
+    let distinct = found
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(distinct.len(), 6, "{distinct:?}");
+    for composite in &found {
+        assert!(is_unspaced_currency_composite(composite), "{composite}");
+        assert!(is_balance_composite(composite), "{composite}");
+        assert!(!is_currency_composite(composite), "{composite}");
+    }
+}
+
+/// The later sitting's composites, three of them with a rate that has decimals (two or four), are
+/// the 7.2 layout too, and still not the 7.1 one.
+#[test]
+fn every_composite_in_the_72_decimal_rate_captures_is_the_unspaced_layout() {
+    let found = composites_of_the_72_decimal_rate_captures();
+    assert!(!found.is_empty());
+    let decimal_rates = found
+        .iter()
+        .filter_map(|composite| {
+            let rate = composite.split(" @ ").nth(1)?.split('/').next()?;
+            rate.contains('.').then(|| rate.to_string())
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        decimal_rates.into_iter().collect::<Vec<_>>(),
+        ["\u{20b9} 86.0058", "\u{20b9} 87.50", "\u{20b9} 87.9999"]
+    );
+    for composite in &found {
+        assert!(is_unspaced_currency_composite(composite), "{composite}");
+        assert!(is_balance_composite(composite), "{composite}");
+        assert!(!is_currency_composite(composite), "{composite}");
+    }
+}
+
+/// The 7.1 captures keep their layout: none of them is the 7.2 one, so nothing that was read
+/// through `is_currency_composite` changes meaning.
+#[test]
+fn the_71_captured_composites_are_not_the_unspaced_layout() {
+    let captured = captured_composites();
+    assert!(!captured.is_empty());
+    for composite in &captured {
+        assert!(is_currency_composite(composite), "{composite}");
+        assert!(is_balance_composite(composite), "{composite}");
+        assert!(!is_unspaced_currency_composite(composite), "{composite}");
+    }
+}
+
+/// The 7.2 layout is admitted as far as the captures show and no further: each change below is a
+/// shape no capture holds, and is refused.
+#[test]
+fn a_change_to_the_72_layout_that_no_capture_shows_is_not_a_composite() {
+    for text in [
+        // the other layout's spaces
+        "$ 100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$  = \u{20b9} 8700.00",
+        // a rate that is not a decimal: a point with no digit on one side, two points, a sign,
+        // a comma, a space
+        "$100.00 @ \u{20b9} 87./$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} .5/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87.5.1/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} +87.5/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87,5/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87 .5/$ = \u{20b9} 8700.00",
+        // amounts without two decimals
+        "$100 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.0 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.000",
+        // the base amount against its symbol, or its symbol missing
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9}8700.00",
+        "$100.00 @ \u{20b9} 87/$ = 8700.00",
+        // a sign in the wrong place or doubled
+        "$-100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+        "--$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+        "-$100.00 @ \u{20b9} 87/$ = \u{20b9}- 8700.00",
+        // symbols that disagree, or are the same
+        "$100.00 @ \u{20b9} 87/\u{20ac} = \u{20b9} 8700.00",
+        "$100.00 @ \u{20ac} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ $ 87/$ = $ 8700.00",
+        // a missing part
+        "$100.00 \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$ \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87 = \u{20b9} 8700.00",
+        // doubled, padded or trailing text
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        " $100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00 ",
+        // no digit after the symbol
+        "$ @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        // a non-ASCII digit
+        "$\u{0661}00.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "",
+    ] {
+        assert!(!is_unspaced_currency_composite(text), "{text:?}");
+        // None of them is a balance composite by the other layout either, except the spaced
+        // ones, which are the 7.1 layout and keep being read as it.
+        if !is_currency_composite(text) {
+            assert!(!is_balance_composite(text), "{text:?}");
+        }
+    }
+}
+
+/// The empty rate of a zero total, in both captured places, and the zero composite as the lab
+/// wrote it.
+#[test]
+fn the_zero_total_with_an_empty_rate_is_the_unspaced_layout() {
+    assert!(is_unspaced_currency_composite(
+        "$0.00 @ \u{20b9} /$ = \u{20b9} 0.00"
+    ));
+}
+
+/// Shapes no capture shows that the unspaced check admits by shape, pinned so a change is seen
+/// (the 7.1 check admits its own, listed in the module doc). The row is set aside by name and its
+/// value is never read, so none of these can give a figure.
+#[test]
+fn the_shapes_the_unspaced_check_admits_without_a_capture_are_pinned() {
+    for text in [
+        // an empty or a zero rate with non-zero amounts
+        "$100.00 @ \u{20b9} /$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 0/$ = \u{20b9} 8700.00",
+        // amounts of opposite signs
+        "-$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        // a signed zero, and a zero base with a foreign value
+        "-$0.00 @ \u{20b9} /$ = -\u{20b9} 0.00",
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 0.00",
+        // leading zeros
+        "$0100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 087/$ = \u{20b9} 8700.00",
+        // a foreign or a base symbol other than `$` and the rupee symbol
+        "\u{20ac}100.00 @ \u{20b9} 87/\u{20ac} = \u{20b9} 8700.00",
+        "US$100.00 @ \u{20b9} 87/US$ = \u{20b9} 8700.00",
+        "$100.00 @ I\u{20b9} 87/$ = I\u{20b9} 8700.00",
+    ] {
+        assert!(is_unspaced_currency_composite(text), "{text}");
+    }
+}
+
+/// Reading a composite into its parts takes the 7.2 layout too, its decimal rate included, as a
+/// captured voucher shows it (`fixtures/agent/vouchers-forex-unspaced-20250401`).
+#[test]
+fn the_composite_parse_reads_the_unspaced_layout_and_its_decimal_rate() {
+    let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");
+    let parsed =
+        parse_currency_composite("-$100.00 @ \u{20b9} 86.4125/$ = -\u{20b9} 8641.25", &base);
+    let Ok(CurrencyComposite::Valued(composite)) = parsed else {
+        panic!("{parsed:?}");
+    };
+    assert_eq!(composite.side(), Side::Negative);
+    assert_eq!(composite.foreign_symbol(), "$");
+    assert_eq!(composite.foreign().magnitude().as_str(), "100.00");
+    assert_eq!(composite.rate().as_str(), "86.4125");
+    assert_eq!(composite.base().magnitude().as_str(), "8641.25");
+}
+
+#[test]
+fn the_composite_parse_applies_its_refusals_to_the_unspaced_layout() {
+    let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");
+    for (text, refusal) in [
+        (
+            "$100.00 @ I\u{20b9} 87/$ = I\u{20b9} 8700.00",
+            CompositeRefusal::BaseNotBookBase,
+        ),
+        (
+            "$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+            CompositeRefusal::SignsDisagree,
+        ),
+        (
+            "$100.00 @ \u{20b9} 87.12345/$ = \u{20b9} 8712.34",
+            CompositeRefusal::RatePrecision,
+        ),
+        (
+            "$0100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+            CompositeRefusal::LeadingZero,
+        ),
+        (
+            "$100.00 @ \u{20b9} /$ = \u{20b9} 8700.00",
+            CompositeRefusal::EmptyRateWithValue,
+        ),
+        (
+            "$100.00 @ \u{20b9} 87/$  = \u{20b9} 8700.00",
+            CompositeRefusal::NotComposite,
+        ),
+    ] {
+        assert_eq!(
+            parse_currency_composite(text, &base),
+            Err(refusal),
+            "{text}"
+        );
+    }
 }

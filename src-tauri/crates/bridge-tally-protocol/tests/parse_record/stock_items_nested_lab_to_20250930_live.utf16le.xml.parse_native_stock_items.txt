@@ -1,0 +1,325 @@
+# fixture: tests/fixtures/stock_items_nested_lab_to_20250930_live.utf16le.xml
+# parser: parse_native_stock_items
+# source: captured
+Ok(NativeStockItems {
+    rows: [
+        NativeStockItem {
+            name: "Lab Depth1 Nut",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d3",
+            parent: Some(
+                "Lab Group One",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "20",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-40.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "20",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-40.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Lab Depth1 Powder",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d4",
+            parent: Some(
+                "Lab Group One",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "2.500",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-250.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "2.500",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-250.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Lab Depth2 Resin",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d6",
+            parent: Some(
+                "Lab Group Two",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "1.250",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-100.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "1.250",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-100.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Lab Depth2 Spare",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d7",
+            parent: Some(
+                "Lab Group Two",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Empty,
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Empty,
+                agreement: NotCompared,
+                value: None,
+            },
+        },
+        NativeStockItem {
+            name: "Lab Depth2 Washer",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d5",
+            parent: Some(
+                "Lab Group Two",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "30",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-30.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "35",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-35.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Lab Depth3 Oil",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d9",
+            parent: Some(
+                "Lab Group Three",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "-0.750",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "45.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "-0.750",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "45.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Lab Depth3 Pin",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d8",
+            parent: Some(
+                "Lab Group Three",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "40",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-20.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "35",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-17.50",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Lab Root Bolt",
+            guid: "4b6094e2-d6db-46b6-a4ad-90c283cd1b52-000000d2",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "10",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-50.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "10",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-50.00",
+                    ),
+                ),
+            },
+        },
+    ],
+})

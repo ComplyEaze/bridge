@@ -194,7 +194,7 @@ fn invoice_number(voucher: &ImportVoucher) -> Option<String> {
 }
 
 fn entries_match(expected: &ImportVoucher, matched: &ReadVoucher) -> bool {
-    expected_entry_fingerprint(expected) == actual_entry_fingerprint(matched)
+    canonical_entry_fingerprint(expected) == actual_entry_fingerprint(matched)
 }
 
 #[derive(Default)]
@@ -217,13 +217,12 @@ impl VerificationCandidates {
     }
 }
 
-/// A batch voucher's date, type and entries. `voucher` must carry canonical
-/// amounts, as `verify_batch_as`'s comparison copy does.
+/// A batch voucher's date, type and entries, the amounts in canonical form.
 fn expected_content(voucher: &ImportVoucher) -> VerificationFingerprint {
     VerificationFingerprint::Content(
         Some(voucher.date.as_str().to_owned()),
         Some(voucher.filed_type_name().to_string()),
-        expected_entry_fingerprint(voucher),
+        canonical_entry_fingerprint(voucher),
     )
 }
 
@@ -328,21 +327,13 @@ pub(super) fn verify_batch_as(
         Attribution::Tag => (None, true),
         Attribution::Span(bindings) => (bindings, false),
     };
-    // Normalize only the comparison copies. Persisted batches and generated XML
-    // retain their original amount lexemes and remain backward compatible.
-    let mut comparison_line = line.clone();
-    for entry in comparison_line
-        .vouchers
-        .iter_mut()
-        .flat_map(|v| &mut v.entries)
-    {
-        entry.amount = canonical_verification_amount(&entry.amount)?;
-    }
+    // Only the book's side is normalised here. A batch's amounts are compared in the canonical
+    // form their type holds (`canonical_entry_fingerprint`); the batch and the XML written
+    // from it keep the lexeme, so a saved batch stays bound to its bytes.
     let mut comparison_observed = observed.rows.clone();
     for entry in comparison_observed.iter_mut().flat_map(|v| &mut v.entries) {
         entry.amount = canonical_verification_amount(&entry.amount)?;
     }
-    let line = &comparison_line;
     let observed = comparison_observed.as_slice();
     let observed_identities = observed
         .iter()
@@ -740,6 +731,19 @@ pub(super) fn mark_book_rolled_back(result: &mut Value) {
     result["book_rolled_back"] = json!(true);
 }
 
+/// What a verified batch with no dispatch on record says of itself. It states
+/// only what the journal shows: a journal replaced by an older copy, or the
+/// journal of another computer, would not hold a post made elsewhere or since.
+pub(super) const NOT_SENT_BY_BRIDGE_SUMMARY: &str = "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status.";
+
+/// Beside the verdict, never instead of it, for a verified batch whose journal
+/// records no dispatch (the same record `local_data_report` counts as sent).
+/// A partly found batch is not marked.
+pub(super) fn mark_found_not_sent(result: &mut Value) {
+    result["dispatch_record"] =
+        json!({"state":"none_on_record","summary":NOT_SENT_BY_BRIDGE_SUMMARY});
+}
+
 /// Rewrites a verification of a native post that carries no tag and was not
 /// bound to its span: a voucher not found by its content is `sent_not_attributed`,
 /// never `not_found`. It was sent, so an edit in Tally (which a tag used to
@@ -805,7 +809,7 @@ pub(super) fn unmatched_cause(
 /// Whether a post's answer has the captured shape of a post Tally rejected
 /// whole: every counter reported, `CREATED 0`, `EXCEPTIONS` equal to the
 /// `sent` vouchers and every other counter zero (§9.2; bridge#1108).
-fn answer_reported_none_created(
+pub(super) fn answer_reported_none_created(
     counters: &bridge_tally_protocol::TallyImportResult,
     sent: u64,
 ) -> bool {
@@ -873,14 +877,14 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
         "bound_not_in_window" => Some("This voucher was posted, but it is not in the book for these dates now: it may have been deleted or re-dated in Tally, or the company restored from a backup. Check in Tally before posting it again."),
         "book_rolled_back" => Some("This voucher was posted, but the company's books are now older than that post: they were probably restored from a backup or replaced by another copy. Check in Tally before posting it again."),
         "sent_not_attributed" => Some("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now, for example because it was edited in Tally. Check in Tally before posting it again."),
-        "tally_reported_not_created" => Some("Tally reported this voucher as not created. ComplyEaze Bridge will not send this saved voucher again, and nothing in ComplyEaze Bridge puts it in the book yet; do not import it again through Tally's Import menu. Verify this batch again later to see whether a voucher with these same details is in the book."),
+        "tally_reported_not_created" => Some("Tally reported this voucher as not created. ComplyEaze Bridge will not send this saved voucher again; do not import it again through Tally's Import menu. Ask the user to check in Tally whether it is in the book. Once they say each voucher of the batch is in the book or will not be posted, call acknowledge_post_review with doubt not_created: it asks them in a dialog you cannot answer, and closes the batch."),
         _ => None,
     }
 }
 
 /// What a person does about an invoice that is in the book and did not read
 /// back as built.
-pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number; or the voucher found under that number is not the one this post created (`guid`, `alter_id`); or Tally's GSTR-1 does not list it as included (`gst_status_uncertain`, `gst_status_excluded`, `gst_status_not_in_return`; `gst_status_not_reported` or `gst_status_unreadable` when its status did not come back or does not read), or a person accepted it there as it stands (`gst_status_overridden`); or Tally did not fill in the HSN/SAC of a sales line (`invoice_line_hsn_unresolved`: `invoice_lines` shows, for every sales line, the code Tally used and the ledger or group it took it from). Open the invoice in Tally and check it against the source document before relying on it. For `invoice_line_hsn_unresolved`, that line's ledger, its group or the company has no HSN/SAC for the invoice date: set it in Tally. Correcting the master alone did not change an invoice already saved; saving the invoice again did change it on a test company, but that changes the invoice's AlterID, and what ComplyEaze Bridge's verification reads after a person saves a posted invoice again has not been established, so the invoice may stay not confirmed here. For a GSTR-1 status, open GSTR-1 for the invoice's month in Tally and read the reason there: none comes back with the status. Correcting a ledger or another master does not by itself change the status of an invoice already saved: on a test company an invoice stayed uncertain after its sales ledger's HSN/SAC was set, until the invoice itself was saved again. Accepting it as it stands in GSTR-1 leaves it not confirmed here until a person releases it in ComplyEaze Bridge's own dialog. These statuses were seen only on invoices to an unregistered buyer. Do not post it again.";
+pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number; or the voucher found under that number is not the one this post created (`guid`, `alter_id`); or Tally's GSTR-1 does not list it as included (`gst_status_uncertain`, `gst_status_excluded`, `gst_status_not_in_return`; `gst_status_post_dated` when Tally marks it post-dated; `gst_status_not_reported` or `gst_status_unreadable` when its status did not come back or does not read), or a person accepted it there as it stands (`gst_status_overridden`); or Tally did not fill in the HSN/SAC of a sales line (`invoice_line_hsn_unresolved`: `invoice_lines` shows, for every sales line, the code Tally used and the ledger or group it took it from). Open the invoice in Tally and check it against the source document before relying on it. For `invoice_line_hsn_unresolved`, that line's ledger, its group or the company has no HSN/SAC for the invoice date: set it in Tally. Correcting the master alone did not change an invoice already saved; saving the invoice again did change it on a test company, but that changes the invoice's AlterID, and what ComplyEaze Bridge's verification reads after a person saves a posted invoice again has not been established, so the invoice may stay not confirmed here. For a GSTR-1 status, open GSTR-1 for the invoice's month in Tally and read the reason there: none comes back with the status. Correcting a ledger or another master does not by itself change the status of an invoice already saved: on a test company an invoice stayed uncertain after its sales ledger's HSN/SAC was set, until the invoice itself was saved again. Accepting it as it stands in GSTR-1 leaves it not confirmed here until a person releases it in ComplyEaze Bridge's own dialog. These statuses were seen only on invoices to an unregistered buyer. Do not post it again.";
 
 /// An invoice the standard readback matched, whose own fields did not read back
 /// as built (party, GST header, reference, allocation, or the voucher could not
@@ -957,7 +961,7 @@ pub(super) fn invoice_readback_due<'a>(
 /// The next step of a voucher a later verification cannot find when the saved
 /// answer of its post reported it as not created
 /// (`UnmatchedCause::ReportedNotCreatedWhenSent`).
-pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered in Tally with a different date, voucher type, ledger or amount: look for it there. ComplyEaze Bridge will not send this saved voucher again, and nothing in ComplyEaze Bridge puts it in the book yet; do not import its file through Tally's Import menu.";
+pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered in Tally with a different date, voucher type, ledger or amount: look for it there. ComplyEaze Bridge will not send this saved voucher again; do not import its file through Tally's Import menu. Once the user says each voucher of the batch is in the book or will not be posted, call acknowledge_post_review with doubt not_created: it asks them in a dialog you cannot answer, and closes the batch.";
 
 /// The next step of an unbound post's voucher that its content cannot find when
 /// the post's own answer from Tally is on record and was not clean (it did not
@@ -1011,6 +1015,19 @@ fn mark_not_found_with(result: &mut Value, status: &str, next_step: Option<&str>
     counts["not_found"] = json!(0);
     counts["bound_not_in_window"] = json!(0);
     counts[status] = json!(already + moved);
+}
+
+/// How many of a verification result's `vouchers` rows are a content-only match that is in the
+/// accounts (`accounting_effective` is `true`); a row without the field, or input that is not an
+/// array, counts none.
+pub(super) fn content_matches_in_the_accounts(vouchers: &Value) -> usize {
+    vouchers.as_array().map_or(0, |rows| {
+        rows.iter()
+            .filter(|row| {
+                row["status"] == "matching_content_observed" && row["accounting_effective"] == true
+            })
+            .count()
+    })
 }
 
 pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<bool, String> {
@@ -1326,7 +1343,7 @@ pub(super) fn voucher_diffs(
             .entries
             .iter()
             .map(|entry| {
-                json!({"ledger":party_name(&entry.ledger), "amount":entry.amount, "side":entry.side,
+                json!({"ledger":party_name(&entry.ledger), "amount":entry.amount.canonical(), "side":entry.side,
                 "is_deemed_positive":entry.side.tally_positive()})
             })
             .collect::<Vec<_>>();
@@ -1343,7 +1360,25 @@ pub(super) fn voucher_diffs(
     diffs
 }
 
+/// What a batch voucher's entries are matched by: each ledger, the signed amount in canonical
+/// form (`0012.50` is `-12.5` as a debit) and the deemed-positive mark. The book's side of
+/// the comparison is `actual_entry_fingerprint`, over amounts the reads canonicalise.
+pub(super) fn canonical_entry_fingerprint(voucher: &ImportVoucher) -> Vec<String> {
+    entry_fingerprint(voucher, ImportAmount::signed_canonical)
+}
+
+/// [`canonical_entry_fingerprint`] over the amounts as they were received. No comparison
+/// uses this form; it is kept so a test can hold the received form apart from the canonical
+/// one (#1872).
+#[cfg(test)]
 pub(super) fn expected_entry_fingerprint(voucher: &ImportVoucher) -> Vec<String> {
+    entry_fingerprint(voucher, ImportAmount::signed_lexeme)
+}
+
+fn entry_fingerprint(
+    voucher: &ImportVoucher,
+    signed: fn(&ImportAmount, &EntrySide) -> String,
+) -> Vec<String> {
     let mut result = voucher
         .entries
         .iter()
@@ -1351,10 +1386,7 @@ pub(super) fn expected_entry_fingerprint(voucher: &ImportVoucher) -> Vec<String>
             format!(
                 "{}|{}|{}",
                 entry.ledger,
-                match entry.side {
-                    EntrySide::Dr => format!("-{}", entry.amount),
-                    EntrySide::Cr => entry.amount.clone(),
-                },
+                signed(&entry.amount, &entry.side),
                 entry.side.tally_positive()
             )
         })
@@ -1553,6 +1585,9 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
                 .as_str()
                 .unwrap_or("unknown")
         ));
+    }
+    if proof["dispatch_record"]["state"] == "none_on_record" {
+        output.push_str("- Dispatch record: none on this computer — found in the book, not sent by ComplyEaze Bridge\n");
     }
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));

@@ -31,7 +31,7 @@ fn failed_partial_write_and_sync_restore_the_original_receipts() {
 }
 
 #[test]
-fn failed_rollback_is_distinct_and_incomplete_log_refuses_future_appends() {
+fn failed_rollback_is_distinct_and_the_next_append_repairs_the_torn_tail() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("agent-egress.jsonl");
     fs::write(&path, b"{}\n").unwrap();
@@ -46,14 +46,23 @@ fn failed_rollback_is_distinct_and_incomplete_log_refuses_future_appends() {
     });
     assert_eq!(result, Err("egress_record_rollback_failed".into()));
     let damaged = fs::read(&path).unwrap();
+    let before = read_egress_tail(&path, 20).unwrap();
+    assert_eq!(before.records, ["{}"]);
+    assert_eq!(before.unrepaired_tail_bytes, Some(9));
+    assert_eq!(fs::read(&path).unwrap(), damaged, "reads never repair");
+    append_egress_line(&path, r#"{"next":1}"#).unwrap();
+    let repaired = fs::read(&path).unwrap();
+    assert!(repaired.starts_with(&damaged), "nothing is removed");
+    let after = read_egress_tail(&path, 20).unwrap();
+    assert_eq!(after.records, [r#"{"next":1}"#, "{}"]);
+    assert_eq!(after.unrepaired_tail_bytes, None);
     assert_eq!(
-        append_egress_line(&path, "{}"),
-        Err("egress_log_incomplete".into())
-    );
-    assert_eq!(fs::read(&path).unwrap(), damaged);
-    assert_eq!(
-        read_egress_tail(&path, 20).unwrap_err(),
-        "egress_log_incomplete"
+        after.torn,
+        [TornRecord {
+            offset: 3,
+            bytes: 11,
+            sha256: super::super::sha256_hex(b"{\"partial#\n"),
+        }]
     );
 }
 
@@ -68,7 +77,7 @@ fn receipt_size_limit_preserves_the_file_and_admitted_tail_is_readable() {
         Err("egress_record_too_large".into())
     );
     assert_eq!(fs::read(&path).unwrap(), b"{}\n");
-    let admitted = format!("\"{}\"", "x".repeat(MAX_EGRESS_TAIL_BYTES - 4));
+    let admitted = format!("{{\"x\":\"{}\"}}", "x".repeat(MAX_EGRESS_TAIL_BYTES - 10));
     append_egress_line(&path, &admitted).unwrap();
     assert_eq!(read_egress_tail(&path, 1).unwrap().records, [admitted]);
 }
@@ -177,6 +186,7 @@ async fn egress_log_reports_byte_bounded_tail_even_below_requested_record_count(
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     append_egress_line(&path, r#"{"index":0}"#).unwrap();
@@ -216,7 +226,7 @@ async fn egress_log_reports_byte_bounded_tail_even_below_requested_record_count(
 }
 
 #[tokio::test]
-async fn egress_log_rejects_unterminated_and_malformed_receipts_in_band() {
+async fn egress_log_reports_a_torn_tail_and_rejects_malformed_receipts_in_band() {
     use super::super::{Redaction, Server, Settings, TallyEndpointConfig};
     use serde_json::{json, Value};
     let directory = tempfile::tempdir().unwrap();
@@ -232,6 +242,7 @@ async fn egress_log_rejects_unterminated_and_malformed_receipts_in_band() {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server
@@ -245,11 +256,25 @@ async fn egress_log_rejects_unterminated_and_malformed_receipts_in_band() {
     let complete = read_egress_tail(&path, 20).unwrap();
     assert_eq!(complete.records.len(), 1);
     assert!(!complete.truncated);
+    // A torn tail is never read as a receipt, and is reported by its size until the next receipt
+    // repairs it; the read itself repairs nothing.
+    for torn in [
+        valid[..valid.len() - 1].to_vec(),
+        valid[..valid.len() / 2].to_vec(),
+    ] {
+        fs::write(&path, &torn).unwrap();
+        let tail = read_egress_tail(&path, 20).unwrap();
+        assert!(tail.records.is_empty());
+        assert_eq!(tail.unrepaired_tail_bytes, Some(torn.len() as u64));
+        let response = server.call_tool("egress_log", json!({"limit":20})).await;
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(result["records"], json!([]), "{response}");
+        assert_eq!(result["unrepaired_tail_bytes"], torn.len(), "{response}");
+        assert_eq!(fs::read(&path).unwrap(), torn, "reads never repair");
+    }
     let mut prefix_with_newline = valid[..valid.len() / 2].to_vec();
     prefix_with_newline.push(b'\n');
     for damaged in [
-        valid[..valid.len() - 1].to_vec(),
-        valid[..valid.len() / 2].to_vec(),
         prefix_with_newline,
         [b"{\"tool\":\n".as_slice(), valid.as_slice()].concat(),
     ] {
@@ -359,6 +384,7 @@ async fn egress_log_reads_back_receipts_that_carry_a_full_trail() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     // The default read (20 receipts) of receipts that each carry a full trail
@@ -373,12 +399,396 @@ async fn egress_log_reads_back_receipts_that_carry_a_full_trail() {
         let parsed: Value = serde_json::from_str(line.as_str().unwrap()).unwrap();
         assert_eq!(parsed["request_trail"]["sent"], TRAIL_LAST + 5);
     }
-    // A much larger `limit` over such receipts exceeds the byte cap, and is then
-    // refused by its code, not cut mid-line (ask for fewer receipts).
+    // A much larger `limit` over such receipts exceeds the byte cap: the answer keeps the newest
+    // whole receipts that fit the cap as the response is really encoded (both copies and the
+    // envelope), says so with `truncated` and counts the rest in `omitted_for_size`; it is no
+    // longer refused (#2125).
     let many = server.call_tool("egress_log", json!({"limit": 100})).await;
-    assert_eq!(many["isError"], true, "{many}");
+    assert_eq!(many["isError"], false, "{many}");
+    assert_eq!(many["structuredContent"]["truncated"], true, "{many}");
+    let kept = many["structuredContent"]["result"]["records"]
+        .as_array()
+        .unwrap();
+    let omitted = many["structuredContent"]["result"]["omitted_for_size"]
+        .as_u64()
+        .unwrap();
+    assert!(!kept.is_empty() && kept.len() < 40, "{}", kept.len());
+    // The file holds 40 receipts and the scan reaches all of them: what is kept and what is
+    // left out account for every receipt.
+    assert_eq!(kept.len() as u64 + omitted, 40);
+    // Whole lines, newest first.
+    for (position, line) in kept.iter().enumerate() {
+        let parsed: Value = serde_json::from_str(line.as_str().unwrap()).unwrap();
+        assert_eq!(parsed["index"], 39 - position);
+    }
+    // And the answer is within the cap as it is sent.
+    assert!(many.to_string().len() <= 200_000);
+}
+
+/// The fixture of the next two tests: `count` receipts of the same length, so that a cap can be
+/// set to the byte.
+fn equal_receipts(directory: &tempfile::TempDir, count: usize, padding: usize) {
+    let path = directory.path().join("agent-egress.jsonl");
+    for index in 0..count {
+        let line = serde_json::json!({"record_type": "response_prepared", "index": format!("{index:04}"), "padding": "x".repeat(padding)}).to_string();
+        append_egress_line(&path, &line).unwrap();
+    }
+}
+
+fn server_with_cap(directory: &tempfile::TempDir, max_bytes: usize) -> super::super::Server {
+    use super::super::{Redaction, Server, Settings, TallyEndpointConfig};
+    Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 256,
+        max_bytes,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    })
+}
+
+/// `egress_log` called as `call_tool` calls a tool, but with the call's start set 50 s back, so
+/// its `duration_ms` has five digits however long the call takes (#2154). The answer is sized
+/// with that field in it, so a test that sets a cap to the byte from one answer otherwise depends
+/// on two calls' durations having as many digits: 9 ms against 10 ms moved the size by one byte.
+/// `read_at` is written to the millisecond in a fixed width, so nothing else in the answer varies.
+async fn egress_log_with_fixed_width_duration(
+    server: &super::super::Server,
+    arguments: serde_json::Value,
+) -> serde_json::Value {
+    let started = chrono::Utc::now() - chrono::Duration::seconds(50);
+    let (result, _) = crate::request_trail::with_request_trail(Box::pin(
+        server.tool_payload("egress_log", &arguments),
+    ))
+    .await;
+    let response = server.finish_tool_response("egress_log", &arguments, started, result);
+    let duration = response.value["structuredContent"]["evidence"]["duration_ms"]
+        .as_u64()
+        .expect("the answer's duration");
+    assert!((10_000..100_000).contains(&duration), "{duration}");
+    if let Some(evidence) = response.egress.evidence {
+        server.record_evidence(evidence);
+    }
+    response.value
+}
+
+/// The boundary, to the byte: a cap equal to the size of the answer for twelve receipts returns
+/// all twelve and nothing is marked left out; one byte less returns eleven, marked, and the
+/// eleven are within that cap as sent.
+#[tokio::test]
+async fn egress_log_keeps_the_newest_receipts_that_fit_at_the_exact_boundary() {
+    use serde_json::json;
+    let directory = tempfile::tempdir().unwrap();
+    equal_receipts(&directory, 12, 1_000);
+    let whole = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, 1_000_000),
+        json!({"limit": 12}),
+    )
+    .await;
+    assert_eq!(whole["structuredContent"]["truncated"], false, "{whole}");
+    let size = whole.to_string().len();
+    let at = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, size),
+        json!({"limit": 12}),
+    )
+    .await;
+    assert_eq!(at["isError"], false, "{at}");
+    // The cap is the answer's own size, to the byte.
+    assert_eq!(at.to_string().len(), size, "{at}");
+    assert_eq!(at["structuredContent"]["truncated"], false, "{at}");
+    assert!(at["structuredContent"]["result"]
+        .get("omitted_for_size")
+        .is_none());
     assert_eq!(
-        many["structuredContent"]["error"]["code"], "agent_response_too_large",
-        "{many}"
+        at["structuredContent"]["result"]["records"]
+            .as_array()
+            .unwrap()
+            .len(),
+        12
     );
+    let under = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, size - 1),
+        json!({"limit": 12}),
+    )
+    .await;
+    assert_eq!(under["isError"], false, "{under}");
+    assert_eq!(under["structuredContent"]["truncated"], true, "{under}");
+    let result = &under["structuredContent"]["result"];
+    assert_eq!(result["records"].as_array().unwrap().len(), 11);
+    assert_eq!(result["omitted_for_size"], 1);
+    assert!(under.to_string().len() < size);
+    // The newest eleven: the oldest receipt is the one left out.
+    let first = result["records"][0].as_str().unwrap();
+    assert!(first.contains("\"0011\""), "{first}");
+}
+
+/// One receipt that alone is over the cap cannot be cut mid-line, so the call is refused with
+/// the existing code, as before (#2125); so is any cap too small for the first newest receipt.
+#[tokio::test]
+async fn egress_log_still_refuses_when_one_receipt_alone_is_over_the_cap() {
+    use serde_json::json;
+    let directory = tempfile::tempdir().unwrap();
+    equal_receipts(&directory, 3, 60_000);
+    let refused = server_with_cap(&directory, 100_000)
+        .call_tool("egress_log", json!({"limit": 3}))
+        .await;
+    assert_eq!(refused["isError"], true, "{refused}");
+    assert_eq!(
+        refused["structuredContent"]["error"]["code"], "agent_response_too_large",
+        "{refused}"
+    );
+    // The same receipts fit a cap that holds one of them: the newest only, two counted left out.
+    let one = server_with_cap(&directory, 300_000)
+        .call_tool("egress_log", json!({"limit": 3}))
+        .await;
+    assert_eq!(one["isError"], false, "{one}");
+    let result = &one["structuredContent"]["result"];
+    let kept = result["records"].as_array().unwrap().len();
+    assert_eq!(
+        kept as u64 + result["omitted_for_size"].as_u64().unwrap(),
+        3
+    );
+}
+
+/// The response digest of `egress_log` hashes the receipt lines the call read, not the ones it
+/// returned, so on an answer trimmed for size it covers more lines than the answer holds
+/// (`omitted_for_size` counts the difference): the digest is of what was read from the log and
+/// the README says so (#2125).
+#[tokio::test]
+async fn egress_log_digest_covers_every_line_read_even_when_the_answer_is_trimmed() {
+    use serde_json::json;
+    let directory = tempfile::tempdir().unwrap();
+    equal_receipts(&directory, 12, 1_000);
+    let path = directory.path().join("agent-egress.jsonl");
+    let read = read_egress_tail(&path, 12).unwrap();
+    assert_eq!(read.records.len(), 12);
+    let size = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, 1_000_000),
+        json!({"limit": 12}),
+    )
+    .await
+    .to_string()
+    .len();
+    let trimmed = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, size - 1),
+        json!({"limit": 12}),
+    )
+    .await;
+    let result = &trimmed["structuredContent"]["result"];
+    let returned = result["records"].as_array().unwrap().len();
+    assert_eq!(returned, 11);
+    assert_eq!(result["omitted_for_size"], 1);
+    let digest = trimmed["structuredContent"]["evidence"]["response_sha256"]
+        .as_str()
+        .unwrap();
+    // The digest is of all twelve lines read, as the call computes it.
+    assert_eq!(digest, super::super::sha256_json(&read.records));
+    // And not of the eleven returned.
+    let returned_lines = read.records[..returned].to_vec();
+    assert_ne!(digest, super::super::sha256_json(&returned_lines));
+}
+
+/// The log as written, then read back newest first.
+fn records_of(path: &Path) -> Vec<String> {
+    read_egress_tail(path, 256).unwrap().records
+}
+
+/// A record cut just before its newline is whole JSON, yet it is never read as a record: not
+/// before the repair, and not after it.
+#[test]
+fn a_whole_record_cut_before_its_newline_is_never_read_as_one() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    fs::write(&path, b"{\"a\":1}\n{\"cut\":true}").unwrap();
+    assert_eq!(records_of(&path), [r#"{"a":1}"#]);
+    append_egress_line(&path, r#"{"b":2}"#).unwrap();
+    let tail = read_egress_tail(&path, 256).unwrap();
+    assert_eq!(tail.records, [r#"{"b":2}"#, r#"{"a":1}"#]);
+    assert_eq!(tail.torn.len(), 1);
+    let bytes = fs::read(&path).unwrap();
+    assert!(bytes.starts_with(b"{\"a\":1}\n{\"cut\":true}#\n{\"record_type\":\"torn_record\""));
+}
+
+/// A complete line that is not a record is never hidden: it is refused whether or not a torn tail
+/// follows it, and the repair leaves such a file as it was.
+#[test]
+fn a_complete_malformed_line_is_refused_and_never_vouched_for() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    let damaged = b"{\"a\":1}\n\0\0\0\n{\"cut".to_vec();
+    fs::write(&path, &damaged).unwrap();
+    assert_eq!(
+        read_egress_tail(&path, 20).unwrap_err(),
+        "egress_log_incomplete"
+    );
+    assert_eq!(
+        append_egress_line(&path, r#"{"b":2}"#),
+        Err("egress_log_incomplete".into())
+    );
+    assert_eq!(fs::read(&path).unwrap(), damaged);
+    let middle = b"{\"a\":1}\nnot json\n{\"b\":2}\n".to_vec();
+    fs::write(&path, &middle).unwrap();
+    assert_eq!(
+        read_egress_tail(&path, 20).unwrap_err(),
+        "egress_log_incomplete"
+    );
+}
+
+/// A marker is honoured only when it matches the bytes before it exactly.
+#[test]
+fn a_marker_that_does_not_match_its_bytes_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    fs::write(&path, b"{\"a\":1}\n{\"cut").unwrap();
+    append_egress_line(&path, r#"{"b":2}"#).unwrap();
+    let good = fs::read(&path).unwrap();
+    let text = String::from_utf8(good.clone()).unwrap();
+    let sha = read_egress_tail(&path, 20).unwrap().torn[0].sha256.clone();
+    for forged in [
+        text.replace(&sha, &"0".repeat(64)),
+        text.replace("\"torn_bytes\":7", "\"torn_bytes\":6"),
+        text.replace("\"torn_offset\":8", "\"torn_offset\":9"),
+        text.replace("{\"cut#", "{\"cux#"),
+    ] {
+        assert_ne!(forged, text);
+        fs::write(&path, &forged).unwrap();
+        assert_eq!(
+            read_egress_tail(&path, 20).unwrap_err(),
+            "egress_log_incomplete",
+            "{forged}"
+        );
+    }
+}
+
+/// A repair that is itself cut short is repaired by the next append, whose marker vouches for the
+/// whole run; the cut repair's bytes are never a record.
+#[test]
+fn a_cut_repair_is_vouched_for_by_the_next_one() {
+    for debris in [
+        b"#".as_slice(),
+        b"#\n".as_slice(),
+        b"#\n{\"record_type\":\"torn_re".as_slice(),
+        b"#\n{\"record_type\":\"torn_record\",\"torn_bytes\":3}".as_slice(),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("agent-egress.jsonl");
+        let damaged = [b"{\"a\":1}\n{\"cut\":true}".as_slice(), debris].concat();
+        fs::write(&path, &damaged).unwrap();
+        assert_eq!(records_of(&path), [r#"{"a":1}"#]);
+        append_egress_line(&path, r#"{"b":2}"#).unwrap();
+        let tail = read_egress_tail(&path, 256).unwrap();
+        assert_eq!(tail.records, [r#"{"b":2}"#, r#"{"a":1}"#]);
+        assert_eq!(tail.torn.len(), 1);
+        assert_eq!(tail.torn[0].offset, 8);
+        assert!(fs::read(&path).unwrap().starts_with(&damaged));
+    }
+}
+
+/// Wherever the scan's window starts, a marker is checked against its bytes, read from the file
+/// when the window does not hold them, and the torn bytes are never a record.
+#[test]
+fn a_marker_is_checked_at_every_window_cut() {
+    for padding in [0_usize, 1, 7, 100, 1_000, 30_000, 60_000] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("agent-egress.jsonl");
+        let filler = format!("{{\"pad\":\"{}\"}}\n", "x".repeat(padding));
+        let mut bytes = filler.repeat(3).into_bytes();
+        bytes.extend_from_slice(format!("{{\"cut\":\"{}", "y".repeat(padding)).as_bytes());
+        fs::write(&path, &bytes).unwrap();
+        append_egress_line(&path, r#"{"after":0}"#).unwrap();
+        for index in 1..=5 {
+            append_egress_line(&path, &format!("{{\"after\":{index}}}")).unwrap();
+        }
+        for take in [1, 2, 5, 6, 7, 8, 10, 256] {
+            let tail = read_egress_tail(&path, take).unwrap();
+            assert!(
+                tail.records
+                    .iter()
+                    .all(|record| !record.contains("\"cut\"")),
+                "padding {padding}, take {take}"
+            );
+            assert!(tail.records.len() + tail.torn.len() <= take);
+        }
+    }
+}
+
+/// Every line written is one JSON object, so every record ends `}` and a torn tail is found.
+#[test]
+fn only_a_single_line_json_object_is_appended() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    for line in ["[1]", "1", "{\"a\":1}\n{\"b\":2}", "\"text\""] {
+        assert_eq!(
+            append_egress_line(&path, line),
+            Err("egress_record_write_failed".into()),
+            "{line}"
+        );
+    }
+    assert!(!path.exists() || fs::read(&path).unwrap().is_empty());
+}
+
+/// A torn tail longer than any record leaves the file as it was.
+#[test]
+fn a_torn_tail_longer_than_a_record_is_refused_not_repaired() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    let mut bytes = b"{\"a\":1}\n".to_vec();
+    bytes.extend(std::iter::repeat_n(b'z', MAX_TORN_BYTES + 1));
+    fs::write(&path, &bytes).unwrap();
+    assert_eq!(
+        append_egress_line(&path, r#"{"b":2}"#),
+        Err("egress_log_incomplete".into())
+    );
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+}
+
+/// The bound counts the sentinel the repair adds: a run at the bound gets a marker the reader then
+/// honours, and a run one byte longer is refused and left as it was, never given a marker the
+/// reader would refuse for good.
+#[test]
+fn a_run_at_the_bound_is_repaired_and_one_byte_more_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    let at_bound = MAX_TORN_BYTES - TORN_SENTINEL.len();
+    for (run, repaired) in [(at_bound, true), (at_bound + 1, false)] {
+        let mut bytes = b"{\"a\":1}\n".to_vec();
+        bytes.extend(std::iter::repeat_n(b'z', run));
+        fs::write(&path, &bytes).unwrap();
+        let appended = append_egress_line(&path, r#"{"b":2}"#);
+        if repaired {
+            appended.unwrap();
+            // The record before the run lies past the scan's 256 KiB window: the marker's range,
+            // which starts before the window, is read back and checked from the file.
+            let tail = read_egress_tail(&path, 256).unwrap();
+            assert_eq!(tail.records, [r#"{"b":2}"#]);
+            assert!(tail.truncated);
+            assert_eq!(tail.torn.len(), 1);
+            assert_eq!(tail.torn[0].offset, 8);
+            assert_eq!(tail.torn[0].bytes, MAX_TORN_BYTES as u64);
+        } else {
+            assert_eq!(appended, Err("egress_log_incomplete".into()));
+            assert_eq!(fs::read(&path).unwrap(), bytes);
+        }
+    }
+}
+
+/// A line that is JSON but not an object is not a record, wherever it sits.
+#[test]
+fn a_json_line_that_is_not_an_object_is_refused_mid_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    for line in ["[null]", "[\"x\"]", "1", "\"text\""] {
+        fs::write(&path, format!("{{\"a\":1}}\n{line}\n{{\"b\":2}}\n")).unwrap();
+        assert_eq!(
+            read_egress_tail(&path, 20).unwrap_err(),
+            "egress_log_incomplete",
+            "{line}"
+        );
+    }
 }

@@ -5,7 +5,7 @@ The native Rust dependency inventory and full license texts are provided in
 THIRD_PARTY_LICENSES_RUST.txt. This file covers the production frontend
 dependency graph from pnpm-lock.yaml.
 
-@tauri-apps/api 2.12.1
+@tauri-apps/api 2.12.4
 ----------------------
 License: Apache-2.0 OR MIT
 Source: https://github.com/tauri-apps/tauri
@@ -84,7 +84,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-lucide-react 1.49.0
+lucide-react 1.63.0
 -------------------
 License: ISC
 Source: https://github.com/lucide-icons/lucide
@@ -133,7 +133,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-react 19.3.0, react-dom 19.3.0, scheduler 0.28.0
+react 19.3.1, react-dom 19.3.1, scheduler 0.28.0
 ------------------------------------------------
 License: MIT
 Source: https://github.com/react/react

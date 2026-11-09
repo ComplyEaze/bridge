@@ -88,10 +88,7 @@ fn book_row(line: &ImportLedgerLine) -> ReadVoucher {
             .rev()
             .map(|entry| ReadEntry {
                 ledger: entry.ledger.clone(),
-                amount: match entry.side {
-                    EntrySide::Dr => format!("-{}", entry.amount),
-                    EntrySide::Cr => entry.amount.clone(),
-                },
+                amount: entry.amount.signed_lexeme(&entry.side),
                 is_deemed_positive: entry.side.tally_positive().into(),
             })
             .collect(),
@@ -583,6 +580,7 @@ async fn an_unknown_amendment_target_is_refused_before_any_tally_read() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut input = serde_json::to_value(payload()).unwrap();
@@ -602,7 +600,7 @@ fn endpoint_on_port(port: u16) -> TallyEndpointConfig {
     }
 }
 
-fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
+pub(super) fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
     Server::new(crate::agent::Settings {
         endpoint: endpoint_on_port(port),
         data_dir: directory.to_path_buf(),
@@ -611,12 +609,15 @@ fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
 
 /// The Journal build sequence, with the preflight read answered by `book`.
-fn build_plans_reading(book: Option<String>) -> Vec<ScenarioPlan> {
+pub(in crate::agent::agent_import) fn build_plans_reading(
+    book: Option<String>,
+) -> Vec<ScenarioPlan> {
     let mut plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec();
     if let Some(book) = book {
         // probe (2) + first cycle (16) + numbering read + repeated catalogue
@@ -718,6 +719,11 @@ async fn an_amendment_built_against_an_unchanged_book_reuses_the_original_remote
         .as_str()
         .unwrap()
         .starts_with("This file amends an earlier batch."));
+    // The vouchers it amends are in the book on purpose: it is not told that
+    // its rows are already there (#2152).
+    assert!(!result["warnings"]
+        .to_string()
+        .contains("already match vouchers in the book"));
     // The warning names what is not compared, and the next message says why
     // the file must be imported by hand, not the generic native-post reason.
     let warning = result["warnings"][0].as_str().unwrap();

@@ -4273,3 +4273,7 @@ mod tests;
 #[cfg(test)]
 #[path = "agent_financial_profile_tests.rs"]
 mod financial_profile_tests;
+
+#[cfg(test)]
+#[path = "agent_lab_683_lm_render_tests.rs"]
+mod lab_683_lm_render_tests;

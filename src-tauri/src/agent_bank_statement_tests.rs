@@ -946,6 +946,58 @@ fn a_cash_payment_answer_binds_its_contra_and_its_cash_payment() {
     }
 }
 
+/// A record's cash Payment must be its own row's: one that names another
+/// row's Payment, present in the same file, is refused, not bound twice.
+#[test]
+fn a_cash_payment_answer_cannot_bind_another_rows_cash_payment() {
+    let directory = tempfile::tempdir().unwrap();
+    let publish = |first_paid_to: &str| {
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let row = |number: u64, day: &str| {
+            let id = format!("st-{number}");
+            (
+                [
+                    json!({"bridge_txn_id":id,"date":day,"voucher_type":"Contra",
+                     "narration":format!("ATM WDL to Cash | SBI SB xx1234 | {day}"),
+                     "entries":[{"ledger":"Cash","amount":"500.00","side":"Dr"},
+                                {"ledger":"SBI","amount":"500.00","side":"Cr"}]}),
+                    json!({"bridge_txn_id":format!("{id}-cash"),"date":day,"voucher_type":"Payment",
+                     "narration":format!("Cash paid to Synthetic Wages from Cash | withdrawn ATM WDL | SBI SB xx1234 | {day}"),
+                     "entries":[{"ledger":"Synthetic Wages","amount":"500.00","side":"Dr"},
+                                {"ledger":"Cash","amount":"500.00","side":"Cr"}]}),
+                ],
+                json!({"row":number,"date":day,"disposition":{"voucher":"Contra"},"amount":"500.00",
+                    "party":"ATM CASH WITHDRAWAL","ledger":"Cash","suspense":false,"bridge_txn_id":id,
+                    "cash_movement":"withdrawal","cash_answer":"paid_to_someone",
+                    "paid_to":{"ledger":"Synthetic Wages","bridge_txn_id":format!("{id}-cash"),"over_cash_limit":false},
+                    "direction":"outflow","reversed_same_day":false}),
+            )
+        };
+        let (first_vouchers, mut first) = row(1, "2026-08-01");
+        let (second_vouchers, second) = row(2, "2026-08-02");
+        first["paid_to"]["bridge_txn_id"] = json!(first_paid_to);
+        let document = json!({
+            "schema": PROPOSALS_SCHEMA,
+            "proposals_id": proposals_id,
+            "bank_ledger": "SBI",
+            "coverage": null,
+            "vouchers": [first_vouchers[0], first_vouchers[1], second_vouchers[0], second_vouchers[1]],
+            "records": [first, second],
+        });
+        let bytes = serde_json::to_vec_pretty(&document).unwrap();
+        let statements = directory.path().join(PROPOSALS_DIRECTORY);
+        fs::create_dir_all(&statements).unwrap();
+        fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+    };
+    let resolved = resolve_import_arguments(directory.path(), &publish("st-1-cash")).unwrap();
+    assert_eq!(resolved.cash_ledgers.len(), 6);
+    assert_eq!(
+        resolve_import_arguments(directory.path(), &publish("st-2-cash")).err(),
+        Some("proposals_file_invalid".to_string())
+    );
+}
+
 /// A statement with hundreds of open cash lines and suspense lines keeps a
 /// result small enough to return: each list is bounded, says how many it left
 /// out, and the counts still cover every line.

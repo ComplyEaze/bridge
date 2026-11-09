@@ -3297,15 +3297,21 @@ fn a_resolved_code_is_warned_about_and_an_unresolved_one_refused() {
     assert_eq!(warnings.len(), 1);
 }
 
-/// The divergent invoice's next step must not promise that saving the invoice again repairs it:
-/// a save changes the voucher's AlterID, and what a verification reads after one is not
-/// established (voucher writes reference, section 9.16).
+/// The divergent invoice's next step must not promise that saving the invoice again repairs it.
+/// What it says a later verification does with a re-saved invoice is row 2162-RS's, PARTIAL (one
+/// run): an unchanged save kept the GUID and MASTERID and moved only the AlterID and fields the
+/// read-back does not read, and a verification judges the invoice on the fields the build wrote
+/// (ADR 0004, the 2026-10-31 checklist, item 8; the re-save test below pins it on those bytes).
 #[test]
 fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
     let text = crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP;
     assert!(!text.contains("then open the invoice and save it again"));
-    assert!(text.contains("changes the invoice's AlterID"));
-    assert!(text.contains("has not been established"));
+    assert!(!text.contains("has not been established"));
+    assert!(text.contains(
+        "Saving an invoice again in Tally, unchanged, kept its identity on a test company and \
+         changed only its AlterID and fields this check does not read"
+    ));
+    assert!(text.contains("so it reads confirmed only when they match what was built."));
     assert!(text.ends_with("Do not post it again."));
 }
 

@@ -5,9 +5,9 @@ Not for merge. Part of #2162 (item 10). Written 9 Nov 2026. Lines below are at m
 ## Question
 Row 2162-IRN9 (`lab/2162-irn-import-answers` at 9cb3ebd0) imported Sales `4`, an invoice without e-invoice details. Tally's e-Invoice report listed it under `Uncertain Transactions (Corrections needed)` > `Applicable Tax Ledger is not selected`, beside the keyed invoice B (Sales `2`). It did not list it as waiting for an IRN. So that row could not say what Tally shows for an imported invoice without details. The tax line was in the way.
 
-**The likely cause is the IGST ledger's tax type.** In 1378's ledger read just after the seed import (`lab/1378-irn-capture-answers`, `reads/l1.xml`), `BRIDGE IRN IGST` reads `TAXTYPE` `GST` with no `GSTDUTYHEAD`, though that read named it. So Tally may not know the ledger is Integrated Tax. 1378 keyed the customer's and the Sales ledger's fields by hand, and its notes record no change to the IGST ledger. Confidence: unverified, until this row's first read.
+**The likely cause is the IGST ledger's tax type.** In 1378's ledger read just after the seed import (`lab/1378-irn-capture-answers`, `reads/l1.xml`), `BRIDGE IRN IGST` reads `TAXTYPE` `GST` with no `GSTDUTYHEAD`, though that read named it. So Tally may not know the ledger is an IGST ledger. 1378 keyed the customer's and the Sales ledger's fields by hand, and its notes record no change to the IGST ledger. Confidence: unverified, until this row's first read.
 
-**This row changes that one variable, on Tally's screen.** It sets the IGST ledger's tax type to Integrated Tax and nothing else. Then:
+**This row changes that one variable, on Tally's screen.** It sets the IGST ledger's tax type to IGST and nothing else. Then:
 - it reads the report: does B move out of that cause?
 - only if it moved, it imports Sales `5`, row 2162-IRN9's invoice `4` with the number `5`, and reads the report again: where is `5` listed, and is it beside B?
 
@@ -57,7 +57,7 @@ Requests are UTF-16LE with a BOM, as sent. `SHA256.txt` lists every file with it
 - **`count.py`:** row 2162-IRN9's, with its K kind widened from the customer's ledger to any ledger by name. For each LEDGER row K prints:
   - its name, `PARENT`, `ISBILLWISEON`, `TAXTYPE`, `GSTDUTYHEAD` and how many GSTIN values it holds;
   - every non-empty leaf of the GST and tax family by path;
-  - for `BRIDGE IRN IGST`, one gate line: `IGST ledger reads as a GST Integrated Tax ledger: yes` or `no`. It says yes only for `TAXTYPE` `GST` with `GSTDUTYHEAD` `Integrated Tax`.
+  - for `BRIDGE IRN IGST`, one gate line: `IGST ledger reads as a GST ledger with duty head IGST: yes` or `no`. It says yes only for `TAXTYPE` `GST` with `GSTDUTYHEAD` `IGST`, the spelling TallyPrime 7.2 stored when this row first ran (its s4r answer, `lab/2162-irn-pending-answers`).
 
   Its other kinds (M, L, V, F, I), its parsing, its STOP rules, `--diff`, `--before-write` and `--same-row` are unchanged.
 
@@ -103,8 +103,8 @@ Then:
    - From the Gateway open the ledger for alteration: Alter > Ledger (or Alt+G, `Alter Master`, Ledger), and pick `BRIDGE IRN IGST`. Write down the path and every key used.
    - Before pressing anything on that screen, screenshot it and write down every label and its value, word for word.
    - **Change only the tax type.** Go to it with Enter or the arrows, without typing into any field you pass.
-     - If `Type of Duty/Tax` is `GST` and a `Tax Type` (or GST duty head) field shows blank or another value: choose `Integrated Tax` from its list. Screenshot.
-     - If that field shows `Integrated Tax` already, if `Type of Duty/Tax` is not `GST`, or if the screen has no such field or its list has no `Integrated Tax`: change nothing. Screenshot, leave by Ctrl+Q (C7), and go to step 7 (nothing to restore: send only `s9` and its checks).
+     - If `Type of Duty/Tax` is `GST` and a `Tax Type` (or GST duty head) field shows blank or another value: choose `IGST` from its list (TallyPrime 7.2 offers IGST, CGST, SGST/UTGST and Cess). Screenshot.
+     - If that field shows `IGST` already, if `Type of Duty/Tax` is not `GST`, or if the screen has no such field or its list has no `IGST`: change nothing. Screenshot, leave by Ctrl+Q (C7), and go to step 7 (nothing to restore: send only `s9` and its checks).
    - Accept with Ctrl+A. An `Accept ?` prompt is answered Yes (`y`). Any other prompt, sub-screen or dialog: C7, stop with no key pressed, and report. Fields that appear only after the choice are left as they show; write each one down from the screenshot.
    - Screenshot the window. Then `s4r`: `M-marks.xml K-igst.xml`. EXPECT ALTVCHID 3, ALTMSTID one more than s1's, and K-igst's gate line `yes`. Record every leaf K-igst prints, and how it differs from s1's. If the gate line is `no`: record it and go to step 7.
 5. **The report after the change.** The report read above. Write down where `1` and `2` are listed. Then `s5m`: `M-marks.xml`, and `count.py --same-row a-s4r-M-marks.xml a-s5m-M-marks.xml`. EXPECT it passes.

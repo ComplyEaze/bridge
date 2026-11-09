@@ -11,7 +11,7 @@
 #      header fields named in GST below, and every direct child of the e-invoice family (EINVOICE below).
 #   K- every native field of one ledger by name: each LEDGER row's name, PARENT, ISBILLWISEON, TAXTYPE and GSTDUTYHEAD,
 #      how many GSTIN values it holds (the GSTIN itself is never printed), then every non-empty leaf of the GST and tax
-#      family (TAXFAMILY below) by path; for BRIDGE IRN IGST, whether it reads as a GST Integrated Tax ledger.
+#      family (TAXFAMILY below) by path; for BRIDGE IRN IGST, whether it reads as a GST ledger with duty head IGST.
 #   I- import: every counter Tally returned and every LINEERROR.
 # Every read answer (all but I) prints its HEADER/STATUS and every LINEERROR first. An answer with no BODY/DATA/COLLECTION,
 # or an import answer with no counters, is a failed request: count.py prints STOP and exits non-zero, and never reports it
@@ -147,8 +147,10 @@ def report(path):
                     walk(child, here_path)
             walk(row, "")
             if name_of(row) == "BRIDGE IRN IGST":
-                ready = value(row, "TAXTYPE") == "'GST'" and value(row, "GSTDUTYHEAD") == "'Integrated Tax'"
-                print("   IGST ledger reads as a GST Integrated Tax ledger:", "yes" if ready else "no")
+                # TallyPrime 7.2 stores the Tax type chosen on screen as IGST in GSTDUTYHEAD (row 2162-IRN10's s4r,
+                # lab/2162-irn-pending-answers): the screen's list offers IGST, CGST, SGST/UTGST and Cess.
+                ready = value(row, "TAXTYPE") == "'GST'" and value(row, "GSTDUTYHEAD") == "'IGST'"
+                print("   IGST ledger reads as a GST ledger with duty head IGST:", "yes" if ready else "no")
     elif kind == "I":
         result = root if root.tag == "RESPONSE" else root.find(".//IMPORTRESULT")
         print("  root", root.tag)

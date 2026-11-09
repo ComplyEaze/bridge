@@ -1,0 +1,16 @@
+$ check_r1.py marks answers/a-c1.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 213
+exit 0
+$ check_r1.py names answers/a-a1c.xml "SC Sibling Goods"
+LANGUAGENAME.LIST elements: 1; name entries: 2
+   'SC Sibling Goods' (16 characters)
+   'SC Sibling Alias' (16 characters)
+exit 0
+$ check_r1.py diff answers/a-a1b2.xml answers/a-a1c.xml
+rows before: 3  after: 3
+CHANGED 'SC Sibling Goods' (16 characters) : ALTERID, LANGUAGENAME.LIST
+  ALTERID: <ALTERID TYPE='Number'>210</ALTERID>  ->  <ALTERID TYPE='Number'>213</ALTERID>
+  LANGUAGENAME.LIST: <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>SC Sibling Goods</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>  ->  <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>SC Sibling Goods</NAME><NAME>SC Sibling Alias</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>
+unchanged rows: 2
+exit 0

@@ -1,0 +1,49 @@
+$ check_r1.py fetch answers/a-a0.xml answers/a-a1.xml
+rows a0: 1  a1: 1  same GUIDs: True
+'SC Sibling Goods' (16 characters): NAME attribute same; a0 fields not equal in a1: none; a1 adds: BASEUNITS (a value), GSTAPPLICABLE (a value), GSTTYPEOFSUPPLY (a value)
+exit 0
+$ check_r1.py diff <1381-M base-items> answers/a-a1.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0
+$ check_r1.py names answers/a-a1.xml "SC Sibling Goods"
+LANGUAGENAME.LIST elements: 1; name entries: 1
+   'SC Sibling Goods' (16 characters)
+exit 0
+$ check_r1.py rows answers/a-a1.xml
+rows: 1
+STOCKITEM 'SC Sibling Goods' (16 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 24 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 3 descendants
+  MASTERID: a value
+  PARENT: a value
+exit 0
+$ check_r1.py rows answers/a-g1.xml
+rows: 1
+STOCKGROUP 'SC Goods Group' (14 characters)
+  ALTERID: a value
+  BRIDGECOMPANYGUID: a value
+  LANGUAGENAME.LIST: 1 element(s), 3 descendants
+  MASTERID: a value
+  PARENT: a value
+exit 0
+$ check_r1.py rows answers/a-u1.xml
+rows: 1
+UNIT 'Nos' (3 characters)
+  ALTERID: a value
+  BRIDGECOMPANYGUID: a value
+  DECIMALPLACES: a value
+  ISSIMPLEUNIT: a value
+  MASTERID: a value
+  ORIGINALNAME: a value
+exit 0
+$ check_r1.py marks answers/a-m1.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 210
+exit 0

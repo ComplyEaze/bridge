@@ -1,0 +1,12 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the whole Tally window (PrintWindow).
+shots/c10-window.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/s0-gateway.png 45718 B f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/s0-window.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/s0b-window.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/s2-before-accept.png 51731 B de9a5b425c8c9e8c300f1853e8b9700ddc778f0c330c2af9bbd8664fe6a1c22e
+shots/s5-b1-after.png 45718 B f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/s6-b2-after.png 45718 B f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/s7-after-accept.png 49283 B 47ad05615f0fddf068aed3d459a380e2c594c0a8ef71588f24f36b487fa85b1f
+shots/s7-alter-open.png 47878 B 489a3b57d950b8681367aa7a230102f047f71ce2273138737b08695bf4059642
+shots/s8-after-gateway.png 45718 B f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/s8-before-accept.png 35389 B 9ed6a73ef278c2d0216fb5a67c18623d46dbbe7f85f5e5442879c29ffceee9fa

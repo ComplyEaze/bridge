@@ -1,0 +1,16 @@
+$ check_r1.py marks answers/a-m-r.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 210
+exit 0
+$ check_r1.py diff answers/a-a1.xml answers/a-a1r.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0
+$ check_r1.py diff answers/a-g1.xml answers/a-g2.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0
+$ check_r1.py diff answers/a-u1.xml answers/a-u2.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0

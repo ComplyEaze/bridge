@@ -1,0 +1,56 @@
+$ check_r1.py import answers/a-b1.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+$ check_r1.py marks answers/a-b1post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 211
+exit 0
+$ check_r1.py same answers/a-a1b1.xml "SC Copied Goods" answers/a-a1b1.xml "SC Sibling Goods"
+PARENT: same (a value / a value)
+BASEUNITS: same (a value / a value)
+GSTAPPLICABLE: DIFFERENT (absent / a value)
+GSTTYPEOFSUPPLY: same (a value / a value)
+GSTDETAILS.LIST: DIFFERENT (1 element(s), 4 descendants / 1 element(s), 24 descendants)
+HSNDETAILS.LIST: same (1 element(s), 4 descendants / 1 element(s), 4 descendants)
+exit 0
+$ check_r1.py same answers/a-a1b1.xml "SC Copied Goods" <1381-M r2-items> "SC Copied Goods"
+PARENT: same (a value / a value)
+BASEUNITS: same (a value / a value)
+GSTAPPLICABLE: DIFFERENT (absent / a value)
+GSTTYPEOFSUPPLY: same (a value / a value)
+GSTDETAILS.LIST: DIFFERENT (1 element(s), 4 descendants / 1 element(s), 24 descendants)
+HSNDETAILS.LIST: same (1 element(s), 4 descendants / 1 element(s), 4 descendants)
+exit 0
+$ check_r1.py rows answers/a-a1b1.xml
+rows: 2
+STOCKITEM 'SC Copied Goods' (15 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTDETAILS.LIST: 1 element(s), 4 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 2 descendants
+  MASTERID: a value
+  PARENT: a value
+STOCKITEM 'SC Sibling Goods' (16 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 24 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 3 descendants
+  MASTERID: a value
+  PARENT: a value
+exit 0

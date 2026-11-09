@@ -1,0 +1,8 @@
+$ make_b.py plain answers/a-a1.xml
+written: 4 scalars, 1 GST entries (1 state rows), 1 HSN entries, 0 marked values
+8f1e50a6f4a996adf951b6b30cee4f0b1366e9925f6bc3e6f016ecb2d8b28f93  3646  requests/b1-create.utf16le.xml
+exit 0
+$ make_b.py marked answers/a-a1.xml
+written: 4 scalars, 1 GST entries (1 state rows), 1 HSN entries, 3 marked values
+6961f4754673d5359c7bf597dd272e11c28b64cbe74f9e27064875f1709c526c  3674  requests/b2-create.utf16le.xml
+exit 0

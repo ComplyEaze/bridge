@@ -1,0 +1,4 @@
+913d6a82fb9dff5fb33a743bd466a60edbc7341f1285845bda0d01de32d7b1b5  1206  requests/a0-shipped-items.utf16le.xml
+581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1  1330  requests/a1-candidate-items.utf16le.xml
+d79503503a31c4fee4195b2e03308c2833aa2e9c3072bd4cc0ed1f73d9121245  1144  requests/groups.utf16le.xml
+3f79503b5480a6e3a23ec6fb8fc8fd5ca8200d4f0889590c994d1240ed299d0c  1174  requests/units.utf16le.xml

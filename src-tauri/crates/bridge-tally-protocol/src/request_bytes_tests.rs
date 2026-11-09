@@ -6,7 +6,11 @@
 //!
 //! On a mismatch the test prints every differing row, with the hash it got, in
 //! table syntax, so a declared change is a copy and paste. A row with no
-//! builder, or a builder with no row, fails as well.
+//! builder, or a builder with no row, fails as well. Every enum whose variants
+//! the table iterates is listed through `every!`, so a new variant does not
+//! compile until it is listed, and once listed it is built and needs a row.
+//! Some rows hash the same bytes under two labels: they are different entry
+//! points reaching one request, each pinned in its own name.
 //!
 //! The `template` rows are [`ReadOnlyProfileId::template_sha256`], the hash
 //! of each profile's UTF-16LE template that `xml_read_profiles_tests` already
@@ -68,6 +72,20 @@ use crate::parent_partition::{ParentObservation, ParentPart, ParentPartition, Pa
 use crate::xml_read_profiles::{
     compatibility, ReadOnlyProfile, ReadOnlyProfileId, ValidatedCompanyName, ValidatedDateRange,
 };
+
+/// Every variant of a fieldless enum, in the order named: the list the table
+/// iterates and an exhaustive `match` are written from the one token list, so
+/// a new variant fails to compile until it is named here, and from then on it
+/// is iterated and gets a row. A variant named twice is an unreachable pattern
+/// and builds two rows under one label, which `assert_matches_table` refuses.
+macro_rules! every {
+    ($enum:ident: $($variant:ident),+ $(,)?) => {{
+        let _exhaustive = |value: $enum| match value {
+            $($enum::$variant)|+ => (),
+        };
+        [$($enum::$variant),+]
+    }};
+}
 
 /// One synthetic company name holding `&`, `<`, a double quote and non-ASCII
 /// text, used by every builder that takes a company.
@@ -491,7 +509,7 @@ fn built_requests() -> Vec<(String, String)> {
     let mut rows: Vec<(String, String)> = Vec::new();
     let mut row = |label: String, request: String| rows.push((label, request));
 
-    for report in [ImportReport::Vouchers, ImportReport::AllMasters] {
+    for report in every!(ImportReport: Vouchers, AllMasters) {
         let name = match report {
             ImportReport::Vouchers => "Vouchers",
             ImportReport::AllMasters => "AllMasters",
@@ -501,12 +519,22 @@ fn built_requests() -> Vec<(String, String)> {
             render_import_envelope(COMPANY, report, "<TALLYMESSAGE/>"),
         );
     }
-    for kind in NativeMasterKind::ALL {
+    // Not `NativeMasterKind::ALL`: nothing makes that list name every kind.
+    for kind in every!(NativeMasterKind:
+        VoucherTypes,
+        Godowns,
+        Units,
+        StockGroups,
+        StockItems,
+        CostCentres,
+        CostCategories,
+    ) {
         row(
             format!("render_native_masters_request/{kind:?}"),
             render_native_masters_request(kind, COMPANY),
         );
     }
+    // The same request as the `ReadOnlyProfile::CompanyBookExtentV2` row.
     row(
         "render_company_book_extent_v2".into(),
         render_company_book_extent_v2(COMPANY),
@@ -516,27 +544,28 @@ fn built_requests() -> Vec<(String, String)> {
         render_company_ledger_count_request(COMPANY),
     );
 
-    let profile_ids = [
-        ReadOnlyProfileId::CompanyListV2,
-        ReadOnlyProfileId::CompanyBookExtentV2,
-        ReadOnlyProfileId::StandardLedgerIdentityV1,
-        ReadOnlyProfileId::StandardLedgerCatalogV1,
-        ReadOnlyProfileId::StandardLedgerCatalogV2,
-        ReadOnlyProfileId::StandardLedgerCatalogV3,
-        ReadOnlyProfileId::AuditCompanyObjectV1,
-        ReadOnlyProfileId::InvoiceCompanyHsnV1,
-        ReadOnlyProfileId::AuditLedgersV1,
-        ReadOnlyProfileId::AuditVouchersV1,
-        ReadOnlyProfileId::AuditStockItemsV1,
-    ];
+    let profile_ids = every!(ReadOnlyProfileId:
+        CompanyListV2,
+        CompanyBookExtentV2,
+        StandardLedgerIdentityV1,
+        StandardLedgerCatalogV1,
+        StandardLedgerCatalogV2,
+        StandardLedgerCatalogV3,
+        AuditCompanyObjectV1,
+        InvoiceCompanyHsnV1,
+        AuditLedgersV1,
+        AuditVouchersV1,
+        AuditStockItemsV1,
+    );
     for id in profile_ids {
-        // Exhaustive, so a new profile fails to compile until it has a row.
+        // The profile each id names; `every!` puts each id in the list.
         let profile = match id {
             // The control row: discovery names no company.
             ReadOnlyProfileId::CompanyListV2 => ReadOnlyProfile::CompanyListV2,
             ReadOnlyProfileId::CompanyBookExtentV2 => {
                 ReadOnlyProfile::CompanyBookExtentV2 { company: &company }
             }
+            // V1 identity and V1 catalogue render one request (and template).
             ReadOnlyProfileId::StandardLedgerIdentityV1 => {
                 ReadOnlyProfile::StandardLedgerIdentityV1 { company: &company }
             }
@@ -571,6 +600,8 @@ fn built_requests() -> Vec<(String, String)> {
         assert_eq!(profile.id(), id);
         row(format!("ReadOnlyProfile::{id:?}/render"), profile.render());
     }
+    // The two compatibility entry points reach the same request as the
+    // StandardLedgerIdentityV1 and StandardLedgerCatalogV1 rows.
     row(
         "compatibility::standard_ledger_identity_request".into(),
         compatibility::standard_ledger_identity_request(COMPANY),
@@ -613,10 +644,7 @@ fn built_requests() -> Vec<(String, String)> {
         render_stock_group_census_slice_request(COMPANY, &group_plan.slices()[1]),
     );
 
-    for kind in [
-        NativeStatementKind::BalanceSheet,
-        NativeStatementKind::ProfitAndLoss,
-    ] {
+    for kind in every!(NativeStatementKind: BalanceSheet, ProfitAndLoss) {
         let name = match kind {
             NativeStatementKind::BalanceSheet => "BalanceSheet",
             NativeStatementKind::ProfitAndLoss => "ProfitAndLoss",
@@ -626,12 +654,28 @@ fn built_requests() -> Vec<(String, String)> {
             render_native_statement_request(kind, COMPANY, &snapshot),
         );
     }
-    for report in BuiltInReport::ALL {
+    // Each public report builder below (statement, stock summary, funds and
+    // cash flow, month register, negative ledgers and stock, godown summary)
+    // reaches the same request as its row here: different entry points, one
+    // request. Not `BuiltInReport::ALL`: nothing makes that list name every report.
+    for report in every!(BuiltInReport:
+        BalanceSheet,
+        ProfitAndLoss,
+        SalesRegister,
+        PurchaseRegister,
+        CashFlow,
+        FundsFlow,
+        NegativeLedgers,
+        NegativeStock,
+        StockSummary,
+        GodownSummary,
+    ) {
         row(
             format!("render_built_in_report_request/{report:?}"),
             render_built_in_report_request(report, COMPANY, &snapshot),
         );
     }
+    // The same request as `render_native_stock_summary_exploded_request` below.
     row(
         "render_exploded_stock_summary_request".into(),
         render_exploded_stock_summary_request(COMPANY, &snapshot),
@@ -648,7 +692,7 @@ fn built_requests() -> Vec<(String, String)> {
         "render_native_cash_flow_request".into(),
         render_native_cash_flow_request(COMPANY, &months),
     );
-    for kind in [MonthRegisterKind::Sales, MonthRegisterKind::Purchase] {
+    for kind in every!(MonthRegisterKind: Sales, Purchase) {
         let name = match kind {
             MonthRegisterKind::Sales => "Sales",
             MonthRegisterKind::Purchase => "Purchase",
@@ -684,10 +728,7 @@ fn built_requests() -> Vec<(String, String)> {
         render_native_trial_balance_request_with_currency(COMPANY, &snapshot),
     );
 
-    for kind in [
-        NativeBillsReportKind::Receivable,
-        NativeBillsReportKind::Payable,
-    ] {
+    for kind in every!(NativeBillsReportKind: Receivable, Payable) {
         let name = match kind {
             NativeBillsReportKind::Receivable => "Receivable",
             NativeBillsReportKind::Payable => "Payable",

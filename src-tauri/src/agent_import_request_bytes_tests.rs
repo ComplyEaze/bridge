@@ -7,11 +7,22 @@
 //! On a mismatch the test prints every differing row, with the hash it got, in
 //! table syntax, so a declared change is a copy and paste. A row with no
 //! builder, or a builder with no row, fails as well. The builders compiled only
-//! with the `lab-writes` feature have their own table.
+//! with the `lab-writes` feature have their own table. Every enum whose
+//! variants a table iterates is listed through `every!`, so a new variant does
+//! not compile until it is listed, and once listed it is built and needs a row.
+//! Some rows hash the same bytes under two labels: they are different entry
+//! points reaching one request, each pinned in its own name.
 //!
 //! The module sits under `agent_import` so that the import builders, which are
 //! private to it, are reachable; the protocol crate's builders are pinned in
 //! its own `request_bytes_tests`.
+//!
+//! Three lab write requests are not pinned. `render_master_batch_xml` is
+//! private to `lab::import` and so unreachable here. `render_voucher_batch_xml`
+//! mints a fresh `Uuid::new_v4` for each voucher, so its bytes differ on every
+//! call. `lab_import_masters` calls `render_import_envelope` inline, with no
+//! builder of its own to call. The envelope all three send is the protocol
+//! crate's `render_import_envelope/*` rows.
 
 use std::collections::BTreeSet;
 
@@ -42,6 +53,20 @@ use crate::agent::voucher_parse::{EInvoiceFields, NamedVoucherFields, VoucherGst
 use crate::agent::voucher_window::AlterIdSpan;
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
 use crate::tally::VerifiedCompanyIdentity;
+
+/// Every variant of a fieldless enum, in the order named: the list a table
+/// iterates and an exhaustive `match` are written from the one token list, so
+/// a new variant fails to compile until it is named here, and from then on it
+/// is iterated and gets a row. A variant named twice is an unreachable pattern
+/// and builds two rows under one label, which `assert_matches_table` refuses.
+macro_rules! every {
+    ($enum:ident: $($variant:ident),+ $(,)?) => {{
+        let _exhaustive = |value: $enum| match value {
+            $($enum::$variant)|+ => (),
+        };
+        [$($enum::$variant),+]
+    }};
+}
 
 /// One synthetic company name holding `&`, `<`, a double quote and non-ASCII
 /// text, used by every builder that takes a company.
@@ -343,10 +368,12 @@ fn built_requests() -> Vec<(String, String)> {
         "render_agent_class_vouchers_in_span/span",
         render_agent_class_vouchers_in_span(COMPANY, &from, &to, span),
     );
-    for e_invoice in [EInvoiceFields::NotAsked, EInvoiceFields::Asked] {
-        for gst in [VoucherGstFields::NotAsked, VoucherGstFields::Asked] {
+    // `plain/plain/no_classes` reaches the same request as the
+    // `render_agent_vouchers_in_span/span` row, and `plain/plain/classes` the
+    // same as `render_agent_class_vouchers_in_span/span`: different entry points.
+    for e_invoice in every!(EInvoiceFields: NotAsked, Asked) {
+        for gst in every!(VoucherGstFields: NotAsked, Asked) {
             for classes in [false, true] {
-                // Exhaustive, so a new choice fails to compile until it has rows.
                 let e = match e_invoice {
                     EInvoiceFields::NotAsked => "plain",
                     EInvoiceFields::Asked => "e_invoice",
@@ -374,7 +401,7 @@ fn built_requests() -> Vec<(String, String)> {
         "render_agent_stock_line_vouchers_in_span/span",
         render_agent_stock_line_vouchers_in_span(COMPANY, &from, &to, span),
     );
-    for fields in [LedgerVoucherFields::Movement, LedgerVoucherFields::Window] {
+    for fields in every!(LedgerVoucherFields: Movement, Window) {
         let name = match fields {
             LedgerVoucherFields::Movement => "Movement",
             LedgerVoucherFields::Window => "Window",
@@ -462,7 +489,9 @@ fn built_requests() -> Vec<(String, String)> {
             std::iter::once((&voucher, remote_id)),
         )),
     );
-    for action in [VoucherAction::Create, VoucherAction::Cancel] {
+    // `/Create` reaches the same request as `render_native_vouchers_xml`, and
+    // `/Cancel` the same as `render_native_cancel_xml`: different entry points.
+    for action in every!(VoucherAction: Create, Cancel) {
         let name = match action {
             VoucherAction::Create => "Create",
             VoucherAction::Cancel => "Cancel",
@@ -533,14 +562,7 @@ fn built_lab_requests() -> Vec<(String, String)> {
         "render_agent_lab_purchase_identity_vouchers",
         render_agent_lab_purchase_identity_vouchers(COMPANY, &from, &to),
     );
-    for kind in [
-        MasterKind::Unit,
-        MasterKind::Godown,
-        MasterKind::StockGroup,
-        MasterKind::Group,
-        MasterKind::Ledger,
-        MasterKind::StockItem,
-    ] {
+    for kind in every!(MasterKind: Unit, Godown, StockGroup, Group, Ledger, StockItem) {
         let name = match kind {
             MasterKind::Unit => "Unit",
             MasterKind::Godown => "Godown",
@@ -558,12 +580,7 @@ fn built_lab_requests() -> Vec<(String, String)> {
         "render_voucher_window_request",
         render_voucher_window_request(COMPANY, &from, &to),
     );
-    for kind in [
-        LabMasterKind::Unit,
-        LabMasterKind::Godown,
-        LabMasterKind::StockGroup,
-        LabMasterKind::StockItem,
-    ] {
+    for kind in every!(LabMasterKind: Unit, Godown, StockGroup, StockItem) {
         let name = match kind {
             LabMasterKind::Unit => "Unit",
             LabMasterKind::Godown => "Godown",
@@ -576,16 +593,10 @@ fn built_lab_requests() -> Vec<(String, String)> {
         );
     }
     // The two keys of the lab module's own probe test.
-    for (term, key) in [
-        (
-            ProbeTerm::Guid,
-            "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce",
-        ),
-        (ProbeTerm::RemoteId, "00000000-0000-4000-8000-000000000002"),
-    ] {
-        let name = match term {
-            ProbeTerm::Guid => "Guid",
-            ProbeTerm::RemoteId => "RemoteId",
+    for term in every!(ProbeTerm: Guid, RemoteId) {
+        let (name, key) = match term {
+            ProbeTerm::Guid => ("Guid", "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce"),
+            ProbeTerm::RemoteId => ("RemoteId", "00000000-0000-4000-8000-000000000002"),
         };
         let key = ProbeKey::new(key).expect("an admitted probe key");
         row(

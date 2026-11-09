@@ -88,13 +88,15 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
         );
         // The build notice is present exactly when the compiled-in release date is old enough
         // (#2391), whatever day the test runs on; the thresholds are tested on their own.
-        let expected_notice = build_age_notice(RELEASE_DATE, &before)
-            .map(|notice| json!(notice))
-            .unwrap_or(Value::Null);
-        assert_eq!(
-            result.get("build_notice").cloned().unwrap_or(Value::Null),
-            expected_notice,
-            "{fault}"
+        let notice_for = |day: &str| {
+            build_age_notice(RELEASE_DATE, day)
+                .map(|notice| json!(notice))
+                .unwrap_or(Value::Null)
+        };
+        let shown = result.get("build_notice").cloned().unwrap_or(Value::Null);
+        assert!(
+            shown == notice_for(&before) || shown == notice_for(&after),
+            "{fault}: {shown}"
         );
         assert_eq!(
             result["product"],

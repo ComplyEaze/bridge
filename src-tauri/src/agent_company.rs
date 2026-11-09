@@ -46,6 +46,8 @@ impl Server {
             evidence.state = "partial";
             evidence.reason_code = refusal_reason.clone();
         }
+        // One reading of the date for both the field and the notice, so they cannot disagree across midnight.
+        let today = tally_host_today();
         let mut result = json!({
             "product": product,
             "release": probe.profile.release,
@@ -55,9 +57,9 @@ impl Server {
             "loaded_companies": probe.companies,
             "refusal_reason": refusal_reason,
             // The host date every omitted date defaults to (YYYYMMDD).
-            "today": tally_host_today(),
+            "today": today,
         });
-        if let Some(notice) = build_age_notice(RELEASE_DATE, &tally_host_today()) {
+        if let Some(notice) = build_age_notice(RELEASE_DATE, &today) {
             result["build_notice"] = json!(notice);
         }
         Ok((result, evidence))

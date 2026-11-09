@@ -86,6 +86,16 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             result["today"] == before || result["today"] == after,
             "{fault}: {result}"
         );
+        // The build notice is present exactly when the compiled-in release date is old enough
+        // (#2391), whatever day the test runs on; the thresholds are tested on their own.
+        let expected_notice = build_age_notice(RELEASE_DATE, &before)
+            .map(|notice| json!(notice))
+            .unwrap_or(Value::Null);
+        assert_eq!(
+            result.get("build_notice").cloned().unwrap_or(Value::Null),
+            expected_notice,
+            "{fault}"
+        );
         assert_eq!(
             result["product"],
             if fault == "unobserved" {

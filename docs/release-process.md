@@ -795,10 +795,13 @@ patch for a fix-only release:
 
 `--apply` writes the version to `package.json`, `packaging/mcpb/manifest.json`,
 `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, the `bridge` entry in
-`src-tauri/Cargo.lock`, and the README sentence naming the current version.
+`src-tauri/Cargo.lock`, and the README sentence naming the current version. It also
+writes today's date (UTC) as `RELEASE_DATE` in `src-tauri/src/agent.rs`, the date from
+which `tally_status` adds its build notice once a build is more than 60 days old (no
+request is made; a build between releases carries the last release's date).
 It checks every file first and writes none if one fails. Then:
 
-1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
+1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because some of those files are pinned, `src-tauri/src/agent.rs` among them (see "Compatibility-surface reseal").
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`, and move the
    unreleased entries into the new section (see "At cut time" under `CHANGELOG.md` below).
 3. Commit, and open the version pull request.

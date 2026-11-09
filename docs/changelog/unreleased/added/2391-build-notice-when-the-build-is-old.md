@@ -1,0 +1,1 @@
+- `tally_status` now adds one line, `build_notice`, when the release the program belongs to is more than 60 days old, saying a newer release may exist and giving the releases page address. The release date is compiled in (the version pull request writes it), so no request is made and the notice is absent on a fresh build or if the date cannot be read (#2391).

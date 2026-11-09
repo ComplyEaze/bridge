@@ -46,20 +46,21 @@ impl Server {
             evidence.state = "partial";
             evidence.reason_code = refusal_reason.clone();
         }
-        Ok((
-            json!({
-                "product": product,
-                "release": probe.profile.release,
-                "license_tier": probe.profile.license_tier,
-                "education_mode": education_mode,
-                "endpoint": endpoint,
-                "loaded_companies": probe.companies,
-                "refusal_reason": refusal_reason,
-                // The host date every omitted date defaults to (YYYYMMDD).
-                "today": tally_host_today(),
-            }),
-            evidence,
-        ))
+        let mut result = json!({
+            "product": product,
+            "release": probe.profile.release,
+            "license_tier": probe.profile.license_tier,
+            "education_mode": education_mode,
+            "endpoint": endpoint,
+            "loaded_companies": probe.companies,
+            "refusal_reason": refusal_reason,
+            // The host date every omitted date defaults to (YYYYMMDD).
+            "today": tally_host_today(),
+        });
+        if let Some(notice) = build_age_notice(RELEASE_DATE, &tally_host_today()) {
+            result["build_notice"] = json!(notice);
+        }
+        Ok((result, evidence))
     }
 
     pub(super) async fn companies(&self) -> Result<(Vec<TallyCompany>, Evidence), ToolFailure> {
@@ -229,3 +230,57 @@ mod identity_tests;
 #[cfg(test)]
 #[path = "agent_company_tuple_tests.rs"]
 mod tuple_tests;
+
+/// The one line `tally_status` adds when this build's release is more than
+/// [`BUILD_NOTICE_AFTER_DAYS`] days before `today` (YYYYMMDD, the computer's date). It makes no
+/// request: the date is compiled in. An unreadable date on either side gives no notice, never a
+/// false claim that the build is old (#2391).
+pub(super) fn build_age_notice(release_date: &str, today: &str) -> Option<&'static str> {
+    let released = chrono::NaiveDate::parse_from_str(release_date, "%Y-%m-%d").ok()?;
+    let today = chrono::NaiveDate::parse_from_str(today, "%Y%m%d").ok()?;
+    ((today - released).num_days() > BUILD_NOTICE_AFTER_DAYS).then_some(
+        "This build of ComplyEaze Bridge was released more than 60 days ago, so a newer release may exist: https://github.com/ComplyEaze/bridge/releases . Tell the person once, plainly; installing a newer release is their step, and nothing is updated by itself.",
+    )
+}
+
+#[cfg(test)]
+mod build_age_tests {
+    use super::build_age_notice;
+
+    #[test]
+    fn the_notice_starts_after_sixty_days_and_not_before() {
+        assert_eq!(build_age_notice("2026-10-30", "20261129"), None, "30 days");
+        assert_eq!(build_age_notice("2026-10-30", "20261229"), None, "60 days");
+        assert!(
+            build_age_notice("2026-10-30", "20261230").is_some(),
+            "61 days"
+        );
+        assert_eq!(
+            build_age_notice("2026-10-30", "20260101"),
+            None,
+            "a clock before the release"
+        );
+    }
+
+    #[test]
+    fn an_unreadable_date_gives_no_notice() {
+        for (release, today) in [
+            ("", "20270101"),
+            ("2026-10", "20270101"),
+            ("2026-10-30", ""),
+            ("2026-10-30", "2027-01-01"),
+            ("20261030", "20270101"),
+        ] {
+            assert_eq!(
+                build_age_notice(release, today),
+                None,
+                "{release:?} {today:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_compiled_in_date_is_a_real_date() {
+        assert!(chrono::NaiveDate::parse_from_str(super::RELEASE_DATE, "%Y-%m-%d").is_ok());
+    }
+}

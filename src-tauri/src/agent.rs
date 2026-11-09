@@ -174,6 +174,12 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufRea
 
 const SERVER_NAME: &str = "bridge-tally";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The date (YYYY-MM-DD) of the release this build belongs to. `scripts/next-version.mjs --apply`
+/// writes it with the version, so a build between releases carries the last release's date and the
+/// notice below comes late, never early (#2391).
+const RELEASE_DATE: &str = "2026-10-30";
+/// A build older than this many days gets the notice in `tally_status`.
+const BUILD_NOTICE_AFTER_DAYS: i64 = 60;
 const MAX_EVIDENCE_RECORDS: usize = 256;
 const SUPPORTED_PROTOCOL_VERSIONS: [&str; 2] = ["2025-06-18", "2024-11-05"];
 const PARTY_NAME_MARKER: &str = "$bridge_agent_party_name";

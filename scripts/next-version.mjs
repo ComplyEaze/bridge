@@ -97,13 +97,18 @@ export const VERSION_FILES = {
   },
 };
 
+// The release date the program reports in tally_status once a build is old (#2391). It is written
+// with the version, so a build between releases carries the last release's date.
+export const RELEASE_DATE_FILE = "src-tauri/src/agent.rs";
+const RELEASE_DATE_LINE = /(const RELEASE_DATE: &str = ")(\d{4}-\d{2}-\d{2})(";)/;
+
 export function readVersions(base = root) {
   return Object.fromEntries(
     Object.entries(VERSION_FILES).map(([file, spec]) => [file, spec.read(readFileSync(resolve(base, file), "utf8")) ?? null]),
   );
 }
 
-export function writeVersions(next, base = root) {
+export function writeVersions(next, base = root, date = new Date().toISOString().slice(0, 10)) {
   // Check every file before writing any, so a refusal leaves none half-bumped.
   const updates = Object.entries(VERSION_FILES).map(([file, spec]) => {
     const path = resolve(base, file);
@@ -118,6 +123,11 @@ export function writeVersions(next, base = root) {
   const sentences = (readmeText.match(new RegExp(sentence.source, "g")) ?? []).length;
   if (sentences !== 1) throw new Error(`README.md: expected exactly one current-version sentence, found ${sentences}`);
   updates.push([readme, readmeText.replace(sentence, (_, a, _old, b) => `${a}${next}${b}`)]);
+  const source = resolve(base, RELEASE_DATE_FILE);
+  const sourceText = readFileSync(source, "utf8");
+  const dateLines = (sourceText.match(new RegExp(RELEASE_DATE_LINE.source, "g")) ?? []).length;
+  if (dateLines !== 1) throw new Error(`${RELEASE_DATE_FILE}: expected exactly one RELEASE_DATE line, found ${dateLines}`);
+  updates.push([source, sourceText.replace(RELEASE_DATE_LINE, (_, a, _old, b) => `${a}${date}${b}`)]);
   for (const [path, text] of updates) writeFileSync(path, text);
 }
 
@@ -327,7 +337,7 @@ async function main() {
   console.log(`\n${draftNotes(result.classified)}\n`);
   if (process.argv.includes("--apply")) {
     writeVersions(result.next);
-    console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md`);
+    console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md, and today's date as RELEASE_DATE in ${RELEASE_DATE_FILE}`);
     console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: the pull request that commits them needs an acknowledgement file (see docs/release-process.md).");
   }
 }

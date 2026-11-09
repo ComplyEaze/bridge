@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 
 import {
-  VERSION_FILES, bump, checkArguments, classify, draftNotes, latestReleaseTag, levelFor, propose, pullNumbers, readVersions, run, writeVersions,
+  RELEASE_DATE_FILE, VERSION_FILES, bump, checkArguments, classify, draftNotes, latestReleaseTag, levelFor, propose, pullNumbers, readVersions, run, writeVersions,
 } from "./next-version.mjs";
 
 const repository = resolve(import.meta.dirname, "..");
@@ -105,15 +105,19 @@ test("draft notes group titles by kind and mark themselves as a draft", () => {
 test("writing a version changes exactly the five version files and the README sentence", () => {
   const base = mkdtempSync(join(tmpdir(), "next-version-"));
   try {
-    for (const file of [...Object.keys(VERSION_FILES), "README.md"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE]) {
       mkdirSync(dirname(join(base, file)), { recursive: true });
       copyFileSync(join(repository, file), join(base, file));
     }
     const before = readVersions(base);
     assert.equal(new Set(Object.values(before)).size, 1, "the repository's own version files agree");
     const next = bump(Object.values(before)[0], "minor");
-    writeVersions(next, base);
+    writeVersions(next, base, "2031-02-03");
     assert.deepEqual(Object.values(readVersions(base)), Object.keys(VERSION_FILES).map(() => next));
+    const source = readFileSync(join(base, RELEASE_DATE_FILE), "utf8");
+    const original_source = readFileSync(join(repository, RELEASE_DATE_FILE), "utf8");
+    assert.match(source, /const RELEASE_DATE: &str = "2031-02-03";/);
+    assert.equal(source.replace("2031-02-03", original_source.match(/const RELEASE_DATE: &str = "([^"]+)";/)[1]), original_source, "only the date changed");
     assert.match(readFileSync(join(base, "README.md"), "utf8"), new RegExp(`current development source is version \`${next.replaceAll(".", "\\.")}\``));
     const old = Object.values(before)[0];
     const original = readFileSync(join(repository, "src-tauri/Cargo.lock"), "utf8");
@@ -128,7 +132,7 @@ test("writing a version changes exactly the five version files and the README se
 test("a file with two candidate version lines is refused, not half-written", () => {
   const base = mkdtempSync(join(tmpdir(), "next-version-"));
   try {
-    for (const file of [...Object.keys(VERSION_FILES), "README.md"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE]) {
       mkdirSync(dirname(join(base, file)), { recursive: true });
       copyFileSync(join(repository, file), join(base, file));
     }
@@ -145,7 +149,7 @@ test("a file with two candidate version lines is refused, not half-written", () 
 test("a README with two current-version sentences is refused before any file is written", () => {
   const base = mkdtempSync(join(tmpdir(), "next-version-"));
   try {
-    for (const file of [...Object.keys(VERSION_FILES), "README.md"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE]) {
       mkdirSync(dirname(join(base, file)), { recursive: true });
       copyFileSync(join(repository, file), join(base, file));
     }
@@ -198,7 +202,7 @@ function inRelease(callback) {
     mkdirSync(bin);
     writeFileSync(join(bin, "gh"), gh);
     chmodSync(join(bin, "gh"), 0o755);
-    for (const file of [...Object.keys(VERSION_FILES), "README.md", "scripts/next-version.mjs"]) {
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", RELEASE_DATE_FILE, "scripts/next-version.mjs"]) {
       mkdirSync(dirname(join(work, file)), { recursive: true });
       copyFileSync(join(repository, file), join(work, file));
     }

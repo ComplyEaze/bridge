@@ -2038,6 +2038,13 @@ fn an_invoice_is_built_alone_and_never_amended() {
         refuse_mixed_shapes(&[voucher(), journal.clone()]),
         Err("voucher_type_shapes_mixed".to_string())
     );
+    // Each refusal tells the caller how to split the batch.
+    assert!(crate::agent::refusal_remediation("invoice_one_per_batch")
+        .is_some_and(|step| step.contains("batch of its own")));
+    assert!(
+        crate::agent::refusal_remediation("voucher_type_shapes_mixed")
+            .is_some_and(|step| step.contains("one Sales invoice alone"))
+    );
     assert_eq!(
         refuse_invoice_amendment(&[voucher()]),
         Err("invoice_amendment_not_supported".to_string())

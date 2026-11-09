@@ -5,7 +5,9 @@
 //! `scripts/check-no-test-seam.mjs` proves its marker is absent from every
 //! shipped executable.
 //!
-//! Its first act is to create an empty `<path>.ran`, where `<path>` is the
+//! Its first act is to save the arguments it was started with, one a line, in
+//! `<path>.args`, so a test can see which dialog mode the parent asked for. It
+//! then creates an empty `<path>.ran`, where `<path>` is the
 //! path it was started by (`argv[0]`, as the parent passed it). It then reads
 //! its whole input and writes the answer scripted in `<path>.answer`: that
 //! file's first line is the exit code, and the rest is written byte for byte,
@@ -37,6 +39,8 @@ fn beside_me(extension: &str) -> OsString {
 
 fn main() {
     std::hint::black_box(STANDIN_MARKER);
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    std::fs::write(beside_me(".args"), arguments.join("\n")).unwrap();
     std::fs::write(beside_me(".ran"), "").unwrap();
     let script = std::fs::read_to_string(beside_me(".answer")).expect("a scripted answer");
     let (code, answer) = script.split_once('\n').expect("an exit code line");

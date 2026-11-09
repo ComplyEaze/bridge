@@ -636,8 +636,8 @@
   "by": "author",
   "what": "registry find matches a prefix",
   "file": "src/registry.rs",
-  "from": "    PORTED.iter().find(|t| t.id == id)",
-  "to": "    PORTED.iter().find(|t| t.id.starts_with(id))"
+  "from": "    PORTED.iter().chain(CRATE_FIRST).find(|t| t.id == id)",
+  "to": "    PORTED.iter().chain(CRATE_FIRST).find(|t| t.id.starts_with(id))"
  },
  {
   "id": "F04",
@@ -8148,16 +8148,16 @@
   "by": "author",
   "what": "the s.269ST receipt row is never unnamed",
   "file": "src/cash_payments_40a3.rs",
-  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),",
-  "to": "        let unnamed = false;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),"
+  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        // Over on the party's side but under on the vouchers' own cash line: a true title and\n        // amount definition, as the high-value register gives the same row (#772). The rest of the\n        // finding stays.\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),",
+  "to": "        let unnamed = false;\n        // Over on the party's side but under on the vouchers' own cash line: a true title and\n        // amount definition, as the high-value register gives the same row (#772). The rest of the\n        // finding stays.\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),"
  },
  {
   "id": "CP-17",
   "by": "author",
   "what": "the s.269ST payment row is never unnamed",
   "file": "src/cash_payments_40a3.rs",
-  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),",
-  "to": "        let unnamed = false;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),"
+  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),",
+  "to": "        let unnamed = false;\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),"
  },
  {
   "id": "CP-18",
@@ -8172,8 +8172,8 @@
   "by": "author",
   "what": "an unnamed s.269ST receipt row keeps the one-party title",
   "file": "src/cash_payments_40a3.rs",
-  "from": "            title: if unnamed {\n                format!(\n                    \"Cash received on {}",
-  "to": "            title: if false {\n                format!(\n                    \"Cash received on {}"
+  "from": "            title: match (unnamed, proven_under) {\n                (true, true) => format!(\n                    \"Cash received on {}",
+  "to": "            title: match (false, proven_under) {\n                (true, true) => format!(\n                    \"Cash received on {}"
  },
  {
   "id": "CP-20",
@@ -8196,8 +8196,8 @@
   "by": "author",
   "what": "an unnamed s.269ST payment row keeps the one-party title",
   "file": "src/cash_payments_40a3.rs",
-  "from": "            title: if unnamed {\n                format!(\n                    \"Cash paid on {}",
-  "to": "            title: if false {\n                format!(\n                    \"Cash paid on {}"
+  "from": "            title: match (unnamed, proven_under) {\n                (true, true) => format!(\n                    \"Cash paid on {}",
+  "to": "            title: match (false, proven_under) {\n                (true, true) => format!(\n                    \"Cash paid on {}"
  },
  {
   "id": "CP-23",
@@ -14262,6 +14262,1182 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "C42-01",
+  "by": "author",
+  "what": "the limit is not strict",
+  "file": "src/clause42_sft.rs",
+  "from": "        if debits > limit.paise() {\n",
+  "to": "        if debits >= limit.paise() {\n"
+ },
+ {
+  "id": "C42-02",
+  "by": "author",
+  "what": "Contra is listed",
+  "file": "src/clause42_sft.rs",
+  "from": "        if v.base_type == \"Contra\" {\n            continue;\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "C42-03",
+  "by": "author",
+  "what": "a cash credit reduces the voucher's cash",
+  "file": "src/clause42_sft.rs",
+  "from": "l.amount_paise > 0 && cash.contains(&l.ledger)",
+  "to": "cash.contains(&l.ledger)"
+ },
+ {
+  "id": "C42-04",
+  "by": "author",
+  "what": "a debit to any ledger counts as cash",
+  "file": "src/clause42_sft.rs",
+  "from": "l.amount_paise > 0 && cash.contains(&l.ledger)",
+  "to": "l.amount_paise > 0"
+ },
+ {
+  "id": "C42-05",
+  "by": "author",
+  "what": "vouchers outside the books population are listed",
+  "file": "src/clause42_sft.rs",
+  "from": "    for v in book.population()? {\n",
+  "to": "    for v in &book.vouchers {\n"
+ },
+ {
+  "id": "C42-06",
+  "by": "author",
+  "what": "a limit of zero or less is admitted",
+  "file": "src/clause42_sft.rs",
+  "from": "            Some(paise) if paise > 0 => Ok(Self(paise)),\n",
+  "to": "            Some(paise) => Ok(Self(paise)),\n"
+ },
+ {
+  "id": "C42-07",
+  "by": "author",
+  "what": "a voucher's cash total wraps instead of refusing",
+  "file": "src/clause42_sft.rs",
+  "from": ".try_fold(0i64, |sum, l| sum.checked_add(l.amount_paise))",
+  "to": ".try_fold(0i64, |sum, l| Some(sum.wrapping_add(l.amount_paise)))"
+ },
+ {
+  "id": "C42-08",
+  "by": "author",
+  "what": "candidates keep the book's order",
+  "file": "src/clause42_sft.rs",
+  "from": "(a.date.as_str(), voucher_label(a), &a.guid).cmp(&(",
+  "to": "(b.date.as_str(), voucher_label(b), &b.guid).cmp(&("
+ },
+ {
+  "id": "C42-09",
+  "by": "author",
+  "what": "a table other than sft_013 is read",
+  "file": "src/clause42_sft.rs",
+  "from": "        if let Some(name) = table.keys().find(|k| k.as_str() != \"sft_013\") {\n",
+  "to": "        if let Some(name) = table.keys().find(|k| k.as_str().is_empty()) {\n"
+ },
+ {
+  "id": "L772-1",
+  "by": "author",
+  "what": "#772: a s.269ST receipt row under the limit on its cash line keeps the old title",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),\n",
+  "to": "        let proven_under = false;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),\n"
+ },
+ {
+  "id": "L772-2",
+  "by": "author",
+  "what": "#772: a s.269ST payment row under the limit on its cash line keeps the old title",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),\n",
+  "to": "        let proven_under = false;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),\n"
+ },
+ {
+  "id": "L772-3",
+  "by": "author",
+  "what": "#772: a s.269ST receipt row under the limit on its cash line keeps the old amount definition",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "} else if proven_under {\n                format!(\n                    \"Received from one party",
+  "to": "} else if false {\n                format!(\n                    \"Received from one party"
+ },
+ {
+  "id": "L772-4",
+  "by": "author",
+  "what": "#772: a s.269ST payment row under the limit on its cash line keeps the old amount definition",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "} else if proven_under {\n                format!(\n                    \"Paid to one party",
+  "to": "} else if false {\n                format!(\n                    \"Paid to one party"
+ },
+ {
+  "id": "C16-01",
+  "by": "author",
+  "what": "an overdraft is not money",
+  "file": "src/clause16_credits.rs",
+  "from": "    let mut money = book.ledgers_under_any(&[OVERDRAFT_GROUP.to_string()]);\n",
+  "to": "    let mut money = BTreeSet::new();\n"
+ },
+ {
+  "id": "C16-02",
+  "by": "author",
+  "what": "no ledger is money",
+  "file": "src/clause16_credits.rs",
+  "from": "    if money.contains(&ledger.name) {\n",
+  "to": "    if false {\n"
+ },
+ {
+  "id": "C16-03",
+  "by": "author",
+  "what": "the reserved profit and loss ledger is not excluded",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if reserved_pl {\n        Role::Excluded\n",
+  "to": "    } else if false {\n        Role::Excluded\n"
+ },
+ {
+  "id": "C16-04",
+  "by": "author",
+  "what": "any ledger of the reserved name is the reserved one",
+  "file": "src/clause16_credits.rs",
+  "from": "matches!(ledger.chain.as_slice(), [root] if crate::xml::is_reserved_root(root))",
+  "to": "true"
+ },
+ {
+  "id": "C16-05",
+  "by": "author",
+  "what": "an incomplete chain is tested",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if !ledger.chain_complete\n",
+  "to": "    } else if false\n"
+ },
+ {
+  "id": "C16-06",
+  "by": "author",
+  "what": "a chain ending at a user group is tested",
+  "file": "src/clause16_credits.rs",
+  "from": ".is_some_and(|g| PRIMARY_GROUPS.contains(&g.as_str()))",
+  "to": ".is_some_and(|_| true)"
+ },
+ {
+  "id": "C16-07",
+  "by": "author",
+  "what": "asset and investment heads are not excluded",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if PL_GROUPS\n        .iter()\n        .chain(&ASSET_GROUPS)\n",
+  "to": "    } else if PL_GROUPS\n        .iter()\n"
+ },
+ {
+  "id": "C16-08",
+  "by": "author",
+  "what": "a tax ledger is a head",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if ledger.under(TAX_GROUP) {\n",
+  "to": "    } else if false {\n"
+ },
+ {
+  "id": "C16-09",
+  "by": "author",
+  "what": "no ledger is a head",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if HEAD_GROUPS.iter().any(|g| ledger.under(g)) {\n",
+  "to": "    } else if false {\n"
+ },
+ {
+  "id": "C16-10",
+  "by": "author",
+  "what": "a ledger missing from the book is other",
+  "file": "src/clause16_credits.rs",
+  "from": ".map_or(Role::Untested, |l| role(l, money))",
+  "to": ".map_or(Role::Other, |l| role(l, money))"
+ },
+ {
+  "id": "C16-11",
+  "by": "author",
+  "what": "one excluded or tax debit is enough to exclude",
+  "file": "src/clause16_credits.rs",
+  "from": "            .all(|l| matches!(role_of(&l.ledger), Role::Excluded | Role::Tax))\n",
+  "to": "            .any(|l| matches!(role_of(&l.ledger), Role::Excluded | Role::Tax))\n"
+ },
+ {
+  "id": "C16-12",
+  "by": "author",
+  "what": "tax debits alone exclude",
+  "file": "src/clause16_credits.rs",
+  "from": "\n            && debits.iter().any(|l| role_of(&l.ledger) == Role::Excluded);\n",
+  "to": ";\n"
+ },
+ {
+  "id": "C16-13",
+  "by": "author",
+  "what": "tax on a sale is listed",
+  "file": "src/clause16_credits.rs",
+  "from": ".any(|l| l.amount_paise < 0 && under_any(&l.ledger, &CREDIT_BALANCE_GROUPS))",
+  "to": ".any(|_| false)"
+ },
+ {
+  "id": "C16-14",
+  "by": "author",
+  "what": "an income debit triggers the tax rule",
+  "file": "src/clause16_credits.rs",
+  "from": "l.amount_paise < 0 && under_any(&l.ledger, &CREDIT_BALANCE_GROUPS)",
+  "to": "under_any(&l.ledger, &CREDIT_BALANCE_GROUPS)"
+ },
+ {
+  "id": "C16-15",
+  "by": "author",
+  "what": "tax withheld from a creditor is listed",
+  "file": "src/clause16_credits.rs",
+  "from": "\n            || debits\n                .iter()\n                .any(|l| under_any(&l.ledger, &[CREDITOR_GROUP]));\n",
+  "to": ";\n"
+ },
+ {
+  "id": "C16-16",
+  "by": "author",
+  "what": "a repeated debit ledger is named again",
+  "file": "src/clause16_credits.rs",
+  "from": "            if !debit_names.contains(&l.ledger.as_str()) {\n",
+  "to": "            if true {\n"
+ },
+ {
+  "id": "C16-17",
+  "by": "author",
+  "what": "tax credited on an excluded voucher is listed",
+  "file": "src/clause16_credits.rs",
+  "from": "                Role::Head | Role::Tax if is_excluded => {\n",
+  "to": "                Role::Head if is_excluded => {\n"
+ },
+ {
+  "id": "C16-18",
+  "by": "author",
+  "what": "a ledger's credits on one voucher are not summed",
+  "file": "src/clause16_credits.rs",
+  "from": "Role::Head | Role::Tax => add(listed.entry(&l.ledger).or_insert(0), credit)?,",
+  "to": "Role::Head | Role::Tax => *listed.entry(&l.ledger).or_insert(0) = credit,"
+ },
+ {
+  "id": "C16-19",
+  "by": "author",
+  "what": "an excluded voucher with nothing listed is counted",
+  "file": "src/clause16_credits.rs",
+  "from": "        if excluded_here {\n",
+  "to": "        if is_excluded {\n"
+ },
+ {
+  "id": "C16-20",
+  "by": "author",
+  "what": "a voucher the tax rule applies to is counted without a tax credit",
+  "file": "src/clause16_credits.rs",
+  "from": "        if taxed_here {\n",
+  "to": "        if tax_left_out {\n"
+ },
+ {
+  "id": "C16-21",
+  "by": "author",
+  "what": "the excluded credit is not added",
+  "file": "src/clause16_credits.rs",
+  "from": "                    add(&mut excluded_credit, credit)?;\n",
+  "to": ""
+ },
+ {
+  "id": "C16-22",
+  "by": "author",
+  "what": "the tax left out is not added",
+  "file": "src/clause16_credits.rs",
+  "from": "                    add(&mut taxed_credit, credit)?;\n",
+  "to": ""
+ },
+ {
+  "id": "C16-23",
+  "by": "author",
+  "what": "an untested credit is not added",
+  "file": "src/clause16_credits.rs",
+  "from": "Role::Untested => add(untested.entry(&l.ledger).or_insert(0), credit)?,",
+  "to": "Role::Untested => add(untested.entry(&l.ledger).or_insert(0), 0)?,"
+ },
+ {
+  "id": "C16-24",
+  "by": "author",
+  "what": "rows are not sorted by date first",
+  "file": "src/clause16_credits.rs",
+  "from": "    rows.sort_by(|a, b| {\n        (\n            a.voucher.date.as_str(),\n            voucher_label(a.voucher),\n            &a.voucher.guid,\n            a.ledger,\n        )\n            .cmp(&(\n                b.voucher.date.as_str(),\n                voucher_label(b.voucher),\n                &b.voucher.guid,\n                b.ledger,\n            ))\n    });\n",
+  "to": "    rows.sort_by(|a, b| {\n        (voucher_label(a.voucher), &a.voucher.guid, a.ledger).cmp(&(\n            voucher_label(b.voucher),\n            &b.voucher.guid,\n            b.ledger,\n        ))\n    });\n"
+ },
+ {
+  "id": "C16-25",
+  "by": "author",
+  "what": "rows are not sorted by label",
+  "file": "src/clause16_credits.rs",
+  "from": "    rows.sort_by(|a, b| {\n        (\n            a.voucher.date.as_str(),\n            voucher_label(a.voucher),\n            &a.voucher.guid,\n            a.ledger,\n        )\n            .cmp(&(\n                b.voucher.date.as_str(),\n                voucher_label(b.voucher),\n                &b.voucher.guid,\n                b.ledger,\n            ))\n    });\n",
+  "to": "    rows.sort_by(|a, b| {\n        (a.voucher.date.as_str(), &a.voucher.guid, a.ledger).cmp(&(\n            b.voucher.date.as_str(),\n            &b.voucher.guid,\n            b.ledger,\n        ))\n    });\n"
+ },
+ {
+  "id": "C16-26",
+  "by": "author",
+  "what": "a credit's sign is not checked",
+  "file": "src/clause16_credits.rs",
+  "from": "    amount_paise.checked_neg()\n",
+  "to": "    Some(amount_paise.wrapping_neg())\n"
+ },
+ {
+  "id": "TI-01",
+  "by": "author",
+  "what": "tds_interest_201: the pre-deduction rate is read from the post-deduction key",
+  "file": "src/tds_interest_201.rs",
+  "from": "            t.rate_before_deduction_bp,\n            t.rate_after_deduction_bp,",
+  "to": "            t.rate_after_deduction_bp,\n            t.rate_after_deduction_bp,"
+ },
+ {
+  "id": "TI-02",
+  "by": "author",
+  "what": "tds_interest_201: the post-deduction rate is read from the pre-deduction key",
+  "file": "src/tds_interest_201.rs",
+  "from": "            t.rate_before_deduction_bp,\n            t.rate_after_deduction_bp,",
+  "to": "            t.rate_before_deduction_bp,\n            t.rate_before_deduction_bp,"
+ },
+ {
+  "id": "TI-03",
+  "by": "author",
+  "what": "tds_interest_201: the default pre-deduction rate changes",
+  "file": "src/tds_interest_201.rs",
+  "from": "const DEFAULT_S201_1A: (i64, i64, &str, &str) = (100, 150, \"s.201(1A)\", \"confirm\");",
+  "to": "const DEFAULT_S201_1A: (i64, i64, &str, &str) = (125, 150, \"s.201(1A)\", \"confirm\");"
+ },
+ {
+  "id": "TI-04",
+  "by": "author",
+  "what": "tds_interest_201: the default post-deduction rate changes",
+  "file": "src/tds_interest_201.rs",
+  "from": "const DEFAULT_S201_1A: (i64, i64, &str, &str) = (100, 150, \"s.201(1A)\", \"confirm\");",
+  "to": "const DEFAULT_S201_1A: (i64, i64, &str, &str) = (100, 125, \"s.201(1A)\", \"confirm\");"
+ },
+ {
+  "id": "TI-05",
+  "by": "author",
+  "what": "tds_interest_201: the default s.206C(7) rate changes",
+  "file": "src/tds_interest_201.rs",
+  "from": "const DEFAULT_S206C_7: (i64, &str, &str) = (100, \"s.206C(7)\", \"confirm\");",
+  "to": "const DEFAULT_S206C_7: (i64, &str, &str) = (125, \"s.206C(7)\", \"confirm\");"
+ },
+ {
+  "id": "TI-06",
+  "by": "author",
+  "what": "tds_interest_201: the rules' [s201_1a] is ignored",
+  "file": "src/tds_interest_201.rs",
+  "from": "match &rules.s201_1a {",
+  "to": "match rules.s201_1a.as_ref().filter(|_| false) {"
+ },
+ {
+  "id": "TI-07",
+  "by": "author",
+  "what": "tds_interest_201: the rules' [s206c_7] is ignored",
+  "file": "src/tds_interest_201.rs",
+  "from": "match &rules.s206c_7 {",
+  "to": "match rules.s206c_7.as_ref().filter(|_| false) {"
+ },
+ {
+  "id": "TI-08",
+  "by": "author",
+  "what": "tds_interest_201: the default-rate limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "    if default_rate {\n        limits.push(LIMIT_DEFAULT_RATE.to_string());",
+  "to": "    if default_rate && false {\n        limits.push(LIMIT_DEFAULT_RATE.to_string());"
+ },
+ {
+  "id": "TI-09",
+  "by": "author",
+  "what": "tds_interest_201: a single-rate row is in the lower scenario only",
+  "file": "src/tds_interest_201.rs",
+  "from": "Self::Single => true,",
+  "to": "Self::Single => !higher,"
+ },
+ {
+  "id": "TI-10",
+  "by": "author",
+  "what": "tds_interest_201: a single-rate row is in neither scenario",
+  "file": "src/tds_interest_201.rs",
+  "from": "Self::Single => true,",
+  "to": "Self::Single => false,"
+ },
+ {
+  "id": "TI-11",
+  "by": "author",
+  "what": "tds_interest_201: every row is in both scenarios",
+  "file": "src/tds_interest_201.rs",
+  "from": ".filter(|&i| rows[i].rate_tag.in_scenario(higher))",
+  "to": ".filter(|&i| rows[i].rate_tag.in_scenario(higher) || true)"
+ },
+ {
+  "id": "TI-12",
+  "by": "author",
+  "what": "tds_interest_201: a row's tag leaves out its position",
+  "file": "src/tds_interest_201.rs",
+  "from": "let t = hash8(&format!(\"{section}:{}:{p}\", row.payee_key));",
+  "to": "let t = hash8(&format!(\"{section}:{}\", row.payee_key));"
+ },
+ {
+  "id": "TI-13",
+  "by": "author",
+  "what": "tds_interest_201: a row's tag leaves out its section",
+  "file": "src/tds_interest_201.rs",
+  "from": "let t = hash8(&format!(\"{section}:{}:{p}\", row.payee_key));",
+  "to": "let t = hash8(&format!(\"{}:{p}\", row.payee_key));"
+ },
+ {
+  "id": "TI-14",
+  "by": "author",
+  "what": "tds_interest_201: a row's tag is ten characters",
+  "file": "src/tds_interest_201.rs",
+  "from": "let t = hash8(&format!(\"{section}:{}:{p}\", row.payee_key));",
+  "to": "let t = hash8(&format!(\"{section}:{}:{p}\", row.payee_key)) + \"00\";"
+ },
+ {
+  "id": "TI-15",
+  "by": "author",
+  "what": "tds_interest_201: a part month is not counted",
+  "file": "src/tds_interest_201.rs",
+  "from": "        month_index(end) - month_index(start) + 1",
+  "to": "        month_index(end) - month_index(start)"
+ },
+ {
+  "id": "TI-16",
+  "by": "author",
+  "what": "tds_interest_201: a span ending on its start day is a month",
+  "file": "src/tds_interest_201.rs",
+  "from": "fn months(start: &TallyDate, end: &TallyDate) -> i64 {\n    if end <= start {",
+  "to": "fn months(start: &TallyDate, end: &TallyDate) -> i64 {\n    if end < start {"
+ },
+ {
+  "id": "TI-17",
+  "by": "author",
+  "what": "tds_interest_201: interest is rounded down",
+  "file": "src/tds_interest_201.rs",
+  "from": "        .and_then(|x| x.checked_mul(i128::from(months)))\n        .and_then(|x| x.checked_add(5000))",
+  "to": "        .and_then(|x| x.checked_mul(i128::from(months)))\n        .and_then(|x| x.checked_add(0))"
+ },
+ {
+  "id": "TI-18",
+  "by": "author",
+  "what": "tds_interest_201: interest is rounded up",
+  "file": "src/tds_interest_201.rs",
+  "from": "        .and_then(|x| x.checked_mul(i128::from(months)))\n        .and_then(|x| x.checked_add(5000))",
+  "to": "        .and_then(|x| x.checked_mul(i128::from(months)))\n        .and_then(|x| x.checked_add(9999))"
+ },
+ {
+  "id": "TI-19",
+  "by": "author",
+  "what": "tds_interest_201: the maximum's post-deduction leg is at the pre-deduction rate",
+  "file": "src/tds_interest_201.rs",
+  "from": ".checked_add(interest(tax, self.after, months(&day, self.as_of))?)",
+  "to": ".checked_add(interest(tax, self.before, months(&day, self.as_of))?)"
+ },
+ {
+  "id": "TI-20",
+  "by": "author",
+  "what": "tds_interest_201: the maximum's pre-deduction leg is at the post-deduction rate",
+  "file": "src/tds_interest_201.rs",
+  "from": "let both = interest(tax, self.before, months(start, &day))?",
+  "to": "let both = interest(tax, self.after, months(start, &day))?"
+ },
+ {
+  "id": "TI-21",
+  "by": "author",
+  "what": "tds_interest_201: the maximum takes deduction on the start day only",
+  "file": "src/tds_interest_201.rs",
+  "from": "        while day <= *self.as_of {",
+  "to": "        while day <= *self.as_of && day == *start {"
+ },
+ {
+  "id": "TI-22",
+  "by": "author",
+  "what": "tds_interest_201: the maximum's search starts the day after the start",
+  "file": "src/tds_interest_201.rs",
+  "from": "        let mut day = start.clone();",
+  "to": "        let mut day = start.next_day().unwrap_or_else(|_| start.clone());"
+ },
+ {
+  "id": "TI-23",
+  "by": "author",
+  "what": "tds_interest_201: the still-not-deducted amount is at the post-deduction rate",
+  "file": "src/tds_interest_201.rs",
+  "from": "let not_deducted = interest(row.tax, pricing.before, stage_max)?;",
+  "to": "let not_deducted = interest(row.tax, pricing.after, stage_max)?;"
+ },
+ {
+  "id": "TI-24",
+  "by": "author",
+  "what": "tds_interest_201: the stage-2 maximum months are left 0",
+  "file": "src/tds_interest_201.rs",
+  "from": "        &format!(\"months_stage2_max_{t}\"),\n        Value::Int(stage_max),",
+  "to": "        &format!(\"months_stage2_max_{t}\"),\n        Value::Int(0),"
+ },
+ {
+  "id": "TI-25",
+  "by": "author",
+  "what": "tds_interest_201: the minimum runs to the as-of date",
+  "file": "src/tds_interest_201.rs",
+  "from": "let minimum = 0_i64;",
+  "to": "let minimum = interest(row.tax, pricing.before, stage_max)?;"
+ },
+ {
+  "id": "TI-26",
+  "by": "author",
+  "what": "tds_interest_201: the own-date maximum runs from the tranche's date",
+  "file": "src/tds_interest_201.rs",
+  "from": ".checked_add(pricing.maximum(*tax, day)?)",
+  "to": ".checked_add(pricing.maximum(*tax, &row.deductible)?)"
+ },
+ {
+  "id": "TI-27",
+  "by": "author",
+  "what": "tds_interest_201: the own-date still-not-deducted amount runs from the tranche's date",
+  "file": "src/tds_interest_201.rs",
+  "from": ".checked_add(interest(*tax, pricing.before, months(day, pricing.as_of))?)",
+  "to": ".checked_add(interest(*tax, pricing.before, months(&row.deductible, pricing.as_of))?)"
+ },
+ {
+  "id": "TI-28",
+  "by": "author",
+  "what": "tds_interest_201: the own-date still-not-deducted amount is at the post-deduction rate",
+  "file": "src/tds_interest_201.rs",
+  "from": ".checked_add(interest(*tax, pricing.before, months(day, pricing.as_of))?)",
+  "to": ".checked_add(interest(*tax, pricing.after, months(day, pricing.as_of))?)"
+ },
+ {
+  "id": "TI-29",
+  "by": "author",
+  "what": "tds_interest_201: the scenario maximum sums the plain maxima",
+  "file": "src/tds_interest_201.rs",
+  "from": "let total_maximum = sum(&|i| priced[i].maximum_own_date)?;",
+  "to": "let total_maximum = sum(&|i| priced[i].maximum)?;"
+ },
+ {
+  "id": "TI-30",
+  "by": "author",
+  "what": "tds_interest_201: the one-off total takes the own-date maximum for one-off rows and the plain one for others",
+  "file": "src/tds_interest_201.rs",
+  "from": "if rows[i].foreseeability == Some(Foreseeability::OneOff) {",
+  "to": "if rows[i].foreseeability != Some(Foreseeability::OneOff) {"
+ },
+ {
+  "id": "TI-31",
+  "by": "author",
+  "what": "tds_interest_201: the one-off total treats an unclassified row as one-off",
+  "file": "src/tds_interest_201.rs",
+  "from": "if rows[i].foreseeability == Some(Foreseeability::OneOff) {",
+  "to": "if rows[i].foreseeability != Some(Foreseeability::Foreseeable) {"
+ },
+ {
+  "id": "TI-32",
+  "by": "author",
+  "what": "tds_interest_201: the without-filing-date count is left 0",
+  "file": "src/tds_interest_201.rs",
+  "from": "count(TEST_ID, rows.len())?,",
+  "to": "count(TEST_ID, 0)?,"
+ },
+ {
+  "id": "TI-33",
+  "by": "author",
+  "what": "tds_interest_201: the unclassified count includes foreseeable rows",
+  "file": "src/tds_interest_201.rs",
+  "from": ".filter(|row| row.foreseeability.is_none())",
+  "to": ".filter(|row| row.foreseeability != Some(Foreseeability::OneOff))"
+ },
+ {
+  "id": "TI-34",
+  "by": "author",
+  "what": "tds_interest_201: the scenario one-off figures are always emitted",
+  "file": "src/tds_interest_201.rs",
+  "from": "        if one_off {\n            let at_crossing",
+  "to": "        if true {\n            let at_crossing"
+ },
+ {
+  "id": "TI-35",
+  "by": "author",
+  "what": "tds_interest_201: the combined one-off figure is always emitted",
+  "file": "src/tds_interest_201.rs",
+  "from": "    if one_off {\n        r.fig(\n            \"total_interest_max_one_off_at_crossing_paise\",",
+  "to": "    if true {\n        r.fig(\n            \"total_interest_max_one_off_at_crossing_paise\","
+ },
+ {
+  "id": "TI-36",
+  "by": "author",
+  "what": "tds_interest_201: the combined ceiling is the lower scenario's",
+  "file": "src/tds_interest_201.rs",
+  "from": "        if higher {\n            higher_maximum = total_maximum;",
+  "to": "        if !higher {\n            higher_maximum = total_maximum;"
+ },
+ {
+  "id": "TI-37",
+  "by": "author",
+  "what": "tds_interest_201: the combined one-off ceiling is the lower scenario's",
+  "file": "src/tds_interest_201.rs",
+  "from": "            if higher {\n                higher_one_off = at_crossing;",
+  "to": "            if !higher {\n                higher_one_off = at_crossing;"
+ },
+ {
+  "id": "TI-38",
+  "by": "author",
+  "what": "tds_interest_201: the two-readings limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "limits.push(format!(\n        \"Where the date of deduction is not known",
+  "to": "std::mem::drop(format!(\n        \"Where the date of deduction is not known"
+ },
+ {
+  "id": "TI-39",
+  "by": "author",
+  "what": "tds_interest_201: the dates limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "let mut limits = vec![LIMIT_DATES.to_string(), LIMIT_QUARTERLY.to_string()];",
+  "to": "let mut limits = vec![LIMIT_QUARTERLY.to_string()];"
+ },
+ {
+  "id": "TI-40",
+  "by": "author",
+  "what": "tds_interest_201: the quarterly-statement limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "let mut limits = vec![LIMIT_DATES.to_string(), LIMIT_QUARTERLY.to_string()];",
+  "to": "let mut limits = vec![LIMIT_DATES.to_string()];"
+ },
+ {
+  "id": "TI-41",
+  "by": "author",
+  "what": "tds_interest_201: the no-filing-date limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "    limits.push(LIMIT_NO_FILING.to_string());",
+  "to": "    std::mem::drop(LIMIT_NO_FILING.to_string());"
+ },
+ {
+  "id": "TI-42",
+  "by": "author",
+  "what": "tds_interest_201: the basis limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "    limits.push(row.section.basis().to_string());",
+  "to": "    std::mem::drop(row.section.basis().to_string());"
+ },
+ {
+  "id": "TI-43",
+  "by": "author",
+  "what": "tds_interest_201: the basis comes before the no-filing-date limit",
+  "file": "src/tds_interest_201.rs",
+  "from": "    limits.push(LIMIT_NO_FILING.to_string());\n    limits.push(row.section.basis().to_string());",
+  "to": "    limits.push(row.section.basis().to_string());\n    limits.push(LIMIT_NO_FILING.to_string());"
+ },
+ {
+  "id": "TI-44",
+  "by": "author",
+  "what": "tds_interest_201: every row's limits carry the s.194C basis",
+  "file": "src/tds_interest_201.rs",
+  "from": "    limits.push(row.section.basis().to_string());",
+  "to": "    limits.push(Section::S194C.basis().to_string());"
+ },
+ {
+  "id": "TI-45",
+  "by": "author",
+  "what": "tds_interest_201: the unclassified limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "None => limits.push(LIMIT_UNCLASSIFIED.to_string()),",
+  "to": "None => {}"
+ },
+ {
+  "id": "TI-46",
+  "by": "author",
+  "what": "tds_interest_201: the one-off limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "Some(Foreseeability::OneOff) => limits.push(LIMIT_ONE_OFF.to_string()),",
+  "to": "Some(Foreseeability::OneOff) => {}"
+ },
+ {
+  "id": "TI-47",
+  "by": "author",
+  "what": "tds_interest_201: the flag limit is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "    if row.flag {",
+  "to": "    if false {"
+ },
+ {
+  "id": "TI-48",
+  "by": "author",
+  "what": "tds_interest_201: the flag limit is on every row",
+  "file": "src/tds_interest_201.rs",
+  "from": "    if row.flag {",
+  "to": "    if true {"
+ },
+ {
+  "id": "TI-49",
+  "by": "author",
+  "what": "tds_interest_201: a group's limits are not de-duplicated",
+  "file": "src/tds_interest_201.rs",
+  "from": "if !limits.contains(l) {",
+  "to": "if true {"
+ },
+ {
+  "id": "TI-50",
+  "by": "author",
+  "what": "tds_interest_201: the basis is dropped from the tax definition",
+  "file": "src/tds_interest_201.rs",
+  "from": "let (basis, sentence) = (row.section.basis(), row.rate_tag.sentence());",
+  "to": "let (basis, sentence) = (\"\", row.rate_tag.sentence());"
+ },
+ {
+  "id": "TI-51",
+  "by": "author",
+  "what": "tds_interest_201: the rate sentence is dropped from the tax definition",
+  "file": "src/tds_interest_201.rs",
+  "from": "let (basis, sentence) = (row.section.basis(), row.rate_tag.sentence());",
+  "to": "let (basis, sentence) = (row.section.basis(), \"\");"
+ },
+ {
+  "id": "TI-52",
+  "by": "author",
+  "what": "tds_interest_201: a group id leaves out the section",
+  "file": "src/tds_interest_201.rs",
+  "from": "let g = hash8(&format!(\"{section}:{group}\"));",
+  "to": "let g = hash8(group);"
+ },
+ {
+  "id": "TI-53",
+  "by": "author",
+  "what": "tds_interest_201: every group gets a finding",
+  "file": "src/tds_interest_201.rs",
+  "from": "if !members.iter().any(|&i| priced[i].maximum > 0) {",
+  "to": "if members.is_empty() {"
+ },
+ {
+  "id": "TI-54",
+  "by": "author",
+  "what": "tds_interest_201: a group gets a finding only when every row's maximum is above 0",
+  "file": "src/tds_interest_201.rs",
+  "from": "if !members.iter().any(|&i| priced[i].maximum > 0) {",
+  "to": "if !members.iter().all(|&i| priced[i].maximum > 0) {"
+ },
+ {
+  "id": "TI-55",
+  "by": "author",
+  "what": "tds_interest_201: a finding lists only the rows with a maximum above 0",
+  "file": "src/tds_interest_201.rs",
+  "from": ".filter(|&i| rows[i].tax > 0)",
+  "to": ".filter(|&i| priced[i].maximum > 0)"
+ },
+ {
+  "id": "TI-56",
+  "by": "author",
+  "what": "tds_interest_201: a finding lists a row of tax 0",
+  "file": "src/tds_interest_201.rs",
+  "from": ".filter(|&i| rows[i].tax > 0)",
+  "to": ".filter(|&i| rows[i].tax >= 0)"
+ },
+ {
+  "id": "TI-57",
+  "by": "author",
+  "what": "tds_interest_201: a finding's tranche count is always plural",
+  "file": "src/tds_interest_201.rs",
+  "from": "let s = if n > 1 { \"s\" } else { \"\" };",
+  "to": "let s = \"s\";"
+ },
+ {
+  "id": "TI-58",
+  "by": "author",
+  "what": "tds_interest_201: a finding counts every row of its group",
+  "file": "src/tds_interest_201.rs",
+  "from": "let n = listed.len();",
+  "to": "let n = members.len();"
+ },
+ {
+  "id": "TI-59",
+  "by": "author",
+  "what": "tds_interest_201: a finding's tranches are numbered from 0",
+  "file": "src/tds_interest_201.rs",
+  "from": "facts.push((format!(\"tranche_{}_{name}\", n + 1), id.clone()));",
+  "to": "facts.push((format!(\"tranche_{}_{name}\", n), id.clone()));"
+ },
+ {
+  "id": "TI-60",
+  "by": "author",
+  "what": "tds_interest_201: the still-not-deducted fact points at the maximum",
+  "file": "src/tds_interest_201.rs",
+  "from": "            (\"interest_max\", f_max),\n            (\"interest_if_not_deducted\", f_not_deducted),",
+  "to": "            (\"interest_max\", f_max.clone()),\n            (\"interest_if_not_deducted\", f_max),"
+ },
+ {
+  "id": "TI-61",
+  "by": "author",
+  "what": "tds_interest_201: the deductible-date fact is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "            (\"deductible_date\", f_deductible),\n",
+  "to": ""
+ },
+ {
+  "id": "TI-62",
+  "by": "author",
+  "what": "tds_interest_201: the rate phrase is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "let phrase = first.rate_tag.phrase();",
+  "to": "let phrase = \"\";"
+ },
+ {
+  "id": "TI-63",
+  "by": "author",
+  "what": "tds_interest_201: clause 3CD-34(c) is dropped",
+  "file": "src/tds_interest_201.rs",
+  "from": "const CLAUSES: [&str; 3] = [\"s.201(1A)\", \"3CD-34(a)\", \"3CD-34(c)\"];",
+  "to": "const CLAUSES: [&str; 2] = [\"s.201(1A)\", \"3CD-34(a)\"];"
+ },
+ {
+  "id": "TI-64",
+  "by": "author",
+  "what": "tds_interest_201: the clauses are reordered",
+  "file": "src/tds_interest_201.rs",
+  "from": "const CLAUSES: [&str; 3] = [\"s.201(1A)\", \"3CD-34(a)\", \"3CD-34(c)\"];",
+  "to": "const CLAUSES: [&str; 3] = [\"3CD-34(a)\", \"s.201(1A)\", \"3CD-34(c)\"];"
+ },
+ {
+  "id": "TI-65",
+  "by": "author",
+  "what": "tds_interest_201: a finding's confidence is judgement required",
+  "file": "src/tds_interest_201.rs",
+  "from": "            evidence,\n            confidence: Confidence::NeedsDocument,",
+  "to": "            evidence,\n            confidence: Confidence::JudgementRequired,"
+ },
+ {
+  "id": "TI-66",
+  "by": "author",
+  "what": "tds_interest_201: a finding cites no voucher",
+  "file": "src/tds_interest_201.rs",
+  "from": "if !evidence.contains(e) {",
+  "to": "if false {"
+ },
+ {
+  "id": "TI-67",
+  "by": "author",
+  "what": "tds_interest_201: the tax figure cites no voucher",
+  "file": "src/tds_interest_201.rs",
+  "from": "not re-derived here. {basis}{sentence}\"\n        ),\n        ev(),",
+  "to": "not re-derived here. {basis}{sentence}\"\n        ),\n        Vec::new(),"
+ },
+ {
+  "id": "TI-68",
+  "by": "author",
+  "what": "tds_interest_201: the still-not-deducted figure cites no voucher",
+  "file": "src/tds_interest_201.rs",
+  "from": "the pre-deduction rate for the months from the deductible date.\"\n        ),\n        ev(),",
+  "to": "the pre-deduction rate for the months from the deductible date.\"\n        ),\n        Vec::new(),"
+ },
+ {
+  "id": "TI-69",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 recomputes the maximum at the pre-deduction rate throughout",
+  "file": "src/tds_interest_201.rs",
+  "from": "let want_max = check_maximum(tax, deductible, as_of, before, after)",
+  "to": "let want_max = check_maximum(tax, deductible, as_of, before, before)"
+ },
+ {
+  "id": "TI-70",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 does not search the day after the start",
+  "file": "src/tds_interest_201.rs",
+  "from": "    let mut days = vec![start];\n    if as_of > start {",
+  "to": "    let mut days = vec![start];\n    if false {"
+ },
+ {
+  "id": "TI-71",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 skips the first day of each later month",
+  "file": "src/tds_interest_201.rs",
+  "from": "        days.push((y, m, 1));",
+  "to": "        let _ = (y, m, 1);"
+ },
+ {
+  "id": "TI-72",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 recomputes the still-not-deducted amount at the post-deduction rate",
+  "file": "src/tds_interest_201.rs",
+  "from": "check_interest(tax, before, check_months(deductible, as_of))",
+  "to": "check_interest(tax, after, check_months(deductible, as_of))"
+ },
+ {
+  "id": "TI-73",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 does not count a part month",
+  "file": "src/tds_interest_201.rs",
+  "from": "        (end.0 - start.0) * 12 + (end.1 - start.1) + 1",
+  "to": "        (end.0 - start.0) * 12 + (end.1 - start.1)"
+ },
+ {
+  "id": "TI-74",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 counts a span ending on its start day as a month",
+  "file": "src/tds_interest_201.rs",
+  "from": "fn check_months(start: Ymd, end: Ymd) -> i64 {\n    if end <= start {",
+  "to": "fn check_months(start: Ymd, end: Ymd) -> i64 {\n    if end < start {"
+ },
+ {
+  "id": "TI-75",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 rounds interest down",
+  "file": "src/tds_interest_201.rs",
+  "from": "        .checked_add(5000)?;",
+  "to": "        .checked_add(0)?;"
+ },
+ {
+  "id": "TI-76",
+  "by": "author",
+  "what": "tds_interest_201: TDSI-1 reads the as-of date one day late",
+  "file": "src/tds_interest_201.rs",
+  "from": "        .and_then(check_ymd)\n        .ok_or_else(|| refuse(\"as_of\"))?;",
+  "to": "        .and_then(check_ymd)\n        .map(check_next_day)\n        .ok_or_else(|| refuse(\"as_of\"))?;"
+ },
+ {
+  "id": "TI-77",
+  "by": "author",
+  "what": "tds_interest_201: a non-deductor's payees get rows",
+  "file": "src/tds_interest_201.rs",
+  "from": "if deductor_status(payees)? != \"not_deductor\" {",
+  "to": "if deductor_status(payees)? != \"never\" {"
+ },
+ {
+  "id": "TI-78",
+  "by": "author",
+  "what": "tds_interest_201: an unknown deductor's payees get no row",
+  "file": "src/tds_interest_201.rs",
+  "from": "if deductor_status(payees)? != \"not_deductor\" {",
+  "to": "if deductor_status(payees)? == \"deductor\" {"
+ },
+ {
+  "id": "TI-79",
+  "by": "author",
+  "what": "tds_interest_201: a finding without a credited fact gives rows",
+  "file": "src/tds_interest_201.rs",
+  "from": "!PAYEE_SECTIONS.contains(&section) || !f.facts.iter().any(|(n, _)| n == \"credited\")",
+  "to": "!PAYEE_SECTIONS.contains(&section)"
+ },
+ {
+  "id": "TI-80",
+  "by": "author",
+  "what": "tds_interest_201: s.194H findings give no row",
+  "file": "src/tds_interest_201.rs",
+  "from": "const PAYEE_SECTIONS: [&str; 4] = [\"194C\", \"194I\", \"194J\", \"194H\"];",
+  "to": "const PAYEE_SECTIONS: [&str; 3] = [\"194C\", \"194I\", \"194J\"];"
+ },
+ {
+  "id": "TI-81",
+  "by": "author",
+  "what": "tds_interest_201: the s.194C rates are swapped",
+  "file": "src/tds_interest_201.rs",
+  "from": "two(t.s194c_individual_huf_bp, t.s194c_other_bp),",
+  "to": "two(t.s194c_other_bp, t.s194c_individual_huf_bp),"
+ },
+ {
+  "id": "TI-82",
+  "by": "author",
+  "what": "tds_interest_201: the s.194-I rates are swapped",
+  "file": "src/tds_interest_201.rs",
+  "from": "two(t.s194i_plant_machinery_bp, t.s194i_land_building_bp),",
+  "to": "two(t.s194i_land_building_bp, t.s194i_plant_machinery_bp),"
+ },
+ {
+  "id": "TI-83",
+  "by": "author",
+  "what": "tds_interest_201: the s.194J two-rate pair is swapped",
+  "file": "src/tds_interest_201.rs",
+  "from": "\"royalty\" | \"28va\" => two(t.s194j_technical_bp, t.s194j_professional_bp),",
+  "to": "\"royalty\" | \"28va\" => two(t.s194j_professional_bp, t.s194j_technical_bp),"
+ },
+ {
+  "id": "TI-84",
+  "by": "author",
+  "what": "tds_interest_201: a professional fee is at the technical rate",
+  "file": "src/tds_interest_201.rs",
+  "from": "\"professional\" => vec![(RateTag::Single, t.s194j_professional_bp)],",
+  "to": "\"professional\" => vec![(RateTag::Single, t.s194j_technical_bp)],"
+ },
+ {
+  "id": "TI-85",
+  "by": "author",
+  "what": "tds_interest_201: a technical fee is at the professional rate",
+  "file": "src/tds_interest_201.rs",
+  "from": "\"technical\" => vec![(RateTag::Single, t.s194j_technical_bp)],",
+  "to": "\"technical\" => vec![(RateTag::Single, t.s194j_professional_bp)],"
+ },
+ {
+  "id": "TI-86",
+  "by": "author",
+  "what": "tds_interest_201: a known s.194J category is at two rates",
+  "file": "src/tds_interest_201.rs",
+  "from": "\"professional\" => vec![(RateTag::Single, t.s194j_professional_bp)],",
+  "to": "\"professional\" => two(t.s194j_technical_bp, t.s194j_professional_bp),"
+ },
+ {
+  "id": "TI-87",
+  "by": "author",
+  "what": "tds_interest_201: the higher rate's row comes before the lower's",
+  "file": "src/tds_interest_201.rs",
+  "from": "let two = |lower, higher| vec![(RateTag::Lower, lower), (RateTag::Higher, higher)];",
+  "to": "let two = |lower, higher| vec![(RateTag::Higher, higher), (RateTag::Lower, lower)];"
+ },
+ {
+  "id": "TI-88",
+  "by": "author",
+  "what": "tds_interest_201: row and credit tax are rounded down",
+  "file": "src/tds_interest_201.rs",
+  "from": "        .checked_mul(i128::from(rate_bp))\n        .and_then(|x| x.checked_add(5000))\n        .ok_or_else(|| overflow(TEST_ID))?;\n    i64::try_from(scaled.div_euclid(10_000))",
+  "to": "        .checked_mul(i128::from(rate_bp))\n        .and_then(|x| x.checked_add(0))\n        .ok_or_else(|| overflow(TEST_ID))?;\n    i64::try_from(scaled.div_euclid(10_000))"
+ },
+ {
+  "id": "TI-89",
+  "by": "author",
+  "what": "tds_interest_201: a row's evidence is every voucher of the payee",
+  "file": "src/tds_interest_201.rs",
+  "from": "e.kind == \"voucher\" && t.refs.iter().any(|r| r.id == e.id && r.label == e.label)",
+  "to": "e.kind == \"voucher\" && !t.refs.is_empty()"
+ },
+ {
+  "id": "TI-90",
+  "by": "author",
+  "what": "tds_interest_201: a row's evidence matches refs by GUID only",
+  "file": "src/tds_interest_201.rs",
+  "from": "e.kind == \"voucher\" && t.refs.iter().any(|r| r.id == e.id && r.label == e.label)",
+  "to": "e.kind == \"voucher\" && t.refs.iter().any(|r| r.id == e.id)"
+ },
+ {
+  "id": "TI-91",
+  "by": "author",
+  "what": "tds_interest_201: a payee key carries its date's length, not the date",
+  "file": "src/tds_interest_201.rs",
+  "from": "payee_key: format!(\"{}_{}_{day}\", src.row_id, rate_tag.as_str()),",
+  "to": "payee_key: format!(\"{}_{}_{}\", src.row_id, rate_tag.as_str(), day.len()),"
+ },
+ {
+  "id": "TI-92",
+  "by": "author",
+  "what": "tds_interest_201: a payee's rows are one group",
+  "file": "src/tds_interest_201.rs",
+  "from": "group: format!(\"{}_{}\", src.row_id, rate_tag.as_str()),",
+  "to": "group: src.row_id.to_string(),"
+ },
+ {
+  "id": "TI-93",
+  "by": "author",
+  "what": "tds_interest_201: the flag is never set",
+  "file": "src/tds_interest_201.rs",
+  "from": "flag: src.flag,",
+  "to": "flag: false,"
+ },
+ {
+  "id": "TI-94",
+  "by": "author",
+  "what": "tds_interest_201: the flag is set on a partner's row",
+  "file": "src/tds_interest_201.rs",
+  "from": "            flag: false,\n            foreseeability: foreseeability.get(&entry.key).copied(),",
+  "to": "            flag: true,\n            foreseeability: foreseeability.get(&entry.key).copied(),"
+ },
+ {
+  "id": "TI-95",
+  "by": "author",
+  "what": "tds_interest_201: the flag comes from an unknown deductor status only",
+  "file": "src/tds_interest_201.rs",
+  "from": "Ok(deductor_status(payees)? == \"unknown\" || turnover_is_placeholder)",
+  "to": "Ok(deductor_status(payees)? == \"unknown\" || (turnover_is_placeholder && false))"
+ },
+ {
+  "id": "TI-96",
+  "by": "author",
+  "what": "tds_interest_201: the flag comes from a placeholder turnover only",
+  "file": "src/tds_interest_201.rs",
+  "from": "Ok(deductor_status(payees)? == \"unknown\" || turnover_is_placeholder)",
+  "to": "Ok(deductor_status(payees)?.is_empty() || turnover_is_placeholder)"
+ },
+ {
+  "id": "TI-97",
+  "by": "author",
+  "what": "tds_interest_201: a row's rate is not passed on",
+  "file": "src/tds_interest_201.rs",
+  "from": "                rate_bp,\n                credits,",
+  "to": "                rate_bp: 0,\n                credits,"
+ },
+ {
+  "id": "TI-98",
+  "by": "author",
+  "what": "tds_interest_201: a row's credits are not passed on",
+  "file": "src/tds_interest_201.rs",
+  "from": "                rate_bp,\n                credits,",
+  "to": "                rate_bp,\n                credits: credits[..0].to_vec(),"
+ },
+ {
+  "id": "TI-99",
+  "by": "author",
+  "what": "tds_interest_201: a payee's foreseeability is never read",
+  "file": "src/tds_interest_201.rs",
+  "from": "foreseeability: foreseeability.get(&entry.entity).copied(),",
+  "to": "foreseeability: None,"
+ },
+ {
+  "id": "TI-100",
+  "by": "author",
+  "what": "tds_interest_201: a partner's foreseeability is never read",
+  "file": "src/tds_interest_201.rs",
+  "from": "foreseeability: foreseeability.get(&entry.key).copied(),",
+  "to": "foreseeability: None,"
+ },
+ {
+  "id": "TI-101",
+  "by": "author",
+  "what": "tds_interest_201: a payee's foreseeability is matched after trimming",
+  "file": "src/tds_interest_201.rs",
+  "from": "foreseeability: foreseeability.get(&entry.entity).copied(),",
+  "to": "foreseeability: foreseeability.get(entry.entity.trim()).copied(),"
+ },
+ {
+  "id": "TI-102",
+  "by": "author",
+  "what": "tds_interest_201: the s.194T rate is s.194H's",
+  "file": "src/tds_interest_201.rs",
+  "from": "let partner_rate = rules.s194t.map_or(DEFAULT_S194T_RATE_BP, |t| t.rate_bp);",
+  "to": "let partner_rate = rates.s194h_bp.unwrap_or(DEFAULT_S194T_RATE_BP);"
+ },
+ {
+  "id": "TI-103",
+  "by": "author",
+  "what": "tds_interest_201: the s.194T rate has no default",
+  "file": "src/tds_interest_201.rs",
+  "from": "let partner_rate = rules.s194t.map_or(DEFAULT_S194T_RATE_BP, |t| t.rate_bp);",
+  "to": "let partner_rate = rules.s194t.map_or(0, |t| t.rate_bp);"
+ },
+ {
+  "id": "TI-104",
+  "by": "author",
+  "what": "tds_interest_201: the as-of date is the audit-case return date",
+  "file": "src/lib.rs",
+  "from": "let result = tds_interest_201::run(rules, &rows, &rules.due_date_audit_report)?;",
+  "to": "let result = tds_interest_201::run(rules, &rows, &rules.due_date_return_audit_case)?;"
+ },
+ {
+  "id": "TI-105",
+  "by": "author",
+  "what": "tds_interest_201: payee tranches are taken before the row's adjustments",
+  "file": "src/tds_payees.rs",
+  "from": "let tranches = row_tranches(nature, row_adj, limits_paise)?",
+  "to": "let tranches = row_tranches(nature, &rows[&key], limits_paise)?"
+ },
+ {
+  "id": "TI-106",
+  "by": "author",
+  "what": "tds_interest_201: payee tranches are left out",
+  "file": "src/tds_payees.rs",
+  "from": "if let Some(table) = tranche_table.as_deref_mut().filter(|_| !is_unmapped_194j) {",
+  "to": "if let Some(table) = tranche_table.as_deref_mut().filter(|_| false) {"
+ },
+ {
+  "id": "TI-107",
+  "by": "author",
+  "what": "tds_interest_201: the partner limit is crossed at the limit itself",
+  "file": "src/partners_40b_194t.rs",
+  "from": "Ok(crossing_tranches(&paise, None, Some(limit_paise), TEST_ID)?",
+  "to": "Ok(crossing_tranches(&paise, None, Some(limit_paise - 1), TEST_ID)?"
+ },
+ {
+  "id": "TI-108",
+  "by": "author",
+  "what": "tds_interest_201: partner tranches are left out",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    tranches: s194t_tranches(&credits, tds_limit_paise)?,",
+  "to": "                    tranches: Vec::new(),"
  },
  {
   "id": "S1-10",

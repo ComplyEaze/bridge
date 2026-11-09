@@ -55,8 +55,7 @@ fn captured_rows() -> Vec<Value> {
 }
 
 fn captured_index() -> MasterIndex {
-    MasterIndex::build(captured_masters().iter(), &captured_groups(), Vec::new())
-        .expect("masters index")
+    MasterIndex::build(captured_masters().iter(), &captured_groups()).expect("masters index")
 }
 
 fn row_on<'a>(rows: &'a [Value], date: &str) -> &'a Value {
@@ -253,7 +252,7 @@ fn a_ledger_whose_head_and_tax_type_disagree_makes_the_voucher_a_head_conflict()
         tax_type: "Others".to_string(),
         raw: "CGST".to_string(),
     };
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     assert_eq!(row["status"], "head_conflict");
@@ -277,12 +276,7 @@ fn a_ledger_whose_group_cannot_be_resolved_is_named_not_classified() {
         .into_iter()
         .filter(|group| group.name != "Duties & Taxes")
         .collect();
-    let index = MasterIndex::build(
-        captured_masters().iter(),
-        &GroupIndex::build(groups),
-        Vec::new(),
-    )
-    .unwrap();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     // No ledger is placed under Duties & Taxes, so nothing is in the register, and the
     // vouchers that touch the unplaced ledgers are named rather than silently absent.
@@ -343,7 +337,7 @@ fn two_listings_of_the_same_masters_are_equal_and_a_changed_head_is_not() {
         .unwrap()
         .fields
         .gst_duty_head = GstDutyHeadObservation::Absent;
-    let changed = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let changed = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     assert_ne!(first, changed, "a re-headed ledger is drift");
 
     let mut reparented = captured_masters();
@@ -355,7 +349,7 @@ fn two_listings_of_the_same_masters_are_equal_and_a_changed_head_is_not() {
         .parent = bridge_tally_protocol::PartyLedgerMasterFieldObservation::Returned(
         "Indirect Expenses".to_string(),
     );
-    let moved = MasterIndex::build(reparented.iter(), &captured_groups(), Vec::new()).unwrap();
+    let moved = MasterIndex::build(reparented.iter(), &captured_groups()).unwrap();
     assert_ne!(first, moved, "a re-parented ledger is drift");
 }
 
@@ -364,31 +358,20 @@ fn a_repeated_ledger_name_refuses_as_drift() {
     let mut masters = captured_masters();
     masters.push(masters[0].clone());
     assert_eq!(
-        MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()),
+        MasterIndex::build(masters.iter(), &captured_groups()),
         Err("ledger_snapshot_drifted".to_string())
     );
 }
 
 #[test]
-fn a_voucher_touching_a_ledger_the_compliance_read_set_aside_refuses_with_its_own_code() {
-    // The compliance read leaves out ledgers kept in another currency; a voucher that names
-    // one cannot be classified and must not fall into "drift" or "other".
+fn a_voucher_touching_a_ledger_the_masters_do_not_list_refuses_as_drift() {
+    // A ledger set aside for its currency is in the index (#683), so the only ledger a voucher
+    // can name that the index lacks is one the masters do not list.
     let masters: Vec<_> = captured_masters()
         .into_iter()
         .filter(|record| record.ledger.name != "Input CGST")
         .collect();
-    let index = MasterIndex::build(
-        masters.iter(),
-        &captured_groups(),
-        vec!["Input CGST".to_string()],
-    )
-    .unwrap();
-    assert_eq!(
-        classify_register(&index, &captured_rows()),
-        Err("register_ledger_currency_excluded".to_string())
-    );
-    // Without the exclusion the same absence is drift.
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     assert_eq!(
         classify_register(&index, &captured_rows()),
         Err("ledger_snapshot_drifted".to_string())
@@ -446,12 +429,7 @@ fn a_register_voucher_with_an_unplaced_purchase_ledger_is_returned_flagged_not_c
         .into_iter()
         .filter(|group| group.name != "Purchase Accounts")
         .collect();
-    let index = MasterIndex::build(
-        captured_masters().iter(),
-        &GroupIndex::build(groups),
-        Vec::new(),
-    )
-    .unwrap();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     assert_eq!(row["status"], "has_unresolved_group");
@@ -497,10 +475,7 @@ fn masters_read(marks: CompanyMarks, index: MasterIndex) -> RegisterMasters {
     }
 }
 
-const PINNED: CompanyMarks = CompanyMarks {
-    vouchers: 54,
-    masters: 120,
-};
+const PINNED: CompanyMarks = CompanyMarks::new(Some(54), 120);
 
 #[test]
 fn a_window_whose_marks_are_unchanged_is_stable() {
@@ -508,15 +483,19 @@ fn a_window_whose_marks_are_unchanged_is_stable() {
 }
 
 #[test]
+fn a_voucher_mark_omitted_by_one_read_and_sent_as_zero_by_the_other_is_not_drift() {
+    // The extent listing and the high-water read are two requests; on a book that has never
+    // held a voucher they may differ on whether ALTVCHID is sent, which is not the book moving.
+    let extent = CompanyMarks::new(None, 120);
+    let high_water = CompanyMarks::new(Some(0), 120);
+    assert_eq!(window_drift(extent, high_water), None);
+    assert_eq!(window_drift(high_water, extent), None);
+}
+
+#[test]
 fn a_window_is_refused_when_either_mark_moved_after_it() {
-    let moved_voucher = CompanyMarks {
-        vouchers: 55,
-        ..PINNED
-    };
-    let moved_master = CompanyMarks {
-        masters: 121,
-        ..PINNED
-    };
+    let moved_voucher = CompanyMarks::new(Some(55), 120);
+    let moved_master = CompanyMarks::new(Some(54), 121);
     for closing in [moved_voucher, moved_master] {
         assert_eq!(
             window_drift(PINNED, closing),
@@ -538,13 +517,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks {
-                    masters: 121,
-                    ..PINNED
-                },
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(54), 121), captured_index())
         ),
         Some("ledger_snapshot_drifted")
     );
@@ -555,7 +528,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
         .unwrap()
         .fields
         .gst_duty_head = GstDutyHeadObservation::Absent;
-    let rehead = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let rehead = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     assert_eq!(
         masters_drifted(&first, &masters_read(PINNED, rehead)),
         Some("ledger_snapshot_drifted")
@@ -564,13 +537,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks {
-                    vouchers: 55,
-                    ..PINNED
-                },
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(55), 120), captured_index())
         ),
         Some("voucher_window_changed_during_read")
     );
@@ -670,7 +637,7 @@ fn an_entry_on_a_ledger_with_no_head_and_a_gst_tax_type_says_so() {
         .unwrap()
         .fields
         .gst_duty_head = GstDutyHeadObservation::Absent;
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     let entry = &row["duties_taxes_entries_without_gst_head"][0];
@@ -694,12 +661,7 @@ fn no_party_name_survives_redaction_in_any_list_of_the_real_response() {
         .into_iter()
         .filter(|group| group.name != "Sundry Creditors")
         .collect();
-    let index = MasterIndex::build(
-        captured_masters().iter(),
-        &GroupIndex::build(groups),
-        Vec::new(),
-    )
-    .unwrap();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
     let mut rows = captured_rows();
     // A voucher whose only tax-free ledgers are unplaced lands in the unplaced side list.
     rows[0]["amounts"].as_array_mut().unwrap().retain(|entry| {
@@ -740,6 +702,20 @@ fn a_row_without_a_purchase_ledger_entry_says_it_has_no_taxable_entry() {
     assert_eq!(row["has_taxable_entry"], false);
     assert!(row["taxable_entries"].as_array().unwrap().is_empty());
     assert_eq!(row_on(&page.rows, "20250905")["has_taxable_entry"], true);
+}
+
+/// The five item invoices of `class-purchase-lab` (§8.2m), one keyed with the voucher's common
+/// ledger off, each carried the purchase ledger as an entry of its own, and the register listed it
+/// under `taxable_entries`, so the description may not say that an item invoice's purchase is never
+/// taken as taxable.
+#[test]
+fn the_purchase_description_says_what_the_measured_item_invoices_showed() {
+    assert!(PURCHASE_REGISTER_DESCRIPTION.contains(
+        "takes an item invoice's purchase as taxable only from its own Purchase Accounts entry, \
+         which the five item invoices measured each had (partial: one synthetic book, one with its \
+         common ledger off),"
+    ));
+    assert!(!PURCHASE_REGISTER_DESCRIPTION.contains("does not classify an item invoice"));
 }
 
 #[test]
@@ -899,7 +875,7 @@ fn an_unrecognised_head_sits_only_in_the_unrecognised_list() {
         .gst_duty_head = GstDutyHeadObservation::Unrecognized {
         raw: "Central Tax".to_string(),
     };
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     assert_eq!(row["status"], "has_unrecognised_head");
@@ -1246,12 +1222,12 @@ fn derived_sales_tail() -> String {
             "a Sales or Credit Note voucher with no entry on a Duties & Taxes ledger under `sales_vouchers_without_duties_taxes_entry` (listed by identity only; the tool does not say why such a voucher carries no tax entry). A cancelled sale that Tally returns with no ledger entries is listed there too, with `cancelled` true; no cancelled sale has been read, so whether one keeps its entries is not measured.",
         ),
         (
-            "false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation)",
-            "false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen, or an item invoice of another shape than the imported one that was measured, may hold the sales ledger in an inventory allocation instead; not measured)",
+            "false when no entry sits on a Purchase Accounts ledger.",
+            "false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen, or an item invoice of another shape than the imported one that was measured, may hold the sales ledger in an inventory allocation instead; not measured).",
         ),
         (
-            "Not measured: a REFERENCEDATE on a sale, item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
-            "Measured so far: `sales_register` was run against a live Tally on two synthetic companies. On the first, once per day, for one taxed Sales item invoice and one untaxed one: the taxed sale came back as one row with its CGST and SGST/UTGST heads taken from the ledger masters and its sales ledger as the taxable entry, and the untaxed one (read once by an earlier build; its voucher window is committed, its masters and the tool's answer are not) was counted under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44 ledgers, for one Credit Note in voucher view booked on account: one row, with its CGST and state-tax heads and its sales ledger as the taxable entry. One Sales accounting voucher (not an invoice) was also classified, in tests, against the ledger masters of the purchase register's lab book. A Credit Note is returned as a row with its signs reversed as Tally sends them: the tool neither nets nor flips, so a caller that sums tax over a window must add signed amounts. The measured Credit Note of 1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry -1000.00, each tax entry -90.00 and the party entry 1180.00, where a Sales row has the sales and tax entries positive and the party entry negative. The state-side tax head is `state_tax` (raw State Tax) on one measured book and `sgst_utgst` (raw SGST/UTGST) on another; both are recognised heads for the same side of the tax, so a caller must not look for one of them only. The cost of a call varies by book: 102 requests on a book with 8 ledgers and one currency (96 were recorded before a small book was counted, plus the six the count adds; not measured since), 118 on one with 44 ledgers and two currencies, which adds base-currency reads; the result does not report the cost. Not shown by any run: an invoice-view Credit Note; an inter-state (IGST) line; a cancelled or optional sales voucher; an unrecognised or missing duty head on a sale; more than one voucher in a window; paging; a company with a registration; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; a post-dated sale; a REFERENCE or a populated PARTYGSTIN on a sale; a REFERENCEDATE on a sale; and a ledger or voucher kept in a currency other than the book's base. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (invoice_view_credit_note, inter_state_line, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess), an invoice of another shape than the one run (for example several goods lines), and a ledger or voucher kept in a currency other than the book's base; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
+            "Not measured: a REFERENCEDATE on a sale, an item invoice whose purchase ledger is not an entry of its own, and books with several currencies.",
+            "Measured so far: `sales_register` was run against a live Tally on two synthetic companies. On the first, once per day, for one taxed Sales item invoice and one untaxed one: the taxed sale came back as one row with its CGST and SGST/UTGST heads taken from the ledger masters and its sales ledger as the taxable entry, and the untaxed one (read once by an earlier build; its voucher window is committed, its masters and the tool's answer are not) was counted under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44 ledgers, for one Credit Note in voucher view booked on account: one row, with its CGST and state-tax heads and its sales ledger as the taxable entry. One Sales accounting voucher (not an invoice) was also classified, in tests, against the ledger masters of the purchase register's lab book. A Credit Note is returned as a row with its signs reversed as Tally sends them: the tool neither nets nor flips, so a caller that sums tax over a window must add signed amounts. The measured Credit Note of 1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry -1000.00, each tax entry -90.00 and the party entry 1180.00, where a Sales row has the sales and tax entries positive and the party entry negative. The state-side tax head is `state_tax` (raw State Tax) on one measured book and `sgst_utgst` (raw SGST/UTGST) on another; both are recognised heads for the same side of the tax, so a caller must not look for one of them only. The cost of a call varies by book: 94 requests on a book with 8 ledgers and one currency (96 recorded, six more to count a small book, eight fewer with no balance reads; not measured since), 118 on one with 44 ledgers and two currencies, which adds base-currency reads; the result does not report the cost. Not shown by any run: an invoice-view Credit Note; an inter-state (IGST) line; a cancelled or optional sales voucher; an unrecognised or missing duty head on a sale; more than one voucher in a window; paging; a company with a registration; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; a post-dated sale; a REFERENCE or a populated PARTYGSTIN on a sale; a REFERENCEDATE on a sale; and a ledger or voucher kept in a currency other than the book's base. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (invoice_view_credit_note, inter_state_line, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess), an invoice of another shape than the one run (for example several goods lines), and a ledger or voucher kept in a currency other than the book's base; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
         ),
     ];
     let mut text = shared.to_string();
@@ -1469,4 +1445,142 @@ fn the_register_labels_its_window_by_the_one_rule_vouchers_uses() {
         register_window_label(false, Some((false, Some("company_has_no_vouchers")))),
         ("complete", None)
     );
+}
+
+#[test]
+fn cost_centre_and_category_names_on_register_entries_are_masked_like_the_ledger_names() {
+    // The register copies each whole entry into its lists, so the allocation names of an
+    // entry go out with it; they are marked the way the vouchers read marks them.
+    let mut rows = captured_rows();
+    for entry in rows[0]["amounts"].as_array_mut().unwrap() {
+        entry["cost_centre_allocations"] = json!([
+            {"category": "Reg Category", "cost_centre": "Reg Centre", "amount": "-1.00"}
+        ]);
+    }
+    let plain = result_for(rows.clone(), &captured_index(), Redaction::None).unwrap();
+    let plain = plain.result.to_string();
+    assert!(
+        plain.contains("Reg Centre") && plain.contains("Reg Category"),
+        "the unmasked response carries the names, so the assertion below can fail: {plain}"
+    );
+    let masked = result_for(rows, &captured_index(), Redaction::MaskParties).unwrap();
+    let masked = masked.result.to_string();
+    assert!(!masked.contains("Reg Centre"), "{masked}");
+    assert!(!masked.contains("Reg Category"), "{masked}");
+    assert!(
+        masked.contains("-1.00"),
+        "the amount is not a name: {masked}"
+    );
+}
+
+#[test]
+fn cost_centre_names_in_the_side_list_of_unplaced_ledgers_are_masked_too() {
+    // Without Sundry Creditors in the group collection the suppliers' ledgers cannot be
+    // placed, so the voucher goes to the side list of unplaced ledgers, which copies each
+    // entry whole.
+    let xml = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-groups.utf16le.xml"
+    ));
+    let groups: Vec<_> = parse_native_group_snapshot(&xml, COMPANY_GUID)
+        .unwrap()
+        .into_iter()
+        .filter(|group| group.name != "Sundry Creditors")
+        .collect();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
+    let mut rows = captured_rows();
+    // As in the test above: a voucher whose only ledgers outside Duties & Taxes are unplaced
+    // lands in the unplaced side list.
+    rows[0]["amounts"].as_array_mut().unwrap().retain(|entry| {
+        let name = entry["ledger"].as_str().unwrap();
+        name != "Input CGST" && name != "Input SGST"
+    });
+    rows[0]["voucher_class"] = json!("Sales");
+    for entry in rows[0]["amounts"].as_array_mut().unwrap() {
+        entry["cost_centre_allocations"] = json!([
+            {"category": "Side Category", "cost_centre": "Side Centre", "amount": "-1.00"}
+        ]);
+    }
+    let plain = result_for(rows.clone(), &index, Redaction::None).unwrap();
+    let side = plain.result["vouchers_with_unplaced_ledgers"].to_string();
+    assert!(
+        side.contains("Side Centre"),
+        "the side list carries the names unmasked, so the assertion below can fail: {side}"
+    );
+    let masked = result_for(rows, &index, Redaction::MaskParties).unwrap();
+    let masked = masked.result.to_string();
+    assert!(!masked.contains("Side Centre"), "{masked}");
+    assert!(!masked.contains("Side Category"), "{masked}");
+}
+
+/// The several-currency book's masters and its registers' window as the window parse leaves it
+/// (`forex-register`, #683): eight of its eleven vouchers are withheld.
+fn forex_withheld_window() -> (MasterIndex, Vec<Value>) {
+    use crate::agent::voucher_parse::{captured_72_register_window, FOREX_72_COMPANY_GUID};
+    let masters: Vec<PartyLedgerMasterRecord> = parse_native_party_ledger_master_records_with_evidence(
+        &utf16(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-ledgers-master.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+    )
+    .expect("the master answer parses")
+    .records
+    .into_iter()
+    .map(|row| row.record)
+    .collect();
+    let groups = GroupIndex::build(
+        parse_native_group_snapshot(
+            &utf16(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/native/group_snapshot_forexgroup_lab.utf16le.xml"
+            )),
+            FOREX_72_COMPANY_GUID,
+        )
+        .expect("the group answer parses"),
+    );
+    let index = MasterIndex::build(masters.iter(), &groups).expect("masters index");
+    let rows = captured_72_register_window();
+    let withheld = rows
+        .iter()
+        .filter(|row| row.get(WITHHELD_MARKER).is_some())
+        .count();
+    assert_eq!(withheld, 8);
+    (index, rows)
+}
+
+/// A withheld voucher is checked against the window with every other row, before it is set
+/// aside: one dated outside the window refuses as a read row does (#674).
+#[test]
+fn a_withheld_voucher_dated_outside_the_window_refuses_as_window_not_honoured() {
+    let (index, rows) = forex_withheld_window();
+    for kind in [RegisterKind::Sales, RegisterKind::Purchase] {
+        assert_eq!(
+            register_result(
+                kind,
+                &index,
+                rows.clone(),
+                ("20250402", "20250430"),
+                (0, 500),
+                Redaction::None,
+            )
+            .map(|_| ()),
+            Err("window_not_honoured".to_string())
+        );
+    }
+}
+
+/// A withheld voucher is classified by its ledgers like any other and counted among the
+/// vouchers observed; only one of the register's own classes is set aside.
+#[test]
+fn a_withheld_voucher_is_set_aside_only_in_its_own_registers_classes_and_still_counted() {
+    let (index, rows) = forex_withheld_window();
+    for kind in [RegisterKind::Sales, RegisterKind::Purchase] {
+        let page = super::classify_register(kind, &index, &rows).unwrap();
+        assert_eq!(page.vouchers_observed, 11);
+        let own = rows
+            .iter()
+            .filter(|row| row.get(WITHHELD_MARKER).is_some())
+            .filter(|row| is_register_class(kind, row["voucher_class"].as_str().unwrap()))
+            .count();
+        assert_eq!(page.withheld.len(), own);
+        assert!(page.rows.is_empty());
+    }
 }

@@ -1,0 +1,330 @@
+# fixture: ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml
+# parser: parse_agent_rows(BILLTRAIL_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(1),
+        "amounts": Array [
+            Object {
+                "amount": String("-20000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-20000.00"),
+                        "bill_date": String("20250410"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("INV-1"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Party P1"),
+            },
+            Object {
+                "amount": String("20000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250410"),
+        "guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000001"),
+        "is_invoice": Bool(false),
+        "master_id": String("1"),
+        "narration": String("Synthetic invoice INV-1 [BRIDGE-LAB:a08384fd-d18b-5494-847d-ca5b5b1ff61f]"),
+        "optional": Bool(false),
+        "party": String("Lab Party P1"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Sales"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Sales"),
+        "voucher_type_guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-0000002c"),
+        "voucher_type_reserved_name": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2),
+        "amounts": Array [
+            Object {
+                "amount": String("-3000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Bank"),
+            },
+            Object {
+                "amount": String("3000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("3000.00"),
+                        "bill_date": String("20250520"),
+                        "bill_type": String("Advance"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("ADV-1"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Party P1"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250520"),
+        "guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000002"),
+        "is_invoice": Bool(false),
+        "master_id": String("2"),
+        "narration": String("Synthetic advance ADV-1 (never adjusted) [BRIDGE-LAB:63a93690-912a-54b4-86e4-022df9af729d]"),
+        "optional": Bool(false),
+        "party": String("Lab Bank"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Receipt"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Receipt"),
+        "voucher_type_guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000024"),
+        "voucher_type_reserved_name": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(3),
+        "amounts": Array [
+            Object {
+                "amount": String("-4000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Bank"),
+            },
+            Object {
+                "amount": String("4000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("4000.00"),
+                        "bill_date": String("20250610"),
+                        "bill_type": String("Advance"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("ADV-2"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Party P1"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250610"),
+        "guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000003"),
+        "is_invoice": Bool(false),
+        "master_id": String("3"),
+        "narration": String("Synthetic advance ADV-2 [BRIDGE-LAB:3a7cdc98-0088-5697-b08f-300a82ae88f0]"),
+        "optional": Bool(false),
+        "party": String("Lab Bank"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Receipt"),
+        "voucher_number": String("2"),
+        "voucher_type": String("Receipt"),
+        "voucher_type_guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000024"),
+        "voucher_type_reserved_name": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(4),
+        "amounts": Array [
+            Object {
+                "amount": String("-9000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-4000.00"),
+                        "bill_date": String("20250610"),
+                        "bill_type": String("Agst Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("ADV-2"),
+                        },
+                    },
+                    Object {
+                        "amount": String("-5000.00"),
+                        "bill_date": String("20250715"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("INV-2"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Party P1"),
+            },
+            Object {
+                "amount": String("9000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250715"),
+        "guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000004"),
+        "is_invoice": Bool(false),
+        "master_id": String("4"),
+        "narration": String("Synthetic invoice INV-2 adjusting ADV-2 [BRIDGE-LAB:e9ea6cd2-88e7-56b3-b0f4-22eb4fe6b273]"),
+        "optional": Bool(false),
+        "party": String("Lab Party P1"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Sales"),
+        "voucher_number": String("2"),
+        "voucher_type": String("Sales"),
+        "voucher_type_guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-0000002c"),
+        "voucher_type_reserved_name": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(5),
+        "amounts": Array [
+            Object {
+                "amount": String("-8000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Bank"),
+            },
+            Object {
+                "amount": String("8000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("8000.00"),
+                        "bill_date": String("20250410"),
+                        "bill_type": String("Agst Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("INV-1"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Party P1"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250805"),
+        "guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000005"),
+        "is_invoice": Bool(false),
+        "master_id": String("5"),
+        "narration": String("Synthetic receipt against INV-1 [BRIDGE-LAB:f7f8adaf-960c-5423-a29d-86236e71fd96]"),
+        "optional": Bool(false),
+        "party": String("Lab Bank"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Receipt"),
+        "voucher_number": String("3"),
+        "voucher_type": String("Receipt"),
+        "voucher_type_guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000024"),
+        "voucher_type_reserved_name": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(6),
+        "amounts": Array [
+            Object {
+                "amount": String("1000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("600.00"),
+                        "bill_date": String("20250901"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("CN-1"),
+                        },
+                    },
+                    Object {
+                        "amount": String("400.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Party P1"),
+            },
+            Object {
+                "amount": String("-1000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250901"),
+        "guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000006"),
+        "is_invoice": Bool(false),
+        "master_id": String("6"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("Lab Party P1"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Credit Note"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Credit Note"),
+        "voucher_type_guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000028"),
+        "voucher_type_reserved_name": String("Credit Note"),
+    },
+    Object {
+        "alter_id": Number(7),
+        "amounts": Array [
+            Object {
+                "amount": String("2000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2000.00"),
+                        "bill_date": String("20250715"),
+                        "bill_type": String("Agst Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("INV-2"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Party P1"),
+            },
+            Object {
+                "amount": String("-2000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260310"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque/DD"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260310"),
+        "guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000007"),
+        "is_invoice": Bool(false),
+        "master_id": String("7"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("Lab Party P1"),
+        "post_dated": Bool(true),
+        "voucher_class": String("Receipt"),
+        "voucher_number": String("4"),
+        "voucher_type": String("Receipt"),
+        "voucher_type_guid": String("9ab5002c-e910-4242-83e4-a27cc490600b-00000024"),
+        "voucher_type_reserved_name": String("Receipt"),
+    },
+])

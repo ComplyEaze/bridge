@@ -496,10 +496,9 @@ impl TallyConnector for RuntimeTallyConnector {
         // recreate that single-use UI authority.
         //
         // Uses Tally's documented `Company` collection (`ReadOnlyProfile::CompanyListV2`)
-        // rather than the legacy `CompanyListV1` custom TDL report: the collection always
-        // answers with the ordinary shaped `HEADER/STATUS=1` envelope, so `parse_companies_from_collection`
-        // can require that shape outright instead of depending on a report-rendering path that
-        // one Tally instance is known to hang on and another to answer inconsistently.
+        // (no custom TDL report, #1872): the collection answers with the ordinary shaped
+        // `HEADER/STATUS=1` envelope, so `parse_companies_from_collection` can require that
+        // shape outright.
         let lineage = source_lineage(&self.config)?;
         let companies = parse_companies_from_collection(
             &self

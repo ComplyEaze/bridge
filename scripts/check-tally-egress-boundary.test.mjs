@@ -66,7 +66,6 @@ const todayTrees = (root) => {
   };
   // The lower-level network crates, as printed on 2026-09-28: no first-party dependent in either workspace.
   for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"]]) {
-    EVERY_EDGE[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
     EVERY_EDGE[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
     EVERY_EDGE[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
     EVERY_EDGE[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
@@ -84,7 +83,7 @@ const TODAY = todayTrees(root);
 const APP_LINE = `bridge v0.2.0 (${root}/src-tauri)`;
 const TRANSPORT_LINE = `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`;
 const EVERY_CALL = ["src-tauri"].flatMap((workspace) =>
-  ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service", "tower"].flatMap((name) => [
+  ["reqwest", "hyper", "hyper-util", "socket2", "mio", "tower-service", "tower"].flatMap((name) => [
     `${workspace}.${name}.all`,
     `${workspace}.${name}.shipped`,
   ]),
@@ -230,6 +229,37 @@ test("static control: a clean repository passes, and a comment naming clippy is 
   const result = sandbox().run();
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^Tally-path egress boundary is sealed:/);
+});
+
+// Every name the gate's DENIED_TRANSPORT_STACKS lists. The gate runs when it is imported, so the
+// list cannot be imported; the next test reads the gate's source and holds the two lists equal.
+const TRANSPORT_STACKS = [
+  "rustls", "hyper-rustls", "tokio-rustls", "aws-lc-sys", "ring", "native-tls", "hyper-tls", "h2", "h3", "quinn",
+];
+
+test("the TLS, HTTP/2 and QUIC names planted below are exactly the gate's list", () => {
+  const source = readFileSync(gate, "utf8");
+  const declared = source.match(/^const DENIED_TRANSPORT_STACKS = \[([^\]]*)\];$/m);
+  assert.ok(declared, "DENIED_TRANSPORT_STACKS not found in the gate");
+  const names = [...declared[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(names, TRANSPORT_STACKS);
+});
+
+test("a lock file read as nothing is refused", { skip }, () => {
+  assertRefused(sandbox({ "src-tauri/Cargo.lock": "" }).run(), "src-tauri/Cargo.lock lists no packages; it was not read");
+});
+
+test("a network-capable crate, or a TLS, HTTP/2 or QUIC crate, in the lock file is refused", { skip }, () => {
+  const lock = (name) => ({ "src-tauri/Cargo.lock": `[[package]]\nname = "reqwest"\n\n[[package]]\nname = "${name}"\n` });
+  assertRefused(sandbox(lock("ureq")).run(), "src-tauri/Cargo.lock contains ureq, a network-capable crate outside the pinned HTTP client");
+  for (const name of TRANSPORT_STACKS) {
+    assertRefused(
+      sandbox(lock(name)).run(),
+      `src-tauri/Cargo.lock contains ${name}, a TLS, HTTP/2 or QUIC crate the loopback-only transport does not use`,
+    );
+  }
+  // A name that only starts like a listed one is not refused.
+  assert.equal(sandbox(lock("h2o")).run().status, 0);
 });
 
 test("CLIPPY_CONF_DIR or CLIPPY_ARGS in any tracked file is refused", { skip }, () => {

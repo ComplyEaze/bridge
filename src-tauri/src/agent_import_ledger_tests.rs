@@ -2,7 +2,7 @@ use super::*;
 
 fn batch() -> ImportLedgerLine {
     ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -40,6 +40,7 @@ fn server(path: &Path) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }

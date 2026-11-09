@@ -144,6 +144,7 @@ async fn call_observed(
         import_enabled: false,
         posting: crate::agent::Posting::Off,
         audit_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server
         .call_tool(
@@ -184,6 +185,45 @@ async fn the_captured_list_is_returned_as_tallys_own_and_says_what_was_not_check
     );
     assert_eq!(result["unmeasured_in_this_answer"], json!([]));
     assert!(result.get("reason").is_none(), "{result}");
+}
+
+/// The sign a value carries is stated in the result and the tool text (#2051): the captured
+/// item's value 360.00 is positive, and the screen shows it as (-)360.00.
+#[tokio::test]
+async fn the_sign_a_value_carries_is_stated_beside_the_captured_positive_value() {
+    let (response, _) = call(plans(captured()), "2026-04-01", "2027-03-31").await;
+    let result = result(&response);
+    assert_eq!(result["listed_items"][0]["value"]["value"], "360.00");
+    let limitations = result["limitations"].as_array().unwrap();
+    let sentence = limitations
+        .iter()
+        .filter_map(Value::as_str)
+        .find(|line| {
+            line.starts_with("When a value is present it keeps the sign Tally's export carries")
+        })
+        .expect("the sign is stated in the limitations");
+    for part in [
+        "When a value is present",
+        "a debit is negative and a credit is positive",
+        "(-)360.00",
+        "on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed",
+        "the other two short items captured had no value",
+        "sections 12a.13 and 12a.16",
+    ] {
+        assert!(sentence.contains(part), "{part}: {sentence}");
+    }
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "negative_stock"))
+        .and_then(|tool| tool["description"].as_str())
+        .expect("negative_stock is registered");
+    assert!(
+        description.contains(
+            "a present value keeps the export's sign (a debit negative, a credit positive; the screen shows a credit as (-))"
+        ),
+        "{description}"
+    );
 }
 
 #[tokio::test]
@@ -409,6 +449,7 @@ async fn a_reversed_window_is_refused_before_any_request() {
         import_enabled: false,
         posting: crate::agent::Posting::Off,
         audit_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server
         .call_tool(

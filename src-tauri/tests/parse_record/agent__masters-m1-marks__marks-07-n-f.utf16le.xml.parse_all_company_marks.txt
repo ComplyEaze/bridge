@@ -1,0 +1,11 @@
+# fixture: agent/masters-m1-marks/marks-07-n-f.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE MASTERS LAB",
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6",
+        vouchers: 0,
+        masters: 222,
+    },
+])

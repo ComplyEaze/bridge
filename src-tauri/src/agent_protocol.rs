@@ -143,7 +143,7 @@ where
             }
             "ping" => Ok(json!({})),
             _ if !initialized => Err("initialize_required".to_string()),
-            "tools/list" => Ok(json!({"tools": catalog::listed_tool_definitions(server.settings.import_enabled, server.settings.posting.enabled(), server.settings.audit_enabled)})),
+            "tools/list" => Ok(json!({"tools": catalog::listed_tool_definitions(server.settings.import_enabled, server.settings.posting.enabled(), server.settings.audit_enabled, server.settings.master_writes_enabled)})),
             "tools/call" => match params.get("name").and_then(Value::as_str) {
                 Some(name) => {
                 let arguments = params
@@ -151,9 +151,10 @@ where
                     .cloned()
                     .unwrap_or_else(|| json!({}));
                 if catalog::registered_tool_definitions(true, true).as_array().is_some_and(|tools| tools.iter().any(|tool| tool["name"] == name)) {
-                    let response = if name == "post_import" {
-                        run_post(
+                    let response = if is_post_tool(name) {
+                        run_named_post(
                             &server,
+                            name,
                             id.as_ref().expect("tool requests have IDs"),
                             &arguments,
                             &mut reader, &mut framer, &mut pending,
@@ -190,7 +191,7 @@ where
                         }
                         ToolCallEnd::Withdrawn { request_trail } => {
                             let mut cancelled = server.finish_tool_response(name, &arguments, Utc::now(),
-                                server.cancelled_import_for_response(&arguments));
+                                server.cancelled_post_for_response(name, &arguments));
                             cancelled.egress.request_trail = request_trail;
                             recovery_batch_id = cancelled.recovery_batch_id;
                             egress = Some(cancelled.egress);
@@ -401,6 +402,14 @@ fn recovery_error_with_dispatch(
         data["dispatch"] = json!({"state":"reconciliation_required","resent":false});
         data["dispatch_response"] = dispatch;
     }
+    // A ledger create keeps Tally's counters in `counters`. This keeps them when
+    // the egress record of the answer could not be written. It is not the cap
+    // on the answer's size: an answer over the cap is withheld as
+    // `agent_response_too_large` with the batch id alone, and its counters,
+    // state and alert are dropped.
+    if let Some(counters) = compact_master_counters(&result["counters"]) {
+        data["counters"] = counters;
+    }
     response["error"]["data"] = data;
     if response.to_string().len() < max_bytes {
         response
@@ -423,6 +432,22 @@ pub(super) fn compact_dispatch_response(response: &Value) -> Option<Value> {
         "response_sha256":response_sha256,
         "bytes":bytes,
         "outcome":outcome,
+    }))
+}
+
+/// Tally's counters as a ledger create reports them: all seven, each a number.
+/// Anything else (null included) is not kept.
+fn compact_master_counters(counters: &Value) -> Option<Value> {
+    let counters = counters.as_object()?;
+    let counter = |name| counters.get(name).and_then(Value::as_u64);
+    Some(json!({
+        "created":counter("created")?,
+        "altered":counter("altered")?,
+        "deleted":counter("deleted")?,
+        "ignored":counter("ignored")?,
+        "errors":counter("errors")?,
+        "cancelled":counter("cancelled")?,
+        "exceptions":counter("exceptions")?
     }))
 }
 
@@ -531,6 +556,9 @@ impl Framer {
 }
 
 struct PostRequest<'a> {
+    /// The tool being called: the voucher post or the master post, which keep
+    /// their dispatch records in different journals.
+    tool: &'a str,
     id: &'a Value,
     args: &'a Value,
     /// Withdraws the post before its next queued Tally operation (#554).
@@ -552,7 +580,14 @@ struct PostRequest<'a> {
 fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
     request.cancellation.cancel();
     if let Some(batch_id) = request.args.get("batch_id").and_then(Value::as_str) {
-        server.post_approvals.revoke(batch_id, "request_cancelled");
+        let kind = if request.tool == "post_ledger_creates" {
+            crate::tally::approved_import::PostKind::Masters
+        } else {
+            crate::tally::approved_import::PostKind::Vouchers
+        };
+        server
+            .post_approvals
+            .revoke_of(kind, batch_id, "request_cancelled");
     }
 }
 
@@ -567,10 +602,17 @@ pub(in crate::agent) enum ToolCallEnd {
     Withdrawn { request_trail: Option<Value> },
 }
 
+/// The tools that post to Tally behind a native approval, and so run through
+/// [`run_named_post`] rather than as an ordinary call.
+fn is_post_tool(name: &str) -> bool {
+    matches!(name, "post_import" | "post_ledger_creates")
+}
+
 /// Run one `post_import` call to its end while servicing input: the one path
 /// every agent post takes. It runs under its own withdrawal token (#725): a
 /// cancellation before its intent stops it before its next Tally operation,
 /// never in one.
+#[cfg(test)]
 pub(in crate::agent) async fn run_post<R, W>(
     server: &Server,
     id: &Value,
@@ -584,6 +626,36 @@ where
     R: AsyncBufRead + Unpin,
     W: AsyncWrite + Unpin,
 {
+    run_named_post(
+        server,
+        "post_import",
+        id,
+        args,
+        reader,
+        framer,
+        pending,
+        stdout,
+    )
+    .await
+}
+
+/// [`run_post`] for `tool`, one of the tools [`is_post_tool`] names.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::agent) async fn run_named_post<R, W>(
+    server: &Server,
+    tool: &str,
+    id: &Value,
+    args: &Value,
+    reader: &mut R,
+    framer: &mut Framer,
+    pending: &mut std::collections::VecDeque<Frame>,
+    stdout: &mut W,
+) -> Result<ToolCallEnd, String>
+where
+    R: AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    debug_assert!(is_post_tool(tool));
     let cancellation = tokio_util::sync::CancellationToken::new();
     // Boxed: the post's state machine is large (#725 added the dialog wait),
     // and held inline it overflowed a Windows debug test thread's stack. The
@@ -593,10 +665,11 @@ where
             cancellation.clone(),
             // One wire-lock wait budget for the whole call (#697).
             crate::tally::runtime::with_operation_wire_budget(
-                server.call_tool_response("post_import", args.clone()),
+                server.call_tool_response(tool, args.clone()),
             ),
         )),
         PostRequest {
+            tool,
             id,
             args,
             cancellation: &cancellation,
@@ -665,7 +738,7 @@ where
                         if matches!(phase, PostPhase::Draining | PostPhase::Withdrawing) {
                             continue;
                         }
-                        match post_dispatch_state(server, request.args) {
+                        match post_dispatch_state(server, request.tool, request.args) {
                             PostDispatchState::NotDispatched => {
                                 withdraw_post(server, &request);
                                 phase = PostPhase::Withdrawing;
@@ -686,7 +759,7 @@ where
             // the durable snapshot lock. In particular, a ping must not wait
             // for the builder's Tally reads to finish.
             _ = classifier_retry.tick(), if phase == PostPhase::Classifying => {
-                match post_dispatch_state(server, request.args) {
+                match post_dispatch_state(server, request.tool, request.args) {
                     PostDispatchState::NotDispatched => {
                         withdraw_post(server, &request);
                         phase = PostPhase::Withdrawing;
@@ -883,8 +956,8 @@ enum PostPhase {
     Withdrawing,
 }
 
-fn post_dispatch_state(server: &Server, args: &Value) -> PostDispatchState {
-    match server.recorded_import_attempt(args) {
+fn post_dispatch_state(server: &Server, tool: &str, args: &Value) -> PostDispatchState {
+    match server.recorded_post_attempt(tool, args) {
         Ok(Some(false)) => PostDispatchState::NotDispatched,
         Ok(_) => PostDispatchState::MayHaveDispatched,
         Err(ToolFailure { code, .. }) if code == "import_admission_busy" => {
@@ -896,9 +969,9 @@ fn post_dispatch_state(server: &Server, args: &Value) -> PostDispatchState {
     }
 }
 
-async fn post_may_have_dispatched(server: &Server, args: &Value) -> bool {
+async fn post_may_have_dispatched(server: &Server, tool: &str, args: &Value) -> bool {
     loop {
-        match post_dispatch_state(server, args) {
+        match post_dispatch_state(server, tool, args) {
             PostDispatchState::NotDispatched => return false,
             // A concurrent build holds this lock across source reads. Keep the
             // post future suspended until its durable phase can be observed;
@@ -921,7 +994,7 @@ async fn finish_interrupted_post<F>(
 where
     F: std::future::Future<Output = ToolResponse>,
 {
-    if known_dispatched || post_may_have_dispatched(server, request.args).await {
+    if known_dispatched || post_may_have_dispatched(server, request.tool, request.args).await {
         // The caller may be gone, but the original execution owns the only
         // response wire. Let the ordinary response path publish it if stdout
         // remains usable; no replacement post is created.
@@ -979,14 +1052,14 @@ async fn cancel_queued_request<W: AsyncWrite + Unpin>(
         .cloned()
         .unwrap_or_else(|| json!({}));
     let name = request["params"]["name"].as_str().unwrap_or("unknown");
-    if is_tool && name == "post_import" {
+    if is_tool && is_post_tool(name) {
         // Cancelled before it started, it holds nothing: what an earlier call
         // left for this batch belongs to that call, and is left alone (#725).
         let response = server.finish_tool_response(
             name,
             &args,
             Utc::now(),
-            server.cancelled_import_for_response(&args),
+            server.cancelled_post_for_response(name, &args),
         );
         return finish_response(
             server,

@@ -35,6 +35,54 @@ fn a_paired_report_response_marker_does_not_change_the_command_code() {
     }
 }
 
+/// The same property for the request a party ledger read names (#2265): the desktop export
+/// classifies this read by the same text, so the code is identical with and without it, each
+/// failure reaching the mapper the way a failed send does.
+#[test]
+fn a_named_ledger_request_does_not_change_the_command_code() {
+    use crate::tally::connection::LedgerReadRequest;
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    use bridge_tally_transport::TallyTransportError;
+
+    let wrapped = |error| with_read_evidence(error, RuntimeReadEvidence::empty());
+    let failures = || {
+        [
+            (
+                anyhow::Error::new(TallyTransportError::ConnectionFailed),
+                "endpoint_unreachable",
+            ),
+            (
+                anyhow::Error::new(TallyTransportError::RequestTimedOut),
+                "tally_request_deadline_exceeded",
+            ),
+            (
+                anyhow::Error::new(TallyTransportError::ResponseTooLarge {
+                    limit: 1,
+                    declared_by_peer: true,
+                }),
+                "response_validation_failed",
+            ),
+            (
+                anyhow::anyhow!("The request was cancelled"),
+                "request_cancelled",
+            ),
+            (
+                anyhow::anyhow!("Tally company was not found"),
+                "tally_company_context_failed",
+            ),
+        ]
+    };
+    for ((bare, code), (failure, _)) in failures().into_iter().zip(failures()) {
+        let bare = party_ledger_master_runtime_command_error(wrapped(bare));
+        let named = party_ledger_master_runtime_command_error(wrapped(
+            LedgerReadRequest::LedgerMaster.failed(failure),
+        ));
+        assert_eq!(bare.code, code);
+        assert_eq!(named.code, code);
+        assert_eq!(named.message, bare.message);
+    }
+}
+
 use super::all_clients::migration::{
     load_client_group_labels_for_migration, prepare_client_group_label_migration_from_labels,
     ClientGroupLabelMigrationPreparationError,
@@ -50,7 +98,7 @@ use super::{
     write_unique_download, CompanySweepFailure, OutstandingsRequest, PartyLedgerMasterExport,
     PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
     VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED, MIRROR_KEY_INVALID_MESSAGE,
-    MIRROR_KEY_MISSING_MESSAGE,
+    MIRROR_KEY_MISSING_MESSAGE, PARTY_LEDGER_MASTER_EXPORT_READ,
 };
 use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
@@ -509,12 +557,6 @@ fn tally_runtime_error_serialization_is_stable_and_redacted() {
     assert_eq!(deadline.code, "tally_request_deadline_exceeded");
     assert_eq!(deadline.retry, "after_change");
     assert!(deadline.remediation.contains("Do not retry"));
-
-    let discovery_limit = tally_runtime_command_error(anyhow::anyhow!(
-        "interactive discovery listing limit exceeded: synthetic company response"
-    ));
-    assert_eq!(discovery_limit.code, "untrusted_discovery_limit_exceeded");
-    assert_eq!(discovery_limit.category, "Discovery listing");
 }
 
 #[test]
@@ -645,6 +687,16 @@ fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_bou
     for malformed in ["2026-07-31", "20260230", "", "2026073"] {
         assert!(request(Some(malformed)).is_err(), "{malformed}");
     }
+}
+
+/// The export's mailing columns are blank unless its request names the mailing
+/// details: the read it sends is the one that does (bridge#1490).
+#[test]
+fn the_party_ledger_master_export_asks_for_the_mailing_details() {
+    assert_eq!(
+        PARTY_LEDGER_MASTER_EXPORT_READ,
+        crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits
+    );
 }
 
 #[test]
@@ -1187,5 +1239,176 @@ fn desktop_messages_name_the_product_in_full() {
                 );
             }
         }
+    }
+}
+
+/// A party/ledger master read that asked for the mailing details and timed out, or came
+/// back too large, names that larger read and says what to do; only the size limit says the
+/// estimate may have been too low. Every other marked failure is told exactly as a read without
+/// them, and the same failure of a read without them is told as before (bridge#2074). An export
+/// whose wait for the drain of such a failure ended says Tally was still busy with that read
+/// (bridge#2214). Which failures are marked is decided where the read is sent, and tested
+/// there; this matches on the marked cause, not on text.
+#[test]
+fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
+    use crate::tally::connection::{
+        mailing_details_read_error as marked, PairedNativeReportResponseFailure,
+    };
+    // The marker reads the master post's own failure, which the paired read wraps.
+    let posted = |error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error));
+    use super::{
+        MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE as ESTIMATE,
+        MAILING_DETAILS_READ_FAILED_REMEDIATION as REMEDIATION,
+        MAILING_DETAILS_READ_FAILED_SENTENCE as SENTENCE,
+    };
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    use bridge_tally_transport::TallyTransportError;
+    // Each failure, the code it keeps, and the sentences a marked one adds.
+    let failures = || {
+        [
+            (
+                TallyTransportError::RequestTimedOut,
+                "tally_request_deadline_exceeded",
+                SENTENCE.to_owned(),
+            ),
+            (
+                TallyTransportError::ResponseTooLarge {
+                    limit: bridge_tally_transport::XML_RESPONSE_MAX_BYTES,
+                    declared_by_peer: false,
+                },
+                "response_validation_failed",
+                format!("{SENTENCE}{ESTIMATE}"),
+            ),
+            (
+                TallyTransportError::ResponseTruncated,
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::ResponseReadFailed,
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::RequestFailed,
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::HttpStatus { status: 503 },
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::ConnectionFailed,
+                "endpoint_unreachable",
+                String::new(),
+            ),
+        ]
+    };
+    for (error, code, added) in failures() {
+        let plain = party_ledger_master_runtime_command_error(with_read_evidence(
+            anyhow::Error::new(error.clone()),
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(plain.code, code, "{error:?}");
+        assert!(!plain.message.contains("mailing"), "{}", plain.message);
+        assert_ne!(plain.remediation, REMEDIATION);
+        let named = party_ledger_master_runtime_command_error(with_read_evidence(
+            marked(posted(anyhow::Error::new(error.clone()))),
+            RuntimeReadEvidence::empty(),
+        ));
+        // The marker keeps the failure's own code and message, and adds the sentences.
+        assert_eq!(named.code, code, "{error:?}");
+        assert!(named
+            .message
+            .starts_with("ComplyEaze Bridge withheld the party/ledger master: "));
+        assert_eq!(
+            named.message,
+            format!("{}{added}", plain.message),
+            "{error:?}"
+        );
+        if added.is_empty() {
+            // Told exactly as the same failure of a read without the details.
+            assert!(!named.message.contains(SENTENCE), "{}", named.message);
+            assert!(!named.message.contains(ESTIMATE), "{}", named.message);
+            assert_eq!(named.remediation, plain.remediation, "{error:?}");
+            assert_ne!(named.remediation, REMEDIATION, "{error:?}");
+        } else {
+            assert_eq!(named.remediation, REMEDIATION, "{error:?}");
+        }
+    }
+    // An answer that did not decode, or whose XML did not parse, is marked too, and is told
+    // exactly as the same failure unmarked: neither sentence, nor the remediation.
+    use crate::tally::connection::{mailing_details_answer_error, MailingDetailsReadFailed};
+    let undecodable = || TallyTransportError::InvalidEncoding {
+        code: "response_encoding_invalid",
+    };
+    let malformed = || bridge_tally_protocol::NativeCollectionError::MalformedResponse;
+    let not_success = || bridge_tally_protocol::NativeCollectionError::NotSuccess;
+    for (plain, named) in [
+        (
+            anyhow::Error::new(undecodable()),
+            marked(posted(anyhow::Error::new(undecodable()))),
+        ),
+        (
+            anyhow::Error::new(malformed()),
+            mailing_details_answer_error(anyhow::Error::new(malformed())),
+        ),
+        (
+            anyhow::Error::new(not_success()),
+            mailing_details_answer_error(anyhow::Error::new(not_success())),
+        ),
+    ] {
+        assert!(
+            named
+                .chain()
+                .any(|cause| cause.is::<MailingDetailsReadFailed>()),
+            "{named:#}"
+        );
+        let plain = party_ledger_master_runtime_command_error(with_read_evidence(
+            plain,
+            RuntimeReadEvidence::empty(),
+        ));
+        let named = party_ledger_master_runtime_command_error(with_read_evidence(
+            named,
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(named.code, plain.code);
+        assert_eq!(named.message, plain.message);
+        assert_eq!(named.remediation, plain.remediation);
+        assert!(!named.message.contains(SENTENCE), "{}", named.message);
+        assert_ne!(named.remediation, REMEDIATION);
+    }
+    // Tally still busy with a mailing read whose answer broke off, could not be read, did not
+    // decode or never came, past the export's wait (bridge#2214): the failure's own code and
+    // message, then the wait's sentence and remediation.
+    use super::{
+        MAILING_RETRY_HELD_BY_DRAIN_REMEDIATION as HELD_REMEDIATION,
+        MAILING_RETRY_HELD_BY_DRAIN_SENTENCE as HELD,
+    };
+    for error in [
+        TallyTransportError::ResponseTruncated,
+        TallyTransportError::ResponseReadFailed,
+        TallyTransportError::RequestFailed,
+        undecodable(),
+    ] {
+        let plain = party_ledger_master_runtime_command_error(with_read_evidence(
+            anyhow::Error::new(error.clone()),
+            RuntimeReadEvidence::empty(),
+        ));
+        let held = party_ledger_master_runtime_command_error(with_read_evidence(
+            crate::tally::connection::mailing_retry_held_by_drain(marked(posted(
+                anyhow::Error::new(error.clone()),
+            ))),
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(held.code, plain.code, "{error:?}");
+        assert_eq!(
+            held.message,
+            format!("{}{HELD}", plain.message),
+            "{error:?}"
+        );
+        assert_eq!(held.remediation, HELD_REMEDIATION, "{error:?}");
     }
 }

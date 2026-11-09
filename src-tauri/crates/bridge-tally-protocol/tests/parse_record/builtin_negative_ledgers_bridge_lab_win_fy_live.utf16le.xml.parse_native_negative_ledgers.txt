@@ -1,0 +1,23 @@
+# fixture: tests/fixtures/builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml
+# parser: parse_native_negative_ledgers
+# source: captured
+Ok(NativeNegativeLedgers {
+    entries: [
+        NativeNegativeLedger {
+            name: "Synthetic Creditor",
+            balance: Debit(
+                ExactDecimal(
+                    "2500.50",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "Synthetic Debtor",
+            balance: Credit(
+                ExactDecimal(
+                    "10000.00",
+                ),
+            ),
+        },
+    ],
+})

@@ -1,0 +1,5 @@
+src-tauri/src/commands_trial_balance.rs
+src-tauri/src/reports/trial_balance_tests.rs
+src-tauri/src/reports/trial_balance_xlsx.rs
+src-tauri/src/reports/trial_balance_xlsx_tests.rs
+reviewer: lamemustafa

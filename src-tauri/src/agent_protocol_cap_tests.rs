@@ -73,7 +73,7 @@ async fn control_frames_but_the_tool_list_obey_minimum_cap_and_refusals_keep_ses
         assert_eq!(frames[1]["result"]["protocolVersion"], "2025-06-18");
         assert_eq!(
             frames[2]["result"]["tools"],
-            catalog::listed_tool_definitions(import_enabled, false, false)
+            catalog::listed_tool_definitions(import_enabled, false, false, false)
         );
         assert_eq!(frames[3]["error"]["code"], -32601);
         assert_eq!(frames[4]["error"]["message"], "request_id_too_large");

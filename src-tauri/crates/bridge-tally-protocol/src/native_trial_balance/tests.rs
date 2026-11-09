@@ -505,3 +505,161 @@ fn a_trial_balance_status_is_one_failure_absent_or_repeated() {
         );
     }
 }
+
+fn amount(text: &str) -> NativeTrialBalanceAmount {
+    NativeTrialBalanceAmount::Present(ExactDecimal::parse(text).unwrap())
+}
+
+fn row_of(
+    opening: NativeTrialBalanceAmount,
+    debit: NativeTrialBalanceAmount,
+    credit: NativeTrialBalanceAmount,
+    closing: NativeTrialBalanceAmount,
+) -> NativeTrialBalanceRow {
+    NativeTrialBalanceRow {
+        name: "Ledger".to_string(),
+        guid: "guid".to_string(),
+        parent: PartyLedgerMasterFieldObservation::NotObserved,
+        opening,
+        debit,
+        credit,
+        closing,
+    }
+}
+
+/// The two captured answers of #2068 (`tests/fixtures/native/PROVENANCE.md`), one book not
+/// integrated with inventory and one integrated: each has a Closing Stock ledger whose closing
+/// balance of 1,400.00 was keyed on Tally's screen. Tally keeps its opening as `TBALCLOSING` and
+/// shows the keyed figure only as its debit total, so that row alone does not add up, by the
+/// same 400.00 on both books; the row is parsed as it was sent.
+#[test]
+fn a_keyed_closing_stock_ledger_is_the_only_row_that_does_not_add_up() {
+    for (bytes, company) in [
+        (
+            &include_bytes!(
+                "../../tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml"
+            )[..],
+            "567653b1-c8be-4deb-b4fc-3ea5de801884",
+        ),
+        (
+            &include_bytes!(
+                "../../tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml"
+            )[..],
+            "3fc2a3c7-1da8-4bc4-a472-44028cdebca7",
+        ),
+    ] {
+        let report = parse_native_trial_balance(&forex_capture(bytes), company).unwrap();
+        assert_eq!(report.rows.len(), 8, "{company}");
+        let mut differing = Vec::new();
+        for row in &report.rows {
+            if let NativeTrialBalanceMovements::Differ(gap) = row.movements() {
+                differing.push((row.name.as_str(), gap));
+            }
+        }
+        assert_eq!(
+            differing,
+            [("Closing Stock", "400.00".to_string())],
+            "{company}"
+        );
+        let stock = report
+            .rows
+            .iter()
+            .find(|r| r.name == "Closing Stock")
+            .unwrap();
+        assert_eq!(
+            [&stock.opening, &stock.debit, &stock.credit, &stock.closing],
+            [
+                &amount("-1000.00"),
+                &amount("-400.00"),
+                &NativeTrialBalanceAmount::PresentEmpty,
+                &amount("-1000.00"),
+            ],
+            "{company}"
+        );
+    }
+}
+
+/// An empty amount is taken as zero in this check, as the statements' own row check does, so
+/// the lab's Cash row (opening 0.00, everything else empty) ties, and an opening with an empty
+/// closing does not.
+#[test]
+fn an_empty_amount_counts_as_zero_in_the_check() {
+    let cash = row_of(
+        amount("0.00"),
+        NativeTrialBalanceAmount::PresentEmpty,
+        NativeTrialBalanceAmount::PresentEmpty,
+        NativeTrialBalanceAmount::PresentEmpty,
+    );
+    assert_eq!(cash.movements(), NativeTrialBalanceMovements::Tie);
+    let emptied = row_of(
+        amount("5.00"),
+        NativeTrialBalanceAmount::PresentEmpty,
+        NativeTrialBalanceAmount::PresentEmpty,
+        NativeTrialBalanceAmount::PresentEmpty,
+    );
+    assert_eq!(
+        emptied.movements(),
+        NativeTrialBalanceMovements::Differ("-5.00".to_string())
+    );
+}
+
+#[test]
+fn the_difference_is_exact_and_signed_in_tallys_sign() {
+    let short = row_of(
+        amount("10.10"),
+        amount("-0.05"),
+        amount("0.01"),
+        amount("10.06"),
+    );
+    assert_eq!(short.movements(), NativeTrialBalanceMovements::Tie);
+    let one_paisa = row_of(
+        amount("10.10"),
+        amount("-0.05"),
+        amount("0.01"),
+        amount("10.07"),
+    );
+    assert_eq!(
+        one_paisa.movements(),
+        NativeTrialBalanceMovements::Differ("0.01".to_string())
+    );
+    let negative = row_of(
+        amount("1.00"),
+        amount("2.00"),
+        amount("3.00"),
+        amount("5.50"),
+    );
+    assert_eq!(
+        negative.movements(),
+        NativeTrialBalanceMovements::Differ("-0.50".to_string())
+    );
+}
+
+/// No row of these three committed Trial Balance captures differs (the two of #2068 each have
+/// one, pinned above), so the check names none of their ledgers: the 6 rows of the known lab, the 8 of the opening-year book and the base rows of the
+/// several-currency book. The statements' own tests run the same check over the dense month (123
+/// rows), the year, and the stock book, and refuse any read where it differs.
+#[test]
+fn no_row_of_the_committed_captures_differs() {
+    let known = parse_native_trial_balance(KNOWN_LAB, COMPANY).unwrap();
+    let opening_year =
+        parse_native_trial_balance(OPENING_YEAR, "915d42f8-42ae-4b03-8291-55f596e3a2ea").unwrap();
+    let forex = parse_native_trial_balance_with_currency(
+        &forex_with_currency(),
+        FOREX_COMPANY,
+        &forex_base(),
+    )
+    .unwrap();
+    let mut checked = 0;
+    for row in known
+        .rows
+        .iter()
+        .chain(opening_year.rows.iter())
+        .chain(forex.report.rows.iter())
+    {
+        match row.movements() {
+            NativeTrialBalanceMovements::Differ(gap) => panic!("{} differs by {gap}", row.name),
+            NativeTrialBalanceMovements::Tie => checked += 1,
+        }
+    }
+    assert!(checked >= 10, "{checked} rows were checked");
+}

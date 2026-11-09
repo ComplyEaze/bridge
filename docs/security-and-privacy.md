@@ -3,8 +3,8 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Release 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) was
-published after the pull requests named here; this page was not read again at that tag. Six
+page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026), 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) and 0.7.0 (tag `mcp-v0.7.0`, 30 October 2026) were
+published after the pull requests named here; this page was not read again at any of those tags. Seven
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -12,7 +12,7 @@ masters read, in sections 1 and 2 (#1398), the note on how long a
 from this repository loads the PDF library from, in section 5 (#1422), the
 statement party written into a bank voucher's narration, in section 2 (#1430), the
 file of skipped bank-statement rows, in section 4 (#1625), and the
-location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569). It was written from a reading
+location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569), and the mailing details of a party ledger and the masking of its address, in section 2 (#1490). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -79,7 +79,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 - **Between ComplyEaze Bridge and Tally:** only to a loopback address on this
   computer. If you forward that port to a virtual machine or another machine,
   the traffic follows your forward.
-- **A Windows network path, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
+- **A Windows network path, in 0.3.0 and 0.4.0 (its network forms refused from 0.4.1; some paths still pass).** The
   bank statement tool could be given a path that names another computer, and
   Windows then connects to that computer by itself. Section 3 describes it.
 - **To your AI provider: yes, whatever the assistant reads.** ComplyEaze Bridge
@@ -94,8 +94,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   read or a `ledger_movement` read took (no book data), to Claude Desktop.
   Claude Desktop is the host, and it sends tool results to the AI provider you
   use as part of the conversation; that is the host's behaviour, which this
-  repository cannot show. ComplyEaze Bridge can shorten party and ledger names
-  and bank account numbers to their first two and last two characters, or drop
+  repository cannot show. ComplyEaze Bridge can shorten party and ledger names,
+  bank account numbers and, from release 0.7.0 (#1490), the address printed for a
+  party ledger, to their first two and last two
+  characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
   MSME or Udyam registration numbers, contact details or references, or the last
@@ -105,21 +107,34 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
-    register, bank-statement proposals, voucher totals by ledger, the party ledger of
+    register, the GST totals per counter ledger, bank-statement proposals, voucher totals by ledger, the party ledger of
     each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
-    named in a build warning and the ledger in a refused cash-or-bank row), stock
+    named in a build warning, the ledger in a refused cash-or-bank row and the
+    ledgers on Tally's Negative Ledgers list), stock
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
-    holder's name and the bank details. A name of four characters or fewer is
+    holder's name and the bank details; from release 0.7.0 (#1490) also the name a
+    mailing address is printed under and the address itself (each line of the mailing address, and the flat address field).
+    A line is shortened to its first two and last two characters, so a house number
+    or a town at either end of a line can stay readable. Every `ledger_masters` call
+    with `fields=compliance` reads and returns the older flat fields (the address
+    from `LEDADDRESS.LIST`, the PIN code and the state), as before: under mode `none`
+    (and under dropping narrations, which masks no name) they are in clear, and under
+    `mask_parties` the flat address is shortened and the PIN code and state are not. The dated mailing address (lines, PIN code, state and
+    country) is read from Tally only when the assistant asks for it
+    (`include_mailing_details`); without that argument `ledger_masters` does not read
+    it. The flat PIN code and state, and the mailing entry's PIN code, state and
+    country when asked for, are not masked under any mode: for a party that is an
+    individual, such as a proprietor, they can point to the locality of a home address. A name of four characters or fewer is
     replaced by “…”. The spelling a ledger's vouchers carry, which is returned
     beside its name when the two differ, is left out. It does not mask amounts, company names, the names of
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, or the last four digits of a bank statement's account
+    addresses outside a ledger's own address fields, or IFSCs, or the last four digits of a bank statement's account
     number (`account_last4`), and a name written inside a narration or reference
     stays as it is.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of
@@ -134,7 +149,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
-  - A tax-audit test run (`audit_test_run`, in source and not yet in a published build) sends the AI
+  - A tax-audit test run (`audit_test_run`, added in release 0.6.1 and listed only when its setting is on) sends the AI
     provider the test's figures and findings: amounts in paise, figure and finding ids, the test's
     fixed wording, and the code and count of any failed book check. It names no ledger, group,
     party or voucher, and it is refused while `mask_parties` or `drop_narration` is on, because
@@ -168,6 +183,32 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       a group total cannot be given, are shortened under `mask_parties`.
     - A voucher's reference date (the `reference_date` field) is a date, the
       same under every setting.
+    - An invoice's e-invoice details (the `e_invoice` field `vouchers` adds with
+      `include_e_invoice`: the IRN, the acknowledgement number and its date) are
+      sent as the book has them under every setting.
+    - A voucher's stock lines (the `stock_lines` field `vouchers` adds when asked:
+      direction, item, quantities, rate, amount, godown and batch) are sent only
+      for a call that asks. Item, godown and batch names are masked under
+      `mask_parties`, as a goods line's are.
+    - A voucher's GST and note details (the `voucher_gst` field `vouchers` adds
+      with `include_gst_details`: its place of supply, the party's state and
+      registration type, a note's reason, and the party's own note number and
+      date) are sent as the book has them under every setting, as `reference`
+      and `party_gstin` are.
+    - A voucher's dispatch details (the `dispatch` field `vouchers` adds with
+      `include_gst_details`: the dispatch document number, how it was
+      dispatched, the destination, the carrier, the bill of lading or LR-RR
+      number and its date, and the motor vehicle number) are sent as the book
+      has them, except that how it was dispatched (usually the transporter's
+      name), the carrier and the vehicle number, which name or identify a
+      business or person other than the book's own, are masked under
+      `mask_parties` as a party name is: `mark_voucher_party_names`
+      (`src-tauri/src/agent.rs:434`) marks them for every `vouchers` row
+      (`src-tauri/src/agent_vouchers.rs:274`), and `redact_value` masks the
+      marked values. The destination, both document numbers and the date stay
+      as place of supply does, and so does each Delivery Note's number and date
+      (`delivery_notes`), the book's own document as the dispatch document number
+      is.
     - The cost centre and cost category lists (two new kinds of the masters
       read) send each one's name, its parent (a cost centre's parent is another
       cost centre or the top level), its category for a cost centre, three
@@ -175,7 +216,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       and alteration number of each. Names, parents and categories are
       shortened under `mask_parties`; the flags are not names. In the answers
       captured they carry no amounts and no narrations. How a voucher was
-      allocated to a cost centre is not read.
+      allocated to a cost centre is not returned in 0.5.0, 0.5.1 and 0.6.0 (Tally's
+      answer to the vouchers read carries it, and those releases drop it); from
+      release 0.6.1 the voucher reads return it (see
+      "What the reads added since 0.5.0 send").
     - The list of bill-wise ledgers waiting for your approval sends each
       ledger's name (shortened under `mask_parties`), the date, voucher type,
       side and amount of each of its rows with its transaction label, its totals
@@ -203,6 +247,19 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       chose (`kind`) and the report's name, the window's dates, and for each
       month, Tally's debit, credit and closing amounts. It holds no
       party, ledger or narration, and `mask_parties` has nothing to shorten in it.
+    - The stock-by-batch read (`stock_by_batch`) sends the company name and
+      its identifier and the date, and for each item asked for, its name
+      (shortened under `mask_parties`), its identifier, its closing quantity
+      in Tally's stock item list, and Tally's quantity per godown and batch,
+      each godown and named batch shortened under `mask_parties`. The
+      quantities are not masked under any setting. It holds no values, rates
+      or narrations.
+    - The stock-by-godown read (`stock_by_godown`) sends the company name and
+      its identifier and the dates, each godown's name (shortened under
+      `mask_parties`), value and quantity, and for each item directly under
+      the root, its name and each godown's name (both shortened under
+      `mask_parties`), quantity and value. The figures are not masked under
+      any setting. It holds no rates or narrations.
     - The Negative Stock read (`negative_stock`) sends the company name and
       its identifier and the dates, and for each item on Tally's Negative
       Stock list, the item's name (shortened under `mask_parties`), its closing
@@ -216,6 +273,17 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The GST-by-ledger read (`gst_by_counter_ledger`) sends the company, the
+      dates, each counter ledger's name, Tally GUID, group and parent with its
+      voucher count and its GST totals per head, and for each set-aside reason its totals and
+      up to 100 vouchers by number, date, type, class and Tally's identifier.
+      It sends no party names and no narrations; `mask_parties` shortens the
+      ledger names and does not mask the GUID, which names no party.
+    - The negative ledgers read (`negative_ledgers`) sends the company name and
+      its identifier and the dates, and for each ledger on Tally's Negative
+      Ledgers list, the ledger's name (shortened under `mask_parties`), the side
+      and the closing amount. The side and the amount are not masked under any
+      setting. It holds no narrations.
     - The uncertain-voucher read (`gst_uncertain_vouchers`) sends the company,
       the voucher type name and the dates, the counts of the whole window and
       the pre-filing line, and, only for each voucher it lists as uncertain or
@@ -227,6 +295,37 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       amounts to the assistant. `mask_parties` shortens the party names in
       it and does not shorten the amounts. It holds no narrations and no
       ledger entries of the voucher.
+    - Cost-centre allocations of a voucher's ledger entries (added in release
+      0.6.1): each entry that carries them sends, for each allocation, the name
+      of its cost category, the name of its cost centre and the amount. The reads that return a voucher's entries carry them: the
+      vouchers read and its search, and the entries the purchase and sales
+      registers list. The two names are shortened under
+      `mask_parties`, like the cost centre and cost category lists; the amount
+      is not a name and is sent under every setting. An entry whose allocations
+      cannot be read whole says so with a reason and sends none of them, an
+      allocation in a shape the read does not recognise included. On an item
+      invoice the read returns the sales or purchase ledger as a ledger entry
+      with the goods line nested under it: an allocation list directly under
+      that entry is read and sent like any other, and one inside the goods line
+      is flagged as in a shape the read does not recognise. No captured item
+      invoice carries allocations, so where Tally prints them there is not
+      measured.
+    - Bank allocations of a voucher's ledger entries (added in release 0.7.0),
+      only when `vouchers` is asked for them with
+      `bank_allocations: true`: for each allocation, at most eight per entry, its
+      bank date, instrument number and date, transaction type and status. The
+      payee, bank, branch and account details an allocation can carry are not
+      read or sent. The instrument number is any text typed or sent, so a name typed into it
+      stays as it is: it is sent under every setting, as the voucher's own
+      reference is. An entry whose allocations cannot be read whole says so with
+      a reason and sends none of them.
+    - Goods lines of a voucher's ledger entries (added in release 0.7.0),
+      only when `vouchers` is asked for them with
+      `goods_lines: true`: for each line of an invoice voucher, the stock item,
+      quantities, rate and amount, and each godown and batch row with its
+      quantities and amount. Item, godown and batch names are masked under
+      `mask_parties`. An entry whose lines cannot be read whole says so with a
+      reason and sends none of them.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to
@@ -282,7 +381,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   The changelog adds that the check does not by itself prove that no data
   leaves the machine.
 
-- **One exception, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The Windows network
+- **One exception, in 0.3.0 and 0.4.0 (its network forms refused from 0.4.1; some paths still pass).** The Windows network
   path ([advisory](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7)):
   - *What was wrong.* The `parse_bank_statement` tool opened any absolute path
     it was given for the statement or the password file, including a Windows
@@ -319,17 +418,62 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 | macOS: `~/Library/Application Support/Bridge` | the files below |
 
 On a Microsoft Store install of Claude Desktop, Windows may keep some of these
-files under `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`,
-and a given file can be in either place (seen on one computer, #1459;
-**Not measured:** when Windows puts a file in which place). For the import file
-that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
-Windows reports for that file, with a `path_state` beside it that says whether
-Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
-still prints the folder as built (the Windows location in the table above,
-unless you set another data folder), whichever place the files are in. On that
+files under
+`%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`, and a
+given file can be in either place. Measured on one computer (30 October 2026,
+#1584), with ComplyEaze Bridge started from a shell that Claude Desktop runs:
+the files it created went to that second folder; a copy started outside Claude
+Desktop created `%LOCALAPPDATA%\Bridge\agent` and its files there; and once both
+had run, each kept its own import journal. For the import file that the
+`build_import_xml` tool reports, ComplyEaze Bridge shows the location Windows
+reports for that file, with a `path_state` beside it that says whether Windows
+reported it; there it named the second folder, and a process outside Claude
+Desktop opened the file there with the same sha256. The command-line report
+(`bridge_mcp --local-data-report --show-paths`) prints each folder as built (the
+Windows location in the table above, unless you set another data folder); beside
+it, where the files directly in that folder are as Windows reports each file
+(`folder_file_locations` and `lock_folder_file_locations`, read from the first
+64 files by name (when the listing is capped, among the entries listed), with
+how many were read of how many; not the files in its subfolders, such as
+`imports`; the listing stops at 100,000 entries, and `listing_capped` says so; a
+lock folder's `native-dispatch-leases` that is itself a link is not entered and
+reads `link_not_followed`); the import journal's own location (`journal_path`; a
+journal file that is itself a link is shown as built, its target not followed,
+with `journal_path_state` `link_not_followed`; a data folder that is itself a
+link, or a link in a folder above the journal or the lease folder, is still
+followed, as the report follows it); and, on Windows, each copy of the data
+folder inside a Store app's package that exists (`package_copies`). It does not
+print a folder where Windows reports the folder itself to be: once both folders
+existed, Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed
+the second folder's files. Seen from inside Claude Desktop, a file both copies
+held named the second folder and a file only `%LOCALAPPDATA%\Bridge\agent` held
+named that folder; from outside, every file named `%LOCALAPPDATA%\Bridge\agent`.
+So a file in both copies is shown only by the copy that side reads, and a file
+in one copy by that copy. `package_copies` is what shows that the second copy
+exists, and a terminal outside Claude Desktop does not see that copy as part of
+the folder. The report does not record which side ran it; run from inside Claude
+Desktop on that computer, `package_copies` and the data folder's file locations
+would both name the second folder (inferred from the lab's probe, not from a run
+of this report), so such a run cannot tell whether `%LOCALAPPDATA%\Bridge\agent`
+also exists. Check both folders before you archive or delete. **Not measured:**
+ComplyEaze Bridge as Claude Desktop starts the extension (the measured copies
+carried no package identity, yet Windows redirected their files); a copy outside
+Claude Desktop running first; another Claude Desktop version; Windows 11; this
+build, its file locations once both folders exist (the lab read them with a
+probe making the same Windows call), and `package_copies`, which lists
+`%LOCALAPPDATA%\Packages`, on a real computer. On that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).
+Because each side's journal checks see only its own batches, on Windows
+`build_import_xml` and `post_import` refuse (`import_journal_split`) while a
+Store app's copy of the data folder holds an import journal, other than the one
+the running process uses, with a batch; neither journal is moved, merged or
+deleted (#2233). Seen from inside Claude Desktop, a journal in
+`%LOCALAPPDATA%\Bridge\agent` is hidden behind the package's own copy, so only
+the side outside Claude Desktop is refused by it. Ledger creates, which keep
+their own journal, are not covered. **Not measured:** this refusal on a real
+computer.
 Microsoft's documentation says that uninstalling or resetting a Store app
 (here Claude Desktop itself; this is not the removal of the extension that
 section 8 describes) removes that second folder and everything in it.
@@ -363,9 +507,11 @@ go, and what an uninstall or reset really removes.
   bill-wise ledgers you approved to receive entries On Account (with the
   64-character fingerprint your approval matched when the batch was built, a
   short code made from that party's rows, the batch and the company; it is kept as a record
-  and is not checked again when the batch is posted). These records hold ledger
-  names and fingerprints, and no new amounts, PAN, bank account numbers or
-  contact details. It also holds the proof-of-post files that hold what Tally
+  and is not checked again when the batch is posted). A batch with a deposit
+  from the cash box also holds the cash ledgers' names, the dates read and a
+  64-character fingerprint of their day-end balances, which the post compares
+  with a fresh read. These records hold ledger names and fingerprints, and no
+  new amounts, PAN, bank account numbers or contact details. It also holds the proof-of-post files that hold what Tally
   read back, and a short note when an approval you gave was dropped without
   being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
@@ -478,7 +624,7 @@ The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge
 — approve one voucher" with the buttons Cancel and Post voucher. On Windows it
 is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel, and
 No is the default. Only the positive button approves. On Windows the window
-also takes the keyboard (#1780). In tests on Windows 10 with TallyPrime 7.1 full
+also takes the keyboard ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)). In tests on Windows 10 with TallyPrime 7.1 full
 screen and one screen, each tried once, a Down arrow moved its buttons on the
 0.6.0 release candidate, and on the published 0.6.0 a typed n declined it and a
 typed y approved it, so a key typed for Tally can answer it. When you ask for a post, stop typing in Tally
@@ -492,15 +638,15 @@ begin (for example when the batch is not found or the journal is busy); a
 refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
 puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
-characters it cannot show safely, or do not fit, it refuses. In the next build,
+characters it cannot show safely, or do not fit, it refuses. From 0.6.0,
 a narration too long for one line is shown instead in numbered parts, each
 quoted and split only at a space, under a line that counts them; one that
 cannot be split so, and a reference too long for one line, are still refused.
 The review window for a posted voucher shows its narration last, under the
 same heading (#1535). A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
-and up to 40 characters of its narration, with no reference; from the next
-build a Journal's line names its first debit and first credit ledger and up to
+and up to 40 characters of its narration, with no reference; from 0.6.0
+a Journal's line names its first debit and first credit ledger and up to
 20 characters of its narration, fewer (never under 10) when that makes the line
 fit, and the line above says a narration may be cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten

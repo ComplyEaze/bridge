@@ -6,7 +6,7 @@ use bridge_tally_protocol::native_masters::{
     masters_worst_row_bytes, parse_native_masters, NativeMasterKind, MASTERS_RESPONSE_BUDGET_BYTES,
 };
 use tally_protocol_simulator::{
-    Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
 
 const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
@@ -313,6 +313,7 @@ impl OneServer {
             redaction,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         Self {
@@ -536,7 +537,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it() {
         (row["master_id"].as_u64(), row["alter_id"].as_u64()),
         (Some(212), Some(213))
     );
-    assert_eq!(row["parent"], "\u{fffd}#4; Primary");
+    assert_eq!(row["parent"], "&#4; Primary");
     assert!(
         row.get("active").is_none(),
         "a godown has no voucher type fields"
@@ -608,12 +609,59 @@ async fn voucher_types_report_their_numbering_and_flags() {
     assert_eq!(attendance["parent"], "Attendance");
     assert_eq!(attendance["active"], false);
     assert_eq!(attendance["optional"], false);
+    // A pair that agreed the first time has no first disagreement to show.
+    assert!(page.get("first_pair_differed").is_none());
     assert!(page["limitations"]
         .as_array()
         .unwrap()
         .iter()
         .any(|line| line.as_str().unwrap().contains("unrecognised")));
     assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS);
+}
+
+/// The voucher types as the lab's first read after a company load answered
+/// them, and as its second read did (#2160): the first leaves one element out
+/// of two rows.
+fn voucher_types_read(second: bool) -> String {
+    let bytes: &[u8] = if second {
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_second_read_live.utf16le.xml"
+        )
+    } else {
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_first_read_live.utf16le.xml"
+        )
+    };
+    decode(bytes).replace(CAPTURE_GUID, GUID)
+}
+
+#[tokio::test]
+async fn a_voucher_types_pair_that_disagreed_first_is_shown_beside_the_rows() {
+    let (first, second) = (voucher_types_read(false), voucher_types_read(true));
+    let numbering = numbering_for(&second);
+    let companies = xml(companies());
+    let mut plans = through_opening_extent(14, MARK);
+    plans.extend([xml(first.clone()), status(), xml(second.clone()), status()]);
+    pair(&mut plans, xml(second.clone()));
+    pair(&mut plans, xml(numbering));
+    pair(&mut plans, xml(extents(14, MARK)));
+    plans.extend([companies.clone(), status(), companies]);
+    let one = OneServer::spawn(plans);
+    let response = one.call(args("voucher_types", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["state"], "observed");
+    assert_eq!(page["total"], 26);
+    // The answer says the read was repeated, and gives the first pair's
+    // digests: two reads whose bytes differ.
+    let shown = &page["first_pair_differed"];
+    assert_eq!(shown["request_sha256"].as_str().unwrap().len(), 64);
+    assert_eq!(shown["response_sha256"].as_str().unwrap().len(), 64);
+    assert_eq!(
+        shown["bytes"],
+        encode(&first, WireEncoding::Utf16Le).len() + encode(&second, WireEncoding::Utf16Le).len()
+    );
+    assert!(shown["note"].as_str().unwrap().contains("repeated once"));
+    assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS + 4);
 }
 
 #[tokio::test]
@@ -723,6 +771,15 @@ async fn groups_come_from_the_group_snapshot_with_their_own_row_shape() {
         .unwrap();
     assert_eq!(bank["reserved_name"], "Bank Accounts");
     assert!(bank["parent"].is_string());
+    // A group directly under Tally's root shows the root as Tally sent it.
+    let capital = page["masters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["name"] == "Capital Account")
+        .unwrap();
+    assert_eq!(capital["parent"], "&#4; Primary");
+    assert!(!response.to_string().contains('\u{fffd}'));
     assert!(
         bank.get("guid").is_none(),
         "the group snapshot carries no GUID"
@@ -769,7 +826,7 @@ async fn stock_groups_read_end_to_end_with_their_parent() {
     assert_eq!(page["total"], 3);
     let rows = page["masters"].as_array().unwrap();
     let packaging = rows.iter().find(|row| row["name"] == "Packaging").unwrap();
-    assert_eq!(packaging["parent"], "\u{fffd}#4; Primary");
+    assert_eq!(packaging["parent"], "&#4; Primary");
     assert_eq!(packaging["alter_id"], 264);
     assert!(packaging.get("active").is_none());
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
@@ -785,7 +842,7 @@ async fn cost_centres_read_end_to_end_with_their_category_although_the_setting_i
     let rows = page["masters"].as_array().unwrap();
     let assembly = rows.iter().find(|row| row["name"] == "Assembly").unwrap();
     assert_eq!(assembly["category"], "Business Line");
-    assert_eq!(assembly["parent"], "\u{fffd}#4; Primary");
+    assert_eq!(assembly["parent"], "&#4; Primary");
     assert!(page["limitations"]
         .as_array()
         .unwrap()
@@ -904,7 +961,7 @@ async fn cost_centre_and_category_names_and_categories_are_masked_under_mask_par
     }
     assert!(rows
         .iter()
-        .all(|row| row["parent"] == json!("\u{fffd}#4; Primary")));
+        .all(|row| row["parent"] == json!("&#4; Primary")));
 
     let response = one.call(args("cost_categories", 0, 500, None)).await;
     let page = result(&response);
@@ -946,9 +1003,9 @@ async fn a_child_cost_centre_under_mask_parties_has_its_parent_masked_and_the_ro
     assert_eq!(
         names_and_parents(page),
         [
-            (mask("Parity CC A"), json!("\u{fffd}#4; Primary")),
+            (mask("Parity CC A"), json!("&#4; Primary")),
             (mask("Parity CC A1"), json!(mask("Parity CC A"))),
-            (mask("Parity CC B"), json!("\u{fffd}#4; Primary")),
+            (mask("Parity CC B"), json!("&#4; Primary")),
         ]
     );
     for row in page["masters"].as_array().unwrap() {
@@ -1129,7 +1186,7 @@ async fn godown_names_and_parents_are_masked_and_voucher_type_names_are_not() {
 
     let response = one.call(args("godowns", 0, 500, None)).await;
     let page = result(&response);
-    let masked_root = json!("\u{fffd}#4; Primary");
+    let masked_root = json!("&#4; Primary");
     assert_eq!(
         names_and_parents(page),
         [
@@ -1174,7 +1231,7 @@ async fn stock_group_names_and_parents_are_masked_and_unit_names_are_not() {
     let one = OneServer::spawn_with(plans, Redaction::MaskParties);
 
     let response = one.call(args("stock_groups", 0, 500, None)).await;
-    let masked_root = json!("\u{fffd}#4; Primary");
+    let masked_root = json!("&#4; Primary");
     assert_eq!(
         names_and_parents(result(&response)),
         [
@@ -1208,7 +1265,7 @@ async fn masked_godown_rows_are_held_marked_and_not_masked_without_mask_parties(
     assert_eq!(
         names_and_parents(result(&response)),
         [
-            ("Factory Floor".to_string(), json!("\u{fffd}#4; Primary")),
+            ("Factory Floor".to_string(), json!("&#4; Primary")),
             ("Main Location".to_string(), json!("Factory Floor")),
         ]
     );

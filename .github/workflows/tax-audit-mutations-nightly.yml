@@ -14,6 +14,17 @@ on:
   schedule:
     - cron: "23 21 * * *" # daily, off the hour
   workflow_dispatch:
+    inputs:
+      mode:
+        # full: every mutation against the full suite (finds new killers). proof: each
+        # mutation with a committed killed record runs those killers first, and the full suite
+        # only when they do not kill it; every kill is still seen on this exact tree, after the
+        # full suite passed unmutated on it, which is all a pull request's records need, and
+        # every other verdict comes from the full suite. Master's runs are always full.
+        description: "full, or proof (a pull request head's records)"
+        type: choice
+        options: [full, proof]
+        default: full
 
 permissions:
   contents: read
@@ -53,17 +64,27 @@ jobs:
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: 1.96.0
-      # The whole list, the full suite each time: a survivor verdict must never come
-      # from a subset of the tests. Exit 1 is a mutation not killed: this step leaves it
+      # The whole list each time, and a survivor verdict never comes from a subset of the
+      # tests: a proof run's killers-first pass falls back to the full suite for any
+      # mutation its recorded killers do not kill. Exit 1 is a mutation not killed: this step leaves it
       # to the report job, which judges every shard's results file together. Any other
       # non-zero exit is the runner refusing to start (the unmutated copy does not build or
       # pass; it has written a typed refusal in place of results): this job fails, so a
       # shard that ran nothing is never green.
       - name: Run this shard's mutations
+        env:
+          MODE: ${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/master' && inputs.mode == 'proof') && 'proof' || 'full' }}
         run: |
           set +e
+          # A proof run reads the committed records for their killer lists only; its shard's own
+          # results file starts empty, so nothing old is counted as run.
+          full=(--full)
+          if [ "$MODE" = "proof" ]; then
+            full=(--killers-from src-tauri/crates/bridge-tax-audit/parity/mutation-results.json)
+          fi
+          echo "mode: $MODE"
           node src-tauri/crates/bridge-tax-audit/parity/mutations.mjs \
-            --full --jobs 2 --shard "${{ matrix.shard }}/8" \
+            "${full[@]}" --jobs 2 --shard "${{ matrix.shard }}/8" \
             --workdir "$RUNNER_TEMP/mutants" \
             --results "$RUNNER_TEMP/shard-${{ matrix.shard }}.json" 2>&1 | tee "$RUNNER_TEMP/shard-${{ matrix.shard }}.log"
           rc=${PIPESTATUS[0]}

@@ -1,0 +1,1 @@
+- A refused read of a book's ledgers (`party_ledger_master_read_failed`, which `sales_register`, `purchase_register`, `gst_by_ledger` and `ledger_masters` share) now says which request failed, in `failed_request`, where one of them did, so a deadline on a large book can be traced to one request (#2265).

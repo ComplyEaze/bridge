@@ -1,0 +1,198 @@
+# fixture: tests/fixtures/opening-stock-tieout-e/r5-w5-ledgers.utf16le.xml
+# parser: parse_native_trial_balance
+# source: captured
+Ok(NativeTrialBalance {
+    rows: [
+        NativeTrialBalanceRow {
+            name: "Cash",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-0000001f",
+            parent: Returned(
+                "Cash-in-Hand",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Bank",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-000000d1",
+            parent: Returned(
+                "Bank Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-50000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "1000.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "-49000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Capital",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-000000d0",
+            parent: Returned(
+                "Capital Account",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "50000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "50000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Customer",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-000000d3",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-6650.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-6650.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Purchase",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-000000d5",
+            parent: Returned(
+                "Purchase Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-5150.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-5150.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Rent",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-000000d6",
+            parent: Returned(
+                "Indirect Expenses",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-1000.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Sales",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-000000d4",
+            parent: Returned(
+                "Sales Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "6650.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "6650.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Supplier",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-000000d2",
+            parent: Returned(
+                "Sundry Creditors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "5150.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "5150.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Profit & Loss A/c",
+            guid: "ffa928f6-5934-48e2-bbd6-474936e71546-0000001e",
+            parent: Returned(
+                "�#4; Primary",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+        },
+    ],
+})

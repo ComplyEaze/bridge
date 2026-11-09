@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/opening-stock-tieout-e/r2-w2-negative-stock.utf16le.xml
+# parser: parse_native_negative_stock
+# source: captured
+Err(EmptyEnvelope)

@@ -47,11 +47,13 @@ async fn uncertain_build_retains_xml_journal_and_exact_recovery_error() {
         writer: OpenOptions::new().append(true).open(&ledger).unwrap(),
     };
     let update = line();
-    let code = persist_build(&imports, &update, b"<retained-batch/>", || {
+    let persisted = persist_build(&imports, &update, b"<retained-batch/>", || {
         append_import_ledger_bytes(&mut writer, b"next status\n")
     })
-    .unwrap()
     .unwrap();
+    let Persisted::Incomplete(code) = persisted else {
+        panic!("not incomplete: {persisted:?}")
+    };
     assert_eq!(code, "import_ledger_rollback_failed");
     assert_eq!(
         fs::read(imports.join("batch-proof.xml")).unwrap(),
@@ -77,6 +79,7 @@ async fn uncertain_build_retains_xml_journal_and_exact_recovery_error() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let result = json!({"isError":true,"content":[],"structuredContent":{"result":{
@@ -139,7 +142,9 @@ fn failed_xml_cleanup_retains_its_journal_and_recovery_id() {
     });
     assert_eq!(
         result,
-        Ok(Some("import_publication_recovery_required".into()))
+        Ok(Persisted::Incomplete(
+            "import_publication_recovery_required".into()
+        ))
     );
     assert_eq!(
         fs::read(imports.join(BUILD_TRANSACTION).join("retained.xml")).unwrap(),
@@ -170,8 +175,12 @@ fn partial_xml_stage_keeps_a_journal_and_never_exposes_the_importable_name() {
             write_private(path, &bytes[..5])?;
             Err("import_file_write_failed".into())
         },
+        clear_transaction_folder,
     );
-    assert_eq!(result, Ok(Some("import_file_write_failed".into())));
+    assert_eq!(
+        result,
+        Ok(Persisted::Incomplete("import_file_write_failed".into()))
+    );
     assert!(!imports.join("batch-proof.xml").exists());
     assert_eq!(
         fs::read(imports.join(BUILD_TRANSACTION).join("batch.xml")).unwrap(),
@@ -235,8 +244,12 @@ async fn staged_build_failures_retain_recorded_batch_identity_through_framing() 
                     Ok(())
                 }
             },
+            clear_transaction_folder,
         );
-        assert_eq!(result, Ok(Some("import_file_write_failed".into())));
+        assert_eq!(
+            result,
+            Ok(Persisted::Incomplete("import_file_write_failed".into()))
+        );
         let retained: ImportLedgerLine = serde_json::from_slice(
             &fs::read(imports.join(BUILD_TRANSACTION).join("update.json")).unwrap(),
         )
@@ -267,13 +280,16 @@ async fn staged_build_failures_retain_recorded_batch_identity_through_framing() 
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         assert_eq!(
             server.lock_import_admission().err(),
             Some("import_publication_recovery_required".into())
         );
-        let code = result.unwrap().unwrap();
+        let Ok(Persisted::Incomplete(code)) = result else {
+            panic!("not incomplete: {result:?}")
+        };
         let mut wire = Vec::new();
         crate::agent::agent_protocol::finish_response(
             &server,
@@ -324,6 +340,7 @@ fn interruption_after_xml_publication_keeps_admission_blocked() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     assert_eq!(
@@ -335,6 +352,195 @@ fn interruption_after_xml_publication_keeps_admission_blocked() {
         Some("import_publication_recovery_required".into())
     );
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
+fn server_at(data_dir: &Path) -> Server {
+    Server::new(crate::agent::Settings {
+        endpoint: bridge_tally_transport::TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: data_dir.to_path_buf(),
+        max_rows: 10,
+        max_bytes: 256,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    })
+}
+
+#[test]
+fn a_committed_build_stays_built_when_its_folder_cannot_be_removed() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path().join("imports");
+    fs::create_dir(&imports).unwrap();
+    // The measured case: the journal holds the batch and the removal emptied
+    // the folder but failed on the folder itself.
+    let result = persist_build_with_stage(
+        &imports,
+        &line(),
+        b"<committed/>",
+        || Ok(()),
+        write_private,
+        |folder| {
+            fs::remove_file(folder.join("update.json")).unwrap();
+            Err("os error 32".into())
+        },
+    );
+    assert_eq!(
+        result,
+        Ok(Persisted::Built {
+            folder_left: Some("os error 32".into())
+        })
+    );
+    assert_eq!(
+        fs::read(imports.join("batch-proof.xml")).unwrap(),
+        b"<committed/>"
+    );
+    assert!(imports.join(BUILD_TRANSACTION).is_dir());
+    // The next build is admitted, and clears the folder at admission.
+    let server = server_at(directory.path());
+    let admission = server.lock_import_admission().unwrap();
+    assert!(!imports.join(BUILD_TRANSACTION).exists());
+    assert_eq!(
+        persist_build(&imports, &line(), b"<next/>", || Ok(())),
+        Ok(Persisted::Built { folder_left: None })
+    );
+    drop(admission);
+}
+
+#[test]
+fn a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let result = persist_build_with_stage(
+        imports,
+        &line(),
+        b"<committed/>",
+        || Ok(()),
+        write_private,
+        |_| Err("os error 5".into()),
+    );
+    assert_eq!(
+        result,
+        Ok(Persisted::Built {
+            folder_left: Some("os error 5".into())
+        })
+    );
+    assert_eq!(
+        require_settled(imports),
+        Err("import_publication_recovery_required".into())
+    );
+    assert!(imports
+        .join(BUILD_TRANSACTION)
+        .join("update.json")
+        .is_file());
+}
+
+#[test]
+fn a_rolled_back_build_whose_folder_stays_keeps_its_recovery_id_and_settles_once_empty() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let result = persist_build_with_stage(
+        imports,
+        &line(),
+        b"<uncommitted/>",
+        || Err("import_ledger_unavailable".into()),
+        write_private,
+        |folder| {
+            fs::remove_file(folder.join("update.json")).unwrap();
+            Err("os error 32".into())
+        },
+    );
+    assert_eq!(
+        result,
+        Ok(Persisted::Incomplete(
+            "import_publication_recovery_required".into()
+        ))
+    );
+    assert!(!imports.join("batch-proof.xml").exists());
+    assert_eq!(require_settled(imports), Ok(()));
+}
+
+#[test]
+fn admission_clears_only_an_empty_transaction_folder() {
+    for (name, code) in [
+        (TRANSACTION, "proof_publication_recovery_required"),
+        (BUILD_TRANSACTION, "import_publication_recovery_required"),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let imports = directory.path().join("imports");
+        fs::create_dir(&imports).unwrap();
+        let folder = imports.join(name);
+        // A stop just after creating it: nothing was published.
+        create_transaction(&folder).unwrap();
+        let server = server_at(directory.path());
+        drop(server.lock_import_admission_shared().unwrap());
+        assert!(!folder.exists(), "{name}");
+        // Anything in it, even an empty file, keeps the marker and refuses.
+        create_transaction(&folder).unwrap();
+        fs::write(folder.join("update.json"), b"").unwrap();
+        assert_eq!(require_settled(&imports), Err(code.into()));
+        assert_eq!(
+            server.lock_import_admission_shared().err(),
+            Some(code.into())
+        );
+        assert!(folder.join("update.json").is_file());
+        // A file of that name is not a folder to clear.
+        fs::remove_dir_all(&folder).unwrap();
+        fs::write(&folder, b"").unwrap();
+        assert_eq!(require_settled(&imports), Err(code.into()));
+        assert!(folder.is_file());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn admission_does_not_clear_a_link_at_a_transaction_name() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let target = imports.join("elsewhere");
+    fs::create_dir(&target).unwrap();
+    std::os::unix::fs::symlink(&target, imports.join(BUILD_TRANSACTION)).unwrap();
+    assert_eq!(
+        require_settled(imports),
+        Err("import_publication_recovery_required".into())
+    );
+    assert!(target.is_dir());
+}
+
+#[test]
+fn a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join("transaction");
+    let refused = |_: &Path| Err(std::io::Error::from_raw_os_error(32));
+    fs::create_dir(&folder).unwrap();
+    assert_eq!(clear_transaction(&folder, refused), Ok(()));
+    assert!(!folder.exists());
+    fs::create_dir(&folder).unwrap();
+    fs::write(folder.join("update.json"), b"{}").unwrap();
+    assert_eq!(
+        clear_transaction(&folder, refused),
+        Err("os error 32".into())
+    );
+    assert!(folder.join("update.json").is_file());
+}
+
+#[test]
+fn os_cause_names_the_number_or_the_kind_and_no_text() {
+    assert_eq!(
+        os_cause(&std::io::Error::from_raw_os_error(32)),
+        "os error 32"
+    );
+    assert_eq!(
+        os_cause(&std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "imports under a home folder"
+        )),
+        "PermissionDenied"
+    );
 }
 
 /// Every file under `directory`, by name: its bytes and its identity on the
@@ -532,6 +738,38 @@ fn a_stop_at_any_step_keeps_every_earlier_file_and_blocks_only_inside_the_append
 }
 
 #[test]
+fn a_whole_proof_record_stays_published_when_its_folder_cannot_be_removed() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let ledger = imports.join("ledger.jsonl");
+    let name = publish_proofs_syncing(
+        imports,
+        &line(),
+        b"next JSON",
+        b"next Markdown",
+        |record| {
+            append_private_import_ledger(
+                &ledger,
+                format!("{}\n", serde_json::to_string(record).unwrap()).as_bytes(),
+                set_private_file,
+            )
+        },
+        |_| Ok(()),
+        (sync_directory, |folder: &Path| {
+            fs::remove_file(folder.join("update.json")).unwrap();
+            Err("os error 32".into())
+        }),
+    )
+    .unwrap();
+    let last: Value =
+        serde_json::from_str(fs::read_to_string(&ledger).unwrap().lines().last().unwrap()).unwrap();
+    assert_eq!(last["proof"], json!(String::from(name)));
+    assert!(imports.join(TRANSACTION).is_dir());
+    assert_eq!(require_settled(imports), Ok(()));
+    assert!(!imports.join(TRANSACTION).exists());
+}
+
+#[test]
 fn a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing() {
     let directory = tempfile::tempdir().unwrap();
     let imports = directory.path();
@@ -580,6 +818,7 @@ fn an_append_of_unknown_outcome_keeps_its_marker_and_blocks_import_admission() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     assert_eq!(
@@ -832,7 +1071,7 @@ fn a_proof_pair_whose_directory_cannot_be_synced_is_refused_before_any_record_na
             Ok(())
         },
         |_| Ok(()),
-        |_: &Path| injected(),
+        (|_: &Path| injected(), clear_transaction_folder),
     );
     assert_eq!(result, Err("import_file_write_failed".to_string()));
     assert!(!appended.get());

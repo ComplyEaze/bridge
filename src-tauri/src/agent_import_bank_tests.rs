@@ -381,7 +381,12 @@ fn rendered(voucher_type: &str, dr: &str, cr: &str) -> String {
     }))
     .expect("voucher");
     let date = normalized_date(&voucher.date).unwrap();
-    render_import_xml("Synthetic Book", &[voucher.dated(date)], "batch-render")
+    let entries = voucher.parsed_entries().expect("an import amount");
+    render_import_xml(
+        "Synthetic Book",
+        &[voucher.admitted(date, entries)],
+        "batch-render",
+    )
 }
 
 #[test]
@@ -435,7 +440,8 @@ fn a_bank_voucher_renders_its_debit_first_whatever_order_the_caller_used() {
     }))
     .expect("voucher");
     let date = normalized_date(&credit_first.date).unwrap();
-    let credit_first = credit_first.dated(date);
+    let entries = credit_first.parsed_entries().expect("an import amount");
+    let credit_first = credit_first.admitted(date, entries);
     let xml = render_import_xml(
         "Synthetic Book",
         std::slice::from_ref(&credit_first),
@@ -525,7 +531,7 @@ pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
 
 /// How many requests a bank build sends up to and including its numbering
 /// read.
-const THROUGH_BANK_NUMBERING: usize = 2 + 10 + 6 + 6 + BUILD_NUMBERING_PLANS;
+pub(super) const THROUGH_BANK_NUMBERING: usize = 2 + 10 + 6 + 6 + BUILD_NUMBERING_PLANS;
 
 /// [`bank_build_plans`], its numbering read answered by `numbering`.
 fn bank_build_plans_numbering(numbering: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
@@ -760,7 +766,7 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
         guid: format!("61c6de69-1748-461c-ad3f-162cb949df9f-{suffix}"),
     };
     assert_eq!(
-        saved.ledger_identities,
+        saved.binding.ledgers().map(<[_]>::to_vec),
         Some(vec![
             bound("Bridge Nested Debtor WR4", "000000d5"),
             bound("Cash", "0000001f"),
@@ -1431,7 +1437,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         voucher.voucher_type = voucher_type.clone();
         voucher.voucher_number = None;
         let line = ImportLedgerLine {
-            ledger_identities: None,
+            binding: LedgerBinding::Unbound,
             cash_in_hand_ledgers: Some(Vec::new()),
             on_account_approved: Some(Vec::new()),
             statement: None,
@@ -1460,10 +1466,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             .iter()
             .map(|entry| ReadEntry {
                 ledger: entry.ledger.clone(),
-                amount: match entry.side {
-                    EntrySide::Dr => format!("-{}", entry.amount),
-                    EntrySide::Cr => entry.amount.clone(),
-                },
+                amount: entry.amount.signed_lexeme(&entry.side),
                 is_deemed_positive: entry.side.tally_positive().into(),
             })
             .collect::<Vec<_>>();
@@ -1745,6 +1748,7 @@ fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
         bridge_txn_id: "st-20260801-0000000000000001".into(),
         ledger: ledger.into(),
         cash_in_hand: true,
+        cash_out: false,
     };
     assert_eq!(
         answered_ledger_refusals(&[need("Cash")], &masters, 200_000),
@@ -1960,6 +1964,137 @@ async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
         .unwrap()
         .batch;
     assert_eq!(saved.cash_in_hand_ledgers, Some(Vec::new()));
+}
+
+/// A deposit from the cash box, through the build, on a book of `balance` as
+/// Tally signs it. `WR2 Sales` is rewritten under Bank Accounts for the test.
+async fn deposit_build(balance: &str, built: bool) -> (Server, Value, tempfile::TempDir) {
+    let cycle = import_family_cycle_plans();
+    // The captured licensed list, as the read profile needs, under the number
+    // this cycle's company carries.
+    let company = match &mode_tests::licensed_import_probe()[1].fixture {
+        Fixture::SyntheticXml(body) => body.replace("> 100004<", "> 1<"),
+        other => panic!("the company answer is synthetic: {other:?}"),
+    };
+    let mut plans = bank_build_plans()
+        .into_iter()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                    let moved = body.replace(
+                        "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                        "<PARENT TYPE=\"String\">Bank Accounts</PARENT>",
+                    );
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    let rest = plans.split_off(THROUGH_BANK_NUMBERING);
+    plans.extend(super::cash_projection::tests::cash_book_plans(
+        CAPTURED_GUID,
+        "1",
+        &company,
+        balance,
+    ));
+    if built {
+        plans.extend(cycle[10..16].to_vec());
+        plans.extend(rest);
+    }
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let deposit = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Contra",
+        "entries":[{"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
+                   {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]);
+    let args = cash_answer_proposals(
+        directory.path(),
+        deposit,
+        "Cash",
+        "own_cash_box",
+        "WR2 Sales",
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    (server, response, directory)
+}
+
+/// The names `mcp-v0.7.0` reads a batch's ledger binding from: its
+/// `ImportLedgerLine` at the tag (`fcfb5ff6`, `agent_import.rs:479`). It
+/// reads no `cash_projection`, and its post refuses a batch where it finds no
+/// binding as built before one (`agent_import_post.rs:811` there).
+const MCP_V0_7_0_BINDING_NAMES: [&str; 3] = [
+    "ledger_identities_3",
+    "ledger_identities_2",
+    "ledger_identities",
+];
+
+/// The journal line of a deposit from the cash box holds its binding only
+/// under a name `mcp-v0.7.0` does not read, so that release refuses to post
+/// the deposit instead of posting it without checking its cash book. A Sales
+/// or release line stays one it reads (the `mcp_v0_7_0` floor tests).
+#[tokio::test]
+async fn a_deposit_from_the_cash_box_builds_on_the_projected_book_and_records_it() {
+    let (server, response, directory) = deposit_build("-20.00", true).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 1, "{response}");
+    let projection = &result["cash_projection"];
+    assert_eq!(projection["from"], "20260901", "{response}");
+    assert_eq!(projection["to"], "20270331", "{response}");
+    let low = &projection["lowest_day_end_after_deposits"][0];
+    assert_eq!(low["ledger"], "Cash", "{response}");
+    assert_eq!(low["balance"], "7.5", "{response}");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    assert_eq!(
+        saved.binding.cash_projection().cloned(),
+        Some(super::cash_projection::tests::unmoved_book_record("-20.00"))
+    );
+    let journal =
+        std::fs::read_to_string(directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    let lines = journal.lines().collect::<Vec<_>>();
+    assert_eq!(lines.len(), 1, "{journal}");
+    let line: Value = serde_json::from_str(lines[0]).unwrap();
+    for name in MCP_V0_7_0_BINDING_NAMES {
+        assert!(line.get(name).is_none(), "{name}: {line}");
+    }
+    assert_eq!(
+        line["ledger_identities_4"].as_array().map(Vec::len),
+        saved.binding.ledgers().map(<[_]>::len),
+        "{line}"
+    );
+    assert!(line["cash_projection"].is_object(), "{line}");
+}
+
+#[tokio::test]
+async fn a_deposit_the_book_cannot_carry_writes_no_file() {
+    let (server, response, _directory) = deposit_build("-5.00", false).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["reason"], "cash_projection_negative", "{response}");
+    assert_eq!(result["date"], "20260901", "{response}");
+    assert_eq!(result["balance"], "-7.5", "{response}");
+    let files = fs::read_dir(server.imports_dir().unwrap())
+        .unwrap()
+        .filter(|entry| {
+            let name = entry.as_ref().unwrap().file_name();
+            name.to_string_lossy().ends_with(".xml")
+        })
+        .count();
+    assert_eq!(files, 0, "{response}");
+}
+
+#[tokio::test]
+async fn a_book_already_below_zero_is_refused_as_that() {
+    let (_server, response, _directory) = deposit_build("5.00", false).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["reason"], "cash_book_already_negative", "{response}");
+    assert_eq!(result["balance"], "-5", "{response}");
 }
 
 /// The requirement binds the voucher actually built: a record naming Cash for
@@ -2571,7 +2706,8 @@ fn captured_shape_lab_catalogue() -> String {
 }
 
 /// The captured catalogue with `Chem Supplier 4` renamed `CRLF Supplier`, so
-/// the captured CR LF ledger gains a twin that folds equal to it. This is a
+/// the captured CR LF ledger gains a twin that differs from it only by that
+/// line break. This is a
 /// test-local rewrite of captured bytes: it exercises Bridge's own refusal, and
 /// is no evidence of what Tally does with such a pair.
 fn shape_lab_catalogue_with_folded_twin() -> String {
@@ -2584,6 +2720,73 @@ fn shape_lab_catalogue_with_folded_twin() -> String {
     let twinned = captured.replace("Chem Supplier 4", "CRLF Supplier");
     assert_eq!(twinned.matches("CRLF Supplier").count(), 4);
     twinned
+}
+
+/// #626, P1: a pair is admitted only on the shape it was posted on (§9.4e): a
+/// Payment with the ledger on its debit side alone and off bill-wise. The rest
+/// keeps the refusal, for either spelling of the pair.
+#[test]
+fn a_line_break_pair_is_admitted_on_the_measured_shape_alone() {
+    const COMPANY: &str = "BRIDGE SHAPE LAB";
+    let catalogue_of = |xml: String| {
+        crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+            &xml,
+            COMPANY,
+            SHAPE_LAB_GUID,
+        )
+        .unwrap()
+    };
+    let flat = catalogue_of(shape_lab_catalogue_with_folded_twin());
+    let bill_wise = catalogue_of(crate::agent::agent_import::tests::with_bill_wise_flags(
+        &shape_lab_catalogue_with_folded_twin(),
+        &["CRLF Supplier", "CRLF Supplier\r\n"],
+    ));
+    for pair in ["CRLF Supplier", "CRLF Supplier\r\n"] {
+        let requested = vec![pair.to_string(), "Cash".to_string()];
+        let admitted =
+            |batch: &ImportPayload, catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2| {
+                let twins = folded_twins(
+                    &requested,
+                    catalogue.catalog().parents(),
+                    catalogue.catalog().aliases(),
+                );
+                assert_eq!(twins.len(), 1, "{pair:?}");
+                twins[0]
+                    .admitted_pair(&requested, &batch.vouchers, catalogue)
+                    .is_some()
+            };
+        let debit = [(pair, "1.00", "Dr"), ("Cash", "1.00", "Cr")];
+        let credit = [("Cash", "1.00", "Dr"), (pair, "1.00", "Cr")];
+        assert!(admitted(&multi_entry_batch("Payment", &debit), &flat));
+        // The party of a Receipt, and the money leg of a Payment.
+        assert!(!admitted(&multi_entry_batch("Receipt", &credit), &flat));
+        assert!(!admitted(&multi_entry_batch("Payment", &credit), &flat));
+        // Both sides of one Payment.
+        let both = [
+            (pair, "1.00", "Dr"),
+            (pair, "1.00", "Cr"),
+            ("Cash", "1.00", "Cr"),
+            ("Cash", "1.00", "Dr"),
+        ];
+        assert!(!admitted(&multi_entry_batch("Payment", &both), &flat));
+        for voucher_type in ["Journal", "Contra", "Receipt"] {
+            assert!(
+                !admitted(&multi_entry_batch(voucher_type, &debit), &flat),
+                "{voucher_type}"
+            );
+        }
+        // A bill-wise line.
+        assert!(!admitted(&multi_entry_batch("Payment", &debit), &bill_wise));
+        // A batch of which one voucher is unmeasured.
+        let mut mixed = multi_entry_batch("Payment", &debit);
+        mixed
+            .vouchers
+            .extend(multi_entry_batch("Receipt", &credit).vouchers);
+        assert!(!admitted(&mixed, &flat));
+        // Named only outside the vouchers, as a statement's facts can.
+        let elsewhere = multi_entry_batch("Payment", &[("Cash", "1.00", "Dr")]);
+        assert!(!admitted(&elsewhere, &flat));
+    }
 }
 
 /// The paired identity read, then the bracketed paired catalogue read, for
@@ -2674,12 +2877,34 @@ async fn validate_masters_marks_both_spellings_of_a_folded_twin_unimportable() {
     assert_eq!(simulator.finish().unwrap().len(), plans.len());
 }
 
+/// #626: a request that names one ledger of a line-break pair by its exact
+/// bytes is importable; `validate_masters_marks_both_spellings` is the same
+/// pair named together.
+#[tokio::test]
+async fn validate_masters_admits_one_exact_ledger_of_a_line_break_pair() {
+    for ledger in ["CRLF Supplier\r\n", "CRLF Supplier"] {
+        let plans = shape_lab_catalogue_plans(&shape_lab_catalogue_with_folded_twin());
+        let simulator = SequenceSimulator::spawn(plans).expect("shape lab plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = bank_server(directory.path(), simulator.address().port());
+        let outcome = server
+            .validate_masters(&json!({"company_guid":SHAPE_LAB_GUID,"ledgers":[ledger]}))
+            .await
+            .unwrap();
+        let master = &outcome.payload["result"]["masters"][0];
+        assert_eq!(master["importable"], true, "{master}");
+        assert!(master.get("folded_twins").is_none(), "{master}");
+    }
+}
+
 #[tokio::test]
 async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_file() {
-    for ledger in ["CRLF Supplier\r\n", "CRLF Supplier"] {
+    // Differs by more than the line break, so no pair is admitted.
+    let catalogue = captured_shape_lab_catalogue().replace("Chem Supplier 4", "crlf supplier");
+    for ledger in ["CRLF Supplier\r\n", "crlf supplier"] {
         let plans = [
             mode_tests::licensed_import_probe(),
-            shape_lab_catalogue_plans(&shape_lab_catalogue_with_folded_twin()),
+            shape_lab_catalogue_plans(&catalogue),
         ]
         .concat();
         let simulator = SequenceSimulator::spawn(plans.clone()).expect("shape lab plan");
@@ -3440,8 +3665,9 @@ fn outflow_skip_record() -> Value {
 
 fn guid_of(batch: &ImportLedgerLine, name: &str) -> String {
     batch
-        .ledger_identities
-        .iter()
+        .binding
+        .ledgers()
+        .into_iter()
         .flatten()
         .find(|bound| bound.name == name)
         .unwrap_or_else(|| panic!("{name} is not bound"))

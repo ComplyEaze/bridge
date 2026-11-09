@@ -33,8 +33,20 @@ The edge books are written by hand in a small generator, as data, then read by b
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `cp_unnamed.json` | 7,978 | `f099436d35a0469c76a478708dcd0fe6fe0b09ee339426d0ea710276bc96ea8c` | `edge-books/cp_unnamed.json` |
-| `edge.cp_unnamed.cash_payments_40a3.json` | 69,333 | `dd2022e8a772178aef8e7ea8aaecd66fb6bb21b43c3e95005abcce73412e6fa6` | `golden/edge.cp_unnamed.cash_payments_40a3.json` |
+| `edge.cp_unnamed.cash_payments_40a3.json` | 69,446 | `9b2b87a88249c6226f22bcc102ae06ec3fa7822794f3926ff195bc7b1d41c895` | `golden/edge.cp_unnamed.cash_payments_40a3.json` |
 | `cp_loans.json` | 7,004 | `a25a79803ea038dc52fdfae10a8f0346ff594eb96bf795dbe7fce5aef7f09cb2` | `edge-books/cp_loans.json` |
-| `edge.cp_loans.cash_payments_40a3.json` | 49,254 | `35fdf62af4e7c91942495c1fcb883a4e656f59b6df8d35040509b0fcba99a96c` | `golden/edge.cp_loans.cash_payments_40a3.json` |
+| `edge.cp_loans.cash_payments_40a3.json` | 49,367 | `f552e24d20df272ca6fcac77af3a0a1e028489d3ab2c933b0d78c3c654764157` | `golden/edge.cp_loans.cash_payments_40a3.json` |
 | `cp_loan_blank.json` | 1,290 | `b75ad26a2b52a035cf118704cc3194f8c56fe656e9eadd60e11b730747e01f04` | `edge-books/cp_loan_blank.json` |
-| `edge.cp_loan_blank.cash_payments_40a3.json` | 10,343 | `19e40a0256b5779780879b79351516c708f100a02e17c14c235c247841db6d6b` | `golden/edge.cp_loan_blank.cash_payments_40a3.json` |
+| `edge.cp_loan_blank.cash_payments_40a3.json` | 10,456 | `56d0d68be3742aaeea9736595a49e6e22c693e8cbab831a0d4102492845d729c` | `golden/edge.cp_loan_blank.cash_payments_40a3.json` |
+
+## Declared behaviour difference: a s.269ST row under the limit on its own cash line
+
+2 November 2026, #772. `docs/tax-audit/parity-spec-v1.md` section 12 requires every change to an
+existing output to be a declared difference that names the invented book which exercises it.
+
+- **What differs.** A s.269ST row is flagged on the party's side of its vouchers. Where that side is at or over the limit and the cash on those vouchers' own cash line is below it, because bank also moved, the title said the cash was at or over the limit. It now says the party's side is at or over and the cash debited or credited on these vouchers is below it. `Row::over` of `high_value_register` decides this, so the two tests give one row one account. The amount's definition on a named row said the figure was cash; on such a row it now says the figure is the party's side of each voucher, not only its cash, the wording an unnamed row already had. The two counts of rows at or over the limit said the day's total or cash payment total; each now says the party's side of the day's vouchers, and the payment count says a row is reportable in clause 31(bc) where its cash is too. The row, its figures' values, its evidence and its limits are as before. The compared fields are `title_sha256_16` and `definition_sha256_16` (parity-spec section 3).
+- **The book.** The invented book is the unit-test book of `src/cash_payments_40a3.rs`. The test `cash_payments_40a3::tests::a_row_under_the_limit_on_its_cash_line_says_so_in_its_title` builds each of the four rows, receipt and payment, named and unnamed, both ways round the limit, and asserts the title whole and the amount's definition. The counts' definitions hold on every book, so the goldens below pin them.
+- **The golden.** The synthetic book has one such row, the payment of 2025-04-01. `golden/synthetic.cash_payments_40a3.json` carries the new title, the new amount definition and their hashes, recomputed by hand with the hash `canonical.rs` uses (each old hash was reproduced first, to check the method). The four `edge.cp_*` goldens hold no such row, and only the two counts' definitions and hashes move in them, as in the synthetic golden. Nothing else changed, so these five are no longer the reference's own dumps for those texts. Their byte rows in `PROVENANCE.md`, here and in `shared-guid-rows-1195.md` are updated in place.
+- **Why it was not regenerated.** `parity/python_golden.py` takes the reference engine's directory, which is not in this repository, and the reference still gives the old texts (inferred from this golden, not measured), so a regeneration would bring it back.
+- **What a local parity run shows.** A run of `cash_payments_40a3` on a real book holding such a row reports its `title_sha256_16` and its amount's `definition_sha256_16` as differences, and a run on any book the two counts' `definition_sha256_16`. These are this declared difference, not a regression.
+- **Where it is declared.** The divergence registry of #1809 is not on master. When it is, this difference belongs there, with the goldens back at the reference's bytes.

@@ -76,7 +76,9 @@ fn maps_only_immutable_group_evidence_and_lists_everything_else() {
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
     let view = view_with(&workbook(source), &[]).unwrap();
     assert_eq!(view.lines.len(), 1);
@@ -115,7 +117,9 @@ fn contra_signed_sundry_debtor_is_excluded_not_netted_against_its_group_subtotal
         }],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -157,7 +161,9 @@ fn contra_signed_sundry_creditor_is_excluded_not_netted_against_its_group_subtot
         }],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -206,7 +212,9 @@ fn cash_in_hand_and_bank_accounts_keep_separate_group_subtotals_and_totals() {
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -262,7 +270,9 @@ fn contra_signed_bank_account_is_excluded_not_netted_against_its_group_subtotal(
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -299,7 +309,9 @@ fn empty_closing_balance_is_excluded_not_manufactured_as_zero() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -348,6 +360,7 @@ fn book_between(
         balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse(to).unwrap()),
         last_voucher_date: TallyDate::parse(to).unwrap(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
         rows,
         request_sha256: "0".repeat(64),
         master_response_sha256: "a".repeat(64),
@@ -374,6 +387,7 @@ fn book_between(
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
     })
 }
 

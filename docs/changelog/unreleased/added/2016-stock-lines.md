@@ -1,0 +1,1 @@
+- `vouchers` with `stock_lines` returns each voucher's stock movement, with its direction, quantities, rate, amount, godown and batch, for Stock Journals, Delivery Notes, Receipt Notes and Credit Notes; other kinds are counted as not read, and nothing is compared with the Stock Summary (#2016).

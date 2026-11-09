@@ -33,7 +33,7 @@ use sha2::Sha256;
 use crate::book::{Book, Ledger, Voucher};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
-use crate::high_value_register::{cash_269st_rows, Direction, Row, UNIDENTIFIED_PARTY};
+use crate::high_value_register::{cash_269st_rows, Direction, Over, Row, UNIDENTIFIED_PARTY};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::iso;
 use crate::rules::Rules;
@@ -599,8 +599,8 @@ population, non-Contra voucher, party ledger not under 'Sales Accounts', any amo
         Value::Int(rows_269st.len() as i64),
         Unit::Count,
         &format!(
-            "(date, party) pairs where the day's total is at or over the s.269ST(a) limb (i) \
-limit ({} per person per day).",
+            "(date, party) pairs where the party's side of the day's cash-receipt vouchers is at \
+or over the s.269ST(a) limb (i) limit ({} per person per day), whether or not their cash is.",
             rupees(i128::from(limit_269st))
         ),
         Vec::new(),
@@ -610,6 +610,10 @@ limit ({} per person per day).",
         let h = stable_ledger_tag(book, ledger_name)?;
         let rid = format!("{}_{h}", iso(d));
         let unnamed = ledger_name == UNIDENTIFIED_PARTY;
+        // Over on the party's side but under on the vouchers' own cash line: a true title and
+        // amount definition, as the high-value register gives the same row (#772). The rest of the
+        // finding stays.
+        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;
         let f_amt = r.fig(
             &format!("s269st_row_amount_{rid}"),
             Value::Int(data.paise),
@@ -618,6 +622,12 @@ limit ({} per person per day).",
                 format!(
                     "Received on {} on cash-receipt vouchers with no party ledger (tag {h}), \
 whatever name they print, summed: the payers' side of each voucher, not only its cash.",
+                    iso(d)
+                )
+            } else if proven_under {
+                format!(
+                    "Received from one party ledger (tag {h}) on {}, summed across every population \
+voucher that day: the party's side of each voucher, not only its cash.",
                     iso(d)
                 )
             } else {
@@ -634,17 +644,26 @@ population voucher that day.",
         r.findings.push(Finding {
             id: format!("{TEST_ID}/s269st/{rid}"),
             clauses: vec!["s.269ST(a)".to_string()],
-            title: if unnamed {
-                format!(
+            title: match (unnamed, proven_under) {
+                (true, true) => format!(
+                    "Cash received on {} on vouchers that do not name the payer: the payers' side \
+is at or over the s.269ST(a) limit, but the cash debited on these vouchers is below it",
+                    iso(d)
+                ),
+                (true, false) => format!(
                     "Cash received on {} on vouchers that do not name the payer: the total is at or \
 over the s.269ST(a) limit; whether any one person paid that much is not known",
                     iso(d)
-                )
-            } else {
-                format!(
+                ),
+                (false, true) => format!(
+                    "Cash received from one party on {}: the party's side is at or over the \
+s.269ST(a) limit, but the cash debited on these vouchers is below it",
+                    iso(d)
+                ),
+                (false, false) => format!(
                     "Cash received from one party at or over the s.269ST(a) limb (i) limit on {}",
                     iso(d)
-                )
+                ),
             },
             facts: vec![("amount".to_string(), f_amt)],
             evidence,
@@ -712,9 +731,10 @@ population, non-Contra voucher, party ledger not under 'Purchase Accounts', any 
         Value::Int(rows_269st_pay.len() as i64),
         Unit::Count,
         &format!(
-            "(date, party) pairs where the day's cash payment total is at or over the \
-s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reportable in clause \
-31(bc), not a contravention by the assessee (s.269ST binds the receiver, not the payer).",
+            "(date, party) pairs where the party's side of the day's cash-payment vouchers is at \
+or over the s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reportable \
+in clause 31(bc) where their cash is too, not a contravention by the assessee (s.269ST binds the \
+receiver, not the payer).",
             limit_269st_text = rupees(i128::from(limit_269st))
         ),
         Vec::new(),
@@ -724,6 +744,7 @@ s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reporta
         let h = stable_ledger_tag(book, ledger_name)?;
         let rid = format!("{}_{h}", iso(d));
         let unnamed = ledger_name == UNIDENTIFIED_PARTY;
+        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;
         let f_amt = r.fig(
             &format!("s269st_payment_row_amount_{rid}"),
             Value::Int(data.paise),
@@ -732,6 +753,12 @@ s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reporta
                 format!(
                     "Paid on {} on cash-payment vouchers with no party ledger (tag {h}), whatever \
 name they print, summed: the payees' side of each voucher, not only its cash.",
+                    iso(d)
+                )
+            } else if proven_under {
+                format!(
+                    "Paid to one party ledger (tag {h}) on {}, summed across every population \
+voucher that day: the party's side of each voucher, not only its cash.",
                     iso(d)
                 )
             } else {
@@ -748,18 +775,27 @@ voucher that day.",
         r.findings.push(Finding {
             id: format!("{TEST_ID}/s269st_payment/{rid}"),
             clauses: vec!["s.269ST(a)".to_string()],
-            title: if unnamed {
-                format!(
+            title: match (unnamed, proven_under) {
+                (true, true) => format!(
+                    "Cash paid on {} on vouchers that do not name the payee: the payees' side is \
+at or over the s.269ST(a) limit, but the cash credited on these vouchers is below it",
+                    iso(d)
+                ),
+                (true, false) => format!(
                     "Cash paid on {} on vouchers that do not name the payee: the total is at or \
 over the s.269ST limit; whether any one person was paid that much is not known",
                     iso(d)
-                )
-            } else {
-                format!(
+                ),
+                (false, true) => format!(
+                    "Cash paid to one party on {}: the party's side is at or over the s.269ST(a) \
+limit, but the cash credited on these vouchers is below it",
+                    iso(d)
+                ),
+                (false, false) => format!(
                     "Cash paid to one party at or over the s.269ST person-per-day threshold on {} \
 -- reportable in clause 31(bc)",
                     iso(d)
-                )
+                ),
             },
             facts: vec![("amount".to_string(), f_amt)],
             evidence,
@@ -1329,6 +1365,123 @@ mod tests {
                 "{UNIDENTIFIED_PARTY} (printed as 'Walk-in', and vouchers printing no usable name)"
             )
         );
+    }
+
+    /// The title of the one s.269ST row of a single voucher: `cash` and `bank` on the cash side
+    /// against `party` for their sum, on the receipt or the payment leg, with its amount and the
+    /// amount's definition.
+    fn s269st_row_of(receipt: bool, party: &str, cash: i64, bank: i64) -> (String, i64, String) {
+        use crate::book::{LedgerLine, VoucherStatus};
+        let sign = if receipt { 1 } else { -1 };
+        let line = |ledger: &str, amount_paise: i64| LedgerLine {
+            ledger: ledger.to_string(),
+            amount_paise: sign * amount_paise,
+        };
+        let ledgers = [
+            invented_ledger("Customer A", "Sundry Debtors"),
+            invented_ledger("Sales", "Sales Accounts"),
+            invented_ledger("Purchases", "Purchase Accounts"),
+        ];
+        let book = Book {
+            ledgers: ledgers.into_iter().map(|l| (l.name.clone(), l)).collect(),
+            vouchers: vec![Voucher {
+                guid: "g1".to_string(),
+                date: TallyDate::parse("20250601").unwrap(),
+                base_type: if receipt { "Receipt" } else { "Payment" }.to_string(),
+                status: VoucherStatus::Regular,
+                lines: vec![
+                    line("Cash", cash),
+                    line("Bank", bank),
+                    line(party, -(cash + bank)),
+                ],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let set = |names: &[&str]| -> BTreeSet<String> {
+            names.iter().map(|n| (*n).to_string()).collect()
+        };
+        let r = run(
+            &book,
+            &Rules::vendored().unwrap(),
+            &set(&["Cash"]),
+            &set(&["Bank"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+        )
+        .unwrap();
+        let prefix = if receipt { "s269st" } else { "s269st_payment" };
+        let finding = r
+            .findings
+            .iter()
+            .find(|f| f.id.starts_with(&format!("{TEST_ID}/{prefix}/")))
+            .unwrap();
+        let amount = r
+            .figures
+            .iter()
+            .find(|f| f.id == finding.facts[0].1)
+            .unwrap();
+        let Value::Int(paise) = amount.value else {
+            panic!("{:?}", amount.value);
+        };
+        (finding.title.clone(), paise, amount.definition.clone())
+    }
+
+    /// #772, declared in `provenance/cp-repin.md`: Rs 1,00,000 in cash and Rs 1,20,000 by bank is
+    /// over the s.269ST limit on the party's side and under it on the cash line, so the row keeps
+    /// its amount, and its title and the amount's definition say so, on either leg and with or
+    /// without a party ledger. The control moves the whole Rs 2,20,000 in cash.
+    #[test]
+    fn a_row_under_the_limit_on_its_cash_line_says_so_in_its_title() {
+        let cases = [
+            (
+                true,
+                "Sales",
+                "Cash received on 2025-06-01 on vouchers that do not name the payer: the payers' \
+                 side is at or over the s.269ST(a) limit, but the cash debited on these vouchers \
+                 is below it",
+                "Cash received on 2025-06-01 on vouchers that do not name the payer: the total is \
+                 at or over the s.269ST(a) limit; whether any one person paid that much is not \
+                 known",
+            ),
+            (
+                true,
+                "Customer A",
+                "Cash received from one party on 2025-06-01: the party's side is at or over the \
+                 s.269ST(a) limit, but the cash debited on these vouchers is below it",
+                "Cash received from one party at or over the s.269ST(a) limb (i) limit on \
+                 2025-06-01",
+            ),
+            (
+                false,
+                "Purchases",
+                "Cash paid on 2025-06-01 on vouchers that do not name the payee: the payees' side \
+                 is at or over the s.269ST(a) limit, but the cash credited on these vouchers is \
+                 below it",
+                "Cash paid on 2025-06-01 on vouchers that do not name the payee: the total is at \
+                 or over the s.269ST limit; whether any one person was paid that much is not known",
+            ),
+            (
+                false,
+                "Customer A",
+                "Cash paid to one party on 2025-06-01: the party's side is at or over the \
+                 s.269ST(a) limit, but the cash credited on these vouchers is below it",
+                "Cash paid to one party at or over the s.269ST person-per-day threshold on \
+                 2025-06-01 -- reportable in clause 31(bc)",
+            ),
+        ];
+        for (receipt, party, under, over) in cases {
+            let (title, paise, definition) = s269st_row_of(receipt, party, 10_000_000, 12_000_000);
+            assert_eq!((title.as_str(), paise), (under, 22_000_000));
+            assert!(
+                !definition.starts_with("Cash")
+                    && definition.ends_with(" side of each voucher, not only its cash."),
+                "{definition}"
+            );
+            let (title, paise, definition) = s269st_row_of(receipt, party, 22_000_000, 0);
+            assert_eq!((title.as_str(), paise), (over, 22_000_000));
+            assert_eq!(definition.starts_with("Cash"), party == "Customer A");
+        }
     }
 
     /// Characterises the receipt leg of the s.269ST walk (`high_value_register::cash_269st_rows`),

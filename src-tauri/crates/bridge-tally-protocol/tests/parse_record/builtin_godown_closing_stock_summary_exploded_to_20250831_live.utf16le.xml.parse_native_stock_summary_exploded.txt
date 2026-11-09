@@ -1,0 +1,282 @@
+# fixture: tests/fixtures/builtin_godown_closing_stock_summary_exploded_to_20250831_live.utf16le.xml
+# parser: parse_native_stock_summary_exploded
+# source: captured
+Ok(Some(
+    [
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Finished Kits",
+                quantity: Empty,
+                amount: Some(
+                    ExactDecimal(
+                        "18750.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Cleaning Kit A",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "12",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "18750.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Packaging",
+                quantity: Empty,
+                amount: Some(
+                    ExactDecimal(
+                        "14500.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Carton Box Small",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "100",
+                        ),
+                        unit: "Box",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "2500.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "HDPE Drum 50L",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "40",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "12000.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Raw Chemicals",
+                quantity: Empty,
+                amount: Some(
+                    ExactDecimal(
+                        "-30249.99",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Caustic Soda Flakes",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "400.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "-1000.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Hydrochloric Acid 33pc",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "816.667",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "-15500.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Soda Ash Light",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "1300.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "-18749.99",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Sulphuric Acid 98pc",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "100.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "5000.00",
+                    ),
+                ),
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Zero Stock Item",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "-50.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                amount: None,
+            },
+            sub_lines: [],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Godown Single Item",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "15",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "-150.00",
+                    ),
+                ),
+            },
+            sub_lines: [
+                NativeReportSubLine {
+                    batch: None,
+                    godown: "Factory Floor",
+                    quantity: Read(
+                        NativeStockQuantity {
+                            amount: ExactDecimal(
+                                "15",
+                            ),
+                            unit: "Nos",
+                        },
+                    ),
+                    amount: Some(
+                        ExactDecimal(
+                            "-150.00",
+                        ),
+                    ),
+                },
+            ],
+        },
+        NativeExplodedLine {
+            line: NativeReportLine {
+                name: "Godown Split Item",
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "50",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                amount: Some(
+                    ExactDecimal(
+                        "-550.00",
+                    ),
+                ),
+            },
+            sub_lines: [
+                NativeReportSubLine {
+                    batch: None,
+                    godown: "Godown Lab C",
+                    quantity: Read(
+                        NativeStockQuantity {
+                            amount: ExactDecimal(
+                                "20",
+                            ),
+                            unit: "Nos",
+                        },
+                    ),
+                    amount: Some(
+                        ExactDecimal(
+                            "-250.00",
+                        ),
+                    ),
+                },
+                NativeReportSubLine {
+                    batch: None,
+                    godown: "Main Location",
+                    quantity: Read(
+                        NativeStockQuantity {
+                            amount: ExactDecimal(
+                                "30",
+                            ),
+                            unit: "Nos",
+                        },
+                    ),
+                    amount: Some(
+                        ExactDecimal(
+                            "-300.00",
+                        ),
+                    ),
+                },
+            ],
+        },
+    ],
+))

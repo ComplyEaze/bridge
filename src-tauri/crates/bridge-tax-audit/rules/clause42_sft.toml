@@ -1,0 +1,6 @@
+# Form 3CD clause 42 SFT-013 candidate lister (clause42_sft): the cash a voucher must debit, strictly more than this, to be
+# listed for the CA. Data, not code. A listed voucher is a candidate, never a conclusion.
+
+[sft_013]
+source = "Income-tax Rules 1962, Rule 114E(2) Sl.11 and Rule 114E(3); Reporting Portal FAQ on SFT-013 (CBDT, 21-08-2018)"
+limit_paise = 20000000

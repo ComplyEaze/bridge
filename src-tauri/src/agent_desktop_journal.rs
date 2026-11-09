@@ -159,7 +159,7 @@ impl DesktopJournalService {
                         EntrySide::Dr => "Dr".into(),
                         EntrySide::Cr => "Cr".into(),
                     },
-                    amount: entry.amount.clone(),
+                    amount: entry.amount.as_str().to_owned(),
                     on_account,
                 })
                 .collect(),

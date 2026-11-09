@@ -1,0 +1,27 @@
+# fixture: agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml
+# parser: parse_agent_rows_reading_gst(CLASS_PURCHASE_LAB, StockLines::Asked)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(1),
+        "amounts": Array [],
+        "cancelled": Bool(false),
+        "date": String("20250615"),
+        "guid": String("92a7ef97-dd28-4286-b02c-c059fcb8690e-00000001"),
+        "is_invoice": Bool(true),
+        "master_id": String("1"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("Lab Supplier"),
+        "party_gstin": String("27ZZZZZ0000Z2ZP"),
+        "post_dated": Bool(false),
+        "reference": String("LAB-2057-6"),
+        "reference_date": String("20250615"),
+        "stock_lines_not_read": Bool(true),
+        "voucher_class": String("Purchase"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Purchase"),
+        "voucher_type_guid": String("92a7ef97-dd28-4286-b02c-c059fcb8690e-0000002e"),
+        "voucher_type_reserved_name": String("Purchase"),
+    },
+])

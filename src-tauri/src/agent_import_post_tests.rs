@@ -3,6 +3,7 @@
     clippy::disallowed_methods,
     reason = "test doubles: local sockets, servers and processes"
 )]
+use super::super::cash_projection::CashProjectionRecord;
 use super::super::statement_facts::{
     statement_record, ContraRow, RowDirection, SkipRow, StatementFacts, StatementWindow,
 };
@@ -1477,7 +1478,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     .unwrap()
     .bind_selected(requested.clone())
     .unwrap();
-    let recheck = |catalogue: &str| {
+    let recheck_bound = |catalogue: &str, binding: &_| {
         recheck_import_admission(
             &line,
             &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
@@ -1486,12 +1487,13 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             catalogue,
             None,
             &single_currency,
-            &ledger_binding,
+            binding,
             InvoiceIdentity::ByNumber,
             None,
             None,
         )
     };
+    let recheck = |catalogue: &str| recheck_bound(catalogue, &ledger_binding);
     // Control: the captured catalogue holds no twin of any named ledger.
     recheck(&catalogue).expect("no twin, so the queued batch is admitted");
     assert_eq!(
@@ -1515,6 +1517,16 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     .is_empty());
     // In the queue, the recheck reads every voucher's ledgers again.
     let error = recheck(&twinned).expect_err("a twin of voucher 2's ledger must refuse the batch");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
+    // This batch is Journals, not the measured shape, so naming the other
+    // ledger in the binding does not let it on (#626).
+    let shown = twinned_parents
+        .bind_selected(requested.iter().cloned().chain(["Cash\r\n".to_string()]))
+        .unwrap();
+    let error = recheck_bound(&twinned, &shown).expect_err("not the measured shape");
     assert!(matches!(
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
@@ -1945,7 +1957,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let mut absent = line;
     absent.batch_id = "bridge-00000000-0000-4000-8000-000000000003".into();
     for entry in &mut absent.vouchers[0].entries {
-        entry.amount = "12.62".into();
+        entry.amount = ImportAmount::parse("12.62").unwrap();
     }
     recheck_import_admission(
         &absent,
@@ -2031,6 +2043,54 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             Some(ApprovedImportAdmissionError::AdmissionInconsistent)
         ));
     }
+
+    // A pair the dialog named goes on in the queue, on the measured shape: this
+    // Payment's debit ledger, its twin in the approved binding (#626). The same
+    // twin outside the binding is refused.
+    let debit = payment.vouchers[0]
+        .entries
+        .iter()
+        .find(|entry| entry.side == EntrySide::Dr)
+        .unwrap()
+        .ledger
+        .clone();
+    let twin = catalogue.replace("WR2 Sales", &format!("{debit}&#13;&#10;"));
+    let parents = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &twin,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap();
+    let named = payment.vouchers[0]
+        .entries
+        .iter()
+        .map(|entry| entry.ledger.clone())
+        .collect::<Vec<_>>();
+    let recheck_twin = |binding: &_| {
+        recheck_import_admission(
+            &payment,
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
+            &captured,
+            &captured,
+            &twin,
+            Some(&groups),
+            &single_currency,
+            binding,
+            InvoiceIdentity::ByNumber,
+            None,
+            None,
+        )
+    };
+    let shown = parents
+        .bind_selected(named.iter().cloned().chain([format!("{debit}\r\n")]))
+        .unwrap();
+    recheck_twin(&shown).expect("the pair the dialog named");
+    let unshown = parents.bind_selected(named).unwrap();
+    let error = recheck_twin(&unshown).expect_err("a twin the dialog did not name");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
 }
 
 #[test]
@@ -2104,8 +2164,8 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
 
     // The record is self-consistent; the file holds a different Journal.
     let mut other = line.vouchers.clone();
-    other[0].entries[0].amount = "99.00".into();
-    other[0].entries[1].amount = "99.00".into();
+    other[0].entries[0].amount = ImportAmount::parse("99.00").unwrap();
+    other[0].entries[1].amount = ImportAmount::parse("99.00").unwrap();
     fs::write(
         &path,
         render_import_xml("Synthetic Accounts", &other, &line.batch_id),
@@ -2202,12 +2262,12 @@ fn payment_with(parties: usize, name: impl Fn(usize) -> String) -> ImportLedgerL
     voucher.entries = (0..parties)
         .map(|index| ImportEntry {
             ledger: name(index),
-            amount: "1.00".into(),
+            amount: ImportAmount::parse("1.00").unwrap(),
             side: EntrySide::Dr,
         })
         .chain(std::iter::once(ImportEntry {
             ledger: "Cash".into(),
-            amount: format!("{parties}.00"),
+            amount: ImportAmount::parse(&format!("{parties}.00")).unwrap(),
             side: EntrySide::Cr,
         }))
         .collect();
@@ -2601,18 +2661,19 @@ fn a_post_admits_only_the_ledgers_its_build_bound() {
 fn a_record_without_ledger_identities_reads_as_built_before_binding() {
     // An older record, exactly as it was serialized: no `ledger_identities`.
     let (mut line, _) = batch();
-    line.ledger_identities = None;
+    line.binding = LedgerBinding::bound(None);
     let json = serde_json::to_value(&line).unwrap();
     assert!(json.get("ledger_identities").is_none(), "{json}");
     assert!(json.get("ledger_identities_2").is_none(), "{json}");
     assert!(json.get("ledger_identities_3").is_none(), "{json}");
+    assert!(json.get("ledger_identities_4").is_none(), "{json}");
     let reread: ImportLedgerLine = serde_json::from_value(json).unwrap();
-    assert_eq!(reread.ledger_identities, None);
+    assert_eq!(reread.binding, LedgerBinding::Unbound);
     // And a current record keeps them across a round trip.
-    line.ledger_identities = Some(recorded(&[("Cash", "g")]));
+    line.binding = LedgerBinding::bound(Some(recorded(&[("Cash", "g")])));
     let reread: ImportLedgerLine =
         serde_json::from_value(serde_json::to_value(&line).unwrap()).unwrap();
-    assert_eq!(reread.ledger_identities, line.ledger_identities);
+    assert_eq!(reread.binding, line.binding);
 }
 
 /// Every key of a saved batch, by its path in the record, with every optional
@@ -2640,21 +2701,25 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 }
 
 /// A saved batch holds exactly these records, and its ledger binding is
-/// written as `ledger_identities_3`, never as the `ledger_identities_2` that
-/// the releases after 0.4.2 read or the `ledger_identities` that releases
-/// 0.3.0 to 0.4.2 read. Those releases refuse a batch with no binding they can
-/// read and know nothing of the cash-in-hand, bill-wise and statement records,
-/// so this name is what keeps them from posting a batch saved here without
-/// those checks (ADR 0004).
+/// written as `ledger_identities_3`, or as `ledger_identities_4` on a deposit
+/// from the cash box, which alone carries `cash_projection`; never as the
+/// `ledger_identities_2` that the releases after 0.4.2 read or the
+/// `ledger_identities` that releases 0.3.0 to 0.4.2 read. Those releases
+/// refuse a batch with no binding they can read and know nothing of the
+/// cash-in-hand, bill-wise and statement records, so this name is what keeps
+/// them from posting a batch saved here without those checks (ADR 0004).
+/// Releases up to `mcp-v0.7.0` read `_3` and know nothing of the projection,
+/// so `_4` is what keeps them from posting a deposit whose cash book they
+/// cannot check, while every other batch stays one they read.
 ///
 /// `withdrawn_skips` was added in the same unreleased change as `statement`
 /// and the `_3` name, so no release holds `_3` without it.
 ///
 /// If this test stops compiling or its list has to change because a field
 /// was added, removed or renamed, the releases before that change will not
-/// read the new record either: give the binding a new written name again
-/// (`ledger_identities_4`, keeping every earlier name as a `serde` alias) in
-/// the same change, and update the name here. A release that cannot check a
+/// read the new record either: give the binding a new written name again on
+/// the batches that carry the record (keeping every earlier name as a `serde`
+/// alias) in the same change, and update the name here. A release that cannot check a
 /// batch must find no binding in it.
 ///
 /// The destructurings name every field and have no `..`, so a field added to
@@ -2691,12 +2756,26 @@ fn a_saved_batch_holds_exactly_these_records() {
             status: _,
             pre_import_mark,
             vouchers,
-            ledger_identities,
+            binding,
             cash_in_hand_ledgers,
             on_account_approved,
             statement,
             withdrawn_skips: _,
         } = line;
+        let ledgers = match binding {
+            LedgerBinding::Unbound => None,
+            LedgerBinding::Bound(ledgers) => Some(ledgers),
+            LedgerBinding::CashBox {
+                ledgers,
+                projection:
+                    CashProjectionRecord {
+                        ledgers: _,
+                        from: _,
+                        to: _,
+                        book_sha256: _,
+                    },
+            } => Some(ledgers),
+        };
         if let Some(ImportCompanyTuple {
             name: _,
             guid: _,
@@ -2754,7 +2833,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                 } = entry;
             }
         }
-        for bound in ledger_identities.iter().flatten() {
+        for bound in ledgers.into_iter().flatten() {
             let BoundLedger { name: _, guid: _ } = bound;
         }
         for cash in cash_in_hand_ledgers.iter().flatten() {
@@ -2801,7 +2880,7 @@ fn a_saved_batch_holds_exactly_these_records() {
     }
     let (mut line, _) = batch();
     line.amends_batch_id = Some("bridge-00000000-0000-4000-8000-000000000009".into());
-    line.ledger_identities = Some(recorded(&[("Cash", "g")]));
+    line.binding = LedgerBinding::bound(Some(recorded(&[("Cash", "g")])));
     line.cash_in_hand_ledgers =
         serde_json::from_value(json!([{"bridge_txn_id":"journal-test","ledger":"Cash"}])).unwrap();
     line.on_account_approved =
@@ -2931,9 +3010,148 @@ fn a_saved_batch_holds_exactly_these_records() {
         ],
         "{written}"
     );
-    let reread: ImportLedgerLine = serde_json::from_value(written).unwrap();
-    assert_eq!(reread.ledger_identities, line.ledger_identities);
+    let reread: ImportLedgerLine = serde_json::from_value(written.clone()).unwrap();
+    assert_eq!(reread.binding, line.binding);
     assert_eq!(reread.statement, line.statement);
+
+    // A deposit from the cash box: the binding moves to the new name and the
+    // projection is the one record added.
+    line.binding = LedgerBinding::CashBox {
+        ledgers: recorded(&[("Cash", "g")]),
+        projection: CashProjectionRecord {
+            ledgers: vec!["Cash".into()],
+            from: TallyDate::parse("20260901").unwrap(),
+            to: TallyDate::parse("20270331").unwrap(),
+            book_sha256: "0".repeat(64),
+        },
+    };
+    every_field_is_named(&line);
+    let deposit = serde_json::to_value(&line).unwrap();
+    let mut deposit_paths = std::collections::BTreeSet::new();
+    record_key_paths(&deposit, "", &mut deposit_paths);
+    let bound_paths = [
+        "ledger_identities_3",
+        "ledger_identities_3[].guid",
+        "ledger_identities_3[].name",
+    ];
+    let mut expected: std::collections::BTreeSet<String> = paths
+        .iter()
+        .filter(|path| !bound_paths.contains(&path.as_str()))
+        .cloned()
+        .collect();
+    expected.extend(
+        [
+            "cash_projection",
+            "cash_projection.book_sha256",
+            "cash_projection.from",
+            "cash_projection.ledgers",
+            "cash_projection.to",
+            "ledger_identities_4",
+            "ledger_identities_4[].guid",
+            "ledger_identities_4[].name",
+        ]
+        .map(String::from),
+    );
+    assert_eq!(deposit_paths, expected, "{deposit}");
+    let reread: ImportLedgerLine = serde_json::from_value(deposit).unwrap();
+    assert_eq!(reread.binding, line.binding);
+}
+
+/// No build writes a binding whose name disagrees with its projection, and a
+/// line holding one does not parse. The journal reader refuses it by its own
+/// code, so it is told apart from a line that does not parse at all.
+#[test]
+fn a_binding_whose_name_disagrees_with_its_projection_does_not_parse() {
+    let (mut line, _) = batch();
+    line.binding = LedgerBinding::CashBox {
+        ledgers: recorded(&[("Cash", "g")]),
+        projection: CashProjectionRecord {
+            ledgers: vec!["Cash".into()],
+            from: TallyDate::parse("20260901").unwrap(),
+            to: TallyDate::parse("20270331").unwrap(),
+            book_sha256: "0".repeat(64),
+        },
+    };
+    let deposit = serde_json::to_value(&line).unwrap();
+    let ledgers = deposit["ledger_identities_4"].clone();
+    let mut under_the_old_name = deposit.clone();
+    let fields = under_the_old_name.as_object_mut().unwrap();
+    fields.remove("ledger_identities_4");
+    fields.insert("ledger_identities_3".into(), ledgers.clone());
+    let mut without_its_projection = deposit.clone();
+    without_its_projection
+        .as_object_mut()
+        .unwrap()
+        .remove("cash_projection");
+    let mut under_both_names = deposit;
+    under_both_names["ledger_identities_3"] = ledgers;
+    // A bad amount alone, under a binding that agrees, is a line that does not parse.
+    let mut amount_only = serde_json::to_value(&line).unwrap();
+    amount_only["vouchers"][0]["entries"][0]["amount"] = json!("-1.00");
+    assert_eq!(
+        ImportLedgerLine::from_journal(amount_only).map(drop),
+        Err(BatchLineRefusal::Unreadable),
+    );
+    for (written, mismatch) in [
+        (
+            under_the_old_name,
+            LedgerBindingMismatch::ProjectionWithoutName,
+        ),
+        (
+            without_its_projection,
+            LedgerBindingMismatch::NameWithoutProjection,
+        ),
+        (under_both_names, LedgerBindingMismatch::TwoNames),
+    ] {
+        assert!(
+            serde_json::from_value::<ImportLedgerLine>(written.clone()).is_err(),
+            "{written}"
+        );
+        assert_eq!(
+            ImportLedgerLine::from_journal(written.clone()).map(drop),
+            Err(BatchLineRefusal::Binding(mismatch)),
+            "{written}"
+        );
+        // the journal reader refuses the whole history on it, by its own code
+        let text = format!("{written}\n");
+        assert_eq!(
+            super::super::ledger::read_snapshot(std::io::Cursor::new(text.as_bytes()), None)
+                .map(drop),
+            Err(IMPORT_LEDGER_BINDING_MISMATCH.to_string()),
+            "{written}"
+        );
+        // and a mismatch is named before another defect of the same line
+        let mut also_a_bad_amount = written.clone();
+        also_a_bad_amount["vouchers"][0]["entries"][0]["amount"] = json!("-1.00");
+        assert_eq!(
+            ImportLedgerLine::from_journal(also_a_bad_amount).map(drop),
+            Err(BatchLineRefusal::Binding(mismatch)),
+        );
+    }
+    // Two earlier names for the binding are a line that does not parse, as before.
+    let (mut line, _) = batch();
+    line.binding = LedgerBinding::bound(Some(recorded(&[("Cash", "g")])));
+    let mut two_earlier = serde_json::to_value(&line).unwrap();
+    two_earlier["ledger_identities_2"] = two_earlier["ledger_identities_3"].clone();
+    assert_eq!(
+        ImportLedgerLine::from_journal(two_earlier.clone()).map(drop),
+        Err(BatchLineRefusal::Unreadable),
+    );
+    assert_eq!(
+        super::super::ledger::read_snapshot(
+            std::io::Cursor::new(format!("{two_earlier}\n").as_bytes()),
+            None
+        )
+        .map(drop),
+        Err("import_ledger_invalid".to_string()),
+    );
+    // The new code tells the person what the old one does.
+    let step = crate::agent::refusal_remediation(IMPORT_LEDGER_BINDING_MISMATCH);
+    assert!(step.is_some());
+    assert_eq!(
+        step,
+        crate::agent::refusal_remediation("import_ledger_invalid")
+    );
 }
 
 /// A batch an earlier release saved, as that release journaled it (a captured
@@ -2952,13 +3170,17 @@ fn a_batch_an_earlier_release_saved_keeps_its_ledger_binding() {
         .len();
     assert!(bound > 0);
     let line: ImportLedgerLine = serde_json::from_value(captured).unwrap();
-    assert_eq!(line.ledger_identities.as_ref().map(Vec::len), Some(bound));
+    assert_eq!(line.binding.ledgers().map(<[_]>::len), Some(bound));
     assert_eq!(line.cash_in_hand_ledgers, None);
     assert_eq!(line.on_account_approved, None);
     let rewritten = serde_json::to_value(&line).unwrap();
     assert!(rewritten.get("ledger_identities").is_none(), "{rewritten}");
     assert!(
         rewritten.get("ledger_identities_2").is_none(),
+        "{rewritten}"
+    );
+    assert!(
+        rewritten.get("ledger_identities_4").is_none(),
         "{rewritten}"
     );
     assert_eq!(
@@ -4876,6 +5098,82 @@ fn a_name_that_spells_a_line_break_in_typed_characters_takes_no_mark() {
     );
 }
 
+fn line_break_twin(named: &str, other: &str) -> LineBreakTwin {
+    LineBreakTwin {
+        named: named.into(),
+        named_group: "Current Assets".into(),
+        other: other.into(),
+        other_group: "Bank Accounts".into(),
+    }
+}
+
+/// #626: every form of the dialog names both ledgers of a pair, each with its
+/// group, and which one the post uses, in either direction; the name is
+/// written bare, so the only marked name is one the voucher lines show.
+#[test]
+fn a_dialog_names_both_ledgers_of_a_line_break_pair_and_which_is_used() {
+    let (mut single, endpoint) = batch();
+    let plain = line_break_twin("Cash", "Cash\r\n");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&plain),
+    )
+    .unwrap()
+    .text;
+    let expected = [
+        r#"Used: "Cash", no line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", line break at its end, group "Bank Accounts""#,
+    ];
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines.windows(2).any(|shown| shown == expected), "{text}");
+    assert!(!text.contains("Line break"), "{text}");
+
+    single.vouchers[0].entries[1].ledger = "Cash\r\n".into();
+    refresh_batch_sha256(&mut single);
+    let broken = line_break_twin("Cash\r\n", "Cash");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&broken),
+    )
+    .unwrap()
+    .text;
+    for shown in [
+        r#"Used: "Cash", line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", no line break at its end, group "Bank Accounts""#,
+    ] {
+        assert!(text.lines().any(|line| line == shown), "{text}");
+    }
+
+    let (several, endpoint) = batch_of_every_type();
+    for form in [PreviewForm::Listed, PreviewForm::TotalsOnly] {
+        let text =
+            review_preview_with_twins(&several, &endpoint, form, std::slice::from_ref(&plain))
+                .unwrap()
+                .text;
+        assert!(text.contains(expected[0]), "{form:?}: {text}");
+        assert!(text.contains(expected[1]), "{form:?}: {text}");
+    }
+}
+
+/// #626: a group is Tally's text, so a dialog refuses one it could not show
+/// whole, as it refuses any other value.
+#[test]
+fn a_dialog_refuses_a_line_break_pair_whose_group_it_cannot_show() {
+    let (single, endpoint) = batch();
+    let mut twin = line_break_twin("Cash", "Cash\r\n");
+    twin.other_group = "Bank\nAccounts".into();
+    assert_eq!(
+        review_preview_with_twins(&single, &endpoint, PreviewForm::Listed, &[twin])
+            .err()
+            .as_deref(),
+        Some("import_review_layout_text")
+    );
+}
+
 /// An assistant's one-voucher text shows such a name quoted with its break
 /// written out and the mark before it, with the line that explains the mark
 /// once, under the entries and the On Account sentence and above the totals;
@@ -5611,6 +5909,10 @@ fn each_master_refusal_reaches_the_caller_under_its_own_code() {
             UnderLockRefusal::MasterJournalUnavailable,
             "master_ledger_unavailable",
         ),
+        (
+            UnderLockRefusal::JournalSplit("other_journal_holds_batches"),
+            "import_journal_split",
+        ),
     ] {
         assert_eq!(refusal_code(&anyhow::Error::from(refusal)), code);
     }
@@ -5669,10 +5971,11 @@ fn the_voucher_recheck_given_a_masters_admission_refuses_and_aims_nothing() {
     let aimed = std::sync::Mutex::new(None::<u64>);
     let error = recheck_voucher_queue(
         QueuedAdmission::Masters {
-            item: &crate::tally::ledger_create_item::LedgerCreateItem::new(
+            batch: &crate::tally::ledger_create_item::LedgerCreateItem::new(
                 crate::tally::ledger_create_item::MasterName::new("Some Party").unwrap(),
                 crate::tally::ledger_create_item::AdmittedLedgerKind::Suspense,
-            ),
+            )
+            .into(),
             company: &crate::tally::VerifiedCompanyIdentity::test_fixture(
                 "Synthetic Accounts",
                 "00000000-0000-4000-8000-000000000002",
@@ -5755,16 +6058,21 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
     assert!(unread["result"]["error"]
         .get("unsettled_batch_id")
         .is_none());
-    // The invoice text never leaves a person at a dead end or offers to nudge
-    // a figure: where a new number cannot help it says to enter the invoice by
-    // hand, and it forbids changing the number, date, ledger, amount or side.
-    // Case (2), a match by figures alone: a new number cannot help.
+    // The invoice text never offers to nudge a figure: it forbids changing the
+    // number, date, ledger, amount or side.
+    // Case (2), a match by figures alone: a new number cannot help, and the
+    // sale is left out with the user told, as the rows step leaves out a
+    // second real row. A stated stop, never a hand entry (#1709).
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
-        "a new number does not get past this check: tell the user and enter the invoice in Tally by hand"
+        "a new number does not get past this check, and ComplyEaze Bridge cannot post this sale yet: leave it out and tell the user so; do not enter it in Tally by hand"
     ));
-    // Case (3), an unconfirmed earlier batch: hand entry, and how it ends.
-    assert!(PREEXISTING_INVOICE_NEXT_STEP
-        .contains("cannot post it while that batch is unconfirmed: enter it in Tally by hand"));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("tell the user and enter the invoice"));
+    // Case (3), an unconfirmed earlier batch: the same stated stop, and how it
+    // ends. A stop release does not end it (the owner's ruling on #1709).
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "cannot post it while that batch is unconfirmed: verify_import on that batch is the only way this refusal ends, and until it does, leave the invoice out and tell the user so; do not enter it in Tally by hand"
+    ));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("unconfirmed: enter it in Tally by hand"));
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("verify_import on it can confirm it"));
     // A busy journal is a retry, not a reason to enter anything by hand.
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(

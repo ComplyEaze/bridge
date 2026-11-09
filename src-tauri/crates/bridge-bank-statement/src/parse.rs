@@ -467,16 +467,7 @@ pub fn require_account_match(
     bank: Bank,
     account_tail: &str,
 ) -> Result<String, Refusal> {
-    let digits = account_digits(account_tail);
-    let digit_count = digits.chars().count();
-    if digit_count < 4 {
-        return Err(Refusal::new(
-            "unbindable_account",
-            format!(
-                "the account label carries {digit_count} digits; at least 4 are needed to bind the statement to the ledger"
-            ),
-        ));
-    }
+    let digits = bindable_digits(account_tail)?;
     if bank == Bank::Bob {
         return bob_account_match(pages, &digits);
     }
@@ -501,6 +492,36 @@ pub fn require_account_match(
             "ambiguous_account_match",
             "the account digits match more than one number on the account-number line; supply more digits",
         )),
+    }
+}
+
+/// The digits of the operator's label, at least four, or a refusal.
+fn bindable_digits(account_tail: &str) -> Result<String, Refusal> {
+    let digits = account_digits(account_tail);
+    let digit_count = digits.chars().count();
+    if digit_count < 4 {
+        return Err(Refusal::new(
+            "unbindable_account",
+            format!(
+                "the account label carries {digit_count} digits; at least 4 are needed to bind the statement to the ledger"
+            ),
+        ));
+    }
+    Ok(digits)
+}
+
+/// [`require_account_match`] for a file that prints its one account number in a cell of its own,
+/// so there is no line of numbers to tell apart. A comparison only: the number is the file's and
+/// is returned for the row labels, as [`require_account_match`] returns the statement's.
+pub fn require_printed_account_match(printed: &str, account_tail: &str) -> Result<String, Refusal> {
+    let digits = bindable_digits(account_tail)?;
+    if printed.ends_with(&digits) {
+        Ok(printed.to_string())
+    } else {
+        Err(Refusal::new(
+            "account_not_in_statement",
+            "the account number this file prints does not end with the account digits supplied; refusing to post it to this ledger",
+        ))
     }
 }
 

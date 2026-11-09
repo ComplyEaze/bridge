@@ -258,10 +258,13 @@ test("a probe whose core read stopped names the refusal by its title in Pack rea
     packs: {
       core_accounting: { state: "unknown", confidence: "observed", safe_reason_code: "company_altmstid_missing" },
       india_tax: { state: "unknown", confidence: "observed", safe_reason_code: "some_unlisted_code" },
+      inventory: { state: "unknown", confidence: "observed", safe_reason_code: "xml_export_shape_unrecognized" },
     },
   };
   await act(async () => root.render(<MirrorProofScreen {...fixture.result} />));
   const text = host.textContent ?? "";
+  expect(text).toContain("The endpoint answered, but not as a Tally company list.");
+  expect(text).not.toContain("Xml export shape unrecognized");
   expect(text).toContain("Observed by this probe. The core read stopped: Tally did not report its master-change marker.");
   expect(text).toContain("Observed by this probe. Reason: Some unlisted code.");
   expect(text).not.toContain("Company altmstid missing");

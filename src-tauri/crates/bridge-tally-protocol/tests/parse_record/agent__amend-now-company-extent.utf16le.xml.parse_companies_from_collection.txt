@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/agent/amend-now-company-extent.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE AMEND LAB",
+        guid: Some(
+            "17a10910-773c-42c6-bd66-7bba9a392536",
+        ),
+        company_number: Some(
+            "100024",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

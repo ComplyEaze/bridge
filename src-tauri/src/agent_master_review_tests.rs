@@ -6,6 +6,25 @@ use crate::tally::ledger_create_item::{
 };
 use bridge_tally_protocol::GstDutyHead;
 
+/// The preview of a batch of `item` alone: the one-ledger text, through the
+/// batch's one builder.
+fn master_review_text(
+    item: &LedgerCreateItem,
+    company: &VerifiedCompanyIdentity,
+    origin: &str,
+) -> Result<String, MasterReviewError> {
+    super::master_review_text(&LedgerCreateBatch::one(item.clone()), company, origin)
+}
+
+/// The masked preview of a batch of `item` alone.
+fn masked_review_text(
+    item: &LedgerCreateItem,
+    company: &VerifiedCompanyIdentity,
+    origin: &str,
+) -> Result<String, MasterReviewError> {
+    super::masked_review_text(&LedgerCreateBatch::one(item.clone()), company, origin)
+}
+
 fn guid() -> &'static str {
     crate::synthetic_guid(1)
 }
@@ -260,4 +279,50 @@ fn every_built_text_fits_the_dialog() {
     let shown = text(&longest).unwrap();
     assert!(shown.len() <= BATCH_REVIEW_MAX_BYTES);
     assert!(shown.lines().count() <= BATCH_REVIEW_MAX_LINES);
+}
+
+/// A batch names its count on the first line and lists each ledger, two lines
+/// each, in the order it is sent; the masked text masks every name and is
+/// refused exactly when the whole text is.
+#[test]
+fn a_batch_preview_names_its_count_and_lists_each_ledger_in_order() {
+    let batch = LedgerCreateBatch::new(vec![
+        item(
+            "MLab Batch One",
+            party(PartySide::SundryCreditors, None, false),
+        ),
+        item(
+            "MLab Batch Two",
+            party(PartySide::SundryCreditors, None, true),
+        ),
+    ])
+    .unwrap();
+    let lab = company("BRIDGE MASTERS LAB");
+    let text = super::master_review_text(&batch, &lab, ORIGIN).unwrap();
+    let one = destination();
+    let expected = format!(
+        "{}Create ledger \"MLab Batch One\" under Sundry Creditors\nno GST, bill-by-bill No\nCreate ledger \"MLab Batch Two\" under Sundry Creditors\nno GST, bill-by-bill Yes{WARNING}",
+        one.replacen("Create ONE ledger in", "Create 2 ledgers in", 1)
+    );
+    assert_eq!(text, expected);
+    let masked = super::masked_review_text(&batch, &lab, ORIGIN).unwrap();
+    assert!(!masked.contains("MLab Batch One") && !masked.contains("MLab Batch Two"));
+    assert_eq!(masked.lines().count(), text.lines().count());
+}
+
+/// A batch at the limit fits the box with names of a working length.
+#[test]
+fn a_batch_at_the_limit_fits_the_box() {
+    let batch = LedgerCreateBatch::new(
+        (0..crate::tally::ledger_create_item::MAX_LEDGERS_PER_BATCH)
+            .map(|index| {
+                item(
+                    &format!("MLab Batch Creditor With A Longer Name {index:02}"),
+                    party(PartySide::SundryCreditors, Some(GSTIN), true),
+                )
+            })
+            .collect(),
+    )
+    .unwrap();
+    assert!(super::master_review_text(&batch, &company("BRIDGE MASTERS LAB"), ORIGIN).is_ok());
 }

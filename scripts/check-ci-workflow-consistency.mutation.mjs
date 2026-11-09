@@ -395,8 +395,9 @@ test("merge gate scope: a base SHA taken from the pull request's head is refused
     "the merge-gate-scope step must read the event name and the pull request's base SHA");
 });
 
-// A release pull request must move src-tauri/release-date.txt (#2416): the scope step runs the date check exactly when the
-// version differs from the base's, on the base and the merge commit, and lets its exit status fail the step.
+// A release pull request must move src-tauri/release-date.txt (#2416): the scope step's pinned text runs the date check
+// under the version test, on the base and the merge commit, with no `|| true`. These cases prove the pinned text is exact;
+// scripts/check-release-date-changed.test.mjs proves what the script decides.
 const RELEASE_DATE_CALL = 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"; fi';
 for (const [name, replacement] of [
   ["the call removed", ""],

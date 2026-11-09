@@ -61,6 +61,32 @@ test("the same day as the base is refused as unchanged, naming the file", () => 
   assert.match(r.err, /::error file=src-tauri\/release-date\.txt::release-date: unchanged:/);
 });
 
+test("a base without its final newline still names its day, so the same day is unchanged", () => {
+  const r = run({ base: "2026-10-30", head: "2026-10-30\n" });
+  assert.equal(r.status, 1);
+  assert.match(r.err, /release-date: unchanged:/);
+});
+
+test("run from a subdirectory it reads the same file from the repository root", () => {
+  const dir = mkdtempSync(join(tmpdir(), "release-date-sub-"));
+  try {
+    git(dir, "init", "-q");
+    mkdirSync(join(dir, "src-tauri"), { recursive: true });
+    mkdirSync(join(dir, "sub"));
+    writeFileSync(join(dir, RELEASE_DATE_FILE), "2026-10-30\n");
+    writeFileSync(join(dir, "sub", "marker.txt"), "a");
+    git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "base");
+    const base = git(dir, "rev-parse", "HEAD");
+    writeFileSync(join(dir, RELEASE_DATE_FILE), "2026-11-09\n");
+    git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "head");
+    const head = git(dir, "rev-parse", "HEAD");
+    const r = spawnSync(process.execPath, [script, base, head], { cwd: join(dir, "sub"), encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("an earlier day than the base's is refused", () => {
   const r = run({ base: "2026-10-30\n", head: "2026-10-29\n" });
   assert.equal(r.status, 1);

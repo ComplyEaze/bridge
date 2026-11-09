@@ -18,8 +18,8 @@ export const RELEASE_DATE_FILE = "src-tauri/release-date.txt";
 export const REFUSALS = {
   missing: `${RELEASE_DATE_FILE} is missing from the version pull request; run \`node scripts/next-version.mjs --apply\``,
   malformed: `${RELEASE_DATE_FILE} must hold one line, a real YYYY-MM-DD day, ending in a single newline`,
-  unchanged: `${RELEASE_DATE_FILE} is the same as the base's; a version pull request must set it to the release day (\`node scripts/next-version.mjs --apply\` does)`,
-  earlier: `${RELEASE_DATE_FILE} names a day earlier than the base's; check the computer's clock and run \`node scripts/next-version.mjs --apply\` again`,
+  unchanged: `${RELEASE_DATE_FILE} is the same as the base's; a version pull request must set it to a later release day (\`node scripts/next-version.mjs --apply\` does, but not on the base's own UTC day: wait for the next day)`,
+  earlier: `${RELEASE_DATE_FILE} names a day earlier than the base's; check the computer's clock and run \`node scripts/next-version.mjs --apply\` again (a revert of a version pull request needs a fresh, later date too)`,
 };
 
 export class ReleaseDateRefusal extends Error {
@@ -44,7 +44,9 @@ export function checkReleaseDateChange({ base, head }) {
   if (head === null) throw new ReleaseDateRefusal("missing");
   const headDay = parseReleaseDate(head);
   if (headDay === null) throw new ReleaseDateRefusal("malformed");
-  const baseDay = base === null ? null : parseReleaseDate(base);
+  // The base is read leniently (a missing final newline still names its day): it is already merged, and a strict read
+  // would let a same-day head pass as having no predecessor.
+  const baseDay = base === null ? null : parseReleaseDate(`${base.trim()}\n`);
   if (baseDay === null) return { baseDay, headDay };
   if (headDay === baseDay) throw new ReleaseDateRefusal("unchanged");
   if (headDay < baseDay) throw new ReleaseDateRefusal("earlier");
@@ -54,7 +56,7 @@ export function checkReleaseDateChange({ base, head }) {
 // The file's text at a commit, or null when the commit has no such file. `git ls-tree` exits 0 with no output for an
 // absent path and non-zero for a bad commit, so "absent" is told apart from "git failed" (which throws).
 function textAt(sha) {
-  const listed = execFileSync("git", ["ls-tree", sha, "--", RELEASE_DATE_FILE], { encoding: "utf8" });
+  const listed = execFileSync("git", ["ls-tree", "--full-tree", sha, "--", RELEASE_DATE_FILE], { encoding: "utf8" });
   if (listed === "") return null;
   return execFileSync("git", ["show", `${sha}:${RELEASE_DATE_FILE}`], { encoding: "utf8" });
 }

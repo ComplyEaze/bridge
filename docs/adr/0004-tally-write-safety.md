@@ -1000,3 +1000,40 @@ The cost is one more open and lock per acquisition. An earlier unpackaged build 
 **Not measured.** An actual overlap before #1641 (the split is shown by a holder of the AppData file alone, not by a build from before #1641, and the overlap it allowed is not measured); whether the extension's own AppData files are redirected; the extension as Claude Desktop starts it as an acquirer; whether a server Claude Desktop starts from a config entry also runs inside the package; whether the direct installer is also MSIX-packaged.
 
 **Rollback.** This amendment changes no code. Reverting #1641 restores one lock folder, and with it the split on a Store install.
+
+## Amendment — 2026-11-09: the invoice number is read a month at a time and compared as folded (#2162 item 11)
+
+**What changes.** The duplicate-number check no longer asks Tally to filter by the invoice number. It reads every voucher of the invoice's financial year, one calendar month per request, with the same fetch list and Sales-class compute as before and no number term (`render_invoice_window_numbers_request`, `src-tauri/src/agent_import_invoice_wire.rs`). The program then compares each month's Sales-class numbers with the invoice's. Two numbers are the same when they are equal after ignoring case and the leading zeros of each run of digits (`folded_number`). That is the leading-zero rule decided on #2162 on 4 November 2026. The first month that holds the number refuses the build, as `invoice_number_already_used`, or `invoice_number_already_used_with_irn` when one of that month's holders carries an IRN.
+
+**Why.** Tally's own filter and duplicate guard ignore case but not a dropped zero (row 2162-S4), so they cannot be asked whether two numbers fold to the same one. One read of the whole year did not fit the transport on a dense book (row 2162-S6: 83.7 MB, 44 s). Read a month at a time, every dense month answered in under 15 s and 24 MiB, and the months' rows equalled the year's (row 2162-S7, VERIFIED, one book). On the pilot book the twelve month answers equalled the year read element for element, and two reads of each month were equal (row 2162-M1, part A, VERIFIED, one book).
+
+**The control.** A control dated inside the year is looked for in its own month's answer. A control dated outside the year gets one more read, of its own month. The invoice number never enters a request now. It is still parsed into the invoice alphabet once, and refused as `invoice_number_invalid` before any read.
+
+**Not changed.** The check still covers one financial year (item 14 is still owed). The fold is the decided rule, not a measurement of what Tally treats as the same number: item 11's cases still need their live row (S7).
+
+**Rollback.** Revert the change. The single filtered read returns, and with it the dropped-zero miss of row 2162-S4.
+
+## Amendment — 2026-11-09: a control Tally still shows (#2162 item 13)
+
+**Replaces.** This replaces one sentence of the slice 4 amendment's bullet "Not changed, and owed", which item 13 repeats. The sentence says the case "needs a person's confirmed way to drop a control, in the same kind of dialog". There will be no drop. This contradicts that remedy; it does not narrow it. It was decided under the owner's delegation of 9 November 2026. A review against it returned AMEND, because it contradicts the remedy the owner chose. The owner ratifies it before Sales is switched on.
+
+**Why.** Since item 11's amendment above, the control is checked inside its own month's answer. The control is an invoice whose batch reads `posted_verified`: `verify_import` found that voucher with that number and date. If that month's answer still has no Sales row with that number and date, the month read has missed a row Tally holds. Every number checked against that read is then unproven, not only the control's. A released batch is different: it is unverified, so it says nothing about the number read, and dropping it as the control loses no evidence. Dropping a verified control would discard the one piece of evidence that the read fails on this book, and would let the next build trust that read. So `invoice_number_control_missing` stays a refusal, and no person can override it.
+
+**What the refusal carries.** The refusal's `detail` is still the control's batch. Its `control` object adds:
+- the control's number and date as the journal stores them;
+- the number of Sales rows in the answer that should have shown it;
+- whether that answer held the control's voucher GUID under another number, date or type (`guid_in_answer`: the row as it reads, `not_seen`, or `not_recorded` when the journal holds no single bound GUID for the batch).
+
+The GUID comes from the batch's post-span binding. The month answers carry each voucher's `GUID` although the fetch list does not name it (the captured `pilot-lab-number-*` answers). This keeps the cause measurable: a miss of one voucher can be told apart from a read that misses rows.
+
+**What the person can do.** The next step first runs `verify_import` on the control's batch: a batch that no longer reads verified is no longer a control. If it still reads verified, the step says that ComplyEaze Bridge cannot check invoice numbers on this company at present, that repeating the build does not clear this, and that an update of ComplyEaze Bridge can. Until then the user enters this company's invoices in Tally, where Tally's own duplicate-number check is the only one. The step never suggests editing or deleting the control invoice.
+
+**Not closed yet (UNVERIFIED).** "A miss means the read failed" is an argument, not a measurement. Item 13 closes only after a live row of the month read covers misses that are specific to one voucher, and finds each control:
+- number shapes: case, leading zeros, and the characters the invoice alphabet admits;
+- a control in another series or Sales-class voucher type than the new invoice;
+- an optional control and a post-dated control;
+- a control dated on a month's first or last day, and on the book's first day.
+
+If any such miss is found, the drop question reopens. Item 12 stays open: a company with no verified invoice still has no control.
+
+**Rollback.** The refusal is unchanged in kind. Reverting removes the `control` object and restores the earlier next step.

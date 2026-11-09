@@ -13,3 +13,4 @@ The lab reads this file from `origin/lab/queue` at the end of each item, with `g
 7. `lab/2162-m1-sheet` at eaf2a4fc (reads only, raw requests, no Bridge build): parts A and B on `BRIDGE PILOT LAB`, part C on `BRIDGE EINVOICE LAB`. Check `SHA256.txt` first. Answers on `lab/2162-m1-answers`.
 
 Item 1 is done: `lab/2074-2214-w4-answers` at a16b7cc7, gate PASS.
+8. `lab/2162-bc-sheet` at e2b1ca82, right after item 7 in the same pilot sitting. It writes to `BRIDGE PILOT LAB` only: take BK first (C5), restore at the end (C6), and check the COMPANY row's marks equal step 1's. Answers on `lab/2162-bc-answers`.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# count7.py ANSWER...: row 2162-IRN10's count.py (lab/2162-irn-pending-sheet) cut to the three kinds this row sends,
-# with its K kind widened to every leaf and a C kind and a --leafdiff check added. It prints what ROW.md records of each
+# count7.py ANSWER...: row 2162-IRN10's count.py (lab/2162-irn-pending-sheet) cut to the kinds this row sends, with
+# its K kind widened to every leaf, a C kind and a --leafdiff check added, and its import kind read under L as well. It prints what ROW.md records of each
 # answer, by an XML parser (LAB-COMMON C4), never a text search. Its parsing, its STOP rules and its --before-write and
 # --same-row checks are that file's, with the book's GUID changed to BRIDGE PILOT LAB's. The kind is the first letter of
 # the request's name inside the answer's name (a-<label>-<request>):
@@ -10,9 +10,11 @@
 #      a value, by path, at most LEAF_CAP of them.
 #   C- the build's compliance read of every ledger: how many LEDGER rows, then for the row named TARGET its PARENT,
 #      STATENAME and every leaf of each LEDGSTREGDETAILS.LIST, empty ones included.
-# Every answer prints its HEADER/STATUS and every LINEERROR first, then its bytes and its count of GSTIN shapes. An
-# answer with no BODY/DATA/COLLECTION is a failed request: count7.py prints STOP and exits non-zero, and never reports
-# it as 0 rows.
+#   L- the setup ledger's import (row 2162-BC's L-seed.xml): every counter Tally returned and every LINEERROR, as row
+#      2162-BC's count5.py reads its L answers.
+# Every read answer (all but L) prints its HEADER/STATUS and every LINEERROR first; every answer prints its bytes and
+# its count of GSTIN shapes. A read answer with no BODY/DATA/COLLECTION, or an import answer with no counters, is a
+# failed request: count7.py prints STOP and exits non-zero, and never reports it as 0 rows.
 # count7.py --leafdiff A B: two answers of one kind (K or C), each holding exactly one LEDGER row named TARGET (else
 #   STOP): every leaf of that row, by indexed path, whose value or TYPE differs between them or that is in one only,
 #   empty leaves included; then how many differ. "0 leaves differ" is printed only after both rows were found.
@@ -28,6 +30,8 @@ GSTIN = re.compile(r"\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]")
 BOOK = "6b43e498-430c-4d5c-bfef-d32e2ab93c85"
 TARGET = "BRIDGE Customer RJ"
 LEAF_CAP = 400
+COUNTERS = ["CREATED", "ALTERED", "DELETED", "LASTVCHID", "LASTMID", "COMBINED", "IGNORED", "ERRORS", "CANCELLED",
+            "EXCEPTIONS"]
 
 def show(text):
     text = (text or "").strip()
@@ -96,7 +100,8 @@ def report(path):
     root, size, gstins = parse(path)
     kind = path.name.split("-", 2)[-1][:1]
     print(f"== {path.name}: {size} bytes, GSTIN shapes {gstins}")
-    status(root)
+    if kind != "L":
+        status(root)
     if kind == "M":
         found = rows(root, "COMPANY")
         for company in found:
@@ -130,6 +135,18 @@ def report(path):
             for index, detail in enumerate(details, 1):
                 for leaf_path, kind_attr, text in leaves(detail):
                     print(f"    [{index}] {leaf_path} {kind_attr!r} {show(text)}")
+    elif kind == "L":
+        # Tally 7.2 answered S4's imports with a bare RESPONSE holding the counters; an IMPORTRESULT is read too.
+        result = root if root.tag == "RESPONSE" else root.find(".//IMPORTRESULT")
+        print("  root", root.tag)
+        if result is None:
+            for error in root.iter("LINEERROR"):
+                print("  LINEERROR", repr(masked("".join(error.itertext()))))
+            raise SystemExit("STOP: no import counters in the answer; the request failed")
+        for tag in COUNTERS:
+            print(f"  {tag} {value(result, tag)}")
+        for error in root.iter("LINEERROR"):
+            print("  LINEERROR", repr(masked("".join(error.itertext()))))
     else:
         raise SystemExit(f"{path.name}: no kind for this name")
 

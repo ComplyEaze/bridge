@@ -2076,3 +2076,33 @@ async fn a_partial_read_past_the_end_shows_no_bill_and_keeps_the_total() {
     assert!(base["open_bills"].as_array().unwrap().is_empty(), "{base}");
     assert!(base["next_offset"].is_null(), "{base}");
 }
+
+/// The handler's own guards on `ageing_basis` and `direction`, each held to its code. The
+/// published schema's enums refuse both values before the handler runs (as
+/// `argument_invalid:<name>`), so the handler is called directly here, with the ageing book's
+/// whole sequence scripted: the basis is refused before the currency read, the direction after
+/// the native read.
+#[tokio::test]
+async fn the_handler_refuses_an_unknown_ageing_basis_and_an_unknown_direction_by_their_codes() {
+    for (extra, code) in [
+        (
+            json!({"ageing_basis": "posting_date"}),
+            OutstandingsCode::InvalidAgeingBasis,
+        ),
+        (
+            json!({"direction": "sideways"}),
+            OutstandingsCode::InvalidDirection,
+        ),
+    ] {
+        let (plans, _) = ageing_plans(None, ageing_ledgers_with_currency("I₹"), &extra);
+        let simulator = tally_protocol_simulator::SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = ageing_server(simulator.address().port(), directory.path());
+        let outcome = server.outstandings(&ageing_arguments(&extra)).await;
+        simulator.cancel();
+        match outcome {
+            Err(failure) => assert_eq!(failure.code, code.as_str(), "{extra}"),
+            Ok(_) => panic!("{extra}: the handler answered"),
+        }
+    }
+}

@@ -18,10 +18,26 @@ holds a GSTR-3B (named as loaded, or as `applicability_44ab`'s GSTR-3B turnover)
 reference, which is accepted because it fails closed: the reference reads a document only when the key is truthy, so
 `false`, `0`, `[]` or `{}` is no document there, and a GSTR-3B loaded with no row in the period gives the reference
 this same no-GSTR-3B dump. A `[documents]` that is not a table ends the reference's run, and the crate refuses it as
-a client config error. Unit tests pin the `false` refusal and the not-a-table refusal.
+a client config error. The tests that pin these are named under "Declared behaviour differences" below.
 
 GSTR-1 is not an input of the crate's test, and a named GSTR-1 is not refused: `edge-books/g3b_gstr1.json` shows the
 reference's dump does not read one when there is no GSTR-3B.
+
+## Declared behaviour differences
+
+Both refuse where the reference runs, and both fail closed. No golden reaches either: a golden is the reference's
+own dump of a book with no GSTR-3B, which is also the dump of the engagements refused here.
+
+- A `[documents].gstr3b` the reference reads as no document (`false`, `0`, `[]`, `{}`) is refused. Covered by
+  `a_gstr3b_named_or_held_is_refused` in `src/lib.rs`, which names a string, `false`, an empty string, a value and an
+  array of tables.
+- A GSTR-3B that is loaded, named or held as the GSTR-3B turnover, with no row in the period, is refused, where the
+  reference gives its no-GSTR-3B dump. Covered by the named-document and turnover cases of
+  `a_gstr3b_named_or_held_is_refused`, and on the registry path by
+  `the_registry_refuses_gst_ledgers_3b_when_the_caller_holds_a_gstr3b` in `tests/registry.rs`.
+
+A `[documents]` that is not a table ends the reference's run and is refused here as a client config error; it is an
+agreement, not a difference, and is covered by the same unit test.
 
 - `golden/synthetic.gst_ledgers_3b.json` is the test on the synthetic read, through the registry's path from the
   engagement. `synthetic-engagement.toml` gains the two required roles `[roles].payable_ledgers` and

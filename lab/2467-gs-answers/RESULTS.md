@@ -93,7 +93,7 @@ Keys pressed in step 3, in all: the Go To label (clicked); `Alter Master`; Enter
 - Tally was then closed by its own Quit (Q: Quit clicked at Select Company), no prompt; no `tally.exe` ran after.
 
 ## Files
-- `answers/`: the answers that may be pushed, byte for byte. The U answers name GSTINs and stay on the lab PC by the standing rule (`kept-local.txt`, by size and sha256); their sha256 are also in `evidence/answers-sha.txt`.
+- `answers/`: every answer, byte for byte. The three U answers were first kept on the lab PC by the GSTIN rule; they are pushed on the run lead's word that the synthetic `08ZZZZZ0000Z1ZQ` and `08ZZZZZ0000Z3ZO` may go out (`kept-local.txt`). Their sha256 are also in `evidence/answers-sha.txt`.
 - `evidence/`: notes, the count15 outputs, the diffs, the backup's record. Folder, process and port listings stay on the lab PC.
 - `scripts/`: the row's helpers, with lab paths replaced.
 - `SCREENSHOTS.txt`: every capture, by name, size and sha256. They stay on the lab PC.

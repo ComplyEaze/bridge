@@ -2,9 +2,7 @@ Kept on the lab PC by the run lead's standing rules, by size and sha256, with th
 backup-1/TDBK1800_<company number>.001 90051 B 9593e56454a01c33f0783ee559eab51fc4b54923bb3409b3989bc9485f5b456e (BK, taken at step 1 to the sheet's backup-1 folder; restored after step 4)
 restore-plan-4.txt 861 B 3eb34e399d653c1e4989d1b83c4868fd3a558e642d14ef15fafbf7303e80c53e (a restore plan, written before the shut; it names the company number; restore-plan.txt is equal to restore-plan-4.txt)
 restore-plan.txt 861 B 3eb34e399d653c1e4989d1b83c4868fd3a558e642d14ef15fafbf7303e80c53e (a restore plan, written before the shut; it names the company number; restore-plan.txt is equal to restore-plan-4.txt)
-answers/a-s2-U-taxunits.xml 22636 B e40ef83cc01ffc18ee38a48745dd712d2f0f89f282cd2fe1e716a7ff71835989 (GSTIN shape (answers holding a GSTIN stay local))
-answers/a-s4-U-taxunits.xml 22636 B 85551b5d3c318a569fa0863c1c0fa127b5793cbe4cb29b953eff7b50833125da (GSTIN shape (answers holding a GSTIN stay local))
-answers/a-s5-U-taxunits.xml 22636 B e40ef83cc01ffc18ee38a48745dd712d2f0f89f282cd2fe1e716a7ff71835989 (GSTIN shape (answers holding a GSTIN stay local))
+answers/a-{s2,s4,s5}-U-taxunits.xml (3 files): first kept here by the GSTIN rule; now pushed in answers/, byte for byte, on the run lead's word that the synthetic 08ZZZZZ0000Z1ZQ and 08ZZZZZ0000Z3ZO may go out; each is listed in SHA256.txt.
 evidence/4-data-after-restore.txt 1257 B 003e1e5331d0b826d49a70446c6dac69667904d535f3a71f8df1a32197de1470 (Tally data folder or backup folder listing)
 evidence/4-data-before-restore.txt 1744 B a8f36132748ee8d579fd1a89a163f0f3182b733ed9589fcacbf67787d6a1c1c4 (Tally data folder or backup folder listing)
 evidence/bk-after-listing.txt 190 B 243ba3d2d1d883891de4a3d40bb74660debd3e6ae1f457c67c3e994f227f0db6 (Tally data folder or backup folder listing)

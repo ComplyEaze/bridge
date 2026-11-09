@@ -10,3 +10,6 @@ The lab reads this file from `origin/lab/queue` at the end of each item, with `g
 4. `lab/1381-r1-sheet` at c76e23d6. Answers on `lab/1381-r1-answers`.
 5. `lab/2162-class-sheet` at 8d6c7ab4. Answers on `lab/2162-class-answers`.
 6. `lab/2119-p-sheet` at 742fc289 (reads only, DENSE). Build: artifact 13650831945 (unsigned-bundle-smoke-windows-latest) of run 42562853635, commit d04f67a9. Record the exe's sha256 yourself. Answers on `lab/2119-p-answers`.
+7. `lab/2162-m1-sheet` at eaf2a4fc (reads only, raw requests, no Bridge build): parts A and B on `BRIDGE PILOT LAB`, part C on `BRIDGE EINVOICE LAB`. Check `SHA256.txt` first. Answers on `lab/2162-m1-answers`.
+
+Item 1 is done: `lab/2074-2214-w4-answers` at a16b7cc7, gate PASS.

@@ -1,0 +1,6 @@
+== --unit-diff a-s2-U-taxunits.xml a-s4-U-taxunits.xml: TAXUNIT names ['Default Tax Unit', 'Rajasthan Registration'] -> ['Default Tax Unit', 'Rajasthan Registration']
+   unit 'Default Tax Unit': 0 leaves differ
+   unit 'Rajasthan Registration': 3 leaves differ
+     /ALTERID[1]: '206' -> '246'
+     /GSTREGNUMBER[1]: '08ZZZZZ0000Z1ZQ' -> '08ZZZZZ0000Z3ZO'
+     @TAXREGISTRATION: '08ZZZZZ0000Z1ZQ' -> '08ZZZZZ0000Z3ZO'

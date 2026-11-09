@@ -15,7 +15,8 @@
 import hashlib, pathlib, subprocess, sys, time
 BOUND = 2_000_000
 URL = "http://127.0.0.1:9001"
-REQUESTS = ("C-company-list.utf16le.xml", "M-marks-shape-lab.utf16le.xml", "M-marks-spaced.utf16le.xml")
+REQUESTS = ("C-company-list.utf16le.xml", "M-marks-shape-lab.utf16le.xml", "L-ledgers-shape-lab.utf16le.xml",
+            "L-ledgers-spaced.utf16le.xml")
 here = pathlib.Path(__file__).resolve().parent
 label, files = sys.argv[1], sys.argv[2:]
 if not files or not label.replace("-", "").isalnum():

@@ -1011,7 +1011,15 @@ enum Fault {
     RefusedRunHidesTheTools,
     RefusedRunRecordsAcceptance,
     OldProtocol,
-    DropsTheToolListReply,
+    /// The last reply of the start with this index (0 refused, 1 accepted, 2 posting opt-in, 3 tax-audit
+    /// opt-in, 4 statement) is never written.
+    DropsLastReply(usize),
+    NotJsonRpc2,
+    RefusalNotMarkedAnError,
+    AcceptanceFromAnotherSource,
+    SchemaReplyIsAnError,
+    SchemaIsNotAnObject,
+    PasswordInTheReply,
     PostingListedByDefault,
     OptInMissesAPostingTool,
     AuditSwitchAddsAnotherTool,
@@ -1048,6 +1056,7 @@ impl StandIn {
         environment: &Map<String, Value>,
         timeout: Duration,
     ) -> Result<(Vec<u8>, Vec<u8>), Failure> {
+        let start = self.starts.len();
         self.starts.push(Start {
             command: command.to_vec(),
             environment: environment.clone(),
@@ -1070,9 +1079,16 @@ impl StandIn {
                 .append(true)
                 .open(&acceptance)
                 .unwrap();
-            file.write_all(b"{\"source\":\"setting\"}\n").unwrap();
+            let source = if fault == Fault::AcceptanceFromAnotherSource {
+                "prompt"
+            } else {
+                "setting"
+            };
+            file.write_all(format!("{{\"source\":\"{source}\"}}\n").as_bytes())
+                .unwrap();
         }
         let (mut output, mut diagnostics) = (Vec::new(), Vec::new());
+        let mut last_reply = 0;
         for line in payload
             .split(|byte| *byte == b'\n')
             .filter(|line| !line.is_empty())
@@ -1091,9 +1107,6 @@ impl StandIn {
                     "serverInfo": {"name": "bridge-mcp", "version": STAND_IN_VERSION},
                 }),
                 "tools/list" => {
-                    if fault == Fault::DropsTheToolListReply && accepted && !writes && !audit {
-                        continue;
-                    }
                     let mut names = checker::expected_tools(environment);
                     let extra = checker::POSTING_TOOLS[0].to_string();
                     match fault {
@@ -1114,19 +1127,24 @@ impl StandIn {
                     json!({ "tools": tools })
                 }
                 "tools/call" if refused => json!({
-                    "isError": true,
+                    "isError": fault != Fault::RefusalNotMarkedAnError,
                     "structuredContent": {"result": {"error": {"code": "terms_not_accepted"}}},
                     "content": [{"type": "text", "text": "the Terms of Use are not accepted"}],
                 }),
                 "tools/call" if tool == "voucher_schema" => {
-                    let structured = json!({"result": {"schema": {"type": "object"}}});
+                    let kind = if fault == Fault::SchemaIsNotAnObject {
+                        "array"
+                    } else {
+                        "object"
+                    };
+                    let structured = json!({"result": {"schema": {"type": kind}}});
                     let shown = if fault == Fault::SchemaTextDiffers {
                         json!({"result": {"schema": {"type": "array"}}})
                     } else {
                         structured.clone()
                     };
                     json!({
-                        "isError": false,
+                        "isError": fault == Fault::SchemaReplyIsAnError,
                         "structuredContent": structured,
                         "content": [{"type": "text", "text": shown.to_string()}],
                     })
@@ -1156,18 +1174,29 @@ impl StandIn {
                         } else {
                             6
                         };
-                        json!({
+                        let mut parsed = json!({
                             "isError": false,
                             "structuredContent": {"result": {"statement_rows": 6, "vouchers": vouchers, "proposals_id": "stand-in"}},
-                        })
+                        });
+                        if fault == Fault::PasswordInTheReply {
+                            parsed["content"] =
+                                json!([{"type": "text", "text": checker::STATEMENT_PASSWORD}]);
+                        }
+                        parsed
                     }
                 }
                 other => {
                     panic!("the smoke sent a request the stand-in does not answer: {other} {tool}")
                 }
             };
+            let version = if fault == Fault::NotJsonRpc2 && start == 1 {
+                "1.0"
+            } else {
+                "2.0"
+            };
             let mut reply =
-                serde_json::to_vec(&json!({"jsonrpc": "2.0", "id": id, "result": result})).unwrap();
+                serde_json::to_vec(&json!({"jsonrpc": version, "id": id, "result": result}))
+                    .unwrap();
             reply.push(b'\n');
             if tool == "voucher_schema" && !refused {
                 let digest = hex_sha256(&reply);
@@ -1190,7 +1219,11 @@ impl StandIn {
                     file.write_all(format!("{receipt}\n").as_bytes()).unwrap();
                 }
             }
+            last_reply = output.len();
             output.extend(reply);
+        }
+        if fault == Fault::DropsLastReply(start) {
+            output.truncate(last_reply);
         }
         Ok((output, diagnostics))
     }
@@ -1335,7 +1368,9 @@ fn the_terms_refusal_is_checked_on_the_run_with_the_default_settings() {
         return;
     }
     for (fault, code) in [
+        (Fault::DropsLastReply(0), "terms_refusal_response_ids"),
         (Fault::RefusedRunServesTheCall, "terms_refusal_missing"),
+        (Fault::RefusalNotMarkedAnError, "terms_refusal_missing"),
         (
             Fault::RefusedRunHidesTheTools,
             "terms_refusal_hid_the_tool_list",
@@ -1346,6 +1381,10 @@ fn the_terms_refusal_is_checked_on_the_run_with_the_default_settings() {
         ),
         (
             Fault::AcceptanceRecordedEachRun,
+            "terms_acceptance_not_recorded",
+        ),
+        (
+            Fault::AcceptanceFromAnotherSource,
             "terms_acceptance_not_recorded",
         ),
     ] {
@@ -1360,7 +1399,10 @@ fn the_tool_lists_must_match_each_setting() {
     }
     for (fault, code) in [
         (Fault::OldProtocol, "protocol_mismatch"),
-        (Fault::DropsTheToolListReply, "unexpected_response_ids"),
+        (Fault::DropsLastReply(1), "unexpected_response_ids"),
+        (Fault::NotJsonRpc2, "invalid_jsonrpc_response"),
+        (Fault::DropsLastReply(2), "opt_in_response_ids"),
+        (Fault::DropsLastReply(3), "audit_opt_in_response_ids"),
         (Fault::PostingListedByDefault, "default_tools_mismatch"),
         (Fault::OptInMissesAPostingTool, "opt_in_tools_mismatch"),
         (
@@ -1379,6 +1421,14 @@ fn the_schema_reply_must_agree_with_itself_and_its_receipts() {
     }
     for (fault, code) in [
         (Fault::SchemaTextDiffers, "voucher_schema_response_invalid"),
+        (
+            Fault::SchemaReplyIsAnError,
+            "voucher_schema_response_invalid",
+        ),
+        (
+            Fault::SchemaIsNotAnObject,
+            "voucher_schema_response_invalid",
+        ),
         (
             Fault::NoCompletionReceipt,
             "schema_egress_completion_missing",
@@ -1403,7 +1453,55 @@ fn the_statement_parse_must_build_its_vouchers_without_echoing_the_password() {
             "statement_parse_failed:pdfium_unavailable",
         ),
         (Fault::PasswordEchoed, "statement_password_echoed"),
+        (Fault::PasswordInTheReply, "statement_password_echoed"),
+        (Fault::DropsLastReply(4), "statement_response_ids"),
     ] {
         assert_eq!(smoke_failure(fault), failure(code), "{fault:?}");
     }
+}
+
+/// NOTICE is copied into every archive, and the smoke compares the archive's copy to it, so this is what a
+/// user of the package reads about the icon: not Apache-2.0, all rights reserved.
+#[test]
+fn the_shipped_notice_reserves_the_rights_in_the_icon() {
+    let notice = fs::read_to_string(repository().join("NOTICE")).unwrap();
+    let text = notice.split_whitespace().collect::<Vec<_>>().join(" ");
+    for phrase in [
+        "packaging/mcpb/icon.png",
+        "are not licensed under Apache-2.0: all rights in them are reserved",
+        "A fork or modified build must replace them",
+    ] {
+        assert!(text.contains(phrase), "{phrase}");
+    }
+}
+
+/// A file held open without delete sharing locks its folder's removal on Windows: the removal waits, once,
+/// for the lock to clear, against the real operating system.
+#[cfg(windows)]
+#[test]
+fn a_file_held_open_is_waited_for_against_the_real_operating_system() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join("scratch");
+    fs::create_dir(&folder).unwrap();
+    let mut held = Some(
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .share_mode(0)
+            .open(folder.join("server.exe"))
+            .unwrap(),
+    );
+    let mut pauses = 0;
+    let message = checker::remove_with_retries(
+        &folder,
+        |path| fs::remove_dir_all(path),
+        |_| {
+            pauses += 1;
+            drop(held.take());
+        },
+    );
+    assert_eq!(message, None);
+    assert_eq!(pauses, 1);
+    assert!(!folder.exists());
 }

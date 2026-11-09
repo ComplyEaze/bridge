@@ -44,16 +44,59 @@ impl fmt::Display for ReadProfileValidationError {
 
 impl std::error::Error for ReadProfileValidationError {}
 
+/// The longest company name, in UTF-8 bytes, that a request may carry in
+/// `SVCURRENTCOMPANY`. Held at 255 until the lab measures what Tally answers
+/// for a longer name (#2433); it is the one copy of this limit.
+pub const MAX_COMPANY_NAME_BYTES: usize = 255;
+
+/// Why a company name, exactly as Tally reported it, cannot be sent in a
+/// request. The company still lists; only its reads refuse (#2433).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompanyNameRefusal {
+    /// The name is empty, or holds only whitespace.
+    Blank,
+    /// The name is over [`MAX_COMPANY_NAME_BYTES`].
+    OverLimit,
+    /// The name holds a control character anywhere, its edges included.
+    ControlCharacter,
+}
+
+impl CompanyNameRefusal {
+    /// A stable code for this reason, carrying no text of the name.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Blank => "company_name_blank",
+            Self::OverLimit => "company_name_over_limit",
+            Self::ControlCharacter => "company_name_control_character",
+        }
+    }
+}
+
+/// A company name a request may carry. It holds the name byte for byte as
+/// given, never trimmed, and is the only place the company-name rule lives.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ValidatedCompanyName(String);
 
 impl ValidatedCompanyName {
     pub fn new(value: impl Into<String>) -> Result<Self, ReadProfileValidationError> {
         let value = value.into();
-        if value.trim().is_empty() || value.len() > 255 || value.chars().any(char::is_control) {
-            return Err(ReadProfileValidationError::CompanyInvalid);
+        match Self::refusal(&value) {
+            Some(_) => Err(ReadProfileValidationError::CompanyInvalid),
+            None => Ok(Self(value)),
         }
-        Ok(Self(value))
+    }
+
+    /// Why `value` cannot be sent, or `None` when it can.
+    pub fn refusal(value: &str) -> Option<CompanyNameRefusal> {
+        if value.trim().is_empty() {
+            Some(CompanyNameRefusal::Blank)
+        } else if value.chars().any(char::is_control) {
+            Some(CompanyNameRefusal::ControlCharacter)
+        } else if value.len() > MAX_COMPANY_NAME_BYTES {
+            Some(CompanyNameRefusal::OverLimit)
+        } else {
+            None
+        }
     }
 
     pub fn as_str(&self) -> &str {

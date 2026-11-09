@@ -12,7 +12,7 @@ use super::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
     },
     tdl_engine,
-    validators::{normalize_company_guid, normalize_company_name},
+    validators::{normalize_company_guid, validate_company_name},
     xml_parser::{self, TallyCompany},
     VerifiedCompanyIdentity,
 };
@@ -2128,7 +2128,7 @@ impl TallyClient {
         &self,
         candidate_name: &str,
     ) -> anyhow::Result<TallyCompany> {
-        let candidate_name = normalize_company_name(candidate_name)
+        validate_company_name(candidate_name)
             .map_err(|_| anyhow::anyhow!("Tally direct company candidate was invalid"))?;
         let discovered = self.fetch_companies().await?;
         let candidates = discovered
@@ -3353,11 +3353,14 @@ fn party_ledger_master_closing_period(
     NativeLedgerSnapshotPeriod::new(boundary_profile, books_from, closing_boundary)
 }
 
+/// The name is kept exactly as Tally reported it and is not checked here: a
+/// company whose name a request cannot carry still lists, and its reads
+/// refuse through `validate_company_name` (#2433).
 fn normalize_discovered_companies(companies: Vec<TallyCompany>) -> Result<Vec<TallyCompany>, ()> {
     companies
         .into_iter()
         .map(|company| {
-            let name = normalize_company_name(&company.name).map_err(|_| ())?;
+            let name = company.name;
             let guid = company
                 .guid
                 .as_deref()

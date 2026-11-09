@@ -121,6 +121,12 @@ impl Server {
                 }
                 let (company, observed_guid) =
                     matches.into_iter().next().expect("one checked above");
+                // Every read of a company passes here. A company whose name a
+                // request cannot carry is listed, marked, and refused here,
+                // before any request names it (#2433).
+                if ValidatedCompanyName::refusal(&company.name).is_some() {
+                    return Err(super::failure_code::CompanyReadCode::NameInvalid.into());
+                }
                 let company_number = company
                     .company_number
                     .clone()
@@ -211,7 +217,35 @@ pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Valu
         .company_number
         .as_deref()
         .is_some_and(|value| !crate::tally::validators::is_valid_company_number(value));
-    json!({"name": company.name, "guid": guid, "company_number": company.company_number, "books_from": company.books_from, "identity_state": if duplicate_guid {"ambiguous_duplicate_guid"} else if missing.is_some() {"incomplete_tuple"} else if invalid_guid {"invalid_guid"} else if invalid_number {"invalid_company_number"} else if invalid_books_from {"invalid_books_from"} else {"verified_tuple"}, "missing_field": missing})
+    // A name a request cannot carry is marked with its reason, and shown with
+    // each control or invisible format character written as `\u{..}`, so it is
+    // never shown raw; a sendable name is shown as Tally reported it (#2433).
+    let name_refusal = ValidatedCompanyName::refusal(&company.name);
+    let name = match name_refusal {
+        Some(_) => escaped_company_name(&company.name),
+        None => company.name.clone(),
+    };
+    let mut row = json!({"name": name, "guid": guid, "company_number": company.company_number, "books_from": company.books_from, "identity_state": if duplicate_guid {"ambiguous_duplicate_guid"} else if missing.is_some() {"incomplete_tuple"} else if invalid_guid {"invalid_guid"} else if invalid_number {"invalid_company_number"} else if invalid_books_from {"invalid_books_from"} else {"verified_tuple"}, "missing_field": missing});
+    // Only a marked row carries the key, so every other company block is unchanged.
+    if let Some(refusal) = name_refusal {
+        row["name_refusal"] = json!(refusal.code());
+    }
+    row
+}
+
+/// The name byte for byte, except that each control character and each
+/// invisible format character becomes its `\u{..}` code, so no character in it
+/// can hide or reorder the text around it.
+fn escaped_company_name(name: &str) -> String {
+    name.chars()
+        .map(|character| {
+            if character.is_control() || super::headline::is_invisible_format(character) {
+                format!("\\u{{{:04x}}}", u32::from(character))
+            } else {
+                character.to_string()
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -229,3 +263,7 @@ mod identity_tests;
 #[cfg(test)]
 #[path = "agent_company_tuple_tests.rs"]
 mod tuple_tests;
+
+#[cfg(test)]
+#[path = "agent_company_name_tests.rs"]
+mod name_tests;

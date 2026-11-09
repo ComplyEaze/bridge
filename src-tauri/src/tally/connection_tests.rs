@@ -468,20 +468,44 @@ fn company_identity_normalization_rejects_invalid_and_ambiguous_guids() {
         },
     ])
     .expect("normalize company identities");
-    assert_eq!(normalized[0].name, "Synthetic A");
+    // The name is held as Tally reported it, edge spaces kept (#2433).
+    assert_eq!(normalized[0].name, "  Synthetic A  ");
     assert_eq!(normalized[0].guid.as_deref(), Some("GUID-1"));
     assert!(unique_company_identities(&normalized));
     assert!(!has_presentation_equivalent_guid_siblings(&normalized));
 
-    assert!(
-        normalize_discovered_companies(vec![crate::tally::TallyCompany {
+    // A name a request cannot carry no longer refuses the whole list: the
+    // company stays, named as reported, and its reads refuse (#2433).
+    let kept = normalize_discovered_companies(vec![
+        crate::tally::TallyCompany {
             name: "Synthetic\nCompany".to_string(),
             guid: Some("guid-2".to_string()),
             company_number: None,
             books_from: None,
-        }])
-        .is_err()
+        },
+        crate::tally::TallyCompany {
+            name: "x".repeat(300),
+            guid: Some("guid-3".to_string()),
+            company_number: None,
+            books_from: None,
+        },
+        crate::tally::TallyCompany {
+            name: "Synthetic Company".to_string(),
+            guid: Some("guid-4".to_string()),
+            company_number: None,
+            books_from: None,
+        },
+    ])
+    .expect("an unsendable name keeps the list");
+    assert_eq!(
+        kept.iter()
+            .map(|company| company.name.len())
+            .collect::<Vec<_>>(),
+        [17, 300, 17]
     );
+    assert!(crate::tally::validators::validate_company_name(&kept[0].name).is_err());
+    assert!(crate::tally::validators::validate_company_name(&kept[1].name).is_err());
+    assert!(crate::tally::validators::validate_company_name(&kept[2].name).is_ok());
     assert!(
         normalize_discovered_companies(vec![crate::tally::TallyCompany {
             name: "Synthetic Company".to_string(),
@@ -1004,7 +1028,8 @@ async fn interactive_company_fetch_sends_the_native_collection_request() {
     server.await.expect("synthetic Tally server task");
 
     assert_eq!(companies.len(), 1);
-    assert_eq!(companies[0].name, "Synthetic Company");
+    // Held as Tally reported it, edge spaces kept (#2433).
+    assert_eq!(companies[0].name, "  Synthetic Company  ");
     assert_eq!(companies[0].guid.as_deref(), Some("guid-1"));
 }
 
@@ -1256,7 +1281,8 @@ async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous(
     assert_eq!(probe.companies.len(), 2);
     assert_eq!(probe.companies[0].name, "Synthetic Company A");
     assert_eq!(probe.companies[0].guid.as_deref(), Some("synthetic-guid-a"));
-    assert_eq!(probe.companies[1].name, "synthetic company a");
+    // Held as Tally reported it, edge spaces kept (#2433).
+    assert_eq!(probe.companies[1].name, " synthetic company a ");
     assert_eq!(probe.companies[1].guid.as_deref(), Some("SYNTHETIC-GUID-A"));
     assert_eq!(probe.profile.product, "TallyPrime");
     assert_eq!(probe.profile.mode.as_deref(), Some("Licensed"));

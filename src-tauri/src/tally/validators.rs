@@ -1,25 +1,25 @@
 use chrono::NaiveDate;
 
+use bridge_tally_protocol::xml_read_profiles::{
+    CompanyNameRefusal, ValidatedCompanyName, MAX_COMPANY_NAME_BYTES,
+};
+
+/// Whether a request may carry this company name, exactly as given. The rule
+/// is `ValidatedCompanyName`'s; this only words its refusal for the app (#2433).
 pub fn validate_company_name(value: &str) -> Result<(), String> {
-    normalize_company_name(value).map(|_| ())
+    match ValidatedCompanyName::refusal(value) {
+        None => Ok(()),
+        Some(CompanyNameRefusal::Blank) => {
+            Err("Select a Tally company before requesting company data".to_string())
+        }
+        Some(CompanyNameRefusal::OverLimit | CompanyNameRefusal::ControlCharacter) => Err(format!(
+            "Tally company name must be at most {MAX_COMPANY_NAME_BYTES} bytes and contain no control characters"
+        )),
+    }
 }
 
 pub(crate) fn is_valid_company_number(value: &str) -> bool {
     (1..=16).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_digit())
-}
-
-pub fn normalize_company_name(value: &str) -> Result<String, String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err("Select a Tally company before requesting company data".to_string());
-    }
-    if trimmed.len() > 255 || trimmed.chars().any(char::is_control) {
-        return Err(
-            "Tally company name must be at most 255 bytes and contain no control characters"
-                .to_string(),
-        );
-    }
-    Ok(trimmed.to_string())
 }
 
 pub fn normalize_company_guid(value: &str) -> Result<String, String> {

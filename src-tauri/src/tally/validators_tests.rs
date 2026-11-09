@@ -1,6 +1,4 @@
-use super::{
-    normalize_company_guid, normalize_company_name, validate_company_name, validate_date_range,
-};
+use super::{normalize_company_guid, validate_company_name, validate_date_range};
 
 #[test]
 fn validates_company_selection() {
@@ -8,10 +6,12 @@ fn validates_company_selection() {
     assert!(validate_company_name("  ").is_err());
     assert!(validate_company_name("Synthetic\nCompany").is_err());
     assert!(validate_company_name(&"x".repeat(256)).is_err());
-    assert_eq!(
-        normalize_company_name("  Synthetic Company  ").unwrap(),
-        "Synthetic Company"
-    );
+    assert!(validate_company_name(&"x".repeat(255)).is_ok());
+    // The name is checked as given, never trimmed first: an edge control
+    // character is refused, not removed, and edge spaces are kept (#2433).
+    assert!(validate_company_name("Synthetic Company\t").is_err());
+    assert!(validate_company_name("\nSynthetic Company").is_err());
+    assert!(validate_company_name("  Synthetic Company  ").is_ok());
     assert_eq!(normalize_company_guid("  guid-1  ").unwrap(), "guid-1");
     assert!(normalize_company_guid("guid\n1").is_err());
     assert!(normalize_company_guid(&"g".repeat(257)).is_err());

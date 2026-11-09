@@ -68,6 +68,14 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The refusals of a read for a listed company, before any request names it.
+    pub(crate) enum CompanyReadCode {
+        /// The company's name, as Tally reported it, is one a request cannot carry (#2433).
+        NameInvalid = "company_name_invalid",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

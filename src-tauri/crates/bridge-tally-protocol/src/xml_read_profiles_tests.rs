@@ -23,6 +23,42 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
         ValidatedCompanyName::new("x".repeat(256)),
         Err(ReadProfileValidationError::CompanyInvalid)
     );
+    // The one copy of the company-name rule, and its typed reasons (#2433).
+    // The name is checked as given: never trimmed, so an edge control
+    // character is refused, and edge spaces are kept.
+    for (company, refusal) in [
+        ("", Some(CompanyNameRefusal::Blank)),
+        (" \t ", Some(CompanyNameRefusal::Blank)),
+        ("Lab\t", Some(CompanyNameRefusal::ControlCharacter)),
+        ("\nLab", Some(CompanyNameRefusal::ControlCharacter)),
+        ("Lab\u{85}", Some(CompanyNameRefusal::ControlCharacter)),
+        ("  Lab  ", None),
+    ] {
+        assert_eq!(
+            ValidatedCompanyName::refusal(company),
+            refusal,
+            "{company:?}"
+        );
+    }
+    let at_limit = "x".repeat(MAX_COMPANY_NAME_BYTES);
+    assert_eq!(ValidatedCompanyName::refusal(&at_limit), None);
+    assert_eq!(
+        ValidatedCompanyName::new(at_limit.clone())
+            .unwrap()
+            .as_str(),
+        at_limit
+    );
+    assert_eq!(
+        ValidatedCompanyName::refusal(&format!("{at_limit}x")),
+        Some(CompanyNameRefusal::OverLimit)
+    );
+    // 85 Devanagari letters are 255 bytes; one more is over the byte limit.
+    let devanagari = "\u{915}".repeat(86);
+    assert_eq!(ValidatedCompanyName::refusal(&devanagari[..255]), None);
+    assert_eq!(
+        ValidatedCompanyName::refusal(&devanagari),
+        Some(CompanyNameRefusal::OverLimit)
+    );
     for (from, to, expected) in [
         (
             "2026-01-01",

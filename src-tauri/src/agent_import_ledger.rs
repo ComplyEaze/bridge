@@ -116,10 +116,73 @@ enum StatusKind {
     /// status. From then on no native batch of the same company and endpoint
     /// that it covers reads `posted_verified` ([`rollback_cover`]).
     RollbackSeen,
+    /// A person's record that they checked in Tally a native batch matched by
+    /// content only (#1039): its span binding was refused, or its answer from
+    /// Tally was never recorded, so no later check binds it. Written only after
+    /// a native dialog, and never a batch status: it changes no verdict, binds
+    /// no voucher and lifts no stop. A later `posted_verified` of the batch, a
+    /// later answer with an outcome, or any rollback cover voids it
+    /// ([`ContentReviews`]). A binary older than this kind refuses the whole
+    /// journal holding one, as for a stop release.
+    ContentReview,
+    /// A person's settlement of a native batch Tally answered as creating
+    /// none of its vouchers (#1709): written only after a native dialog, in
+    /// which the person said each voucher is in the book or will not be
+    /// posted. It closes the batch in the journal's settlement count, and is
+    /// never a batch status: it changes no verdict, sends nothing, releases no
+    /// row (#876) and lifts no invoice stop. A later `posted_verified`, a
+    /// later answer with an outcome, a binding, or any rollback cover voids it
+    /// ([`PersonSettlements`]). A binary older than this kind refuses the
+    /// whole journal holding one, as for a stop release.
+    PersonSettlement,
+    /// A person's release of the rows of a native batch a rollback record
+    /// covers (#1038): written only after a native dialog, in which the person
+    /// said none of its listed vouchers is in the book. It names the cover it
+    /// rests on and the batch's company and endpoint, and is never a batch
+    /// status: the batch keeps its history and reads `book_rolled_back`, and
+    /// only [`vouchers_already_posted`] and [`guids_bound_elsewhere`] act on
+    /// it, so those rows may be built again as an ordinary batch and bound to
+    /// a GUID the batch had bound. It is never voided, and at most one stands
+    /// per batch. A binary older than this kind refuses the whole journal
+    /// holding one, as for a stop release.
+    RowRelease,
 }
 
 /// The status a stop release record carries. It is not a batch status.
 const STOP_RELEASE_STATUS: &str = "stop_released";
+
+/// The status a content review record carries. It is not a batch status.
+const CONTENT_REVIEW_STATUS: &str = "content_reviewed";
+
+/// The status a person settlement record carries. It is not a batch status.
+const PERSON_SETTLEMENT_STATUS: &str = "settled_by_person";
+
+/// The status a row release record carries. It is not a batch status.
+const ROW_RELEASE_STATUS: &str = "rows_released";
+
+/// Which content-only state a person reviewed: the span binding refused by a
+/// code other than `span_identity_reused`, or a post with no outcome recorded
+/// from Tally's answer, which never binds. A value this build does not know is
+/// refused with its record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum ReviewedBinding {
+    Refused,
+    ResponseNotRecorded,
+}
+
+impl ReviewedBinding {
+    pub(super) fn code(self) -> &'static str {
+        match self {
+            Self::Refused => "refused",
+            Self::ResponseNotRecorded => "response_not_recorded",
+        }
+    }
+}
+
+/// The refusal a content review never covers: another batch's voucher was
+/// bound in this post's span, which a person's check cannot settle.
+pub(super) const IDENTITY_REUSED: &str = "span_identity_reused";
 
 /// The status a rollback-seen record carries. It is not a batch status.
 const ROLLBACK_SEEN_STATUS: &str = "rollback_seen";
@@ -199,6 +262,30 @@ pub(in crate::agent) struct StatusRecord {
     /// a rollback-seen record.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     records_before_read: Option<u64>,
+    /// A content review's record of the content-only state the person was
+    /// shown. `Some` only on a content review. A binary older than this field
+    /// refuses a journal holding one (`deny_unknown_fields`, and the record
+    /// kind is unknown to it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reviewed_binding: Option<ReviewedBinding>,
+    /// A row release's cover and the batch's place. `Some` only on a row
+    /// release (#1038). A binary older than this field refuses a journal
+    /// holding one (`deny_unknown_fields`, and the record kind is unknown to
+    /// it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    release_cover: Option<ReleaseCover>,
+}
+
+/// What a row release rests on: the cover's mark and the batch whose
+/// verification read it, and the batch's company, all four fields, and Tally
+/// address as its full record named them when the person released its rows.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReleaseCover {
+    mark_read: u64,
+    seen_by: String,
+    company: ImportCompanyTuple,
+    endpoint_origin: String,
 }
 
 /// What the read at a stop release saw of the batch's invoice, as journaled
@@ -251,6 +338,8 @@ impl StatusRecord {
             release_seen: None,
             mark_read: None,
             records_before_read: None,
+            reviewed_binding: None,
+            release_cover: None,
         }
     }
     /// The dispatch intent of one native post, bound to the request it sends:
@@ -304,6 +393,8 @@ impl StatusRecord {
             release_seen: None,
             mark_read: None,
             records_before_read: None,
+            reviewed_binding: None,
+            release_cover: None,
         }
     }
 
@@ -312,7 +403,12 @@ impl StatusRecord {
     fn sets_status(&self) -> bool {
         !matches!(
             self.record_type,
-            StatusKind::PostSpanVerdict | StatusKind::StopRelease | StatusKind::RollbackSeen
+            StatusKind::PostSpanVerdict
+                | StatusKind::StopRelease
+                | StatusKind::RollbackSeen
+                | StatusKind::ContentReview
+                | StatusKind::PersonSettlement
+                | StatusKind::RowRelease
         )
     }
 
@@ -340,6 +436,8 @@ impl StatusRecord {
             release_seen: None,
             mark_read: Some(mark_read),
             records_before_read: Some(records_before_read),
+            reviewed_binding: None,
+            release_cover: None,
         }
     }
 
@@ -362,7 +460,91 @@ impl StatusRecord {
             release_seen: Some(seen),
             mark_read: None,
             records_before_read: None,
+            reviewed_binding: None,
+            release_cover: None,
         }
+    }
+
+    /// A person's review of `batch`, matched by content only in the state
+    /// `reviewed` (#1039).
+    pub(super) fn content_review(batch: &ImportLedgerLine, reviewed: ReviewedBinding) -> Self {
+        Self {
+            record_type: StatusKind::ContentReview,
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.sha256.clone(),
+            status: CONTENT_REVIEW_STATUS.into(),
+            response: None,
+            native_request_sha256: None,
+            native_remote_id: None,
+            native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings: None,
+            binding_refusal: None,
+            proof: None,
+            release_seen: None,
+            mark_read: None,
+            records_before_read: None,
+            reviewed_binding: Some(reviewed),
+            release_cover: None,
+        }
+    }
+
+    /// A person's settlement of `batch`, which Tally answered as creating
+    /// none of its vouchers (#1709).
+    pub(super) fn person_settlement(batch: &ImportLedgerLine) -> Self {
+        Self {
+            record_type: StatusKind::PersonSettlement,
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.sha256.clone(),
+            status: PERSON_SETTLEMENT_STATUS.into(),
+            response: None,
+            native_request_sha256: None,
+            native_remote_id: None,
+            native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings: None,
+            binding_refusal: None,
+            proof: None,
+            release_seen: None,
+            mark_read: None,
+            records_before_read: None,
+            reviewed_binding: None,
+            release_cover: None,
+        }
+    }
+
+    /// A person's release of the rows of `batch`, which `cover` covers
+    /// (#1038). The only way to make one: a cover comes only from
+    /// [`rollback_cover`], and [`row_release_after`] admits the record only
+    /// while that cover still stands for the company and endpoint it names.
+    /// `None` for a batch whose record names no company or no address, which
+    /// no cover covers.
+    pub(super) fn row_release(batch: &ImportLedgerLine, cover: &RollbackCover) -> Option<Self> {
+        let release_cover = ReleaseCover {
+            mark_read: cover.mark_read,
+            seen_by: cover.seen_by.clone(),
+            company: batch.company.clone()?,
+            endpoint_origin: batch.endpoint_origin.clone()?,
+        };
+        Some(Self {
+            record_type: StatusKind::RowRelease,
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.sha256.clone(),
+            status: ROW_RELEASE_STATUS.into(),
+            response: None,
+            native_request_sha256: None,
+            native_remote_id: None,
+            native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings: None,
+            binding_refusal: None,
+            proof: None,
+            release_seen: None,
+            mark_read: None,
+            records_before_read: None,
+            reviewed_binding: None,
+            release_cover: Some(release_cover),
+        })
     }
 
     /// The proof this record names current: a verification record names its
@@ -400,6 +582,8 @@ impl StatusRecord {
             release_seen: None,
             mark_read: None,
             records_before_read: None,
+            reviewed_binding: None,
+            release_cover: None,
         }
     }
 }
@@ -431,6 +615,8 @@ impl StatusRecord {
             release_seen: None,
             mark_read: None,
             records_before_read: None,
+            reviewed_binding: None,
+            release_cover: None,
         }
     }
 }
@@ -665,14 +851,39 @@ pub(super) struct Settlement {
     /// found posted at some point.
     pub(super) sent_or_found: usize,
     /// Batches with a dispatch intent that are not settled: no recorded
-    /// response, or a response but the latest status is not `posted_verified`.
+    /// response, a response but the latest status is not `posted_verified`, or
+    /// a native post a recorded restore covers, whatever its status (#1050).
     pub(super) unsettled: usize,
-    /// Of `unsettled`, the batches with no recorded response.
+    /// Of `unsettled`, the batches with no recorded response, other than those
+    /// a recorded restore covers (in `unsettled_restored`).
     pub(super) unsettled_no_response: usize,
     /// Of `unsettled`, the batches with a response whose binding to their own
     /// vouchers was refused: matched by content only, they stay unsettled for
-    /// good (#1039).
+    /// good (#1039). Those a recorded restore covers count in
+    /// `unsettled_restored` instead.
     pub(super) unsettled_binding_refused: usize,
+    /// Of `unsettled`, the batches a person recorded checking in Tally while
+    /// they were matched by content only, with the review standing (#1039).
+    /// They count in no other part of `unsettled`: still unsettled, never
+    /// verified, and their rows stay held.
+    pub(super) unsettled_reviewed: usize,
+    /// Of `unsettled`, the native posts a recorded restore covers (#1050):
+    /// whatever their latest status, the book may no longer hold what was
+    /// recorded for them. A covered post never reads `posted_verified` again;
+    /// only a person's release of its rows moves it to `released_by_person`.
+    /// They count in no other part of `unsettled`: one with no response, a
+    /// refused binding, a review or a settlement counts here alone (a restore
+    /// voids the last two).
+    pub(super) unsettled_restored: usize,
+    /// Batches with a dispatch intent that a person settled after Tally
+    /// answered that their post created none of their vouchers, with the
+    /// settlement standing (#1709). They are not in `unsettled`, and their
+    /// rows stay held.
+    pub(super) settled_by_person: usize,
+    /// Batches with a dispatch intent, a recorded restore covers, whose rows a
+    /// person released (#1038). They are not in `unsettled`, and their rows are
+    /// no longer held.
+    pub(super) released_by_person: usize,
     /// Batches with no recorded dispatch that were never found posted. That
     /// includes a batch imported by hand whose verification is incomplete, which
     /// may well be in Tally: this is what the journal holds, not what Tally
@@ -682,7 +893,16 @@ pub(super) struct Settlement {
 }
 
 /// Validate the whole journal and count its batches by settlement (#local-data).
+#[cfg(test)]
 pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
+    settlement_at(reader, &std::cell::Cell::new(0))
+}
+
+/// [`settlement`], with the line it was reading left in `line` (see [`scan_records_at`]).
+pub(super) fn settlement_at(
+    reader: impl BufRead,
+    line: &std::cell::Cell<usize>,
+) -> Result<Settlement, String> {
     #[derive(Default)]
     struct Progress {
         dispatched: bool,
@@ -693,77 +913,144 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
         found: bool,
         binding_refused: bool,
     }
-    let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
-    scan_records(reader, |record, _| match record {
-        Record::Batch(batch) => {
-            let progress = batches.entry(batch.batch_id.clone()).or_default();
-            progress.verified = batch.status == "posted_verified";
-            progress.found |= progress.verified;
-        }
-        Record::Status(update) => {
-            let progress = batches.entry(update.batch_id.clone()).or_default();
-            match update.record_type {
-                StatusKind::DispatchIntent => progress.dispatched = true,
-                StatusKind::DispatchResponse => progress.responded = true,
-                StatusKind::PostSpanVerdict => {
-                    progress.binding_refused = update.binding_refusal.is_some();
-                }
-                StatusKind::VerificationStatus
-                | StatusKind::StopRelease
-                | StatusKind::RollbackSeen => {}
+    /// A dispatched batch's verification as the journal stands, its recorded
+    /// restores counted (#1050). `Verified` is built only here, and never for
+    /// a batch a rollback record covers, whatever its latest status reads. The
+    /// counts below ask it, not the raw status, whether a batch is settled.
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Standing {
+        Verified,
+        Restored,
+        Open,
+    }
+    impl Standing {
+        fn of(progress: &Progress, covered: bool) -> Self {
+            if covered {
+                Self::Restored
+            } else if progress.responded && progress.verified {
+                Self::Verified
+            } else {
+                Self::Open
             }
-            // The latest status of every kind is the batch's status, as
-            // `read_snapshot` takes it: a dispatch intent or a response after a
-            // hand-import's `posted_verified` makes the batch unverified again.
-            // A post-span verdict sets no status.
-            if update.sets_status() {
-                progress.verified = update.status == "posted_verified";
+        }
+    }
+    let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
+    let mut reviews = ContentReviews::default();
+    let mut settlements = PersonSettlements::default();
+    let mut rollbacks = RollbackFacts::empty();
+    let mut released = BTreeSet::new();
+    scan_records_at(reader, line, |record, VerificationGeneration(at)| {
+        reviews.feed(&record);
+        settlements.feed(&record);
+        rollbacks.feed(&record, at);
+        match record {
+            Record::Batch(batch) => {
+                let progress = batches.entry(batch.batch_id.clone()).or_default();
+                progress.verified = batch.status == "posted_verified";
                 progress.found |= progress.verified;
+            }
+            Record::Status(update) => {
+                let progress = batches.entry(update.batch_id.clone()).or_default();
+                match update.record_type {
+                    StatusKind::DispatchIntent => progress.dispatched = true,
+                    StatusKind::DispatchResponse => progress.responded = true,
+                    StatusKind::PostSpanVerdict => {
+                        progress.binding_refused = update.binding_refusal.is_some();
+                    }
+                    StatusKind::VerificationStatus
+                    | StatusKind::StopRelease
+                    | StatusKind::RollbackSeen
+                    | StatusKind::ContentReview
+                    | StatusKind::PersonSettlement => {}
+                    StatusKind::RowRelease => {
+                        released.insert(update.batch_id.clone());
+                    }
+                }
+                // The latest status of every kind is the batch's status, as
+                // `read_snapshot` takes it: a dispatch intent or a response after a
+                // hand-import's `posted_verified` makes the batch unverified again.
+                // A post-span verdict sets no status.
+                if update.sets_status() {
+                    progress.verified = update.status == "posted_verified";
+                    progress.found |= progress.verified;
+                }
             }
         }
     })?;
+    let covered = rollbacks.covered();
+    let reviewed = reviews.standing(&covered);
+    let settled = settlements.standing(&covered);
     let sent_or_found = batches
         .values()
         .filter(|progress| progress.dispatched || progress.found)
         .count();
-    let unsettled = batches
-        .values()
-        .filter(|progress| progress.dispatched && !(progress.responded && progress.verified));
+    let standing =
+        |batch_id: &String, progress: &Progress| Standing::of(progress, covered.contains(batch_id));
+    let open = batches.iter().filter(|(batch_id, progress)| {
+        progress.dispatched && standing(batch_id, progress) != Standing::Verified
+    });
+    // A batch a person settled leaves `unsettled` and every part of it. A
+    // recorded restore voids the settlement, so no restored batch is among them.
+    // A batch whose rows a person released leaves it too (#1038).
+    let unsettled = open
+        .clone()
+        .filter(|(batch_id, _)| !settled.contains(*batch_id) && !released.contains(*batch_id));
+    let released_by_person = open
+        .clone()
+        .filter(|(batch_id, _)| released.contains(*batch_id))
+        .count();
+    // A restored batch counts in its own bucket and in no other part of
+    // `unsettled` (a restore voids a review too).
+    let restored = unsettled
+        .clone()
+        .filter(|(batch_id, progress)| standing(batch_id, progress) == Standing::Restored)
+        .count();
+    // A batch a person reviewed counts in its own bucket and in no other
+    // part of `unsettled`.
+    let unreviewed = unsettled
+        .clone()
+        .filter(|(batch_id, progress)| {
+            !reviewed.contains_key(*batch_id) && standing(batch_id, progress) != Standing::Restored
+        })
+        .map(|(_, progress)| progress);
     Ok(Settlement {
         batches: batches.len(),
         sent_or_found,
         no_dispatch_never_verified: batches.len() - sent_or_found,
-        unsettled_no_response: unsettled
+        unsettled_no_response: unreviewed
             .clone()
             .filter(|progress| !progress.responded)
             .count(),
-        unsettled_binding_refused: unsettled
+        unsettled_binding_refused: unreviewed
             .clone()
             .filter(|progress| progress.responded && progress.binding_refused)
             .count(),
+        unsettled_reviewed: unsettled.clone().count() - unreviewed.count() - restored,
+        unsettled_restored: restored,
+        settled_by_person: open.count() - unsettled.clone().count() - released_by_person,
+        released_by_person,
         unsettled: unsettled.count(),
     })
 }
 
 /// A voucher's date and its entries as (amount, is debit), sorted, so two
 /// vouchers compare equal whatever order their ledgers were listed in and
-/// whichever ledgers they name. `None` when an amount cannot be read, which a
-/// caller treats as a match.
+/// whichever ledgers they name. The amounts are in canonical form.
 type RowShape = (bridge_tally_core::TallyDate, Vec<(String, bool)>);
 
-fn row_shape(voucher: &ImportVoucher) -> Option<RowShape> {
+fn row_shape(voucher: &ImportVoucher) -> RowShape {
     let mut entries = voucher
         .entries
         .iter()
         .map(|entry| {
-            Some((
-                super::verification::canonical_verification_amount(&entry.amount).ok()?,
+            (
+                entry.amount.canonical().to_string(),
                 matches!(entry.side, EntrySide::Dr),
-            ))
+            )
         })
-        .collect::<Option<Vec<_>>>()?;
+        .collect::<Vec<_>>();
     entries.sort();
-    Some((voucher.date.clone(), entries))
+    (voucher.date.clone(), entries)
 }
 
 /// The id of another batch of the same company that Bridge sent to Tally (a
@@ -795,10 +1082,6 @@ pub(super) fn rows_already_posted(
 enum InvoiceFigures {
     /// Not an invoice: the guard reads nothing of it.
     NotInvoice,
-    /// An invoice whose amount cannot be read (its date is a `TallyDate`, so
-    /// always readable). The guard never takes this for "no figures": on a
-    /// saved batch it counts as a match.
-    Unreadable,
     Of((String, String, Vec<String>)),
 }
 
@@ -806,17 +1089,10 @@ fn invoice_figures(voucher: &ImportVoucher) -> InvoiceFigures {
     if !voucher.voucher_type.is_invoice() {
         return InvoiceFigures::NotInvoice;
     }
-    let mut canonical = voucher.clone();
-    for entry in &mut canonical.entries {
-        match super::verification::canonical_verification_amount(&entry.amount) {
-            Ok(amount) => entry.amount = amount,
-            Err(_) => return InvoiceFigures::Unreadable,
-        }
-    }
     InvoiceFigures::Of((
         voucher.date.as_str().to_string(),
         voucher.filed_type_name().to_string(),
-        super::verification::expected_entry_fingerprint(&canonical),
+        super::verification::canonical_entry_fingerprint(voucher),
     ))
 }
 
@@ -840,7 +1116,6 @@ pub(super) fn unsettled_invoice_twin(
     for figures in batch.vouchers.iter().map(invoice_figures) {
         match figures {
             InvoiceFigures::NotInvoice => {}
-            InvoiceFigures::Unreadable => return Err("import_invoice_figures_unreadable".into()),
             InvoiceFigures::Of(figures) => wanted.push(figures),
         }
     }
@@ -849,9 +1124,10 @@ pub(super) fn unsettled_invoice_twin(
     }
     let mut holds_a_twin = BTreeSet::new();
     let mut sent = BTreeSet::new();
-    // A batch is settled when its LATEST status is `posted_verified`, as
-    // `settlement` takes it: a dispatch intent after a hand import's
-    // verification makes it unverified again.
+    // A batch is settled when its LATEST status is `posted_verified`: a
+    // dispatch intent after a hand import's verification makes it unverified
+    // again. Unlike `settlement`, this does not yet count a recorded restore's
+    // cover (#1050): that waits for a ruling on the invoice readers.
     let mut verified = BTreeSet::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(other) if other.batch_id != batch.batch_id => {
@@ -862,7 +1138,6 @@ pub(super) fn unsettled_invoice_twin(
                     .map(invoice_figures)
                     .any(|figures| match figures {
                         InvoiceFigures::NotInvoice => false,
-                        InvoiceFigures::Unreadable => true,
                         InvoiceFigures::Of(figures) => wanted.contains(&figures),
                     });
             if twin {
@@ -918,7 +1193,8 @@ pub(super) enum NumberControl {
 
 /// The control the journal offers for an invoice number read of this
 /// company (`NumberControl`). A batch is verified while its latest status is
-/// `posted_verified`, as `settlement` takes it; a dispatch intent makes it
+/// `posted_verified` (unlike `settlement`, a recorded restore's cover is not
+/// counted yet, #1050: that waits for a ruling); a dispatch intent makes it
 /// sent. A person's release makes it neither until it next reads verified:
 /// whatever the read at the release saw, it did not show that the number read
 /// works on this Tally. An invoice whose number or date cannot be read is not a
@@ -1021,7 +1297,9 @@ pub(super) fn invoice_number_control(
 /// sent and does not stop anything; a lost answer, a post Tally declined and a
 /// readback that does not match all do. A later `posted_verified` lifts the
 /// stop by itself and voids a release made before it, so a divergence found
-/// after that is a new stop.
+/// after that is a new stop. A recorded restore's cover is not counted yet
+/// (#1050): a covered invoice batch whose latest status reads
+/// `posted_verified` still lifts the stop. That waits for a ruling.
 pub(super) fn invoice_stops(
     reader: impl BufRead,
     company_guid: &str,
@@ -1082,7 +1360,7 @@ pub(super) fn vouchers_already_posted(
     own_batch_id: Option<&str>,
     vouchers: &[ImportVoucher],
 ) -> Result<Option<String>, String> {
-    let mut wanted: BTreeMap<&str, Vec<Option<RowShape>>> = BTreeMap::new();
+    let mut wanted: BTreeMap<&str, Vec<RowShape>> = BTreeMap::new();
     for voucher in vouchers {
         wanted
             .entry(voucher.bridge_txn_id.as_str())
@@ -1091,6 +1369,8 @@ pub(super) fn vouchers_already_posted(
     }
     let mut holds_a_row = BTreeSet::new();
     let mut sent_or_found = BTreeSet::new();
+    // A batch whose rows a person released holds none of them (#1038).
+    let mut released = BTreeSet::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(other) if Some(other.batch_id.as_str()) != own_batch_id => {
             let same_row = other.company_guid.eq_ignore_ascii_case(company_guid)
@@ -1100,11 +1380,7 @@ pub(super) fn vouchers_already_posted(
                         .is_some_and(|shapes| {
                             bridge_bank_statement::proposals::is_statement_txn_id(
                                 &voucher.bridge_txn_id,
-                            ) || row_shape(voucher).is_none_or(|shape| {
-                                shapes
-                                    .iter()
-                                    .any(|wanted| wanted.as_ref().is_none_or(|w| *w == shape))
-                            })
+                            ) || shapes.contains(&row_shape(voucher))
                         })
                 });
             if same_row {
@@ -1122,10 +1398,16 @@ pub(super) fn vouchers_already_posted(
             {
                 sent_or_found.insert(update.batch_id.clone());
             }
+            if matches!(update.record_type, StatusKind::RowRelease) {
+                released.insert(update.batch_id.clone());
+            }
         }
         Record::Batch(_) => {}
     })?;
-    Ok(holds_a_row.intersection(&sent_or_found).next().cloned())
+    Ok(holds_a_row
+        .intersection(&sent_or_found)
+        .find(|batch_id| !released.contains(*batch_id))
+        .cloned())
 }
 
 /// The first batch, in id order, that holds as a voucher some of `rows` and
@@ -1175,24 +1457,41 @@ pub(super) fn rows_held_as_vouchers(
 /// The facts the transfer pairing view takes for one company: the journal
 /// (every record admitted, as for every other read) and the skip-only file,
 /// with a build about to be written, if any, read as the newest record.
+///
+/// `subject` is a batch already in the journal that is being judged again (the
+/// one about to be sent): every record of it is left out, so the journal reads
+/// as it did when that batch was built, and it is given as `candidate`.
 pub(super) fn transfer_facts(
     journal: impl BufRead,
     skips_file: impl BufRead,
     company_guid: &str,
     candidate: Option<statement_facts::Candidate>,
+    subject: Option<&str>,
 ) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
     use statement_facts::{BuildLine, Candidate, JournalEvent, TransferFactsError};
     let mut events = Vec::new();
-    scan_records(journal, |record, _| match record {
-        Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
-        Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
-            sent: matches!(update.record_type, StatusKind::DispatchIntent),
-            batch_id: update.batch_id,
-            status: update.status,
-        }),
-        Record::Status(_) => {}
+    // The same pass gathers what a recorded rollback covers (#1050), so the
+    // facts never call a batch found that a restore may have emptied. It reads
+    // every record, the subject's too, since a cover depends on positions.
+    let mut rollbacks = RollbackFacts::empty();
+    scan_records(journal, |record, VerificationGeneration(at)| {
+        rollbacks.feed(&record, at);
+        match record {
+            Record::Batch(batch) if Some(batch.batch_id.as_str()) == subject => {}
+            Record::Batch(batch) => {
+                events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch))));
+            }
+            Record::Status(update) if Some(update.batch_id.as_str()) == subject => {}
+            Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
+                sent: matches!(update.record_type, StatusKind::DispatchIntent),
+                batch_id: update.batch_id,
+                status: update.status,
+            }),
+            Record::Status(_) => {}
+        }
     })
     .map_err(|code| TransferFactsError::JournalUnreadable { code })?;
+    let covered = rollbacks.covered();
     let mut skip_records = statement_facts::read_skip_records(skips_file)
         .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
     match candidate {
@@ -1200,11 +1499,22 @@ pub(super) fn transfer_facts(
         Some(Candidate::SkipOnly(record)) => skip_records.push(*record),
         None => {}
     }
-    statement_facts::build_transfer_facts(events, skip_records, company_guid)
+    statement_facts::build_transfer_facts(events, skip_records, company_guid, &covered)
 }
 
 fn scan_records(
+    reader: impl BufRead,
+    visit: impl FnMut(Record, VerificationGeneration),
+) -> Result<(), String> {
+    scan_records_at(reader, &std::cell::Cell::new(0), visit)
+}
+
+/// [`scan_records`], leaving in `line` the 1-based line of the record it is reading, so a
+/// caller that wants to say where a refusal came from can ask. Every other reader calls
+/// `scan_records` and gets the bare code, as before.
+fn scan_records_at(
     mut reader: impl BufRead,
+    line_read: &std::cell::Cell<usize>,
     mut visit: impl FnMut(Record, VerificationGeneration),
 ) -> Result<(), String> {
     // Compact records must be checked even for unrelated batches. Retain only
@@ -1225,8 +1535,24 @@ fn scan_records(
     // Batches whose latest status is `posted_verified`: a stop release is
     // admitted only while its batch is not.
     let mut verified: BTreeSet<String> = BTreeSet::new();
+    // Batches whose journaled span refusal a content review can cover (any
+    // code but `span_identity_reused`), and those with a review admitted since
+    // the batch last read verified or was answered: a second is refused while
+    // one is in this set (a rollback cover does not clear it).
+    let mut refused: BTreeSet<String> = BTreeSet::new();
+    let mut reviewed: BTreeSet<String> = BTreeSet::new();
+    // Batches whose latest answer with an outcome reported none of their
+    // vouchers created (#1709), those bound, and those with a settlement
+    // admitted since the batch last read verified or was answered: a second
+    // is refused while one is in this set.
+    let mut not_created: BTreeSet<String> = BTreeSet::new();
+    let mut bound: BTreeSet<String> = BTreeSet::new();
+    let mut settled: BTreeSet<String> = BTreeSet::new();
+    // Batches with a row release: a second is refused, and none is voided.
+    let mut released: BTreeSet<String> = BTreeSet::new();
     let mut line = Vec::new();
     let mut ordinal = 0_usize;
+    line_read.set(1);
     while read_record(&mut reader, &mut line)? {
         let text =
             std::str::from_utf8(&line).map_err(|_| "import_ledger_unavailable".to_string())?;
@@ -1314,6 +1640,57 @@ fn scan_records(
             } else if update.release_seen.is_some() {
                 return Err("import_ledger_invalid".into());
             }
+            // A content review follows a native dispatch intent that recorded
+            // a pre-POST mark, is made only while the batch is not verified and
+            // its content-only state holds (a refusal it can cover, or no
+            // outcome), carries nothing else, and is refused while another
+            // stands: one admitted since the batch last read verified or was
+            // answered. A rollback cover does not clear that: the batch then
+            // reads rolled back and is never reviewed again.
+            if matches!(update.record_type, StatusKind::ContentReview) {
+                let state_holds = match update.reviewed_binding {
+                    Some(ReviewedBinding::Refused) => refused.contains(&update.batch_id),
+                    // A verdict follows an answer with an outcome, so none
+                    // stands without one.
+                    Some(ReviewedBinding::ResponseNotRecorded) => {
+                        !responded.contains(&update.batch_id)
+                    }
+                    None => false,
+                };
+                if !marked.contains(&update.batch_id)
+                    || verified.contains(&update.batch_id)
+                    || update.status != CONTENT_REVIEW_STATUS
+                    || !state_holds
+                    || update.response.is_some()
+                    || update.native_request_sha256.is_some()
+                    || update.native_remote_id.is_some()
+                    || update.native_remote_ids.is_some()
+                    || update.pre_post_voucher_mark.is_some()
+                    || update.bindings.is_some()
+                    || update.binding_refusal.is_some()
+                    || !reviewed.insert(update.batch_id.clone())
+                {
+                    return Err("import_ledger_invalid".into());
+                }
+            } else if update.reviewed_binding.is_some() {
+                return Err("import_ledger_invalid".into());
+            }
+            // A person settlement follows a native dispatch intent that
+            // recorded a pre-POST mark and an answer that reported none of the
+            // batch's vouchers created, is made only while the batch is not
+            // verified and not bound, and is refused while another stands.
+            // Every field of another record kind is refused by that kind's own
+            // rule above, so it carries nothing else.
+            if matches!(update.record_type, StatusKind::PersonSettlement)
+                && (!marked.contains(&update.batch_id)
+                    || !not_created.contains(&update.batch_id)
+                    || verified.contains(&update.batch_id)
+                    || bound.contains(&update.batch_id)
+                    || update.status != PERSON_SETTLEMENT_STATUS
+                    || !settled.insert(update.batch_id.clone()))
+            {
+                return Err("import_ledger_invalid".into());
+            }
             // A rollback-seen record follows a native dispatch intent that
             // recorded a pre-POST mark, names a count of records it had read no
             // larger than its own position, and carries nothing else. Its mark
@@ -1342,6 +1719,26 @@ fn scan_records(
             } else if update.mark_read.is_some() || update.records_before_read.is_some() {
                 return Err("import_ledger_invalid".into());
             }
+            // A row release follows a native dispatch intent that recorded a
+            // pre-POST mark, names the cover it rests on and the batch's
+            // company and endpoint, is made only while the batch is not
+            // verified (a covered batch never is: an extra guard, kept), and is
+            // refused while another stands. Whether that cover still stands is
+            // the writer's admission ([`row_release_after`]), not the scan's:
+            // a later restore can change which record covers the batch. Every
+            // field of another record kind is refused by that kind's own rule.
+            if matches!(update.record_type, StatusKind::RowRelease) {
+                if !marked.contains(&update.batch_id)
+                    || verified.contains(&update.batch_id)
+                    || update.status != ROW_RELEASE_STATUS
+                    || update.release_cover.is_none()
+                    || !released.insert(update.batch_id.clone())
+                {
+                    return Err("import_ledger_invalid".into());
+                }
+            } else if update.release_cover.is_some() {
+                return Err("import_ledger_invalid".into());
+            }
             // A saved proof belongs only to a verification status record.
             if update.proof.is_some()
                 && !matches!(update.record_type, StatusKind::VerificationStatus)
@@ -1356,6 +1753,18 @@ fn scan_records(
                     responded.contains(&update.batch_id) && marked.contains(&update.batch_id),
                     &mut with_verdict,
                 )?;
+                if update
+                    .binding_refusal
+                    .as_ref()
+                    .is_some_and(|code| code != IDENTITY_REUSED)
+                {
+                    refused.insert(update.batch_id.clone());
+                }
+                // A bound batch is never settled again, so its settlement
+                // needs no clearing here; the reader voids it.
+                if update.bindings.is_some() {
+                    bound.insert(update.batch_id.clone());
+                }
             } else if update.bindings.is_some() || update.binding_refusal.is_some() {
                 return Err("import_ledger_invalid".into());
             }
@@ -1364,8 +1773,17 @@ fn scan_records(
                     .get(&update.batch_id)
                     .ok_or("import_ledger_invalid")?;
                 let response = update.response.as_ref().ok_or("import_ledger_invalid")?;
-                if response.outcome.is_some() {
+                if let Some(outcome) = &response.outcome {
                     responded.insert(update.batch_id.clone());
+                    reviewed.remove(&update.batch_id);
+                    settled.remove(&update.batch_id);
+                    if u64::try_from(*voucher_count).is_ok_and(|sent| {
+                        super::verification::answer_reported_none_created(outcome.counters(), sent)
+                    }) {
+                        not_created.insert(update.batch_id.clone());
+                    } else {
+                        not_created.remove(&update.batch_id);
+                    }
                 }
                 if request_hash
                     .as_ref()
@@ -1379,14 +1797,16 @@ fn scan_records(
             if update.sets_status() {
                 if update.status == "posted_verified" {
                     verified.insert(update.batch_id.clone());
+                    reviewed.remove(&update.batch_id);
+                    settled.remove(&update.batch_id);
                 } else {
                     verified.remove(&update.batch_id);
                 }
             }
             Record::Status(Box::new(update))
         } else {
-            let batch: ImportLedgerLine =
-                serde_json::from_value(value).map_err(|_| "import_ledger_invalid".to_string())?;
+            let batch = ImportLedgerLine::from_journal(value)
+                .map_err(|refusal| refusal.code().to_string())?;
             if dispatched.contains_key(&batch.batch_id)
                 && latest.get(&batch.batch_id).map(|(sha256, _)| sha256) != Some(&batch.sha256)
             {
@@ -1398,6 +1818,8 @@ fn scan_records(
             );
             if batch.status == "posted_verified" {
                 verified.insert(batch.batch_id.clone());
+                reviewed.remove(&batch.batch_id);
+                settled.remove(&batch.batch_id);
             } else {
                 verified.remove(&batch.batch_id);
             }
@@ -1415,8 +1837,215 @@ fn scan_records(
         ordinal = ordinal
             .checked_add(1)
             .ok_or_else(|| "import_ledger_invalid".to_string())?;
+        line_read.set(ordinal.saturating_add(1));
     }
     Ok(())
+}
+
+/// The content reviews standing in the journal (#1039), by batch: what each
+/// reviewed. A later `posted_verified` of the batch, or a later answer with an
+/// outcome, voids a review; so does any rollback cover of the batch, which
+/// [`Self::standing`] takes from the caller's [`RollbackFacts`] of the same scan.
+#[derive(Default)]
+struct ContentReviews(BTreeMap<String, ReviewedBinding>);
+
+impl ContentReviews {
+    fn feed(&mut self, record: &Record) {
+        match record {
+            Record::Batch(batch) => {
+                if batch.status == "posted_verified" {
+                    self.0.remove(&batch.batch_id);
+                }
+            }
+            Record::Status(update) => {
+                if let (StatusKind::ContentReview, Some(reviewed)) =
+                    (&update.record_type, update.reviewed_binding)
+                {
+                    self.0.insert(update.batch_id.clone(), reviewed);
+                }
+                let answered = update
+                    .response
+                    .as_ref()
+                    .is_some_and(|response| response.outcome.is_some());
+                if answered || (update.sets_status() && update.status == "posted_verified") {
+                    self.0.remove(&update.batch_id);
+                }
+            }
+        }
+    }
+
+    /// The reviews that stand: those no rollback in `covered` voids.
+    fn standing(self, covered: &BTreeSet<String>) -> BTreeMap<String, ReviewedBinding> {
+        self.0
+            .into_iter()
+            .filter(|(batch_id, _)| !covered.contains(batch_id))
+            .collect()
+    }
+}
+
+/// The content review of `batch_id` that stands now, if any, with what it
+/// reviewed, the whole journal admitted on the way (#1039).
+pub(super) fn content_review(
+    reader: impl BufRead,
+    batch_id: &str,
+) -> Result<Option<ReviewedBinding>, String> {
+    let mut reviews = ContentReviews::default();
+    let mut rollbacks = RollbackFacts::empty();
+    scan_records(reader, |record, VerificationGeneration(at)| {
+        reviews.feed(&record);
+        rollbacks.feed(&record, at);
+    })?;
+    Ok(reviews.standing(&rollbacks.covered()).remove(batch_id))
+}
+
+/// The review `record` would stand as, were it appended to the journal `reader`
+/// holds: `None` when the journal would hold no standing review of its batch
+/// after it (a rollback covers the batch), and the journal's refusal when it
+/// would not admit the record (the batch's state is not content-only, it reads
+/// verified, or a review of it already stands). The writer appends only what
+/// this admits, so a record it writes never makes the journal unreadable.
+pub(super) fn content_review_after(
+    reader: impl BufRead,
+    record: &StatusRecord,
+) -> Result<Option<ReviewedBinding>, String> {
+    let mut appended =
+        serde_json::to_vec(record).map_err(|_| "import_ledger_serialization_failed".to_string())?;
+    appended.push(b'\n');
+    content_review(
+        reader.chain(std::io::Cursor::new(appended)),
+        &record.batch_id,
+    )
+}
+
+/// The person settlements standing in the journal (#1709), by batch. A later
+/// `posted_verified` of the batch, a later answer with an outcome, or a
+/// binding voids a settlement; so does any rollback cover of the batch, which
+/// [`Self::standing`] takes from the caller's [`RollbackFacts`] of the same scan.
+#[derive(Default)]
+struct PersonSettlements(BTreeSet<String>);
+
+impl PersonSettlements {
+    fn feed(&mut self, record: &Record) {
+        match record {
+            Record::Batch(batch) => {
+                if batch.status == "posted_verified" {
+                    self.0.remove(&batch.batch_id);
+                }
+            }
+            Record::Status(update) => {
+                if matches!(update.record_type, StatusKind::PersonSettlement) {
+                    self.0.insert(update.batch_id.clone());
+                }
+                let answered = update
+                    .response
+                    .as_ref()
+                    .is_some_and(|response| response.outcome.is_some());
+                if answered
+                    || update.bindings.is_some()
+                    || (update.sets_status() && update.status == "posted_verified")
+                {
+                    self.0.remove(&update.batch_id);
+                }
+            }
+        }
+    }
+
+    /// The settlements that stand: those no rollback in `covered` voids.
+    fn standing(self, covered: &BTreeSet<String>) -> BTreeSet<String> {
+        self.0.difference(covered).cloned().collect()
+    }
+}
+
+/// Whether a person settlement of `batch_id` stands now, the whole journal
+/// admitted on the way (#1709).
+pub(super) fn person_settlement(reader: impl BufRead, batch_id: &str) -> Result<bool, String> {
+    let mut settlements = PersonSettlements::default();
+    let mut rollbacks = RollbackFacts::empty();
+    scan_records(reader, |record, VerificationGeneration(at)| {
+        settlements.feed(&record);
+        rollbacks.feed(&record, at);
+    })?;
+    Ok(settlements
+        .standing(&rollbacks.covered())
+        .contains(batch_id))
+}
+
+/// Whether `record` would stand, were it appended to the journal `reader`
+/// holds: `false` when a rollback covers its batch, and the journal's refusal
+/// when it would not admit the record. The writer appends only what this
+/// admits, so a record it writes never makes the journal unreadable.
+pub(super) fn person_settlement_after(
+    reader: impl BufRead,
+    record: &StatusRecord,
+) -> Result<bool, String> {
+    let mut appended =
+        serde_json::to_vec(record).map_err(|_| "import_ledger_serialization_failed".to_string())?;
+    appended.push(b'\n');
+    person_settlement(
+        reader.chain(std::io::Cursor::new(appended)),
+        &record.batch_id,
+    )
+}
+
+/// Whether a row release of `batch_id` stands, the whole journal admitted on
+/// the way (#1038). A release is never voided.
+pub(super) fn row_release(reader: impl BufRead, batch_id: &str) -> Result<bool, String> {
+    let mut released = false;
+    scan_records(reader, |record, _| {
+        if let Record::Status(update) = &record {
+            released |=
+                matches!(update.record_type, StatusKind::RowRelease) && update.batch_id == batch_id;
+        }
+    })?;
+    Ok(released)
+}
+
+/// Whether `record`, a row release, would be admitted were it appended to the
+/// journal `reader` holds: only while its batch is still covered by the cover
+/// it names, for the company (all four fields) and endpoint it names, with no
+/// release of the batch standing. The journal's own rule refuses a second
+/// release and a batch that reads `posted_verified`; a covered batch never
+/// reads that, so the second is an extra guard, not a separate case. The
+/// writer appends only what this admits, so a record it writes never makes the
+/// journal unreadable.
+pub(super) fn row_release_after(
+    reader: impl BufRead,
+    record: &StatusRecord,
+) -> Result<bool, String> {
+    if !matches!(record.record_type, StatusKind::RowRelease) {
+        return Ok(false);
+    }
+    let mut appended =
+        serde_json::to_vec(record).map_err(|_| "import_ledger_serialization_failed".to_string())?;
+    appended.push(b'\n');
+    let reader = reader.chain(std::io::Cursor::new(appended));
+    let mut rollbacks = RollbackFacts::empty();
+    // The cover and place as the journal stood just before the release: the
+    // appended record is the journal's last, so its values are the ones kept.
+    let mut at_release = None;
+    scan_records(reader, |seen, VerificationGeneration(at)| {
+        if let Record::Status(update) = &seen {
+            if matches!(update.record_type, StatusKind::RowRelease)
+                && update.batch_id == record.batch_id
+            {
+                at_release = Some((
+                    rollbacks.cover_of(&update.batch_id),
+                    rollbacks.place_of(&update.batch_id).cloned(),
+                ));
+            }
+        }
+        rollbacks.feed(&seen, at);
+    })?;
+    let Some((Some(cover), Some((company, endpoint_origin)))) = at_release else {
+        return Ok(false);
+    };
+    let Some(on) = &record.release_cover else {
+        return Ok(false);
+    };
+    Ok(on.mark_read == cover.mark_read
+        && on.seen_by == cover.seen_by
+        && company.as_ref() == Some(&on.company)
+        && endpoint_origin.as_deref() == Some(on.endpoint_origin.as_str()))
 }
 
 /// What the rollback-seen records say about one batch (#1050), from one scan.
@@ -1429,12 +2058,23 @@ pub(super) struct RollbackScan {
     pub(super) covered_by: Option<RollbackCover>,
 }
 
-/// A rollback-seen record that covers a batch.
+/// A rollback-seen record that covers a batch. Its fields are private, so
+/// [`rollback_cover`] is the only place one is made (#1038).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct RollbackCover {
-    pub(super) mark_read: u64,
+    mark_read: u64,
     /// The batch whose verification read the mark.
-    pub(super) seen_by: String,
+    seen_by: String,
+}
+
+impl RollbackCover {
+    pub(super) fn mark_read(&self) -> u64 {
+        self.mark_read
+    }
+
+    pub(super) fn seen_by(&self) -> &str {
+        &self.seen_by
+    }
 }
 
 /// What one batch had journaled, and where, for judging a record's cover.
@@ -1443,7 +2083,7 @@ struct NativePost {
     intent_at: Option<usize>,
     pre_post_voucher_mark: Option<u64>,
     /// Where its answer with a parsed outcome was recorded, and the vouchers
-    /// that answer counted created.
+    /// that answer proves landed ([`landed_count`]).
     created_at: Option<(usize, u64)>,
     /// Where its binding was recorded, and how many vouchers it bound.
     bound_at: Option<(usize, u64)>,
@@ -1453,7 +2093,8 @@ impl NativePost {
     /// The floor the post had proved within the first `prefix` records: the
     /// vouchers it bound (the bind read exactly those AlterIDs above the
     /// pre-POST mark), else the vouchers Tally's recorded answer counted
-    /// created (a recorded answer means they had landed), else the pre-POST
+    /// created (a recorded answer means they had landed, unless it reported
+    /// `STATUS=0`: [`landed_count`]), else the pre-POST
     /// mark alone. `None` for a post not dispatched within the prefix or with
     /// no pre-POST mark.
     fn floor_within(&self, prefix: usize) -> Option<u64> {
@@ -1467,6 +2108,18 @@ impl NativePost {
             _ => 0,
         };
         Some(before.saturating_add(proved))
+    }
+}
+
+/// The vouchers a recorded answer proves landed: its `CREATED`, unless it
+/// reported `STATUS=0`, which failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6; #2035).
+pub(super) fn landed_count(outcome: &bridge_tally_protocol::TallyImportOutcome) -> u64 {
+    if outcome.application_status() == bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    {
+        0
+    } else {
+        outcome.counters().created
     }
 }
 
@@ -1498,48 +2151,59 @@ pub(super) fn rollback_record_extends(
     records_before_read: u64,
 ) -> Result<bool, String> {
     let facts = RollbackFacts::scan(reader)?;
-    let Some(place) = facts.place_of(seen_by) else {
-        return Ok(false);
-    };
-    let prefix = usize::try_from(records_before_read).unwrap_or(usize::MAX);
-    Ok(facts.order.iter().any(|batch_id| {
-        facts.place_of(batch_id) == Some(place)
-            && facts
-                .posts
-                .get(batch_id)
-                .and_then(|post| post.floor_within(prefix))
-                .is_some_and(|floor| floor > mark_read)
-            && facts.cover_of(batch_id).is_none()
-    }))
+    let extends = facts
+        .newly_covered(seen_by, mark_read, records_before_read)
+        .next()
+        .is_some();
+    Ok(extends)
 }
 
-/// The other native batches the rollback-seen records `seen_by` wrote cover,
-/// in journal order, for the answer that records a rollback to name: their
-/// own status is unchanged until each is verified again.
-pub(super) fn covered_by_records_of(
+/// The batch a rollback-seen record written for a post's own reading names
+/// (#1050, seen at the post): the first native batch, in journal order, of
+/// `poster`'s company and address that such a record would cover and no record
+/// on file covers. The post that read the mark has no dispatch intent yet, so
+/// a record may not name it; it names a batch it covers, which admission
+/// accepts. `None` when the record would cover nothing new.
+pub(super) fn first_newly_covered(
     reader: impl BufRead,
-    seen_by: &str,
-) -> Result<Vec<String>, String> {
+    poster: &str,
+    mark_read: u64,
+    records_before_read: u64,
+) -> Result<Option<String>, String> {
     let facts = RollbackFacts::scan(reader)?;
-    let Some(place) = facts.place_of(seen_by) else {
+    let first = facts
+        .newly_covered(poster, mark_read, records_before_read)
+        .next()
+        .cloned();
+    Ok(first)
+}
+
+/// The native batches the journal's last record covers when it is a
+/// rollback-seen record, in journal order, the batch it names included, for
+/// the answer that just wrote it to name: their own status is unchanged until
+/// each is verified again. Empty when the last record is another kind. One
+/// record, not every record its batch names: a record written for a post's
+/// reading names a batch it covers, and that batch may write its own later.
+pub(super) fn covered_by_last_record(reader: impl BufRead) -> Result<Vec<String>, String> {
+    let facts = RollbackFacts::scan(reader)?;
+    let Some(record) = facts
+        .seen
+        .last()
+        .filter(|record| record.at + 1 == facts.records)
+    else {
         return Ok(Vec::new());
     };
-    let records = facts
-        .seen
-        .iter()
-        .filter(|(by, _, _)| by == seen_by)
-        .collect::<Vec<_>>();
+    let Some(place) = facts.place_of(&record.by) else {
+        return Ok(Vec::new());
+    };
     Ok(facts
         .order
         .iter()
-        .filter(|batch_id| batch_id.as_str() != seen_by)
         .filter(|batch_id| facts.place_of(batch_id) == Some(place))
         .filter(|batch_id| {
             facts.posts.get(*batch_id).is_some_and(|post| {
-                records.iter().any(|(_, mark_read, prefix)| {
-                    post.floor_within(*prefix)
-                        .is_some_and(|floor| floor > *mark_read)
-                })
+                post.floor_within(record.prefix)
+                    .is_some_and(|floor| floor > record.mark_read)
             })
         })
         .cloned()
@@ -1549,75 +2213,112 @@ pub(super) fn covered_by_records_of(
 /// The batch's company and Tally address, as its full record names them.
 type Place = (Option<ImportCompanyTuple>, Option<String>);
 
+/// One rollback-seen record: the batch it names, the mark read, how many
+/// records the reading had read before the mark, and its own position.
+struct SeenRecord {
+    by: String,
+    mark_read: u64,
+    prefix: usize,
+    at: usize,
+}
+
 /// What one scan of the journal says about native posts and rollback-seen
-/// records, for [`rollback_cover`] and [`covered_by_records_of`].
+/// records, for [`rollback_cover`] and [`covered_by_last_record`].
 struct RollbackFacts {
     places: BTreeMap<String, Place>,
     posts: BTreeMap<String, NativePost>,
     /// Batch ids in the order their first full record appeared.
     order: Vec<String>,
-    /// Each rollback-seen record: the batch that wrote it, its mark and count.
-    seen: Vec<(String, u64, usize)>,
+    /// Each rollback-seen record, in journal order.
+    seen: Vec<SeenRecord>,
     records: usize,
 }
 
 impl RollbackFacts {
-    fn scan(reader: impl BufRead) -> Result<Self, String> {
-        let mut facts = Self {
+    fn empty() -> Self {
+        Self {
             places: BTreeMap::new(),
             posts: BTreeMap::new(),
             order: Vec::new(),
             seen: Vec::new(),
             records: 0,
-        };
+        }
+    }
+
+    fn scan(reader: impl BufRead) -> Result<Self, String> {
+        let mut facts = Self::empty();
         scan_records(reader, |record, VerificationGeneration(at)| {
-            facts.records = at + 1;
-            match record {
-                Record::Batch(batch) => {
-                    if !facts.places.contains_key(&batch.batch_id) {
-                        facts.order.push(batch.batch_id.clone());
-                    }
-                    facts.places.insert(
-                        batch.batch_id.clone(),
-                        (batch.company.clone(), batch.endpoint_origin.clone()),
-                    );
-                }
-                Record::Status(update) => {
-                    let post = facts.posts.entry(update.batch_id.clone()).or_default();
-                    match update.record_type {
-                        StatusKind::DispatchIntent => {
-                            post.intent_at = Some(at);
-                            post.pre_post_voucher_mark = update.pre_post_voucher_mark;
-                        }
-                        StatusKind::DispatchResponse => {
-                            if let Some(outcome) = update
-                                .response
-                                .as_ref()
-                                .and_then(|response| response.outcome.as_ref())
-                            {
-                                post.created_at = Some((at, outcome.counters().created));
-                            }
-                        }
-                        StatusKind::PostSpanVerdict => {
-                            if let Some(bound) = &update.bindings {
-                                post.bound_at = Some((at, bound.len() as u64));
-                            }
-                        }
-                        StatusKind::RollbackSeen => {
-                            if let (Some(mark), Some(count)) =
-                                (update.mark_read, update.records_before_read)
-                            {
-                                // Admission bounds the count by the record's position.
-                                let count = usize::try_from(count).unwrap_or(at);
-                                facts.seen.push((update.batch_id.clone(), mark, count));
-                            }
-                        }
-                        StatusKind::VerificationStatus | StatusKind::StopRelease => {}
-                    }
-                }
-            }
+            facts.feed(&record, at);
         })?;
         Ok(facts)
+    }
+
+    /// Take one admitted record, the `at`-th of the journal.
+    fn feed(&mut self, record: &Record, at: usize) {
+        let facts = self;
+        facts.records = at + 1;
+        match record {
+            Record::Batch(batch) => {
+                if !facts.places.contains_key(&batch.batch_id) {
+                    facts.order.push(batch.batch_id.clone());
+                }
+                facts.places.insert(
+                    batch.batch_id.clone(),
+                    (batch.company.clone(), batch.endpoint_origin.clone()),
+                );
+            }
+            Record::Status(update) => {
+                let post = facts.posts.entry(update.batch_id.clone()).or_default();
+                match update.record_type {
+                    StatusKind::DispatchIntent => {
+                        post.intent_at = Some(at);
+                        post.pre_post_voucher_mark = update.pre_post_voucher_mark;
+                    }
+                    StatusKind::DispatchResponse => {
+                        if let Some(outcome) = update
+                            .response
+                            .as_ref()
+                            .and_then(|response| response.outcome.as_ref())
+                        {
+                            post.created_at = Some((at, landed_count(outcome)));
+                        }
+                    }
+                    StatusKind::PostSpanVerdict => {
+                        if let Some(bound) = &update.bindings {
+                            post.bound_at = Some((at, bound.len() as u64));
+                        }
+                    }
+                    StatusKind::RollbackSeen => {
+                        if let (Some(mark), Some(count)) =
+                            (update.mark_read, update.records_before_read)
+                        {
+                            // Admission bounds the count by the record's position.
+                            let count = usize::try_from(count).unwrap_or(at);
+                            facts.seen.push(SeenRecord {
+                                by: update.batch_id.clone(),
+                                mark_read: mark,
+                                prefix: count,
+                                at,
+                            });
+                        }
+                    }
+                    StatusKind::VerificationStatus
+                    | StatusKind::StopRelease
+                    | StatusKind::ContentReview
+                    | StatusKind::PersonSettlement
+                    | StatusKind::RowRelease => {}
+                }
+            }
+        }
+    }
+
+    /// Every batch some recorded rollback covers.
+    fn covered(&self) -> BTreeSet<String> {
+        self.order
+            .iter()
+            .filter(|batch_id| self.cover_of(batch_id).is_some())
+            .cloned()
+            .collect()
     }
 
     /// The record that covers `batch_id`, if any (the lowest mark among them):
@@ -1628,17 +2329,40 @@ impl RollbackFacts {
         let post = self.posts.get(batch_id)?;
         self.seen
             .iter()
-            .filter(|(seen_by, mark_read, prefix)| {
-                self.place_of(seen_by) == Some(own_place)
+            .filter(|record| {
+                self.place_of(&record.by) == Some(own_place)
                     && post
-                        .floor_within(*prefix)
-                        .is_some_and(|floor| floor > *mark_read)
+                        .floor_within(record.prefix)
+                        .is_some_and(|floor| floor > record.mark_read)
             })
-            .min_by_key(|(_, mark_read, _)| *mark_read)
-            .map(|(seen_by, mark_read, _)| RollbackCover {
-                mark_read: *mark_read,
-                seen_by: seen_by.clone(),
+            .min_by_key(|record| record.mark_read)
+            .map(|record| RollbackCover {
+                mark_read: record.mark_read,
+                seen_by: record.by.clone(),
             })
+    }
+
+    /// The native batches of `reader`'s company and address, in journal order,
+    /// that a record of `mark_read`, read after `records_before_read` records,
+    /// would cover and that no record on file covers.
+    fn newly_covered<'a>(
+        &'a self,
+        reader: &str,
+        mark_read: u64,
+        records_before_read: u64,
+    ) -> impl Iterator<Item = &'a String> + 'a {
+        let place = self.place_of(reader);
+        let prefix = usize::try_from(records_before_read).unwrap_or(usize::MAX);
+        self.order.iter().filter(move |batch_id| {
+            place.is_some()
+                && self.place_of(batch_id) == place
+                && self
+                    .posts
+                    .get(*batch_id)
+                    .and_then(|post| post.floor_within(prefix))
+                    .is_some_and(|floor| floor > mark_read)
+                && self.cover_of(batch_id).is_none()
+        })
     }
 
     /// The batch's place, when its record names both a company and an address.
@@ -1651,25 +2375,37 @@ impl RollbackFacts {
 
 /// Every GUID that a batch other than `own_batch_id` has bound, the whole
 /// journal admitted on the way. A bind refuses to claim one of these again.
+/// A GUID bound only by a batch whose rows a person released is left out
+/// (#1038): the person said none of its vouchers is in the book, and after a
+/// restore the next voucher created took a removed voucher's GUID (one lab
+/// run on 7.1), so a fresh post of those rows can be bound to it.
 pub(super) fn guids_bound_elsewhere(
     reader: impl BufRead,
     own_batch_id: &str,
 ) -> Result<BTreeSet<String>, String> {
-    let mut guids = BTreeSet::new();
+    let mut bound = Vec::new();
+    let mut released = BTreeSet::new();
     scan_records(reader, |record, _| {
         if let Record::Status(update) = record {
             if update.batch_id != own_batch_id {
-                guids.extend(
+                if matches!(update.record_type, StatusKind::RowRelease) {
+                    released.insert(update.batch_id.clone());
+                }
+                bound.extend(
                     update
                         .bindings
                         .iter()
                         .flatten()
-                        .map(|bound| bound.guid.clone()),
+                        .map(|identity| (update.batch_id.clone(), identity.guid.clone())),
                 );
             }
         }
     })?;
-    Ok(guids)
+    Ok(bound
+        .into_iter()
+        .filter(|(batch_id, _)| !released.contains(batch_id))
+        .map(|(_, guid)| guid)
+        .collect())
 }
 
 /// Admits one post-span verdict, or refuses the journal. It must follow the

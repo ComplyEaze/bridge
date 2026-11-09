@@ -1,15 +1,17 @@
 //! Renders the exact party and ledger master source as one `.xlsx` workbook.
 
+use bridge_tally_core::TallyDate;
+use bridge_tally_protocol::mailing_details::MailingDetailsHistory;
 use std::collections::BTreeMap;
 
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
 
-use super::party_ledger_master::PartyLedgerMasterWorkbook;
+use super::party_ledger_master::{PartyLedgerMasterSource, PartyLedgerMasterWorkbook};
 use super::party_statement_xlsx::amount_to_f64;
 use super::schedule_iii::{
-    build_schedule_iii_view, Decision, DecisionStatus, Finality, LineBasis, NotApplied,
-    ScheduleIIIError,
+    build_schedule_iii_view, DecisionInput, DecisionSource, DecisionStatus, DecisionsUnavailable,
+    Finality, LineBasis, NotApplied, ScheduleIIIError, ScheduleIIIView,
 };
 use crate::tally::OutstandingsCurrencyAssertion;
 
@@ -44,7 +46,7 @@ pub(crate) enum PartyLedgerMasterXlsxError {
 
 pub(crate) fn render_party_ledger_master_xlsx(
     workbook_source: &PartyLedgerMasterWorkbook,
-    decisions: &[Decision],
+    decisions: DecisionInput<'_>,
 ) -> Result<Vec<u8>, PartyLedgerMasterXlsxError> {
     let source = workbook_source.source();
     if source.rows.len().saturating_add(15) > EXCEL_MAX_ROWS {
@@ -85,6 +87,10 @@ pub(crate) fn render_party_ledger_master_xlsx(
     if let Some(note) = source.notes_text() {
         worksheet.write_string(2, 2, note)?;
     }
+    // A failed mailing read says so among the notes instead (bridge#2214).
+    if no_mailing_details_were_observed(source) && source.mailing_details_read_failed.is_none() {
+        worksheet.write_string(3, 2, NO_MAILING_DETAILS_OBSERVED_NOTE)?;
+    }
     worksheet.write_string_with_format(7, 0, "Repeated read agreement", &bold)?;
     worksheet.write_string(
         7,
@@ -95,7 +101,7 @@ pub(crate) fn render_party_ledger_master_xlsx(
     worksheet.write_string(
         8,
         1,
-        "Ledger identity, parent, Party GSTIN and requested party/master fields when returned, plus opening/closing balances over the named period.",
+        "Ledger identity, parent, Party GSTIN and requested party/master fields when returned, the dated mailing details (address, PIN code, state) in force on the Balances-as-of date (requested only where the read is estimated to fit their bound: a master-alteration mark of at most 3,200, or, for a book whose ledgers were counted to size the read, the count and the alterations beyond it; a note beside the header says when none were observed), plus opening/closing balances over the named period. The \"as returned\" address, PIN code and state columns are Tally's older flat fields, which can be empty for a party that holds a mailing address: read the Mailing columns at the right when they were observed.",
     )?;
     worksheet.write_string_with_format(9, 0, "Not observed fields", &bold)?;
     worksheet.write_string(
@@ -144,6 +150,11 @@ pub(crate) fn render_party_ledger_master_xlsx(
         "Closing balance",
         "Opening balance (exact text)",
         "Closing balance (exact text)",
+        "Mailing address in force (as of Balances-as-of date)",
+        "Mailing PIN code in force",
+        "Mailing state in force",
+        "Mailing details effective from",
+        "Mailing details status",
     ]
     .into_iter()
     .enumerate()
@@ -202,9 +213,16 @@ pub(crate) fn render_party_ledger_master_xlsx(
             worksheet.write_string(sheet_row, 22, "Not established")?;
         }
         worksheet.write_string(sheet_row, 21, row.opening_balance.as_str())?;
+        let mailing = mailing_cells(&row.fields.mailing_details, &source.to);
+        for (column, value) in mailing.into_iter().enumerate() {
+            // An empty value (nothing in force) leaves its cell blank.
+            if !value.is_empty() {
+                worksheet.write_string(sheet_row, 23 + column as u16, value)?;
+            }
+        }
     }
     let last_row = header_row + source.rows.len() as u32;
-    worksheet.autofilter(header_row, 0, last_row, 22)?;
+    worksheet.autofilter(header_row, 0, last_row, 27)?;
     worksheet.set_column_width(0, 30)?;
     worksheet.set_column_width(1, 24)?;
     worksheet.set_column_width(2, 24)?;
@@ -218,16 +236,79 @@ pub(crate) fn render_party_ledger_master_xlsx(
     worksheet.set_column_width(20, 18)?;
     worksheet.set_column_width(21, 22)?;
     worksheet.set_column_width(22, 22)?;
+    worksheet.set_column_width(23, 40)?;
+    worksheet.set_column_width(24, 16)?;
+    worksheet.set_column_width(25, 20)?;
+    worksheet.set_column_width(26, 18)?;
+    worksheet.set_column_width(27, 34)?;
     write_schedule_iii(&mut workbook, workbook_source, decisions)?;
     workbook
         .save_to_buffer()
         .map_err(PartyLedgerMasterXlsxError::from)
 }
 
+/// Said in the workbook when no ledger's answer carried a mailing-details list. The export asks
+/// for the lists only where the whole read fits their bound, by the mark or by a count taken to
+/// size the read (bridge#2074), so a book past it is read as it was before they existed
+/// (bridge#1490); a blank mailing column is then not "no address".
+const NO_MAILING_DETAILS_OBSERVED_NOTE: &str = "No ledger's mailing details were observed in this read: the request for them is made only where the read is estimated to fit their bound (a master-alteration mark of at most 3,200, or, for a book whose ledgers were counted to size the read, the count and the alterations beyond it), or Tally returned none. The Mailing columns are empty and their status says not observed; that is not the same as a party having no mailing address. Read the address in Tally.";
+
+fn no_mailing_details_were_observed(source: &PartyLedgerMasterSource) -> bool {
+    !source.rows.is_empty()
+        && source.rows.iter().all(|row| {
+            matches!(
+                row.fields.mailing_details,
+                MailingDetailsHistory::NotObserved
+            )
+        })
+}
+
+/// The five mailing-details cells of one ledger as of `as_of` (`YYYYMMDD`):
+/// address lines joined by ", ", PIN code, state, the date the entry in force
+/// applies from, and a status that says why the cells are empty when they are
+/// (a first entry that starts after `as_of` is named in the status, not shown).
+fn mailing_cells(history: &MailingDetailsHistory, as_of: &TallyDate) -> [String; 5] {
+    let in_force = history.in_force(as_of);
+    let status = match (history, in_force) {
+        (_, Some(entry)) if entry.other_content_skipped => {
+            "in force; some content of the entry was not read".to_string()
+        }
+        (_, Some(_)) => "in force".to_string(),
+        (MailingDetailsHistory::Entries { entries }, None) if entries.is_empty() => {
+            "no mailing details".to_string()
+        }
+        // Not in force on the date, but not "no address": the first entry starts later.
+        (MailingDetailsHistory::Entries { entries }, None) => format!(
+            "none in force on that date; first entry from {}",
+            entries[0].applicable_from.as_str()
+        ),
+        (MailingDetailsHistory::NotObserved, None) => "not observed".to_string(),
+        (MailingDetailsHistory::Unreadable { defect }, None) => {
+            format!("unreadable: {}", defect.as_str())
+        }
+    };
+    let Some(entry) = in_force else {
+        return [
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            status,
+        ];
+    };
+    [
+        entry.address_lines.join(", "),
+        entry.pin_code.clone().unwrap_or_default(),
+        entry.state.clone().unwrap_or_default(),
+        entry.applicable_from.as_str().to_string(),
+        status,
+    ]
+}
+
 fn write_schedule_iii(
     workbook: &mut Workbook,
     workbook_source: &PartyLedgerMasterWorkbook,
-    decisions: &[Decision],
+    decisions: DecisionInput<'_>,
 ) -> Result<(), PartyLedgerMasterXlsxError> {
     let source = workbook_source.source();
     let view = build_schedule_iii_view(workbook_source, decisions)?;
@@ -271,11 +352,7 @@ fn write_schedule_iii(
     worksheet.write_string_with_format(7, 0, "Check interpretation", &bold)?;
     worksheet.write_string(7, 1, "Difference 0 is the Tally-sign self-check over every captured ledger closing balance; it is evidence, not an assertion of statement completeness.")?;
     worksheet.write_string_with_format(8, 0, "CA grouping decisions", &bold)?;
-    worksheet.write_string(
-        8,
-        1,
-        decisions_summary(view.decisions(), view.exclusions().len(), view.finality()),
-    )?;
+    worksheet.write_string(8, 1, decisions_summary(&view))?;
 
     let header_row = 9u32;
     for (column, label) in [
@@ -386,7 +463,11 @@ fn write_schedule_iii(
         worksheet.write_string(row, 3, exclusion.reason())?;
         row += 1;
     }
-    if !decisions.is_empty() {
+    let given = match decisions {
+        DecisionInput::Read(set) => set.decisions(),
+        DecisionInput::Unavailable(_) => &[],
+    };
+    if !given.is_empty() {
         row += 1;
         worksheet.write_string_with_format(row, 0, "CA GROUPING DECISIONS", &bold)?;
         row += 1;
@@ -403,7 +484,7 @@ fn write_schedule_iii(
             worksheet.write_string_with_format(row, column as u16, label, &bold)?;
         }
         row += 1;
-        for (decision, status) in decisions.iter().zip(view.decisions()) {
+        for (decision, status) in given.iter().zip(view.decisions()) {
             worksheet.write_string(row, 0, decision.id.0.to_string())?;
             worksheet.write_string(row, 1, &decision.ledger_name_when_made)?;
             worksheet.write_string(row, 2, decision.ledger.as_str())?;
@@ -430,20 +511,43 @@ fn basis_text(basis: LineBasis) -> &'static str {
     }
 }
 
-fn decisions_summary(
-    statuses: &[DecisionStatus],
-    excluded_ledgers: usize,
-    finality: Finality,
-) -> String {
+fn decisions_summary(view: &ScheduleIIIView) -> String {
+    let unavailable = match view.decision_source() {
+        DecisionSource::Read => None,
+        DecisionSource::Unavailable(DecisionsUnavailable::StoreUnavailable) => {
+            Some("the encrypted store could not be opened or read")
+        }
+        DecisionSource::Unavailable(DecisionsUnavailable::Unreadable) => {
+            Some("the stored decisions could not be read by this version of ComplyEaze Bridge")
+        }
+    };
+    if let Some(why) = unavailable {
+        return format!(
+            "Could not be read: {why}. NOT FINAL: no decision could be applied, and none is assumed absent."
+        );
+    }
+    let (statuses, finality) = (view.decisions(), view.finality());
+    let excluded_ledgers = view.exclusions().len();
+    let elsewhere = view.decisions_elsewhere();
+    let elsewhere_note = format!(
+        " {elsewhere} grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
+    );
     if statuses.is_empty() {
-        // With no decision given, the only thing that can keep the view from being final is a
-        // ledger still excluded.
-        return match finality {
-            Finality::Final => "None were applied to this export.".to_string(),
-            Finality::NotFinal => format!(
-                "None were applied to this export. NOT FINAL: {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
-            ),
-        };
+        // With no decision given, what can keep the view from being final is a ledger still
+        // excluded, or events kept under another book.
+        let mut text = String::from("None were applied to this export.");
+        if finality == Finality::NotFinal {
+            text.push_str(" NOT FINAL:");
+            if excluded_ledgers > 0 {
+                text.push_str(&format!(
+                    " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
+                ));
+            }
+            if elsewhere > 0 {
+                text.push_str(&elsewhere_note);
+            }
+        }
+        return text;
     }
     let applied = statuses
         .iter()
@@ -490,6 +594,9 @@ fn decisions_summary(
                 text.push_str(&format!(
                     " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
                 ));
+            }
+            if elsewhere > 0 {
+                text.push_str(&elsewhere_note);
             }
             text
         }

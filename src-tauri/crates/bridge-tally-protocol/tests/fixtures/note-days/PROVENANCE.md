@@ -131,6 +131,16 @@ fixture's own hash differs and is the one in the table below.
 | `shape_lab_ledgers_2_request.utf16le.xml` | 1284 | `72ea0f6d407252333dad3bfb6cc2d569147833d4df690306de558253c3e72c2c` | request for the ledger listing with balances, the bill-wise flag and the currency; wire bytes, UTF-16LE with a byte-order mark |
 | `shape_lab_ledgers_2_response.utf16le.xml` | 57668 | `f9b437b881baafd592f61b263b747c0f661e5ddcffdc0dbeb07b1f5323af75e0` | response: the ledger listing with balances, the bill-wise flag and the currency; wire bytes |
 
+## The census spanned to the mark (#2145)
+
+Since #2145 every census is spanned, a single one to `(0, mark]`. The three calls recorded the census unspanned, at the voucher mark 111. On 28 Oct 2026 the lab read each day's census twice more on BRIDGE SHAPE LAB (TallyPrime 7.2, Silver, licensed; marks 112 and 292 before and after, byte-equal): the recorded request, and the same request spanned to `(0, 111]` (lab branch `lab/899-note-days-spanned-census-run-sheet` at `fdef8edf`, answers on `lab/899-note-days-spanned-census-answers` at `5edea71c`). On each day the two answers and the recorded answer were byte-equal, so the recorded response files stand as the spanned request's answers. The spanned requests are kept here; each is byte-equal to the request the code renders for that day and mark, which the replays check. Confidence: PARTIAL, one sitting, as the lab graded it (until repeated).
+
+| File | Bytes | SHA-256 | What it is |
+| --- | ---: | --- | --- |
+| `debit_note_day_voucher_census_spanned_request.utf16le.xml` | 1522 | `0e73d2fd878bad5ca32f488d86367676e1a4842df8a20bb7ebcf7148c1a3b429` | the 28 Apr 2025 census request spanned to `(0, 111]`; sent 28 Oct 2026; its answer is byte-equal to `debit_note_day_voucher_census_response.utf16le.xml` |
+| `credit_note_day_voucher_census_spanned_request.utf16le.xml` | 1522 | `7d87182578c6a8860809219dc33e40838baab177f22851f8155109a0aa517aca` | the 29 Apr 2025 census request spanned to `(0, 111]`; sent 28 Oct 2026; its answer is byte-equal to `credit_note_day_voucher_census_response.utf16le.xml` |
+| `cancelled_purchase_day_voucher_census_spanned_request.utf16le.xml` | 1522 | `91d7b64727592034585cc63adf019f147e4e85c027609ca44c7b0adb7a95c284` | the 3 Jul 2025 census request spanned to `(0, 111]`; sent 28 Oct 2026; its answer is byte-equal to `cancelled_purchase_day_voucher_census_response.utf16le.xml` |
+
 ## What the captures show
 
 - **The credit note (2025-04-29).** One voucher, type and class `Credit Note`, not an invoice-mode

@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.2 read of the synthetic company BRIDGE REVIEW LAB through the census row's relay (lab/2210-census-answers), during the 50-voucher batch's build and post",
+  "observed_date": "2026-11-03",
+  "source_response_bytes": 6658,
+  "source_response_sha256": "652e419a35ccf772d05adb25a3e36bca6b8fc9a966d3243b9dcf4d09623c9338",
+  "source_request_bytes": 2108,
+  "source_request_sha256": "215735dac6142fb181ece3d979135b5e6dab0012fb628ca2349fc7dfb5664802",
+  "request_rendered_by": "ReadOnlyProfile::StandardLedgerCatalogV2 { company }.render()",
+  "fixture_bytes": 6658,
+  "fixture_sha256": "652e419a35ccf772d05adb25a3e36bca6b8fc9a966d3243b9dcf4d09623c9338",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "The import family's ledger catalogue: 3 ledgers (Cash, Profit & Loss A/c, Test Expense B) with name, GUID, parent, the company GUID and name computes, and ISBILLWISEON No on every row.",
+  "provenance_limit": "One synthetic book on one build. The request was sent 8 times on the batch's connection, each answered with these bytes; the payment's 8 sends on the second connection were answered with a body of the same length that differs only in the header's object counters. It shows how Tally answers this request for these shapes; it is not evidence about a client's book or a large book.",
+  "sensitivity_review": "Synthetic BRIDGE company, synthetic ledger names and GUIDs; no client, GSTIN, address or credential.",
+  "observed_at_utc": "2026-11-03T03:18Z"
+}

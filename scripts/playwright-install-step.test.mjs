@@ -9,7 +9,8 @@
 // runs only when the browser cache missed.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -31,11 +32,16 @@ const stub = (name, body) => { writeFileSync(join(stubDir, name), `#!/bin/bash\n
 // STUB_ROOT marks what sudo started, so a record says whether timeout and node ran as root.
 stub("sudo", `echo "sudo $*" >> "$STUB_DIR/calls"
 if [ "$1" = tee ]; then cat > "$STUB_DIR/apt-conf-written"; fi
-if [ "$1" = timeout ]; then STUB_ROOT=1 exec "$@"; fi`);
+if [ "$1" = timeout ]; then STUB_ROOT=1 exec "$@"; fi
+if [ "$1" = cp ] || [ "$1" = /usr/bin/find ]; then exec "$@"; fi`);
 stub("timeout", 'echo "timeout root=${STUB_ROOT:-0} $*" >> "$STUB_DIR/calls"; while [[ "$1" == --* ]]; do shift; done; shift; exec "$@"');
+// A modification time in January 2020 (touch -t YYYYMMDDhhmm), written in parts so that no run of digits appears in this file.
+const OLD_STAMP = ["2020", "0101", "0000"].join("");
 stub("node", `echo "node root=\${STUB_ROOT:-0} $*" >> "$STUB_DIR/calls"
 case "$*" in
-  *install-deps*) n=$(grep -c "^node.*install-deps" "$STUB_DIR/calls"); [ "$n" -le "$FAIL_DEPS" ] && exit 1 ;;
+  *install-deps*) n=$(grep -c "^node.*install-deps" "$STUB_DIR/calls"); [ "$n" -le "$FAIL_DEPS" ] && exit 1
+    # what apt does: the package arrives after the step started, carrying the mirror's old modification time
+    if [ -n "$FAKE_DOWNLOAD" ]; then sleep 1.1; for name in $FAKE_DOWNLOAD; do echo "$name" > "$APT_ARCHIVES/$name"; touch -t ${OLD_STAMP} "$APT_ARCHIVES/$name"; done; fi ;;
 esac
 exit 0`);
 stub("corepack", `echo "corepack $*" >> "$STUB_DIR/calls"
@@ -44,21 +50,52 @@ case "$*" in
 esac
 exit 0`);
 
+// The package index: "apt-cache show name:arch=version" prints the SHA256 line the test's index file lists for it,
+// "apt-get update" can be made to fail, and a host without sha256sum (macOS) gets one that calls shasum.
+stub("apt-cache", `echo "apt-cache $*" >> "$STUB_DIR/calls"
+[ "$1" = show ] || exit 1
+awk -F '\t' -v key="$2" '$1 == key { print "SHA256: " $2; found = 1 } END { exit found ? 0 : 1 }' "$STUB_DIR/index"`);
+stub("apt-get", `echo "apt-get $*" >> "$STUB_DIR/calls"
+[ -z "$FAIL_UPDATE" ]`);
+if (spawnSync("bash", ["-c", "command -v sha256sum"], { encoding: "utf8" }).status !== 0) stub("sha256sum", 'exec shasum -a 256 "$@"');
+
 // failDeps / failDownload: how many leading calls of that command fail.
-function runStep({ cacheHit, failDeps = 0, failDownload = 0 }) {
+const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+// cachedDebs: file names put in the restored directory. Each holds "<name>\n"; the index lists the digest of that text for
+// every name in `indexed` (defaults to all of them), and a name in `altered` holds other text of the same size.
+function runStep({ cacheHit, failDeps = 0, failDownload = 0, failUpdate = false, debsHit = "false", cachedDebs = [], indexed = cachedDebs, altered = [], fakeDownload = "" }) {
   const dir = mkdtempSync(join(tmpdir(), "playwright-step-"));
   try {
     writeFileSync(join(dir, "step.sh"), `${stepScript()}\n`);
+    // apt's archive directory holds one package from before the step; $HOME/apt-debs is what the cache restored.
+    let linked = false;
+    writeFileSync(join(dir, "index"), "");
+    mkdirSync(join(dir, "archives"));
+    writeFileSync(join(dir, "archives", "before.deb"), "before\n");
+    if (cachedDebs.length) {
+      mkdirSync(join(dir, "apt-debs"));
+      for (const name of cachedDebs) writeFileSync(join(dir, "apt-debs", name), altered.includes(name) ? `${name.slice(0, -1)}!\n` : `${name}\n`);
+      // the index line for name_version_arch.deb is "name:arch=version" (an epoch is written %3a in the file name)
+      const keyOf = (file) => { const [pkg, version, arch] = file.slice(0, -4).split("_"); return version === undefined ? file : `${pkg}:${arch}=${version.replace("%3a", ":")}`; };
+      // the link's target holds text the index lists for the link's own name, so only the step's own check keeps it out
+      writeFileSync(join(dir, "index"), [...indexed, "linked_1.0_amd64.deb"].map((name) => `${keyOf(name)}\t${sha256(`${name}\n`)}`).join("\n") + "\n");
+      writeFileSync(join(dir, "other-file"), "linked_1.0_amd64.deb\n");
+      writeFileSync(join(dir, "apt-debs", "readme.txt"), "not named like a package\n");
+      // a link named like a package, and a file not named like one: neither may reach the archive directory
+      try { symlinkSync(join(dir, "other-file"), join(dir, "apt-debs", "linked_1.0_amd64.deb")); linked = true; } catch { /* no symlinks on this host */ }
+      mkdirSync(join(dir, "apt-debs", "folder.deb"));
+    }
     // GitHub runs a step with no `shell:` key as `bash -e {0}`: errexit, no pipefail. Run it the same way.
     const result = spawnSync("bash", ["-e", join(dir, "step.sh")], {
       cwd: dir, encoding: "utf8",
-      env: { PATH: `${stubDir}:${process.env.PATH}`, HOME: dir, STUB_DIR: dir, CACHE_HIT: cacheHit, FAIL_DEPS: String(failDeps), FAIL_DOWNLOAD: String(failDownload) },
+      env: { PATH: `${stubDir}:${process.env.PATH}`, HOME: dir, STUB_DIR: dir, CACHE_HIT: cacheHit, DEBS_HIT: debsHit, APT_ARCHIVES: join(dir, "archives"), FAKE_DOWNLOAD: fakeDownload, FAIL_UPDATE: failUpdate ? "1" : "", FAIL_DEPS: String(failDeps), FAIL_DOWNLOAD: String(failDownload) },
     });
     let calls = [];
     try { calls = readFileSync(join(dir, "calls"), "utf8").trim().split("\n"); } catch { /* none */ }
     let aptConf = null;
     try { aptConf = readFileSync(join(dir, "apt-conf-written"), "utf8"); } catch { /* none */ }
-    return { status: result.status, calls, aptConf };
+    const names = (sub) => { try { return readdirSync(join(dir, sub)).sort(); } catch { return null; } };
+    return { status: result.status, calls, aptConf, archives: names("archives"), kept: names("apt-debs"), linked, stderr: result.stderr };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -125,4 +162,99 @@ test("a failed browser download is retried, at most three times, and then fails 
   const always = runStep({ cacheHit: "false", failDownload: 99 });
   assert.equal(always.status, 1);
   assert.equal(downloads(always.calls).length, 3);
+});
+
+// The cached system packages (bridge#2056): the mirror's throughput, not the install, was what failed 45 steps.
+const stepBlock = (name) => {
+  const start = workflow.findIndex((line) => line.includes(`- name: ${name}`));
+  assert.ok(start !== -1, `the step "${name}" exists`);
+  const end = workflow.findIndex((line, index) => index > start && /^      - /.test(line));
+  return workflow.slice(start, end === -1 ? workflow.length : end).join("\n");
+};
+
+// the restored directory also holds a link, a folder and a text file the step must leave alone
+const withoutExtras = (names) => names.filter((name) => !["folder.deb", "linked_1.0_amd64.deb", "readme.txt"].includes(name));
+const updateIndex = (calls) => calls.findIndex((call) => call === "timeout root=1 --kill-after=10 120 apt-get update -qq");
+const firstCopy = (calls) => calls.findIndex((call) => call.startsWith("sudo cp"));
+
+test("on a package-cache hit each cached .deb whose SHA-256 the updated package index lists is put in apt's archive directory", () => {
+  const cachedDebs = ["one_1.0_amd64.deb", "two_2.0_amd64.deb", "epoch_1%3a2.0_all.deb"];
+  const { status, calls, archives, kept } = runStep({ cacheHit: "true", debsHit: "true", cachedDebs });
+  assert.equal(status, 0);
+  assert.deepEqual(archives, ["before.deb", ...cachedDebs].sort());
+  assert.deepEqual(withoutExtras(kept), [...cachedDebs].sort(), "the restored directory is not changed");
+  assert.ok(calls.includes("apt-cache show one:amd64=1.0") && calls.includes("apt-cache show epoch:all=1:2.0"), "looked up by package, architecture and version, an epoch written as apt writes it");
+  assert.ok(updateIndex(calls) !== -1 && updateIndex(calls) < firstCopy(calls), "the index is updated, under a time limit and as root, before anything is copied");
+  assert.ok(firstCopy(calls) < calls.findIndex((call) => call.includes("install-deps")), "copied before apt installs");
+  assert.equal(deps(calls).length, 1);
+});
+
+test("a cached .deb of the right name and size but other content is refused and deleted, and the others are still used", () => {
+  const { status, archives, kept } = runStep({ cacheHit: "true", debsHit: "true", cachedDebs: ["one_1.0_amd64.deb", "two_2.0_amd64.deb"], altered: ["one_1.0_amd64.deb"] });
+  assert.equal(status, 0);
+  assert.deepEqual(archives, ["before.deb", "two_2.0_amd64.deb"], "the changed package does not reach apt's archive directory");
+  assert.deepEqual(withoutExtras(kept), ["two_2.0_amd64.deb"], "and is deleted from the restored directory");
+});
+
+test("a cached .deb whose version the index does not list (a newer one replaced it on the mirror) is deleted", () => {
+  const { archives, kept } = runStep({ cacheHit: "true", debsHit: "true", cachedDebs: ["one_1.0_amd64.deb", "old_0.9_amd64.deb"], indexed: ["one_1.0_amd64.deb"] });
+  assert.deepEqual(archives, ["before.deb", "one_1.0_amd64.deb"]);
+  assert.deepEqual(withoutExtras(kept), ["one_1.0_amd64.deb"]);
+});
+
+test("only files named as apt names its downloads are looked up, and a link or a folder is neither copied nor followed, even when the index lists the name", () => {
+  const odd = ["with space_3.0_amd64.deb", "-dash_4.0_amd64.deb", "Upper_5.0_amd64.deb", "noversion.deb", "two_2.0_amd64.deb"];
+  const { status, calls, archives, linked } = runStep({ cacheHit: "true", debsHit: "true", cachedDebs: odd });
+  assert.equal(status, 0);
+  assert.deepEqual(archives, ["before.deb", "two_2.0_amd64.deb"], "a link named like a package whose target the index vouches for, a folder named folder.deb and the odd names stay out");
+  assert.equal(calls.filter((call) => call.startsWith("apt-cache")).length, 1, "the odd names never reach apt-cache");
+  if (!linked) console.warn("playwright-install-step: this host cannot make a symbolic link, so the link case was not tested");
+});
+
+test("if the package index cannot be updated nothing is copied or deleted, and the install goes on and downloads as on a miss", () => {
+  const { status, calls, archives, kept } = runStep({ cacheHit: "true", debsHit: "true", cachedDebs: ["one_1.0_amd64.deb"], failUpdate: true });
+  assert.equal(status, 0);
+  assert.deepEqual(archives, ["before.deb"]);
+  assert.deepEqual(withoutExtras(kept), ["one_1.0_amd64.deb"]);
+  assert.equal(firstCopy(calls), -1);
+  assert.equal(deps(calls).length, 1);
+});
+
+test("on a package-cache miss the packages the install downloaded, and only those, are kept for the save step", () => {
+  const { status, archives, kept } = runStep({ cacheHit: "true", debsHit: "false", fakeDownload: "new_1.0_amd64.deb new_2.0_amd64.deb" });
+  assert.equal(status, 0);
+  assert.deepEqual(kept, ["new_1.0_amd64.deb", "new_2.0_amd64.deb"], "found by inode change time although apt sets an old modification time; the package that was there before is not kept");
+  assert.deepEqual(archives, ["before.deb", "new_1.0_amd64.deb", "new_2.0_amd64.deb"]);
+});
+
+test("a miss that downloaded nothing keeps no directory, so that no empty cache is saved under the key", () => {
+  const { status, kept } = runStep({ cacheHit: "true", debsHit: "false" });
+  assert.equal(status, 0);
+  assert.equal(kept, null);
+});
+
+test("a failed system install keeps nothing and fails the step before any package is kept", () => {
+  const { status, kept } = runStep({ cacheHit: "true", debsHit: "false", failDeps: 99, fakeDownload: "x_1.0_amd64.deb" });
+  assert.equal(status, 1);
+  assert.equal(kept, null);
+});
+
+test("the package cache is keyed by Playwright version and runner image, and only a push, manual or scheduled run writes it", () => {
+  const read = stepBlock("Read the Playwright version");
+  assert.match(read, /echo "image=\$\{ImageVersion:-unknown\}" >> "\$GITHUB_OUTPUT"/);
+  const restore = stepBlock("Restore Playwright system packages");
+  const save = stepBlock("Save Playwright system packages");
+  const key = "playwright-debs-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-${{ steps.playwright-version.outputs.image }}";
+  assert.ok(restore.includes(`key: ${key}`) && save.includes(`key: ${key}`), "restore and save use one key, with the version and the image");
+  assert.match(restore, /uses: actions\/cache\/restore@[0-9a-f]{40}/);
+  assert.match(save, /uses: actions\/cache\/save@[0-9a-f]{40}/);
+  assert.ok(restore.includes("path: ~/apt-debs") && save.includes("path: ~/apt-debs"));
+  const condition = save.split("\n").find((line) => line.trim().startsWith("if:"));
+  assert.ok(condition, "the save step is conditional");
+  for (const event of ["push", "workflow_dispatch", "schedule"]) assert.ok(condition.includes(`github.event_name == '${event}'`), event);
+  for (const event of ["pull_request", "merge_group"]) assert.ok(!condition.includes(event), `${event} never saves`);
+  assert.ok(condition.includes("steps.apt-cache.outputs.cache-hit != 'true'"), "a hit is not saved again");
+  const order = workflow.findIndex((line) => line.includes("- name: Restore Playwright system packages"));
+  assert.ok(order !== -1 && order < workflow.findIndex((line) => line.includes("- name: Install Playwright browsers and system dependencies")), "restored before the install");
+  assert.ok(workflow.findIndex((line) => line.includes("- name: Save Playwright system packages")) > workflow.findIndex((line) => line.includes("- name: Install Playwright browsers and system dependencies")), "saved after the install");
 });

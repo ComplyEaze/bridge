@@ -249,7 +249,7 @@ fn verified_words(result: &Value) -> String {
 /// the person reads (the same ones the review dialog refuses) shows as `?`.
 /// The text comes from the journal and Tally, and a release must not become
 /// impossible for a name that carries one.
-fn shown(text: &str) -> String {
+pub(super) fn shown(text: &str) -> String {
     text.chars()
         .map(|character| {
             let one = character.to_string();

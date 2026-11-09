@@ -202,7 +202,7 @@ impl<'a> Row<'a> {
 
     /// At or over `threshold` on the party's side, and on the vouchers' own line too; a row over on
     /// the party's side but under on the line is proven under it (`parity/PORT-NOTE-HVR.md`).
-    fn over(&self, threshold: i64) -> Result<Over> {
+    pub(crate) fn over(&self, threshold: i64) -> Result<Over> {
         Ok(if self.paise < threshold {
             Over::No
         } else if self.line_total()? < threshold {
@@ -214,7 +214,7 @@ impl<'a> Row<'a> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Over {
+pub(crate) enum Over {
     No,
     PartySideOnly,
     Yes,

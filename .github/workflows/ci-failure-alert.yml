@@ -1,0 +1,80 @@
+name: Bridge CI failure alert
+
+# A macOS-only defect reaches master because no pull request or merge-queue run tests the native code on
+# macOS (the master push and the nightly run do). Nothing else looks at those two runs, so a red one waited for
+# a person to open the Actions page. This workflow tracks them in one issue: a failed master push or nightly
+# run of Bridge CI opens it or adds a comment, and the first passing run after a failure adds a comment (it
+# does not close the issue; a person does, once the cause is understood). A manual run is not tracked: the
+# person who started it is watching it.
+on:
+  # The trigger matches a workflow by name. The job also requires a run on the default branch of this
+  # repository, of the kinds named below; a pull request, a merge-queue run and a run on any other branch
+  # never reach the issue.
+  workflow_run:
+    workflows: ["Bridge CI"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  alert:
+    name: Track a failed master push or nightly run in one issue
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+      (github.event.workflow_run.event == 'push' ||
+      github.event.workflow_run.event == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Reads the failed run's jobs and writes one issue. It checks out and runs nothing of the repository.
+    permissions:
+      actions: read
+      issues: write
+    steps:
+      # Every value comes from the finished run's own record and is used as data: through the environment, never
+      # spliced into the script.
+      - name: Open, update or add to the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          case "$CONCLUSION" in
+            failure | timed_out | startup_failure) failed=true ;;
+            success) failed=false ;;
+            *) echo "Conclusion $CONCLUSION: nothing to track."; exit 0 ;;
+          esac
+          # The oldest open issue, if several were opened by hand.
+          open="$(gh issue list --label ci-failure --state open --limit 100 --json number --jq 'map(.number) | min // empty')"
+          if [ "$failed" = "true" ]; then
+            # A listing that cannot be read must not stop the alert: the body then says to see the run.
+            jobs="$(gh run view "$RUN_ID" --json jobs \
+              --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled") | "- " + .name')" || jobs=""
+            {
+              echo "Run: $RUN_URL"
+              echo "Kind: $RUN_EVENT run, commit $HEAD_SHA"
+              echo
+              echo "Jobs that did not pass:"
+              if [ -n "$jobs" ]; then printf '%s\n' "$jobs"; else echo "- none listed; see the run"; fi
+            } > body.md
+            if [ -n "$open" ]; then
+              gh issue comment "$open" --body-file body.md
+            else
+              gh label create ci-failure --color B60205 \
+                --description "A push to master or the nightly run of Bridge CI failed" --force
+              gh issue create --label ci-failure --label area:infra --label severity:p2 --label type:bug \
+                --title "Bridge CI failed on master" --body-file body.md
+            fi
+          elif [ -n "$open" ]; then
+            # One comment per recovery, not one per passing push.
+            last="$(gh issue view "$open" --json comments --jq '.comments[-1].body // ""')" || last=""
+            case "$last" in
+              "Bridge CI passed again on master"*) ;;
+              *) gh issue comment "$open" --body "Bridge CI passed again on master at $HEAD_SHA. $RUN_URL" ;;
+            esac
+          fi

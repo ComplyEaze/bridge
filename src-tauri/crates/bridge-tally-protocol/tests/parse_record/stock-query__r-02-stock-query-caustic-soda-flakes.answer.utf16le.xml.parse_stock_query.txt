@@ -1,0 +1,29 @@
+# fixture: tests/fixtures/stock-query/r-02-stock-query-caustic-soda-flakes.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "200.000",
+                ),
+                unit: "Kgs",
+            },
+        },
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Named(
+                "B-2504-A",
+            ),
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "200.000",
+                ),
+                unit: "Kgs",
+            },
+        },
+    ],
+))

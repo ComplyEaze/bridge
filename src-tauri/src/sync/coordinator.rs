@@ -158,21 +158,8 @@ impl SnapshotCoordinator {
                 },
                 Err(error) => {
                     let _ = store.release(&plan.resume_key).await;
-                    match store.load(&plan.resume_key).await {
-                        Ok(Some(state)) => {
-                            let requires_resume = !state.progress.phase.is_terminal();
-                            let mut status = status_from_state(state, requires_resume);
-                            status.failure_code = Some(snapshot_error_code(&error).to_string());
-                            status
-                        }
-                        _ => SnapshotJobStatus {
-                            phase: SnapshotPhase::Failed,
-                            failure_code: Some(snapshot_error_code(&error).to_string()),
-                            requires_resume: false,
-                            resume_available: false,
-                            ..status_from_plan(&plan)
-                        },
-                    }
+                    let loaded = store.load(&plan.resume_key).await.ok().flatten();
+                    status_after_error(&plan, loaded, &error)
                 }
             };
             if let Ok(mut state) = terminal.lock() {
@@ -317,9 +304,39 @@ fn snapshot_error_code(error: &SnapshotError) -> &'static str {
         SnapshotError::StateConflict => "snapshot_state_generation_changed",
         SnapshotError::StateStore(_) => "snapshot_state_store_failed",
         SnapshotError::Mirror(_) => "snapshot_mirror_failed",
+        SnapshotError::CommitRefused => "snapshot_commit_refused",
         SnapshotError::Reconciliation(_) => "snapshot_reconciliation_failed",
         SnapshotError::StateInvariant(_) => "snapshot_state_invariant_failed",
         SnapshotError::Serialization => "snapshot_serialization_failed",
+    }
+}
+
+/// The status of a run whose worker stopped on `error`, from the durable state it left (none when
+/// that could not be loaded). A run whose commit the mirror refused stays inspectable but offers no
+/// resume: the commit goes to the mirror alone and would be refused again.
+pub(crate) fn status_after_error(
+    plan: &SnapshotPlan,
+    loaded: Option<DurableSnapshotState>,
+    error: &SnapshotError,
+) -> SnapshotJobStatus {
+    let failure_code = Some(snapshot_error_code(error).to_string());
+    match loaded {
+        Some(state) => {
+            let requires_resume = !state.progress.phase.is_terminal();
+            let mut status = status_from_state(state, requires_resume);
+            status.failure_code = failure_code;
+            if matches!(error, SnapshotError::CommitRefused) {
+                status.resume_available = false;
+            }
+            status
+        }
+        None => SnapshotJobStatus {
+            phase: SnapshotPhase::Failed,
+            failure_code,
+            requires_resume: false,
+            resume_available: false,
+            ..status_from_plan(plan)
+        },
     }
 }
 

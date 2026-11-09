@@ -132,15 +132,37 @@ fn a_window_showing_other_terms_cannot_accept_and_nothing_is_recorded() {
     assert!(record_lines(directory.path()).is_empty());
 }
 
+/// A torn last line (#2172), even a whole acceptance cut just before its newline, is never an
+/// acceptance; accepting again repairs it, keeping its bytes, and is then recorded.
+#[test]
+fn a_torn_last_line_is_not_an_acceptance_and_accepting_repairs_it() {
+    let whole = format!(
+        "{{\"terms_version\":\"{TERMS_VERSION}\",\"accepted_at\":\"2026-10-30T00:00:00.000Z\",\"source\":\"desktop_app\"}}"
+    );
+    for torn in ["{\"terms_version\":\"2026-10".to_string(), whole] {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join(RECORD), &torn).unwrap();
+        let terms = DesktopTerms::new(directory.path().to_path_buf());
+        assert_eq!(terms.refusal(), Some("terms_not_accepted"), "{torn}");
+        assert!(terms.accept(TERMS_VERSION).is_ok());
+        assert_eq!(terms.refusal(), None);
+        let bytes = std::fs::read(directory.path().join(RECORD)).unwrap();
+        assert!(bytes.starts_with(torn.as_bytes()), "nothing is removed");
+        let text = String::from_utf8(bytes).unwrap();
+        let whole_lines = text
+            .lines()
+            .filter(|line| serde_json::from_str::<serde_json::Value>(line).is_ok())
+            .count();
+        assert_eq!(whole_lines, 2, "the marker and the acceptance: {text}");
+    }
+}
+
 #[test]
 fn a_record_that_cannot_be_read_or_written_refuses_and_says_so() {
-    // A torn last line: the record cannot be read, so it is neither accepted nor writable.
+    // A whole line Bridge did not write: the record cannot be read, so it is neither accepted nor
+    // writable.
     let directory = tempfile::tempdir().unwrap();
-    std::fs::write(
-        directory.path().join(RECORD),
-        "{\"terms_version\":\"2026-10",
-    )
-    .unwrap();
+    std::fs::write(directory.path().join(RECORD), "not a record\n{\"a\":1}\n").unwrap();
     let terms = DesktopTerms::new(directory.path().to_path_buf());
     assert_eq!(terms.refusal(), Some("terms_record_unavailable"));
     assert_eq!(terms.status().state, "record_unavailable");

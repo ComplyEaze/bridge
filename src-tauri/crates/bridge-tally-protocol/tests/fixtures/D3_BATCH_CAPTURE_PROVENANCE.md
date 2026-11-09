@@ -36,6 +36,33 @@ fixture for reviewing a doubted batch end to end (`acknowledge_post_review` over
 | `agent/d3-batch-journal.jsonl` | 17410 | `922b2c13173ce23e39a13ed067bda5f87098ebc719e6f42dddefce3719289b54` |
 | `agent/d3-batch-import.xml` | 31052 | `1b7ff4ddc901fcab949218b78005ad7bd8870ac5cd34f00465f1bb71712dcec5` |
 
+## The census spanned to the mark (#2145)
+
+Since #2145 the call sends this capture's census spanned to the voucher mark it read, `(0, 1469]`: the recorded census
+request with ` AND $AlterID &gt; 0 AND $AlterID &lt;= 1469` added to its formula and nothing else changed, sha256
+`3ae647206cdff8225eaaa74582c87ffb8a14a3cf6f7eb37df220987f3499f6d5` (`requests/a-d3batch_c2_spanned_0_1469.request.utf16le.xml`
+on the run sheet `lab/2145-spanned-census-captures` at `6a968f01`). This capture holds no answer to that request, and an
+answer captured for the unspanned census may not stand in for it (#899). The batch review test, which pins every request,
+therefore no longer reads this capture: the book was read again on 30 Oct 2026 with the census spanned
+(`AMEND_NOW_CAPTURE_PROVENANCE.md`), and that test now reads it and pins the book as it is now.
+
+Six tests in `agent_import_ack_tests.rs` replayed this capture after #2145, its unspanned census standing in for the
+spanned request `(0, 1469]`. Each needs a batch reading back whole and matched, which this book no longer holds. The five
+tests of a review whose read finishes the masters check now read the census row's capture of another synthetic book,
+whose census was spanned and sent (`REVIEW_LAB_CAPTURE_PROVENANCE.md`), and so does the review that binds all fifty
+vouchers, which #2145 had dropped.
+
+`a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown` replayed this capture too, its census a
+stand-in and its unmarked copy of D3-005 derived in memory. It now reads the hand-import row's capture on the census
+row's book, a batch imported from its saved file with an unmarked copy entered beside it in Tally, its census spanned
+and sent (`REVIEW_LAB_CAPTURE_PROVENANCE.md`). No test serves this capture's census for the spanned request now.
+
+The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026 (`lab/2145-spanned-census-captures-answers`
+at `993d96bc`), after the book had moved on: its voucher mark read 1829. Three of the capture's vouchers now carry ALTERIDs
+above 1469 (1677, 1680 and 1685), as the sheet expected, so the spanned answer
+(`08bdf64948cf5ab9bc78fd9bcfd17925276d54fbd5b430d5eb059681b3bc4f22`, 114,704 bytes) leaves them out, and neither answer stands
+for this capture.
+
 ## What it establishes
 
 - A 50-voucher readback of Bridge's own batch, as Tally returns it to the import-verification read:

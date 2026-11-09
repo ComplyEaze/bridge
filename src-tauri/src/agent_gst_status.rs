@@ -485,7 +485,7 @@ pub(super) struct StatusArguments<'a> {
     pub(super) guid: &'a str,
     pub(super) from: bridge_tally_core::TallyDate,
     pub(super) to: bridge_tally_core::TallyDate,
-    pub(super) type_name: &'a str,
+    pub(super) type_name: read_profiles::GstStatusTypeName,
 }
 
 /// The company, its verified identity and what has been read so far, once the
@@ -505,10 +505,9 @@ pub(super) fn status_arguments(args: &Value) -> Result<StatusArguments<'_>, Tool
     let Some(days) = window_span_days(&from, &to) else {
         return Err("invalid_date_range".to_string().into());
     };
-    let type_name = required_string(args, "voucher_type_name")?;
-    if !read_profiles::gst_status_type_name_literal_safe(type_name) {
-        return Err("gst_status_type_name_invalid".to_string().into());
-    }
+    let type_name =
+        read_profiles::GstStatusTypeName::parse(required_string(args, "voucher_type_name")?)
+            .ok_or_else(|| "gst_status_type_name_invalid".to_string())?;
     if days > STATUS_MAX_WINDOW_DAYS {
         return Err("gst_status_window_too_long".to_string().into());
     }
@@ -577,7 +576,7 @@ impl Server {
                 return Err(ToolFailure::from("window_not_honoured".to_string())
                     .with_prior_evidence(evidence));
             }
-            if row.voucher_type != arguments.type_name {
+            if row.voucher_type != arguments.type_name.as_str() {
                 return Err(
                     ToolFailure::from("gst_status_type_not_honoured".to_string())
                         .with_prior_evidence(evidence),
@@ -596,7 +595,7 @@ impl Server {
 
     pub(super) async fn gst_status(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let arguments = status_arguments(args)?;
-        let (from, to, type_name) = (&arguments.from, &arguments.to, arguments.type_name);
+        let (from, to, type_name) = (&arguments.from, &arguments.to, &arguments.type_name);
         let offset = arg_usize(args, "offset", 0)?;
         let limit =
             arg_positive_usize(args, "limit", self.settings.max_rows)?.min(self.settings.max_rows);
@@ -625,7 +624,7 @@ impl Server {
             "state": state,
             "basis": "tally_voucher_gst_status_fields_one_voucher_type_one_window",
             "window": {"from": from.as_str(), "to": to.as_str()},
-            "voucher_type_name": type_name,
+            "voucher_type_name": type_name.as_str(),
             "total": total,
             "offset": offset,
             "counts": counts_json(&counts, unread),

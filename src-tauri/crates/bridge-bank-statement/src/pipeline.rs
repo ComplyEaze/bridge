@@ -14,13 +14,14 @@
 //! malformed input, an ambiguous mapping or an unproven extent stops the run, because
 //! every proposal is posted to a real book.
 
-use crate::bank::Bank;
+use crate::bank::{Bank, RowGrammar};
 use crate::cash::CashAnswers;
+use crate::csv_edge::{CsvLayout, CsvStatement};
 use crate::date::Date;
 use crate::geometry::Page;
 use crate::mapping::Mapping;
 use crate::money::{reconcile, statement_totals, verify_against_statement, Controls, Totals};
-use crate::parse::{parse_statement, require_account_match};
+use crate::parse::{parse_statement, require_account_match, require_printed_account_match, Row};
 use crate::pdf::{no_readable_text, StatementText};
 use crate::proposals::{
     build, coverage, group_counterparties, selfcheck, Build, BuildOptions, CounterpartyGroup,
@@ -29,8 +30,9 @@ use crate::proposals::{
 use crate::refusal::Refusal;
 use bridge_tally_primitives::ExactDecimal;
 
-pub struct StatementRequest<'a> {
-    pub bank: Bank,
+pub struct StatementRequest<'a, G = Bank> {
+    /// How the rows are read: a PDF bank, or a CSV layout.
+    pub bank: G,
     /// The operator's account label; its digits bind the statement.
     pub account_label: &'a str,
     pub controls: &'a Controls,
@@ -102,14 +104,34 @@ pub fn prepare(pages: &[Page], request: &StatementRequest<'_>) -> Result<ParsedS
     }
     let rows = parse_statement(pages, request.bank)?;
     let account_number = require_account_match(pages, request.bank, request.account_label)?;
-    let closing = reconcile(&rows, &request.controls.opening, &request.controls.closing)?;
+    proven(&rows, account_number, request)
+}
+
+/// A statement a CSV reader has read whole → proven proposals, or the first refusal, in the same
+/// order as [`prepare`]: the account, then the arithmetic.
+pub fn prepare_csv(
+    statement: &CsvStatement,
+    request: &StatementRequest<'_, CsvLayout>,
+) -> Result<ParsedStatement, Refusal> {
+    let account_number =
+        require_printed_account_match(&statement.account_number, request.account_label)?;
+    proven(&statement.rows, account_number, request)
+}
+
+/// From an account-bound statement's rows on, every source goes the same way.
+fn proven<G: RowGrammar>(
+    rows: &[Row],
+    account_number: String,
+    request: &StatementRequest<'_, G>,
+) -> Result<ParsedStatement, Refusal> {
+    let closing = reconcile(rows, &request.controls.opening, &request.controls.closing)?;
     // `Controls` holds both totals or neither
     let totals = match (&request.controls.debits, &request.controls.credits) {
-        (Some(debits), Some(credits)) => verify_against_statement(&rows, debits, credits)?,
-        _ => statement_totals(&rows)?,
+        (Some(debits), Some(credits)) => verify_against_statement(rows, debits, credits)?,
+        _ => statement_totals(rows)?,
     };
     let build = build(
-        &rows,
+        rows,
         request.bank,
         request.mapping,
         &BuildOptions {

@@ -16,7 +16,7 @@ use crate::reports::outstandings_working_paper_store::{
 };
 use crate::reports::outstandings_working_paper_xlsx::render_outstandings_working_paper_xlsx;
 use crate::reports::party_ledger_master::{
-    build_party_ledger_master_workbook, BalanceDateBasis, SourceNote,
+    build_party_ledger_master_workbook, BalanceDateBasis, PartyLedgerMasterWorkbook, SourceNote,
 };
 use crate::reports::party_ledger_master_xlsx::render_party_ledger_master_xlsx;
 use crate::reports::party_statement::{
@@ -24,13 +24,17 @@ use crate::reports::party_statement::{
 };
 use crate::reports::party_statement_pdf::render_party_statement_pdf;
 use crate::reports::party_statement_xlsx::render_party_statement_xlsx;
+use crate::reports::schedule_iii::{BookKey, DecisionInput, DecisionsUnavailable, FinancialYear};
 use crate::sync::coordinator::{SnapshotCoordinator, SnapshotJobStatus};
 use crate::sync::reconciliation::ExternalReferenceCatalog;
 use crate::sync::snapshot::{
     capability_profile_sha256, AdaptiveWindowPolicy, PlannedWindow, SnapshotPlan,
     SqliteSnapshotStateStore,
 };
-use crate::tally::connection::{PairedReadValidationError, PartyLedgerMasterSourceValidationError};
+use crate::tally::connection::{
+    MailingDetailsReadFailed, MailingReadFailure, MailingRetryHeldByDrain,
+    PairedReadValidationError, PartyLedgerMasterSourceValidationError,
+};
 use crate::tally::runtime::{with_operation_wire_budget, TallyRuntimeControlError};
 use crate::tally::validators::{
     normalize_company_guid, validate_company_name, validate_date_range,
@@ -52,6 +56,9 @@ use tauri::State;
 
 #[path = "commands_trial_balance.rs"]
 pub(crate) mod trial_balance;
+
+#[path = "commands_grouping_decisions.rs"]
+pub(crate) mod grouping_decisions;
 
 pub mod all_clients;
 
@@ -139,13 +146,21 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
             false,
             "Try again in a few seconds. Nothing was sent to Tally.",
         ),
+        WireRefusal::Draining { .. } => tally_command_error(
+            "tally_endpoint_draining",
+            "Operation",
+            "Tally was still busy with an earlier request that did not finish.",
+            "safe",
+            false,
+            "Try again in a few seconds; this clears by itself within 10 minutes. This request was not sent to Tally.",
+        ),
         WireRefusal::Unavailable => tally_command_error(
             "tally_endpoint_lock_unavailable",
             "Operation",
             "ComplyEaze Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
             "after_change",
             false,
-            "Check that ComplyEaze Bridge's Application Support folder is available and writable, then try again.",
+            "Check that ComplyEaze Bridge's Application Support folder is available and writable, then try again. If a file ending in .wire.debt in its coordination folder cannot be read, deleting that file clears it.",
         ),
     }
 }
@@ -277,15 +292,6 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
             true,
             "Keep the result unverified and inspect redacted diagnostics before retrying.",
         )
-    } else if lower.contains("interactive discovery listing limit exceeded") {
-        (
-            "untrusted_discovery_limit_exceeded",
-            "Discovery listing",
-            "The unverified local company listing exceeded ComplyEaze Bridge's display safety limit.",
-            "after_change",
-            true,
-            "Reduce the locally listed companies or use a strict probe for reviewed company evidence.",
-        )
     } else if lower.contains("company") {
         (
             "tally_company_context_failed",
@@ -409,13 +415,84 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
             )
         };
     }
+    let mailing_read_failed = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+        .map(MailingDetailsReadFailed::cause);
+    let held_by_drain = error
+        .chain()
+        .any(|cause| cause.downcast_ref::<MailingRetryHeldByDrain>().is_some());
     let mut mapped = tally_runtime_command_error(error);
     mapped.message = format!(
         "ComplyEaze Bridge withheld the party/ledger master: {}",
         mapped.message
     );
+    // A master read that asked for each party's mailing details too is marked by
+    // its failure's type where the read is sent or its answer is first checked
+    // (bridge#2074). The export goes on without the details after every marked
+    // failure but a deadline or an oversize Tally did not declare (bridge#2214),
+    // so of the marked causes only those two are named as that larger read here,
+    // with the remediation for it; only the size limit says the estimate may have
+    // been too low, since a deadline does not show the answer's size. Every other
+    // cause reaches here only from a read that asked for the details by name, and
+    // is told exactly as a read without the details would be.
+    match mailing_read_failed {
+        Some(MailingReadFailure::Deadline) => {
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
+            mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+        }
+        Some(MailingReadFailure::ResponseTooLarge { .. }) => {
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE);
+            mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+        }
+        Some(
+            MailingReadFailure::Truncated
+            | MailingReadFailure::ReadFailed
+            | MailingReadFailure::NoAnswer
+            | MailingReadFailure::Undecodable
+            | MailingReadFailure::HttpStatus
+            | MailingReadFailure::NotSent
+            | MailingReadFailure::AnswersDiffered
+            | MailingReadFailure::TallyFailed
+            | MailingReadFailure::StatusAbsent
+            | MailingReadFailure::Malformed
+            | MailingReadFailure::RowRefused
+            | MailingReadFailure::OtherCompany
+            | MailingReadFailure::BoundPassed
+            | MailingReadFailure::IdentityRepeated
+            | MailingReadFailure::CountDiffers,
+        )
+        | None => {}
+    }
+    // The export waited for Tally to finish a mailing read whose answer may have
+    // left it sending, and Tally had not finished when the wait ended
+    // (bridge#2214): the read's own failure, then why the book was not read again.
+    if held_by_drain {
+        mapped
+            .message
+            .push_str(MAILING_RETRY_HELD_BY_DRAIN_SENTENCE);
+        mapped.remediation = MAILING_RETRY_HELD_BY_DRAIN_REMEDIATION;
+    }
     mapped
 }
+
+/// What a CA is told when a party/ledger master read that asked for the mailing
+/// details ran out of time or past the size limit (bridge#2074).
+const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them.";
+/// Added only where the answer passed the size limit, not after a deadline.
+const MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE: &str = " ComplyEaze Bridge asks for them only where it estimates the answer fits, and for this company the estimate may have been too low.";
+const MAILING_DETAILS_READ_FAILED_REMEDIATION: &str = "Do not retry the unchanged export: it sends the same larger read. Try again only after something has changed, such as Tally being less busy or this company's books being smaller; if it keeps failing, report it to ComplyEaze Bridge, which cannot yet export this company's workbook without the mailing addresses.";
+/// What a CA is also told when Tally was still busy with that read when the
+/// export's wait for it ended, so the book was not read again (bridge#2214).
+const MAILING_RETRY_HELD_BY_DRAIN_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses. Tally was still busy with it when ComplyEaze Bridge stopped waiting, so the workbook was not read again without them.";
+const MAILING_RETRY_HELD_BY_DRAIN_REMEDIATION: &str = "Wait a few minutes for Tally to finish, then export again. The export asks for the mailing addresses first again, and reads the workbook without them if that read fails the same way.";
 
 fn party_ledger_master_currency_admission_error(reason: &'static str) -> TallyCommandError {
     // Several Currency-master rows do not identify which row is the company's base
@@ -1931,44 +2008,44 @@ fn verify_observed_company_tuple_from_companies(
     })
 }
 
-/// Reads and writes one columnar party/ledger master workbook. The workbook
-/// is built only from the runtime's verified, paired source; this command
-/// accepts no ledger row or amount from the webview.
-#[tauri::command]
-pub async fn export_party_ledger_master(
-    app: tauri::AppHandle,
-    request: PartyLedgerMasterRequest,
-    runtime: State<'_, TallyRuntime>,
-) -> Result<PartyLedgerMasterExport, TallyCommandError> {
-    // One wire-lock wait budget for the whole command (#697).
-    with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime)).await
-}
+/// What the party/ledger master export asks Tally for: it shows each party's dated
+/// mailing details, so its request names them where the whole read fits the mailing
+/// bound, by the mark or by the ledgers counted to size it and the alterations beyond them
+/// (bridge#2074), and is the
+/// standard request otherwise (bridge#1490); the workbook says when they were not
+/// read. The count's choice is an allowance, so a larger read that runs out of time, or
+/// past the size limit without Tally declaring it, fails; after any other failure of it,
+/// the book is read again without them, once, and the workbook says why (bridge#2214).
+/// A failure of that read again is told as itself. A grouping-decision save uses none of
+/// them and sends the standard request.
+const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
+    crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits;
 
-async fn export_party_ledger_master_once(
-    app: tauri::AppHandle,
-    request: PartyLedgerMasterRequest,
-    runtime: State<'_, TallyRuntime>,
-) -> Result<PartyLedgerMasterExport, TallyCommandError> {
-    let identity =
-        verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
+/// The verified company and its party/ledger master, read through the one
+/// sized path: company tuple check, currency admission, then the paired
+/// source. The export and a grouping-decision save both read through here.
+/// `chosen` is the balance date the CA typed, or the host's date when none;
+/// `read` is what the caller's request asks Tally for.
+pub(crate) async fn fetch_verified_party_ledger_master(
+    runtime: &TallyRuntime,
+    config: TallyConfig,
+    selected_company: &SelectedCompanyIdentity,
+    chosen: Option<TallyDate>,
+    read: crate::tally::connection::ComplianceRead,
+) -> Result<(VerifiedCompanyIdentity, PartyLedgerMasterWorkbook), TallyCommandError> {
+    let identity = verify_observed_company_tuple(runtime, &config, selected_company).await?;
     // The classified read admits a book with several Currency masters when
     // Tally identifies an INR base (bridge#551).
     let currency_assertion = runtime
-        .detect_classified_base_currency_with_extent(request.config.clone(), &identity)
+        .detect_classified_base_currency_with_extent(config.clone(), &identity)
         .await
         .map_err(party_ledger_master_runtime_command_error)?
         .admit_inr_classified()
         .map_err(party_ledger_master_currency_admission_error)?
         .into_compliance_assertion();
-    let basis = party_ledger_master_balance_basis(request.as_of_yyyymmdd, host_today)?;
+    let basis = party_ledger_master_balance_basis(chosen, host_today)?;
     let source = runtime
-        .fetch_party_ledger_master_source(
-            request.config,
-            &identity,
-            currency_assertion,
-            basis,
-            crate::tally::connection::ComplianceRead::Standard,
-        )
+        .fetch_party_ledger_master_source(config, &identity, currency_assertion, basis, read)
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
     party_ledger_master_withheld(
@@ -1983,8 +2060,68 @@ async fn export_party_ledger_master_once(
                 "Refresh the selected Tally company and retry the export after reviewing its runtime status.",
             )
         })?;
-    // CA grouping decisions are not stored yet (#737), so none is presented.
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).map_err(|_| {
+    Ok((identity, workbook))
+}
+
+/// The financial year a party/ledger master's balance date falls in.
+pub(crate) fn party_ledger_master_year(
+    workbook: &PartyLedgerMasterWorkbook,
+) -> Result<FinancialYear, TallyCommandError> {
+    FinancialYear::containing(&workbook.source().to).ok_or_else(|| {
+        party_ledger_master_local_export_error(
+            "party_ledger_master_period_invalid",
+            "ComplyEaze Bridge could not place the read's balance date in a financial year.",
+            "Refresh the selected Tally company and retry.",
+        )
+    })
+}
+
+/// Reads and writes one columnar party/ledger master workbook. The workbook
+/// is built only from the runtime's verified, paired source; this command
+/// accepts no ledger row or amount from the webview. CA grouping decisions
+/// come from the encrypted store; if they cannot be read, the workbook says
+/// so and is NOT FINAL.
+#[tauri::command]
+pub async fn export_party_ledger_master(
+    app: tauri::AppHandle,
+    request: PartyLedgerMasterRequest,
+    runtime: State<'_, TallyRuntime>,
+    mirror: State<'_, crate::LazyTallyMirror>,
+) -> Result<PartyLedgerMasterExport, TallyCommandError> {
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(export_party_ledger_master_once(
+        app, request, runtime, mirror,
+    ))
+    .await
+}
+
+async fn export_party_ledger_master_once(
+    app: tauri::AppHandle,
+    request: PartyLedgerMasterRequest,
+    runtime: State<'_, TallyRuntime>,
+    mirror: State<'_, crate::LazyTallyMirror>,
+) -> Result<PartyLedgerMasterExport, TallyCommandError> {
+    let (identity, workbook) = fetch_verified_party_ledger_master(
+        &runtime,
+        request.config,
+        &request.selected_company,
+        request.as_of_yyyymmdd,
+        PARTY_LEDGER_MASTER_EXPORT_READ,
+    )
+    .await?;
+    let year = party_ledger_master_year(&workbook)?;
+    let loaded = match mirror.get().await {
+        Ok(repository) => repository
+            .grouping_decision_set(&BookKey::of(&identity), year)
+            .await
+            .map_err(|error| error.unavailable()),
+        Err(_) => Err(DecisionsUnavailable::StoreUnavailable),
+    };
+    let decisions = match &loaded {
+        Ok(set) => DecisionInput::Read(set),
+        Err(why) => DecisionInput::Unavailable(*why),
+    };
+    let bytes = render_party_ledger_master_xlsx(&workbook, decisions).map_err(|_| {
         party_ledger_master_local_export_error(
             "party_ledger_master_render_failed",
             "ComplyEaze Bridge could not build the party/ledger master workbook safely.",

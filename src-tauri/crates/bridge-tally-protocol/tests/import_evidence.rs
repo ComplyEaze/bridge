@@ -103,6 +103,31 @@ fn clean_import_success_requires_each_live_evidence_condition_independently() {
 }
 
 #[test]
+fn an_exact_alter_only_or_delete_only_import_is_a_clean_success() {
+    let altered = TallyImportResult {
+        created: 0,
+        altered: 1,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+        line_error_count: 0,
+        counter_presence: all_counters_reported(),
+    };
+    assert!(altered.is_clean_success_for(0, 1, 0));
+    assert!(!altered.is_clean_success_for(1, 0, 0));
+
+    let deleted = TallyImportResult {
+        altered: 0,
+        deleted: 1,
+        ..altered
+    };
+    assert!(deleted.is_clean_success_for(0, 0, 1));
+    assert!(!deleted.is_clean_success_for(0, 1, 0));
+}
+
+#[test]
 fn captured_success_requires_every_clean_counter_to_be_observed() {
     // Start with an ignored live capture, then remove one counter at a time.
     // A missing counter remains auditably absent; it is never promoted to a
@@ -160,6 +185,32 @@ fn non_numeric_lastvchid_is_rejected_even_when_import_counters_are_clean() {
 }
 
 #[test]
+fn an_empty_element_or_cdata_content_refuses_an_otherwise_clean_response() {
+    const COUNTERS: &str = "<CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS>";
+    let clean = format!("<RESPONSE>{COUNTERS}</RESPONSE>");
+    let outcome = parse_import_outcome(&clean).expect("the clean base parses");
+    assert!(outcome.counters().is_clean_success_for(1, 0, 0));
+
+    // An empty IMPORTRESULT is a container only directly under ENVELOPE/BODY/DATA; anywhere
+    // else it is an unexpected empty element.
+    for (defect, xml) in [
+        (
+            "an empty IMPORTRESULT under RESPONSE",
+            format!("<RESPONSE>{COUNTERS}<IMPORTRESULT/></RESPONSE>"),
+        ),
+        (
+            "CDATA content after the counters",
+            format!("<RESPONSE>{COUNTERS}<![CDATA[1]]></RESPONSE>"),
+        ),
+    ] {
+        assert!(
+            parse_import_outcome(&xml).is_err(),
+            "{defect} must refuse the response"
+        );
+    }
+}
+
+#[test]
 fn evidence_binds_counters_response_and_redacted_line_errors() {
     let xml = "<RESPONSE><CREATED>0</CREATED><ALTERED>0</ALTERED><IGNORED>1</IGNORED><ERRORS>1</ERRORS><EXCEPTIONS>0</EXCEPTIONS><LINEERROR>PRIVATE-SYNTHETIC-SENTINEL</LINEERROR></RESPONSE>";
     let evidence = parse_import_evidence(xml).unwrap();
@@ -169,6 +220,17 @@ fn evidence_binds_counters_response_and_redacted_line_errors() {
     assert_eq!(evidence.response_sha256().len(), 64);
     let debug = format!("{evidence:?}");
     assert!(!debug.contains("PRIVATE-SYNTHETIC-SENTINEL"));
+    // Its own last field is how many line errors there were (the counters' Debug holds a
+    // line_error_count too, so only the end pins this one); their digests are not shown.
+    assert!(debug.ends_with(", line_error_count: 1 }"), "{debug}");
+    assert!(!debug.contains(&evidence.line_error_sha256()[0]), "{debug}");
+}
+
+#[test]
+fn whitespace_only_cdata_between_elements_is_accepted_like_whitespace_text() {
+    let xml = "<RESPONSE><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS><![CDATA[ \n ]]></RESPONSE>";
+    let outcome = parse_import_outcome(xml).expect("blank CDATA is not content");
+    assert!(outcome.counters().is_clean_success_for(1, 0, 0));
 }
 
 #[test]
@@ -219,6 +281,49 @@ fn duplicate_or_wrongly_nested_status_and_counters_are_rejected() {
 
     let unknown_wrapper = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><UNEXPECTED><CREATED>1</CREATED></UNEXPECTED><ALTERED>0</ALTERED><IGNORED>0</IGNORED><ERRORS>0</ERRORS></DATA></BODY></ENVELOPE>";
     assert!(parse_import_evidence(unknown_wrapper).is_err());
+}
+
+#[test]
+fn each_shape_refusal_holds_on_an_otherwise_clean_response() {
+    // Each refused response below is a clean one with exactly one defect added, so the
+    // refusal can only come from the rule that defect breaks.
+    const COUNTERS: &str = "<CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS>";
+    const HEADER: &str = "<HEADER><STATUS>1</STATUS></HEADER>";
+    let response = format!("<RESPONSE>{COUNTERS}</RESPONSE>");
+    let body = format!("<BODY><DATA><IMPORTRESULT>{COUNTERS}</IMPORTRESULT></DATA></BODY>");
+    let envelope = format!("<ENVELOPE>{HEADER}{body}</ENVELOPE>");
+    for clean in [&response, &envelope] {
+        let outcome = parse_import_outcome(clean).expect("the clean base parses");
+        assert!(outcome.counters().is_clean_success_for(1, 0, 0));
+    }
+
+    for (defect, xml) in [
+        (
+            "a second root element",
+            format!("{response}<RESPONSE></RESPONSE>"),
+        ),
+        (
+            "BODY before HEADER",
+            format!("<ENVELOPE>{body}{HEADER}</ENVELOPE>"),
+        ),
+        (
+            "an extra ENVELOPE child between HEADER and BODY",
+            format!("<ENVELOPE>{HEADER}<EXTRA></EXTRA>{body}</ENVELOPE>"),
+        ),
+        (
+            "an extra ENVELOPE child after BODY",
+            format!("<ENVELOPE>{HEADER}{body}<EXTRA></EXTRA></ENVELOPE>"),
+        ),
+        (
+            "an undocumented result field",
+            format!("<RESPONSE>{COUNTERS}<UNDOCUMENTED>1</UNDOCUMENTED></RESPONSE>"),
+        ),
+    ] {
+        assert!(
+            parse_import_outcome(&xml).is_err(),
+            "{defect} must refuse the response"
+        );
+    }
 }
 
 #[test]
@@ -655,4 +760,29 @@ fn lastvchid_is_kept_in_records_and_absent_when_unreported() {
         .unwrap()
         .get("last_vch_id")
         .is_none());
+}
+
+#[test]
+fn import_evidence_accepts_a_response_of_exactly_one_mebibyte_and_refuses_one_byte_more() {
+    // The evidence parser's byte limit, `MAX_IMPORT_RESPONSE_BYTES` in import_outcome.rs.
+    const LIMIT: usize = 1024 * 1024;
+    let response = |len: usize| {
+        let open = "<RESPONSE><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS>";
+        let close = "</RESPONSE>";
+        format!(
+            "{open}{}{close}",
+            " ".repeat(len - open.len() - close.len())
+        )
+    };
+
+    let at_limit = response(LIMIT);
+    assert_eq!(at_limit.len(), LIMIT);
+    let evidence = parse_import_evidence(&at_limit).expect("a response at the limit parses");
+    assert!(evidence.counters().is_clean_success_for(1, 0, 0));
+
+    let over = response(LIMIT + 1);
+    assert_eq!(over.len(), LIMIT + 1);
+    // The same shape still parses as an outcome, so the refusal below is the size alone.
+    assert!(parse_import_outcome(&over).is_ok());
+    assert!(parse_import_evidence(&over).is_err());
 }

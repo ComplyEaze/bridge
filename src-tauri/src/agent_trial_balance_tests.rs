@@ -78,14 +78,19 @@ mod listing {
     /// A whole first-page call: identity, then the runtime read's brackets,
     /// currency and report, as `runtime_trial_balance_tests` replays them.
     fn first_page_plans(vouchers: u64) -> Vec<ScenarioPlan> {
-        let companies = xml(companies());
-        let currency = decode(include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
-        ));
         let report = include_str!(
             "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
         )
         .to_string();
+        first_page_plans_answering(vouchers, report)
+    }
+
+    /// As [`first_page_plans`], with `report` as Tally's answer to the Trial Balance request.
+    fn first_page_plans_answering(vouchers: u64, report: String) -> Vec<ScenarioPlan> {
+        let companies = xml(companies());
+        let currency = decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+        ));
         let mut plans = identity_plans();
         plans.extend([status(), companies.clone(), companies.clone()]);
         pair(&mut plans, xml(extents(vouchers)));
@@ -127,6 +132,7 @@ mod listing {
                 redaction: Redaction::None,
                 import_enabled: false,
                 posting: Posting::Off,
+                master_writes_enabled: false,
                 audit_enabled: false,
             });
             Self {
@@ -184,6 +190,244 @@ mod listing {
         let text: Value =
             serde_json::from_str(response["content"][0]["text"].as_str().unwrap()).unwrap();
         assert_eq!(text["headline"], content["headline"]);
+        let _ = one.requests();
+    }
+
+    /// The captured Profit & Loss A/c row has Tally's reserved root as its
+    /// parent, sent as `&#4; Primary`. The answer shows Tally's text, not the
+    /// decoders' working marker (U+FFFD then `#4; Primary`), and every other
+    /// row's parent is a group name as read.
+    #[tokio::test]
+    async fn the_profit_and_loss_row_shows_the_reserved_root_as_tally_sent_it() {
+        let one = OneServer::spawn(first_page_plans(14));
+        let response = one
+            .call(json!({"company_guid":GUID,"from":"2026-04-01","to":"2026-09-02","limit":50}))
+            .await;
+        let rows = result(&response)["ledgers"].as_array().unwrap();
+        let roots: Vec<_> = rows
+            .iter()
+            .filter(|row| {
+                row["parent"]
+                    .as_str()
+                    .is_some_and(|p| p.contains("Primary"))
+            })
+            .collect();
+        assert_eq!(roots.len(), 1, "{rows:?}");
+        assert_eq!(roots[0]["ledger"], "Profit & Loss A/c");
+        assert_eq!(roots[0]["parent"], "&#4; Primary");
+        assert!(
+            !response.to_string().contains('\u{fffd}'),
+            "no replacement character reaches the answer"
+        );
+        let _ = one.requests();
+    }
+
+    /// A ledger whose closing is not its opening plus its debit and credit totals is flagged
+    /// with the exact difference, the first line says so, and the row is returned as Tally sent
+    /// it (#2068). The captured answer's Cash row is edited in one element to the shape the lab
+    /// measured on a Closing Stock ledger (`lab/2068-nonint-trial-balance-answers` at 87446099,
+    /// TallyPrime 7.2): the closing keeps the opening and the movement shows only as the debit
+    /// total. The unedited capture, every row of which adds up, carries no flag and no sentence.
+    #[tokio::test]
+    async fn a_ledger_that_does_not_add_up_is_flagged_and_never_corrected() {
+        let args = json!({"company_guid":GUID,"from":"2026-04-01","to":"2026-09-02","limit":50});
+        let report = include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
+        );
+        let one = OneServer::spawn(first_page_plans_answering(14, report.to_string()));
+        let plain = one.call(args.clone()).await;
+        assert!(
+            !plain.to_string().contains("movements_differ_by"),
+            "{plain}"
+        );
+        let headline = plain["structuredContent"]["headline"]["lead"]
+            .as_str()
+            .unwrap();
+        assert!(!headline.contains("not add up"), "{headline}");
+        let _ = one.requests();
+
+        let edited = report.replace(
+            "<TBALCLOSING TYPE=\"Amount\">-7550.00</TBALCLOSING>",
+            "<TBALCLOSING TYPE=\"Amount\">-2600.00</TBALCLOSING>",
+        );
+        assert_ne!(edited, report, "the Cash closing was edited");
+        let one = OneServer::spawn(first_page_plans_answering(14, edited));
+        let response = one.call(args).await;
+        let content = &response["structuredContent"];
+        let rows = content["result"]["ledgers"].as_array().unwrap();
+        let flagged = rows
+            .iter()
+            .filter(|row| row.get("movements_differ_by").is_some())
+            .collect::<Vec<_>>();
+        assert_eq!(flagged.len(), 1, "{rows:?}");
+        assert_eq!(flagged[0]["ledger"], "Cash");
+        assert_eq!(flagged[0]["movements_differ_by"], "4950.00");
+        // The row is as Tally sent it: the closing is not replaced by the sum.
+        assert_eq!(flagged[0]["closing"]["value"], "-2600.00");
+        let lead = content["headline"]["lead"].as_str().unwrap();
+        assert!(lead.contains("1 ledger does not add up"), "{lead}");
+        let limitation = content["result"]["limitations"][0].as_str().unwrap();
+        assert!(
+            limitation.starts_with("1 ledger(s) carry movements_differ_by"),
+            "{limitation}"
+        );
+        let _ = one.requests();
+    }
+
+    /// The two captured answers of #2068, unedited (`native/PROVENANCE.md` in the protocol
+    /// crate's fixtures): on each, the Closing Stock ledger alone is flagged, by 400.00, and is
+    /// returned with the closing Tally sent (its opening), not the keyed 1,400.00.
+    #[test]
+    fn a_keyed_closing_stock_ledger_is_flagged_as_sent_on_both_captured_books() {
+        for (bytes, company) in [
+            (
+                &include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml")[..],
+                "567653b1-c8be-4deb-b4fc-3ea5de801884",
+            ),
+            (
+                &include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml")[..],
+                "3fc2a3c7-1da8-4bc4-a472-44028cdebca7",
+            ),
+        ] {
+            let report = bridge_tally_protocol::native_trial_balance::parse_native_trial_balance(
+                &decode(bytes),
+                company,
+            )
+            .unwrap();
+            let rows = report.rows.into_iter().map(ledger_row).collect::<Vec<_>>();
+            assert_eq!(rows.len(), 8, "{company}");
+            let flagged = rows
+                .iter()
+                .filter(|(_, differs)| *differs)
+                .map(|(json, _)| json)
+                .collect::<Vec<_>>();
+            assert_eq!(flagged.len(), 1, "{rows:?}");
+            assert_eq!(
+                rows.iter()
+                    .filter(|(json, _)| json.get("movements_differ_by").is_some())
+                    .count(),
+                1,
+                "the key is on the flagged row only"
+            );
+            // Unwrapped from the party-name marker when the server renders the answer.
+            assert_eq!(flagged[0]["ledger"][PARTY_NAME_MARKER], "Closing Stock");
+            assert_eq!(flagged[0]["movements_differ_by"], "400.00");
+            assert_eq!(flagged[0]["opening"]["value"], "-1000.00");
+            assert_eq!(flagged[0]["debit"]["value"], "-400.00");
+            assert_eq!(flagged[0]["closing"]["value"], "-1000.00");
+        }
+    }
+
+    /// The limitation's words are the ones the answer carried before the text moved to
+    /// `reports::trial_balance` for the desktop to share (#2132): pinned whole, so the answer
+    /// stays byte-identical.
+    #[test]
+    fn the_movements_limitation_keeps_the_answers_words() {
+        assert_eq!(
+            crate::reports::trial_balance::MOVEMENTS_DIFFER_LIMITATION,
+            "{count} ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals, counting an empty amount as zero. Each is returned as Tally sent it and nothing is corrected. On the books measured this was a Closing Stock ledger whose closing balance was keyed on Tally's screen: Tally kept the opening as the closing and showed the change only in the debit total. The closing of such a ledger is not necessarily the figure Tally's statements use: on the book not integrated with inventory they used the keyed figure, and on the integrated one they valued the stock from the stock item. The column totals include the closing as sent."
+        );
+    }
+
+    /// On a partial read the label that says so stays the first limitation, and the note about
+    /// a ledger that does not add up follows it, on every page. The captured several-currency
+    /// answer has one element of its base ledger BRIDGE INR DEBTOR A edited (closing -3000.00 to
+    /// -1000.00: the closing keeps the opening, as the lab measured on a Closing Stock ledger).
+    #[tokio::test]
+    async fn on_a_partial_read_the_label_stays_first_and_the_movements_note_follows_on_every_page()
+    {
+        let companies = xml(companies());
+        let fixture = |bytes: &[u8]| xml(decode(bytes));
+        let mut plans = identity_plans();
+        plans.extend([status(), companies.clone(), companies.clone()]);
+        pair(&mut plans, xml(forex_extents()));
+        let report = decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/trial_balance_currency_forex_live.utf16le.xml"
+        ));
+        let edited = report.replace(
+            "<TBALCLOSING TYPE=\"Amount\">-3000.00</TBALCLOSING>",
+            "<TBALCLOSING TYPE=\"Amount\">-1000.00</TBALCLOSING>",
+        );
+        assert_ne!(edited, report, "the closing was edited");
+        for source in [
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+            )),
+            xml(edited),
+        ] {
+            pair(&mut plans, source);
+        }
+        pair(&mut plans, xml(forex_extents()));
+        plans.extend([companies.clone(), status(), companies.clone()]);
+        plans.extend(identity_plans());
+        plans.push(companies.clone());
+        pair(&mut plans, xml(forex_extents()));
+        plans.push(companies);
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        let args = |offset: usize| json!({"company_guid":FOREX,"from":"2025-04-01","to":"2026-09-15","limit":2,"offset":offset});
+        let first = one.call(args(0)).await;
+        let second = one.call(args(2)).await;
+        assert_eq!(one.requests(), total);
+        for response in [&first, &second] {
+            let content = &response["structuredContent"];
+            let limitations = content["result"]["limitations"].as_array().unwrap();
+            assert!(
+                limitations[0].as_str().unwrap().contains("base-currency"),
+                "the partial-read label is first: {limitations:?}"
+            );
+            assert!(
+                limitations[1]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("1 ledger(s) carry movements_differ_by"),
+                "{limitations:?}"
+            );
+            let lead = content["headline"]["lead"].as_str().unwrap();
+            assert!(lead.starts_with("Partial trial balance"), "{lead}");
+            assert!(lead.contains("1 ledger does not add up"), "{lead}");
+        }
+        let flagged = [&first, &second]
+            .iter()
+            .flat_map(|response| result(response)["ledgers"].as_array().unwrap().iter())
+            .filter(|row| row.get("movements_differ_by").is_some())
+            .collect::<Vec<_>>();
+        assert_eq!(flagged.len(), 1);
+        assert_eq!(flagged[0]["ledger"], "BRIDGE INR DEBTOR A");
+        assert_eq!(flagged[0]["movements_differ_by"], "2000.00");
+    }
+
+    /// A Trial Balance answer Bridge cannot use is refused with the rule it failed as `cause`
+    /// and a next step, not with the code alone (#2071). The answer here is a captured company
+    /// list, which is not a Trial Balance: the parser refuses it by name.
+    #[tokio::test]
+    async fn an_unusable_answer_is_refused_with_its_cause_and_a_next_step() {
+        let mut plans = first_page_plans_answering(14, companies());
+        // The refusal ends the call at the report's pair: the extent re-read and the
+        // identity brackets after it are never asked for.
+        plans.truncate(19);
+        let one = OneServer::spawn(plans);
+        let response = one
+            .call(json!({"company_guid":GUID,"from":"2026-04-01","to":"2026-09-02"}))
+            .await;
+        assert_eq!(response["isError"], true, "{response}");
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], "trial_balance_read_failed", "{error}");
+        let cause = error["cause"]
+            .as_str()
+            .expect("the refusal names its cause");
+        assert_eq!(cause, "trial_balance_source_identity_missing");
+        let remediation = error["remediation"].as_str().expect("and a next step");
+        assert!(
+            remediation.contains("Do not repeat this same read"),
+            "{remediation}"
+        );
         let _ = one.requests();
     }
 

@@ -35,10 +35,14 @@ use bridge_tally_protocol::{
     native_outstandings::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
-        render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
-        render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
+        render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_ledgers,
+        render_native_ledger_snapshot_request_for_parents, render_party_ledger_master_request,
+        render_party_ledger_master_request_for_ledgers,
+        render_party_ledger_master_request_for_parents,
         render_party_ledger_master_request_for_parents_with_gst_details,
-        render_party_ledger_master_request_with_gst_details, BaseCurrencyName,
+        render_party_ledger_master_request_for_parents_with_mailing_details,
+        render_party_ledger_master_request_with_gst_details,
+        render_party_ledger_master_request_with_mailing_details, BaseCurrencyName,
         ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
         NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
@@ -48,8 +52,8 @@ use bridge_tally_protocol::{
         DateBoundaryProfile, OutstandingsError,
     },
     parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
-    parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
-    parse_ledger_census_slice, parse_native_party_ledger_master_records_leaving_unparsed,
+    parse_company_gateway_capability_observation, parse_ledger_census_slice,
+    parse_native_party_ledger_master_records_leaving_unparsed,
     parse_native_party_ledger_master_structure, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
@@ -101,6 +105,260 @@ fn party_ledger_master_openings_agree(
 ) -> anyhow::Result<bool> {
     let master_opening = bridge_tally_core::ExactDecimal::parse(master_opening.to_owned())?;
     Ok(master_opening.numeric_eq(balance_opening))
+}
+
+/// A master read that asked Tally for each ledger's dated mailing details and
+/// failed in one of the ways [`MailingReadFailure`] names (bridge#2074), so the
+/// export can decide on that read's failure by its type.
+/// Its text is the failure's own, so every reading of the error's message is as
+/// it was; only its type marks the read.
+#[derive(Debug, thiserror::Error)]
+#[error("{source}")]
+pub(crate) struct MailingDetailsReadFailed {
+    cause: MailingReadFailure,
+    source: anyhow::Error,
+}
+
+impl MailingDetailsReadFailed {
+    pub(crate) const fn cause(&self) -> MailingReadFailure {
+        self.cause
+    }
+}
+
+/// How a mailing read failed, decided once from a type, never from a message
+/// (bridge#2214, bridge#2074): the transport's own error where a post of the
+/// read's pair failed, the pair's two answers differing, or the check that
+/// refused its answer before the balance request was sent. A `/status` check
+/// of the pair that fails is not the mailing read's failure, and neither is any
+/// read after its answer was admitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MailingReadFailure {
+    /// The request's deadline.
+    Deadline,
+    /// The response cap; `declared_by_peer` when Tally's head declared the
+    /// length, so Tally had finished the work.
+    ResponseTooLarge { declared_by_peer: bool },
+    /// A body that ended before its declared length.
+    Truncated,
+    /// A body that could not be read.
+    ReadFailed,
+    /// A request that failed before any answer came back.
+    NoAnswer,
+    /// An answer whose bytes did not decode as the text Tally declared, found at
+    /// its head or partway through its body, or one in a content encoding
+    /// ComplyEaze Bridge does not read.
+    Undecodable,
+    /// An HTTP error status in place of an answer.
+    HttpStatus,
+    /// A post that did not reach Tally: refused before it was sent, or no
+    /// connection was accepted.
+    NotSent,
+    /// The pair's two answers differed.
+    AnswersDiffered,
+    /// Tally's own failure answer: a `STATUS` other than `1`.
+    TallyFailed,
+    /// A whole answer that carried no `STATUS`.
+    StatusAbsent,
+    /// A whole, decoded answer whose XML did not parse.
+    Malformed,
+    /// A row the row grammar refuses, markup inside a mailing field among them.
+    RowRefused,
+    /// An answer not bound to the company asked for.
+    OtherCompany,
+    /// An answer past one of the parser's count bounds.
+    BoundPassed,
+    /// An answer that repeated a ledger's identity.
+    IdentityRepeated,
+    /// An answer with another number of ledgers than were counted, or than its
+    /// part was planned to hold.
+    CountDiffers,
+}
+
+/// What the party/ledger master export does after its own mailing read failed
+/// (bridge#2214, and the maintainers' ruling on bridge#2074): it goes on
+/// without the mailing details unless Tally may still be working on that read.
+/// Every decision but [`Self::Refuse`] sends the standard request once, which
+/// keeps every refusal it has on master, and the workbook says why the details
+/// are missing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MailingReadDecision {
+    /// Tally finished with the read, or it never reached Tally: the standard
+    /// read is sent at once.
+    Continue,
+    /// The answer broke off, could not be read, did not decode, never came, or
+    /// was refused at its head, so Tally may still be sending or working on it,
+    /// and the transport owes a drain for each (#2142). The standard read is
+    /// sent once the drain clears: where its first post is refused as draining
+    /// before anything of it was sent, the export waits and tries again,
+    /// starting no try after [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], a bound
+    /// not measured, and past that fails with the mailing read's own failure.
+    /// An oversize Tally declares is the one such case seen live (protocol
+    /// reference §8.4, lab row 2214).
+    ContinueOnceDrained,
+    /// The read ran out of time, or past the cap without Tally declaring it, so
+    /// Tally may still be working on it, and no such cut of a mailing read has
+    /// been seen live: the export fails, and nothing is sent again.
+    Refuse,
+}
+
+impl MailingReadFailure {
+    /// What the export does after this failure of its mailing read. Every
+    /// failure is named, so a new one is decided here before it compiles.
+    pub(crate) const fn decision(self) -> MailingReadDecision {
+        match self {
+            Self::Deadline
+            | Self::ResponseTooLarge {
+                declared_by_peer: false,
+            } => MailingReadDecision::Refuse,
+            Self::ResponseTooLarge {
+                declared_by_peer: true,
+            }
+            | Self::Truncated
+            | Self::ReadFailed
+            | Self::NoAnswer
+            | Self::Undecodable
+            | Self::HttpStatus => MailingReadDecision::ContinueOnceDrained,
+            Self::NotSent
+            | Self::AnswersDiffered
+            | Self::TallyFailed
+            | Self::StatusAbsent
+            | Self::Malformed
+            | Self::RowRefused
+            | Self::OtherCompany
+            | Self::BoundPassed
+            | Self::IdentityRepeated
+            | Self::CountDiffers => MailingReadDecision::Continue,
+        }
+    }
+
+    /// Every transport error is named, so a new one is placed before it
+    /// compiles.
+    const fn of(error: &TallyTransportError) -> Self {
+        match error {
+            TallyTransportError::RequestTimedOut => Self::Deadline,
+            TallyTransportError::ResponseTooLarge {
+                declared_by_peer, ..
+            } => Self::ResponseTooLarge {
+                declared_by_peer: *declared_by_peer,
+            },
+            TallyTransportError::ResponseTruncated => Self::Truncated,
+            TallyTransportError::ResponseReadFailed => Self::ReadFailed,
+            TallyTransportError::RequestFailed => Self::NoAnswer,
+            TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::UnsupportedContentEncoding => Self::Undecodable,
+            TallyTransportError::HttpStatus { .. } => Self::HttpStatus,
+            TallyTransportError::EndpointInvalid { .. }
+            | TallyTransportError::PolicyInvalid { .. }
+            | TallyTransportError::ClientInitializationFailed
+            | TallyTransportError::RequestTooLarge { .. }
+            | TallyTransportError::ConnectionFailed
+            | TallyTransportError::WireRefused { .. }
+            | TallyTransportError::SendWithdrawn => Self::NotSent,
+        }
+    }
+
+    /// Every refusal of a whole answer the collection parser types is named,
+    /// so a new one is placed before it compiles.
+    const fn of_answer(error: bridge_tally_protocol::NativeCollectionError) -> Self {
+        use bridge_tally_protocol::NativeCollectionError as N;
+        match error {
+            N::MalformedResponse => Self::Malformed,
+            N::NotSuccess => Self::TallyFailed,
+            N::StatusAbsent => Self::StatusAbsent,
+            N::RowUnusable => Self::RowRefused,
+            N::CompanyIdentityMismatch => Self::OtherCompany,
+            N::BoundsViolation => Self::BoundPassed,
+        }
+    }
+}
+
+/// `error`, a failure of a read that asked for the mailing details, marked with
+/// its `cause`, keeping the read evidence a failed pair carries at the chain's
+/// root, as [`parent_part_response_error`] does.
+pub(crate) fn mailing_read_failed(
+    error: anyhow::Error,
+    cause: MailingReadFailure,
+) -> anyhow::Error {
+    let completed = error
+        .downcast_ref::<super::runtime::RuntimeReadFailure>()
+        .map(|failure| failure.evidence.clone());
+    let named = anyhow::Error::new(MailingDetailsReadFailed {
+        cause,
+        source: error,
+    });
+    match completed {
+        Some(evidence) => with_read_evidence(named, evidence),
+        None => named,
+    }
+}
+
+/// Marks a master read that asked for the mailing details and whose post
+/// failed, by the post's own transport error. The cause is the master post's
+/// own failure: the pair's `/status` checks fail in the same chain, and a slow
+/// check is not the mailing answer's, so such a failure is returned as it is.
+pub(crate) fn mailing_details_read_error(error: anyhow::Error) -> anyhow::Error {
+    let Some(cause) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<PairedNativeReportResponseFailure>())
+        .and_then(PairedNativeReportResponseFailure::transport_error)
+        .map(MailingReadFailure::of)
+    else {
+        return error;
+    };
+    mailing_read_failed(error, cause)
+}
+
+/// Marks a whole master answer that asked for the mailing details and that the
+/// collection parser refused, by the refusal's type (the maintainers' ruling on
+/// bridge#2074). The parser types every refusal; one it did not type is
+/// returned as it is.
+pub(crate) fn mailing_details_answer_error(error: anyhow::Error) -> anyhow::Error {
+    let Some(cause) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>())
+        .map(|refusal| MailingReadFailure::of_answer(*refusal))
+    else {
+        return error;
+    };
+    mailing_read_failed(error, cause)
+}
+
+/// The export's mailing read failed in a way that may leave Tally still
+/// sending or working on it, and the drain had not cleared within
+/// [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], so the book was not read again
+/// without the details (bridge#2214). It carries the mailing read's own
+/// failure, whose text it keeps.
+#[derive(Debug, thiserror::Error)]
+#[error("{source}")]
+pub(crate) struct MailingRetryHeldByDrain {
+    source: anyhow::Error,
+}
+
+/// The mailing read's own failure, `mailing`, marked as held by its drain.
+pub(crate) fn mailing_retry_held_by_drain(mailing: anyhow::Error) -> anyhow::Error {
+    anyhow::Error::new(MailingRetryHeldByDrain { source: mailing })
+}
+
+/// The longest the export waits for the drain a failed mailing read may leave
+/// before it reads the book again without the details (bridge#2214). Each wait
+/// sends only `/status` probes. UNVERIFIED, not measured on this read: no
+/// mailing answer that broke off, could not be read, did not decode or never
+/// came has been reached in the lab, and in the 2214 lab row, where Tally
+/// declared every oversize, the next read was sent with no drain (it ran
+/// before #2142 made such a refusal owe one). It rests on the outstandings
+/// drains, which ran 8.9 s to 25.4 s past a 20 s cut, so 60 s covers about
+/// twice the longest. No try starts past it, but the last one can spend its
+/// own drain probes, about 11 s more.
+const MAILING_RETRY_DRAIN_WAIT_UNVERIFIED: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The wait a retry keeps to: [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], or 3 s in
+/// a unit test, so a test reaches the bound in seconds.
+const fn mailing_retry_drain_wait() -> std::time::Duration {
+    if cfg!(test) {
+        std::time::Duration::from_secs(3)
+    } else {
+        MAILING_RETRY_DRAIN_WAIT_UNVERIFIED
+    }
 }
 
 /// The paired sources answered successfully but cannot be reconciled into one
@@ -299,13 +557,61 @@ impl PartyLedgerMasterSourceValidationError {
                 | StandardLedgerCatalogError::LedgerNameUnusable
                 | StandardLedgerCatalogError::BillWiseFlagMissing
                 | StandardLedgerCatalogError::BillWiseFlagInvalid
-                | StandardLedgerCatalogError::BillWiseFlagRepeated => "ledger_span_slice_malformed",
+                | StandardLedgerCatalogError::BillWiseFlagRepeated
+                | StandardLedgerCatalogError::AlterIdInvalid => "ledger_span_slice_malformed",
             },
             Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
             Self::LedgerCountDiffers { .. } => "ledger_count_differs",
             Self::CountedCatalogueTooLarge { .. } => "ledger_count_catalogue_too_large",
         }
     }
+}
+
+/// Which request of the party ledger read failed (#2265): one code and one cause cover the whole
+/// chain, so a deadline alone cannot say which request it cut. `LedgerCount` is every request of
+/// the census by span.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LedgerReadRequest {
+    BaseCurrency,
+    BookExtent,
+    LedgerCount,
+    LedgerCatalogue,
+    LedgerMaster,
+    LedgerBalance,
+    Groups,
+}
+
+impl LedgerReadRequest {
+    pub(crate) const fn code(self) -> &'static str {
+        match self {
+            Self::BaseCurrency => "base_currency",
+            Self::BookExtent => "book_extent",
+            Self::LedgerCount => "ledger_count",
+            Self::LedgerCatalogue => "ledger_catalogue",
+            Self::LedgerMaster => "ledger_master",
+            Self::LedgerBalance => "ledger_balance",
+            Self::Groups => "groups",
+        }
+    }
+
+    /// Adds this request to `error` as context, so the chain's typed causes and read evidence
+    /// stay where they are, with the error's own text, for the reason at
+    /// [`PairedNativeReportResponseFailure`].
+    pub(crate) fn failed(self, error: anyhow::Error) -> anyhow::Error {
+        let message = error.to_string();
+        error.context(LedgerRequestFailed {
+            request: self,
+            message,
+        })
+    }
+}
+
+/// See [`LedgerReadRequest::failed`].
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub(crate) struct LedgerRequestFailed {
+    pub(crate) request: LedgerReadRequest,
+    message: String,
 }
 
 /// Names a parent part's read that ran past the response cap as such, so the
@@ -350,6 +656,45 @@ fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 
 /// Bytes one ledger is estimated to add to the compliance master response when
+/// the request also names each ledger's `LEDMAILINGDETAILS.LIST`
+/// ([`ComplianceRead::WithMailingDetails`], bridge#1490). UNVERIFIED. Naming it
+/// grew the one populated party row of the captured eight-ledger book by 948
+/// bytes (3,010 to 3,958 UTF-16 bytes; one dated entry of two short address
+/// lines) and every other row by 122. A second dated entry on that party then
+/// grew its row by 944 more, to 4,902 (TallyPrime 7.2, 2026-10-29, eight
+/// ledgers; the read averaged 2,612 bytes a ledger with one entry and 2,730 with
+/// two). The figure, 5,000, is above that largest row measured, which was a sparse
+/// probe row (3,010 bytes before the list was named): 3,200 rows of 4,902 bytes,
+/// with the response's own 3,010-byte envelope and 12 bytes between rows, come to
+/// about 15.73 MB, about 272 KB under the budget. It is not a bound: at exactly 5,000
+/// a row the rows alone fill the budget and the envelope goes over it (about 41 KB
+/// at 3,200 rows). A fully populated party row of 3.3 KB (the 1,989-ledger book
+/// above) with two entries is about 5,190 bytes, over the figure; so is a party with
+/// three entries (about 950 more each, extrapolated) or with longer address lines,
+/// and a book of such parties can still be admitted and overrun. No such book has
+/// been read. An under-estimate is a read that fails, not only a refusal. On the
+/// one book read with many entries a party (protocol reference §8.4, lab row
+/// 2214), the 32 MiB response cap came first, not the 20 s deadline: an entry
+/// added about 940 bytes and 0.13 ms. A book of slower rows may time out instead.
+/// It was 4,700 before the second entry was measured.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 5_000;
+
+// A further dated mailing entry's cost, and how many entries a counted ledger
+// is allowed that the master mark does not show (bridge#2074; protocol
+// reference §8.4). Each is an allowance, not a bound. A4 of lab row 2074-L
+// (partial): nine further entries on one party cost 923.6 bytes each, short
+// two-line addresses, and 1,200 leaves about 30 percent over that. A4b: one save
+// of five dated entries moved the mark by one, so the mark missed four of them.
+// Lab row 2214 created parties with about 200 entries each, one create apiece,
+// and each moved the mark by one: about fifty times the four allowed. A party
+// given its history in one save can hold more than four, and a longer address
+// costs more, so a book can still be admitted and overrun; where Tally declares
+// such an answer past the cap, the export reads it again without the details
+// (bridge#2214).
+const MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED: u64 = 1_200;
+const MAILING_DETAILS_UNSEEN_ENTRIES_PER_LEDGER_UNVERIFIED: u64 = 4;
+
+/// Bytes one ledger is estimated to add to the compliance master response when
 /// the request also names each ledger's `GSTDETAILS.LIST`
 /// ([`ComplianceRead::WithGstDetails`]). UNVERIFIED. The one capture (14
 /// ledgers, a lab book) measured 2,138 to 2,704 bytes for a ledger with an
@@ -368,22 +713,111 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
 
 /// What a compliance master read asks Tally for. [`Self::Standard`] is the
-/// production request, and every caller other than a `ledger_masters` call
-/// that asked for the GST details passes it. [`Self::WithGstDetails`] names
-/// each ledger's dated GST details in the request's `FETCH` and is sized by
-/// its own per-ledger estimate everywhere the standard one would be.
+/// production request, and every caller other than a `ledger_masters` call that
+/// asked for the dated mailing or GST details and the party/ledger master
+/// workbook passes it. [`Self::WithMailingDetails`] names each ledger's dated
+/// mailing details (`include_mailing_details`). [`Self::WithGstDetails`] names each ledger's dated GST
+/// details. They are not combined: the request naming both has not been captured
+/// live, so `ledger_masters` refuses the two flags together. Each is sized by its
+/// own per-ledger estimate wherever the standard one would be.
+/// [`Self::WithMailingDetailsWhereWholeReadFits`] is what the party/ledger master
+/// workbook asks for (bridge#1490): the mailing details where the book's master
+/// change mark puts the whole read inside the mailing bound, the standard request
+/// otherwise. [`Self::resolved_for_mark`] makes that choice before
+/// any ledger request is sent, and [`Self::resolved_for_count`] makes it again when
+/// the ledgers were counted to size a whole read (bridge#2074); no request is
+/// rendered for the unresolved kind. The count's choice rests on an allowance,
+/// not a bound: a counted book that the standard request read before can now be
+/// sent the larger mailing request. Where that read runs out of time, or past
+/// the size limit without Tally declaring it, the export fails; after any other
+/// failure of it, the standard request is sent once instead (bridge#2214,
+/// [`MailingReadDecision`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
+    WithMailingDetails,
+    WithMailingDetailsWhereWholeReadFits,
     WithGstDetails,
+    /// The register's: the standard master request, with the balance pair left
+    /// out on a book of one Currency master, taken to hold no other currency
+    /// (`classify_ledger_currencies`). This read's one caller uses no amount,
+    /// only the ledgers set aside (bridge#2265).
+    WithoutBalances,
 }
 
 impl ComplianceRead {
+    /// The kind of read a book is actually sent, and whether the mailing details
+    /// asked for were given up for it. The mark upper-bounds the ledgers (every
+    /// master raises it), so a mark inside the mailing bound is a whole read the
+    /// mailing request may carry; a larger one is read as it was before the mailing
+    /// details existed, whatever its size class then. Any other kind is unchanged.
+    pub(crate) fn resolved_for_mark(self, master_mark: u64) -> Self {
+        match self {
+            Self::WithMailingDetailsWhereWholeReadFits => {
+                if compliance_estimate_unverified(master_mark, Self::WithMailingDetails).fits {
+                    Self::WithMailingDetails
+                } else {
+                    Self::Standard
+                }
+            }
+            other => other,
+        }
+    }
+
+    /// The kind of read a book is sent once its ledgers were counted to size a
+    /// whole read (bridge#2074): the workbook's mailing details where the counted
+    /// ledgers, each at the mailing estimate with the further entries the mark
+    /// may not show, and one further dated mailing entry for every master
+    /// alteration beyond them fit the budget; the standard request otherwise. The
+    /// count bounds the ledgers but not their entries: one save can add several
+    /// entries and move the mark by one, so this is an allowance, not a bound.
+    /// UNVERIFIED, as every figure in it is. A count that fits is inside the
+    /// standard bound too, so the read stays whole. Any other kind is unchanged.
+    pub(crate) fn resolved_for_count(self, counted: u64, master_mark: u64) -> Self {
+        match self {
+            Self::WithMailingDetailsWhereWholeReadFits => {
+                let ledgers = counted.saturating_mul(
+                    COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED
+                        + MAILING_DETAILS_UNSEEN_ENTRIES_PER_LEDGER_UNVERIFIED
+                            * MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED,
+                );
+                let entries = master_mark
+                    .saturating_sub(counted)
+                    .saturating_mul(MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED);
+                if ledgers.saturating_add(entries)
+                    <= COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+                {
+                    Self::WithMailingDetails
+                } else {
+                    Self::Standard
+                }
+            }
+            other => other,
+        }
+    }
+
     /// The bytes one ledger is estimated to add to this read's master response.
     const fn bytes_per_ledger(self) -> u64 {
         match self {
-            Self::Standard => COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+            Self::Standard | Self::WithoutBalances => COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+            Self::WithMailingDetails | Self::WithMailingDetailsWhereWholeReadFits => {
+                COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED
+            }
             Self::WithGstDetails => COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
+        }
+    }
+
+    /// Whether a book of this base is read without its balance pair.
+    fn skips_balances(self, base: Option<&BaseCurrencyName>) -> bool {
+        matches!(self, Self::WithoutBalances)
+            && base.is_some_and(BaseCurrencyName::is_single_master)
+    }
+
+    /// Whether this read's master request names the mailing details.
+    const fn names_mailing_details(self) -> bool {
+        match self {
+            Self::WithMailingDetails | Self::WithMailingDetailsWhereWholeReadFits => true,
+            Self::Standard | Self::WithGstDetails | Self::WithoutBalances => false,
         }
     }
 }
@@ -427,13 +861,13 @@ const LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED: u64 = 32_000_000;
 /// the longest name Bridge assumes fits [`COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED`]
 /// (asserted by a test), which is about half the transport's cap. Measured at
 /// 800, 1,000, 4,000 and 8,000 wide, on three books (section 11e, PARTIAL).
-const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
+pub(crate) const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
 
 /// Most slices one census makes (#679): Bridge's own bound on the serial
 /// requests a census may spend, not a measured limit. With the slice width it
 /// admits a master mark of 400,000, so a book whose mark is above that is
 /// refused before anything is sent after the extent.
-const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
+pub(crate) const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
 
 /// Characters of a GUID-only census row that do not depend on the ledger's
 /// name, counting the row's separators: 391 in the committed eight-row capture
@@ -492,13 +926,15 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// ledgers than one part may carry is refused as `parent_over_budget`, never
 /// split, because a group cannot be read in pieces by `$Parent`. That figure is
 /// the budget over the read's per-ledger constant, not a measurement: 4,266
-/// ledgers for a [`ComplianceRead::Standard`] read and 2,000 for a
+/// ledgers for a [`ComplianceRead::Standard`] read, 3,200 for a
+/// [`ComplianceRead::WithMailingDetails`] one and 2,000 for a
 /// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
-/// limit. It admits about 51,000 ledgers (about 24,000 with the GST details),
-/// far past what the mark bound admits.
+/// limit. It admits about 51,000 ledgers (about 38,400 with the mailing
+/// details, about 24,000 with the GST details), far past what the mark bound
+/// admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
 /// Most bytes of `NOT` formula text the complement part's request may carry
@@ -588,6 +1024,33 @@ impl CountCrossCheck {
 enum PartyLedgerRead<'a> {
     Whole { expected_ledgers: Option<u64> },
     Part(&'a ParentPart),
+}
+
+/// How much of the book one compliance read covers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ComplianceScope {
+    /// Every ledger, with the fields `ComplianceRead` asks for: sized first.
+    Book(ComplianceRead),
+    /// Only these ledgers, with the standard fields (#1331). The part bounds the
+    /// rows whatever the book's size, so nothing sizes the read and a book too
+    /// large for the whole listing is read the same way.
+    Ledgers(bridge_tally_protocol::ledger_guid_part::LedgerGuidPart),
+}
+
+impl ComplianceScope {
+    fn read(&self) -> ComplianceRead {
+        match self {
+            Self::Book(read) => *read,
+            Self::Ledgers(_) => ComplianceRead::Standard,
+        }
+    }
+
+    fn ledgers(&self) -> Option<&bridge_tally_protocol::ledger_guid_part::LedgerGuidPart> {
+        match self {
+            Self::Book(_) => None,
+            Self::Ledgers(part) => Some(part),
+        }
+    }
 }
 
 /// What sizing a compliance master read decided before any ledger request.
@@ -723,7 +1186,7 @@ fn named_past_the_cap(
 /// A paired or bracketed read observed movement in the endpoint's data. This
 /// is response validation, not an endpoint failure: Tally answered, but
 /// Bridge must withhold the unstable result.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
 pub(crate) enum PairedReadValidationError {
     #[error("Tally native ledger collection changed between paired reads")]
     NativeLedgerCollection,
@@ -751,6 +1214,10 @@ pub(crate) enum PairedReadValidationError {
     NativeStatement,
     #[error("Tally's own Cash Flow changed between paired reads")]
     NativeCashFlow,
+    #[error("Tally's own Negative Ledgers changed between paired reads")]
+    NativeNegativeLedgers,
+    #[error("Tally's Ledger Outstandings for one party changed between paired reads")]
+    PartyBills,
     #[error("Tally's Company collection changed between paired reads")]
     CompanyFeatures,
     #[error("Tally company book changed during the company features read")]
@@ -772,6 +1239,10 @@ pub(crate) enum PairedReadValidationError {
     StockSummaryCollection,
     #[error("Tally company book changed during stock summary read")]
     StockSummaryExtent,
+    #[error("Tally stock collection changed between paired reads beside Stock Query")]
+    StockByBatchCollection,
+    #[error("Tally company book changed during the stock-by-batch read")]
+    StockByBatchExtent,
     #[error("Tally's own month-wise register changed between paired reads")]
     MonthRegister,
     #[error("Tally company book changed during the month-wise register read")]
@@ -780,6 +1251,12 @@ pub(crate) enum PairedReadValidationError {
     NativeNegativeStock,
     #[error("Tally company book changed during the Negative Stock read")]
     NegativeStockExtent,
+    #[error("Tally's own Godown Summary changed between paired reads")]
+    NativeGodownSummary,
+    #[error("Tally's own Stock Summary with the explode flag changed between paired reads")]
+    NativeStockSummaryExploded,
+    #[error("Tally company book changed during the stock by godown read")]
+    StockByGodownExtent,
     /// The company's inventory flags, read beside a statement that offers
     /// Tally's own closing stock.
     #[error("Tally company inventory flags changed between paired reads beside a statement")]
@@ -803,6 +1280,8 @@ impl PairedReadValidationError {
             Self::CompanyCurrencyName => "company_currency_name_changed",
             Self::NativeStatement => "native_statement_changed",
             Self::NativeCashFlow => "native_cash_flow_changed",
+            Self::NativeNegativeLedgers => "native_negative_ledgers_changed",
+            Self::PartyBills => "party_bills_drifted",
             Self::CompanyFeatures => "company_features_changed",
             Self::CompanyFeaturesExtent => "company_features_extent_changed",
             Self::CurrencyExtent => "currency_extent_changed",
@@ -814,8 +1293,13 @@ impl PairedReadValidationError {
             Self::MonthRegisterExtent => "month_register_extent_changed",
             Self::StockSummaryCollection => "stock_summary_collection_changed",
             Self::StockSummaryExtent => "stock_summary_extent_changed",
+            Self::StockByBatchCollection => "stock_by_batch_collection_changed",
+            Self::StockByBatchExtent => "stock_by_batch_extent_changed",
             Self::NativeNegativeStock => "native_negative_stock_changed",
             Self::NegativeStockExtent => "negative_stock_extent_changed",
+            Self::NativeGodownSummary => "native_godown_summary_changed",
+            Self::NativeStockSummaryExploded => "native_stock_summary_exploded_changed",
+            Self::StockByGodownExtent => "stock_by_godown_extent_changed",
             Self::StatementInventoryFlags => "statement_inventory_flags_changed",
         }
     }
@@ -1077,6 +1561,20 @@ const ENCODING_UTF16_LE: u8 = 3;
 const ENCODING_UTF16_LE_BOM: u8 = 4;
 const ENCODING_UTF16_BE_BOM: u8 = 5;
 
+/// `http` gated on `wire`'s lock and retry bound, and drained after a cut post
+/// when `wire` has a drain policy (#2142).
+fn gated(
+    http: TallyHttpTransport,
+    config: &TallyConfig,
+    wire: &WireGateConfig,
+) -> TallyHttpTransport {
+    let http = http.with_wire_gate(wire.gate_for(config), wire.retry());
+    match wire.drain() {
+        Some(policy) => http.with_drain(policy),
+        None => http,
+    }
+}
+
 impl TallyClient {
     /// Every send takes the endpoint's wire lock (`endpoint_wire`), at the
     /// shared per-user coordination root.
@@ -1087,8 +1585,7 @@ impl TallyClient {
 
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
-        let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry())
+        let http = gated(TallyHttpTransport::new(config.clone())?, &config, wire)
             .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
@@ -1126,13 +1623,16 @@ impl TallyClient {
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
         let wire = WireGateConfig::default();
-        let http = TallyHttpTransport::with_builder(
-            config.clone(),
-            bridge_tally_transport::TransportPolicy::default(),
-            builder,
+        let http = gated(
+            TallyHttpTransport::with_builder(
+                config.clone(),
+                bridge_tally_transport::TransportPolicy::default(),
+                builder,
+            )
+            .expect("build synthetic Tally HTTP transport"),
+            &config,
+            &wire,
         )
-        .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry())
         .with_send_observer(crate::request_trail::observer());
         Self {
             http,
@@ -1146,10 +1646,12 @@ impl TallyClient {
         policy: bridge_tally_transport::TransportPolicy,
         wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
-        let http =
-            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry())
-                .with_send_observer(crate::request_trail::observer());
+        let http = gated(
+            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?,
+            &config,
+            wire,
+        )
+        .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
@@ -1205,6 +1707,12 @@ impl TallyClient {
         // `/status` is useful local diagnostics but is not part of Tally's
         // documented third-party XML contract. Never gate the POST probe or
         // authoritative product metadata on this unauthenticated heuristic.
+        // The one exception is the drain after a cut post (#2142), which holds
+        // the next post until `/status` has answered three times in a row,
+        // whatever its answer, and at most 10 minutes: two lab rows measured
+        // that `/status` waits while Tally works on a cut read, and that a data
+        // read sent after three quick probes answered at its rest speed
+        // (`bridge_tally_transport::DrainPolicy::MEASURED`).
         let (mut connection, mut wire_evidence) =
             match self.check_connection_strict_with_wire_evidence().await {
                 Ok(observation) => observation,
@@ -1409,16 +1917,14 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`). Unlike the legacy custom TDL
-    /// report, its response is Tally's ordinary shaped `HEADER/STATUS=1`
-    /// success envelope, so a successful parse directly satisfies the export
-    /// trust check instead of requiring the narrower, explicitly-untrusted
-    /// interactive compatibility parse.
+    /// (`ReadOnlyProfile::CompanyListV2`). Its response is Tally's ordinary
+    /// shaped `HEADER/STATUS=1` success envelope, so a successful parse
+    /// directly satisfies the export trust check.
     ///
-    /// Responders that reject the collection outright — a shaped failure, an
-    /// unrecognized shape, or anything else the collection parser cannot
-    /// read — fall back to `legacy_company_discovery_evidence`, off the happy
-    /// path but otherwise unchanged.
+    /// A responder that rejects the collection is reported from that one
+    /// answer: a shaped failure by its own reason code, anything else as
+    /// `xml_export_shape_unrecognized`. No second request is sent; the legacy
+    /// custom company report it once fell back to is gone (#1872).
     async fn company_discovery_evidence(
         &self,
         connection: &mut ConnectionStatus,
@@ -1429,55 +1935,11 @@ impl TallyClient {
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), wire_evidence)
             .await?;
-        match xml_parser::parse_companies_from_collection(&xml) {
+        Ok(match xml_parser::parse_companies_from_collection(&xml) {
             Ok(discovered) => {
                 *gateway_product_mode = parse_company_gateway_capability_observation(&xml)
                     .map(GatewayProductModeEvidence::from_observation)
                     .unwrap_or_else(|_| GatewayProductModeEvidence::unavailable());
-                connection.reachable = true;
-                if connection.error.is_some() {
-                    connection.error = Some("status_heuristic_unavailable".to_string());
-                }
-                Ok(match normalize_discovered_companies(discovered) {
-                    Ok(normalized) => {
-                        *companies = normalized;
-                        CapabilityEvidence {
-                            state: CapabilityState::Supported,
-                            confidence: EvidenceConfidence::Observed,
-                            safe_reason_code: None,
-                        }
-                    }
-                    Err(()) => CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("company_identity_invalid".to_string()),
-                    },
-                })
-            }
-            Err(_) => {
-                self.legacy_company_discovery_evidence(connection, companies, wire_evidence)
-                    .await
-            }
-        }
-    }
-
-    /// The pre-`CompanyListV2` company discovery path: the custom
-    /// `CompanyListV1` TDL report, which most Tally responders answer with a
-    /// bare `<ENVELOPE><COMPANYINFO>...` document carrying no
-    /// `HEADER`/`STATUS` at all. That bare shape is accepted only through the
-    /// narrow, explicitly-untrusted interactive discovery parse; it can never
-    /// promote `CapabilityState::Supported`.
-    async fn legacy_company_discovery_evidence(
-        &self,
-        connection: &mut ConnectionStatus,
-        companies: &mut Vec<TallyCompany>,
-        wire_evidence: &mut RuntimeReadEvidence,
-    ) -> anyhow::Result<CapabilityEvidence> {
-        let xml = self
-            .post_probe_xml(tdl_engine::company_list_request(), wire_evidence)
-            .await?;
-        Ok(match xml_parser::parse_companies(&xml) {
-            Ok(discovered) => {
                 connection.reachable = true;
                 if connection.error.is_some() {
                     connection.error = Some("status_heuristic_unavailable".to_string());
@@ -1508,17 +1970,6 @@ impl TallyClient {
                         xml_parser::export_failure_reason_code(&xml).to_string(),
                     ),
                 },
-                _ if parse_companies_for_interactive_discovery(&xml).is_ok() => {
-                    connection.reachable = true;
-                    if connection.error.is_some() {
-                        connection.error = Some("status_heuristic_unavailable".to_string());
-                    }
-                    CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("direct_company_report_untrusted".to_string()),
-                    }
-                }
                 _ => CapabilityEvidence {
                     state: CapabilityState::Unknown,
                     confidence: EvidenceConfidence::Observed,
@@ -1582,13 +2033,41 @@ impl TallyClient {
         Ok((response.into_text(), encoded_bytes, encoded_sha256))
     }
 
+    /// One AlterID census slice of a master collection other than ledgers (#1233), read once and
+    /// not paired, as the ledger census reads its slices: the census's own checks and the extent
+    /// read around it stand in for a second read. Returns the text, its encoded bytes and their
+    /// SHA-256.
+    pub(crate) async fn fetch_census_slice(
+        &self,
+        request_xml: String,
+    ) -> anyhow::Result<(String, usize, String)> {
+        self.post_xml_with_encoded_bytes(request_xml).await
+    }
+
+    /// One Stock Query for one item (#2018), read once under `response_max_bytes` for this send:
+    /// an answer past it is the transport's `ResponseTooLarge`, never a cut-short text. Not paired:
+    /// the extent read around the item reads stands in for a second read, as for a census slice.
+    /// Returns the text, its encoded bytes and their SHA-256.
+    pub(crate) async fn fetch_stock_query(
+        &self,
+        request_xml: String,
+        response_max_bytes: usize,
+    ) -> anyhow::Result<(String, usize, String)> {
+        let response = self
+            .http
+            .post_xml_decoded_within(request_xml, response_max_bytes)
+            .await?;
+        let encoded_bytes = response.encoded_bytes();
+        let encoded_sha256 = response.encoded_sha256().to_string();
+        self.record_observed_encoding(response.encoding());
+        Ok((response.into_text(), encoded_bytes, encoded_sha256))
+    }
+
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`) rather than the legacy `CompanyListV1`
-    /// custom TDL report. Unlike the legacy report -- which one Tally instance
-    /// answers with a bare, unwrapped `<COMPANYINFO>` document and another is
-    /// known to simply hang on -- the collection always answers with the
-    /// ordinary shaped `HEADER/STATUS=1` envelope, so `parse_companies_from_collection`
-    /// can require that shape outright.
+    /// (`ReadOnlyProfile::CompanyListV2`). It answers with the ordinary shaped
+    /// `HEADER/STATUS=1` envelope, so `parse_companies_from_collection` can
+    /// require that shape outright. Bridge sends no custom TDL report for this
+    /// (#1872).
     pub async fn fetch_companies(&self) -> anyhow::Result<Vec<TallyCompany>> {
         self.fetch_companies_with_wire_evidence()
             .await
@@ -1603,7 +2082,7 @@ impl TallyClient {
     ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence)> {
         self.fetch_companies_observing_education_mode()
             .await
-            .map(|(companies, evidence, _)| (companies, evidence))
+            .map(|(companies, evidence, _, _)| (companies, evidence))
     }
 
     /// As [`Self::fetch_companies_with_wire_evidence`], also returning whether
@@ -1613,15 +2092,18 @@ impl TallyClient {
     /// further request is made.
     pub(crate) async fn fetch_companies_observing_education_mode(
         &self,
-    ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence, bool)> {
+    ) -> anyhow::Result<(
+        Vec<TallyCompany>,
+        RuntimeReadEvidence,
+        bool,
+        super::runtime::ObservedTally,
+    )> {
         let mut evidence = RuntimeReadEvidence::empty();
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), &mut evidence)
             .await?;
-        let education = parse_company_gateway_capability_observation(&xml)
-            .map(|observation| observation.educational_mode)
-            .unwrap_or(false)
-            || bridge_tally_protocol::company_list_may_be_in_educational_mode(&xml);
+        let tally = super::runtime::ObservedTally::of_company_list(&xml);
+        let education = tally.education;
         let discovered = xml_parser::parse_companies_from_collection(&xml)
             .map_err(|error| with_read_evidence(error, evidence.clone()))?;
         let companies = normalize_discovered_companies(discovered).map_err(|_| {
@@ -1632,7 +2114,7 @@ impl TallyClient {
                 evidence.clone(),
             )
         })?;
-        Ok((companies, evidence, education))
+        Ok((companies, evidence, education, tally))
     }
 
     /// Re-enumerates the trusted `Company` collection, then proves one
@@ -1704,12 +2186,17 @@ impl TallyClient {
         boundary_profile: DateBoundaryProfile,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
         basis: &BalanceDateBasis,
-        read: ComplianceRead,
+        scope: &ComplianceScope,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let mut evidence = RuntimeReadEvidence::empty();
         let mut count_evidence = RuntimeReadEvidence::empty();
+        let read = scope.read();
+        let ledgers = scope.ledgers();
         let result = async {
-            let opening_extent = self.fetch_company_book_extent(identity).await?;
+            let opening_extent = self
+                .fetch_company_book_extent(identity)
+                .await
+                .map_err(|error| LedgerReadRequest::BookExtent.failed(error))?;
             if let BalanceDateBasis::Requested(requested) = basis {
                 if requested < opening_extent.books_from() {
                     return Err(anyhow::Error::new(
@@ -1722,10 +2209,20 @@ impl TallyClient {
                 .master_alter_id_high_water()
                 .ok_or(OutstandingsError::MasterWitnessAbsent)?
                 .get();
+            // The workbook's mailing details are given up where the mark puts the
+            // whole read past the mailing bound. A count taken below may resolve the
+            // kind asked for again, on an allowance that is not a bound, so a mailing
+            // read of the export that fails is read again without them where its
+            // decision says so (bridge#2214).
+            let asked = read;
+            let read = read.resolved_for_mark(master_mark);
             // Sized before any ledger request is sent (#637): by the mark when
             // it fits, otherwise by the count of a balance-free catalogue read
             // once the local checks below have passed (#668).
-            let admission = admit_compliance_master_read(master_mark, None, read)?;
+            let admission = match ledgers {
+                Some(_) => ComplianceAdmission::Admitted,
+                None => admit_compliance_master_read(master_mark, None, read)?,
+            };
             let currency = currency_assertion.require_opening_extent(&opening_extent)?;
             let master_period = NativeLedgerExportPeriod::new(
                 boundary_profile,
@@ -1752,8 +2249,9 @@ impl TallyClient {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalancePeriod)
             })?;
             let mut partition = None;
-            // How many ledgers the whole read must return, once a count says.
-            let mut expected_ledgers = None;
+            // How many ledgers the whole read must return, once a count says, or
+            // the ledgers the read names: a row short means a filter not applied.
+            let mut expected_ledgers = ledgers.map(|part| part.guids().len() as u64);
             // A census counts a book whose mark is past what its catalogue can
             // be read for (#679); its count admits the read like a catalogue's.
             let mut census_count = None;
@@ -1768,7 +2266,8 @@ impl TallyClient {
                         &mut evidence,
                         &mut count_evidence,
                     )
-                    .await?;
+                    .await
+                    .map_err(|error| LedgerReadRequest::LedgerCount.failed(error))?;
                 let counted = census.get();
                 count_cross_check = Some(cross_check);
                 census_count = Some(counted);
@@ -1789,7 +2288,8 @@ impl TallyClient {
                     render_standard_ledger_catalog_request(identity.display_name())?;
                 let catalogue_pair = self
                     .fetch_native_report_paired(catalogue_request.clone())
-                    .await?;
+                    .await
+                    .map_err(|error| LedgerReadRequest::LedgerCatalogue.failed(error))?;
                 let (catalogue_body, catalogue_bytes, catalogue_sha256) = catalogue_pair
                     .require_stable(PairedReadValidationError::PartyLedgerCatalogue)?;
                 let catalogue_read = RuntimeReadEvidence::paired(
@@ -1849,14 +2349,42 @@ impl TallyClient {
                     expected_ledgers = Some(counted);
                 }
             }
+            // A count taken to size a whole read also says whether the workbook's
+            // mailing details fit it (bridge#2074). A read in parts keeps the kind
+            // the mark gave, so its parts are planned as before.
+            let read = match expected_ledgers {
+                Some(counted) => asked.resolved_for_count(counted, master_mark),
+                None => read,
+            };
             let group_request = render_native_group_snapshot_request(identity.display_name());
-            let part_requests = match &partition {
-                None => vec![(
+            let part_requests = |read: ComplianceRead| match (&partition, ledgers) {
+                (_, Some(part)) => vec![(
+                    render_party_ledger_master_request_for_ledgers(
+                        identity.display_name(),
+                        &master_period,
+                        part,
+                    ),
+                    render_native_ledger_snapshot_request_for_ledgers(
+                        identity.display_name(),
+                        &balance_period,
+                        part,
+                    ),
+                )],
+                (None, None) => vec![(
                     match read {
-                        ComplianceRead::Standard => render_party_ledger_master_request(
-                            identity.display_name(),
-                            &master_period,
-                        ),
+                        ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
+                            render_party_ledger_master_request(
+                                identity.display_name(),
+                                &master_period,
+                            )
+                        }
+                        ComplianceRead::WithMailingDetails
+                        | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
+                            render_party_ledger_master_request_with_mailing_details(
+                                identity.display_name(),
+                                &master_period,
+                            )
+                        }
                         ComplianceRead::WithGstDetails => {
                             render_party_ledger_master_request_with_gst_details(
                                 identity.display_name(),
@@ -1866,14 +2394,22 @@ impl TallyClient {
                     },
                     render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
                 )],
-                Some(partition) => partition
+                (Some(partition), None) => partition
                     .parts()
                     .iter()
                     .map(|part| {
                         (
                             match read {
-                                ComplianceRead::Standard => {
+                                ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                                     render_party_ledger_master_request_for_parents(
+                                        identity.display_name(),
+                                        &master_period,
+                                        part,
+                                    )
+                                }
+                                ComplianceRead::WithMailingDetails
+                                | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
+                                    render_party_ledger_master_request_for_parents_with_mailing_details(
                                         identity.display_name(),
                                         &master_period,
                                         part,
@@ -1896,32 +2432,93 @@ impl TallyClient {
                     })
                     .collect(),
             };
-            let committed_requests = part_requests
+            let mut requests = part_requests(read);
+            let mut mailing_details_read_failed = None;
+            let reads = match self
+                .read_party_ledger_master_parts(
+                    identity,
+                    &requests,
+                    partition.as_ref(),
+                    expected_ledgers,
+                    ledger_currency_base.as_ref(),
+                    read,
+                    &mut evidence,
+                )
+                .await
+            {
+                Ok(reads) => reads,
+                // The export's failed mailing read is sent once more as the standard
+                // request unless its decision is to refuse (bridge#2214); after a failure
+                // that may leave Tally sending, once the drain clears. Only the export's
+                // own kind: a `ledger_masters` call that asked for the details by name
+                // keeps its failure. Nothing before the parts is sent again, and a failure
+                // of the standard read is told as itself.
+                Err(error) => {
+                    let cause = match asked {
+                        ComplianceRead::WithMailingDetailsWhereWholeReadFits => error
+                            .chain()
+                            .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+                            .map(MailingDetailsReadFailed::cause),
+                        ComplianceRead::Standard
+                        | ComplianceRead::WithMailingDetails
+                        | ComplianceRead::WithGstDetails
+                        | ComplianceRead::WithoutBalances => None,
+                    };
+                    let Some(cause) = cause else {
+                        return Err(error);
+                    };
+                    let once_drained = match cause.decision() {
+                        MailingReadDecision::Refuse => return Err(error),
+                        MailingReadDecision::Continue => false,
+                        MailingReadDecision::ContinueOnceDrained => true,
+                    };
+                    if let Some(failure) =
+                        error.downcast_ref::<super::runtime::RuntimeReadFailure>()
+                    {
+                        evidence = evidence.clone().combine(failure.evidence.clone());
+                    }
+                    requests = part_requests(ComplianceRead::Standard);
+                    mailing_details_read_failed = Some(cause);
+                    if once_drained {
+                        self.read_party_ledger_master_parts_once_drained(
+                            identity,
+                            &requests,
+                            partition.as_ref(),
+                            expected_ledgers,
+                            ledger_currency_base.as_ref(),
+                            error,
+                            &mut evidence,
+                        )
+                        .await?
+                    } else {
+                        self.read_party_ledger_master_parts(
+                            identity,
+                            &requests,
+                            partition.as_ref(),
+                            expected_ledgers,
+                            ledger_currency_base.as_ref(),
+                            ComplianceRead::Standard,
+                            &mut evidence,
+                        )
+                        .await?
+                    }
+                }
+            };
+            // The requests whose answers make the source: after a retry, the standard ones.
+            let balances_sent = !read.skips_balances(ledger_currency_base.as_ref());
+            let committed_requests = requests
                 .iter()
-                .flat_map(|(master, balance)| [master.clone(), balance.clone()])
+                .flat_map(|(master, balance)| {
+                    std::iter::once(master.clone())
+                        .chain(balances_sent.then(|| balance.clone()))
+                })
                 .chain(std::iter::once(group_request.clone()))
                 .collect::<Vec<_>>();
             let request_sha256 = party_ledger_request_commitment(&committed_requests);
-            let mut reads = Vec::with_capacity(part_requests.len());
-            for (index, (master_request, balance_request)) in part_requests.iter().enumerate() {
-                reads.push(
-                    self.read_party_ledger_master_part(
-                        identity,
-                        master_request,
-                        balance_request,
-                        match &partition {
-                            Some(partition) => PartyLedgerRead::Part(&partition.parts()[index]),
-                            None => PartyLedgerRead::Whole { expected_ledgers },
-                        },
-                        ledger_currency_base.as_ref(),
-                        &mut evidence,
-                    )
-                    .await?,
-                );
-            }
             let group_pair = self
                 .fetch_native_report_paired(group_request.clone())
-                .await?;
+                .await
+                .map_err(|error| LedgerReadRequest::Groups.failed(error))?;
             let (group_body, group_response_bytes, group_response_sha256) =
                 group_pair.require_stable(PairedReadValidationError::PartyLedgerGroup)?;
             evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
@@ -1935,7 +2532,10 @@ impl TallyClient {
                     .into_iter()
                     .map(|entry| entry.record)
                     .collect();
-            let closing_extent = self.fetch_company_book_extent(identity).await?;
+            let closing_extent = self
+                .fetch_company_book_extent(identity)
+                .await
+                .map_err(|error| LedgerReadRequest::BookExtent.failed(error))?;
             if closing_extent != opening_extent {
                 return Err(anyhow::Error::new(
                     PairedReadValidationError::PartyLedgerExtent,
@@ -1986,9 +2586,17 @@ impl TallyClient {
             let mut rows = Vec::new();
             let mut foreign_currency_ledgers_excluded = Vec::new();
             let mut mixed_currency_ledgers_excluded = Vec::new();
+            let mut set_aside_masters = Vec::new();
             for read in reads {
                 foreign_currency_ledgers_excluded.extend(read.foreign.iter().cloned());
                 mixed_currency_ledgers_excluded.extend(read.mixed.iter().cloned());
+                set_aside_masters.extend(
+                    read.master
+                        .records
+                        .iter()
+                        .filter(|source| read.set_aside.contains(&source.record.ledger.name))
+                        .cloned(),
+                );
                 rows.extend(join_party_ledger_master_part(read)?);
             }
             if several_parts {
@@ -2021,6 +2629,8 @@ impl TallyClient {
                 groups,
                 foreign_currency_ledgers_excluded,
                 mixed_currency_ledgers_excluded,
+                set_aside_masters,
+                mailing_details_read_failed,
             };
             Ok((source, count_evidence))
         }
@@ -2145,9 +2755,108 @@ impl TallyClient {
         })
     }
 
-    /// One master-and-balance pair of a compliance ledger read: the whole book,
-    /// or one parent part of it (#679). Each response is checked against the
+    /// Every part's master-and-balance pair, in order: the whole book as one
+    /// part, or its parent parts (#679).
+    #[allow(clippy::too_many_arguments)]
+    async fn read_party_ledger_master_parts(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        part_requests: &[(String, String)],
+        partition: Option<&ParentPartition>,
+        expected_ledgers: Option<u64>,
+        ledger_currency_base: Option<&BaseCurrencyName>,
+        read: ComplianceRead,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<Vec<PartyLedgerMasterPartRead>> {
+        let mut reads = Vec::with_capacity(part_requests.len());
+        for (index, (master_request, balance_request)) in part_requests.iter().enumerate() {
+            reads.push(
+                self.read_party_ledger_master_part(
+                    identity,
+                    master_request,
+                    balance_request,
+                    match partition {
+                        Some(partition) => PartyLedgerRead::Part(&partition.parts()[index]),
+                        None => PartyLedgerRead::Whole { expected_ledgers },
+                    },
+                    ledger_currency_base,
+                    read,
+                    evidence,
+                )
+                .await?,
+            );
+        }
+        Ok(reads)
+    }
+
+    /// The standard read the export sends once after a failure of its mailing
+    /// read that may leave Tally still sending or working on it (bridge#2214,
+    /// [`MailingReadDecision::ContinueOnceDrained`]). The transport then probes
+    /// `/status` before the send, and refuses it as draining while Tally does not
+    /// answer them, before anything is sent. Each such refusal is waited out and
+    /// the read tried again, starting no try once
+    /// [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], a bound not measured on this
+    /// read, has passed; past it, the export fails with the mailing read's own
+    /// failure, `mailing`. Any other failure of the standard read, a refusal as
+    /// draining after part of it was sent among them, is returned as itself, with
+    /// no mailing marker. The wait holds this process's queue for the endpoint
+    /// (the runtime's gate), so another operation on it waits behind the export,
+    /// up to its own queue deadline; the wire lock other processes share is not
+    /// held while waiting.
+    #[allow(clippy::too_many_arguments)]
+    async fn read_party_ledger_master_parts_once_drained(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        part_requests: &[(String, String)],
+        partition: Option<&ParentPartition>,
+        expected_ledgers: Option<u64>,
+        ledger_currency_base: Option<&BaseCurrencyName>,
+        mailing: anyhow::Error,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<Vec<PartyLedgerMasterPartRead>> {
+        let started = std::time::Instant::now();
+        loop {
+            let before = evidence.clone();
+            let error = match self
+                .read_party_ledger_master_parts(
+                    identity,
+                    part_requests,
+                    partition,
+                    expected_ledgers,
+                    ledger_currency_base,
+                    ComplianceRead::Standard,
+                    evidence,
+                )
+                .await
+            {
+                Ok(reads) => return Ok(reads),
+                Err(error) => error,
+            };
+            // Refused at the first send, with no pair completed and none begun.
+            let nothing_sent = *evidence == before
+                && error
+                    .downcast_ref::<super::runtime::RuntimeReadFailure>()
+                    .is_none();
+            let wait = match crate::endpoint_wire::wire_refusal(&error) {
+                Some(bridge_tally_transport::WireRefusal::Draining { retry_after_ms })
+                    if nothing_sent =>
+                {
+                    std::time::Duration::from_millis(retry_after_ms)
+                }
+                _ => return Err(error),
+            };
+            if started.elapsed() + wait > mailing_retry_drain_wait() {
+                return Err(mailing_retry_held_by_drain(mailing));
+            }
+            tokio::time::sleep(wait).await;
+        }
+    }
+
+    /// One master-and-balance pair of a compliance ledger read, or its master
+    /// alone where the read leaves balances out: the whole book, or one parent
+    /// part of it (#679). Each response is checked against the
     /// selected company and classified before any other request is sent.
+    #[allow(clippy::too_many_arguments)]
     async fn read_party_ledger_master_part(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -2155,18 +2864,40 @@ impl TallyClient {
         balance_request: &str,
         scope: PartyLedgerRead<'_>,
         ledger_currency_base: Option<&BaseCurrencyName>,
+        read: ComplianceRead,
         evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<PartyLedgerMasterPartRead> {
         let part = match scope {
             PartyLedgerRead::Part(part) => Some(part),
             PartyLedgerRead::Whole { .. } => None,
         };
+        // Only the master request names the mailing details, so only its pair is
+        // the mailing read (bridge#2074): each failure of it, up to the checks made
+        // before the balance request is sent, is marked with its cause. The
+        // balance pair, and the amounts parsed after it, are told as themselves.
+        let mailing = read.names_mailing_details();
+        let marked = |error: anyhow::Error, cause: MailingReadFailure| {
+            if mailing {
+                mailing_read_failed(error, cause)
+            } else {
+                error
+            }
+        };
         let master_pair = self
             .fetch_native_report_paired(master_request.to_owned())
             .await
-            .map_err(|error| parent_part_response_error(part, error))?;
-        let (master_body, master_response_bytes, master_response_sha256) =
-            master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
+            .map_err(|error| parent_part_response_error(part, error))
+            .map_err(|error| {
+                if mailing {
+                    mailing_details_read_error(error)
+                } else {
+                    error
+                }
+            })
+            .map_err(|error| LedgerReadRequest::LedgerMaster.failed(error))?;
+        let (master_body, master_response_bytes, master_response_sha256) = master_pair
+            .require_stable(PairedReadValidationError::PartyLedgerMaster)
+            .map_err(|error| marked(error, MailingReadFailure::AnswersDiffered))?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
             master_request,
             master_response_sha256.clone(),
@@ -2177,10 +2908,18 @@ impl TallyClient {
         // set aside (bridge#551).
         let structure =
             parse_native_party_ledger_master_structure(&master_body, identity.company_guid())
-                .map_err(party_ledger_master_master_snapshot_error)?;
+                .map_err(party_ledger_master_master_snapshot_error)
+                .map_err(|error| {
+                    if mailing {
+                        mailing_details_answer_error(error)
+                    } else {
+                        error
+                    }
+                })?;
         if !structure.evidence.duplicate_identities.is_empty() {
-            return Err(anyhow::Error::new(
-                PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
+            return Err(marked(
+                anyhow::Error::new(PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity),
+                MailingReadFailure::IdentityRepeated,
             ));
         }
         // A part that came back short or long means Tally did not apply its
@@ -2189,9 +2928,14 @@ impl TallyClient {
         // part's among them, whose filter rests on the same assumption.
         if let Some(part) = part {
             part.check_row_count(structure.records.len())
-                .map_err(
-                    |source| PartyLedgerMasterSourceValidationError::ParentPartition { source },
-                )?;
+                .map_err(|source| {
+                    marked(
+                        anyhow::Error::new(
+                            PartyLedgerMasterSourceValidationError::ParentPartition { source },
+                        ),
+                        MailingReadFailure::CountDiffers,
+                    )
+                })?;
         } else if let PartyLedgerRead::Whole {
             expected_ledgers: Some(expected),
         } = scope
@@ -2200,24 +2944,97 @@ impl TallyClient {
             // request, and the master read returns the same collection.
             let observed = structure.records.len() as u64;
             if observed != expected {
-                return Err(anyhow::Error::new(
-                    PartyLedgerMasterSourceValidationError::LedgerCountDiffers {
-                        expected,
-                        observed,
-                    },
+                return Err(marked(
+                    anyhow::Error::new(
+                        PartyLedgerMasterSourceValidationError::LedgerCountDiffers {
+                            expected,
+                            observed,
+                        },
+                    ),
+                    MailingReadFailure::CountDiffers,
                 ));
             }
         }
+        // Left out, a composite master opening is still set aside by name
+        // (bridge#642); a composite closing alone is not seen.
+        let part_balances = if read.skips_balances(ledger_currency_base) {
+            PartyLedgerPartBalances {
+                mixed: structure
+                    .records
+                    .iter()
+                    .filter(|source| {
+                        source.record.ledger.opening_balance.as_deref().is_some_and(
+                            bridge_tally_protocol::currency_composite::is_balance_composite,
+                        )
+                    })
+                    .map(|source| source.record.ledger.name.clone())
+                    .collect(),
+                ..Default::default()
+            }
+        } else {
+            self.read_party_ledger_part_balances(
+                identity,
+                balance_request,
+                part,
+                ledger_currency_base,
+                evidence,
+            )
+            .await?
+        };
+        // Ledger names are unique within a Tally company, so a ledger set
+        // aside is the master row with its name. The master is parsed only
+        // now, leaving those rows' openings unparsed.
+        let set_aside = part_balances
+            .foreign
+            .iter()
+            .map(|ledger| ledger.ledger.clone())
+            .chain(part_balances.mixed.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        let master = parse_native_party_ledger_master_records_leaving_unparsed(
+            &master_body,
+            identity.company_guid(),
+            &set_aside,
+        )
+        .map_err(party_ledger_master_master_snapshot_error)?;
+        if !master.evidence.duplicate_identities.is_empty() {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
+            ));
+        }
+        Ok(PartyLedgerMasterPartRead {
+            master,
+            balances: part_balances.balances,
+            foreign: part_balances.foreign,
+            mixed: part_balances.mixed,
+            set_aside,
+            master_response_sha256,
+            master_response_bytes,
+            balance_response_sha256: part_balances.response_sha256,
+            balance_response_bytes: part_balances.response_bytes,
+        })
+    }
+
+    /// The balance pair of one part of a compliance ledger read, classified by
+    /// currency.
+    async fn read_party_ledger_part_balances(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        balance_request: &str,
+        part: Option<&ParentPart>,
+        ledger_currency_base: Option<&BaseCurrencyName>,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<PartyLedgerPartBalances> {
         let balance_pair = self
             .fetch_native_report_paired(balance_request.to_owned())
             .await
-            .map_err(|error| parent_part_response_error(part, error))?;
-        let (balance_body, balance_response_bytes, balance_response_sha256) =
+            .map_err(|error| parent_part_response_error(part, error))
+            .map_err(|error| LedgerReadRequest::LedgerBalance.failed(error))?;
+        let (balance_body, response_bytes, response_sha256) =
             balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
             balance_request,
-            balance_response_sha256.clone(),
-            balance_response_bytes,
+            response_sha256.clone(),
+            response_bytes,
         ));
         // Each ledger's own currency is compared with the base before any
         // balance is parsed (bridge#551): a foreign ledger's balance is a
@@ -2244,35 +3061,12 @@ impl TallyClient {
                 Vec::new(),
             ),
         };
-        // Ledger names are unique within a Tally company, so a ledger set
-        // aside is the master row with its name. The master is parsed only
-        // now, leaving those rows' openings unparsed.
-        let set_aside = foreign
-            .iter()
-            .map(|ledger| ledger.ledger.clone())
-            .chain(mixed.iter().cloned())
-            .collect::<BTreeSet<_>>();
-        let master = parse_native_party_ledger_master_records_leaving_unparsed(
-            &master_body,
-            identity.company_guid(),
-            &set_aside,
-        )
-        .map_err(party_ledger_master_master_snapshot_error)?;
-        if !master.evidence.duplicate_identities.is_empty() {
-            return Err(anyhow::Error::new(
-                PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
-            ));
-        }
-        Ok(PartyLedgerMasterPartRead {
-            master,
-            balances,
+        Ok(PartyLedgerPartBalances {
+            balances: Some(balances),
             foreign,
             mixed,
-            set_aside,
-            master_response_sha256,
-            master_response_bytes,
-            balance_response_sha256,
-            balance_response_bytes,
+            response_sha256,
+            response_bytes,
         })
     }
 
@@ -2479,14 +3273,6 @@ impl TallyClient {
         Ok(first)
     }
 
-    /// The smallest request Tally answers: its status page. Used to learn
-    /// whether a responder that was left building an abandoned response has
-    /// finished; it proves nothing else.
-    pub(crate) async fn status_probe(&self) -> anyhow::Result<()> {
-        self.http.get_status_decoded().await?;
-        Ok(())
-    }
-
     fn record_observed_encoding(&self, encoding: TallyTextEncoding) {
         let value = match encoding {
             TallyTextEncoding::Utf8 => ENCODING_UTF8,
@@ -2677,7 +3463,8 @@ fn has_presentation_equivalent_guid_siblings(companies: &[TallyCompany]) -> bool
 /// (#679): the whole book's, or one parent part's.
 struct PartyLedgerMasterPartRead {
     master: ParsedExport<ParsedSourceRecord<PartyLedgerMasterRecord>>,
-    balances: Vec<LedgerSnapshotEntry>,
+    /// `None` where the read left the balance pair out.
+    balances: Option<Vec<LedgerSnapshotEntry>>,
     foreign: Vec<ForeignCurrencyLedger>,
     mixed: Vec<String>,
     set_aside: BTreeSet<String>,
@@ -2685,6 +3472,17 @@ struct PartyLedgerMasterPartRead {
     master_response_bytes: usize,
     balance_response_sha256: String,
     balance_response_bytes: usize,
+}
+
+/// What one part's balance pair gave. Where it was left out, `balances` is
+/// `None` and only `mixed` is filled, from the master's openings.
+#[derive(Default)]
+struct PartyLedgerPartBalances {
+    balances: Option<Vec<LedgerSnapshotEntry>>,
+    foreign: Vec<ForeignCurrencyLedger>,
+    mixed: Vec<String>,
+    response_sha256: String,
+    response_bytes: usize,
 }
 
 /// A single read's own response hash and size, unchanged. For several parts the
@@ -2709,12 +3507,14 @@ fn aggregate_part_evidence<'a>(parts: impl Iterator<Item = (&'a str, usize)>) ->
 
 /// Joins one read's master rows to its balances by `(name, parent)`, leaving out
 /// the ledgers set aside for currency, and refuses any row or balance the other
-/// side lacks.
+/// side lacks. A read that left its balances out has only the master's opening,
+/// and no closing.
 fn join_party_ledger_master_part(
     read: PartyLedgerMasterPartRead,
 ) -> anyhow::Result<Vec<PartyLedgerMasterRow>> {
+    let balances_read = read.balances.is_some();
     let mut balances_by_key = HashMap::new();
-    for balance in read.balances {
+    for balance in read.balances.into_iter().flatten() {
         let key = ledger_display_key(&balance.name, balance.parent.as_deref());
         if balances_by_key.insert(key, balance).is_some() {
             return Err(anyhow::Error::new(
@@ -2733,9 +3533,15 @@ fn join_party_ledger_master_part(
             &source.record.ledger.name,
             source.record.ledger.parent.nonempty_returned_text(),
         );
-        let balance = balances_by_key.remove(&key).ok_or_else(|| {
-            anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalanceMissingMasterLedger)
-        })?;
+        let balance = balances_read
+            .then(|| {
+                balances_by_key.remove(&key).ok_or_else(|| {
+                    anyhow::Error::new(
+                        PartyLedgerMasterSourceValidationError::BalanceMissingMasterLedger,
+                    )
+                })
+            })
+            .transpose()?;
         let guid = source.identities.guid.ok_or_else(|| {
             anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterGuid)
         })?;
@@ -2754,11 +3560,20 @@ fn join_party_ledger_master_part(
             .ok_or_else(|| {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterOpeningBalance)
             })?;
-        if !party_ledger_master_openings_agree(master_opening, &balance.opening_balance)? {
-            return Err(anyhow::Error::new(
-                PartyLedgerMasterSourceValidationError::OpeningBalancesDisagreed,
-            ));
-        }
+        let (opening_balance, closing_balance) = match balance {
+            Some(balance) => {
+                if !party_ledger_master_openings_agree(master_opening, &balance.opening_balance)? {
+                    return Err(anyhow::Error::new(
+                        PartyLedgerMasterSourceValidationError::OpeningBalancesDisagreed,
+                    ));
+                }
+                (balance.opening_balance, balance.closing_balance)
+            }
+            None => (
+                bridge_tally_core::ExactDecimal::parse(master_opening.to_owned())?,
+                None,
+            ),
+        };
         rows.push(PartyLedgerMasterRow {
             name: source.record.ledger.name,
             parent: source.record.ledger.parent,
@@ -2767,8 +3582,8 @@ fn join_party_ledger_master_part(
             guid,
             master_id,
             alter_id,
-            opening_balance: balance.opening_balance,
-            closing_balance: balance.closing_balance,
+            opening_balance,
+            closing_balance,
         });
     }
     if !balances_by_key.is_empty() {

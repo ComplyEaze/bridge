@@ -6,8 +6,8 @@
 
 mod common;
 
-use bridge_bank_statement::bank::{BALANCE, CREDIT, DATE, DEBIT, NARRATION};
-use bridge_bank_statement::csv_edge::{read_statement, CHQ_REF, MAX_FILE_BYTES};
+use bridge_bank_statement::bank::{RowGrammar, BALANCE, CREDIT, DATE, DEBIT, NARRATION, UNNAMED};
+use bridge_bank_statement::csv_edge::{read_statement, CsvLayout, CHQ_REF, MAX_FILE_BYTES};
 use bridge_bank_statement::money::reconcile;
 use common::{refuses, rep};
 
@@ -213,6 +213,81 @@ fn encodings_the_export_does_not_use_are_refused() {
     refuses(read_statement(&nul), "encoding_unsupported");
 }
 
+/// `good()` with its account line replaced.
+fn with_account_line(line: &str) -> Vec<u8> {
+    let number = format!(
+        "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"{}\"",
+        rep('0', 12)
+    );
+    let text = String::from_utf8(good()).unwrap();
+    assert!(text.contains(&number));
+    text.replace(&number, line).into_bytes()
+}
+
+#[test]
+fn the_one_account_number_is_read_from_the_preamble_and_a_masked_one_is_not() {
+    let statement = read_statement(&good()).unwrap();
+    assert_eq!(statement.account_number, rep('0', 12));
+    for line in [
+        "\"1 SYNTHETIC ROAD\"",
+        "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"\"",
+        "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\"",
+        "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"XXXXXXXX0000\"",
+        "\"Account No.\",\"000000000000\"",
+    ] {
+        refuses(
+            read_statement(&with_account_line(line)),
+            "no_account_number_line",
+        );
+    }
+    let number = "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"000000000000\"";
+    refuses(
+        read_statement(&with_account_line(&format!("{number}\n{number}"))),
+        "ambiguous_account_match",
+    );
+}
+
+#[test]
+fn the_layouts_grammar_reads_only_the_rows_own_cells() {
+    let blank = (
+        "03-04-2025 09:00:01",
+        "03-04-2025",
+        "",
+        "000",
+        "250.50",
+        "DR",
+        "11,249.50",
+    );
+    let bytes = file(&[(FIRST, "CR"), (blank, "CR")], "11,249.50");
+    let statement = read_statement(&bytes).unwrap();
+    let (named, unnamed) = (&statement.rows[0], &statement.rows[1]);
+    let layout = CsvLayout::BankA;
+    assert_eq!(
+        layout.parse_date(unnamed.get(DATE)).unwrap().iso(),
+        "2025-04-03"
+    );
+    assert_eq!(layout.party(named), named.get(NARRATION));
+    assert_eq!(layout.party(unnamed), UNNAMED);
+    let numbered = (
+        FIRST.0,
+        FIRST.1,
+        "UPI/SYNTHETIC/000111",
+        FIRST.3,
+        FIRST.4,
+        FIRST.5,
+        FIRST.6,
+    );
+    let statement_with_number = read_statement(&file(&[(numbered, "CR")], "11,500.00")).unwrap();
+    assert_eq!(layout.party(&statement_with_number.rows[0]), UNNAMED);
+    assert_eq!(layout.reference(named).1, named.get(CHQ_REF));
+    assert_eq!(layout.transfer_reference(named), None);
+    assert_eq!(
+        layout.instrument(named).as_deref(),
+        Some(named.get(CHQ_REF))
+    );
+    assert_eq!(layout.instrument(unnamed), None);
+}
+
 #[test]
 fn a_header_that_is_not_exactly_the_exports_is_layout_unknown() {
     let text = String::from_utf8(good()).unwrap();
@@ -328,6 +403,25 @@ fn dates_are_checked_for_shape_validity_and_order() {
     let value = text.replace("\"03-04-2025\"", "\"3/4/2025\"");
     assert_eq!(
         refuses(read_statement(value.as_bytes()), "unparseable_date").row,
+        Some(2)
+    );
+    // A value date in another month is refused unless it is the day before.
+    let moved = text.replace("\"03-04-2025\"", "\"31-03-2025\"");
+    assert_eq!(
+        refuses(
+            read_statement(moved.as_bytes()),
+            "value_date_outside_period"
+        )
+        .row,
+        Some(2)
+    );
+    let ahead = text.replace("\"03-04-2025\"", "\"01-05-2025\"");
+    assert_eq!(
+        refuses(
+            read_statement(ahead.as_bytes()),
+            "value_date_outside_period"
+        )
+        .row,
         Some(2)
     );
     // Posting order broken by one second.

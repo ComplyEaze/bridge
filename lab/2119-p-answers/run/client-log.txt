@@ -1,0 +1,13 @@
+2026-11-09T05:55:33Z exe sha256 49d9d9a1eb38891896d75272e78d876e2a9f4ef31598a09c06bcfac6b4050281 ok; launch-env.json sha256 5f57218cfd737d23cc1ad6a714f866ce8be2f3cdc1bd88ca9cb9fbb6e50d4c99; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-09T05:55:33Z launched pid 22376; stderr to server-stderr-20261109T055533Z.log
+2026-11-09T05:55:33Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-09T05:55:45Z 000-tools-list.json tool=list written 2026-11-09T05:55:45.925Z read 2026-11-09T05:55:45.928Z secs=0.012 isError=None error=None saved_sha256=baf49a4f52827cbfdf3df0e23d4272656af5cae3fb11f07e1cc4c4900dc41be4
+2026-11-09T05:55:54Z 001-list-companies.json tool=list_companies written 2026-11-09T05:55:54.100Z read 2026-11-09T05:55:54.179Z secs=0.082 isError=False error=None saved_sha256=8b516a2032dda21bd3fb20818ef859b4d25615bcc629120a59c3c7130d7a761c
+2026-11-09T05:55:55Z 002-m0-basic.json tool=ledger_masters written 2026-11-09T05:55:55.201Z read 2026-11-09T05:55:55.231Z secs=0.036 isError=True error=None saved_sha256=dacf92a2435eaab2c49164238c1adfef32fb4b0e90a980c78633bba3e3e7843d
+2026-11-09T05:56:11Z 003-m0-basic.json tool=ledger_masters written 2026-11-09T05:56:10.513Z read 2026-11-09T05:56:11.258Z secs=0.758 isError=False error=None saved_sha256=aa0efc7059b5b83f9458ea2a5a481378ace05ec0d79b91a2c22bd2e591b5a026
+2026-11-09T05:56:26Z 004-p-top1.json tool=outstandings written 2026-11-09T05:56:21.001Z read 2026-11-09T05:56:26.123Z secs=5.121 isError=False error=None saved_sha256=44828baf3ef8e4ebe9afe174bcc425d576e1dbe0e402773e61bf2b13882e40db
+2026-11-09T05:56:57Z 005-p-top1-egress.json tool=egress_log written 2026-11-09T05:56:57.320Z read 2026-11-09T05:56:57.402Z secs=0.081 isError=False error=None saved_sha256=82e83044aa2bb4221331ee948bf0245a9567ac6bc3e11d908d79977f6d2d977c
+2026-11-09T05:57:45Z 006-p-p1.json tool=outstandings written 2026-11-09T05:57:41.090Z read 2026-11-09T05:57:45.517Z secs=4.432 isError=False error=None saved_sha256=ad20785d60f31846fd32bd834f71917fac6ce1853c0bf507f98caf1ebee9f20a
+2026-11-09T05:57:48Z 007-p-p1-egress.json tool=egress_log written 2026-11-09T05:57:48.607Z read 2026-11-09T05:57:48.662Z secs=0.055 isError=False error=None saved_sha256=8cfcd4540954dbf8a85951d5ca257752b97a758197b237303ab1c205a91c0d3e
+2026-11-09T05:59:20Z 008-m1-basic.json tool=ledger_masters written 2026-11-09T05:59:19.650Z read 2026-11-09T05:59:20.430Z secs=0.777 isError=False error=None saved_sha256=0950bf5a53993bac8f844293e9eaec57064f9fb8979fc6cf21d9dbdf16ccab8c
+2026-11-09T05:59:21Z session ended; server pid 22376 exit code 0

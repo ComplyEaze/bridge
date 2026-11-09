@@ -1,0 +1,2 @@
+top1: file 54 B sha256 ac313c65557d9b42f61d1a7a0a256c1773a182a03323d913ffebd83285376eeb; whole line 16 characters (rule on whole line: character); field 1 12 characters, rule check ok; one TAB True; field 2 count True; file sha256 True
+p1: file 18 B sha256 078b01c5dedf292fb5ddaa99be3cf344406fd8b88b427b1acc785494e3099b60; whole line 16 characters (rule on whole line: character); field 1 12 characters, rule check ok; one TAB True; field 2 count True; file sha256 True

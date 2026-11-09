@@ -1,0 +1,50 @@
+p-p1: whole time 4.432 s (written 2026-11-09T05:57:41.090Z, read 2026-11-09T05:57:45.517Z); answer bytes 69131; truncated False; verification party_bills_tied_to_ledger_closing_between_unchanged_marks
+  isError: False (EXPECT False) met
+  state: observed (EXPECT observed) met
+  basis: tally_ledger_outstandings (EXPECT tally_ledger_outstandings) met
+  detail: open_bills (EXPECT open_bills) met
+  as_of: 20260331 (EXPECT 20260331) met
+  bills: 248 (EXPECT 248) met
+  on_account: 0 (EXPECT 0) met
+  checks.bills_sum_to_ledger_closing: tied (EXPECT tied) met
+  checks.company_marks_unchanged: checked (EXPECT checked) met
+  ledger_match.matched: exact (EXPECT exact) met
+  sum equal to kept: True (EXPECT True) met
+  similar_ledgers_total 0; evidence {"bytes": 1027622, "duration_ms": 4370, "state": "complete"}
+  egress_log records 12; outstandings response_prepared records 1
+  request_trail: sent 44 failed 0 omitted 12; record time 2026-11-09T05:57:45.483Z
+  trail keys: failed=0, omitted=12, sent=44
+  | seq | kind | request_bytes | response_bytes | held_ms | outcome |
+  |---|---|---|---|---|---|
+  | 13 | status | None | 51 | 0 | answered |
+  | 14 | post | 1980 | 138074 | 27 | answered |
+  | 15 | status | None | 51 | 0 | answered |
+  | 16 | post | 2524 | 4012 | 4 | answered |
+  | 17 | status | None | 51 | 0 | answered |
+  | 18 | post | 2524 | 4012 | 5 | answered |
+  | 19 | post | 2524 | 4012 | 3 | answered |
+  | 20 | post | 1100 | 3854 | 4 | answered |
+  | 21 | status | None | 51 | 0 | answered |
+  | 22 | post | 1100 | 3854 | 3 | answered |
+  | 23 | status | None | 51 | 0 | answered |
+  | 24 | post | 1290 | 155514 | 24 | answered |
+  | 25 | status | None | 51 | 0 | answered |
+  | 26 | post | 1290 | 155514 | 27 | answered |
+  | 27 | status | None | 51 | 0 | answered |
+  | 28 | post | 820 | 205336 | 999 | answered |
+  | 29 | status | None | 51 | 0 | answered |
+  | 30 | post | 820 | 205336 | 1013 | answered |
+  | 31 | status | None | 51 | 0 | answered |
+  | 32 | post | 1100 | 3854 | 3 | answered |
+  | 33 | status | None | 51 | 0 | answered |
+  | 34 | post | 1100 | 3854 | 4 | answered |
+  | 35 | status | None | 51 | 0 | answered |
+  | 36 | post | 2524 | 4012 | 4 | answered |
+  | 37 | status | None | 51 | 0 | answered |
+  | 38 | post | 2524 | 4012 | 6 | answered |
+  | 39 | post | 2524 | 4012 | 4 | answered |
+  | 40 | post | 982 | 3406 | 3 | answered |
+  | 41 | status | None | 51 | 0 | answered |
+  | 42 | post | 982 | 3406 | 4 | answered |
+  | 43 | status | None | 51 | 0 | answered |
+  | 44 | post | 2524 | 4012 | 5 | answered |

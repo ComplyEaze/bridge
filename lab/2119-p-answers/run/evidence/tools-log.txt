@@ -1,0 +1,9 @@
+000-tools-list.json: list written 2026-11-09T05:55:45.925Z read 2026-11-09T05:55:45.928Z secs 0.012 bytes 171022 isError None rpc False
+001-list-companies.json: list_companies written 2026-11-09T05:55:54.100Z read 2026-11-09T05:55:54.179Z secs 0.082 bytes 1620 isError False rpc False
+002-m0-basic.json: ledger_masters written 2026-11-09T05:55:55.201Z read 2026-11-09T05:55:55.231Z secs 0.036 bytes 1484 isError True rpc False
+003-m0-basic.json: ledger_masters written 2026-11-09T05:56:10.513Z read 2026-11-09T05:56:11.258Z secs 0.758 bytes 32110 isError False rpc False
+004-p-top1.json: outstandings written 2026-11-09T05:56:21.001Z read 2026-11-09T05:56:26.123Z secs 5.121 bytes 69645 isError False rpc False
+005-p-top1-egress.json: egress_log written 2026-11-09T05:56:57.320Z read 2026-11-09T05:56:57.402Z secs 0.081 bytes 28305 isError False rpc False
+006-p-p1.json: outstandings written 2026-11-09T05:57:41.090Z read 2026-11-09T05:57:45.517Z secs 4.432 bytes 69131 isError False rpc False
+007-p-p1-egress.json: egress_log written 2026-11-09T05:57:48.607Z read 2026-11-09T05:57:48.662Z secs 0.055 bytes 41987 isError False rpc False
+008-m1-basic.json: ledger_masters written 2026-11-09T05:59:19.650Z read 2026-11-09T05:59:20.430Z secs 0.777 bytes 32111 isError False rpc False

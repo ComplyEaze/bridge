@@ -1,0 +1,5 @@
+a-s0-S-ls-20250401-20250430.xml: HEADER/STATUS '1'
+a-s2-S-ls-20250401-20250430.xml: HEADER/STATUS '1'
+  rows: 8 and 8
+ROWS SAME
+exit 0

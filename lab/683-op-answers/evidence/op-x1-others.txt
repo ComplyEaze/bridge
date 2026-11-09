@@ -1,0 +1,6 @@
+a-x0-X-lx1-20250401.xml: HEADER/STATUS '1'
+a-x1-X-lx1-20250401.xml: HEADER/STATUS '1'
+  rows: 8 and 9
+  'BRIDGE USD Opening': in a-x0-X-lx1-20250401.xml no, in a-x1-X-lx1-20250401.xml yes (not compared)
+OTHERS SAME
+exit 0

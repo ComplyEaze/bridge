@@ -1,0 +1,15 @@
+a-t0-T-tb1-20250401-20250430.xml: HEADER/STATUS '1'
+a-t1-T-tb1-20250401-20250430.xml: HEADER/STATUS '1'
+a-t0-T-tb1-20250401-20250430.xml:
+SET FOREIGN (0): []
+SET MIXED (6): ['BRIDGE Export Sales', 'BRIDGE Import Purchases', 'BRIDGE Lab Bank', 'BRIDGE USD Customer', 'BRIDGE USD Supplier', 'Profit & Loss A/c']
+SET PLAIN (2): ['BRIDGE INR Customer', 'Cash']
+SET UNREAD (0): []
+a-t1-T-tb1-20250401-20250430.xml:
+SET FOREIGN (0): []
+SET MIXED (7): ['BRIDGE Export Sales', 'BRIDGE Import Purchases', 'BRIDGE Lab Bank', 'BRIDGE USD Customer', 'BRIDGE USD Opening', 'BRIDGE USD Supplier', 'Profit & Loss A/c']
+SET PLAIN (2): ['BRIDGE INR Customer', 'Cash']
+SET UNREAD (0): []
+  'BRIDGE USD Opening': no row -> MIXED
+SETS DIFFER
+exit 0

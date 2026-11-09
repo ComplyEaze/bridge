@@ -1,0 +1,47 @@
+Step 5, Tally's e-Invoice report on BRIDGE EINVOICE LAB, read only (9 Nov 2026, 08:35Z to 08:37Z). Words as on the screen.
+The registration and the customer's GSTIN show on these screens; they are written here as <the book's GSTIN> and
+<the customer's GSTIN>. Captures stay on the lab PC (listed in kept-local.txt).
+
+Opened by Alt+G (Go To), "e-Invoice" typed, Enter on "e-Invoice" under "GST Reports". It opened directly on one
+registration (no list of registrations). The period it showed was already 1-Apr-25 to 3-Apr-25, the sheet's period, so
+Alt+F2 was not pressed.
+
+1. e-Invoice (shots/s5-1-summary.png)
+   GST Registration : <the book's GSTIN>            1-Apr-25 to 3-Apr-25
+   Particulars                                      Voucher Count
+   Uncertain Transactions (Corrections needed)      2
+   IRN Generated
+     IRN updated without QR Code                    2
+   Buttons on the right included F5: IRN Register and V: Open e-Invoice Portal; none was pressed.
+
+2. Enter on "Uncertain Transactions (Corrections needed)": e-Invoice - Uncertain Transactions (shots/s5-2-uncertain.png)
+   Details of : Uncertain Transactions (Corrections needed)
+   Transactions with Incomplete/Mismatch in Information    2
+   Outward Supplies
+     Invalid or Missing Information
+       Applicable Tax Ledger is not selected               2
+
+3. Down twice, Enter on "Applicable Tax Ledger is not selected": e-Invoice - Resolution of Uncertain Transactions
+   (shots/s5-3-tax-ledger-vouchers.png)
+   Vouchers of : Applicable Tax Ledger is not selected
+   Date      Particulars          Vch Type  Vch No.  Taxable Amount  Invoice Amount
+   3-Apr-25  BRIDGE IRN Customer  Sales     2        1,000.00        1,180.00
+   3-Apr-25  BRIDGE IRN Customer  Sales     4          100.00          118.00
+   (IGST, CGST, SGST/UTGST, Cess and Tax Amount columns empty.) Bottom bar: "Enter: Alter", "Space: Select";
+   right: "S: Set GST Status". No Enter on a voucher line, nothing selected or set. Esc, Esc to the summary.
+
+4. Down to "IRN updated without QR Code", Enter: e-Invoice - Voucher Register (shots/s5-4-irn-generated-register.png)
+   Vouchers of : IRN updated without QR Code
+   Date      Particulars          GSTIN/UIN                  Vch Type  Vch No.  Invoice Amount
+   3-Apr-25  BRIDGE IRN Customer  <the customer's GSTIN>     Sales     1        1,180.00
+   3-Apr-25  BRIDGE IRN Customer  <the customer's GSTIN>     Sales     3          118.00
+   Right: "F10: Cancel IRN", "Manually Update IRN Info", "Get IRN Info"; bottom: "Enter: Alter". None pressed.
+   Esc, Esc to the Gateway (shots/s5-gateway.png), no dialog.
+
+Every line and cause naming each invoice:
+   1 (A, keyed details): IRN Generated > IRN updated without QR Code.
+   2 (B, no details):    Uncertain Transactions (Corrections needed) > Transactions with Incomplete/Mismatch in
+                         Information > Outward Supplies > Invalid or Missing Information > Applicable Tax Ledger is not selected.
+   3 (imported with the three elements): IRN Generated > IRN updated without QR Code, beside 1.
+   4 (imported without them): Uncertain Transactions (Corrections needed) > ... > Applicable Tax Ledger is not selected, beside 2.
+Keys pressed in step 5: Alt+G, the text "e-Invoice", Enter; Enter; Down, Down, Enter; Esc, Esc; Down, Enter; Esc, Esc.

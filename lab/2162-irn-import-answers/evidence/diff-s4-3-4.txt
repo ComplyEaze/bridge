@@ -1,0 +1,12 @@
+== --diff a-s3r-F-3.xml a-s4r-F-4.xml
+   ALTERID: '4' -> '5'
+   GUID: <45 chars> -> <45 chars>
+   IRN: <64 chars> -> ''
+   IRNACKDATE: '20250403' -> ''
+   IRNACKNO: '445566' -> ''
+   MASTERID: '4' -> '5'
+   REFERENCE: '3' -> '4'
+   REMOTEGUID: <36 chars> -> <36 chars>
+   VOUCHERKEY: <15 digits> -> <15 digits>
+   VOUCHERNUMBER: '3' -> '4'
+   VOUCHERRETAINKEY: '9' -> '13'

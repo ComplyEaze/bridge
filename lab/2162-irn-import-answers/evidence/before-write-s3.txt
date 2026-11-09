@@ -1,0 +1,2 @@
+== a-s3m-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ('eb2f5190-292e-4ed8-bfd3-eace839fe699', '3', '215') against ('eb2f5190-292e-4ed8-bfd3-eace839fe699', '3', '215')
+  one COMPANY row, the same GUID: the write may be sent

@@ -1,0 +1,25 @@
+== a-s9-L-list.xml: 10214 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 3
+   '1' '20250403' 'Sales' MASTERID '1'
+   '2' '20250403' 'Sales' MASTERID '2'
+   '1' '20250403' 'Payment' MASTERID '3'
+== a-s9-M-marks.xml: 3398 bytes, GSTIN shapes 0
+  STATUS '1'
+  COMPANY: GUID is the book's: yes ALTVCHID '3' ALTMSTID '215'
+  COMPANY rows: 1
+== a-s9-V-named.xml: 10826 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 3
+   row '1' 'Sales' DATE '20250403'
+    IRN: 1, TYPE 'String', length 64
+    IRNACKNO: 1, TYPE 'String', '112233'
+    IRNACKDATE: 1, TYPE 'Date', '20250403'
+   row '2' 'Sales' DATE '20250403'
+    IRN: 1, TYPE 'String', length 0
+    IRNACKNO: 1, TYPE 'String', ''
+    IRNACKDATE: 1, TYPE 'Date', ''
+   row '1' 'Payment' DATE '20250403'
+    IRN: 1, TYPE 'String', length 0
+    IRNACKNO: 1, TYPE 'String', ''
+    IRNACKDATE: 1, TYPE 'Date', ''

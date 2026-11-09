@@ -1,0 +1,87 @@
+== a-s3r-F-3.xml: 52992 bytes, GSTIN shapes 2
+  STATUS '1'
+  VOUCHER rows: 1
+   voucher '3' 'Sales' DATE '20250403' direct children 729, elements 733
+    PARTYGSTIN <GSTIN shape>
+    CONSIGNEEGSTIN ''
+    STATENAME 'Karnataka'
+    PLACEOFSUPPLY 'Karnataka'
+    GSTREGISTRATIONTYPE 'Regular'
+    ISINVOICE 'Yes'
+    PERSISTEDVIEW 'Invoice Voucher View'
+    VCHENTRYMODE 'Accounting Invoice'
+    NUMBERINGSTYLE 'Auto Retain'
+    VCHGSTCLASS 'Not Applicable'
+    VCHGSTSTATUSISAPPLICABLE 'Yes'
+    VCHGSTSTATUSISINCLUDED 'No'
+    VCHGSTSTATUSISUNCERTAIN 'Yes'
+    VCHGSTSTATUSISEXCLUDED 'No'
+    ISEWAYBILLAPPLICABLE 'No'
+    e-invoice family, direct children: 37
+     IRNCANCELDATE TYPE '' ''
+     IRNACKDATE TYPE '' '20250403'
+     UAEEINVBILLDATE TYPE '' ''
+     IRN TYPE '' length 64
+     IRNCANCELREASON TYPE '' ''
+     IRNCANCELCODE TYPE '' ''
+     IRNQRCODE TYPE '' length 0
+     IRNACKNO TYPE '' '445566'
+     IRNIRPSOURCE TYPE '' ''
+     UAEEINVAGENCYID TYPE '' ''
+     UAEEINVAGENCYNAME TYPE '' ''
+     UAEEINVAGENCYNUM TYPE '' ''
+     UAEEINVUUID TYPE '' ''
+     UAEEINVREFERENCEID TYPE '' ''
+     UAEEINVALLOWANCEREASON TYPE '' ''
+     UAEEINVCHARGEREASON TYPE '' ''
+     UAEEINVQRCODE TYPE '' ''
+     UAEEINVBUYERAGENCYID TYPE '' ''
+     UAEEINVBUYERAGENCYNAME TYPE '' ''
+     UAEEINVBUYERAGENCYNUM TYPE '' ''
+     UAEEINVALLOWANCETAXEXEMPTIONREASON TYPE '' ''
+     UAEEINVCHARGETAXEXEMPTIONREASON TYPE '' ''
+     IGNOREEINVVALIDATION TYPE '' 'No'
+     IRNJSONEXPORTED TYPE '' 'No'
+     IRNCANCELLED TYPE '' 'No'
+     ISEINVOVERRIDDEN TYPE '' 'No'
+     UAEEINVISBILLPREPAIDAMTOVRDN TYPE '' 'No'
+     RESETIRNQRCODE TYPE '' 'No'
+     QRCODECRC TYPE '' '0'
+     UAEEINVCRC TYPE '' '0'
+     IGNEINVVALIDCRC TYPE '' '0'
+     UAEEINVBILLPREPAIDAMOUNT TYPE '' ''
+     UAEEINVBILLPENDINGAMT TYPE '' ''
+     UAEEINVBILLTOTALAMT TYPE '' ''
+     IRNACKUPDATEDATETIME TYPE '' <9 digits>
+     UAEEINVUPLOADDATETIME TYPE '' <9 digits>
+     IRNERRORLIST.LIST TYPE '' ''
+== a-s3r-L-list.xml: 12604 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 4
+   '1' '20250403' 'Sales' MASTERID '1'
+   '2' '20250403' 'Sales' MASTERID '2'
+   '1' '20250403' 'Payment' MASTERID '3'
+   '3' '20250403' 'Sales' MASTERID '4'
+== a-s3r-M-marks.xml: 3398 bytes, GSTIN shapes 0
+  STATUS '1'
+  COMPANY: GUID is the book's: yes ALTVCHID '4' ALTMSTID '215'
+  COMPANY rows: 1
+== a-s3r-V-named.xml: 13524 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 4
+   row '1' 'Sales' DATE '20250403'
+    IRN: 1, TYPE 'String', length 64
+    IRNACKNO: 1, TYPE 'String', '112233'
+    IRNACKDATE: 1, TYPE 'Date', '20250403'
+   row '2' 'Sales' DATE '20250403'
+    IRN: 1, TYPE 'String', length 0
+    IRNACKNO: 1, TYPE 'String', ''
+    IRNACKDATE: 1, TYPE 'Date', ''
+   row '1' 'Payment' DATE '20250403'
+    IRN: 1, TYPE 'String', length 0
+    IRNACKNO: 1, TYPE 'String', ''
+    IRNACKDATE: 1, TYPE 'Date', ''
+   row '3' 'Sales' DATE '20250403'
+    IRN: 1, TYPE 'String', length 64
+    IRNACKNO: 1, TYPE 'String', '445566'
+    IRNACKDATE: 1, TYPE 'Date', '20250403'

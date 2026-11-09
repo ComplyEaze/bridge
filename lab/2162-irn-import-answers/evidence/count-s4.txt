@@ -1,0 +1,12 @@
+== a-s4-I-4-sent.xml: 538 bytes, GSTIN shapes 0
+  root RESPONSE
+  CREATED '1'
+  ALTERED '0'
+  DELETED '0'
+  LASTVCHID '5'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'

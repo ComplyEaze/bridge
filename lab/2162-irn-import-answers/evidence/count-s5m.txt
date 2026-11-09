@@ -1,0 +1,4 @@
+== a-s5m-M-marks.xml: 3400 bytes, GSTIN shapes 0
+  STATUS '1'
+  COMPANY: GUID is the book's: yes ALTVCHID '5' ALTMSTID '215'
+  COMPANY rows: 1

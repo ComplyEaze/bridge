@@ -117,13 +117,32 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(pinned, declared());
 }
 
-/// Each declared code is the string its site wrote, byte for byte, as a variant and as the
-/// [`FailureCode`] made from it, so typing a site changes nothing a caller or a receipt sees.
+/// Checks each pin of one enum against its variant directly: the variant's own string, the
+/// [`FailureCode`] made from it, and the tool failure made from it by the impl the sites use.
+fn check_pins<C>(pins: &[(C, &str)], as_str: fn(C) -> &'static str)
+where
+    C: Copy + Into<FailureCode> + Into<super::super::ToolFailure>,
+{
+    for (code, string) in pins {
+        assert_eq!(as_str(*code), *string);
+        let failure_code: FailureCode = (*code).into();
+        assert_eq!(failure_code.as_str(), *string);
+        let failure: super::super::ToolFailure = (*code).into();
+        assert_eq!(failure.code, *string);
+    }
+}
+
+/// Each declared code is the string its site wrote, byte for byte, as a variant, as the
+/// [`FailureCode`] made from it and as the tool failure made from it, so typing a site changes
+/// nothing a caller or a receipt sees.
 #[test]
 fn each_declared_code_is_the_string_its_site_wrote() {
-    for (code, string) in pinned() {
-        assert_eq!(code.as_str(), string);
-    }
+    check_pins(GST_UNCERTAIN, GstUncertainCode::as_str);
+    check_pins(READ, ReadCode::as_str);
+    check_pins(GST_STATUS, GstStatusCode::as_str);
+    check_pins(GST_BY_LEDGER, GstByLedgerCode::as_str);
+    check_pins(REGISTER, RegisterCode::as_str);
+    check_pins(OUTSTANDINGS, OutstandingsCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -141,7 +160,7 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    assert!(codes.len() >= 21, "only {} codes declared", codes.len());
+    assert_eq!(codes.len(), 21, "the declared codes");
     for code in codes {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");

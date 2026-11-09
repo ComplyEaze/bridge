@@ -3,8 +3,8 @@
 //! here per production file: a snake_case literal made into a `String` (`.to_string()`,
 //! `.to_owned()`, `.into()`, `String::from(..)`, `ToolFailure::from(..)`), or a code built by
 //! `format!` with a name after its colon. Each file's pin is an upper bound that may only be
-//! lowered; a converted site lowers its file's pin. Test modules (`#[cfg(test)] mod name {` to
-//! the end of a file, and `*tests.rs`) never count.
+//! lowered; a converted site lowers its file's pin. Test modules (an inline `#[cfg(test)] mod name {`
+//! through its closing brace, and `*tests.rs`) never count; code after such a module does.
 //!
 //! Not counted yet, so not held by this test: a code kept in a `const NAME: &str` and made into a
 //! `String` where the name is used, a code chosen by a `match` whose result is made into a
@@ -90,7 +90,7 @@ const PINNED: &[(&str, usize)] = &[
     ("src/endpoint_coordination.rs", 3),
     ("src/sync/reconciliation.rs", 27),
     ("src/sync/snapshot.rs", 8),
-    ("src/tally/approved_import.rs", 4),
+    ("src/tally/approved_import.rs", 24),
     ("src/tally/connection.rs", 20),
     ("src/tally/connector.rs", 10),
     ("src/tally/runtime.rs", 4),
@@ -107,9 +107,55 @@ fn code_shaped(text: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
+/// Whether `line` opens an inline module: `mod name {`, with any visibility (`pub`, `pub(crate)`,
+/// `pub(in path)`).
+fn opens_inline_module(line: &str) -> bool {
+    let line = line.trim();
+    let line = match line.strip_prefix("pub") {
+        None => line,
+        Some(rest) => {
+            let rest = rest.trim_start();
+            match rest.strip_prefix('(') {
+                Some(inner) => inner
+                    .split_once(')')
+                    .map_or("", |(_, after)| after.trim_start()),
+                None => rest,
+            }
+        }
+    };
+    line.starts_with("mod ") && line.ends_with('{')
+}
+
+/// `source` without its inline test modules: each `#[cfg(test)]` at the start of a line, then
+/// `mod name {`, through the closing `}` that stands alone at the start of a line (rustfmt puts a
+/// top-level module's last brace there). Code after such a module still counts, as production
+/// code can follow a test seam in the middle of a file. A module that is only declared
+/// (`mod tests;`) holds no text here.
+fn without_inline_test_modules(source: &str) -> String {
+    let mut kept = String::with_capacity(source.len());
+    let mut lines = source.split_inclusive('\n').peekable();
+    while let Some(line) = lines.next() {
+        if line.starts_with("#[cfg(test)]") {
+            let mut ahead = lines.clone();
+            let module = ahead.find(|next| !next.trim_start().starts_with("#["));
+            if module.is_some_and(opens_inline_module) {
+                for skipped in lines.by_ref() {
+                    if skipped.trim_end_matches(['\r', '\n']) == "}" {
+                        break;
+                    }
+                }
+                continue;
+            }
+        }
+        kept.push_str(line);
+    }
+    kept
+}
+
 /// How many failure-code sites `source` holds as strings.
 fn string_code_sites(source: &str) -> usize {
-    let source = crate::hand_entry_texts_tests::production_part(source);
+    let source = without_inline_test_modules(source);
+    let source = source.as_str();
     crate::hand_entry_texts_tests::string_literal_spans(source)
         .into_iter()
         .filter(|(open, close, literal)| {
@@ -257,4 +303,28 @@ fn string_failure_codes_only_fall() {
          The pins are upper bounds and may only be lowered.\n{}\nPins as they stand now:\n{table}",
         problems.join("\n")
     );
+}
+
+#[test]
+fn an_inline_test_module_of_any_visibility_is_skipped_and_the_code_after_it_is_not() {
+    for head in [
+        "mod seam {",
+        "pub mod seam {",
+        "pub(crate) mod seam {",
+        "pub(in crate::a) mod seam {",
+    ] {
+        let source = format!(
+            "fn a() {{ f(\"first_code\".to_string()); }}\n#[cfg(test)]\n{head}\n    fn b() {{ f(\"test_code\".to_string()); }}\n}}\nfn c() {{ f(\"last_code\".to_string()); }}\n"
+        );
+        assert_eq!(string_code_sites(&source), 2, "{head}");
+    }
+    // A module that is only declared, a name that merely starts with `pub`, and a module that is
+    // not a test module are all kept.
+    for kept in [
+        "#[cfg(test)]\nmod tests;\nfn a() { f(\"some_code\".to_string()); }\n",
+        "#[cfg(test)]\npubx mod seam {\nfn a() { f(\"some_code\".to_string()); }\n}\n",
+        "pub(crate) mod seam {\nfn a() { f(\"some_code\".to_string()); }\n}\n",
+    ] {
+        assert_eq!(string_code_sites(kept), 1, "{kept:?}");
+    }
 }

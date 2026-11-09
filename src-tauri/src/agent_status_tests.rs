@@ -866,3 +866,71 @@ fn a_session_is_given_the_notice_once_and_only_when_one_exists() {
         .take_build_notice("2026-10-30", "20261230")
         .is_some());
 }
+
+/// The insertion of `build_notice` into the status result, driven with a build dated well over 60
+/// days back so it holds on every day the test runs: the first read carries the notice, the second
+/// does not, and a build dated in the future never does (#2391).
+#[tokio::test]
+async fn the_status_result_carries_the_build_notice_once_for_an_old_build() {
+    let raw = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml");
+    let captured = String::from_utf16(
+        &raw.chunks_exact(2)
+            .map(|b| u16::from_le_bytes([b[0], b[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let plans = || {
+        vec![
+            ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime)),
+            ScenarioPlan::new(Fixture::SyntheticXml(captured.clone()))
+                .with_encoding(WireEncoding::Utf16Le),
+        ]
+    };
+    let server_for = |plans: Vec<ScenarioPlan>| {
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = Server::new(Settings {
+            endpoint: TallyEndpointConfig {
+                host: simulator.address().ip().to_string(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 500,
+            max_bytes: 200_000,
+            redaction: Redaction::None,
+            import_enabled: false,
+            posting: Posting::Off,
+            master_writes_enabled: false,
+            audit_enabled: false,
+        });
+        (server, simulator, directory)
+    };
+    let mut twice = plans();
+    twice.extend(plans());
+    let (server, _simulator, _directory) = server_for(twice);
+    let before = tally_host_today();
+    let (first, _) = server.status_for_release("2020-01-01").await.unwrap();
+    let after = tally_host_today();
+    let text = first["build_notice"]
+        .as_str()
+        .expect("the first read carries the notice");
+    let expected = |day: &str| {
+        format!("This build is dated 2020-01-01; this computer's date is {}-{}-{}. Releases are listed at https://github.com/ComplyEaze/bridge/releases .", &day[0..4], &day[4..6], &day[6..8])
+    };
+    assert!(
+        text == expected(&before) || text == expected(&after),
+        "{text}"
+    );
+    let (second, _) = server.status_for_release("2020-01-01").await.unwrap();
+    assert!(
+        second.get("build_notice").is_none(),
+        "the second read does not repeat it: {second}"
+    );
+
+    let (future, _simulator, _directory) = server_for(plans());
+    let (result, _) = future.status_for_release("2099-01-01").await.unwrap();
+    assert!(
+        result.get("build_notice").is_none(),
+        "a build dated after today never gets one"
+    );
+}

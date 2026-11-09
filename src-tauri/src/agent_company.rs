@@ -4,6 +4,15 @@ use bridge_tally_core::{CapabilityFeatureId, CapabilityState, EvidenceConfidence
 
 impl Server {
     pub(super) async fn status(&self) -> Result<(Value, Evidence), ToolFailure> {
+        self.status_for_release(RELEASE_DATE).await
+    }
+
+    /// `status` for a build dated `release_date`; the date is a parameter so a test can drive the
+    /// build notice's insertion with a fixed date (#2391).
+    pub(super) async fn status_for_release(
+        &self,
+        release_date: &str,
+    ) -> Result<(Value, Evidence), ToolFailure> {
         let endpoint = endpoint_origin(&self.settings.endpoint)?;
         let (probe, wire_evidence) = self
             .runtime
@@ -59,7 +68,7 @@ impl Server {
             // The host date every omitted date defaults to (YYYYMMDD).
             "today": today,
         });
-        if let Some(notice) = self.take_build_notice(RELEASE_DATE, &today) {
+        if let Some(notice) = self.take_build_notice(release_date, &today) {
             result["build_notice"] = json!(notice);
         }
         Ok((result, evidence))

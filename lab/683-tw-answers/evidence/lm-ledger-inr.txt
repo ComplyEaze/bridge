@@ -1,0 +1,7 @@
+a-mvly-inr-V-mvly-inr-customer-20250401-20260331.xml: HEADER/STATUS 1
+a-mvy-V-mvy-20250401-20260331.xml: HEADER/STATUS 1
+  ledger 'BRIDGE INR Customer': ledger-scoped 2 vouchers, book-scoped with an entry on it 2
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000005: ledger-scoped ['-5000.00'] book-scoped ['-5000.00']
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000006: ledger-scoped ['2000.00'] book-scoped ['2000.00']
+LEDGER SAME
+exit 0

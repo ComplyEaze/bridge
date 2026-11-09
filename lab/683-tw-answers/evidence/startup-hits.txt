@@ -1,0 +1,16 @@
+$ python -I (inline) the start-up check's hits in every file the stage reads, each with 12 characters either side (the number shown as <S>) ("inside the amount": the hit is part of $1000000.00)
+RESULTS.md (utf-8): ...mer' Yes '-$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...Sales' No '$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+a-mvly-usd-V-mvly-usd-customer-20250401-20260331.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mvly-usd-V-mvly-usd-customer-20250401-20260331.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mvly-usd-V-mvly-usd-customer-20250401-20260331.xml (utf-16-le): ...E="Amount">$<S>0.00 @ ₹ 86/... inside the amount
+a-mvy-V-mvy-20250401-20260331.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mvy-V-mvy-20250401-20260331.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mvy-V-mvy-20250401-20260331.xml (utf-16-le): ...E="Amount">$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-ledger-usd.txt (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-ledger-usd.txt (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-mvy.txt (utf-8): ...mer' Yes '-$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-mvy.txt (utf-8): ...Sales' No '$<S>0.00 @ ₹ 86/... inside the amount
+hits 14; not inside the amount: 0

@@ -1,0 +1,6 @@
+19:32:43	T-types.xml	a-s2-T-types.xml	curl 0	306946 bytes
+19:32:43	N-0010-y26.xml	a-s2-N-0010-y26.xml	curl 0	5604 bytes
+19:32:43	N-0010-y27.xml	a-s2-N-0010-y27.xml	curl 0	3022 bytes
+19:32:43	N-0071-y27.xml	a-s2-N-0071-y27.xml	curl 0	3022 bytes
+19:32:43	V-0010.xml	a-s2-V-0010.xml	curl 0	52784 bytes
+19:32:43	V-0071.xml	a-s2-V-0071.xml	curl 0	3022 bytes

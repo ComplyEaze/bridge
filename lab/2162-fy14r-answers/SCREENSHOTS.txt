@@ -1,0 +1,16 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the whole Tally window (PrintWindow).
+shots/c10-select-company-after-shut.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/c10-window.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/s0-window.png 72365 B fb9f1af06e7527fbb3d560245cbe97656de42ff87b5f63911139f27559c1123a
+shots/s1-bk-accept.png 51651 B bf826d6ded1e2a8184bce52c1c633ced145bd1c74d43695e6ba6c6930d82b1f1
+shots/s3-alteration-before-quit.png 61431 B 3bdc609d0495865b6e6cf2562b26e7af89cf186acdf2ed76468182fa824104b7
+shots/s3-alteration-open.png 61431 B 3bdc609d0495865b6e6cf2562b26e7af89cf186acdf2ed76468182fa824104b7
+shots/s3-f12-configuration.png 77425 B d9d2122a850f3641d291ebe41bd779f5c47ef9184184ff0326f115f1680f04ae
+shots/s3-list-of-voucher-types-after-quit.png 58753 B b73f31f5c56716410e9216ab461cd34c693d8b86c2fa4240fc0f58c22eaa7126
+shots/s3-more-details-show-inactive.png 74952 B cab833671d878c8926f692df362a4c9965c47b95ca1819cb90d83305ae190966
+shots/s3-more-details-show-more.png 73168 B 574b553a5335d8e81fda10f756521077f5a4e1b580aabc224a48350844cf8261
+shots/s3-more-details.png 69878 B 9302facc7a35eedeea203512e770fe6e22db96c882f8191394b62fe455fd0072
+shots/s6-after-restore-select-company.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/s6-gateway-after-restore.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/s6-restore-accept.png 34899 B 17871b251675628e9e28bd627c29f51f483b3d5be82777e056457d91970c109b
+shots/s6-restore-already-exists.png 41876 B 75a52633b2c67d4ff7796fdf8b8336d891f01d60efa7df4baabf09a6c09fdfea

@@ -1,0 +1,4 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 417 B sha256 8e92f04ffd45f4bac5eb96b619edf113507d13c888d34d9fdc291d024447ebfe (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/pre.sh: original 876 B sha256 46572a9e47a0537dbd51b314a5e2e7c9ddcb71c92882293d089907c981f7d88e (kept on the lab PC); 1 x -> <the before-write option>; 1 x -> <LAB_DIR>

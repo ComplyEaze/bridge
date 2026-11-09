@@ -1,0 +1,12 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backup-1/TDBK1800_<company number>.001 90051 B 0e0752f228d386cc92640e9e050bc4ec4a1fb177caea5cc91315be5c26835d09 (BK, taken at step 1 of this sitting and restored at step 6)
+restore-plan.txt 540 B 6fd80c25d1df051c17d1c33f7faf98e3c4be551c9705b33ed4988045e759e7a6 (the restore plan: the company number and the data path)
+answers/a-s2-V-0010.xml 52784 B 4bf8b111c33edc1378933a2583021ce677d8ae4641972f88b8dc6343cfc60456 (GSTIN shape (the invented GSTINs stay local))
+evidence/c10-netstat.txt 8568 B ce4698583a55c3d7ee459ef6885e821657fd7a2f87715613da44c09140dfb79b (process or port listing)
+evidence/c10-tasklist.txt 54 B 6ff8118e381876aa565aeea7c40c5ed2cdbce36bbedd2ec5ad9f0b151beb4771 (process or port listing)
+evidence/s0-netstat.txt 8000 B b61019b5c0373b3daa82c16076db6fdddae05609770cc1a2b51031c090f33d21 (process or port listing)
+evidence/s0-tasklist.txt 54 B 4e9cfc297c331f73e19e69111aac9105b6a414951ab5c8ea73929f3256466f4f (process or port listing)
+evidence/s6-data-after-restore.txt 353 B a979de7a554d0fa3ce93e385b380ad5383bdad72d8479ed89330866869702fce (folder listing)
+evidence/s6-data-before.txt 485 B 218778a19728de6bbc5f92d1eee7240c5503fdcc81972955326949a6a6ad8af0 (folder listing)
+evidence/s7-data-after-close.txt 428 B 509404230d8e814d34aee6bc7b087fe9658b524ee5ed7b4a5759776860c37aea (folder listing)
+stage-fy14r.py 10349 B e4f7dbc289e0dd6a9257ff85a94e3487c126df931e1b0fd35985be23fff1e20d (this stage script: its patterns name the lab paths)

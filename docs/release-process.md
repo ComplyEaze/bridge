@@ -801,6 +801,7 @@ It checks every file first and writes none if one fails. Then:
 1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`, and move the
    unreleased entries into the new section (see "At cut time" under `CHANGELOG.md` below).
+
 **Also in the version pull request, between steps 2 and 3,** check the two things a reader meets first:
 
 - the new `CHANGELOG.md` section opens with "In plain words" and its "Should I upgrade?" block

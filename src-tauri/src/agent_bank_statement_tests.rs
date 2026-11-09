@@ -836,6 +836,114 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         })
         .collect::<Vec<_>>();
     assert_eq!(named, [(id.as_str(), "Cash", true)]);
+
+    // Cash paid to someone binds three legs: the cash ledger the row's Contra
+    // fills, the same ledger on the cash Payment, and the payee, none of them
+    // a deposit from the cash box.
+    args["cash_answers"] = json!([{"bridge_txn_id": id, "answer": "paid_to_someone",
+        "ledger": "Synthetic Wages", "cash_ledger": "Cash"}]);
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let paid = parsed_with(&request.choices.cash_answers);
+    let (proposals_id, digest) =
+        persist(directory.path(), &request.record(), &paid, &"0".repeat(64)).unwrap();
+    let resolved =
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
+    let payment = format!("{id}-cash");
+    let named = resolved
+        .cash_ledgers
+        .iter()
+        .map(|need| {
+            (
+                need.bridge_txn_id.as_str(),
+                need.ledger.as_str(),
+                need.cash_in_hand,
+                need.cash_out,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        named,
+        [
+            (id.as_str(), "Cash", true, false),
+            (payment.as_str(), "Cash", true, false),
+            (payment.as_str(), "Synthetic Wages", false, false),
+        ]
+    );
+    assert_eq!(resolved.args["vouchers"].as_array().unwrap().len(), 3);
+    let result = super::summary(&request.record(), &paid, "statement-x", "0", 200_000);
+    assert_eq!(result["vouchers"], 3);
+    assert_eq!(result["cash_payments_over_limit"], 0);
+    assert_eq!(result["cash_questions"], json!([]));
+
+    // Only paid_to_someone takes cash_ledger, and it needs one.
+    args["cash_answers"] = json!([{"bridge_txn_id": id, "answer": "business_cash",
+        "ledger": "Cash", "cash_ledger": "Cash"}]);
+    assert_eq!(
+        OwnedRequest::from_args(&args).err(),
+        Some("statement_cash_ledger_not_used".to_string())
+    );
+    args["cash_answers"] = json!([{"bridge_txn_id": id, "answer": "paid_to_someone",
+        "ledger": "Synthetic Wages"}]);
+    assert_eq!(
+        OwnedRequest::from_args(&args).err(),
+        Some("statement_cash_answer_without_cash_ledger".to_string())
+    );
+}
+
+/// A paid_to_someone record is bound to both its vouchers: a file whose
+/// record names no cash Payment, or whose Payment debits another ledger than
+/// the payee it records, is refused.
+#[test]
+fn a_cash_payment_answer_binds_its_contra_and_its_cash_payment() {
+    let directory = tempfile::tempdir().unwrap();
+    let publish = |paid_to: Value, payment_debit: &str| {
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let document = json!({
+            "schema": PROPOSALS_SCHEMA,
+            "proposals_id": proposals_id,
+            "bank_ledger": "SBI",
+            "coverage": null,
+            "vouchers": [
+                {"bridge_txn_id":"st-1","date":"2026-08-01","voucher_type":"Contra",
+                 "narration":"ATM WDL to Cash | SBI SB xx1234 | 01-Aug-2026",
+                 "entries":[{"ledger":"Cash","amount":"500.00","side":"Dr"},
+                            {"ledger":"SBI","amount":"500.00","side":"Cr"}]},
+                {"bridge_txn_id":"st-1-cash","date":"2026-08-01","voucher_type":"Payment",
+                 "narration":"Cash paid to Synthetic Wages from Cash | withdrawn ATM WDL | SBI SB xx1234 | 01-Aug-2026",
+                 "entries":[{"ledger":payment_debit,"amount":"500.00","side":"Dr"},
+                            {"ledger":"Cash","amount":"500.00","side":"Cr"}]}],
+            "records": [{"row":1,"date":"2026-08-01","disposition":{"voucher":"Contra"},"amount":"500.00",
+                "party":"ATM CASH WITHDRAWAL","ledger":"Cash","suspense":false,"bridge_txn_id":"st-1",
+                "cash_movement":"withdrawal","cash_answer":"paid_to_someone","paid_to":paid_to,
+                "direction":"outflow","reversed_same_day":false}],
+        });
+        let bytes = serde_json::to_vec_pretty(&document).unwrap();
+        let statements = directory.path().join(PROPOSALS_DIRECTORY);
+        fs::create_dir_all(&statements).unwrap();
+        fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+    };
+    let paid_to =
+        json!({"ledger":"Synthetic Wages","bridge_txn_id":"st-1-cash","over_cash_limit":false});
+    let resolved = resolve_import_arguments(
+        directory.path(),
+        &publish(paid_to.clone(), "Synthetic Wages"),
+    )
+    .unwrap();
+    assert_eq!(resolved.cash_ledgers.len(), 3);
+    for (paid_to, debit) in [
+        (Value::Null, "Synthetic Wages"),
+        (paid_to.clone(), "Other Payee"),
+        (
+            json!({"ledger":"Synthetic Wages","bridge_txn_id":"st-2-cash","over_cash_limit":false}),
+            "Synthetic Wages",
+        ),
+    ] {
+        assert_eq!(
+            resolve_import_arguments(directory.path(), &publish(paid_to, debit)).err(),
+            Some("proposals_file_invalid".to_string())
+        );
+    }
 }
 
 /// A statement with hundreds of open cash lines and suspense lines keeps a
@@ -1492,6 +1600,7 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
         [
             "account_last4",
             "bank",
+            "cash_payments_over_limit",
             "cash_questions",
             "cash_questions_omitted",
             "cash_questions_open",
@@ -1811,6 +1920,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         "",
         "/account_last4",
         "/bank",
+        "/cash_payments_over_limit",
         "/cash_questions",
         "/cash_questions/*",
         "/cash_questions/*/amount",
@@ -1881,6 +1991,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
     assert_eq!(
         numbers,
         [
+            "/cash_payments_over_limit",
             "/cash_questions_omitted",
             "/cash_questions_open",
             "/counterparties/*/rows",

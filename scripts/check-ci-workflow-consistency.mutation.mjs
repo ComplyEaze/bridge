@@ -395,6 +395,23 @@ test("merge gate scope: a base SHA taken from the pull request's head is refused
     "the merge-gate-scope step must read the event name and the pull request's base SHA");
 });
 
+// A release pull request must move src-tauri/release-date.txt (#2416): the scope step runs the date check exactly when the
+// version differs from the base's, on the base and the merge commit, and lets its exit status fail the step.
+const RELEASE_DATE_CALL = 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"; fi';
+for (const [name, replacement] of [
+  ["the call removed", ""],
+  ["the call run for every pull request", 'node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"'],
+  ["the call run only when it is not a release pull request", 'if [[ "$release" != true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"; fi'],
+  ["its failure swallowed", 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA" || true; fi'],
+  ["the base and head swapped", 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$GITHUB_SHA" "$base"; fi'],
+  ["the head left out", 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base"; fi'],
+  ["another script run in its place", 'if [[ "$release" == true ]]; then node scripts/next-version.mjs; fi'],
+]) {
+  test(`release date check: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", (text) => text.replace(RELEASE_DATE_CALL, replacement)), "changes changed shape");
+  });
+}
+
 // The nightly records run must not hold eight of the account's twenty runner slots at once.
 for (const [name, replacement] of [
   ["the limit removed", ""],

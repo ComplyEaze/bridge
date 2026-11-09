@@ -745,7 +745,11 @@ every note for them first, and for maintainers second.
   both hosts. The macOS native tests run only on a master push, the daily
   scheduled run, a manual run and the version pull request (the release pull
   request, which changes the version in `src-tauri/tauri.conf.json`), never on
-  another pull request or in the merge queue. A master
+  another pull request or in the merge queue. The scope step of the same run also
+  refuses a version pull request that leaves `src-tauri/release-date.txt` as the
+  base had it, dates it before the base's day, or breaks its one-line format
+  (`scripts/check-release-date-changed.mjs`); a second release on the base's own
+  UTC day is refused too, so wait for the next day. A master
   push leaves the Windows native, bundle and seam jobs out of its matrix when the merge
   queue ran them on that same commit; its job summary names the queue run. The
   macOS bundle and seam jobs run in the queue and on a push only when a

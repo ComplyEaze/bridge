@@ -218,10 +218,13 @@ pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Valu
         .as_deref()
         .is_some_and(|value| !crate::tally::validators::is_valid_company_number(value));
     // A name is shown with each control or invisible format character written
-    // as `\u{..}`, so two names never draw alike, no text is hidden in one and
-    // none reorders the text around it. A sendable name keeps the zero-width
-    // joiner and non-joiner: they are part of how Indic and Persian names are
-    // written (#2433).
+    // as `\u{..}`, so a name holding one never draws like the same name without
+    // it, no text is hidden in it and none reorders the text around it. A
+    // sendable name keeps the zero-width joiner and non-joiner, anywhere: they
+    // are part of how Indic and Persian names are written, so a name made of
+    // them alone draws as nothing. A backslash is not escaped, so a name that
+    // spells a `\u{..}` code out as text draws like one holding the character
+    // (#2433).
     let name_refusal = ValidatedCompanyName::refusal(&company.name);
     let name = match name_refusal {
         Some(_) => escaped_company_name(&company.name, |character| {

@@ -3421,8 +3421,8 @@ its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 
 One native-approved Journal and restart reconciliation have been observed on
-macOS against a synthetic Silver 7.1 instance. This remains a preview: Windows
-interactive approval and native posting on Education have not been established.
+macOS against a synthetic Silver 7.1 instance. Windows interactive approval and
+native posting on Education have not been established.
 Native posts on licensed 7.1 Gold were captured once, in one session on a
 development build and one client book, with the approval step not recorded
 ([reference](../tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)). Also
@@ -3640,7 +3640,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
 Keep the selected company free of other imports and ledger changes while posting,
 and leave Tally's product/licence mode unchanged. Bridge serializes its own writers;
 its separate checks cannot lock out Tally UI edits or other importers. Concurrent
-external changes are outside this preview's validated posting workflow.
+external changes are outside the validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
 approval. (The tool call itself returns "approval pending" after about 40 seconds

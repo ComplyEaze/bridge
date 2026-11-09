@@ -14,6 +14,8 @@
 //!   `DATA`-scoped Ledger collection grammar (`CMPINFO` counter trap).
 //! - `model` — row and result types; reuses `OutstandingsReport` so this
 //!   path is a drop-in for the UI.
+//! - `party_bills` — one party's open bills through `Ledger Outstandings`,
+//!   tied to its ledger's closing (#2377).
 //! - `compute` — assembles the report and the unallocated residual
 //!   cross-check.
 
@@ -22,6 +24,7 @@ mod date;
 mod group_name_index;
 mod ledger_currency;
 mod model;
+mod party_bills;
 mod request;
 mod wire;
 
@@ -39,6 +42,10 @@ pub use model::{
     AgeingAnchor, BillClosing, CompanyCurrency, LedgerSnapshotEntry, NativeBillRow,
     NativeOutstandingsError, NativeOutstandingsResult, NativeOverdueCrosscheck, PartyResidual,
     UnadmittedBillRow, UnadmittedBillRows,
+};
+pub use party_bills::{
+    parse_ledger_outstandings_answer, render_ledger_outstandings_request, PartyBill,
+    PartyBillReference, PartyBillsAnswer, PartyBillsAnswerError, PartyBillsRead, PartyBillsRefusal,
 };
 pub use request::{
     ledger_guid_filter_parts, parent_filter_parts, render_company_base_currency_request,

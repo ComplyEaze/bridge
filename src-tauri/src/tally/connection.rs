@@ -1216,6 +1216,8 @@ pub(crate) enum PairedReadValidationError {
     NativeCashFlow,
     #[error("Tally's own Negative Ledgers changed between paired reads")]
     NativeNegativeLedgers,
+    #[error("Tally's Ledger Outstandings for one party changed between paired reads")]
+    PartyBills,
     #[error("Tally's Company collection changed between paired reads")]
     CompanyFeatures,
     #[error("Tally company book changed during the company features read")]
@@ -1279,6 +1281,7 @@ impl PairedReadValidationError {
             Self::NativeStatement => "native_statement_changed",
             Self::NativeCashFlow => "native_cash_flow_changed",
             Self::NativeNegativeLedgers => "native_negative_ledgers_changed",
+            Self::PartyBills => "party_bills_drifted",
             Self::CompanyFeatures => "company_features_changed",
             Self::CompanyFeaturesExtent => "company_features_extent_changed",
             Self::CurrencyExtent => "currency_extent_changed",

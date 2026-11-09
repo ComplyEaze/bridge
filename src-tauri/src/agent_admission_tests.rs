@@ -1857,6 +1857,9 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// the arguments of `parse_bank_statement`, which adds 3,403 bytes to each list. On the tree
 /// merged with master the lists were over every budget by 3,231, 3,381, 3,390 and 3,267. Each
 /// budget went up by 4,000, leaving margins of 769, 619, 610 and 733.
+/// One party's open bills (#2377) add the `open_bills` detail to `outstandings`: 113 bytes, 13
+/// of enum value and 100 of description, to each list. On the tree merged with master after
+/// #1320 the lists still fit the budgets below, so no budget changed for it.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [212_900, 238_900, 241_400, 246_900];

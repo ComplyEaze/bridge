@@ -82,6 +82,8 @@ use vouchers::VoucherPages;
 mod bill_trail;
 #[path = "agent_outstandings.rs"]
 mod outstandings;
+#[path = "agent_party_bills.rs"]
+mod party_bills;
 #[path = "agent_presence.rs"]
 mod presence;
 #[path = "agent_voucher_search.rs"]
@@ -2690,6 +2692,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::NegativeLedgersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::PartyBillsReadError>()
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {

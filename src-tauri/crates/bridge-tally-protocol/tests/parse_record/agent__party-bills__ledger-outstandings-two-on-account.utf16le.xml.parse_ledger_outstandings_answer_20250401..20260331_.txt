@@ -1,0 +1,35 @@
+# fixture: tests/fixtures/agent/party-bills/ledger-outstandings-two-on-account.utf16le.xml
+# parser: parse_ledger_outstandings_answer(20250401..20260331)
+# source: captured
+Ok(PartyBillsAnswer {
+    bills: [
+        PartyBill {
+            reference: OnAccount,
+            bill_date: TallyDate(
+                "20251001",
+            ),
+            closing: ExactDecimal(
+                "-100.00",
+            ),
+            due_date: Some(
+                TallyDate(
+                    "20251001",
+                ),
+            ),
+            overdue_days: Some(
+                181,
+            ),
+        },
+        PartyBill {
+            reference: OnAccount,
+            bill_date: TallyDate(
+                "20260331",
+            ),
+            closing: ExactDecimal(
+                "-50.00",
+            ),
+            due_date: None,
+            overdue_days: None,
+        },
+    ],
+})

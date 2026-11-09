@@ -1,0 +1,5 @@
+20:46:15	T-types.xml	a-s2-T-types.xml	curl 0	306946 bytes
+20:46:16	W-2026-08.xml	a-s2-W-2026-08.xml	curl 0	115168 bytes
+20:46:16	V-0062.xml	a-s2-V-0062.xml	curl 0	3022 bytes
+20:46:16	V-0063.xml	a-s2-V-0063.xml	curl 0	3022 bytes
+20:46:16	V-0064.xml	a-s2-V-0064.xml	curl 0	3022 bytes

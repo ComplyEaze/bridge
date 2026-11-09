@@ -1,0 +1,1 @@
+s2 40 s3r 41 s2 rows all in s3r unchanged: True | new: ["DATE '20260801'; VOUCHERNUMBER 'BP/26-27/0062'; VOUCHERTYPENAME 'BRIDGE Sales'; "]

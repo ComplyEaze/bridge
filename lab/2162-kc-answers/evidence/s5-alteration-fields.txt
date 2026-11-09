@@ -1,0 +1,13 @@
+Voucher screen opened by Enter on the Day Book line BP/26-27/0062, before Alt+D (nothing changed):
+Title bar: Accounting Voucher Alteration (Secondary) | BRIDGE PILOT LAB
+Voucher type: BRIDGE Sales; No.: BP/26-27/0062; Date: 1-Aug-26, Saturday
+Party A/c name: BRIDGE Walk-in; Current balance: 19,250.70 Dr
+Particulars | Rate | per | Amount
+BRIDGE Svc 998313 5% | | | 600.40
+BRIDGE Svc 998314 5% | | | 400.40
+BRIDGE CGST 2.5% | 2.50 | % | 25.02
+BRIDGE SGST 2.5% | 2.50 | % | 25.02
+BRIDGE Round Off | | | 0.16
+Narration: (empty); Total: 1,051.00
+Button bar: Q: Quit, A: Accept, D: Delete, X: Cancel Vch, F12: Configure
+Alt+D: a box "Delete ?" with "Yes or No" (s5-5-delete-prompt); answered y. No other prompt or message.

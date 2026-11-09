@@ -1,0 +1,4 @@
+20:47:25	W-2026-08.xml	a-s4r-W-2026-08.xml	curl 0	120802 bytes
+20:47:25	R-0063.xml	a-s4r-R-0063.xml	curl 0	94478 bytes
+20:47:26	V-0063.xml	a-s4r-V-0063.xml	curl 0	52788 bytes
+20:47:26	M-marks.xml	a-s4r-M-marks.xml	curl 0	3396 bytes

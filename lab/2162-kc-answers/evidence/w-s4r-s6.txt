@@ -1,0 +1,1 @@
+s4r 42 s6 41 s6 rows all in s4r unchanged: True | gone: ["DATE '20260801'; VOUCHERNUMBER 'BP/26-27/0062'; VOUCHERTYPENAME 'BRIDGE Sales'; "]

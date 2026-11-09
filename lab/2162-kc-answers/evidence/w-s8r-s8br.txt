@@ -1,0 +1,1 @@
+s8r 42 s8br 43 s8r rows all in s8br unchanged: True | new: ["DATE '20260801'; VOUCHERNUMBER 'BP/26-27/0064'; VOUCHERTYPENAME 'BRIDGE Sales'; BRIDGEVCHISSALES 'Yes'; ISCANC"]

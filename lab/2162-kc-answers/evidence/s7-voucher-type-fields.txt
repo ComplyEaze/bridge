@@ -1,0 +1,28 @@
+Voucher Type Creation, BRIDGE PILOT LAB, as shown before Ctrl+A (s7-vt-creation-before-save). Keyed: the Name, Select type of voucher (Sales typed, Enter), Method of Voucher Numbering (Down twice to Manual, Enter), Prevent creating duplicate Voucher Nos. (y, Enter); every other field was passed with Enter or not reached, as Tally filled it.
+Name: BRIDGE Sales Keyed
+(alias): empty
+General:
+ Select type of voucher: Sales
+ Abbreviation: Sale (filled by Tally)
+ Activate this Voucher Type: Yes
+ Method of Voucher Numbering: Manual (offered: Automatic, Automatic (Manual Override), Manual, Multi-user Auto, None)
+  Prevent creating duplicate Voucher Nos.: Yes (shown as No until set; it appeared under the method once Manual was chosen)
+ Show unused vch nos. in transactions for Retain Original Voucher No. behaviour: No (greyed)
+ Use effective dates for vouchers: No (the cursor's field at the save)
+ Allow zero-valued transactions: No
+ Make this voucher type as 'Optional' by default: No
+ Allow narration in voucher: Yes
+ Provide narrations for each ledger in voucher: No
+ Enable default accounting allocations: No
+ WhatsApp voucher after saving: No
+Printing:
+ Print voucher after saving: No
+ Use for POS invoicing: No
+ Default template to print: Not Applicable
+ Default title to print: empty
+ Default bank: Not Applicable
+ Default jurisdiction: empty
+ Set/alter declaration: No
+ Set/Alter Terms and Conditions: No
+Name of Class: empty
+Right panel: F2: Period (greyed), F3: Company, F4 to F9 (greyed), F10: Other Masters, I: More Details; button bar Q: Quit, A: Accept, D: Delete (greyed), F12: Configure.

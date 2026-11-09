@@ -1,0 +1,18 @@
+== a-s7r-M-marks.xml: 3396 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '71' ALTMSTID '247'
+  GUID is the book's: yes
+  COMPANY rows: 1
+== a-s7r-T-types.xml: 319888 bytes
+  STATUS '1'
+  VOUCHERTYPE rows: 29
+  named 'BRIDGE Sales': 1
+   PARENT 'Sales'; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce'; NUMBERINGMETHOD 'None'; ISACTIVE 'Yes'
+   VOUCHERNUMBERSERIES.LIST elements: 1
+   series: NAME 'Default'; NUMBERINGMETHOD 'Manual'; PREVENTDUPLICATES 'Yes'; DUPLICATECONTROL ''; BEGINNINGNUMBER '1'
+   RESTARTFROMLIST.LIST elements: 1 children: [0]
+  named 'BRIDGE Sales Keyed': 1
+   PARENT 'Sales'; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e8'; NUMBERINGMETHOD 'None'; ISACTIVE 'Yes'
+   VOUCHERNUMBERSERIES.LIST elements: 1
+   series: NAME 'Default'; NUMBERINGMETHOD 'Manual'; PREVENTDUPLICATES 'Yes'; DUPLICATECONTROL ''; BEGINNINGNUMBER '1'
+   RESTARTFROMLIST.LIST elements: 1 children: [0]

@@ -1,0 +1,1 @@
+s6b 41 s8r 42 s6b rows all in s8r unchanged: True | new: ["DATE '20260801'; VOUCHERNUMBER 'BP/26-27/0064'; VOUCHERTYPENAME 'BRIDGE Sales Keyed'; BRIDGEVCHISSAL"]

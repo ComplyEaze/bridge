@@ -1,0 +1,46 @@
+Row 2162-SC, step 3: GSTR-1 before, read only. Times UTC, 9 Nov 2026.
+
+16:49:42Z  The Gateway (s3-1-gateway). BRIDGE PILOT LAB alone; current period 1-Apr-26 to 31-Mar-27; current date Tuesday, 15-Sep-2026.
+Keys: "G: Go To" clicked (its label; the sheet says Alt+G). GSTR-1 typed. List of Reports, GST Reports: GSTR-1, GSTR-1 Reconciliation, GSTR-1 Filed Summary - Downloaded; no line highlighted. Down once: GSTR-1 highlighted. Enter.
+No list of GST registrations appeared.
+
+16:50:15Z  GSTR-1 (s3-3-gstr1-summary). GST Registration 08ZZZZZ0000Z1ZQ; Status Not Filed; ARN and ARN Date empty; 1-Aug-26 to 31-Aug-26; "Last online GST activity: No Activity Found". Button bar: F2: Period, F3: Company, F5: Nature View, F6: Validate Party GSTIN/UIN, F7: Validate HSN/SAC, F10: Mark as Filed, B: Basis of Values, H: Change View, J: Exception Reports, L: Save View, J: Stat Adjustment, V: Open GST Portal, A: Manually Update ARN, F12: Configure. No period key was pressed.
+  Total Vouchers 39
+  Included in Return 27
+    Ready for Upload 27
+      Modified in Books After Upload/Export 27
+  Not Relevant for This Return 7
+  Uncertain Transactions (Corrections needed) 5
+  Check Vouchers Having Potential Conflicts with Masters: Yes
+  Return View (Vch Count (Summary) / Taxable / IGST / CGST / SGST/UTGST / Cess / Tax / Invoice):
+  B2B Invoices - 4A, 4B, 4C, 6B, 6C: empty
+  B2C (Large) Invoices - 5A, 5B: empty
+  Exports Invoices - 6A: empty
+  Credit or Debit Notes (Registered) - 9B: empty
+  Credit or Debit Notes (Unregistered) - 9B: empty
+  Amended B2B Invoices - 9A: empty
+  Amended B2C (Large) Invoices - 9A: empty
+  Amended Exports Invoices - 9A: empty
+  Amended Credit or Debit Notes (Registered) - 9C: empty
+  Amended Credit or Debit Notes (Unregistered) - 9C: empty
+  B2C (Small) Invoices - 7: 27 (2) / 13,508.70 / - / 383.26 / 383.24 / - / 766.50 / empty
+  Nil Rated Invoices - 8A, 8B, 8C, 8D: empty
+  Amendment B2C (Small) Invoices - 10: empty
+  Tax Liability (Advances Received) - 11A(1), 11A(2): empty
+  Adjustment of Advances - 11B(1), 11B(2): empty
+  Amended Tax Liability (Advances Received) - 11A: empty
+  (more lines below, "3" with a down mark; not scrolled to)
+  Total: 13,508.70 / - / 383.26 / 383.24 / - / 766.50 / empty
+Keys (3.4, Uncertain Transactions above 0): Down 5 times to Uncertain Transactions (Corrections needed); Enter once.
+
+16:50:41Z  "GSTR-1 - Uncertain Transactions", BRIDGE PILOT LAB, GST Registration 08ZZZZZ0000Z1ZQ, Details of Uncertain Transactions (Corrections needed), 1-Aug-26 to 31-Aug-26 (s3-4-uncertain). Columns: Particulars, Voucher/Summary Count. Lines, word for word:
+  Transactions with Incomplete/Mismatch in Information  5
+  Outward Supplies
+    Invalid or Missing Information
+      HSN/SAC is invalid, mismatched, or not specified  2
+    Mismatch in Information Between Masters and Transactions
+      Mismatch between Expected Tax Amount and Modified Tax Amount in transaction  3
+  Button bar: F2: Period, F3: Company, L: Save View, F12: Configure (B, H and J greyed). Nothing but Esc was pressed on this screen.
+Keys: Esc (back to GSTR-1, Uncertain Transactions highlighted), Esc (the Gateway).
+
+16:51Z  The Gateway (s3-5-gateway). No prompt and no dialog appeared at any point.

@@ -1,0 +1,7 @@
+a-s2-W-2026-08.xml against a-s5-W-2026-08.xml: same size (115168 B); lines that differ:
+--- a-s2-W
++++ a-s5-W
+@@ -39 +39 @@
+-    <TAXUNIT>0</TAXUNIT>
++    <TAXUNIT>1</TAXUNIT>
+enclosing elements (innermost last): ['<BODY>', '<DESC>', '<CMPINFO>']

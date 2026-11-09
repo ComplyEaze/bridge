@@ -1,0 +1,35 @@
+Row 2162-SC, step 6: GSTR-1 after, read only. Times UTC, 9 Nov 2026.
+
+16:57:33Z  The Gateway (s6-1-gateway).
+Keys: "G: Go To" clicked; GSTR-1 typed; List of Reports as at step 3 (GST Reports: GSTR-1, GSTR-1 Reconciliation, GSTR-1 Filed Summary - Downloaded; no line highlighted). Down once: GSTR-1 highlighted. Enter.
+No list of GST registrations appeared. Before the report, a dialog over the Gateway, title bar "GSTR-1", BRIDGE PILOT LAB (s6-1b-status-dialog), word for word:
+  "GST-related details were altered in the masters, hence voucher status for GST reporting will change."
+  "Number of Vouchers in the Current Period : 39"
+  "Number of Vouchers in All Periods : 40"
+  "Select the period for which you want to check the vouchers."
+  Buttons: "A: All Periods" and "C: Current Period" (C framed, as the default).
+The sheet does not name this dialog: stopped, no key pressed, asked the run lead.
+The run lead's word: press C (Current Period), record the dialog word for word with both counts as a new observation, and continue steps 6 to 8.
+Keys: c (C: Current Period).
+
+16:59:24Z  GSTR-1 (s6-3-gstr1-summary). GST Registration 27ZZZZZ0000Z1ZQ; Status Not Filed; ARN and ARN Date empty; 1-Aug-26 to 31-Aug-26; "Last online GST activity: No Activity Found". Button bar as at step 3. No period key was pressed.
+  Total Vouchers 39
+  Included in Return (no count shown)
+  Not Relevant for This Return 7
+  Uncertain Transactions (Corrections needed) 32
+  Marked for Deletion on Portal 4
+  (no "Check Vouchers Having Potential Conflicts with Masters" line)
+  Return View: every line shown is empty: B2B Invoices - 4A, 4B, 4C, 6B, 6C; B2C (Large) Invoices - 5A, 5B; Exports Invoices - 6A; Credit or Debit Notes (Registered) - 9B; Credit or Debit Notes (Unregistered) - 9B; Amended B2B Invoices - 9A; Amended B2C (Large) Invoices - 9A; Amended Exports Invoices - 9A; Amended Credit or Debit Notes (Registered) - 9C; Amended Credit or Debit Notes (Unregistered) - 9C; B2C (Small) Invoices - 7; Nil Rated Invoices - 8A, 8B, 8C, 8D; Amendment B2C (Small) Invoices - 10; Tax Liability (Advances Received) - 11A(1), 11A(2); Adjustment of Advances - 11B(1), 11B(2); Amended Tax Liability (Advances Received) - 11A; Amendment of Adjusted Advances - 11B
+  (more lines below, "2" with a down mark; not scrolled to)
+  Total: empty
+Keys (Uncertain above 0): Down 3 times to Uncertain Transactions (Corrections needed); Enter once.
+
+16:59:55Z  "GSTR-1 - Uncertain Transactions", BRIDGE PILOT LAB, GST Registration 27ZZZZZ0000Z1ZQ, Details of Uncertain Transactions (Corrections needed), 1-Aug-26 to 31-Aug-26 (s6-4-uncertain). Lines, word for word:
+  Transactions with Incomplete/Mismatch in Information  32
+  Outward Supplies
+    Mismatch in Information Between Masters and Transactions
+      Mismatch in GST Registration Details between the GST Registration master and the transaction  32
+  Button bar as at step 3. Nothing but Esc was pressed on this screen.
+Keys: Esc (back to GSTR-1, Uncertain highlighted, the same counts), Esc (the Gateway).
+
+17:00Z  The Gateway (s6-5-gateway). No other prompt or dialog appeared.

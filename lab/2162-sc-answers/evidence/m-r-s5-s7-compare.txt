@@ -1,0 +1,13 @@
+a-s5-M-marks.xml against a-s7-M-marks.xml, lines that differ:
+  @@ -43 +43 @@
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHER>68</VOUCHER>
+a-s5-R-0010.xml against a-s7-R-0010.xml, lines that differ:
+  @@ -43 +43 @@
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHER>68</VOUCHER>
+  @@ -71,2 +71,2 @@
+  -     <VCHGSTSTATUSISINCLUDED TYPE="Logical">Yes</VCHGSTSTATUSISINCLUDED>
+  -     <VCHGSTSTATUSISUNCERTAIN TYPE="Logical">No</VCHGSTSTATUSISUNCERTAIN>
+  +     <VCHGSTSTATUSISINCLUDED TYPE="Logical">No</VCHGSTSTATUSISINCLUDED>
+  +     <VCHGSTSTATUSISUNCERTAIN TYPE="Logical">Yes</VCHGSTSTATUSISUNCERTAIN>

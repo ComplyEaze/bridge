@@ -1,0 +1,5 @@
+== --diff a-s5-R-0010.xml a-s7-R-0010.xml
+   VCHGSTSTATUSISINCLUDED: 'Yes' -> 'No'
+   VCHGSTSTATUSISUNCERTAIN: 'No' -> 'Yes'
+   lists compared: 1
+   legs: 6 -> 6

@@ -1,0 +1,32 @@
+Row 2162-SC, step 4: the change on Tally's screen. Times UTC, 9 Nov 2026.
+
+16:51:25Z  The Gateway (s4-1-gateway). s4m's <the before-write option> had passed (68/245).
+4.1  "G: Go To" clicked (its label; the sheet says Alt+G). "GST Registration" typed as one paste. The field kept "GSTRe". List of Reports: Create Voucher, Create Master, Alter Master, Expand All, Show More; GST Reports (highlighted); Track GST Return Activities. An Error box at the lower right: "Error" / "Oops!" / "Spelling Error" (s4-1-goto-stop). No line named Alter and GST Registration: stopped, pressed nothing, and asked the run lead.
+     The run lead's word (option b): dismiss the Error box with Esc only; clear the field; type "Alter Master"; Enter on that line; write down every line; Enter on "GST Registration" only if a line reads exactly so; else restore and close.
+     Esc once: the Error box closed; Go To stayed with "GSTRe". Backspace x5: the field empty (the list then showed the reports from "Bills Payable - GST" down). "Alter Master" typed; the field showed "AlterMaster" (the field drops spaces). List of Reports: Create Voucher, Create Master, Alter Master (highlighted), Expand All, Show More. Enter.
+     "Master Alteration", List of Masters (s4-1b-master-alteration): Change Company, Expand All, Show More; Accounting Masters: Group, Ledger, Currency, Voucher Type; Inventory Masters: Stock Group, Stock Category, Stock Item, Unit, Godown; Statutory Masters: GST Registration, GST Classification; Statutory Details: Company GST Details, PAN/CIN Details.
+     Down x11 (the highlight passed Godown and the Statutory Masters heading) to "GST Registration"; Enter.
+4.2  "List of GST Registrations" (s4-2-registrations): Create, Back; one line, "Rajasthan Registration" (highlighted). Enter on it.
+4.3  "GST Registration Alteration", BRIDGE PILOT LAB; the Master Alteration field reads "Rajasthan Registration"; panel "GST Details" (s4-3-alteration). Every field, as shown:
+       Registration status: Active
+       GST Registration Details
+         State: Rajasthan
+         Registration type: Regular  (the cursor here, with a "Registration Types" list: Regular, Composition, Regular - SEZ)
+         Assessee of Other Territory: No
+         GSTIN/UIN: 08ZZZZZ0000Z1ZQ
+         Periodicity of GSTR-1: Monthly
+       Connected GST Details
+         GST Username: (empty)
+         Mode of Filing: Not Applicable (with a diamond mark)
+       e-Invoice Details
+         e-Invoicing applicable: No
+       e-Way Bill Details
+         e-Way Bill applicable: Yes
+         Applicable from: 1-Apr-26
+         Applicable for intrastate: Yes
+       Button bar: F2: Period (greyed), F3: Company, F10: Other Masters, I: More Details, A: Accept, D: Delete, Q: Quit, F12: Configure.
+     One field holds 08ZZZZZ0000Z1ZQ: "GSTIN/UIN".
+4.4  Enter (Registration type kept Regular; the cursor to Assessee of Other Territory, No), Enter (kept No; the cursor to GSTIN/UIN, its value highlighted). One Backspace: the cursor went back to Assessee of Other Territory (still No); GSTIN/UIN still 08ZZZZZ0000Z1ZQ; nothing changed. So the sheet's 15 Backspaces would have walked back through the fields, and were not pressed. Enter (kept No; the cursor to GSTIN/UIN, highlighted). "27ZZZZZ0000Z1ZQ" typed as one paste over the highlighted value; zoomed before any Enter: the field reads 27ZZZZZ0000Z1ZQ, 15 characters, capitals (s4-4-gstin-typed).
+4.5  No other field was touched. State reads Rajasthan; Registration type Regular; Assessee of Other Territory No; Periodicity of GSTR-1 Monthly. Tally asked for no date and opened no other field or screen.
+4.6  The field was zoomed once more (27ZZZZZ0000Z1ZQ), then Ctrl+A. No "Accept ?" prompt and no other prompt or message appeared. Tally returned to "Master Alteration", List of GST Registrations: Create, Back, Rajasthan Registration (highlighted) (s4-6-after-accept, 16:56:37Z).
+4.7  Ctrl+Q on that list: the Gateway, BRIDGE PILOT LAB, current date Tuesday, 15-Sep-2026 (s4-7-gateway). Screens passed: List of GST Registrations, the Gateway.

@@ -810,7 +810,7 @@ jobs:
         if: runner.os == 'macOS'
         run: echo 'APPLE_SIGNING_IDENTITY=-' >> "$GITHUB_ENV"
       # tauri fetches its WiX and NSIS tools from github.com release hosts at the end of the build, after the compile. A 5xx there
-      # failed 17 Windows attempts on 8 and 9 Nov (9 to 14 minutes each), in outages that came and went within minutes.
+      # failed 12 of 280 Windows attempts in the week to 9 Nov (9 to 14 minutes each), in outages that came and went within minutes.
       # Only that error is retried: 3 attempts, pauses of 30 s and 90 s; any other failure fails at once. Each attempt writes one
       # `bundle-retry:` line, so a count over a period reads from the job logs. scripts/bundle-retry.test.mjs runs this step's script.
       - name: Build the Windows bundles, retrying only a bundler download 5xx

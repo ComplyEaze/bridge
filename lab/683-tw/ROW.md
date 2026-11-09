@@ -29,7 +29,7 @@ Check every file against `SHA256.txt` first, and each send's request file again 
 | file | what, and where its bytes come from |
 |---|---|
 | `M-marks.xml` | The marks request (GUID, ALTVCHID, ALTMSTID). Byte-equal to rows 683-LM's, 683-TB's and 683-OP's. |
-| `T-tb1-20250401-20250430.xml` | `render_native_trial_balance_request_with_currency` (`native_trial_balance/mod.rs:170`), the period `trial_balance` builds (`tally/runtime_trial_balance.rs:391`, `ModeAgnostic` on a licensed gateway), 20250401 to 20250430. Byte-equal to row 683-TB's and 683-OP's `tb1`. |
+| `T-tb1-20250401-20250430.xml` | `render_native_trial_balance_request_with_currency` (`native_trial_balance/mod.rs:170`), the period `trial_balance` builds (`tally/runtime_trial_balance.rs:391`, with the profile `observe_read_boundary` gives, `tally/runtime.rs:2052`: `ModeAgnostic` on a licensed gateway, as the render test sets it), 20250401 to 20250430. Byte-equal to row 683-TB's and 683-OP's `tb1`. |
 | `T-tb3-20250401-20250401.xml` | The same builder for 20250401 to 20250401. Only `SVTODATE` differs from `tb1`. |
 | `T-tb4-20250401-20260331.xml` | The same builder for 20250401 to 20260331. Only `SVTODATE` differs from `tb1`. |
 | `V-mvy-20250401-20260331.xml` | `render_agent_movement_vouchers` (`agent_read_profiles.rs:100`), book scope, 20250401 to 20260331. Only the dates differ from row 683-LM's `V-mv-20250401.xml`. |
@@ -81,7 +81,7 @@ Run each send as `python3 -I run.py http://127.0.0.1:9001 <label> <file>`. Write
    - one `tally.exe` owning 9001;
    - `GET /status` 200 (record its bytes).
 
-   Load the book alone, as above. Read the Gateway's date and period, and write them down. Record the release and the licence mode.
+   Load the book alone, as above. Read the Gateway's date and period, and write them down. Record the release and the licence mode: the Gateway's title (a licensed gateway shows no Educational mode) and the `tally.exe` file version, as row 683-LM recorded them.
 1. **`m0`:** `M-marks.xml`, then `python3 -I lm.py a-m0-M-marks.xml`. EXPECT one COMPANY row, `the book's: yes`, ALTVCHID 11, ALTMSTID 214.
    - Any other GUID or row count: STOP.
    - Other figures: record them and STOP before step 2, since the book changed after its last note.
@@ -93,7 +93,7 @@ Run each send as `python3 -I run.py http://127.0.0.1:9001 <label> <file>`. Write
 3. **`tb3`:** `T-tb3-20250401-20250401.xml`. Then, at once, screenshot the whole Tally window: this is the first Trial Balance on this book to a `to` other than 30 April. A dialog = Stop. Then `python3 -I tb.py a-tb3-T-tb3-20250401-20250401.xml`, recorded whole.
 4. **`tb4`:** `T-tb4-20250401-20260331.xml`, then `python3 -I tb.py a-tb4-T-tb4-20250401-20260331.xml`, recorded whole.
 5. **The sets:** `python3 -I tb.py --sets a-tb1-T-tb1-20250401-20250430.xml a-tb3-T-tb3-20250401-20250401.xml`, then the same with `a-tb4-T-tb4-20250401-20260331.xml` in place of `tb3`, each recorded whole. Nothing is sent for this step.
-6. **`mvy`:** `V-mvy-20250401-20260331.xml`. Then, at once, screenshot the whole Tally window: this is the first movement window on this book longer than one day. A dialog = Stop. Then `python3 -I lm.py --capture a-mvy-V-mvy-20250401-20260331.xml ref-a-mv-V-mv-20250401.xml`, recorded whole.
+6. **`mvy`:** `V-mvy-20250401-20260331.xml`. Then, at once, screenshot the whole Tally window: this is the first movement window on this book longer than one day. A dialog = Stop. Then `python3 -I lm.py --capture a-mvy-V-mvy-20250401-20260331.xml ref-a-mv-V-mv-20250401.xml`, recorded whole. `--capture` compares each voucher's ledger names and amount texts only, so then `python3 -I lm.py a-mvy-V-mvy-20250401-20260331.xml`, recorded whole: each voucher with its DATE and each entry's ISDEEMEDPOSITIVE.
 7. **`mvly-inr`:** `V-mvly-inr-customer-20250401-20260331.xml`. Then `python3 -I lm.py --ledger a-mvly-inr-V-mvly-inr-customer-20250401-20260331.xml a-mvy-V-mvy-20250401-20260331.xml "BRIDGE INR Customer"`, recorded whole.
 8. **`mvly-usd`:** `V-mvly-usd-customer-20250401-20260331.xml`. Then `python3 -I lm.py --ledger a-mvly-usd-V-mvly-usd-customer-20250401-20260331.xml a-mvy-V-mvy-20250401-20260331.xml "BRIDGE USD Customer"`, recorded whole.
 9. **`m1`:** `M-marks.xml`, then `python3 -I lm.py --same-row a-m0-M-marks.xml a-m1-M-marks.xml`. EXPECT SAME MARKS, and m1 byte-equal to m0 (record both sha256). On MARKS DIFFER:

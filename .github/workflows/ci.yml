@@ -809,11 +809,40 @@ jobs:
       - name: Use ad-hoc signing for macOS smoke bundles
         if: runner.os == 'macOS'
         run: echo 'APPLE_SIGNING_IDENTITY=-' >> "$GITHUB_ENV"
-      - run: corepack pnpm run tauri:build
+      # tauri fetches its WiX and NSIS tools from github.com release hosts at the end of the build, after the compile. A 5xx there
+      # failed 12 of 280 Windows attempts in the week to 9 Nov (9 to 14 minutes each), in outages that came and went within minutes.
+      # Only that error is retried: 3 attempts, pauses of 30 s and 90 s; any other failure fails at once. Each attempt writes one
+      # `bundle-retry:` line, so a count over a period reads from the job logs. scripts/bundle-retry.test.mjs runs this step's script.
+      - name: Build the Windows bundles, retrying only a bundler download 5xx
         if: runner.os != 'macOS'
+        shell: bash
         env:
           CARGO_INCREMENTAL: '0'
           RUSTC_WORKSPACE_WRAPPER: sccache
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/tauri-build.log"
+          pauses=(30 90)
+          for attempt in 1 2 3; do
+            if corepack pnpm run tauri:build 2>&1 | tee "$log"; then
+              echo "bundle-retry: attempt $attempt/3 outcome=ok"
+              exit 0
+            fi
+            status=$(grep -Eo 'http status: 50[0-9]\b' "$log" | tail -n 1 || true)
+            if [ -z "$status" ]; then
+              echo "::error::bundle-retry: attempt $attempt/3 outcome=other-failure, not a bundler download error, not retried"
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::bundle-retry: attempt 3/3 outcome=download-5xx ($status), no attempts left"
+              exit 1
+            fi
+            pause=${pauses[$((attempt - 1))]}
+            echo "::warning::bundle-retry: attempt $attempt/3 outcome=download-5xx ($status), retrying in $pause s"
+            rm -rf src-tauri/target/release/bundle
+            sleep "$pause"
+          done
+          exit 1
       - name: Build macOS bundles with child diagnostics
         id: macos-bundle
         if: runner.os == 'macOS'

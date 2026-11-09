@@ -203,7 +203,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "4cda3f7a75013b25c3192c46ad1be1984858d3d58b32cdd042139ac542bd19db"],
+  ], "7dc6196b7310987961dfc02bf02fe3e344ffcb07748eb82639358e7af726f899"],
   // The one job that writes the archive cache: its steps, its events and its key are pinned, so a change that lets
   // another event or job write what the build jobs restore must edit this pin and carry an acknowledgement.
   [workflow, "pdfium-cache", [

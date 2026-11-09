@@ -344,6 +344,7 @@ import {
   entriesFromAuditToml,
   parseReport,
   recordedAccepted,
+  requireBaselineSettings,
   updateComment,
 } from "./audit-tracking-issue.mjs";
 
@@ -537,8 +538,33 @@ test("ids sharing one comment block share its date, and two reports must each ag
   assert.deepEqual(acceptedEntries([ACCEPTED_REPORT, ACCEPTED_REPORT], AUDIT_TOML), entries);
   assert.throws(() => acceptedEntries([ACCEPTED_REPORT, REPORTED_REPORT], AUDIT_TOML), /only in the file: RUSTSEC-2026-0459/);
   // An id the report repeats is still one id.
-  const repeated = { settings: { ignore: [...ACCEPTED_REPORT.settings.ignore, ACCEPTED_ID] } };
+  const repeated = { settings: { ...ACCEPTED_REPORT.settings, ignore: [...ACCEPTED_REPORT.settings.ignore, ACCEPTED_ID] } };
   assert.deepEqual(acceptedEntries([repeated], AUDIT_TOML), entries);
+});
+
+// A severity floor, a target filter or a dropped informational kind can narrow
+// what cargo-audit reports while the accepted ids stay the same, so each is
+// refused by name. Both captured reports hold the baseline, in any order.
+test("a report whose other settings differ from the captured baseline is refused, naming the setting", () => {
+  for (const report of [ACCEPTED_REPORT, REPORTED_REPORT]) assert.doesNotThrow(() => requireBaselineSettings(report));
+  const reordered = { ...ACCEPTED_REPORT.settings, informational_warnings: ["unsound", "notice", "unmaintained"] };
+  assert.doesNotThrow(() => requireBaselineSettings({ settings: reordered }));
+  const { severity, ...noSeverity } = ACCEPTED_REPORT.settings;
+  const changed = [
+    ["severity", { ...ACCEPTED_REPORT.settings, severity: "high" }],
+    ["severity", noSeverity],
+    ["target_arch", { ...ACCEPTED_REPORT.settings, target_arch: ["x86_64"] }],
+    ["target_os", { ...ACCEPTED_REPORT.settings, target_os: ["windows"] }],
+    ["informational_warnings", { ...ACCEPTED_REPORT.settings, informational_warnings: ["unmaintained", "unsound"] }],
+    ["informational_warnings", { ...ACCEPTED_REPORT.settings, informational_warnings: [] }],
+    ["target_os", { ...ACCEPTED_REPORT.settings, target_os: "windows" }],
+  ];
+  for (const [key, settings] of changed) {
+    const pattern = new RegExp(`settings\\.${key} is .*refusing`);
+    assert.throws(() => requireBaselineSettings({ settings }), pattern);
+    assert.throws(() => acceptedEntries([{ ...ACCEPTED_REPORT, settings }], AUDIT_TOML), pattern);
+    assert.throws(() => acceptedEntries([ACCEPTED_REPORT, { ...ACCEPTED_REPORT, settings }], AUDIT_TOML), pattern);
+  }
 });
 
 test("a recorded line naming the same entries twice repairs silently, and bad rows are not echoed", () => {

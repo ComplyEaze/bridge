@@ -178,9 +178,9 @@ base revision.
 
 [8.2m An item Purchase keyed through a voucher class — **PARTIAL 2026-11-04; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82m-an-item-purchase-keyed-through-a-voucher-class--partial-2026-11-04-tallyprime-72-one-synthetic-book)
 
-<a id="82n-a-dollar-party-balance-carried-past-its-last-voucher-reads-as-a-plain-rupee-figure-in-a-later-window--partial-2026-11-10-tallyprime-72-one-synthetic-book"></a>
+<a id="82n-a-dollar-party-balance-is-a-composite-from-the-books-first-day-and-a-plain-rupee-figure-from-the-day-after-its-only-voucher-day--partial-2026-11-10-tallyprime-72-one-synthetic-book"></a>
 
-[8.2n A dollar party balance carried past its last voucher reads as a plain rupee figure in a later window — **PARTIAL 2026-11-10; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82n-a-dollar-party-balance-carried-past-its-last-voucher-reads-as-a-plain-rupee-figure-in-a-later-window--partial-2026-11-10-tallyprime-72-one-synthetic-book)
+[8.2n A dollar party balance is a composite from the book's first day, and a plain rupee figure from the day after its only voucher day — **PARTIAL 2026-11-10; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82n-a-dollar-party-balance-is-a-composite-from-the-books-first-day-and-a-plain-rupee-figure-from-the-day-after-its-only-voucher-day--partial-2026-11-10-tallyprime-72-one-synthetic-book)
 
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 

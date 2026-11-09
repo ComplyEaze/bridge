@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Verify and launch a trusted, locally built MCPB archive without contacting Tally.
 //!
-//! The Rust port of `scripts/check-mcpb-bundle.py` (#1810 step 6). Every check is the same, in the same
-//! order, with the same diagnostic codes, and the report has the same fields in the same order, so CI can
-//! run both on one bundle and compare the two reports byte for byte before the Python is retired. It reads
-//! the archive with the `zip` crate the `bridge` package already depends on.
+//! Ported from the Python check it replaced (#1810 step 6): every check, its order and its diagnostic
+//! code are the Python's, and so is the report, field for field and byte for byte, which CI compared on
+//! both systems before the Python was deleted. A comment that cites Python names the behaviour it keeps.
+//! It reads the archive with the `zip` crate the `bridge` package already depends on.
 //!
 //! Usage: `check_mcpb_bundle <archive> [--output <file>]`. The report goes to stdout (and the file); a
 //! failure prints `MCPB smoke failed: <code>` on stderr and exits 1.
@@ -87,9 +87,9 @@ pub const ICON: &str = "icon.png";
 pub const ICON_SOURCE: &str = "packaging/mcpb/icon.png";
 pub const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 pub const ARCHIVE_MEMBERS: usize = RESOURCES.len() + 5; // manifest, icon, binary, PDFium library, PDFium notice
-const STATEMENT_FIXTURE: &str =
+pub const STATEMENT_FIXTURE: &str =
     "src-tauri/crates/bridge-bank-statement/tests/fixtures/hdfc-synthetic.pdf";
-const STATEMENT_PASSWORD: &str = "synthetic-user-4321";
+pub const STATEMENT_PASSWORD: &str = "synthetic-user-4321";
 pub const MAX_BUNDLE_BYTES: u64 = 128 * 1024 * 1024;
 pub const MAX_OUTPUT_BYTES: usize = 512 * 1024;
 pub const REMOVE_ATTEMPTS: u32 = 8;
@@ -692,6 +692,11 @@ pub fn validate_server_version(reply: &Value, manifest: &Value) -> Checked<Strin
         .to_string())
 }
 
+/// One run of the bundle's server: the command, its stdin, its environment and its time limit, giving
+/// its stdout and stderr. `run_bounded` is the real one; the tests pass a stand-in server.
+pub type Run<'a> =
+    dyn FnMut(&[String], &[u8], &Map<String, Value>, Duration) -> Checked<(Vec<u8>, Vec<u8>)> + 'a;
+
 /// Run `command` with `payload` on stdin; stdout and stderr each bounded, the whole run timed out.
 #[expect(
     clippy::disallowed_methods,
@@ -827,6 +832,7 @@ fn statement_smoke(
     base_environment: &Map<String, Value>,
     temporary: &Path,
     repository: &Path,
+    server: &mut Run,
 ) -> Checked<Value> {
     let work = temporary.join("statement");
     fs::create_dir(&work).map_err(os_error)?;
@@ -866,7 +872,7 @@ fn statement_smoke(
         json!({"jsonrpc": "2.0", "method": "notifications/initialized"}),
         json!({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "parse_bank_statement", "arguments": arguments}}),
     ];
-    let (output, diagnostics) = run_bounded(
+    let (output, diagnostics) = server(
         &[command.to_string()],
         &requests_payload(&requests),
         &environment,
@@ -954,7 +960,7 @@ pub fn remove_with_retries(
     None
 }
 
-/// The report, field for field and in the order of `scripts/check-mcpb-bundle.py`.
+/// The report, field for field and in the order the Python check wrote it.
 #[derive(Serialize)]
 pub struct Report {
     pub archive_sha256: String,
@@ -976,6 +982,11 @@ pub struct Report {
 }
 
 pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
+    smoke_with(archive, repository, &mut run_bounded)
+}
+
+/// The smoke run, each start of the server going through `server`.
+pub fn smoke_with(archive: &Path, repository: &Path, server: &mut Run) -> Checked<Report> {
     let scratch = ScratchDirectory::new("bridge-mcpb-smoke-")?;
     let temporary = scratch.0.as_path();
     let destination = temporary.join("bundle");
@@ -1028,7 +1039,7 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
     )?)?
     .replace("${__dirname}", &destination.to_string_lossy());
     let refused_data = temporary.join("data-refused");
-    let (refused_output, _) = run_bounded(
+    let (refused_output, _) = server(
         std::slice::from_ref(&command),
         &requests_payload(&requests),
         &with(
@@ -1062,7 +1073,7 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
         "BRIDGE_TERMS_ACCEPTED".to_string(),
         Value::String("true".to_string()),
     );
-    let (output, diagnostics) = run_bounded(
+    let (output, diagnostics) = server(
         std::slice::from_ref(&command),
         &requests_payload(&requests),
         &environment,
@@ -1100,7 +1111,7 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
     // for safe recovery of saved batches.
     let enabled_environment = with(&environment, "BRIDGE_AGENT_ENABLE_WRITES", "true");
     let catalogue_payload = requests_payload(&requests[..3]);
-    let (enabled_output, enabled_diagnostics) = run_bounded(
+    let (enabled_output, enabled_diagnostics) = server(
         std::slice::from_ref(&command),
         &catalogue_payload,
         &enabled_environment,
@@ -1123,7 +1134,7 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
     )?;
     // The tax-audit switch, run on the packaged binary: it adds that one tool and nothing else.
     let audit_environment = with(&environment, "BRIDGE_AGENT_ENABLE_TAX_AUDIT", "true");
-    let (audit_output, _) = run_bounded(
+    let (audit_output, _) = server(
         std::slice::from_ref(&command),
         &catalogue_payload,
         &audit_environment,
@@ -1177,7 +1188,8 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
         opt(&record, "source") == Some(&json!("setting"))
     };
     require(recorded, "terms_acceptance_not_recorded")?;
-    let statement_vouchers = statement_smoke(&command, &environment, temporary, repository)?;
+    let statement_vouchers =
+        statement_smoke(&command, &environment, temporary, repository, server)?;
     Ok(Report {
         archive_sha256: sha256_hex(&fs::read(archive).map_err(os_error)?),
         binary_sha256: sha256_hex(&fs::read(&binary).map_err(os_error)?),

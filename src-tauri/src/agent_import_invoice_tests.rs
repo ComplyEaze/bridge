@@ -3301,3 +3301,74 @@ fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
     assert!(text.contains("has not been established"));
     assert!(text.ends_with("Do not post it again."));
 }
+
+/// Row 2162-S9b's customer after `Regular - SEZ` was chosen on Tally's Ledger Alteration screen
+/// and saved: the build's compliance read answered on `BRIDGE PILOT LAB`, captured, with one
+/// declared substitution (`lab/2162-s9b-answers` at db52c37b, `substitutions.txt`): each GSTIN
+/// set to a synthetic value of the same length that keeps the original's check character. The
+/// ledger holds two dated entries, 20260401 `Regular` and 20260915 `Regular - SEZ`
+/// (voucher-writes reference §9.16).
+fn s9b_customer() -> bridge_tally_protocol::PartyLedgerMasterRecord {
+    let xml = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-s9b-customer-sez-compliance.utf16le.xml"
+    ));
+    let records = bridge_tally_protocol::parse_native_party_ledger_master_records_with_evidence(
+        &xml,
+        &pilot_lab_guid(),
+    )
+    .expect("the captured compliance read parses")
+    .records
+    .into_iter()
+    .map(|row| row.record)
+    .filter(|record| record.ledger.name == "BRIDGE Customer RJ")
+    .collect::<Vec<_>>();
+    let [customer] = <[_; 1]>::try_from(records).expect("one row for the customer");
+    customer
+}
+
+/// The entry in force on the invoice's date decides the type: before the first entry nothing is
+/// known, from it the customer is Regular, and from the day Tally dated the new entry it is not.
+#[test]
+fn a_customer_made_sez_on_screen_is_refused_from_the_date_of_its_new_entry() {
+    let customer = s9b_customer();
+    let on = |date: &str| {
+        gstin_evidence(
+            customer.ledger.party_gstin.returned_text(),
+            &customer.fields.gst_registrations,
+            date,
+        )
+    };
+    const COPIED: &str = "08ZZZZZ0000Z1ZO";
+    let in_force = |kind: &str| {
+        (
+            GstinEvidence::InForce(COPIED.to_string()),
+            Some(kind.to_string()),
+        )
+    };
+    assert_eq!(on("20260331"), (GstinEvidence::NoEntryInForce, None));
+    assert_eq!(on("20260401"), in_force("Regular"));
+    assert_eq!(on("20260914"), in_force("Regular"));
+    assert_eq!(on("20260915"), in_force("Regular - SEZ"));
+
+    // The substitution kept the original's check character, so the copied GSTIN fails the check
+    // digit and would be refused as invalid before its type is read. The judge is given the
+    // valid synthetic GSTIN of the same state and the entry's type as the read gives it.
+    assert!(!gstin_valid(COPIED));
+    let judged = |date: &str| {
+        let (gstin, kind) = on(date);
+        let mut facts = good_facts();
+        let party = facts.get_mut("Customer A").unwrap();
+        party.gstin = match gstin {
+            GstinEvidence::InForce(_) => GstinEvidence::InForce(GSTIN_RJ.to_string()),
+            other => other,
+        };
+        party.registration_type = kind;
+        classify_sales_invoice(&voucher(), &facts, RAJ, date)
+    };
+    assert_eq!(
+        codes(judged("20260331")),
+        vec!["invoice_party_registration_not_in_force"]
+    );
+    assert!(judged("20260914").is_ok());
+    assert_eq!(codes(judged("20260915")), vec!["invoice_party_not_regular"]);
+}

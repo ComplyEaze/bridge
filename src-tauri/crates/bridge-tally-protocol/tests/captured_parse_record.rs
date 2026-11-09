@@ -2682,6 +2682,15 @@ const ROWS: &[Row] = &[
     // Party ledger masters: src/agent_ledgers_tests.rs, src/agent_register_tests.rs; the
     // compliance read's other replays (src/tally/runtime_party_evidence_tests.rs,
     // src/agent_register_server_tests.rs) by the same parser.
+    // Row 2162-S9b's compliance read, captured with each GSTIN set to a synthetic value of the
+    // same length (pilot-lab/PROVENANCE.md): src/agent_import_invoice_tests.rs reads its
+    // customer's two dated registration entries.
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab/pilot-lab-s9b-customer-sez-compliance.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(PILOT LAB)",
+        parse: |_, text| party_masters(text, PILOT_LAB_GUID),
+    },
     Row {
         fixture: "tests/fixtures/agent/native-ledger-masters-duty-heads.utf16le.xml",
         source: Source::Captured,

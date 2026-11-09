@@ -1,0 +1,5 @@
+$ python -I count15.py --unit-diff a-s2-U-taxunits.xml a-s3q-U-taxunits.xml
+== --unit-diff a-s2-U-taxunits.xml a-s3q-U-taxunits.xml: TAXUNIT names ['Default Tax Unit', 'Rajasthan Registration'] -> ['Default Tax Unit', 'Rajasthan Registration']
+   unit 'Default Tax Unit': 0 leaves differ
+   unit 'Rajasthan Registration': 0 leaves differ
+exit 0

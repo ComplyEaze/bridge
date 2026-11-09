@@ -1,0 +1,55 @@
+Step 3, screens and keys, as text.
+
+3.1 At the Gateway (shot s3-gateway-before, 19:58:41Z): F11 pressed once. The screen title (top left) reads "Company Features  Alteration", BRIDGE PILOT LAB in the title bar centre; the button bar shows F2: Period, F3: Company, I: More Details, F12: Configure, Q: Quit, A: Accept. Fields before any change (shot s3-features-before; the cursor on Maintain Accounts):
+Company: BRIDGE PILOT LAB
+Show more features : Yes
+Show all features : Yes
+Accounting
+  Maintain Accounts : Yes
+    Enable Bill-wise entry : Yes
+    Enable Cost Centres : No
+    Enable Interest Calculation : No
+Inventory
+  Maintain Inventory : Yes
+    Integrate Accounts with Inventory : Yes
+    Enable multiple Price Levels : No
+    Enable Batches : No
+      Maintain Expiry Date for Batches : No (shown dimmed)
+    Enable Job Order Processing : No
+    Enable Cost Tracking : No
+    Enable Job Costing : No
+    Use Discount column in invoices : No
+    Use separate Actual and Billed Quantity columns in invoices : No
+Taxation
+  Enable Goods and Services Tax (GST) : Yes
+    Set/Alter Company GST Rate and Other Details : No
+  Enable Tax Deducted at Source (TDS) : No
+  Enable Tax Collected at Source (TCS) : No
+  Enable Value Added Tax (VAT) : No
+  Enable Excise : No
+  Enable Service Tax : No
+Online Access
+  Enable Browser Access for Reports : Yes
+  Enable Tally.NET Services for Remote Access & Synchronisation : No
+Payroll
+  Maintain Payroll : No
+    Enable Payroll Statutory : No (shown dimmed)
+Others
+  Enable Payment Request to share payment link/QR code : No
+  Enable multiple addresses : No
+  Mark modified vouchers : No
+
+3.2 Exactly one field names Goods and Services Tax (GST) and reads Yes: "Enable Goods and Services Tax (GST)".
+
+3.3 Keys on the features screen, in order: Down x7 (the cursor from Maintain Accounts to Enable Batches; Maintain Expiry Date for Batches, dimmed, was passed over), Down x5 (to Use separate Actual and Billed Quantity columns in invoices), Down x1: the cursor on Enable Goods and Services Tax (GST), reading Yes; no other field changed (each field passed kept its value; screen captures checked after each group). Then n typed: the field shows "n" in its edit box, no message, no list, no other field changed (shot s3-gst-n-typed).
+Enter pressed once: Enable Goods and Services Tax (GST) reads No (zoomed); its sub-line Set/Alter Company GST Rate and Other Details now shows dimmed, reading No; the cursor moved to Enable Tax Deducted at Source (TDS), No. No prompt, no message, no sub-screen, no list; every other field as before (shot s3-gst-no).
+3.4 No other field touched.
+
+3.5 Ctrl+A pressed once (19:59:5xZ). No "Accept ?" prompt. A message box came up at the bottom right of the window, over the features screen, word for word:
+  GST-related changes in masters may impact the GST Status of vouchers in Returns.
+  Y : Accept Master & Update GST Status of Vouchers
+  N : Back
+Captured: shots s3-prompt-desktop.jpg (the screen, 20:00:1xZ), s3-prompt-zoom.jpg (the box) and s3-prompt.png (the window capture, which does not reach the box). The Go To button showed "G: Switch To" while the box was up. By the prompt rule it is this row's result, and its No, "N : Back", is the answer.
+n pressed once (N : Back): the box closed; Company Features Alteration still open, its title showing, the GST field reading No (not saved), the cursor back on Maintain Accounts (Yes), every other field as before; no further message (shots s3-after-back.png, s3-after-back-desktop.jpg). Nothing more pressed on the features screen; it is left by Ctrl+Q (C7).
+3.6 Ctrl+Q pressed once on Company Features Alteration: no prompt, no message; the Gateway of Tally shows BRIDGE PILOT LAB, Current Period 1-Apr-26 to 31-Mar-27, Current Date Tuesday, 15-Sep-2026, Date of Last Entry 15-Sep-26, the same menu lines as before F11 (Masters, Transactions, Utilities, Reports, Quit), and the right-hand panel as before (shot s3-gateway-after). Screens passed: Company Features Alteration, the message box, Company Features Alteration, the Gateway.
+Keys pressed in step 3, in all: F11; Down x13; n; Enter; Ctrl+A; n (Back); Ctrl+Q.

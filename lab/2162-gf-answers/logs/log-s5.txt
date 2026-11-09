@@ -1,0 +1,5 @@
+01:35:34	M-marks.xml	a-s5-M-marks.xml	curl 0	3394 bytes
+01:35:34	O-object.xml	a-s5-O-object.xml	curl 0	85654 bytes
+01:35:34	U-taxunits.xml	a-s5-U-taxunits.xml	curl 0	22636 bytes
+01:35:34	T-types.xml	a-s5-T-types.xml	curl 0	306946 bytes
+01:35:34	R-0010.xml	a-s5-R-0010.xml	curl 0	94474 bytes

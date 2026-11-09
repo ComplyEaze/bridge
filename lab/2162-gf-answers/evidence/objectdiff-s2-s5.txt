@@ -1,0 +1,3 @@
+$ python -I count15.py --object-diff a-s2-O-object.xml a-s5-O-object.xml
+== --object-diff a-s2-O-object.xml a-s5-O-object.xml: 0 leaves differ
+exit 0

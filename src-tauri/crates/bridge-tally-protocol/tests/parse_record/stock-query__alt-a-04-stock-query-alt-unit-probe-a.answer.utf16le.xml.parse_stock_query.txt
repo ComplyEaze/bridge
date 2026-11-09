@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/stock-query/alt-a-04-stock-query-alt-unit-probe-a.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "30",
+                ),
+                unit: "Nos",
+            },
+        },
+    ],
+))

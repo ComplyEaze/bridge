@@ -188,10 +188,102 @@ fn a_type_whose_guid_cannot_go_into_the_read_back_formula_is_refused_at_the_buil
     assert!(resolve_voucher_type(&types, "Sales Acc", "Sales").is_ok());
 }
 
+fn number(text: &str) -> InvoiceNumber {
+    InvoiceNumber::parse(text).expect("an admitted invoice number")
+}
+
+fn date(text: &str) -> TallyDate {
+    TallyDate::parse(text).expect("a calendar date")
+}
+
+/// The SHA-256 of a request as it is sent: its file begins with the byte order
+/// mark.
+fn sent_sha256(request: &str) -> String {
+    let sent = [0xFF, 0xFE]
+        .into_iter()
+        .chain(request.encode_utf16().flat_map(u16::to_le_bytes))
+        .collect::<Vec<u8>>();
+    crate::agent::sha256_hex(&sent)
+}
+
+/// The number read the code renders is, for the two numbers row 2162-IRN sent
+/// (4 Nov 2026, #2162 item 8), the request the lab sent, by the SHA-256 of its
+/// file (`NI-1.xml`, `NI-2.xml` of `lab/2162-irn-read-sheet` at 8b1573e8).
+#[test]
+fn the_number_read_is_the_one_the_lab_answered_with_the_e_invoice_words() {
+    let (from, to) = (date("20250401"), date("20260331"));
+    for (text, sha256) in [
+        (
+            "1",
+            "43048185958e9be86e9bbdd403670a160ba9f5e49bd2e55dde3232be12cb8d1c",
+        ),
+        (
+            "2",
+            "43cec4b9b334012bea51cd1c68c019b61111577befb3304c3a165a70d7b145a5",
+        ),
+    ] {
+        let rendered =
+            render_invoice_number_request("BRIDGE EINVOICE LAB", &number(text), (&from, &to));
+        assert_eq!(sent_sha256(&rendered), sha256, "{text}");
+    }
+}
+
+/// Without the e-invoice words, the number read is, for each spelling row S4
+/// sent (3 Nov 2026, #2162), the request the lab sent: the S4 answers replayed
+/// to the read are answers to that request (DERIVED, see the pilot lab's
+/// PROVENANCE).
+#[test]
+fn the_number_read_less_the_e_invoice_words_is_the_one_the_lab_answered_for_each_spelling() {
+    let (from, to) = (date("20260401"), date("20270331"));
+    for (text, sha256) in [
+        (
+            "BP/26-27/0051",
+            "216f6eb3563034e22d848d050a91ddff3d95693117c51554322bc294bf248e78",
+        ),
+        (
+            "bp/26-27/0051",
+            "7c4e42f37643a06872e3e725671cb161d939fb79f1160b6ec7724c2b4c9f7ae7",
+        ),
+        (
+            "BP/26-27/051",
+            "c4e19dfbaae315e436af22a12ac7fc097a35da7248529b5fc5de23a5d195e34d",
+        ),
+    ] {
+        let rendered =
+            render_invoice_number_request("BRIDGE PILOT LAB", &number(text), (&from, &to));
+        let words = ", IRN, IRNACKNO, IRNACKDATE</FETCH>";
+        assert_eq!(rendered.matches(words).count(), 1, "{text}");
+        assert_eq!(
+            sent_sha256(&rendered.replace(words, "</FETCH>")),
+            sha256,
+            "{text}"
+        );
+    }
+}
+
+/// Tally's answer when a Sales type that prevents duplicates is sent an
+/// invoice whose number is already in use (3 Nov 2026, #2162 row S4): nothing
+/// created, one exception, no `LINEERROR`, in the answer and with no dialog.
+/// The same bytes answered the number in lower case.
+#[test]
+fn a_number_the_sales_guard_declines_is_answered_in_band_with_nothing_created() {
+    let outcome = bridge_tally_protocol::parse_import_outcome(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-duplicate-declined.utf16le.xml"
+    )))
+    .unwrap();
+    assert_eq!(outcome.counters().created, 0);
+    assert_eq!(outcome.counters().altered, 0);
+    assert_eq!(outcome.counters().errors, 0);
+    assert_eq!(outcome.counters().exceptions, 1);
+    assert!(outcome.exceptions_were_reported());
+    assert!(outcome.tally_line_errors().is_empty());
+    assert_eq!(outcome.last_vch_id(), Some(0));
+}
+
 #[test]
 fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
-    let request =
-        render_invoice_number_request("Co", "INV/26-27/0042", ("20250401", "20260331")).unwrap();
+    let (from, to) = (date("20250401"), date("20260331"));
+    let request = render_invoice_number_request("Co", &number("INV/26-27/0042"), (&from, &to));
     assert!(
         request.contains("$VoucherNumber = \"INV/26-27/0042\"</SYSTEM>"),
         "the number is the only literal beside the dates"
@@ -204,7 +296,8 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         "the class is a compute, not an unmeasured filter"
     );
     assert!(request.contains("<TYPE>Voucher</TYPE>") && !request.contains("IMPORTDATA"));
-    // GST rule 46(b): 16 characters, letters, digits, hyphen, slash.
+    // GST rule 46(b): 16 characters, letters, digits, hyphen, slash. The
+    // renderer takes only a parsed number, so nothing else reaches the literal.
     for bad_number in [
         "A\"B",
         "A\\B",
@@ -218,15 +311,12 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         "\u{e9}",
         "1".repeat(17).as_str(),
     ] {
-        assert!(
-            render_invoice_number_request("Co", bad_number, ("20250401", "20260331")).is_none(),
-            "{bad_number:?}"
-        );
+        assert_eq!(InvoiceNumber::parse(bad_number), None, "{bad_number:?}");
     }
-    assert!(
-        render_invoice_number_request("Co", &"1".repeat(16), ("20250401", "20260331")).is_some()
-    );
-    assert!(render_invoice_number_request("Co", "1", ("2025-04-01", "20260331")).is_none());
+    assert!(InvoiceNumber::parse(&"1".repeat(16)).is_some());
+    assert!(InvoiceNumber::parse("INV/26-27/0042").is_some());
+    // A date that is not YYYYMMDD never becomes one either.
+    assert!(TallyDate::parse("2025-04-01").is_err());
 }
 
 #[test]
@@ -261,17 +351,68 @@ fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
     );
 }
 
+/// The number read with the e-invoice words as the lab answered it (4 Nov 2026,
+/// #2162 item 8, `einvoice-lab`): number `1` is held by a Sales invoice with an
+/// IRN and by a Payment, number `2` by a Sales invoice without one.
+#[test]
+fn the_captured_number_reads_say_whether_the_sales_holder_carries_an_irn() {
+    let with = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
+    ));
+    let without = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml"
+    ));
+    assert_eq!(count_vouchers(&with), Ok(2));
+    assert_eq!(count_sales_vouchers(&with), Ok(1));
+    assert_eq!(sales_holder_has_irn(&with), Ok(true));
+    assert_eq!(count_sales_vouchers(&without), Ok(1));
+    assert_eq!(sales_holder_has_irn(&without), Ok(false));
+}
+
+/// The holder's IRN is said only when it came back with text; an empty or
+/// missing one claims nothing, and only a Sales-class holder's counts.
+#[test]
+fn only_a_sales_holder_with_an_irn_says_the_number_carries_one() {
+    let wrap = |rows: &str| {
+        format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
+    };
+    let row = |class: &str, irn: &str| {
+        format!("<VOUCHER><VOUCHERNUMBER>1</VOUCHERNUMBER>{irn}<BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
+    };
+    let with = "<IRN TYPE=\"String\">ab12</IRN>";
+    let empty = "<IRN TYPE=\"String\"></IRN>";
+    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", with))), Ok(true));
+    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", empty))), Ok(false));
+    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", ""))), Ok(false));
+    assert_eq!(sales_holder_has_irn(&wrap(&row("No", with))), Ok(false));
+    assert_eq!(
+        sales_holder_has_irn(&wrap(&(row("No", empty) + &row("Yes", with)))),
+        Ok(true)
+    );
+    assert_eq!(
+        sales_holder_has_irn(&wrap(&row("Yes", &format!("{with}{with}")))),
+        Err("invoice_read_field_repeated")
+    );
+    assert_eq!(
+        sales_holder_has_irn(&wrap(&row("Maybe", with))),
+        Err("invoice_number_class_unread")
+    );
+}
+
 #[test]
 fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     let guid = &format!("{}-00000193", sentinel_uuid(0x5));
-    let request =
-        render_invoice_readback_request("Co", guid, "278", ("20250401", "20260331")).unwrap();
+    let (from, to) = (date("20250401"), date("20260331"));
+    let type_guid = VoucherTypeGuid::parse(guid).expect("a hex-and-hyphen GUID");
+    let request = render_invoice_readback_request("Co", &type_guid, &number("278"), (&from, &to));
     assert!(request.contains(&format!("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \"{guid}\"</SYSTEM>")));
     assert!(request.contains("ALLLEDGERENTRIES.*"));
-    assert!(
-        render_invoice_readback_request("Co", "g\"", "278", ("20250401", "20260331")).is_none()
-    );
-    assert!(render_invoice_readback_request("Co", guid, "A B", ("20250401", "20260331")).is_none());
+    // Neither a GUID nor a number that could close the literal becomes one.
+    for bad_guid in ["g\"", "", "a b", &"a".repeat(65)] {
+        assert_eq!(VoucherTypeGuid::parse(bad_guid), None, "{bad_guid:?}");
+    }
+    assert!(VoucherTypeGuid::parse(&"a".repeat(64)).is_some());
+    assert_eq!(InvoiceNumber::parse("A B"), None);
 }
 
 /// The pilot lab's tax units as Tally answered the code's own request (see the
@@ -592,9 +733,28 @@ fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic
 /// Sales-class count from a count of every row:
 /// `only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate` is the
 /// test that does.
+///
+/// Two more answers come from a book holding `BP/26-27/0051` (3 Nov 2026,
+/// #2162 row S4). Asked for `bp/26-27/0051`, Tally's filter ignores case and
+/// returns that invoice, so the build refuses the number. Asked for
+/// `BP/26-27/051`, it returns no row: a dropped leading zero is another number
+/// to this read, and to Tally's own duplicate guard, which then created that
+/// invoice. Whether GST counts the two as one number is open (§9.16).
 #[test]
 fn the_captured_number_answers_count_their_rows_not_their_header() {
     for (name, xml, vouchers, sales) in [
+        (
+            "number-in-use-lower-case",
+            captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml")),
+            1,
+            1,
+        ),
+        (
+            "number-dropped-zero",
+            captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-dropped-zero.utf16le.xml")),
+            0,
+            0,
+        ),
         (
             "number-in-use",
             captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml")),
@@ -733,8 +893,8 @@ const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/test
 #[test]
 fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
     let sent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.request.utf16le.xml"));
-    let rendered =
-        render_ledger_rates_request("BRIDGE PILOT LAB", ("20260401", "20260801")).unwrap();
+    let (from, to) = (date("20260401"), date("20260801"));
+    let rendered = render_ledger_rates_request("BRIDGE PILOT LAB", (&from, &to));
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
     let answered = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
     assert_eq!(
@@ -744,77 +904,40 @@ fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
         ),
         rendered
     );
-    // A window that is not eight digits renders nothing.
-    for bad in ["2026-04-01", "2026040", "2026040a", ""] {
-        assert!(render_ledger_rates_request("X", (bad, "20260801")).is_none());
-        assert!(render_ledger_rates_request("X", ("20260401", bad)).is_none());
+    // A window that is not a YYYYMMDD calendar date never becomes one, so it
+    // cannot reach the request.
+    for bad in ["2026-04-01", "2026040", "2026040a", "", "20260230"] {
+        assert!(TallyDate::parse(bad).is_err(), "{bad:?}");
     }
     // A company name is escaped into the request.
-    assert!(
-        render_ledger_rates_request("A & B", ("20260401", "20260801"))
-            .unwrap()
-            .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>")
-    );
+    assert!(render_ledger_rates_request("A & B", (&from, &to))
+        .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>"));
 }
 
-/// One part naming exactly these parents, planned the way a scope plans them
-/// (one catalogue row per parent is enough to name it).
-fn part_of(parents: &[&str]) -> bridge_tally_protocol::parent_partition::ParentPart {
-    use bridge_tally_protocol::parent_partition::{
-        ParentObservation, ParentPartition, PartitionLimits,
-    };
-    let names = parents
-        .iter()
-        .enumerate()
-        .map(|(index, parent)| (format!("ledger {index}"), format!("guid-{index}"), *parent))
-        .collect::<Vec<_>>();
-    let plan = ParentPartition::plan(
-        names.iter().map(|(name, guid, parent)| {
-            (
-                name.as_str(),
-                guid.as_str(),
-                ParentObservation::Named(parent),
-            )
-        }),
-        PartitionLimits {
-            max_ledgers_per_part: 4_266,
-            max_parents_per_part: 200,
-            max_parts: 12,
-            max_complement_formula_bytes: 262_144,
-        },
+/// The rates request restricted to the named ledgers is the unfiltered one
+/// with the GUID formula added and nothing else changed (#1331): same fetch
+/// list, same window, the `FILTERS` element after the computed company GUID,
+/// where a parent part's request carries it (§11e).
+#[test]
+fn a_ledger_scoped_rates_request_adds_only_the_guid_formula_and_its_filter() {
+    use bridge_tally_protocol::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
+    let (from, to) = (date("20260401"), date("20260801"));
+    let window = (&from, &to);
+    let whole = render_ledger_rates_request("BRIDGE PILOT LAB", window);
+    let part = LedgerGuidPart::new(
+        ["guid-b", "guid-a"].map(|guid| LedgerGuid::parse(&guid.replace("guid", "abc")).unwrap()),
     )
     .unwrap();
-    assert_eq!(plan.parts().len(), 1);
-    plan.parts()[0].clone()
-}
-
-/// The scoped rates request is the unfiltered one with the parent formula
-/// added and nothing else changed (#1331): same fetch list, same window, the
-/// `FILTERS` element after the computed company GUID, as the compliance
-/// listing's parts carry it (§11e).
-#[test]
-fn a_scoped_rates_request_adds_only_the_parent_formula_and_its_filter() {
-    let window = ("20260401", "20260801");
-    let whole = render_ledger_rates_request("BRIDGE PILOT LAB", window).unwrap();
-    let part = part_of(&[
-        "Sundry Debtors",
-        "Sales Accounts",
-        "Duties & Taxes",
-        "Indirect Expenses",
-    ]);
-    let scoped =
-        render_ledger_rates_request_for_parents("BRIDGE PILOT LAB", window, &part).unwrap();
+    let scoped = render_ledger_rates_request_for_ledgers("BRIDGE PILOT LAB", window, &part);
     let formula = concat!(
-        "<SYSTEM TYPE=\"Formulae\" NAME=\"BridgeParentPart\">",
-        "$Parent = \"Duties &amp; Taxes\" OR $Parent = \"Indirect Expenses\" OR ",
-        "$Parent = \"Sales Accounts\" OR $Parent = \"Sundry Debtors\"</SYSTEM>"
+        "<SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceLedgers\">",
+        "$GUID = \"abc-a\" OR $GUID = \"abc-b\"</SYSTEM>"
     );
     assert!(scoped.contains(formula), "{scoped}");
     let undone = scoped
         .replace(formula, "")
-        .replace("<FILTERS>BridgeParentPart</FILTERS>", "");
+        .replace("<FILTERS>BridgeInvoiceLedgers</FILTERS>", "");
     assert_eq!(undone, whole);
-    assert!(render_ledger_rates_request_for_parents("X", ("2026", "20260801"), &part).is_none());
 }
 
 /// The lab's answer, read at the edge: each sales ledger's one dated row with
@@ -1135,33 +1258,58 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
     );
 }
 
-/// The read-back request with the four GSTR-1 status fields is, byte for byte,
-/// the one the lab answered for `BP/26-27/0010` on 10 Oct 2026 (the file begins
-/// with the byte order mark the request is sent with); for `BP/26-27/0021` it
-/// has the SHA-256 of the request file the lab sent for that number.
+/// The read-back request with the four GSTR-1 status fields and `ISPOSTDATED`
+/// is, byte for byte, the one the lab answered for `BP/26-27/0010` on 3 Nov 2026
+/// (the file begins with the byte order mark the request is sent with): the 10 Oct
+/// request with that one word added. For `BP/26-27/0021` it is that file with the
+/// number changed.
 #[test]
 fn the_status_read_back_request_is_the_one_the_lab_answered() {
-    let sent = |number: &str| {
+    let type_guid =
+        VoucherTypeGuid::parse("6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce").unwrap();
+    let (from, to) = (date("20260401"), date("20270331"));
+    let sent = |text: &str| {
         let rendered = render_invoice_readback_request(
             "BRIDGE PILOT LAB",
-            "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce",
-            number,
-            ("20260401", "20270331"),
-        )
-        .unwrap();
+            &type_guid,
+            &number(text),
+            (&from, &to),
+        );
         [0xFF, 0xFE]
             .into_iter()
             .chain(rendered.encode_utf16().flat_map(u16::to_le_bytes))
             .collect::<Vec<u8>>()
     };
     let answered: &[u8] = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.request.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated.request.utf16le.xml"
     );
     assert_eq!(sent("BP/26-27/0010"), answered);
     assert_eq!(
         crate::agent::sha256_hex(&sent("BP/26-27/0021")),
-        "b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5"
+        "e560b89b9d63ab53375a6e03f19ad5ad3b895063052bda0edf9568c805000693"
     );
+    // The requests the bill-wise read-backs answered (3 Nov 2026, #2162 item 3),
+    // by the SHA-256 of each request file the lab sent.
+    for (text, sha256) in [
+        (
+            "BP/26-27/0047",
+            "42cc765c76b8a251268a14a76b8edf6165a58b42864b350061b7f40f3f673525",
+        ),
+        (
+            "BP/26-27/0048",
+            "86efe054a870f38702a4d2d3aec3a0a53db3878a15e16ae936e5f36451a52540",
+        ),
+        (
+            "BP/26-27/0049",
+            "4efe7527ac839af89b765952693064262778034531c74c8a6ea709b19297053b",
+        ),
+        (
+            "BP/26-27/0050",
+            "71c3f4ab3ed3d2371dd1b54d4345097a27726e580df06f663ca608ba80091946",
+        ),
+    ] {
+        assert_eq!(crate::agent::sha256_hex(&sent(text)), sha256, "{text}");
+    }
 }
 
 /// The group request is W16's: the group listing the compliance read sends

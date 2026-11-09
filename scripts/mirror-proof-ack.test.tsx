@@ -197,6 +197,33 @@ test("an inspected interrupted run can resume only while no worker is active", a
   host.remove();
 });
 
+test("a run whose commit the mirror refused says so and offers no resume", async () => {
+  const refused: SnapshotJob = {
+    ...run("refused", "commit_pending", true),
+    resume_available: false,
+    failure_code: "snapshot_commit_refused",
+  };
+  const interrupted = run("interrupted", "commit_pending", true);
+  const fixture = props(async () => [refused, interrupted]);
+  fixture.result.snapshotJob = refused;
+  fixture.result.inspectedJob = refused;
+  fixture.result.selectedRecentSnapshotRuns = [refused, interrupted];
+  fixture.result.snapshotStartOutcomeUnknown = false;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<MirrorProofScreen {...fixture.result} />));
+  const spans = [...host.querySelectorAll("span")].map((span) => span.textContent);
+  expect(spans).toContain("Failure: The local mirror refused to commit this run");
+  expect(spans).toContain("Commit refused: a resume cannot succeed. Start a new read.");
+  expect(spans).not.toContain("Detached legacy state: inspect only");
+  expect([...host.querySelectorAll("button")].some((button) => button.textContent?.includes("Resume interrupted run"))).toBe(false);
+  const cells = [...host.querySelectorAll("tbody tr")].map((row) => row.querySelectorAll("td")[4]?.textContent);
+  expect(cells).toEqual(["Commit refused", "Resume available"]);
+  await act(async () => root.unmount());
+  host.remove();
+});
+
 test("a failed run's Failure line shows the Gap Map title, and an unlisted code its own words", async () => {
   const host = document.createElement("div");
   document.body.append(host);
@@ -231,10 +258,13 @@ test("a probe whose core read stopped names the refusal by its title in Pack rea
     packs: {
       core_accounting: { state: "unknown", confidence: "observed", safe_reason_code: "company_altmstid_missing" },
       india_tax: { state: "unknown", confidence: "observed", safe_reason_code: "some_unlisted_code" },
+      inventory: { state: "unknown", confidence: "observed", safe_reason_code: "xml_export_shape_unrecognized" },
     },
   };
   await act(async () => root.render(<MirrorProofScreen {...fixture.result} />));
   const text = host.textContent ?? "";
+  expect(text).toContain("The endpoint answered, but not as a Tally company list.");
+  expect(text).not.toContain("Xml export shape unrecognized");
   expect(text).toContain("Observed by this probe. The core read stopped: Tally did not report its master-change marker.");
   expect(text).toContain("Observed by this probe. Reason: Some unlisted code.");
   expect(text).not.toContain("Company altmstid missing");

@@ -1,18 +1,18 @@
 name: Node suite on Windows
 
-# Informational. The Node test suite (scripts/*.test.mjs) runs on ubuntu-latest in Bridge CI; this
-# runs it on windows-latest, where bridge#1471 measured 107 of 608 tests failing. It is not a
-# required check and is not part of Bridge CI's `Required checks`, so it cannot hold a pull request
-# or the merge queue. It goes red only for a failure that .github/node-windows-known-failures.txt
-# does not list, and for a run that cannot be trusted (no outcomes, a different set of test files,
-# a non-zero exit with no failed test). When the known-failures file is empty, delete it and the
-# comparison, and move the job into ci.yml as a required job.
-#
-# Deliberately no push, schedule or merge_group trigger: a failing run on master would mark a
-# commit red, and the merge queue must not wait on it.
+# The Node test suite (scripts/*.test.mjs) on windows-latest, where bridge#1471 measured 107 of 608
+# tests failing. Every one now passes or is skipped, so any failing test turns this job red. A skip
+# is the test's own decision on this host: 43 of 800 in the run that measured it (a POSIX stand-in
+# `cargo` in the egress-boundary test, a POSIX `gh` stub in the version test, `cargo audit` absent
+# from the runner, and a few cases that skip win32, `chmod` and `mkfifo` by design). It runs on pull
+# requests and in the merge queue so that it can be added to the repository ruleset's required
+# status checks: that is a ruleset setting, not a file in this repository (the check is named by the
+# job name below).
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   node-windows:
-    name: Node suite (windows-latest, informational)
+    name: Node suite (windows-latest)
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -38,35 +38,10 @@ jobs:
           cache: pnpm
       - run: corepack pnpm install --frozen-lockfile
       # The same command as the first part of `pnpm test`, under bash because the suite's own tests
-      # call bash, jq and python. The exit status is recorded and the next step decides the job's
-      # result from the per-test outcomes, not from this status.
+      # call bash and jq (a test whose tool or platform feature is missing skips itself). failglob
+      # makes a glob that matches no test file an error instead of a run of zero tests.
       - name: Run the Node suite
-        id: node
         shell: bash
         run: |
-          status=0
-          node --experimental-strip-types --test \
-            --test-reporter=spec --test-reporter-destination=stdout \
-            --test-reporter=./scripts/node-test-outcomes.mjs --test-reporter-destination="$RUNNER_TEMP/outcomes.jsonl" \
-            scripts/*.test.mjs || status=$?
-          echo "node_exit=$status" >> "$GITHUB_OUTPUT"
-      - name: Compare with the known failures
-        if: ${{ !cancelled() && steps.node.outcome != 'skipped' }}
-        shell: bash
-        env:
-          NODE_EXIT: ${{ steps.node.outputs.node_exit }}
-        run: |
-          node scripts/check-node-windows-outcomes.mjs \
-            --outcomes "$RUNNER_TEMP/outcomes.jsonl" \
-            --baseline .github/node-windows-known-failures.txt \
-            --node-exit "$NODE_EXIT" \
-            --host "Runner ${{ runner.os }} ${{ runner.arch }}; Node $(node -v); bash $BASH_VERSION" \
-            --summary "$GITHUB_STEP_SUMMARY"
-      - name: Keep the per-test outcomes
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: node-windows-outcomes
-          path: ${{ runner.temp }}/outcomes.jsonl
-          if-no-files-found: warn
-          retention-days: 14
+          shopt -s failglob
+          node --experimental-strip-types --test scripts/*.test.mjs

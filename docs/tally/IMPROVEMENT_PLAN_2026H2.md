@@ -274,7 +274,7 @@ Four persona proposals (CA operator, product strategist, protocol engineer, UX d
 4. **Excel/CSV → review grid → post pipeline** with saved per-client column mappings — the expansion product.
 5. **Drift Sentinel** — checkpoint → "changed/new/deleted/back-dated since sign-off" with before/after diffs. Firm-maintained books only in v1; calm "backup restored, re-baselining" state distinct from tamper alarm.
 6. **Honest freshness UX** — Sync Beacon with dual timestamps; Gap Map reborn as a fix-it list; Truth States compressed to three visual tiers (Verified+time / Attention+reason+fix / Broken+remediation).
-7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (a full-books unbounded export can hang Tally on a large book during working hours — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
+7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (on a large book an unbounded whole-book export can occupy Tally for many minutes and leave the gateway refusing every company for tens of minutes; the agent's windowed voucher reads are bounded before they are sent (16 MiB byte budget from a census of the window at the book's measured per-voucher cost, protocol reference §11c); the sync snapshot path still splits only after a response trips the cap, so v2 must reuse that bound — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
 8. **Kill the ceremony, keep the evidence** — rule adopted verbatim: *no safety mechanism without a demonstrated failure mode it prevents; no capability claim without a receipt.*
 9. **Declared topology honesty** — v1 supports: local single-machine, loaded-company, licensed Tally, no TallyVault, no gateway auth. Tally-on-cloud/RDP (**internal hypothesis: market prevalence is unverified**), multi-user LAN, gateway-security setups = explicit `Unsupported` Passport states, not silent failures.
 
@@ -706,6 +706,16 @@ Tally, or a failed rewrite leaves the read path with neither implementation work
 
 A unit satisfies only its own scope. The Phase 2 exit criterion is met when A–D are all
 complete.
+
+**Note (2026-10-28, #1570):** Unit C's deletions happened without the collection replacement
+this plan assumed. `render_vouchers` went with `vouchers_v2` (#1609), and `render_ledgers` with
+`ledgers_v1` (#2102), because no shipped build sent either. `render_ledger_canary_readback` is no
+longer in the tree. Shipped reads use native Tally shapes. The plan text above is unchanged.
+
+**Note (2026-10-31, #1872):** `company_list_v1` (`render_company_list`) and the `tdl_engine.rs`
+`company_list_request` that wrapped it are deleted as well. The connection check sent that custom
+report only when its answer to the `Company` collection (`company_list_v2`) did not parse, and every
+read and post already required the collection. The tables in §8.10a and §8.10 are unchanged.
 
 **Design inputs established live on 2026-07-29:**
 

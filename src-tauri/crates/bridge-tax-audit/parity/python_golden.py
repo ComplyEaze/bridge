@@ -337,6 +337,23 @@ def _tds_payees(c):
     return tds_payees, pack_tds_payees(c.eng, c.rules, c.cfg, tax_ledgers, partners_config(c.cfg)[0])
 
 
+def _tds_interest_201(c):
+    from tae.audit_tests import tds_interest_201, tds_payees
+    from tae import config as tc
+    from tae.pack import _tds_interest_defaults
+    tax_ledgers = tc.tax_ledgers_by_head(c.cfg) if "tax_ledgers" in c.cfg.get("roles", {}) else {}
+    nature_by_ledger, payee_aliases, _turnover, s194j_category_by_ledger = tc.tds_config(c.cfg)
+    payees, partners_result = _tds_payees(c)[1], _partners_40b_194t(c)[1]
+    uncertain = (payees.figures[f"{tds_payees.TEST_ID}.deductor_status"].value == "unknown"
+                 or tc.turnover_is_placeholder(c.cfg))
+    defaults = _tds_interest_defaults(
+        c.eng, c.rules, payees, partners_result, uncertain,
+        (nature_by_ledger, payee_aliases, s194j_category_by_ledger), tc.partners_config(c.cfg)[0],
+        tc.tds_payees_reversals(c.cfg), tc.tds_payees_foreseeability(c.cfg), tc.tds_payees_gst_separate(c.cfg),
+        frozenset(tax_ledgers), tc.tds_payable_ledgers(c.cfg))
+    return tds_interest_201, tds_interest_201.run(c.eng, c.rules, defaults, c.rules["due_dates"]["audit_report"])
+
+
 def _loans_interest(c):
     from tae.audit_tests import loans_interest
     from tae.config import deductor_activity, loan_ledgers_config, tds_payable_ledgers, turnover_is_placeholder
@@ -571,10 +588,18 @@ RUNNERS = {
     "stale_balances_41_1": _stale_balances_41_1,
     "statutory_dues_43b": _statutory_dues_43b,
     "stock": _stock,
+    "tds_interest_201": _tds_interest_201,
     "tds_payees": _tds_payees,
     "tds_tcs_26as": _tds_tcs_26as,
     "trial_balance": _trial_balance,
     "twentysixas_receipts": _twentysixas_receipts,
+}
+
+# The crate's tests that the reference engine has no module for (registry::CRATE_FIRST, parity spec section 12).
+# None has a reference golden, so asking for one is refused, with the reason.
+CRATE_FIRST = {
+    "clause42_sft": "no reference golden: the reference engine has no clause 42 test; the crate's module is the only one",
+    "clause16_credits": "no reference golden: the reference engine has no clause 16 test; the crate's module is the only one",
 }
 
 
@@ -584,7 +609,7 @@ def main() -> int:
     ap.add_argument("engagement")
     ap.add_argument("output")
     ap.add_argument("--read", help="override [snapshot] with this tally-read-v1 directory")
-    ap.add_argument("--test", default="cash_44ab", choices=sorted(RUNNERS))
+    ap.add_argument("--test", default="cash_44ab", choices=sorted([*RUNNERS, *CRATE_FIRST]))
     ap.add_argument("--turnover-inputs", help="applicability_44ab: comparison turnover JSON to use")
     ap.add_argument("--emit-turnover-inputs",
                     help="applicability_44ab: take GSTR-1 turnover from the reference's own pack and write it here")
@@ -602,6 +627,9 @@ def main() -> int:
     ap.add_argument("--emit-report-totals",
                     help="financial_statements: take report totals from the read and write them here")
     a = ap.parse_args()
+    if a.test in CRATE_FIRST:
+        print(f"{a.test}: {CRATE_FIRST[a.test]}", file=sys.stderr)
+        return 2
 
     sys.path.insert(0, str(Path(a.engine).resolve()))
     from tae.adapters import read_format

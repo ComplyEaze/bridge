@@ -1,7 +1,9 @@
 //! The transfer pairing view: for each bank line skipped as "recorded from the
 //! other bank's statement", whether that other side exists as a posted Contra.
 //!
-//! A pure function of plain typed facts. It reads no journal, holds no state and
+//! The view is a pure function of plain typed facts (`read_days` is the one part
+//! that sends requests, and only through `read_entry_window_rows_with`, the
+//! reader-generic form of `read_entry_window_rows`). It reads no journal, holds no state and
 //! persists no pairing, so a pair whose other batch is rolled back, amended or
 //! fails verification simply stops being a pair the next time it is computed,
 //! and no order of the inputs can change the answer (every candidate set is
@@ -64,15 +66,33 @@
 //! measured, so two references that differ neither pair two rows nor prove
 //! them apart. This changes no pair: the two rounds never read it.
 //!
-//! Otherwise a skip with no candidate is `NotFound` only when the other bank
-//! ledger's verified parse windows cover its whole date +/- k interval; if
-//! they do not, the absence proves nothing and it is `NotEstablished`.
+//! Otherwise a skip with no candidate is open for one of three reasons. If the
+//! other bank ledger's verified parse windows do not cover its whole date +/- k
+//! interval, the absence proves nothing and it is `NotEstablished`. If they do,
+//! it is `NotFound` only when a read of Tally has covered the skip's date and
+//! the day either side and found no entry on the skip's other ledger
+//! (`TallyDays`). Without such a read it is `TallyUnchecked`: the statements
+//! hold no Contra for it, and a Contra entered in Tally by other means is not
+//! in their records. The read is `read_days`, which reads at most four days a
+//! call (newest first, within 31 days of the newest) and yields a `WholeDay`
+//! only from a day whose census counted it, with none withheld and none
+//! outside the day. `with_days_read` joins the two for a call: it plans the
+//! days of the view's `TallyUnchecked` rows, reads them, and computes the view
+//! again with the days read whole (#1392).
 //!
 //! Two skips with one `SkipKey`, or two Contras with one `ContraKey`, are refused
 //! with a typed error naming the smallest such key, whatever the input order.
 
+use super::voucher_parse::VoucherRow;
+use super::voucher_window::{
+    AgentReader, VoucherReadShape, WindowPart, WindowReadKind, WindowReadLimits, WindowReadOutcome,
+    WindowReader,
+};
+use super::vouchers::{read_entry_window_rows_with, VoucherComposites};
+use super::{combine_evidence, Evidence, VerifiedCompanyIdentity};
 use bridge_bank_statement::bank::BankReference;
 use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 macro_rules! text_id {
@@ -86,6 +106,8 @@ macro_rules! text_id {
                 Self(value.into())
             }
 
+            // Not every identifier's text is read back.
+            #[allow(dead_code)]
             pub(crate) fn as_str(&self) -> &str {
                 &self.0
             }
@@ -247,6 +269,682 @@ impl Coverage {
     }
 }
 
+/// How many days apart the two statements may print one transfer and still
+/// pair it by date. Zero until a real statement pair has been measured: k comes
+/// from that pair (the design's C12), not from synthetic rows, so only the same
+/// printed day matches today.
+pub(crate) const TRANSFER_K_DAYS: u32 = 0;
+/// The days of Tally read either side of a skipped row's date (#1392).
+pub(crate) const DAY_READ_WIDTH: u32 = 1;
+// A row paired by date may be k days from its Contra, so a read that rules a
+// Contra out must cover at least those days (#1392). True while k is 0; it
+// stops compiling once k is raised past the width.
+#[allow(clippy::absurd_extreme_comparisons)]
+const _: () = assert!(TRANSFER_K_DAYS <= DAY_READ_WIDTH);
+
+/// The days a skip dated `date` needs read, oldest first: the date and
+/// [`DAY_READ_WIDTH`] days either side. `None` at an end of the calendar.
+fn window_days(date: &TallyDate) -> Option<Vec<TallyDate>> {
+    let mut first = date.clone();
+    for _ in 0..DAY_READ_WIDTH {
+        first = first.previous_day().ok()?;
+    }
+    let mut days = vec![first];
+    for _ in 0..2 * DAY_READ_WIDTH {
+        let next = days.last()?.next_day().ok()?;
+        days.push(next);
+    }
+    Some(days)
+}
+
+/// The ledgers of the catalogue a call read: each GUID's name, and every name,
+/// exactly as Tally sent them. Names are compared by code point, with no
+/// trimming and no case folding: on the one book measured, every voucher row
+/// spelled its ledger as the catalogue did (#1392), and a spelling that differs
+/// fails closed, as a ledger the catalogue does not hold.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct LedgerNames {
+    by_guid: BTreeMap<LedgerGuid, String>,
+    names: BTreeSet<String>,
+}
+
+impl LedgerNames {
+    /// From `(guid, name)` pairs.
+    pub(crate) fn new<'a>(ledgers: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
+        let by_guid: BTreeMap<LedgerGuid, String> = ledgers
+            .into_iter()
+            .map(|(guid, name)| (LedgerGuid::new(guid), name.to_string()))
+            .collect();
+        let names = by_guid.values().cloned().collect();
+        Self { by_guid, names }
+    }
+
+    fn name_of(&self, guid: &LedgerGuid) -> Option<&str> {
+        self.by_guid.get(guid).map(String::as_str)
+    }
+
+    /// Whether every ledger an entry of the day names is in the catalogue. A
+    /// day that names another may hold the other ledger under a spelling the
+    /// catalogue does not give, or a ledger renamed since the catalogue was read.
+    fn name_every_ledger_of(&self, day: &WholeDay) -> bool {
+        day.vouchers.iter().all(|voucher| {
+            voucher
+                .ledgers
+                .iter()
+                .all(|ledger| self.names.contains(ledger))
+        })
+    }
+}
+
+/// The skipped rows whose window of Tally, the row's date and
+/// [`DAY_READ_WIDTH`] days either side, was read and holds no entry on the
+/// row's other ledger. Only such a row may be `NotFound`. Outside tests the
+/// only constructor is [`TallyDays::from_windows`], which takes [`WholeDay`]s,
+/// so a day that was not read in full cannot be in it. A view computed without
+/// reading any day passes [`TallyDays::none`].
+#[derive(Debug, Clone, Default)]
+pub(crate) struct TallyDays(
+    BTreeSet<(
+        CompanyGuid,
+        EndpointOrigin,
+        TallyDate,
+        LedgerGuid,
+        LedgerGuid,
+    )>,
+);
+
+impl TallyDays {
+    /// No day of Tally has been read.
+    pub(crate) fn none() -> Self {
+        Self::default()
+    }
+
+    /// The skips each of whose window days is among `days`, of the skip's
+    /// company and Tally, names only ledgers in `names`, and holds no entry on
+    /// the skip's other ledger, in a voucher of any type. Two rules come from
+    /// the lab run of 2 November 2026 (#1392). An entry on the other ledger
+    /// beside any ledger keeps the row out, not only a voucher on both of its
+    /// ledgers: a transfer through a clearing ledger touches the two banks on
+    /// two vouchers. A window day that holds no voucher counts only beside a
+    /// window day that holds one ([`corroborated`]), which departs from the
+    /// `vouchers` tool's verdict on an empty window (#985). A skip whose other
+    /// ledger has no name in `names` is left out.
+    pub(crate) fn from_windows(days: &[WholeDay], skips: &[SkipFact], names: &LedgerNames) -> Self {
+        Self(
+            skips
+                .iter()
+                .filter(|skip| {
+                    let Some(other) = names.name_of(&skip.other_ledger) else {
+                        return false;
+                    };
+                    let Some(window) = window_days(&skip.date).and_then(|dates| {
+                        dates
+                            .iter()
+                            .map(|date| {
+                                days.iter().find(|day| {
+                                    day.company == skip.key.company
+                                        && day.endpoint_origin == skip.key.endpoint_origin
+                                        && day.date == *date
+                                })
+                            })
+                            .collect::<Option<Vec<&WholeDay>>>()
+                    }) else {
+                        return false;
+                    };
+                    corroborated(&window)
+                        && window
+                            .iter()
+                            .all(|day| names.name_every_ledger_of(day) && !day.has_entry_on(other))
+                })
+                .map(|skip| {
+                    (
+                        skip.key.company.clone(),
+                        skip.key.endpoint_origin.clone(),
+                        skip.date.clone(),
+                        skip.key.bank_ledger.clone(),
+                        skip.other_ledger.clone(),
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    /// Whether a read of Tally ruled out the skip's other side.
+    fn found_no_contra(&self, skip: &SkipFact) -> bool {
+        self.0.contains(&(
+            skip.key.company.clone(),
+            skip.key.endpoint_origin.clone(),
+            skip.date.clone(),
+            skip.key.bank_ledger.clone(),
+            skip.other_ledger.clone(),
+        ))
+    }
+
+    /// Every skip's window read with no entry on its other ledger, for the
+    /// tests of what `NotFound` needs besides a read of Tally.
+    #[cfg(test)]
+    pub(crate) fn clean_for(skips: &[SkipFact]) -> Self {
+        Self(
+            skips
+                .iter()
+                .map(|skip| {
+                    (
+                        skip.key.company.clone(),
+                        skip.key.endpoint_origin.clone(),
+                        skip.date.clone(),
+                        skip.key.bank_ledger.clone(),
+                        skip.other_ledger.clone(),
+                    )
+                })
+                .collect(),
+        )
+    }
+}
+
+/// Whether every day of a window holds a voucher or lies beside a day of the
+/// window that does. This departs from the `vouchers` tool's verdict (#985,
+/// `corroborate_empty_by_days` in `agent.rs`), where rows found only beside an
+/// empty window leave it `partial` (`empty_window_wider_read_nonempty`): they
+/// give no independent count of the window. A day read here gives none either,
+/// as its census and its vouchers request carry the same one-day filter. The
+/// day is taken as read on its own census and vouchers answers agreeing, with
+/// a day beside it read whole in the same call through the same request shape;
+/// that is partial confidence (#1392): no capture shows Tally answering an
+/// empty census for a day that holds vouchers, and none rules it out. Without
+/// it no row could read `NotFound`, as the days beside a transfer are often
+/// empty. The maintainers accepted it for day reads with one risk named: a
+/// company closed between a day's marks read and its census could read as an
+/// empty day. `NotFound` stays report-only, and a person confirms any
+/// withdrawal.
+fn corroborated(window: &[&WholeDay]) -> bool {
+    let holds = |at: usize| window.get(at).is_some_and(|day| !day.vouchers.is_empty());
+    (0..window.len()).all(|at| holds(at) || at.checked_sub(1).is_some_and(holds) || holds(at + 1))
+}
+
+/// A voucher of a day read in full as the check needs it: the ledgers its
+/// entries name, as Tally spelled them. No amount, party or narration is kept.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DayVoucher {
+    guid: String,
+    ledgers: BTreeSet<String>,
+}
+
+/// One day of Tally, read in full (#1392): every voucher of the day, counted by
+/// a census of its own and admitted against it, with none withheld and none
+/// outside the day. A day that holds no voucher is one too, and counts only as
+/// [`TallyDays::from_windows`] lets it. It has no public constructor and no
+/// `Default`; the only way to one is [`read_days`], and a read that is partial
+/// in any way yields a [`NotWhole`] instead, so [`TallyDays::from_windows`],
+/// and with it `NotFound`, cannot be handed a day that was not read in full.
+/// It is a read at one moment: it holds no marks or read time, so it serves
+/// the call that read it and is not kept for a later one, after which the book
+/// may have changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WholeDay {
+    company: CompanyGuid,
+    endpoint_origin: EndpointOrigin,
+    date: TallyDate,
+    vouchers: Vec<DayVoucher>,
+}
+
+/// Why a read of one day is not a whole day. Each leaves the rows whose window
+/// holds the day `TallyUnchecked`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum NotWhole {
+    /// A part of the read is not exactly the day, or a row is dated another day.
+    NotTheDay,
+    /// No census counted the day's vouchers, so nothing but the response itself
+    /// vouches for its rows.
+    Uncounted,
+    /// Tally stored an amount of some vouchers of the day as a foreign-currency
+    /// composite and the read withheld them: the day was not read in full.
+    Withheld { vouchers: usize },
+    /// A row without a GUID, or an entry without a ledger.
+    Unreadable,
+}
+
+impl NotWhole {
+    fn cause(&self) -> &'static str {
+        match self {
+            Self::NotTheDay => "day_read_not_the_day",
+            Self::Uncounted => "day_read_uncounted",
+            Self::Withheld { .. } => "day_read_withheld",
+            Self::Unreadable => "day_read_unreadable",
+        }
+    }
+}
+
+impl WholeDay {
+    /// The day, or why the read was not one. The window is read off the read's
+    /// own parts, not trusted from the caller.
+    fn from_read(
+        company: CompanyGuid,
+        endpoint_origin: EndpointOrigin,
+        date: &TallyDate,
+        read: &WindowReadOutcome<VoucherRow>,
+    ) -> Result<Self, NotWhole> {
+        Self::admit(
+            company,
+            endpoint_origin,
+            date,
+            &read.reads,
+            read.counted(),
+            &read.rows,
+        )
+    }
+
+    fn admit(
+        company: CompanyGuid,
+        endpoint_origin: EndpointOrigin,
+        date: &TallyDate,
+        parts: &[WindowPart],
+        counted: bool,
+        rows: &[VoucherRow],
+    ) -> Result<Self, NotWhole> {
+        if parts.is_empty()
+            || parts
+                .iter()
+                .any(|part| part.from != *date || part.to != *date)
+        {
+            return Err(NotWhole::NotTheDay);
+        }
+        if !counted {
+            return Err(NotWhole::Uncounted);
+        }
+        let mut vouchers = Vec::with_capacity(rows.len());
+        let mut withheld = 0;
+        for row in rows {
+            match row {
+                VoucherRow::Withheld(_) => withheld += 1,
+                VoucherRow::Read(row) => vouchers.push(day_voucher(row, date)?),
+            }
+        }
+        if withheld > 0 {
+            return Err(NotWhole::Withheld { vouchers: withheld });
+        }
+        Ok(Self {
+            company,
+            endpoint_origin,
+            date: date.clone(),
+            vouchers,
+        })
+    }
+
+    // Read only by the tests.
+    #[allow(dead_code)]
+    pub(crate) fn date(&self) -> &TallyDate {
+        &self.date
+    }
+
+    /// The GUIDs of the day's vouchers.
+    // Read only by the tests.
+    #[allow(dead_code)]
+    pub(crate) fn guids(&self) -> BTreeSet<&str> {
+        self.vouchers
+            .iter()
+            .map(|voucher| voucher.guid.as_str())
+            .collect()
+    }
+
+    /// Whether a voucher of the day has an entry on the ledger.
+    fn has_entry_on(&self, ledger: &str) -> bool {
+        self.vouchers
+            .iter()
+            .any(|voucher| voucher.ledgers.contains(ledger))
+    }
+}
+
+fn day_voucher(row: &Value, date: &TallyDate) -> Result<DayVoucher, NotWhole> {
+    if row["date"].as_str() != Some(date.as_str()) {
+        return Err(NotWhole::NotTheDay);
+    }
+    let guid = row["guid"]
+        .as_str()
+        .filter(|guid| !guid.is_empty())
+        .ok_or(NotWhole::Unreadable)?;
+    let ledgers = row["amounts"]
+        .as_array()
+        .ok_or(NotWhole::Unreadable)?
+        .iter()
+        .map(|entry| {
+            entry["ledger"]
+                .as_str()
+                .map(str::to_string)
+                .ok_or(NotWhole::Unreadable)
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(DayVoucher {
+        guid: guid.to_string(),
+        ledgers,
+    })
+}
+
+/// The most days one call reads, each as a window of its own.
+pub(crate) const MAX_DAY_READS: usize = 4;
+/// The days one call looks across, both ends counted: every day it reads is at
+/// most `MAX_DAY_SPAN - 1` days before the newest day it could read.
+pub(crate) const MAX_DAY_SPAN: u32 = 31;
+
+/// Whether the days of a book whose voucher mark is `voucher_mark` are read with
+/// one census request each: a census in AlterID spans has not been run for a
+/// day read against a live Tally, so a book that needs more than one reads no
+/// day (#1392).
+pub(crate) fn census_fits_one_read(voucher_mark: u64) -> bool {
+    voucher_mark
+        <= WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard)
+            .counting_small_books()
+            .census_capacity()
+}
+
+/// A window reader that knows which Tally it reads, so that a day read can be
+/// filed only against that Tally's skips.
+pub(crate) trait DayReader: WindowReader {
+    fn endpoint_origin(&self) -> Result<EndpointOrigin, String>;
+}
+
+impl DayReader for AgentReader<'_> {
+    fn endpoint_origin(&self) -> Result<EndpointOrigin, String> {
+        super::endpoint_origin(&self.0.settings.endpoint).map(EndpointOrigin::new)
+    }
+}
+
+/// The days a call may read, of one company on the Tally the reader reads: the
+/// windows of the skipped rows that are `TallyUnchecked` in the view, newest
+/// row first, a row's window taken whole or not at all, at most
+/// [`MAX_DAY_READS`] days within [`MAX_DAY_SPAN`] days of the newest. Only
+/// [`DayPlan::of`] makes one, so no caller can read a day this did not admit,
+/// and [`read_days`] reads it only through the reader and identity it was made
+/// for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DayPlan {
+    company: CompanyGuid,
+    endpoint_origin: EndpointOrigin,
+    /// Newest first.
+    days: Vec<TallyDate>,
+}
+
+impl DayPlan {
+    pub(crate) fn of<R: DayReader>(
+        skips: &[SkipFact],
+        view: &TransferView,
+        identity: &VerifiedCompanyIdentity,
+        reader: &R,
+    ) -> Result<Self, String> {
+        let company = CompanyGuid::new(identity.company_guid());
+        let endpoint_origin = reader.endpoint_origin()?;
+        let mut unchecked: Vec<&SkipFact> = skips
+            .iter()
+            .filter(|skip| {
+                skip.key.company == company
+                    && skip.key.endpoint_origin == endpoint_origin
+                    && view.skips.get(&skip.key) == Some(&SkipState::TallyUnchecked)
+            })
+            .collect();
+        unchecked.sort_by(|left, right| (&right.date, &right.key).cmp(&(&left.date, &left.key)));
+        let mut days: BTreeSet<TallyDate> = BTreeSet::new();
+        let mut newest: Option<TallyDate> = None;
+        for skip in unchecked {
+            let Some(window) = window_days(&skip.date) else {
+                continue;
+            };
+            let Some(last) = window.last() else {
+                continue;
+            };
+            let newest = newest.get_or_insert_with(|| last.clone());
+            let mut planned = days.clone();
+            planned.extend(window.iter().cloned());
+            if planned.len() <= MAX_DAY_READS
+                && window
+                    .iter()
+                    .all(|day| day <= newest && within(day, newest, MAX_DAY_SPAN - 1))
+            {
+                days = planned;
+            }
+        }
+        Ok(Self {
+            company,
+            endpoint_origin,
+            days: days.into_iter().rev().collect(),
+        })
+    }
+
+    pub(crate) fn days(&self) -> &[TallyDate] {
+        &self.days
+    }
+}
+
+/// Why a planned day yielded no [`WholeDay`] the check can use.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DayKept {
+    NotWhole(NotWhole),
+    /// The read failed, with its refusal code. No later day is tried: a gateway
+    /// that failed is not asked again in the same call.
+    ReadFailed(String),
+    NotAttempted,
+    /// Read in full, but an entry names a ledger the call's catalogue does not
+    /// hold.
+    LedgerNotInCatalogue,
+    /// Not read: the book needs more than one census request a day.
+    BookTooLarge,
+}
+
+impl DayKept {
+    fn cause(&self) -> &str {
+        match self {
+            Self::NotWhole(not_whole) => not_whole.cause(),
+            Self::ReadFailed(code) => code,
+            Self::NotAttempted => "day_read_not_attempted",
+            Self::LedgerNotInCatalogue => "day_ledger_not_in_catalogue",
+            Self::BookTooLarge => "book_too_large_for_day_read",
+        }
+    }
+}
+
+/// Refusal code for a plan read through another company or another Tally than
+/// the one it was made for.
+pub(crate) const DAY_PLAN_FOR_ANOTHER_READ: &str = "day_plan_for_another_company_or_endpoint";
+
+/// What a call's day reads yielded: the days read in full, and for every other
+/// planned day why it was not. A kept day keeps the rows whose window holds it
+/// `TallyUnchecked`.
+#[derive(Debug, Default)]
+pub(crate) struct DayReads {
+    pub(crate) whole: Vec<WholeDay>,
+    pub(crate) kept: Vec<(TallyDate, DayKept)>,
+    /// Every read, whether it came back or failed, folded in the order sent;
+    /// `None` when none was sent.
+    pub(crate) evidence: Option<Evidence>,
+}
+
+impl DayReads {
+    /// What the transfers section shows of the reads: the days read in full
+    /// that hold a voucher and that hold none, and each other planned day with
+    /// its cause. Dates only.
+    pub(crate) fn summary(&self) -> Value {
+        let empty = self
+            .whole
+            .iter()
+            .filter(|day| day.vouchers.is_empty())
+            .count();
+        serde_json::json!({
+            "whole": self.whole.len() - empty,
+            "empty": empty,
+            "kept": self
+                .kept
+                .iter()
+                .map(|(date, kept)| serde_json::json!({"date": date, "cause": kept.cause()}))
+                .collect::<Vec<_>>(),
+        })
+    }
+
+    fn fold(&mut self, evidence: Evidence) {
+        self.evidence = Some(match self.evidence.take() {
+            Some(before) => combine_evidence(before, evidence),
+            None => evidence,
+        });
+    }
+}
+
+/// Read the planned days, newest first, one window of exactly one day each:
+/// the company's marks, the day's census and the day's vouchers
+/// (`read_entry_window_rows`), with a voucher Tally stored as a foreign-currency
+/// composite withheld, not refused, so the day is kept with its cause. A plan
+/// made for another company or another Tally than `identity` and `reader` reads
+/// nothing.
+pub(crate) async fn read_days<R: DayReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    plan: &DayPlan,
+) -> DayReads {
+    let mut reads = DayReads::default();
+    let mut failed = match reader.endpoint_origin() {
+        Ok(endpoint) => {
+            endpoint != plan.endpoint_origin || identity.company_guid() != plan.company.as_str()
+        }
+        Err(_) => true,
+    };
+    if failed {
+        reads.kept = plan
+            .days()
+            .iter()
+            .map(|date| {
+                (
+                    date.clone(),
+                    DayKept::ReadFailed(DAY_PLAN_FOR_ANOTHER_READ.to_string()),
+                )
+            })
+            .collect();
+        return reads;
+    }
+    for date in plan.days() {
+        if failed {
+            reads.kept.push((date.clone(), DayKept::NotAttempted));
+            continue;
+        }
+        let read = read_entry_window_rows_with(
+            reader,
+            identity,
+            company,
+            date,
+            date,
+            VoucherReadShape::EntryWildcard,
+            VoucherComposites::Withhold,
+        )
+        .await;
+        let day = match read {
+            Err(failure) => {
+                if let Some(evidence) = failure.evidence {
+                    reads.fold(*evidence);
+                }
+                Err(DayKept::ReadFailed(failure.code))
+            }
+            Ok(read) => {
+                reads.fold(read.all_evidence());
+                WholeDay::from_read(
+                    CompanyGuid::new(identity.company_guid()),
+                    plan.endpoint_origin.clone(),
+                    date,
+                    &read,
+                )
+                .map_err(DayKept::NotWhole)
+            }
+        };
+        match day {
+            Ok(day) => reads.whole.push(day),
+            Err(kept) => {
+                failed = matches!(kept, DayKept::ReadFailed(_));
+                reads.kept.push((date.clone(), kept));
+            }
+        }
+    }
+    reads
+}
+
+/// The view of a call's checked facts, with the windows of its open skipped
+/// rows read (#1392): the view, a [`DayPlan`] of its `TallyUnchecked` rows'
+/// windows read by [`read_days`] through `reader`, and the view computed again
+/// with [`TallyDays::from_windows`]. `TallyDays` is consulted only for a row
+/// with no candidate whose date the statements cover, so the second view
+/// differs from the first only in rows `TallyUnchecked` there and `NotFound`
+/// here. A day whose entries name a ledger not in `names` is kept with that
+/// cause. Nothing is read for a plan that cannot be made (the reader cannot
+/// name its Tally), and nothing for a book whose voucher mark needs more than
+/// one census request a day ([`census_fits_one_read`]). `voucher_mark` is the
+/// mark the call already read; without one, the company's marks are read
+/// first, and only when a day is planned.
+pub(crate) async fn with_days_read<R: DayReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    input: &PairingInput,
+    names: &LedgerNames,
+    voucher_mark: Option<u64>,
+) -> (TransferView, DayReads) {
+    let view = input.view(&TallyDays::none(), TRANSFER_K_DAYS);
+    let Ok(plan) = DayPlan::of(input.skips(), &view, identity, reader) else {
+        return (view, DayReads::default());
+    };
+    if plan.days().is_empty() {
+        return (view, DayReads::default());
+    }
+    let mut reads = DayReads::default();
+    let voucher_mark = match voucher_mark {
+        Some(mark) => Ok(mark),
+        None => match reader
+            .read(
+                identity,
+                super::company_high_water_read(company),
+                WindowReadKind::Marks,
+            )
+            .await
+        {
+            Ok((xml, evidence, _)) => {
+                reads.fold(evidence);
+                super::voucher_window::company_marks(&xml, identity.company_guid())
+                    .map(|marks| marks.vouchers())
+            }
+            Err(failure) => {
+                if let Some(evidence) = failure.evidence {
+                    reads.fold(*evidence);
+                }
+                Err(failure.code)
+            }
+        },
+    };
+    let kept = match voucher_mark {
+        Err(code) => Some(DayKept::ReadFailed(code)),
+        Ok(mark) if !census_fits_one_read(mark) => Some(DayKept::BookTooLarge),
+        Ok(_) => None,
+    };
+    if let Some(kept) = kept {
+        reads.kept = plan
+            .days()
+            .iter()
+            .map(|date| (date.clone(), kept.clone()))
+            .collect();
+        return (view, reads);
+    }
+    let evidence = reads.evidence.take();
+    let mut reads = read_days(reader, identity, company, &plan).await;
+    reads.evidence = match (evidence, reads.evidence.take()) {
+        (Some(marks), Some(days)) => Some(combine_evidence(marks, days)),
+        (marks, days) => marks.or(days),
+    };
+    let (named, unnamed): (Vec<WholeDay>, Vec<WholeDay>) = std::mem::take(&mut reads.whole)
+        .into_iter()
+        .partition(|day| names.name_every_ledger_of(day));
+    reads.whole = named;
+    reads.kept.extend(
+        unnamed
+            .into_iter()
+            .map(|day| (day.date, DayKept::LedgerNotInCatalogue)),
+    );
+    reads.kept.sort_by(|left, right| right.0.cmp(&left.0));
+    let tally = TallyDays::from_windows(&reads.whole, input.skips(), names);
+    (input.view(&tally, TRANSFER_K_DAYS), reads)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PairRound {
     Reference,
@@ -259,7 +957,13 @@ pub(crate) enum SkipState {
         round: PairRound,
         contra: ContraKey,
     },
+    /// The statements hold no Contra for the row, and a read of Tally covered
+    /// the row's whole date and found none between the two ledgers.
     NotFound,
+    /// The statements hold no Contra for the row, and no read of Tally covered
+    /// its whole date: a Contra entered in Tally by other means is not in the
+    /// statements' records.
+    TallyUnchecked,
     Ambiguous {
         candidates: Vec<ContraKey>,
     },
@@ -426,6 +1130,69 @@ pub(crate) fn transfer_pairing_view(
     coverage: &Coverage,
     k_days: u32,
 ) -> Result<TransferView, PairingInputError> {
+    transfer_pairing_view_with(skips, contras, coverage, &TallyDays::none(), k_days)
+}
+
+/// The view with the days of Tally a whole-day read has covered. With
+/// [`TallyDays::none`] it is [`transfer_pairing_view`].
+pub(crate) fn transfer_pairing_view_with(
+    skips: &[SkipFact],
+    contras: &[ContraFact],
+    coverage: &Coverage,
+    tally: &TallyDays,
+    k_days: u32,
+) -> Result<TransferView, PairingInputError> {
+    let (skips, contras) = checked(skips, contras)?;
+    Ok(view_of(skips, contras, coverage, tally, k_days))
+}
+
+/// The facts of one view, checked once (#1392): no two skips or Contras share a
+/// key, every amount is positive and no skip's two ledgers are one.
+/// [`PairingInput::view`] cannot refuse them, so the view a call computes again
+/// with the days of Tally it read needs no fallback.
+#[derive(Debug, Clone)]
+pub(crate) struct PairingInput {
+    /// In key order, as [`checked`] sorts them.
+    skips: Vec<SkipFact>,
+    contras: Vec<ContraFact>,
+    coverage: Coverage,
+}
+
+impl PairingInput {
+    pub(crate) fn new(
+        skips: &[SkipFact],
+        contras: &[ContraFact],
+        coverage: &Coverage,
+    ) -> Result<Self, PairingInputError> {
+        let (skips, contras) = checked(skips, contras)?;
+        Ok(Self {
+            skips: skips.into_iter().cloned().collect(),
+            contras: contras.into_iter().cloned().collect(),
+            coverage: coverage.clone(),
+        })
+    }
+
+    pub(crate) fn skips(&self) -> &[SkipFact] {
+        &self.skips
+    }
+
+    pub(crate) fn view(&self, tally: &TallyDays, k_days: u32) -> TransferView {
+        view_of(
+            self.skips.iter().collect(),
+            self.contras.iter().collect(),
+            &self.coverage,
+            tally,
+            k_days,
+        )
+    }
+}
+
+/// The skips and Contras in key order, or the first fact the view cannot
+/// reason about.
+fn checked<'a>(
+    skips: &'a [SkipFact],
+    contras: &'a [ContraFact],
+) -> Result<(Vec<&'a SkipFact>, Vec<&'a ContraFact>), PairingInputError> {
     let mut skips: Vec<&SkipFact> = skips.iter().collect();
     skips.sort_by(|left, right| left.key.cmp(&right.key));
     if let Some(pair) = skips.windows(2).find(|pair| pair[0].key == pair[1].key) {
@@ -461,6 +1228,17 @@ pub(crate) fn transfer_pairing_view(
             });
         }
     }
+    Ok((skips, contras))
+}
+
+/// The view of checked facts, `skips` and `contras` in key order.
+fn view_of(
+    skips: Vec<&SkipFact>,
+    contras: Vec<&ContraFact>,
+    coverage: &Coverage,
+    tally: &TallyDays,
+    k_days: u32,
+) -> TransferView {
     let coverage = MergedCoverage::new(coverage);
 
     let mut groups: BTreeMap<GroupKey, Group> = BTreeMap::new();
@@ -619,7 +1397,7 @@ pub(crate) fn transfer_pairing_view(
                             candidates: sorted_keys(&candidates, &contras),
                         }
                     } else {
-                        open_state(skip, &candidates, &contras, &coverage, k_days)
+                        open_state(skip, &candidates, &contras, &coverage, tally, k_days)
                     }
                 }
             };
@@ -627,10 +1405,10 @@ pub(crate) fn transfer_pairing_view(
         })
         .collect();
 
-    Ok(TransferView {
+    TransferView {
         skips: states,
         double_booked,
-    })
+    }
 }
 
 /// The Contras of a group a skip dated `date` can reach within k days: a range
@@ -709,13 +1487,16 @@ fn open_state(
     candidates: &[usize],
     contras: &[&ContraFact],
     coverage: &MergedCoverage,
+    tally: &TallyDays,
     k_days: u32,
 ) -> SkipState {
     if candidates.is_empty() {
-        return if coverage.holds(skip, &skip.other_ledger, &skip.date, k_days) {
+        return if !coverage.holds(skip, &skip.other_ledger, &skip.date, k_days) {
+            SkipState::NotEstablished
+        } else if tally.found_no_contra(skip) {
             SkipState::NotFound
         } else {
-            SkipState::NotEstablished
+            SkipState::TallyUnchecked
         };
     }
     let unverified: BTreeSet<&BatchId> = candidates
@@ -867,4 +1648,4 @@ fn find_double_booked(
 
 #[cfg(test)]
 #[path = "agent_transfer_pairing_tests.rs"]
-mod tests;
+pub(crate) mod tests;

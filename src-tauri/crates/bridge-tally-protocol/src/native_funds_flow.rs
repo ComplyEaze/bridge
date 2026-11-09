@@ -15,8 +15,8 @@
 //! What the columns mean is NOT decided here. On the one book measured, `Dr`
 //! equalled the working capital at the start of the month, `Cr` at its end, and
 //! `CL` was `Cr - Dr`, with June tying to the trial balance's debtors, bank and
-//! cash (a recorded reading: the trial balance responses were not kept); which
-//! groups Tally counts as working capital was not measured. Nothing
+//! cash (observed live; the trial balance side is not committed and is UNVERIFIED
+//! here); which groups Tally counts as working capital was not measured. Nothing
 //! here applies that reading, and nothing ties the figures to anything.
 use serde::Serialize;
 use std::fmt;
@@ -25,16 +25,15 @@ use crate::{
     native_cash_flow::{
         parse_native_cash_flow, CashFlowMonth, NativeCashFlowError, WholeMonthWindow,
     },
-    native_statement_reports::{render_built_in_report_request, NativeStatementAmount},
+    native_statement_reports::{
+        render_built_in_report_request, BuiltInReport, NativeStatementAmount,
+    },
 };
-
-/// The report name Tally's gateway accepts (live capture, 6 Oct 2026).
-const REPORT_ID: &str = "Funds Flow";
 
 /// Renders the only supported request: Tally's own Funds Flow by name over the
 /// window, for the named company. No TDL.
 pub fn render_native_funds_flow_request(company: &str, window: &WholeMonthWindow) -> String {
-    render_built_in_report_request(REPORT_ID, company, window.period())
+    render_built_in_report_request(BuiltInReport::FundsFlow, company, window.period())
 }
 
 /// One month's row, each column exactly as Tally printed it under its own

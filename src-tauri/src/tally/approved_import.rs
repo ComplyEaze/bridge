@@ -1,5 +1,8 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
+use super::ledger_create_item::{LedgerCreateBatch, RenderedLedgerCreate, MAX_LEDGERS_PER_BATCH};
+use super::VerifiedCompanyIdentity;
+use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::{
     outstandings_shared::DateBoundaryProfile, StandardLedgerCatalogBinding,
@@ -8,6 +11,20 @@ use std::{io::Read, num::NonZeroUsize, process::Stdio, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 const MAX_PREVIEW_BYTES: usize = 8_000;
+
+tokio::task_local! {
+    /// Whether the post dialog of the task it is scoped to showed a box that did
+    /// not fit the screen (#1832): set by [`note_box_did_not_fit`] when the
+    /// dialog child exits with the status that says so, and read once by that
+    /// task when the dialog ends. Scoped only by [`PendingPostApproval::ask`];
+    /// anywhere else noting it does nothing.
+    static BOX_DID_NOT_FIT: std::cell::Cell<bool>;
+}
+
+/// Record, for the dialog task this runs in, that its box did not fit.
+fn note_box_did_not_fit() {
+    let _ = BOX_DID_NOT_FIT.try_with(|noted| noted.set(true));
+}
 #[cfg(not(windows))]
 const POST_LABEL: &str = "Post voucher";
 /// The review dialog's positive button, as the person sees it. Windows shows
@@ -16,12 +33,61 @@ const POST_LABEL: &str = "Post voucher";
 pub(crate) const REVIEW_BUTTON: &str = "I reviewed it";
 #[cfg(windows)]
 pub(crate) const REVIEW_BUTTON: &str = "Yes";
+/// The invoice-stop release dialog's positive button on a Mac. Windows shows the
+/// same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const RELEASE_BUTTON: &str = "Release the stop";
+/// The settle dialog's positive button on a Mac (#1709). Windows shows the
+/// same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const SETTLE_BUTTON: &str = "Close the batch";
+/// The row release dialog's positive button on a Mac (#1038). Windows shows
+/// the same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const RELEASE_ROWS_BUTTON: &str = "Release the rows";
 /// What the review dialog's subprocess prints, followed by the nonce it was
 /// given, when and only when the person chose the positive button.
 const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
 /// The same for the post dialog (#635). Distinct from the review's, so a
 /// subprocess in one mode can never answer the other.
 const POST_TOKEN_PREFIX: &str = "bridge-post-approved:";
+/// The same for the one-ledger dialog. Distinct from both others, so a
+/// subprocess in one mode can never answer another.
+const MASTERS_TOKEN_PREFIX: &str = "bridge-create-ledger:";
+/// The one-ledger dialog's title. The Windows box has no custom labels, so the
+/// title asks the question there as well.
+const MASTERS_TITLE: &str = "ComplyEaze Bridge — create one ledger?";
+/// The count a one-ledger dialog is told (tests).
+#[cfg(test)]
+const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
+
+/// What the ledger dialog is asked with: the text the person is shown, and the
+/// count of ledgers its title, button and answer text are worded by.
+#[derive(Clone, Copy)]
+pub(super) struct MastersPrompt<'a> {
+    pub(super) text: &'a str,
+    pub(super) count: VoucherCount,
+}
+
+/// The ledger dialog's title and its Mac button for `count` ledgers. One ledger
+/// keeps the words its box was measured with; a batch is named by its count.
+/// `None` above [`MAX_LEDGERS_PER_BATCH`]: no such box is shown.
+fn masters_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((MASTERS_TITLE.into(), "Create ledger".into())),
+        Some(count) if count.get() <= MAX_LEDGERS_PER_BATCH => Some((
+            format!("ComplyEaze Bridge — create {count} ledgers?"),
+            format!("Create {count} ledgers"),
+        )),
+        Some(_) => None,
+    }
+}
+/// The same for the invoice-stop release dialog, distinct from both.
+const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
+/// The same for the settle dialog (#1709), distinct from every other.
+const SETTLE_TOKEN_PREFIX: &str = "bridge-batch-settle-acknowledged:";
+/// The same for the row release dialog (#1038), distinct from every other.
+const RELEASE_ROWS_TOKEN_PREFIX: &str = "bridge-row-release-acknowledged:";
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -47,8 +113,40 @@ impl VoucherCount {
     }
 }
 
+/// What the person approved, and the all-company marks request every kind of
+/// post is aimed with. The kind decides which reads the queue makes and which
+/// recheck runs; it cannot be changed after construction.
 #[derive(Clone)]
 pub(crate) struct ApprovedImport {
+    pub(super) kind: ApprovedKind,
+    /// The all-company change marks, read last before the POST to confirm the
+    /// aim and again right after it to see where the post went (#574).
+    company_marks_request: AgentReadRequest,
+}
+
+/// The two requests one dispatch can carry. A voucher post and a master post
+/// share the queue, the identity brackets, the aim and the single POST; they
+/// differ only in what is read to admit them.
+#[derive(Clone)]
+pub(super) enum ApprovedKind {
+    Vouchers(VoucherAdmission),
+    /// Boxed: a master admission carries a rendered request and two reads, and
+    /// every `ApprovedImport` moves by value through the approval path.
+    Masters(Box<MasterAdmission>),
+}
+
+/// Which request an approval, a binding or a held request is for. Compared by
+/// kind, never by a count that happens to differ between kinds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PostKind {
+    Vouchers,
+    Masters,
+}
+
+/// A voucher post's admission: every field the voucher path carried before
+/// there was a second kind, moved here unchanged.
+#[derive(Clone)]
+pub(super) struct VoucherAdmission {
     xml: String,
     /// Every voucher's date, in batch order: the queue's Education recheck
     /// covers each of them.
@@ -63,9 +161,6 @@ pub(crate) struct ApprovedImport {
     /// The company's Currency masters, re-read inside the queue: a post goes
     /// only into a book with exactly one (bridge#551).
     currency_request: AgentReadRequest,
-    /// The all-company change marks, read last before the POST to confirm the
-    /// aim and again right after it to see where the voucher went (#574).
-    company_marks_request: AgentReadRequest,
     /// The reads an invoice's admission makes, for the queue to make again
     /// under its lock (#1337). `None` for every other voucher type. Boxed so
     /// that an approval an enum carries stays the size it was.
@@ -88,10 +183,14 @@ pub(crate) struct InvoiceReadPlan {
     /// limits and the currency are judged by the rule the build judges them by,
     /// ahead of the reads they spare.
     pub(crate) precheck: InvoicePrechecker,
-    /// The company's own ledger count: sent only when the precheck asks for it,
-    /// for a book over the master mark.
-    pub(crate) ledger_count: AgentReadRequest,
+    /// The ledgers the compliance listing is read for: the ones the invoice
+    /// names (#1331).
+    pub(crate) listing_ledgers: bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
     pub(crate) rates: AgentReadRequest,
+    /// Each ledger the rates request names, by lower-case GUID, with the parent
+    /// the plan's catalogue gave it (#1331). The request names ledgers by GUID,
+    /// so it is unchanged when one is regrouped; this is how the queue tells.
+    pub(crate) ledger_parents: Vec<(String, String)>,
     pub(crate) voucher_types: AgentReadRequest,
     pub(crate) number: AgentReadRequest,
     /// The same read for the invoice the journal held as the number's control.
@@ -113,25 +212,13 @@ pub(crate) struct InvoicePrecheckInput<'a> {
     pub(crate) marks: &'a str,
     /// The company's Currency masters, as the queue read them.
     pub(crate) currencies: &'a str,
-    /// The company's ledger count, once the precheck has asked for it.
-    pub(crate) ledger_count: Option<&'a str>,
-    pub(crate) company_name: &'a str,
     pub(crate) company_guid: &'a str,
-}
-
-/// The precheck's answer when it refuses nothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum InvoicePrecheck {
-    /// The limits and the currency admit the book: send the rest of the plan.
-    Admitted,
-    /// The master mark is over the size gate's mark: the ledger count decides.
-    NeedsLedgerCount,
 }
 
 /// A function of the invoice module that the queue runs before the plan's
 /// reads, so that this layer does not call that one.
 pub(crate) type InvoicePrechecker =
-    fn(&InvoicePrecheckInput<'_>) -> Result<InvoicePrecheck, ApprovedImportAdmissionError>;
+    fn(&InvoicePrecheckInput<'_>) -> Result<(), ApprovedImportAdmissionError>;
 
 /// What the queue read for an [`InvoiceReadPlan`], or what the build has read
 /// of one so far: each answer is `None` until it is read. The admission's judge
@@ -140,7 +227,6 @@ pub(crate) type InvoicePrechecker =
 pub(crate) struct InvoiceAnswers {
     /// The all-company marks, as the binding reads began.
     pub(crate) marks: Option<String>,
-    pub(crate) ledger_count: Option<String>,
     pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
     pub(crate) rates: Option<String>,
     pub(crate) voucher_types: Option<String>,
@@ -157,73 +243,11 @@ pub(crate) struct QueuedInvoice<'a> {
     pub(crate) answers: &'a InvoiceAnswers,
 }
 
-/// What the queue read for the last admission before the POST.
-pub(crate) struct QueuedAdmission<'a> {
-    pub(crate) first: &'a str,
-    pub(crate) second: &'a str,
-    pub(crate) catalogue: &'a str,
-    pub(crate) groups: Option<&'a str>,
-    pub(crate) currencies: &'a str,
-    /// The all-company marks read as the binding reads began (#239).
-    pub(crate) company_marks_at_binding: &'a str,
-    pub(crate) company_marks: &'a str,
-    pub(crate) ledger_binding: &'a StandardLedgerCatalogBinding,
-    /// An invoice's masters, read again for the admission's judge (#1337).
-    pub(crate) invoice: Option<QueuedInvoice<'a>>,
-}
-
-/// Whether the profile accepts every voucher's date, and there is at least
-/// one: an empty list approves nothing.
-fn every_date_accepted(profile: DateBoundaryProfile, voucher_dates: &[TallyDate]) -> bool {
-    !voucher_dates.is_empty()
-        && voucher_dates
-            .iter()
-            .all(|voucher_date| profile.accepts_boundary(voucher_date))
-}
-
-impl ApprovedImport {
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn confirm(
-        xml: String,
-        preview: &str,
-        voucher_dates: Vec<TallyDate>,
-        verification_request: AgentReadRequest,
-        ledger_catalogue_request: AgentReadRequest,
-        ledger_binding: StandardLedgerCatalogBinding,
-        group_collection_request: Option<AgentReadRequest>,
-        currency_request: AgentReadRequest,
-        company_marks_request: AgentReadRequest,
-    ) -> Result<Self, String> {
-        let count = VoucherCount::new(voucher_dates.len())
-            .ok_or_else(|| "voucher_date_invalid".to_string())?;
-        approve(count, preview).await?;
-        Ok(Self {
-            xml,
-            voucher_dates,
-            verification_request,
-            ledger_catalogue_request,
-            ledger_binding,
-            group_collection_request,
-            currency_request,
-            company_marks_request,
-            invoice: None,
-        })
-    }
-
-    /// The same approval, to be redeemed with an invoice's masters read again
-    /// in the queue. A plain field of the approval and no part of what the
-    /// person was shown: the queue's judge holds the plan to the invoice.
-    pub(crate) fn with_invoice(mut self, invoice: Option<InvoiceReadPlan>) -> Self {
-        self.invoice = invoice.map(Box::new);
-        self
-    }
-
+impl VoucherAdmission {
+    /// The reads an invoice's admission makes, `None` for every other
+    /// voucher type (#1337).
     pub(super) fn invoice_plan(&self) -> Option<&InvoiceReadPlan> {
         self.invoice.as_deref()
-    }
-
-    pub(super) fn xml(&self) -> &str {
-        &self.xml
     }
 
     pub(super) fn verification_request(&self) -> AgentReadRequest {
@@ -245,21 +269,268 @@ impl ApprovedImport {
     pub(super) fn currency_request(&self) -> AgentReadRequest {
         self.currency_request.clone()
     }
+}
+
+/// A master post's admission: one request of ledger `Create`s, rendered once.
+///
+/// `rendered` is produced once, when the admission is built, and never again,
+/// so the bytes the POST sends are the bytes whose digest the dispatch intent
+/// records. The only production constructor is [`ApprovedImport::confirm_masters`],
+/// which builds it before the dialog and holds it only if the person approves,
+/// so no code holds an approved masters kind without that answer (P2).
+#[derive(Clone)]
+pub(super) struct MasterAdmission {
+    batch: LedgerCreateBatch,
+    rendered: RenderedLedgerCreate,
+    /// The ledger name index read (the V3 catalogue request).
+    ledger_index_request: AgentReadRequest,
+    /// The group name index read (the group snapshot request).
+    group_index_request: AgentReadRequest,
+    company: VerifiedCompanyIdentity,
+    /// The master journal batch this approval is for, once the tool binds it
+    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
+    /// batch is licensed by no intent.
+    batch_id: Option<String>,
+}
+
+impl MasterAdmission {
+    /// Renders the request once, with the two index reads for the company.
+    fn new(
+        batch: LedgerCreateBatch,
+        company: &VerifiedCompanyIdentity,
+    ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
+        use super::agent_read_request::AgentReadRequestError;
+        use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
+        let validated =
+            ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
+        let rendered = batch.render_import(company);
+        Ok(Self {
+            batch,
+            rendered,
+            ledger_index_request: AgentReadRequest::parse(
+                ReadOnlyProfile::StandardLedgerCatalogV3 {
+                    company: &validated,
+                }
+                .render(),
+            )?,
+            group_index_request: AgentReadRequest::parse(
+                bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
+                    company.display_name(),
+                ),
+            )?,
+            company: company.clone(),
+            batch_id: None,
+        })
+    }
+
+    pub(super) fn batch(&self) -> &LedgerCreateBatch {
+        &self.batch
+    }
+
+    pub(super) fn ledger_index_request(&self) -> AgentReadRequest {
+        self.ledger_index_request.clone()
+    }
+
+    pub(super) fn group_index_request(&self) -> AgentReadRequest {
+        self.group_index_request.clone()
+    }
+
+    pub(super) fn company(&self) -> &VerifiedCompanyIdentity {
+        &self.company
+    }
+}
+
+/// What the queue read for the last admission before the POST, by kind.
+pub(crate) enum QueuedAdmission<'a> {
+    Vouchers {
+        first: &'a str,
+        second: &'a str,
+        catalogue: &'a str,
+        groups: Option<&'a str>,
+        currencies: &'a str,
+        /// The all-company marks read as the binding reads began (#239).
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+        ledger_binding: &'a StandardLedgerCatalogBinding,
+        /// An invoice's masters, read again for the admission's judge (#1337).
+        invoice: Option<QueuedInvoice<'a>>,
+    },
+    /// Each index is read twice, as the voucher absence reads are: the recheck
+    /// requires the pairs byte-equal.
+    Masters {
+        /// The request being posted and the company it is for, taken from the
+        /// approved request itself, so the recheck reads the name and the
+        /// company from the bytes' own source and no caller supplies them.
+        batch: &'a LedgerCreateBatch,
+        company: &'a VerifiedCompanyIdentity,
+        ledgers_first: &'a str,
+        ledgers_second: &'a str,
+        groups_first: &'a str,
+        groups_second: &'a str,
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+    },
+}
+
+/// Whether the profile accepts every voucher's date, and there is at least
+/// one: an empty list approves nothing.
+fn every_date_accepted(profile: DateBoundaryProfile, voucher_dates: &[TallyDate]) -> bool {
+    !voucher_dates.is_empty()
+        && voucher_dates
+            .iter()
+            .all(|voucher_date| profile.accepts_boundary(voucher_date))
+}
+
+impl ApprovedImport {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn confirm_vouchers(
+        xml: String,
+        preview: &str,
+        voucher_dates: Vec<TallyDate>,
+        verification_request: AgentReadRequest,
+        ledger_catalogue_request: AgentReadRequest,
+        ledger_binding: StandardLedgerCatalogBinding,
+        group_collection_request: Option<AgentReadRequest>,
+        currency_request: AgentReadRequest,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, String> {
+        let count = VoucherCount::new(voucher_dates.len())
+            .ok_or_else(|| "voucher_date_invalid".to_string())?;
+        approve(count, preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Vouchers(VoucherAdmission {
+                xml,
+                voucher_dates,
+                verification_request,
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request,
+                currency_request,
+                invoice: None,
+            }),
+            company_marks_request,
+        })
+    }
+
+    /// The same approval, to be redeemed with an invoice's masters read again
+    /// in the queue. A plain field of the approval and no part of what the
+    /// person was shown: the queue's judge holds the plan to the invoice. Only
+    /// a voucher approval carries a plan; a master approval is returned as it
+    /// is, since the voucher post that calls this admits a voucher approval
+    /// only.
+    pub(crate) fn with_invoice(mut self, invoice: Option<InvoiceReadPlan>) -> Self {
+        if let ApprovedKind::Vouchers(vouchers) = &mut self.kind {
+            vouchers.invoice = invoice.map(Box::new);
+        }
+        self
+    }
+
+    /// The master post's approval: the one-ledger dialog, answered only by its
+    /// own token. On the person's approval this holds `item` as the masters
+    /// kind; any other answer is a typed refusal and holds nothing. The
+    /// request and the two index reads are built before the dialog, so a
+    /// fault there asks no one.
+    ///
+    /// `preview` is what the person is shown. It is built from `item` and
+    /// `company` by the caller's review builder, and bound with them in the
+    /// approval binding.
+    pub(crate) async fn confirm_masters(
+        batch: LedgerCreateBatch,
+        company: &VerifiedCompanyIdentity,
+        preview: &str,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, String> {
+        let count = VoucherCount::new(batch.len()).ok_or("master_request_invalid")?;
+        let admission = MasterAdmission::new(batch, company)
+            .map_err(|_| "master_request_invalid".to_string())?;
+        // The text the person is shown and the count its box is worded by.
+        let preview = MastersPrompt {
+            text: preview,
+            count,
+        };
+        approve_masters(preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Masters(Box::new(admission)),
+            company_marks_request,
+        })
+    }
+
+    /// Which request this approval is for.
+    pub(crate) fn post_kind(&self) -> PostKind {
+        match &self.kind {
+            ApprovedKind::Vouchers(_) => PostKind::Vouchers,
+            ApprovedKind::Masters(_) => PostKind::Masters,
+        }
+    }
+
+    /// The bytes the one POST sends, whatever the kind. For masters they are
+    /// the bytes rendered once in [`MasterAdmission::new`], whose digest the
+    /// dispatch intent records.
+    pub(super) fn xml(&self) -> &str {
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => &vouchers.xml,
+            ApprovedKind::Masters(masters) => masters.rendered.xml(),
+        }
+    }
+
+    /// Whether the one POST would send exactly `xml`.
+    pub(crate) fn sends_exactly(&self, xml: &str) -> bool {
+        self.xml() == xml
+    }
+
+    /// Lowercase hex digest of the bytes the one POST sends, as a master
+    /// dispatch intent records them.
+    pub(crate) fn xml_sha256(&self) -> String {
+        bridge_tally_protocol::sha256_hex(self.xml().as_bytes())
+    }
+
+    /// This approval bound to the master journal batch it was taken for, so the
+    /// intent that licenses its send must be that batch's. A voucher approval is
+    /// returned as it is.
+    #[must_use]
+    pub(crate) fn bound_to_batch(mut self, batch_id: &str) -> Self {
+        if let ApprovedKind::Masters(masters) = &mut self.kind {
+            masters.batch_id = Some(batch_id.to_string());
+        }
+        self
+    }
+
+    /// The master journal batch this approval is bound to, if it is a master
+    /// approval that was bound.
+    pub(crate) fn master_batch_id(&self) -> Option<&str> {
+        match &self.kind {
+            ApprovedKind::Masters(masters) => masters.batch_id.as_deref(),
+            ApprovedKind::Vouchers(_) => None,
+        }
+    }
 
     pub(super) fn company_marks_request(&self) -> AgentReadRequest {
         self.company_marks_request.clone()
     }
 
-    /// Recheck the operator-approved dates after the endpoint queue admits this
-    /// request. The observed product/mode can change while native approval waits.
+    /// Recheck the operator-approved request against the observed product and
+    /// mode after the endpoint queue admits it. The mode can change while
+    /// native approval waits. Vouchers: every date is one the mode accepts.
+    /// Masters: the mode is not Education, which this path has not measured a
+    /// master write in.
     pub(super) fn require_boundary_profile(
         &self,
         profile: DateBoundaryProfile,
     ) -> Result<(), ApprovedImportAdmissionError> {
-        if every_date_accepted(profile, &self.voucher_dates) {
-            Ok(())
-        } else {
-            Err(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => {
+                if every_date_accepted(profile, &vouchers.voucher_dates) {
+                    Ok(())
+                } else {
+                    Err(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+                }
+            }
+            ApprovedKind::Masters(_) => match profile {
+                DateBoundaryProfile::ModeAgnostic => Ok(()),
+                DateBoundaryProfile::EducationRestricted => {
+                    Err(ApprovedImportAdmissionError::MasterWritesNeedLicensedMode)
+                }
+            },
         }
     }
 
@@ -276,18 +547,21 @@ impl ApprovedImport {
         // bypass (bridge#583).
         std::hint::black_box(test_seam::SEAM_MARKER);
         Self {
-            xml,
-            voucher_dates: vec![voucher_date],
-            verification_request: AgentReadRequest::parse(
-                bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2.render(),
-            )
-            .expect("static read profile is admitted"),
-            ledger_catalogue_request,
-            ledger_binding,
-            group_collection_request: None,
-            currency_request,
+            kind: ApprovedKind::Vouchers(VoucherAdmission {
+                xml,
+                voucher_dates: vec![voucher_date],
+                verification_request: AgentReadRequest::parse(
+                    bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2
+                        .render(),
+                )
+                .expect("static read profile is admitted"),
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request: None,
+                currency_request,
+                invoice: None,
+            }),
             company_marks_request,
-            invoice: None,
         }
     }
 }
@@ -319,9 +593,10 @@ impl Answered {
 }
 
 /// A post dialog left open after the MCP call that asked it returned (#725).
-/// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
+/// It is [`ApprovedImport::confirm_vouchers`] itself, unchanged, run on its own task so
 /// that the dialog's time limit and its child's exit are observed while no call
-/// is waiting. Dropping this aborts that task, which drops the dialog child:
+/// is waiting. When its box did not fit the screen (#1832) the task also runs
+/// the one note the asking call gave it, before the answer is stamped. Dropping this aborts that task, which drops the dialog child:
 /// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
 /// read, so a late click approves nothing.
 pub(crate) struct PendingPostApproval {
@@ -333,8 +608,10 @@ pub(crate) struct PendingPostApproval {
 
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
-    /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there.
+    /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
+    /// task. Nothing else can be run there but the masters twin below and the one
+    /// note of a box that did not fit, which the caller gives and only the dialog
+    /// task calls.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
         xml: String,
@@ -346,22 +623,66 @@ impl PendingPostApproval {
         group_collection_request: Option<AgentReadRequest>,
         currency_request: AgentReadRequest,
         company_marks_request: AgentReadRequest,
+        on_box_did_not_fit: Option<Box<dyn FnOnce() + Send>>,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_vouchers(
+                    xml,
+                    &preview,
+                    voucher_dates,
+                    verification_request,
+                    ledger_catalogue_request,
+                    ledger_binding,
+                    group_collection_request,
+                    currency_request,
+                    company_marks_request,
+                )
+                .await
+            },
+            on_box_did_not_fit,
+        )
+    }
+
+    /// The same for the one-ledger dialog: [`ApprovedImport::confirm_masters`]
+    /// with exactly these arguments, on its own task. Its box is measured as
+    /// the post's is, but a box that does not fit is refused with nothing to
+    /// note: the ledger text, one ledger or a batch, has no shorter form.
+    pub(crate) fn ask_masters(
+        batch: LedgerCreateBatch,
+        company: VerifiedCompanyIdentity,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_masters(batch, &company, &preview, company_marks_request)
+                    .await
+            },
+            None,
+        )
+    }
+
+    /// Run `confirm` on its own task, stamping its answer as it ends, and tell
+    /// `on_box_did_not_fit` first if the box it showed did not fit the screen.
+    fn stamped(
+        confirm: impl std::future::Future<Output = Result<ApprovedImport, String>> + Send + 'static,
+        on_box_did_not_fit: Option<Box<dyn FnOnce() + Send>>,
     ) -> Self {
         let answered = std::sync::Arc::new(std::sync::OnceLock::new());
         let stamp = std::sync::Arc::clone(&answered);
         let dialog = async move {
-            let answer = ApprovedImport::confirm(
-                xml,
-                &preview,
-                voucher_dates,
-                verification_request,
-                ledger_catalogue_request,
-                ledger_binding,
-                group_collection_request,
-                currency_request,
-                company_marks_request,
-            )
-            .await;
+            let (answer, too_tall) = BOX_DID_NOT_FIT
+                .scope(std::cell::Cell::new(false), async {
+                    let answer = confirm.await;
+                    (answer, BOX_DID_NOT_FIT.with(std::cell::Cell::get))
+                })
+                .await;
+            // Told before the answer is stamped, so a call that reads the
+            // refusal finds the fact already recorded.
+            if let (true, Some(note)) = (too_tall, on_box_did_not_fit) {
+                note();
+            }
             // Stamped before the task ends, never after: a task seen finished
             // with no stamp is one that ended without an answer. A refusal's
             // code is stamped with it, so it can be read without the task.
@@ -438,8 +759,14 @@ impl ApprovedImport {
     /// How many vouchers the person was asked about: the dialog's count is
     /// taken from these dates (#746), so a redeemed approval can be held to the
     /// batch it is redeemed for.
-    pub(crate) fn voucher_count(&self) -> usize {
-        self.voucher_dates.len()
+    ///
+    /// A master post has no vouchers and no count: `None`. Whether an approval
+    /// is for the right kind is decided by [`Self::post_kind`], never by this.
+    pub(crate) fn voucher_count(&self) -> Option<usize> {
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => Some(vouchers.voucher_dates.len()),
+            ApprovedKind::Masters(_) => None,
+        }
     }
 }
 
@@ -507,8 +834,12 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free code, as the read before approval does (bridge#717).
     #[error("group_export_invalid")]
     GroupExportInvalid { cause: Option<&'static str> },
-    /// A bank voucher reached the queue without its group read, or a Journal
-    /// with one: a wiring fault, refused before any request is sent.
+    /// What the queue reads does not fit what the batch calls for: a bank
+    /// voucher without its group read or a Journal with one, an invoice without
+    /// its reads or reads without an invoice, a plan other than the one the
+    /// build carried, or a judge or precheck that still asks for an answer once
+    /// its reads are in. A wiring fault, refused before the POST is sent; the
+    /// queue's own reads may already have been sent.
     #[error("import_post_admission_inconsistent")]
     AdmissionInconsistent,
     /// The snapshot sent last before the POST no longer shows exactly one
@@ -547,6 +878,23 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free cause the refusal carries.
     #[error("post_catalogue_unreadable")]
     CatalogueUnreadable(#[source] bridge_tally_protocol::StandardLedgerCatalogError),
+    /// A master post met an Education profile at the queue's opening or closing
+    /// observation. Raised before any index read is trusted and before the
+    /// intent; nothing was sent.
+    #[error("master_writes_need_licensed_mode")]
+    MasterWritesNeedLicensedMode,
+    /// The proposed ledger name could resolve to an existing master, through
+    /// its stored name or an alias. Carries only the colliding master's kind
+    /// and how its name matched, never another client's name.
+    #[error("master_name_taken")]
+    MasterNameTaken { kind: MasterKind, via: Via },
+    /// The ledger name index answer could not be read, so a master post
+    /// cannot show a ledger name absent and is refused before the intent.
+    /// `cause` is the parser's code, which carries no book data
+    /// (`StandardLedgerCatalogError::safe_code`),
+    /// so a foreign company's answer is told apart from a malformed one.
+    #[error("master_ledger_index_unavailable")]
+    MasterLedgerIndexUnavailable { cause: &'static str },
     /// What the queue read of an invoice's masters differs from what the build
     /// recorded (#1337). `field` names the first that differs.
     #[error("import_invoice_masters_changed")]
@@ -607,20 +955,64 @@ pub(crate) enum UnderLockRefusal {
     #[error("import_txn_already_posted")]
     TxnAlreadyPosted,
     /// The aim snapshot did not yield the target's voucher mark to record with
-    /// the intent. The aim check before it requires exactly one target row, so
-    /// this should not fire; if it does, no dispatch intent is recorded and
+    /// the intent: its target row omits the mark (#1945), or the company's GUID
+    /// is on more than one loaded row. No dispatch intent is recorded and
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,
+    /// The aim read the company's voucher mark below a floor an earlier native
+    /// post of the company had proved (a restore), and the record of it could
+    /// not be written (#1050). No dispatch intent is recorded and nothing is
+    /// sent: once this post's vouchers raise the mark, no later reading could
+    /// see the restore.
+    #[error("post_rollback_unrecorded")]
+    RollbackUnrecorded,
     /// The approval could not be spent: it was revoked after this call took
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
+    /// A master post reached the lock without the pre-image its queue recheck
+    /// was to leave for the intent: no sidecar can be named, so no intent is
+    /// recorded and nothing is sent.
+    #[error("master_pre_image_unrecorded")]
+    PreImageUnrecorded,
+    /// The pre-image sidecar could not be written. Refused before the intent:
+    /// nothing was recorded in the master journal and nothing was sent.
+    #[error("master_pre_image_write_failed")]
+    PreImageWriteFailed,
+    /// The pre-image sidecar written for a dispatch the journal then refused
+    /// could not be removed again: nothing was recorded or sent, but a file for
+    /// the batch is left behind.
+    #[error("master_pre_image_remove_failed")]
+    PreImageRemoveFailed,
+    /// Another dispatched master batch, whose outcome is still open, names a
+    /// ledger this one names: a second send of it under a new batch id. Nothing
+    /// was recorded and nothing was sent.
+    #[error("master_ledger_open_dispatch_overlaps")]
+    MasterOverlapsOpenDispatch,
+    /// The master journal refused the record before writing it: nothing was
+    /// recorded and nothing was sent.
+    #[error("master_ledger_invalid")]
+    MasterJournalRefused,
+    /// The master journal could not be read under the lock, so the batch's
+    /// state could not be checked: nothing was recorded and nothing was sent.
+    #[error("master_ledger_unavailable")]
+    MasterJournalUnavailable,
     /// Another invoice of this company was sent and is not verified posted, as
     /// an approval dialog stood open (ADR 0004, slice 4): nothing was recorded
     /// or sent.
     #[error("invoice_company_stopped")]
     CompanyStopped,
+    /// The batch is no longer one the company's transfer records allow to be
+    /// sent: the reason is the code. The records changed after the check made
+    /// before the person was asked.
+    #[error("{0}")]
+    Transfers(&'static str),
+    /// A Store package's copy of the data folder holds a second import journal,
+    /// or whether it does could not be told, found again after the approval
+    /// dialog (#2233). The field is the cause; nothing was recorded or sent.
+    #[error("import_journal_split")]
+    JournalSplit(&'static str),
 }
 
 impl UnderLockRefusal {
@@ -632,11 +1024,26 @@ impl UnderLockRefusal {
             Self::BatchChanged => "import_batch_changed",
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
+            Self::RollbackUnrecorded => "post_rollback_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
+            Self::PreImageUnrecorded => "master_pre_image_unrecorded",
+            Self::PreImageWriteFailed => "master_pre_image_write_failed",
+            Self::PreImageRemoveFailed => "master_pre_image_remove_failed",
+            Self::MasterOverlapsOpenDispatch => "master_ledger_open_dispatch_overlaps",
+            Self::MasterJournalRefused => "master_ledger_invalid",
+            Self::MasterJournalUnavailable => "master_ledger_unavailable",
             Self::CompanyStopped => "invoice_company_stopped",
+            Self::Transfers(reason) => reason,
+            Self::JournalSplit(_) => "import_journal_split",
         }
     }
 }
+
+// What `before_dispatch` hands the send: the licence to send this request. Sealed
+// in its own module, where the only two licences are defined.
+#[path = "dispatch_license.rs"]
+mod dispatch_license;
+pub(crate) use dispatch_license::{DispatchLicense, RecordedIntent};
 
 /// Why `before_dispatch` refused. Only a named check made before the intent
 /// append is `Refused`; the lock, the journal read and the append itself are
@@ -665,6 +1072,14 @@ use confirm_review as approve_review;
 
 #[cfg(test)]
 use test_seam::approve_review;
+
+/// The native one-ledger dialog every master approval goes through, gated
+/// exactly as [`approve`] is.
+#[cfg(not(test))]
+use confirm_masters_dialog as approve_masters;
+
+#[cfg(test)]
+use test_seam::approve_masters;
 
 /// What a post dialog's own task runs under (#725). Outside this crate's unit
 /// tests it is the dialog alone: nothing is carried into the task.
@@ -698,6 +1113,17 @@ pub(crate) mod test_seam {
         super::VoucherCount::new(count).unwrap()
     }
 
+    /// Whether the review dialog for `kind` holds `preview` within the box's
+    /// caps, as the real dialog measures it, for the caller's tests.
+    pub(crate) fn review_fits(
+        kind: super::ReviewKind,
+        count: super::VoucherCount,
+        preview: &str,
+    ) -> bool {
+        let shown = kind.shown();
+        super::fits_the_box(shown, count, &super::displayed_text(shown, count, preview))
+    }
+
     /// What a test decided, and every preview the post path asked it about.
     #[derive(Clone)]
     pub(crate) struct ScriptedApproval {
@@ -706,10 +1132,16 @@ pub(crate) mod test_seam {
         /// Every preview the review dialog was asked about, kept apart from
         /// the post dialog's so a test can tell which dialog a person saw.
         reviews: Arc<Mutex<Vec<String>>>,
+        /// Every preview the one-ledger dialog was asked about, kept apart
+        /// from the other two so a test can tell which dialog a person saw.
+        masters: Arc<Mutex<Vec<String>>>,
         /// The voucher count each dialog was asked about, in the same order
         /// as `previews` and `reviews` (#746).
         counts: Arc<Mutex<Vec<usize>>>,
         review_counts: Arc<Mutex<Vec<usize>>>,
+        /// The ledger count each ledger dialog was asked about, in the same
+        /// order as `masters`: a box for ten ledgers must not say one.
+        master_counts: Arc<Mutex<Vec<usize>>>,
         review_kinds: Arc<Mutex<Vec<super::ReviewKind>>>,
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
@@ -721,6 +1153,10 @@ pub(crate) mod test_seam {
         /// Signalled when a held post dialog opens, so a test waits for that
         /// event rather than polling for it against a clock.
         opened: Arc<tokio::sync::Notify>,
+        /// How many of the next post dialogs show a box that does not fit the
+        /// screen, as the real dialog child would report with its exit status
+        /// (#1832): each is refused as `import_review_too_large` and noted.
+        too_tall: Arc<std::sync::atomic::AtomicUsize>,
     }
 
     impl ScriptedApproval {
@@ -740,11 +1176,30 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// Approves, except that the first `times` post dialogs show a box that
+        /// does not fit the screen.
+        pub(crate) fn too_tall_first(times: usize) -> Self {
+            let scripted = Self::new(true);
+            scripted
+                .too_tall
+                .store(times, std::sync::atomic::Ordering::SeqCst);
+            scripted
+        }
+
         /// A post dialog that stays open until [`ScriptedApproval::answer`].
         pub(crate) fn held() -> Self {
             Self {
                 held: Some(Arc::new(tokio::sync::watch::channel(None).0)),
                 ..Self::new(false)
+            }
+        }
+
+        /// A held post dialog that runs `while_pending` as it opens, on the
+        /// dialog's own task, before it waits for [`ScriptedApproval::answer`].
+        pub(crate) fn held_after(while_pending: impl Fn() + Send + Sync + 'static) -> Self {
+            Self {
+                while_pending: Some(Arc::new(while_pending)),
+                ..Self::held()
             }
         }
 
@@ -785,12 +1240,15 @@ pub(crate) mod test_seam {
                 approve,
                 previews: Arc::default(),
                 reviews: Arc::default(),
+                masters: Arc::default(),
                 counts: Arc::default(),
                 review_counts: Arc::default(),
+                master_counts: Arc::default(),
                 review_kinds: Arc::default(),
                 while_pending: None,
                 held: None,
                 opened: Arc::default(),
+                too_tall: Arc::default(),
             }
         }
 
@@ -802,12 +1260,20 @@ pub(crate) mod test_seam {
             self.reviews.lock().unwrap().clone()
         }
 
+        pub(crate) fn masters(&self) -> Vec<String> {
+            self.masters.lock().unwrap().clone()
+        }
+
         pub(crate) fn counts(&self) -> Vec<usize> {
             self.counts.lock().unwrap().clone()
         }
 
         pub(crate) fn review_counts(&self) -> Vec<usize> {
             self.review_counts.lock().unwrap().clone()
+        }
+
+        pub(crate) fn master_counts(&self) -> Vec<usize> {
+            self.master_counts.lock().unwrap().clone()
         }
 
         /// Which use of the review dialog each review was asked for.
@@ -823,13 +1289,13 @@ pub(crate) mod test_seam {
         pub(crate) static SCRIPTED_APPROVAL: ScriptedApproval;
     }
 
-    /// The test-build approval. Unscoped, it declines at once and starts no
-    /// process, so no test can reach a real dialog or approve by default.
-    pub(super) async fn approve(count: super::VoucherCount, preview: &str) -> Result<(), String> {
+    /// What the scripted decision is for a dialog that records itself with
+    /// `record`: the decision, once a held dialog has been answered. Unscoped
+    /// it declines at once and starts no process.
+    async fn scripted_decision(record: impl FnOnce(&ScriptedApproval)) -> bool {
         let decision = SCRIPTED_APPROVAL
             .try_with(|scripted| {
-                scripted.previews.lock().unwrap().push(preview.to_string());
-                scripted.counts.lock().unwrap().push(count.0.get());
+                record(scripted);
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
@@ -845,20 +1311,62 @@ pub(crate) mod test_seam {
             .unwrap_or(Ok(false));
         let decision = match decision {
             Ok(decision) => decision,
-            Err(mut held) => {
-                let answered = held
-                    .wait_for(Option::is_some)
-                    .await
-                    .map(|answer| *answer == Some(true))
-                    .unwrap_or(false);
-                answered
-            }
+            Err(mut held) => held
+                .wait_for(Option::is_some)
+                .await
+                .map(|answer| *answer == Some(true))
+                .unwrap_or(false),
         };
         std::hint::black_box(SEAM_MARKER);
+        decision
+    }
+
+    /// The test-build approval. Unscoped, it declines at once and starts no
+    /// process, so no test can reach a real dialog or approve by default.
+    pub(super) async fn approve(count: super::VoucherCount, preview: &str) -> Result<(), String> {
+        let decision = scripted_decision(|scripted| {
+            scripted.previews.lock().unwrap().push(preview.to_string());
+            scripted.counts.lock().unwrap().push(count.0.get());
+        })
+        .await;
+        let too_tall = SCRIPTED_APPROVAL
+            .try_with(|scripted| {
+                scripted
+                    .too_tall
+                    .fetch_update(
+                        std::sync::atomic::Ordering::SeqCst,
+                        std::sync::atomic::Ordering::SeqCst,
+                        |left| left.checked_sub(1),
+                    )
+                    .is_ok()
+            })
+            .unwrap_or(false);
+        if too_tall {
+            super::note_box_did_not_fit();
+            return Err("import_review_too_large".into());
+        }
         if decision {
             Ok(())
         } else {
             Err("import_approval_declined".into())
+        }
+    }
+
+    /// The test-build one-ledger dialog, scripted by the same decision
+    /// (including a held dialog a test answers) and declining the same way
+    /// when unscoped.
+    pub(super) async fn approve_masters(prompt: super::MastersPrompt<'_>) -> Result<(), String> {
+        let preview = prompt.text;
+        let count = prompt.count.0.get();
+        let decision = scripted_decision(|scripted| {
+            scripted.masters.lock().unwrap().push(preview.to_string());
+            scripted.master_counts.lock().unwrap().push(count);
+        })
+        .await;
+        if decision {
+            Ok(())
+        } else {
+            Err("master_approval_declined".into())
         }
     }
 
@@ -928,6 +1436,29 @@ pub(crate) mod test_seam {
         assert_eq!(
             super::confirm_review(super::ReviewKind::Review, ONE, &oversized).await,
             Err("ack_review_too_large".to_string())
+        );
+    }
+
+    /// The same for the one-ledger dialog, which has its own limit code.
+    #[tokio::test]
+    async fn the_real_masters_approval_refuses_an_oversized_preview_before_starting_a_process() {
+        let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
+        assert_eq!(
+            super::confirm_masters_with(
+                std::path::Path::new("/nonexistent/never-started"),
+                ONE,
+                &oversized
+            )
+            .await,
+            Err("master_review_too_large".to_string())
+        );
+        assert_eq!(
+            super::confirm_masters_dialog(super::MastersPrompt {
+                text: &oversized,
+                count: ONE,
+            })
+            .await,
+            Err("master_review_too_large".to_string())
         );
     }
 
@@ -1069,6 +1600,12 @@ pub(crate) mod test_seam {
                 Err("ack_review_unavailable"),
             ),
             (
+                "the one-ledger dialog's token for this nonce",
+                0,
+                "bridge-create-ledger:{NONCE}\n",
+                Err("ack_review_unavailable"),
+            ),
+            (
                 "a log line, then the token",
                 0,
                 "starting\nbridge-review-acknowledged:{NONCE}\n",
@@ -1098,17 +1635,49 @@ pub(crate) mod test_seam {
             // `ack_review_unavailable`, and would pass a row without reaching
             // the clean-exit-without-token arm it is here to pin.
             let path = standin(directory.path(), exit_code, answer);
-            let result = super::confirm_review_with(&path, ONE, "Review").await;
+            let result =
+                super::confirm_review_with(&path, super::ReviewKind::Review, ONE, "Review").await;
             assert_eq!(result, expected.map_err(str::to_string), "{name}");
             assert_ran_to_its_end(&path, "Review", name);
         }
         // The control: the token for this call's nonce is accepted.
         let echoes_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
         assert_eq!(
-            super::confirm_review_with(&echoes_token, ONE, "Review").await,
+            super::confirm_review_with(&echoes_token, super::ReviewKind::Review, ONE, "Review")
+                .await,
             Ok(())
         );
         assert_ran_to_its_end(&echoes_token, "Review", "the control");
+        // A stop release runs its own mode and answers with its own token: the
+        // review's token does not release a stop, and the release's does.
+        let review_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
+        assert_eq!(
+            super::confirm_review_with(
+                &review_token,
+                super::ReviewKind::StopRelease,
+                ONE,
+                "Review"
+            )
+            .await,
+            Err("ack_review_unavailable".to_string())
+        );
+        assert_ran_to_its_end(&review_token, "Review", "a review token for a release");
+        let release_token = standin(
+            directory.path(),
+            0,
+            "bridge-stop-release-acknowledged:{NONCE}\n",
+        );
+        assert_eq!(
+            super::confirm_review_with(
+                &release_token,
+                super::ReviewKind::StopRelease,
+                ONE,
+                "Review"
+            )
+            .await,
+            Ok(())
+        );
+        assert_ran_to_its_end(&release_token, "Review", "the release control");
     }
 
     /// The post dialog is answered only by the token echoing this call's
@@ -1148,6 +1717,10 @@ pub(crate) mod test_seam {
                 "the review dialog's token for this nonce",
                 "bridge-review-acknowledged:{NONCE}\n",
             ),
+            (
+                "the one-ledger dialog's token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
+            ),
             // The answer is matched byte for byte, so any stray output, such
             // as a log line, is refused. That is fail-closed on purpose: do
             // not trim or search the output to "fix" it.
@@ -1183,6 +1756,67 @@ pub(crate) mod test_seam {
         assert_ran_to_its_end(&approves, "Post", "the control");
     }
 
+    /// A dialog whose box did not fit the screen exits with its own status
+    /// (#1832). That is a refusal that says the text is too large, for the
+    /// post, the review and the one-ledger box (#1780), with or without a
+    /// token: no answer, a printed approval included, passes for a box the
+    /// person could not see whole. It is not a decline, not unavailable and
+    /// never approved.
+    #[tokio::test]
+    async fn a_box_that_did_not_fit_the_screen_is_refused_whatever_it_printed() {
+        let directory = standin_directory();
+        let status = crate::tally::box_fit::DOES_NOT_FIT_EXIT;
+        for (name, answer) in [
+            ("no token", ""),
+            (
+                "the post token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+            (
+                "the review token for this nonce",
+                "bridge-review-acknowledged:{NONCE}\n",
+            ),
+            (
+                "the one-ledger token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_with(&path, ONE, "Post").await,
+                Err("import_review_too_large".to_string()),
+                "post: {name}"
+            );
+            assert_ran_to_its_end(&path, "Post", name);
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_review_with(&path, super::ReviewKind::Review, ONE, "Review").await,
+                Err("ack_review_too_large".to_string()),
+                "review: {name}"
+            );
+            assert_ran_to_its_end(&path, "Review", name);
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, ONE, "Create").await,
+                Err("master_review_too_large".to_string()),
+                "one ledger: {name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        // The statuses next to it keep their meaning: a decline is exit 1, a
+        // clean exit with no token is unavailable.
+        let decline = standin(directory.path(), 1, "");
+        assert_eq!(
+            super::confirm_with(&decline, ONE, "Post").await,
+            Err("import_approval_declined".to_string())
+        );
+        let unavailable = standin(directory.path(), 0, "");
+        assert_eq!(
+            super::confirm_with(&unavailable, ONE, "Post").await,
+            Err("import_approval_unavailable".to_string())
+        );
+    }
+
     /// Each call sends a nonce of its own: a stand-in that answers every call
     /// with the token for the nonce it read sees a different one each time.
     #[tokio::test]
@@ -1201,6 +1835,131 @@ pub(crate) mod test_seam {
         assert_ne!(nonces[0], nonces[1]);
     }
 
+    /// The one-ledger dialog is approved only by the token echoing this call's
+    /// nonce and a clean exit, as the post dialog is. Anything else is refused,
+    /// never approved: a clean exit without the token is an executable that is
+    /// not this dialog (unavailable), and the post and review dialogs' tokens
+    /// are not this one's.
+    #[tokio::test]
+    async fn a_ledger_create_is_approved_only_by_the_token_for_its_nonce() {
+        let directory = standin_directory();
+        for (name, exit_code, answer) in [
+            ("a person's decline: no token, exit 1", 1, ""),
+            (
+                "the token, but a failing exit",
+                1,
+                "bridge-create-ledger:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), exit_code, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, ONE, "Create").await,
+                Err("master_approval_declined".to_string()),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        let another_nonce = format!("bridge-create-ledger:{}\n", crate::synthetic_guid(0));
+        for (name, answer) in [
+            ("an executable ignoring the flag exits 0", ""),
+            ("an echo of the input", "{NONCE}\n1\nCreate"),
+            ("a token for another nonce", another_nonce.as_str()),
+            (
+                "the post dialog's token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+            (
+                "the review dialog's token for this nonce",
+                "bridge-review-acknowledged:{NONCE}\n",
+            ),
+            (
+                "a log line, then the token",
+                "starting\nbridge-create-ledger:{NONCE}\n",
+            ),
+            (
+                "the token, then more output",
+                "bridge-create-ledger:{NONCE}\nmore\n",
+            ),
+            ("the token with CRLF", "bridge-create-ledger:{NONCE}\r\n"),
+            (
+                "the token without its newline",
+                "bridge-create-ledger:{NONCE}",
+            ),
+        ] {
+            let path = standin(directory.path(), 0, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, ONE, "Create").await,
+                Err("master_approval_unavailable".to_string()),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        assert_eq!(
+            super::confirm_masters_with(&approves, ONE, "Create").await,
+            Ok(())
+        );
+        assert_ran_to_its_end(&approves, "Create", "the control");
+    }
+
+    /// The one-ledger token does not approve the post or the review dialog.
+    #[tokio::test]
+    async fn the_ledger_create_token_approves_neither_the_post_nor_the_review() {
+        let directory = standin_directory();
+        let answers = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        assert_eq!(
+            super::confirm_with(&answers, ONE, "Post").await,
+            Err("import_approval_unavailable".to_string())
+        );
+        assert_eq!(
+            super::confirm_review_with(&answers, super::ReviewKind::Review, ONE, "Review").await,
+            Err("ack_review_unavailable".to_string())
+        );
+    }
+
+    /// Each dialog is started in its own mode, so the one-ledger preview is
+    /// never shown by the post dialog or the reverse.
+    #[tokio::test]
+    async fn each_dialog_is_started_in_its_own_mode() {
+        let directory = standin_directory();
+        let sent = |path: &std::path::Path| {
+            std::fs::read_to_string(beside(path, ".args")).expect("the stand-in ran")
+        };
+        let masters = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        super::confirm_masters_with(&masters, ONE, "Create")
+            .await
+            .unwrap();
+        assert_eq!(sent(&masters), "--confirm-masters");
+        let post = standin(directory.path(), 0, "bridge-post-approved:{NONCE}\n");
+        super::confirm_with(&post, ONE, "Post").await.unwrap();
+        assert_eq!(sent(&post), "--confirm-journal");
+        let review = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
+        super::confirm_review_with(&review, super::ReviewKind::Review, ONE, "Review")
+            .await
+            .unwrap();
+        assert_eq!(sent(&review), "--confirm-review");
+    }
+
+    /// The one-ledger dialog is told it is about one item, on the count line,
+    /// and each call sends a nonce of its own.
+    #[tokio::test]
+    async fn the_ledger_create_dialog_is_told_one_item_with_a_fresh_nonce() {
+        let directory = standin_directory();
+        let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        let mut nonces = Vec::new();
+        for _ in 0..2 {
+            assert_eq!(
+                super::confirm_masters_with(&approves, ONE, "Create").await,
+                Ok(())
+            );
+            let input = standin_input(&approves).expect("the stand-in ran");
+            let (nonce, shown, text) = super::dialog_input(&input).expect("the parent's shape");
+            assert_eq!((shown, text), (ONE, "Create"));
+            nonces.push(nonce.to_string());
+        }
+        assert_ne!(nonces[0], nonces[1]);
+    }
+
     /// Each dialog child is told the voucher count its title and button
     /// name, on the line after the nonce, and then the preview (#746). The
     /// stand-in saves the bytes the parent sent, and the child's own parser
@@ -1214,7 +1973,13 @@ pub(crate) mod test_seam {
         ] {
             let answers = standin(directory.path(), 0, &format!("{prefix}{{NONCE}}\n"));
             let result = if review {
-                super::confirm_review_with(&answers, count(sent), preview).await
+                super::confirm_review_with(
+                    &answers,
+                    super::ReviewKind::Review,
+                    count(sent),
+                    preview,
+                )
+                .await
             } else {
                 super::confirm_with(&answers, count(sent), preview).await
             };
@@ -1254,6 +2019,11 @@ pub(crate) mod test_seam {
             super::review_title(count(50)),
             "ComplyEaze Bridge — record that you reviewed 50 vouchers"
         );
+        // A stop release is titled for what it does, and names no review (#1828).
+        assert_eq!(
+            super::release_title(),
+            "ComplyEaze Bridge — release the invoice stop"
+        );
         // What each window's answer text says, in its own buttons' words (#1780).
         assert_eq!(
             super::answer_text(super::Shown::Post, ONE),
@@ -1272,9 +2042,14 @@ pub(crate) mod test_seam {
         );
         assert_eq!(
             super::answer_text(super::Shown::StopRelease, ONE),
-            "Click \"I reviewed it\" to release the invoice stop for this company, so that \
+            "Click \"Release the stop\" to release the invoice stop for this company, so that \
              ComplyEaze Bridge builds and posts invoices for it again. Click Cancel to cancel. \
              Nothing is released until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::Masters, ONE),
+            "Click \"Create ledger\" to create this ledger in Tally. Click Cancel to cancel. \
+             Nothing is created until you answer."
         );
     }
 
@@ -1299,48 +2074,60 @@ pub(crate) mod test_seam {
             "ComplyEaze Bridge — record that you reviewed these 50 vouchers?"
         );
         // What each window's answer text says: Y and N answer a message box
-        // that has the keyboard (#1780).
+        // that has the keyboard (#1780). The text is wrapped at 100 characters,
+        // so its words are compared with the breaks read as spaces.
         assert_eq!(
-            super::answer_text(super::Shown::Post, ONE),
+            super::answer_text(super::Shown::Post, ONE).replace('\n', " "),
             "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
              cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Post, count(200)),
+            super::answer_text(super::Shown::Post, count(200)).replace('\n', " "),
             "Press Y (or click Yes) to post these 200 vouchers into Tally. Press N (or click No) \
              to cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Review, count(50)),
+            super::answer_text(super::Shown::Review, count(50)).replace('\n', " "),
             "Press Y (or click Yes) to record that you reviewed these 50 vouchers. Press N (or \
              click No) to cancel. Nothing is recorded until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::StopRelease, ONE),
+            super::answer_text(super::Shown::StopRelease, ONE).replace('\n', " "),
             "Press Y (or click Yes) to release the invoice stop for this company, so that \
              ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to \
              cancel. Nothing is released until you answer."
         );
+        assert_eq!(
+            super::answer_text(super::Shown::Masters, ONE).replace('\n', " "),
+            "Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to \
+             cancel. Nothing is created until you answer."
+        );
     }
 
     /// The answer text is wrapped under the dialog's line width without losing
-    /// a word, and adds no more than three lines and 150 characters above a
-    /// post or review text, the size the dialog's caps were raised by (#1780).
-    /// A wording that outgrows it fails here, so the box does not grow unseen.
+    /// a word where the box needs it (Windows), is one line on the Mac, where
+    /// the alert wraps its own text, and adds no more than three lines and 150
+    /// characters above a post or review text, the size the dialog's caps were
+    /// raised by (#1780). A wording that outgrows it fails here, so the box
+    /// does not grow unseen.
     #[test]
     fn the_answer_text_is_wrapped_and_stays_within_the_size_the_caps_allow() {
         for shown in [
             super::Shown::Post,
             super::Shown::Review,
             super::Shown::StopRelease,
+            super::Shown::Masters,
         ] {
             for n in [1, 2, 9, 10, 50] {
                 let text = super::answer_text(shown, count(n));
-                let wrapped = super::wrapped(&text);
-                assert_eq!(wrapped.replace('\n', " "), text, "{shown:?} {n}");
+                let joined = text.replace('\n', " ");
+                assert_eq!(super::wrapped(&joined, 100).replace('\n', " "), joined);
+                // The box's own text: Windows lines are within the width; the Mac
+                // text is a single line and stays one.
                 assert!(
-                    wrapped.lines().all(|line| line.chars().count() <= 100),
-                    "{wrapped}"
+                    text.lines().count() == 1
+                        || text.lines().all(|line| line.chars().count() <= 100),
+                    "{text}"
                 );
             }
         }
@@ -1373,9 +2160,7 @@ pub(crate) mod test_seam {
                 );
                 let shown_text = super::displayed_text(shown, count(n), &at_cap);
                 assert!(super::fits_the_box(shown, count(n), &shown_text), "{n}");
-                assert!(
-                    shown_text.starts_with(&super::wrapped(&super::answer_text(shown, count(n))))
-                );
+                assert!(shown_text.starts_with(&super::answer_text(shown, count(n))));
                 assert!(shown_text.ends_with(&at_cap));
                 // One line more, or characters past what the box has room for.
                 let over = super::displayed_text(shown, count(n), &preview(lines + 1, chars));
@@ -1387,6 +2172,139 @@ pub(crate) mod test_seam {
         }
     }
 
+    /// Where the Mac alert's top is taken to sit: on the screen Part A measured,
+    /// all three rules give its 168 points; elsewhere the lowest of them is
+    /// taken (#1780).
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_alert_top_is_the_lowest_of_the_three_rules() {
+        let screen = |height, visible_top, visible_bottom| super::ScreenSpan {
+            height,
+            visible_top,
+            visible_bottom,
+        };
+        let measured = screen(982.0, 33.0, 898.0);
+        assert!((super::alert_top(measured) - 168.0).abs() < 1.0e-9);
+        // A 13.3-inch Mac at 1440 x 900, no notch, a bottom Dock: the fixed offset.
+        assert!((super::alert_top(screen(900.0, 24.0, 816.0)) - 168.0).abs() < 1.0e-9);
+        // A tall screen: its share of the height.
+        assert!(
+            (super::alert_top(screen(1440.0, 25.0, 1356.0)) - 1440.0 * 168.0 / 982.0).abs()
+                < 1.0e-9
+        );
+        // A deep menu bar: the offset below the visible frame.
+        assert!((super::alert_top(screen(982.0, 60.0, 898.0)) - 195.0).abs() < 1.0e-9);
+    }
+
+    /// The Mac alert is shown only if its top, its 150 points of title, icon and
+    /// buttons, its text and one line of slack end inside the visible frame;
+    /// one point more refuses it, and a height that is not a size fits nothing
+    /// (#1780). The dialog child's exit, `exit_unless_the_alert_fits`, asks
+    /// exactly this, and the seam gate pins that it does.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_alert_fits_only_inside_the_visible_frame_with_its_slack() {
+        let measured = super::ScreenSpan {
+            height: 982.0,
+            visible_top: 33.0,
+            visible_bottom: 898.0,
+        };
+        // 898 - 168 - 150 - 16 = 564 points of text.
+        assert!(super::alert_fits(564.0, measured));
+        assert!(!super::alert_fits(564.5, measured));
+        // The slack counts: without it 580 would fit.
+        assert!(!super::alert_fits(580.0, measured));
+        // Part A's smallest one-voucher post: 28 lines of 16 points.
+        assert!(super::alert_fits(448.0, measured));
+        for height in [f64::NAN, f64::INFINITY, -1.0] {
+            assert!(!super::alert_fits(height, measured), "{height}");
+        }
+        // Every screen must hold it, the smallest room deciding; no screen holds nothing.
+        let small = super::ScreenSpan {
+            height: 800.0,
+            visible_top: 24.0,
+            visible_bottom: 716.0,
+        };
+        assert!(super::alert_fits_every_screen(448.0, &[measured]));
+        assert!(!super::alert_fits_every_screen(448.0, &[measured, small]));
+        assert!(super::alert_fits_every_screen(382.0, &[measured, small]));
+        assert!(!super::alert_fits_every_screen(16.0, &[]));
+    }
+
+    /// AppKit lays the alert's text out as Part A saw the panel do: 16 points a
+    /// line, two lines for a 100-character prose line, 28 lines for the smallest
+    /// one-voucher post text, and one of ten 46-capital lines broken (row 1964-M,
+    /// cells A1, A5, A7 and A4e). Measured without a window (#1780). The voucher
+    /// text is Part A's `a7-smallest-voucher.txt` with its GUID and batch lines
+    /// replaced by synthetic text of the same length.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_mac_alert_text_is_measured_as_the_panel_lays_it_out() {
+        assert!((super::alert_text_height("x") - 16.0).abs() < 1.0e-9);
+        let ten = ["Calibration line"; 10].join("\n");
+        assert!((super::alert_text_height(&ten) - 160.0).abs() < 1.0e-9);
+        let prose = "Synthetic narration for the calibration row, with ordinary words and spaces in it, nothing else.";
+        assert!((super::alert_text_height(prose) - 32.0).abs() < 1.0e-9);
+        let voucher = [
+            "Click \"Post voucher\" to post this voucher into Tally. Click Cancel to cancel. Nothing is posted until you answer.",
+            "",
+            "Create ONE Payment in \"Synthetic Accounts\"",
+            "Company GUID: synthetic-guid-for-the-measure-tests",
+            "Company number: 424242  Books from: 1-Apr-2026",
+            "Tally: http://127.0.0.1:9001",
+            "Date: 1-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
+            "",
+            "Dr 1.00  \"Party 0\"",
+            "Cr 1.00  \"Cash\"",
+            "Total debit: 1  Total credit: 1",
+            "Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.",
+            "Batch: bridge-synthetic-batch-for-the-measure-test",
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+            "Do not post a file already imported manually.",
+            "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+            "After a timeout, reconcile this batch; do not rebuild or resend it.",
+            "ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.",
+            "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----",
+            "Reference: \"r1\"",
+            "Narration: \"rent\"",
+        ]
+        .join("\n");
+        // 28 lines, as the panel showed it; macOS's own fonts decide the last
+        // line, so one line either way is allowed. The panel drew 600 points
+        // where 448 + 150 is 598. This 2 and A4e's margin below share the one
+        // 16-point line of slack.
+        let height = super::alert_text_height(&voucher);
+        assert!((27.0 * 16.0..=29.0 * 16.0).contains(&height), "{height}");
+        // Ten lines of 46 capitals: the panel broke one of them (cell A4e). Nine of
+        // them fit, the widest of those (about 401.7 points) only about 0.3 points
+        // inside 402; the tenth (about 405.5) is the one 402 breaks.
+        let capitals = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(4);
+        let a4e = (0..10)
+            .map(|start| &capitals[start..start + 46])
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!((super::alert_text_height(&a4e) - 11.0 * 16.0).abs() < 1.0e-9);
+    }
+
+    /// The Mac alert wraps its own text, so the parent does not break the
+    /// answer text: it is one line, shown whole and first (a break of ours
+    /// would be wrapped again by the alert and leave a ragged second row).
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_answer_text_is_one_unbroken_line() {
+        for shown in [super::Shown::Post, super::Shown::Review] {
+            for n in [1, 2, 10, 50] {
+                let text = super::answer_text(shown, count(n));
+                assert!(!text.contains('\n'), "{text}");
+                let displayed = super::displayed_text(shown, count(n), "Details");
+                assert_eq!(displayed.lines().next(), Some(text.as_str()));
+                assert!(super::fits_the_box(shown, count(n), &displayed), "{n}");
+            }
+        }
+        let (lines, _) = super::answer_reserve();
+        assert_eq!(lines, 2, "one answer line and the blank line");
+    }
+
     /// Each use of the review dialog writes its own first lines, and a stop
     /// release keeps its statement first (#1780).
     #[test]
@@ -1395,7 +2313,7 @@ pub(crate) mod test_seam {
         let post = super::displayed_text(super::Shown::Post, ONE, "Details");
         let review = super::displayed_text(super::Shown::Review, ONE, "Details");
         let release = super::displayed_text(super::Shown::StopRelease, ONE, preview);
-        let wrapped = |shown| super::wrapped(&super::answer_text(shown, ONE));
+        let wrapped = |shown| super::answer_text(shown, ONE);
         assert_eq!(post, format!("{}\n\nDetails", wrapped(super::Shown::Post)));
         assert_eq!(
             review,
@@ -1411,6 +2329,14 @@ pub(crate) mod test_seam {
         assert_ne!(post, review);
         assert!(!release.contains("record that you reviewed"));
         assert!(!post.contains("release the invoice stop"));
+        // The one-ledger dialog opens with its own answer text, never a
+        // voucher's.
+        let masters = super::displayed_text(super::Shown::Masters, super::ONE_ITEM, "Details");
+        assert_eq!(
+            masters,
+            format!("{}\n\nDetails", wrapped(super::Shown::Masters))
+        );
+        assert!(masters.contains("create this ledger in Tally") && !masters.contains("voucher"));
     }
 
     /// The dialog subprocesses show a dialog only for input of the shape the
@@ -1459,14 +2385,26 @@ enum Shown {
     Post,
     Review,
     StopRelease,
+    Settle,
+    RowRelease,
+    /// The ledger dialog: one ledger, or a batch by its count.
+    Masters,
 }
 
-/// The two uses of the review dialog. [`ReviewAcknowledged::confirm`] takes
-/// one, so the invoice-stop release cannot be shown with the review's words.
+/// The kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
+/// and each has its own subprocess mode, so the invoice-stop release or a
+/// batch's settlement is never shown with the review's title or button
+/// (#1828, #1709).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReviewKind {
     Review,
     StopRelease,
+    /// A person's settlement of a batch Tally answered as creating none of
+    /// its vouchers (#1709).
+    Settle,
+    /// A person's release of the rows of a batch whose book was rolled back
+    /// (#1038).
+    RowRelease,
 }
 
 impl ReviewKind {
@@ -1474,6 +2412,19 @@ impl ReviewKind {
         match self {
             Self::Review => Shown::Review,
             Self::StopRelease => Shown::StopRelease,
+            Self::Settle => Shown::Settle,
+            Self::RowRelease => Shown::RowRelease,
+        }
+    }
+
+    /// The subprocess mode that shows this dialog, and the token prefix it answers
+    /// with: each kind its own, so its window is titled for what it does.
+    fn child(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
+            Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
+            Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
+            Self::RowRelease => ("--confirm-row-release", RELEASE_ROWS_TOKEN_PREFIX),
         }
     }
 }
@@ -1504,6 +2455,26 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Settle => (
+            format!(
+                "close this batch in ComplyEaze Bridge for good, so that it never sends {} again",
+                these_vouchers(count)
+            ),
+            "Nothing is closed until you answer.",
+        ),
+        Shown::RowRelease => (
+            "release this batch's rows in ComplyEaze Bridge, so that they can be built and posted \
+             again"
+                .into(),
+            "Nothing is released until you answer.",
+        ),
+        Shown::Masters => (
+            match count.batch() {
+                None => "create this ledger in Tally".into(),
+                Some(count) => format!("create these {count} ledgers in Tally"),
+            },
+            "Nothing is created until you answer.",
+        ),
     }
 }
 
@@ -1511,7 +2482,10 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
 #[cfg(windows)]
 fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
-    format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}")
+    wrapped(
+        &format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}"),
+        ANSWER_WIDTH,
+    )
 }
 
 /// The answer text of a Mac alert, which names its buttons and claims no key.
@@ -1520,23 +2494,33 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
     let button = match shown {
         Shown::Post => post_words(count).1,
-        Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+        Shown::Review => REVIEW_BUTTON.to_string(),
+        Shown::StopRelease => RELEASE_BUTTON.to_string(),
+        Shown::Settle => SETTLE_BUTTON.to_string(),
+        Shown::RowRelease => RELEASE_ROWS_BUTTON.to_string(),
+        Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
     };
-    format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
+    wrapped(
+        &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
+        usize::MAX,
+    )
 }
 
 /// The most characters a line of a dialog's text takes (the post dialog's cap).
 const ANSWER_WIDTH: usize = 100;
 
-/// `text` broken at spaces into lines of at most [`ANSWER_WIDTH`] characters.
-fn wrapped(text: &str) -> String {
+/// `text` broken at spaces into lines of at most `limit` characters. The
+/// Windows box needs it, to keep the box's width bounded; the Mac passes no
+/// limit, because the alert wraps its own text and a break of ours would be
+/// wrapped a second time.
+pub(crate) fn wrapped(text: &str, limit: usize) -> String {
     let (mut lines, mut width) = (String::new(), 0);
     for word in text.split(' ') {
         let length = word.chars().count();
         if width == 0 {
             lines.push_str(word);
             width = length;
-        } else if width + 1 + length <= ANSWER_WIDTH {
+        } else if width + 1 + length <= limit {
             lines.push(' ');
             lines.push_str(word);
             width += 1 + length;
@@ -1547,6 +2531,23 @@ fn wrapped(text: &str) -> String {
         }
     }
     lines
+}
+
+/// `text`, a line of a review box, broken at spaces into lines of at most 100
+/// characters, then any word longer than a line broken where it reaches the
+/// limit, so a name without spaces cannot make the box refuse.
+pub(crate) fn wrapped_to_fit(text: String) -> String {
+    wrapped(&text, 100)
+        .lines()
+        .flat_map(|line| {
+            line.chars()
+                .collect::<Vec<_>>()
+                .chunks(100)
+                .map(|part| part.iter().collect::<String>())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// What the native box holds of a post or review text (#1780): the lines and
@@ -1569,7 +2570,7 @@ fn answer_reserve() -> (usize, usize) {
     let mut reserve = (0, 0);
     for shown in [Shown::Post, Shown::Review] {
         for count in (1..=MOST_VOUCHERS).filter_map(VoucherCount::new) {
-            let answer = wrapped(&answer_text(shown, count));
+            let answer = answer_text(shown, count);
             let added = (answer.lines().count() + 1, answer.chars().count() + 2);
             reserve = (reserve.0.max(added.0), reserve.1.max(added.1));
         }
@@ -1578,10 +2579,13 @@ fn answer_reserve() -> (usize, usize) {
 }
 
 /// Whether the text the box will show is within the box's caps (#1780): the
-/// preview's own caps and room for the answer text, with no line over 100
-/// characters. The parent measures what is shown, so a text that does not fit
+/// preview's own caps and room for the answer text, with no preview line over
+/// 100 characters (the answer text's own lines are the Windows box's, wrapped
+/// at that width, or the Mac alert's one line, which the alert wraps itself).
+/// The parent measures what is shown, so a text that does not fit
 /// is refused before a window opens, never cut. A stop release has no caps
-/// beyond the byte limit.
+/// beyond the byte limit. A Mac's dialog child also measures the alert's text as
+/// the window lays it out before it shows it, [`exit_unless_the_alert_fits`].
 fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
     if shown == Shown::StopRelease {
         return true;
@@ -1591,10 +2595,12 @@ fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
         Some(_) => (BATCH_LINES, BATCH_CHARS),
     };
     let (extra_lines, extra_chars) = answer_reserve();
+    let answer_lines = answer_text(shown, count).lines().count();
     displayed.lines().count() <= lines + extra_lines
         && displayed.chars().count() <= chars + extra_chars
         && displayed
             .lines()
+            .skip(answer_lines)
             .all(|line| line.chars().count() <= ANSWER_WIDTH)
 }
 
@@ -1605,10 +2611,10 @@ pub(crate) fn review_text(kind: ReviewKind, count: VoucherCount, preview: &str) 
 }
 
 /// What the dialog shows: the answer text, then the preview. A stop release
-/// keeps its own statement first, because the title of the shared review
-/// dialog names only a review, and puts the answer text under it.
+/// keeps its own statement first, so its first line says what it releases, and
+/// puts the answer text under it.
 fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
-    let answer = wrapped(&answer_text(shown, count));
+    let answer = answer_text(shown, count);
     match (shown, preview.split_once("\n\n")) {
         (Shown::StopRelease, Some((statement, rest))) => {
             format!("{statement}\n\n{answer}\n\n{rest}")
@@ -1649,6 +2655,12 @@ async fn confirm_with(
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed: the text is too large for this person's screen.
+        Ok(answer) if answer.box_did_not_fit => {
+            note_box_did_not_fit();
+            Err("import_review_too_large".into())
+        }
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1661,8 +2673,9 @@ async fn confirm_with(
     }
 }
 
-/// The review dialog for a doubted post (#239): its own subprocess mode, so
-/// its title and button never read as approving a post. It is answered by
+/// The review dialog for a doubted post (#239), or the invoice-stop release
+/// dialog (#1828): each its own subprocess mode, so neither title nor button
+/// reads as approving a post, nor one as the other. It is answered by
 /// the token alone, as the post dialog is by the token and a clean exit; a
 /// clean exit without the token is unavailable, as the post dialog's is.
 async fn confirm_review(
@@ -1675,31 +2688,26 @@ async fn confirm_review(
     if !fits_the_box(kind.shown(), count, &shown) {
         return Err("ack_review_too_large".into());
     }
-    confirm_review_with(&executable, count, &shown).await
+    confirm_review_with(&executable, kind, count, &shown).await
 }
 
 async fn confirm_review_with(
     executable: &std::path::Path,
+    kind: ReviewKind,
     count: VoucherCount,
     preview: &str,
 ) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("ack_review_too_large".into());
     }
-    match nonce_bound_dialog(
-        executable,
-        "--confirm-review",
-        REVIEW_TOKEN_PREFIX,
-        count,
-        preview,
-    )
-    .await
-    {
+    let (mode, prefix) = kind.child();
+    match nonce_bound_dialog(executable, mode, prefix, count, preview).await {
+        Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
-        // returns false. A clean exit without the token is never that; it is
-        // an executable that is not this dialog, such as one ignoring the
-        // flag (#689).
+        // and `run_release_confirmation` return false. A clean exit without
+        // the token is never that; it is an executable that is not this
+        // dialog, such as one ignoring the flag (#689).
         Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
@@ -1707,11 +2715,54 @@ async fn confirm_review_with(
     }
 }
 
+/// The ledger dialog: its own subprocess mode, title, button and token,
+/// answered exactly as the post dialog is, by the token for this call's nonce
+/// and a clean exit together. Asked about one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`, its title and button saying how many. Like the other
+/// dialogs, its first lines say what each answer does (#1780).
+async fn confirm_masters_dialog(preview: MastersPrompt<'_>) -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
+    let shown = displayed_text(Shown::Masters, preview.count, preview.text);
+    confirm_masters_with(&executable, preview.count, &shown).await
+}
+
+async fn confirm_masters_with(
+    executable: &std::path::Path,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
+    if preview.len() > MAX_PREVIEW_BYTES {
+        return Err("master_review_too_large".into());
+    }
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-masters",
+        MASTERS_TOKEN_PREFIX,
+        count,
+        preview,
+    )
+    .await
+    {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the post's box (#1832).
+        Ok(answer) if answer.box_did_not_fit => Err("master_review_too_large".into()),
+        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
+        // A person's decline is no token and exit 1. A clean exit without the
+        // token is an executable that is not this dialog.
+        Ok(answer) if answer.exited_cleanly => Err("master_approval_unavailable".into()),
+        Ok(_) => Err("master_approval_declined".into()),
+        Err(DialogFailure::Unavailable) => Err("master_approval_unavailable".into()),
+        Err(DialogFailure::TimedOut) => Err("master_approval_timed_out".into()),
+    }
+}
+
 /// What a dialog subprocess answered: whether it printed exactly the token
-/// for this call's nonce, and whether it exited cleanly.
+/// for this call's nonce, whether it exited cleanly, and whether it exited
+/// with the status that says its box did not fit the screen (#1832).
 struct DialogAnswer {
     token_matched: bool,
     exited_cleanly: bool,
+    box_did_not_fit: bool,
 }
 
 enum DialogFailure {
@@ -1770,6 +2821,7 @@ async fn nonce_bound_dialog(
     Ok(DialogAnswer {
         token_matched: answer == dialog_token(prefix, &nonce).as_bytes(),
         exited_cleanly: status.success(),
+        box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),
     })
 }
 
@@ -1795,6 +2847,51 @@ pub fn run_review_confirmation() -> bool {
     answer_with_token(
         REVIEW_TOKEN_PREFIX,
         show_review_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the one-ledger dialog's subprocess, under the same rules.
+pub fn run_masters_confirmation() -> bool {
+    answer_with_token(
+        MASTERS_TOKEN_PREFIX,
+        show_create_ledger,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the invoice-stop release dialog's subprocess, under the same
+/// rules: its own window title and token, so a release is never titled a review.
+pub fn run_release_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_TOKEN_PREFIX,
+        show_release_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the settle dialog's subprocess (#1709), under the same
+/// rules: its own window title and token, so a settlement is never titled a
+/// review.
+pub fn run_settle_confirmation() -> bool {
+    answer_with_token(
+        SETTLE_TOKEN_PREFIX,
+        show_settle_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the row release dialog's subprocess (#1038), under the
+/// same rules: its own window title and token, so a release of rows is never
+/// titled a review.
+pub fn run_release_rows_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_ROWS_TOKEN_PREFIX,
+        show_release_rows_acknowledgement,
         std::io::stdin(),
         std::io::stdout(),
     )
@@ -1858,10 +2955,157 @@ fn review_title(count: VoucherCount) -> String {
     }
 }
 
+// The macOS alert as row 1964-M Part A measured it (`lab/1964-mac-alert-caps-answers`,
+// macOS 26.6.2, one display, one run of each cell, so every figure here is
+// partial). The texts measured took the wide layout; whether a real text can
+// ever take the compact one, whose chrome is 68 points taller, was not measured.
+// Wide is 13-point text in a column about 402 points wide (46 capitals overflow
+// it once in ten lines, cell A4e), under 150 points of title, icon and buttons. The
+// alert opens with its top at a fixed place and is never moved up, so a tall one
+// runs off the bottom of the screen. Its top was 168 points from the top of a
+// 982-point screen whose visible frame starts 33 points down; whether that is a
+// fixed offset, an offset below the visible frame or a share of the height is
+// row 1964-C2's cell C2-2, so the alert's top is taken as the lowest of the
+// three. Which screen it opens on with more than one display is not measured,
+// so it must fit on every screen. One line of text, 16 points, is kept for a
+// hyphenated word or a second title line.
+#[cfg(not(windows))]
+const ALERT_FONT_POINTS: f64 = 13.0;
+#[cfg(not(windows))]
+const ALERT_TEXT_WIDTH: f64 = 402.0;
+#[cfg(not(windows))]
+const ALERT_CHROME: f64 = 150.0;
+#[cfg(not(windows))]
+const ALERT_SLACK: f64 = 16.0;
+#[cfg(not(windows))]
+const ALERT_TOP_FROM_SCREEN_TOP: f64 = 168.0;
+#[cfg(not(windows))]
+const ALERT_TOP_BELOW_VISIBLE_TOP: f64 = 135.0;
+#[cfg(not(windows))]
+const ALERT_TOP_SHARE_OF_HEIGHT: f64 = 168.0 / 982.0;
+
+/// A screen in points, measured down from its top edge, as the alert is placed
+/// on it: its height, and the top and bottom of its visible frame.
+#[cfg(not(windows))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ScreenSpan {
+    height: f64,
+    visible_top: f64,
+    visible_bottom: f64,
+}
+
+/// Where the alert's top edge is taken to sit on `screen` (#1780): the lowest of
+/// the three places Part A could not tell apart.
+#[cfg(not(windows))]
+fn alert_top(screen: ScreenSpan) -> f64 {
+    ALERT_TOP_FROM_SCREEN_TOP
+        .max(screen.visible_top + ALERT_TOP_BELOW_VISIBLE_TOP)
+        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)
+}
+
+/// Whether an alert whose text is `text_height` points tall ends inside the
+/// visible frame of `screen`, with its slack (#1780). A height that is not a
+/// finite size fits nothing.
+#[cfg(not(windows))]
+fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
+    text_height.is_finite()
+        && text_height >= 0.0
+        && alert_top(screen) + ALERT_CHROME + text_height + ALERT_SLACK <= screen.visible_bottom
+}
+
+/// Whether an alert whose text is `text_height` points tall fits on every one
+/// of `screens` (#1780). No screen fits nothing, so an empty list is refused.
+/// Production cannot reach that with an empty list, as `alert_screens` gives
+/// `None` for one and the dialog ends as unavailable; it stays as a defence.
+#[cfg(not(windows))]
+fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
+    !screens.is_empty()
+        && screens
+            .iter()
+            .all(|screen| alert_fits(text_height, *screen))
+}
+
+/// The height AppKit lays `text` out at in the alert's column (#1780), measured
+/// without a window.
+#[cfg(target_os = "macos")]
+fn alert_text_height(text: &str) -> f64 {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{
+        NSFont, NSFontAttributeName, NSStringDrawingOptions, NSStringNSExtendedStringDrawing,
+    };
+    use objc2_foundation::{NSDictionary, NSSize, NSString};
+    let font = NSFont::systemFontOfSize(ALERT_FONT_POINTS);
+    // SAFETY: an AppKit constant, read once.
+    let key = unsafe { NSFontAttributeName };
+    let attributes = NSDictionary::<_, AnyObject>::from_slices(&[key], &[font.as_ref()]);
+    // SAFETY: the attributes map the font key to an `NSFont`, the type AppKit
+    // reads for it.
+    let rect = unsafe {
+        NSString::from_str(text).boundingRectWithSize_options_attributes_context(
+            NSSize::new(ALERT_TEXT_WIDTH, 1.0e7),
+            NSStringDrawingOptions::UsesLineFragmentOrigin
+                | NSStringDrawingOptions::UsesFontLeading,
+            Some(&attributes),
+            None,
+        )
+    };
+    rect.size.height.ceil()
+}
+
+/// Every screen the alert could open on, each measured down from its own top
+/// edge; `None` off the main thread or with no screen.
+#[cfg(target_os = "macos")]
+fn alert_screens() -> Option<Vec<ScreenSpan>> {
+    let main_thread = objc2::MainThreadMarker::new()?;
+    let screens = objc2_app_kit::NSScreen::screens(main_thread)
+        .iter()
+        .map(|screen| {
+            let (frame, visible) = (screen.frame(), screen.visibleFrame());
+            let top = frame.origin.y + frame.size.height;
+            ScreenSpan {
+                height: frame.size.height,
+                visible_top: top - (visible.origin.y + visible.size.height),
+                visible_bottom: top - visible.origin.y,
+            }
+        })
+        .collect::<Vec<_>>();
+    (!screens.is_empty()).then_some(screens)
+}
+
+/// The alert's text height and every screen, measured in the dialog child
+/// before anything is shown.
+#[cfg(target_os = "macos")]
+fn measured_alert(text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
+    Some((alert_text_height(text), alert_screens()?))
+}
+
+/// No other platform's alert has been measured.
+#[cfg(all(not(windows), not(target_os = "macos")))]
+fn measured_alert(_text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
+    None
+}
+
+/// Ends the dialog child before anything is shown when the Mac alert would run
+/// past the bottom of any screen it could open on (#1780), with the status the
+/// parent reads as a box that did not fit the screen, as a Windows box that does
+/// not fit ends (`box_fit`). The parent then refuses the text as too large, and a batch's
+/// next ask shows its totals only (#1832). A text that could not be measured is
+/// not shown either: the child ends with no token, which the parent reads as
+/// unavailable.
+#[cfg(not(windows))]
+fn exit_unless_the_alert_fits(text: &str) {
+    match measured_alert(text) {
+        Some((height, screens)) if alert_fits_every_screen(height, &screens) => {}
+        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
+        None => std::process::exit(0),
+    }
+}
+
 /// The acknowledgement dialog. It posts nothing, so neither its title nor its
 /// button may read as approving a post.
 #[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(review_title(count))
         .set_description(preview)
@@ -1872,6 +3116,78 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         ))
         .show()
         == rfd::MessageDialogResult::Custom(REVIEW_BUTTON.into())
+}
+
+/// The invoice-stop release window's title: it releases a stop and reviews no
+/// voucher, so it names neither a review nor a post (#1828).
+#[cfg(not(windows))]
+fn release_title() -> String {
+    "ComplyEaze Bridge — release the invoice stop".into()
+}
+
+/// The invoice-stop release dialog: the acknowledgement dialog with its own
+/// title and button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(release_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_BUTTON.into())
+}
+
+/// The settle window's title: it closes a batch and reviews no voucher, so it
+/// names neither a review nor a post (#1709).
+#[cfg(not(windows))]
+fn settle_title() -> String {
+    "ComplyEaze Bridge — close this batch".into()
+}
+
+/// The settle dialog: the acknowledgement dialog with its own title and
+/// button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(settle_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            SETTLE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(SETTLE_BUTTON.into())
+}
+
+/// The row release window's title: it releases a batch's rows and reviews no
+/// voucher, so it names neither a review nor a post (#1038).
+#[cfg(not(windows))]
+fn rows_title() -> String {
+    "ComplyEaze Bridge — release this batch's rows".into()
+}
+
+/// The row release dialog: the acknowledgement dialog with its own title and
+/// button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(rows_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_ROWS_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_ROWS_BUTTON.into())
 }
 
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
@@ -1890,31 +3206,162 @@ fn review_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
         .encode_utf16()
         .chain(Some(0))
         .collect();
-    // SAFETY: as for `show_review`: both buffers are NUL-terminated and live
-    // for the synchronous dialog, and no parent HWND is borrowed.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows invoice-stop release box's title, a question as the review's is
+/// (#1828).
+#[cfg(windows)]
+fn release_question() -> String {
+    "ComplyEaze Bridge — release the invoice stop for this company?".into()
+}
+
+/// The Windows invoice-stop release box: the review's box with its own title.
+#[cfg(windows)]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows settle box's title, a question as the review's is (#1709).
+#[cfg(windows)]
+fn settle_question() -> String {
+    "ComplyEaze Bridge — close this batch for good?".into()
+}
+
+/// The Windows settle box: the review's box with its own title.
+#[cfg(windows)]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows row release box's title, a question as the review's is (#1038).
+#[cfg(windows)]
+fn rows_question() -> String {
+    "ComplyEaze Bridge — release this batch's rows to be built again?".into()
+}
+
+/// The Windows row release box: the review's box with its own title.
+#[cfg(windows)]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = rows_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
 }
 
 /// The post dialog's title and positive button. One voucher keeps the
@@ -1936,6 +3383,7 @@ fn post_words(count: VoucherCount) -> (String, String) {
 
 #[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
@@ -1964,30 +3412,116 @@ fn post_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // The box cannot scroll: `guarded` measures it when it opens and, if it is
+    // not wholly on the screen, never returns (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: Both buffers are NUL-terminated and live for the synchronous
+        // dialog; the owner is `guarded`'s hidden window, alive until the box
+        // returns. No application state is exposed
+        // to callbacks.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). MB_TOPMOST alone
+                // was seen not to hold when the box opened seconds after the
+                // last input went to Tally. With MB_SYSTEMMODAL added the box
+                // held it in one lab run on Windows 10, where Tally still took a
+                // click and a key while the box was open (#1780). That run did
+                // not test what else a system-modal box changes: the taskbar
+                // showed no task buttons while it was open, cause not tested
+                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // window, the other way a stand-in box was seen to stay on top
+                // (#1780); an owned box has no taskbar button. When Windows lets it,
+                // MB_SETFOREGROUND also gives the box the foreground, so a key
+                // typed for Tally can answer it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The ledger dialog, for one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`: a larger count has no title or button and shows
+/// nothing.
+#[cfg(not(windows))]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    let Some((title, button)) = masters_words(count) else {
+        return false;
+    };
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(title)
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        // The Cancel label supplies the native Escape action. Creating
+        // requires the explicitly matched positive button.
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            button.clone(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(button)
+}
+
+#[cfg(windows)]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    // As for the post dialog: No is the default, Escape and close are Cancel.
+    let Some((title, _)) = masters_words(count) else {
+        return false;
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832). Through `guarded` it is also
+    // brought to the front once it appears, as the post's box is: its first
+    // line tells the person to press Y or N, and in one lab run on Windows 10
+    // MB_SETFOREGROUND alone did not give it the keyboard when it opened
+    // seconds after the last input went to Tally (#1780).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

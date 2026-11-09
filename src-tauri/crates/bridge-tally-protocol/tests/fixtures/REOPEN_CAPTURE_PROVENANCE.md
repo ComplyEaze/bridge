@@ -58,7 +58,9 @@ so the returned values cannot be an echo of its input.
 These generator files are committed as an auditable record of what was sent, **not as runnable
 scripts**. In particular, `lib.py` imports the session-local `tq.post` probe helper, which is
 not part of this repository; running `python generators/build_reopen.py` is not a reproduction
-procedure.
+procedure. They build their XML with string formatting and post it outside Bridge's one dispatch
+path (`AGENTS.md` P8), so no new capture may be made this way: a new capture comes from a request
+builder in Bridge's code, sent through the dispatch path to a lab book.
 
 **Consequence:** recomputing the age date from a reopening allocation recovers the original due date
 by construction. Under `AgeingAnchor::DueDate` the reopened balance of `RO-INV-003` must age from

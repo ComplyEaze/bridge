@@ -1,0 +1,155 @@
+{
+ "comment": "A firm run on rules without the s201_1a, s206c_7, s194j and s194t tables: 2 rows, 2 findings. The three interest rates are then the test's own (the same values) and their definitions say status=confirm; each finding carries the limit that the s.201(1A) rate is a local default. r01 credits Elm Associates (s.194J professional) Rs 50,000.01, over the limit tds_payees uses without the s194j table. r02 credits the one partner interest of Rs 20,000.01, over the limit and at the rate partners_40b_194t and the caller use without the s194t table.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Legal Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_rules_default-ledger-00"
+  },
+  {
+   "name": "Interest to Partners",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_rules_default-ledger-01"
+  },
+  {
+   "name": "Elm Associates",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_rules_default-ledger-02"
+  },
+  {
+   "name": "Juniper Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_rules_default-ledger-03"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_rules_default-ledger-04"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Legal Fees",
+   "opening": 0,
+   "debit": 5000001,
+   "credit": 0,
+   "closing": 5000001
+  },
+  {
+   "ledger": "Interest to Partners",
+   "opening": 0,
+   "debit": 2000001,
+   "credit": 0,
+   "closing": 2000001
+  },
+  {
+   "ledger": "Elm Associates",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5000001,
+   "closing": -5000001
+  },
+  {
+   "ledger": "Juniper Capital",
+   "opening": -40000000,
+   "debit": 0,
+   "credit": 2000001,
+   "closing": -42000001
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 40000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-r01",
+   "date": "2025-08-11",
+   "base_type": "Journal",
+   "number": "FJ/01",
+   "lines": [
+    [
+     "Legal Fees",
+     5000001
+    ],
+    [
+     "Elm Associates",
+     -5000001
+    ]
+   ]
+  },
+  {
+   "guid": "ti-r02",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "number": "PJ/02",
+   "lines": [
+    [
+     "Interest to Partners",
+     2000001
+    ],
+    [
+     "Juniper Capital",
+     -2000001
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Legal Fees": "194J"
+ },
+ "s194j_category_by_ledger": {
+  "Legal Fees": "professional"
+ },
+ "partners": {
+  "juniper": {
+   "capital_ledgers": [
+    "Juniper Capital"
+   ],
+   "interest_ledger": "Interest to Partners"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ },
+ "rules_without": [
+  "s201_1a",
+  "s206c_7",
+  "s194j",
+  "s194t"
+ ]
+}

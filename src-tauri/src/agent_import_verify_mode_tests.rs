@@ -34,7 +34,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             .iter()
             .map(|entry| ImportEntry {
                 ledger: entry.ledger.clone(),
-                amount: entry.amount.trim_start_matches('-').into(),
+                amount: ImportAmount::parse(entry.amount.trim_start_matches('-')).unwrap(),
                 side: if entry.is_deemed_positive == "Yes" {
                     EntrySide::Dr
                 } else {
@@ -152,6 +152,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let company =
@@ -166,7 +167,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             vouchers.push(missing);
         }
         let line = ImportLedgerLine {
-            ledger_identities: None,
+            binding: LedgerBinding::Unbound,
             cash_in_hand_ledgers: Some(Vec::new()),
             on_account_approved: Some(Vec::new()),
             statement: None,

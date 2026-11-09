@@ -69,7 +69,7 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::ledger_ids::stable_ledger_tag;
 use crate::rules::Rules;
 use crate::support::{count, hash8, overflow, py_lower, py_strip, rupees, voucher_label};
-use crate::tds_tranches::crossing_tranches;
+use crate::tds_tranches::{crossing_tranches, with_refs, RefTranche, Tranche};
 use crate::TdsConfig;
 
 pub const TEST_ID: &str = "tds_payees";
@@ -169,13 +169,21 @@ pub struct Inputs {
 
 const REVERSAL_KINDS: &str = "('bill_specific', 'duplicate_or_error', 'credit_note')";
 
+/// A `[tds_payees.foreseeability]` value: whether a payee's credits were foreseeable from the
+/// year's start, or a one-off. `tds_interest_201` reads it; `tds_payees` only checks the names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Foreseeability {
+    Foreseeable,
+    OneOff,
+}
+
 /// The `[tds]`/`[tds_payees]` lists the reference's config readers give `tds_payees`
 /// (`tds_payees_reversals`, `tds_payees_gst_separate`, `tds_payees_foreseeability`, `tds_challans`,
 /// `tds_form_26a`, `turnover_is_placeholder`), each refused on a malformed value as they refuse it.
 pub struct ConfigLists {
     pub reversals: BTreeMap<String, Reversal>,
     pub gst_separate: BTreeSet<String>,
-    pub foreseeability_names: BTreeSet<String>,
+    pub foreseeability: BTreeMap<String, Foreseeability>,
     pub challans: Option<Vec<Challan>>,
     pub form_26a: BTreeMap<String, bool>,
     pub turnover_is_placeholder: bool,
@@ -249,15 +257,19 @@ pub fn read_config_lists(
                 )
             })?,
     };
-    let mut foreseeability_names = BTreeSet::new();
+    let mut foreseeability = BTreeMap::new();
     for (name, mode) in sub_table("foreseeability")?.into_iter().flatten() {
-        if !matches!(mode.as_str(), Some("foreseeable" | "one_off")) {
-            return Err(config_error(format!(
-                "[tds_payees.foreseeability] {}: must be one of ('foreseeable', 'one_off')",
-                py_repr_str(name)
-            )));
-        }
-        foreseeability_names.insert(name.clone());
+        let value = match mode.as_str() {
+            Some("foreseeable") => Foreseeability::Foreseeable,
+            Some("one_off") => Foreseeability::OneOff,
+            _ => {
+                return Err(config_error(format!(
+                    "[tds_payees.foreseeability] {}: must be one of ('foreseeable', 'one_off')",
+                    py_repr_str(name)
+                )))
+            }
+        };
+        foreseeability.insert(name.clone(), value);
     }
     let challans = match tds.get("challans") {
         None => None,
@@ -373,7 +385,7 @@ pub fn read_config_lists(
     Ok(ConfigLists {
         reversals,
         gst_separate,
-        foreseeability_names,
+        foreseeability,
         challans,
         form_26a,
         turnover_is_placeholder,
@@ -966,12 +978,23 @@ struct Limits {
     s194h: Option<i64>,
 }
 
-/// The reference's `_row_tranches`: the vouchers whose credits attract TDS, by their keys.
+/// The vouchers whose credits attract TDS, by their keys.
 fn row_tranche_keys<'a>(
     nature: &str,
     row: &Row<'a>,
     limits: Limits,
 ) -> Result<BTreeSet<&'a VoucherKey>> {
+    let tranches = row_tranches(nature, row, limits)?;
+    Ok(tranches.into_iter().flat_map(|t| t.ids).collect())
+}
+
+/// The reference's `_row_tranches`: a row's tranches in date order (s.194-I's month by month, the
+/// months in date order).
+fn row_tranches<'a>(
+    nature: &str,
+    row: &Row<'a>,
+    limits: Limits,
+) -> Result<Vec<Tranche<'a, VoucherKey>>> {
     let credits: Vec<(TallyDate, &'a VoucherKey, i64)> = row
         .by_voucher
         .iter()
@@ -1008,7 +1031,7 @@ fn row_tranche_keys<'a>(
         "194H" => crossing_tranches(&credits, None, limits.s194h, TEST_ID)?,
         _ => crossing_tranches(&credits, None, Some(limits.s194j), TEST_ID)?,
     };
-    Ok(tranches.into_iter().flat_map(|t| t.ids).collect())
+    Ok(tranches)
 }
 
 /// Sort keys by (voucher date, key), as the reference's `key=lambda g: (date, g)`.
@@ -1878,15 +1901,59 @@ pub(crate) fn goods_carriage_ledgers(cfg: &TdsConfig) -> Result<&BTreeSet<String
     Ok(&cfg.goods_carriage_ledgers)
 }
 
+/// One over-limit payee row's tranches, for `tds_interest_201`: the row's entity (its alias label,
+/// ledger name or [`PAYEE_NOT_NAMED`]) and its tranches in date order, each citing its vouchers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PayeeRow {
+    pub entity: String,
+    pub tranches: Vec<RefTranche>,
+}
+
+/// The over-limit rows' tranches by row id (`<nature>_<hash>`, or `194J_<category>_<hash>`, the
+/// finding id after `tds_payees/`). A 194J row of category 'unmapped' has none: it is never
+/// threshold-tested.
+pub type PayeeTranches = BTreeMap<String, PayeeRow>;
+
 /// Run the test. `entity_type` is `[client].entity_type`; `cfg` is `[tds]`/`[tds_payees]`, bound;
 /// `inputs` is what the reference's pack passes from the other tables.
-#[allow(clippy::too_many_lines)]
 pub fn run(
     book: &Book,
     rules: &Rules,
     entity_type: &str,
     cfg: &TdsConfig,
     inputs: &Inputs,
+) -> Result<TestResult> {
+    run_into(book, rules, entity_type, cfg, inputs, None)
+}
+
+/// [`run`], with the over-limit rows' tranches as well. The result is [`run`]'s exactly.
+pub fn run_with_tranches(
+    book: &Book,
+    rules: &Rules,
+    entity_type: &str,
+    cfg: &TdsConfig,
+    inputs: &Inputs,
+) -> Result<(TestResult, PayeeTranches)> {
+    let mut tranche_table = PayeeTranches::new();
+    let r = run_into(
+        book,
+        rules,
+        entity_type,
+        cfg,
+        inputs,
+        Some(&mut tranche_table),
+    )?;
+    Ok((r, tranche_table))
+}
+
+#[allow(clippy::too_many_lines)]
+fn run_into(
+    book: &Book,
+    rules: &Rules,
+    entity_type: &str,
+    cfg: &TdsConfig,
+    inputs: &Inputs,
+    mut tranche_table: Option<&mut PayeeTranches>,
 ) -> Result<TestResult> {
     let missing = |table: &str| AuditError::Config(format!("{TEST_ID} needs rules [{table}]"));
     let s194c = rules.s194c.ok_or_else(|| missing("s194c"))?;
@@ -2059,8 +2126,8 @@ figure only; existence or absence of such a ledger is not itself a conclusion ab
             .map(|n| format!("GST by agreement: {n}")),
     );
     unmatched.extend(
-        cfg.foreseeability_names
-            .iter()
+        cfg.foreseeability
+            .keys()
             .filter(|n| !entities.contains(n.as_str()) && !inputs.other_names.contains(*n))
             .map(|n| format!("foreseeability: {n}")),
     );
@@ -2511,6 +2578,20 @@ verified rule."
             let key = row_key(entity);
             let adj = &adjusted[&key];
             let row_adj = &adj.row;
+            // Only when asked for, so `run` refuses nothing it did not refuse before.
+            if let Some(table) = tranche_table.as_deref_mut().filter(|_| !is_unmapped_194j) {
+                let tranches = row_tranches(nature, row_adj, limits_paise)?
+                    .into_iter()
+                    .map(|t| with_refs(t, |k| row_adj.vouchers[k]))
+                    .collect();
+                table.insert(
+                    rid.clone(),
+                    PayeeRow {
+                        entity: entity.to_string(),
+                        tranches,
+                    },
+                );
+            }
             // By GUID, as the client's list of reversals names a bill; a GUID's bills in the books'
             // order, as the reference reads its row, which is their keys' order (the place is
             // zero-padded).
@@ -3080,6 +3161,91 @@ mod tests {
             &bad,
             &rules,
             "not mapped to 194C in [tds].nature_by_ledger: ['Commission']",
+        );
+    }
+
+    /// The tranche table `tds_interest_201` reads: keyed by the row id the finding carries, with
+    /// the row's entity, each tranche citing its own vouchers, two sharing a GUID as two refs. The
+    /// result is `run`'s exactly, and the foreseeability values are kept as read.
+    #[test]
+    fn the_tranche_table_is_keyed_by_row_id_and_keeps_twins_apart() {
+        use crate::book::{Ledger, LedgerLine, VoucherStatus};
+        let ledger = |name: &str, group: &str| Ledger {
+            name: name.to_string(),
+            parent: group.to_string(),
+            chain: vec![group.to_string()],
+            chain_complete: true,
+            master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
+            guid: String::new(),
+            masterid: None,
+        };
+        // Two bills sharing one GUID, told apart by their numbers.
+        let voucher = |number: &str| Voucher {
+            guid: "twin".to_string(),
+            date: TallyDate::parse("20250610".to_string()).unwrap(),
+            vtype: "Journal".to_string(),
+            base_type: "Journal".to_string(),
+            number: number.to_string(),
+            status: VoucherStatus::Regular,
+            lines: vec![
+                LedgerLine {
+                    ledger: "Freight".to_string(),
+                    amount_paise: 20_000_000,
+                },
+                LedgerLine {
+                    ledger: "Carrier".to_string(),
+                    amount_paise: -20_000_000,
+                },
+            ],
+            ..Default::default()
+        };
+        let book = Book {
+            company_name: "Invented".to_string(),
+            company_guid: "invented".to_string(),
+            ledgers: [
+                ledger("Freight", "Direct Expenses"),
+                ledger("Carrier", "Sundry Creditors"),
+            ]
+            .into_iter()
+            .map(|l| (l.name.clone(), l))
+            .collect(),
+            vouchers: vec![voucher("1"), voucher("2")],
+            ..Default::default()
+        };
+        let rules = Rules::vendored().unwrap();
+        let inputs = Inputs::default();
+        let mut cfg = TdsConfig::default();
+        cfg.nature_by_ledger
+            .insert("Freight".to_string(), "194C".to_string());
+        let plain = run(&book, &rules, "firm", &cfg, &inputs).unwrap();
+        let (r, table) = run_with_tranches(&book, &rules, "firm", &cfg, &inputs).unwrap();
+        assert_eq!(format!("{r:?}"), format!("{plain:?}"));
+        let ids: Vec<&str> = r
+            .findings
+            .iter()
+            .filter(|f| f.facts.iter().any(|(n, _)| n == "credited"))
+            .filter_map(|f| f.id.strip_prefix("tds_payees/"))
+            .collect();
+        assert_eq!(ids.len(), 1, "{:?}", r.findings);
+        assert_eq!(table.keys().map(String::as_str).collect::<Vec<_>>(), ids);
+        let row = &table[ids[0]];
+        assert_eq!(row.entity, "Carrier");
+        let refs: Vec<&EvidenceRef> = row.tranches.iter().flat_map(|t| &t.refs).collect();
+        assert_eq!(refs.len(), 2, "{refs:?}");
+        assert!(refs.iter().all(|e| e.id == "twin"));
+        assert_ne!(refs[0].label, refs[1].label);
+
+        let tds: toml::Table = toml::from_str("").unwrap();
+        let tp: toml::Table =
+            toml::from_str("[foreseeability]\nP = \"one_off\"\nQ = \"foreseeable\"").unwrap();
+        assert_eq!(
+            read_config_lists(&tds, Some(&tp)).unwrap().foreseeability,
+            BTreeMap::from([
+                ("P".to_string(), Foreseeability::OneOff),
+                ("Q".to_string(), Foreseeability::Foreseeable),
+            ])
         );
     }
 }

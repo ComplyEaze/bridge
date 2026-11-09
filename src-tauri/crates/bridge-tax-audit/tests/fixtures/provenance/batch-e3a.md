@@ -29,7 +29,9 @@ Tally read of any real assessee.
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `1038dc05`, under Python 3.13:
+At the reference engine (a private repository), commit `1038dc05`, under Python 3.13. The generator
+script has since been deleted from this repository (bridge#1810); its last version is in git history,
+and the bytes and hashes committed here are the record:
 
     python3 parity/generate_fixture.py tests/fixtures
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \

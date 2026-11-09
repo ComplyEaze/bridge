@@ -5,9 +5,9 @@
 //! company bootstrap.
 
 use bridge_tally_protocol::{
-    decode_tally_xml_response_bytes_limited, parse_standard_ledger_catalog_with_identities,
-    parse_standard_ledger_identity_observation, ExpectedTallyTextEncoding,
-    StandardLedgerCatalogError,
+    decode_tally_xml_response_bytes_limited, parse_ledger_name_index,
+    parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
+    ExpectedTallyTextEncoding, StandardLedgerCatalogError,
 };
 
 const COMPANY_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
@@ -157,6 +157,25 @@ fn a_ledger_whose_stored_name_differs_carries_both_spellings() {
     );
 }
 
+/// The catalogue an import is bound against offers and binds a ledger by its
+/// row spelling, never by its stored name (#1085: slice (b), writing the stored
+/// name, is not built). On the captured book the row spelling `ROUND OFF`
+/// binds, and its stored name `Round Off` is neither offered nor bound. This
+/// pins the binding the build uses, not the build end to end.
+#[test]
+fn the_catalogue_binds_the_row_spelling_and_not_the_stored_name() {
+    let catalog = parse_standard_ledger_catalog_with_identities(
+        &decoded_shape_lab_catalogue(),
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("the shape lab capture parses");
+    assert!(catalog.names().any(|name| name == "ROUND OFF"));
+    assert!(!catalog.names().any(|name| name == "Round Off"));
+    assert!(catalog.bind_selected(["ROUND OFF".to_string()]).is_ok());
+    assert!(catalog.bind_selected(["Round Off".to_string()]).is_err());
+}
+
 /// Edits of the captured `ROUND OFF` row, to its list only. The capture holds
 /// one name there; these are the shapes the parser must still decide.
 fn shape_lab_with_round_off_list(list: &str) -> String {
@@ -249,6 +268,131 @@ fn a_name_nested_in_another_child_of_the_list_is_not_the_stored_name() {
     assert_eq!(round_off_stored(list), None);
 }
 
+// ---- Aliases (#1688) ---------------------------------------------------------------------------------
+//
+// The `ROUND OFF` capture holds no alias, so every aliased state in this section is that row with its list
+// edited by these tests: constructed, not captured. They reach shapes no capture holds (an unusable or a
+// repeated alias). Tally's own answers with aliases are tested in the section after it (`alias-lab-1688`).
+
+/// The `(carrying ledger, alias)` pairs the catalogue holds for `xml`.
+fn shape_lab_aliases(xml: &str) -> Vec<(String, String)> {
+    parse_standard_ledger_catalog_with_identities(
+        xml,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("the edited shape lab capture still parses")
+    .aliases()
+    .map(|(owner, alias)| (owner.to_string(), alias.to_string()))
+    .collect()
+}
+
+fn round_off_aliases(list: &str) -> Vec<String> {
+    shape_lab_aliases(&shape_lab_with_round_off_list(list))
+        .into_iter()
+        .inspect(|(owner, _)| assert_eq!(owner, "ROUND OFF"))
+        .map(|(_, alias)| alias)
+        .collect()
+}
+
+/// A ledger with no alias, as every ledger of the capture, yields none.
+#[test]
+fn a_capture_without_aliases_has_none() {
+    assert_eq!(shape_lab_aliases(&decoded_shape_lab_catalogue()), []);
+}
+
+/// Every name after the first is an alias, read verbatim and in the order
+/// Tally listed it, once each; a name the ledger already answers to (its row
+/// spelling or its own name) is not an alias of it.
+#[test]
+fn the_names_after_the_first_are_the_ledgers_aliases() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>Rounding</NAME><NAME>Paise  Adj</NAME>\
+         <NAME>Rounding</NAME><NAME>ROUND OFF</NAME><NAME>Round Off</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_aliases(&list), ["Rounding", "Paise  Adj"]);
+}
+
+/// A name the walk cannot use is left out and fails no read: blank, self-closing,
+/// undecodable, or a forged name.
+#[test]
+fn an_unusable_alias_is_left_out_and_fails_no_read() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>   </NAME><NAME/><NAME>A &bogus; B</NAME>\
+         <NAME>Round\u{202e}Off</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_aliases(&list), ["Rounding"]);
+    assert_eq!(
+        round_off_stored(&list).as_deref(),
+        Some("Round Off"),
+        "the own name is read as before"
+    );
+}
+
+/// An unusable first name leaves the ledger on its row spelling and promotes
+/// nothing, but the names after it are still its aliases.
+#[test]
+fn an_unusable_first_name_does_not_stop_the_aliases_after_it() {
+    let list = format!("{ROUND_OFF_LIST_HEAD}<NAME/><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}");
+    assert_eq!(round_off_stored(&list), None);
+    assert_eq!(round_off_aliases(&list), ["Rounding"]);
+}
+
+/// A second `NAME.LIST` of the first list is "after the first name" too; a
+/// second `LANGUAGENAME.LIST` is not read (never measured to carry aliases).
+#[test]
+fn only_the_first_language_list_carries_aliases() {
+    let list = format!(
+        "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"><NAME>Round Off</NAME><NAME>Rounding</NAME></NAME.LIST>\
+         <NAME.LIST TYPE=\"String\"><NAME>Second Of First</NAME></NAME.LIST><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>\
+         {ROUND_OFF_LIST_HEAD}<NAME>Second List</NAME><NAME>Second List Alias</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_aliases(&list), ["Rounding", "Second Of First"]);
+}
+
+/// A name outside `NAME.LIST` is no alias.
+#[test]
+fn a_name_outside_the_name_list_is_no_alias() {
+    let list = "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"><NAME>Round Off</NAME></NAME.LIST>\
+                <NAME>Loose</NAME><LANGUAGEID><NAME>Nested</NAME></LANGUAGEID></LANGUAGENAME.LIST>";
+    assert_eq!(round_off_aliases(list), Vec::<String>::new());
+}
+
+/// An alias is not a ledger name: one equal, apart from case, to another
+/// ledger's name does not make the catalogue's names collide
+/// (`DuplicateIdentity`), and it is not counted among the names.
+#[test]
+fn an_alias_equal_apart_from_case_to_another_ledger_is_not_a_duplicate_identity() {
+    let xml = decoded_shape_lab_catalogue();
+    let catalogue = parse_standard_ledger_catalog_with_identities(
+        &xml,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("parses");
+    let other = catalogue
+        .names()
+        .find(|name| *name != "ROUND OFF" && name.to_uppercase() != *name)
+        .expect("another ledger with lower case letters")
+        .to_string();
+    let alias = other.to_uppercase();
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>{alias}</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    let edited = shape_lab_with_round_off_list(&list);
+    let parsed = parse_standard_ledger_catalog_with_identities(
+        &edited,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("an alias is not an identity, so no duplicate");
+    assert_eq!(parsed.names().count(), 43);
+    assert_eq!(
+        parsed.aliases().collect::<Vec<_>>(),
+        [("ROUND OFF", alias.as_str())]
+    );
+}
+
 // ---- The V2 catalogue on captures of a live Tally (#1234) ------------------------------------------
 //
 // Four synthetic books answered Bridge's own `StandardLedgerCatalogV2` request on 6 Oct 2026: V1's rows, each with
@@ -277,7 +421,7 @@ struct V2Capture {
     bill_wise: usize,
 }
 
-const V2_CAPTURES: [V2Capture; 4] = [
+const V2_CAPTURES: [V2Capture; 5] = [
     V2Capture {
         company: "BRIDGE OUTSTANDINGS LAB",
         guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
@@ -313,6 +457,14 @@ const V2_CAPTURES: [V2Capture; 4] = [
         provenance: include_str!("fixtures/agent/native-ledger-catalogue-v2.json"),
         ledgers: 9,
         bill_wise: 2,
+    },
+    V2Capture {
+        company: "BRIDGE REVIEW LAB",
+        guid: "63292d7c-d541-42e5-aa9d-2ab5f8b993ff",
+        xml: include_bytes!("fixtures/agent/review-lab-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/review-lab-ledger-catalogue-v2.json"),
+        ledgers: 3,
+        bill_wise: 0,
     },
 ];
 
@@ -419,4 +571,119 @@ fn ledger_names_ending_in_crlf_carry_a_flag_in_the_v2_catalogue() {
             ("CRLF Supplier\r\n".to_string(), BillWiseFlag::On),
         ]
     );
+}
+
+// ---- Aliases as Tally returned them (#1688) ----------------------------------------------------------
+//
+// Tally's own answers to the three ledger-list requests on a book whose ledgers were given aliases on
+// Tally's screen and by import (`fixtures/agent/alias-lab-1688/PROVENANCE.md`).
+
+const ALIAS_LAB_COMPANY_NAME: &str = "BRIDGE ALIAS LAB";
+const ALIAS_LAB_COMPANY_GUID: &str = "021bda0c-b1b1-44c8-8279-5212ce87c9c7";
+const ALIAS_LAB_SCREEN_V2: &[u8] =
+    include_bytes!("fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml");
+const ALIAS_LAB_V1: &[u8] = include_bytes!("fixtures/agent/alias-lab-1688/i1-cat.utf16le.xml");
+const ALIAS_LAB_V2: &[u8] = include_bytes!("fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml");
+const ALIAS_LAB_V3: &[u8] = include_bytes!("fixtures/agent/alias-lab-1688/i1-idx.utf16le.xml");
+
+/// `é` is one code point, U+00E9, as Tally returned it.
+const CAFE_ALIAS: &str = "Lab Caf\u{e9} Sales";
+/// The Devanagari alias, by its code points as the import sent them.
+const SCRIPT_ALIAS: &str = "\u{932}\u{948}\u{92c} \u{916}\u{93e}\u{924}\u{93e}";
+
+/// The aliases keyed on Tally's screen, each beside the ledger that carries it, in keyed order.
+///
+/// The one ledger with two aliases has them in alphabetical order as well as keyed order, so these
+/// tests cannot tell keyed order from sorted order: that Tally lists aliases in keyed order rests on
+/// the lab result (protocol reference §9.4h), not on these tests.
+const SCREEN_ALIASES: [(&str, &str); 4] = [
+    ("Lab Other Ledger", "Lab Other First"),
+    ("Lab Other Ledger", "Lab Other Second"),
+    ("Lab Plain Ledger", "Lab Plain Alias"),
+    ("Lab Sales", CAFE_ALIAS),
+];
+
+fn alias_lab(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("captured BOM-less UTF-16LE response decodes")
+    .text
+}
+
+/// `(carrying ledger, alias)` pairs, grouped by ledger and kept in Tally's order within each.
+fn by_ledger<'a>(pairs: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<(String, String)> {
+    let mut pairs: Vec<(String, String)> = pairs
+        .map(|(owner, alias)| (owner.to_string(), alias.to_string()))
+        .collect();
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+    pairs
+}
+
+fn expected(extra: &[(&str, &str)]) -> Vec<(String, String)> {
+    by_ledger(SCREEN_ALIASES.iter().chain(extra).copied())
+}
+
+/// The screen's aliases, read by the import catalogue (V2), each after its ledger's own name, in
+/// Tally's order (keyed order per the lab result, see `SCREEN_ALIASES`), byte for byte.
+#[test]
+fn aliases_keyed_on_tallys_screen_are_read_as_tally_listed_them() {
+    let v2 = parse_standard_ledger_catalog_v2_with_identities(
+        &alias_lab(ALIAS_LAB_SCREEN_V2),
+        ALIAS_LAB_COMPANY_NAME,
+        ALIAS_LAB_COMPANY_GUID,
+    )
+    .expect("the captured import catalogue parses");
+    assert_eq!(by_ledger(v2.catalog().aliases()), expected(&[]));
+}
+
+/// After two ledgers were created by import with an alias each, V1 and V2 read all six, the
+/// Devanagari one by its exact code points.
+#[test]
+fn imported_aliases_are_read_by_both_catalogues_with_their_code_points() {
+    let six = expected(&[
+        ("Lab Alias Script", SCRIPT_ALIAS),
+        ("Lab Alias Shape", "Lab Shape Alias"),
+    ]);
+    let v1 = parse_standard_ledger_catalog_with_identities(
+        &alias_lab(ALIAS_LAB_V1),
+        ALIAS_LAB_COMPANY_NAME,
+        ALIAS_LAB_COMPANY_GUID,
+    )
+    .expect("the captured standard catalogue parses");
+    assert_eq!(by_ledger(v1.aliases()), six);
+    let v2 = parse_standard_ledger_catalog_v2_with_identities(
+        &alias_lab(ALIAS_LAB_V2),
+        ALIAS_LAB_COMPANY_NAME,
+        ALIAS_LAB_COMPANY_GUID,
+    )
+    .expect("the captured import catalogue parses");
+    assert_eq!(by_ledger(v2.catalog().aliases()), six);
+}
+
+/// The name index (V3) holds every alias among its ledger's names, after the own name.
+#[test]
+fn the_name_index_holds_each_alias_after_its_ledgers_own_name() {
+    let rows = parse_ledger_name_index(&alias_lab(ALIAS_LAB_V3), ALIAS_LAB_COMPANY_GUID)
+        .expect("the captured name index parses");
+    assert_eq!(rows.len(), 7);
+    for (owner, aliases) in [
+        (
+            "Lab Other Ledger",
+            &["Lab Other First", "Lab Other Second"][..],
+        ),
+        ("Lab Plain Ledger", &["Lab Plain Alias"][..]),
+        ("Lab Sales", &[CAFE_ALIAS][..]),
+        ("Lab Alias Shape", &["Lab Shape Alias"][..]),
+        ("Lab Alias Script", &[SCRIPT_ALIAS][..]),
+    ] {
+        let row = rows
+            .iter()
+            .find(|row| row.names.first().map(String::as_str) == Some(owner))
+            .unwrap_or_else(|| panic!("no row named {owner}"));
+        assert_eq!(&row.names[1..], aliases, "{owner}");
+    }
 }

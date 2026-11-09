@@ -141,6 +141,16 @@ bare `Primary` names a group a user called that, and an ancestry walk passes thr
 other group (§8.2b). The same marker prefixes Tally's other reserved values (`&#4; Resave`,
 `&#4; Not Applicable`), which are not the root.
 
+**The root as an answer shows it.** The marked form is a working form for comparison, not text for a
+reader. The tools that return a `parent` (`masters`, `ledger_masters`, `ledger_movement`,
+`stock_summary`, `trial_balance`, `gst_by_ledger`) show the reserved root as `&#4; Primary`, the text
+Tally sent (`tally_root_as_sent`, applied to the row the answer carries and after any step that
+reads the held row's `parent` back, such as the `ledger_masters` group filter). The shown form is
+not the root to `is_tally_reserved_root`, and a group named `&#4; Primary` in a `group` filter
+matches nothing. Only a value `is_tally_reserved_root` accepts is rewritten, so a group a user named `Primary`
+and Tally's other reserved values keep their text. A group a user named literally `&#4; Primary` cannot
+be told from the root by its shown text (**UNVERIFIED** whether Tally accepts such a name).
+
 **Parsers the rule does not cover yet.** The company-list and gateway-capability parsers,
 `export_status`, the Bridge-schema ledger parser, and the import-outcome parser still unescape a
 forbidden reference to its raw character. None of their outputs reaches a reserved-root test. (The

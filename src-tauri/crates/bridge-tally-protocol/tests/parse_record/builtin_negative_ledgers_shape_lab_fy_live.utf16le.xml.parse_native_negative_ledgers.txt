@@ -1,0 +1,95 @@
+# fixture: tests/fixtures/builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml
+# parser: parse_native_negative_ledgers
+# source: captured
+Ok(NativeNegativeLedgers {
+    entries: [
+        NativeNegativeLedger {
+            name: "Bank of Baroda CA",
+            balance: Credit(
+                ExactDecimal(
+                    "24270.50",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "Capital A/c",
+            balance: Debit(
+                ExactDecimal(
+                    "1000000.00",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "Cess",
+            balance: Debit(
+                ExactDecimal(
+                    "200.00",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "CGST",
+            balance: Debit(
+                ExactDecimal(
+                    "3600.25",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "HDFC CC",
+            balance: Debit(
+                ExactDecimal(
+                    "252600.00",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "IGST",
+            balance: Debit(
+                ExactDecimal(
+                    "1800.00",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "Shape Buyer 1",
+            balance: Credit(
+                ExactDecimal(
+                    "1180.00",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "Shape Buyer 2",
+            balance: Credit(
+                ExactDecimal(
+                    "8875.00",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "Shape Buyer 3",
+            balance: Credit(
+                ExactDecimal(
+                    "9090.00",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "State Tax",
+            balance: Debit(
+                ExactDecimal(
+                    "3600.25",
+                ),
+            ),
+        },
+        NativeNegativeLedger {
+            name: "Working Capital Loan",
+            balance: Debit(
+                ExactDecimal(
+                    "500000.00",
+                ),
+            ),
+        },
+    ],
+})

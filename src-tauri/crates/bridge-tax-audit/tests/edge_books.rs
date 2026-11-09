@@ -37,8 +37,8 @@ use bridge_tax_audit::{
     high_value_register, knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees,
     partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
     related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
-    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
-    RelatedPartiesConfig, Tds26asConfig, TdsConfig,
+    stock_read, tds_interest_201, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts,
+    PartnersConfig, RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -364,6 +364,8 @@ fn rules(s: &Value) -> Rules {
             "s194j" => rules.s194j_aggregate_paise = None,
             "s194t" => rules.s194t = None,
             "tds_rates" => rules.tds_rates = None,
+            "s201_1a" => rules.s201_1a = None,
+            "s206c_7" => rules.s206c_7 = None,
             other => panic!("rules_without {other} is not wired here"),
         }
     }
@@ -518,7 +520,7 @@ fn tds_config(s: &Value) -> TdsConfig {
             .unwrap_or_default(),
         reversals: lists.reversals,
         gst_separate: lists.gst_separate,
-        foreseeability_names: lists.foreseeability_names,
+        foreseeability: lists.foreseeability,
         challans: lists.challans,
         form_26a: lists.form_26a,
         turnover_is_placeholder: lists.turnover_is_placeholder,
@@ -1334,6 +1336,46 @@ fn check(name: &str) {
                 let c = tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), &r).unwrap();
                 (r, c)
             }
+            "tds_interest_201" => {
+                // As `parity/edge_golden.py` runs it: the two input tests first, as their arms
+                // above run them, with their tranche tables; the flag from the first result and
+                // the spec's turnover status; the rows; then the test at the audit-report date.
+                let entity_type = s["entity_type"].as_str().unwrap_or("individual");
+                let tds = tds_config(&s);
+                let (payees, payee_tranches) = tds_payees::run_with_tranches(
+                    &book,
+                    &rules,
+                    entity_type,
+                    &tds,
+                    &tds_inputs(&s),
+                )
+                .unwrap();
+                let (partners_result, partner_tranches) = partners_40b_194t::run_with_tranches(
+                    &book,
+                    &rules,
+                    &period(&s),
+                    entity_type,
+                    &partners(&s),
+                    &strs(&s["tds_payable_ledgers"]).into_iter().collect(),
+                )
+                .unwrap();
+                let flag =
+                    tds_interest_201::deductor_uncertain(&payees, tds.turnover_is_placeholder)
+                        .unwrap();
+                let rows = tds_interest_201::assemble_rows(
+                    &rules,
+                    &payees,
+                    &payee_tranches,
+                    &partners_result,
+                    &partner_tranches,
+                    flag,
+                    &tds.foreseeability,
+                )
+                .unwrap();
+                let r = tds_interest_201::run(&rules, &rows, &rules.due_date_audit_report).unwrap();
+                let c = tds_interest_201::check_invariants(&r).unwrap();
+                (r, c)
+            }
             other => panic!("{name}: no edge dispatch for {other} (EDGE_TESTS: {EDGE_TESTS:?})"),
         };
         let rust = canonical_test_result(&book, &result, Some(module_check)).unwrap();
@@ -1374,6 +1416,7 @@ const EDGE_TESTS: [&str; 32] = [
     "stale_balances_41_1",
     "statutory_dues_43b",
     "stock",
+    "tds_interest_201",
     "tds_payees",
     "tds_tcs_26as",
     "trial_balance",

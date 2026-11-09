@@ -74,6 +74,8 @@ pub struct IdentifiedBaseCurrency {
     base: BaseCurrencyName,
     decimal_places: u8,
     is_inr: bool,
+    /// The NAME of every other master of the book.
+    foreign_names: Vec<String>,
 }
 
 /// Parses a currency read into its masters (bridge#551).
@@ -125,6 +127,12 @@ impl CurrencyMasters {
             },
             decimal_places: master.decimal_places,
             is_inr: master.is_inr(),
+            foreign_names: self
+                .masters
+                .iter()
+                .filter(|other| other.name != master.name)
+                .map(|other| other.name.clone())
+                .collect(),
         })
     }
 }
@@ -134,12 +142,17 @@ impl IdentifiedBaseCurrency {
         &self.base
     }
 
+    /// Whether `symbol` is the NAME of one of the book's other Currency masters.
+    pub fn is_foreign_master(&self, symbol: &str) -> bool {
+        self.foreign_names.iter().any(|name| name == symbol)
+    }
+
     pub fn decimal_places(&self) -> u8 {
         self.decimal_places
     }
 
     /// The INR rule, by the base master's mailing name alone
-    /// ([`CurrencyMaster::is_inr`]).
+    /// (`CurrencyMaster::is_inr`).
     pub fn is_inr(&self) -> bool {
         self.is_inr
     }

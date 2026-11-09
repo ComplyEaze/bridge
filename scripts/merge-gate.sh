@@ -210,10 +210,12 @@ if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -
     (.sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
     (.commit | type == "object") and
     (.commit.message | type == "string") and
+    # An email is the plain form, or (#2388) exactly a GitHub bot noreply address,
+    # <digits>+<name>[bot]@users.noreply.github.com, whose local part holds brackets.
     (.commit.author | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     (.commit.committer | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     ((.author == null) or (.author | type == "object" and (.login | type == "string"))) and
     ((.committer == null) or (.committer | type == "object" and (.login | type == "string")))))
 ' <<<"$metadata_commits" >/dev/null 2>&1; then
@@ -243,6 +245,46 @@ else
 $raw_prbody
 $commit_messages
 $commit_identity_names"
+  fi
+fi
+# AI attribution in public text (the owner's practice of 25 Oct 2026, not a mandate): a "Generated with" signature line or a
+# Co-authored-by line naming an assistant in the title or body (comments included), or such a trailer or an author or committer
+# identity naming one on a commit, is reported as a note and never blocks a merge. The note says that GitHub's squash merge copies
+# the body into the commit on master. scripts/check-ai-attribution.mjs decides. The title and body are checked even when the commit
+# list is not proven complete (that case is already INDETERMINATE above): then no commit is read. A check that did not run to its
+# end is INDETERMINATE: an unreadable result is an unknown, not a clean one.
+# The commit list goes in on stdin (a long list would not fit an argument); the title and body are arguments, and one too long for
+# that makes the whole check INDETERMINATE, never a pass.
+attribution_source="[]"
+[ "${metadata_commits_proven:-0}" -eq 1 ] && attribution_source="$metadata_commits"
+attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
+    title: $title, body: $body,
+    commits: ((if all(.[]; type == "array") then flatten else . end) |
+      map({sha: .sha, message: .commit.message,
+           identities: [.commit.author.name, .commit.author.email, .commit.committer.name, .commit.committer.email]}))}' <<<"$attribution_source" 2>/dev/null) || attribution_input=""
+if [ -z "$attribution_input" ]; then
+  unknown "could not prepare the AI attribution check"
+else
+  : >"$errfile"
+  attribution_status=0
+  attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
+  # The check's last line must say how many commits it read, and that number must be the number sent; every line before it must be
+  # a note. Anything else (a crash, an old node, a missing module, a replaced file that prints nothing or refuses) is not an answer.
+  attribution_expected=$(jq -r '.commits | length' <<<"$attribution_input" 2>/dev/null) || attribution_expected=""
+  attribution_last=$(printf '%s\n' "$attribution_output" | tail -n 1)
+  attribution_other=$(printf '%s\n' "$attribution_output" | sed '$d' | grep -vc '^NOTE ' || true)
+  if [ "$attribution_status" -eq 0 ] && [ -n "$attribution_expected" ] && [ "$attribution_last" = "CHECKED $attribution_expected" ] && [ "$attribution_other" -eq 0 ]; then
+    attribution_notes=0
+    while IFS= read -r attribution_line; do
+      case "$attribution_line" in
+        "NOTE "*) say "note" "AI attribution: ${attribution_line#NOTE }"; attribution_notes=$((attribution_notes + 1)) ;;
+      esac
+    done <<<"$attribution_output"
+    if [ "$attribution_notes" -eq 0 ] && [ "${metadata_commits_proven:-0}" -eq 1 ]; then
+      say "ok" "no AI attribution in the title, body or commits"
+    fi
+  else
+    unknown "could not run the AI attribution check"
   fi
 fi
 # Paginate changed files through the REST endpoint; gh pr view hard-codes a
@@ -328,6 +370,42 @@ read_contents_text() {
   contents_text_result="$decoded"
 }
 
+# The PR's own commits, space-separated, filled in by the branch history check below: a 404 for one of
+# these, or for the head, may be the contents API lagging a push. The head, base-tip and merge-base
+# reads run before it is filled in, and the acknowledgement read may run without it, so the retry
+# matches $head on its own.
+pr_commit_shas=""
+# Why the last contents read failed, for the INDETERMINATE line that reports it: the commit, the HTTP
+# status, how many tries were made and the first line of the error. Empty after a read that answered.
+contents_read_failure=""
+# Read a repository file at a commit through read_contents_text, trying again a failure that a second
+# try can cure: a server error (HTTP 5xx), a rate-limit answer (HTTP 403 or 429 whose error names a rate
+# limit), or a 404 for the head or one of the PR's own commits, pushed moments before (#2179). At most
+# 3 tries, 2 s then 4 s apart. Any other failure, or the third, fails closed.
+read_contents_retrying() {
+  local ref="$1" path="$2" try=1 status detail transient
+  contents_read_failure=""
+  while :; do
+    read_contents_text "$ref" "$path" && return 0
+    status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
+    # The first non-blank error line, printable ASCII only, a long digit run (an account id in a
+    # rate-limit message) masked, at most 160 characters.
+    detail=$(grep -m 1 -v '^[[:space:]]*$' "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | sed -E 's/[0-9]{6,}/<n>/g' | cut -c 1-160)
+    transient=0
+    case "$status" in
+      5[0-9][0-9]) transient=1 ;;
+      403|429) grep -qi 'rate limit' "$errfile" 2>/dev/null && transient=1 ;;
+      404) case " $head $pr_commit_shas " in *" $ref "*) transient=1 ;; esac ;;
+    esac
+    if [ "$transient" -ne 1 ] || [ "$try" -ge 3 ]; then
+      contents_read_failure="commit ${ref:0:12}, ${status:+HTTP $status, }after $try $([ "$try" -eq 1 ] && echo try || echo tries): ${detail:-no error text (the answer itself was unreadable)}"
+      return 1
+    fi
+    sleep $((try * 2))
+    try=$((try + 1))
+  done
+}
+
 # $2 is "3" (head: schema 3 only) or "2or3" (base tip and merge base).
 read_surface_paths() {
   local ref="$1"
@@ -337,7 +415,7 @@ read_surface_paths() {
   surface_reasoned_result=""
   surface_bad_reason_result=""
   surface_seen_schema_result=""
-  read_contents_text "$ref" "$SURFACE" || return 1
+  read_contents_retrying "$ref" "$SURFACE" || return 1
   # Remember what schema the file claims, so a stale schema-2 head gets a useful message.
   surface_seen_schema_result=$(jq -r '.schema_version? // empty | tostring' <<<"$contents_text_result" 2>/dev/null || true)
   if ! jq -e --arg accepted "$accepted" '
@@ -372,7 +450,7 @@ if [ "$head_surface_status" -ne 0 ]; then
   if [ "$surface_seen_schema_result" = "2" ]; then
     unknown "could not read and validate compatibility surface at $short: it is still schema 2 (a branch that predates schema 3); merge master into the branch and migrate the pin list to schema 3, see docs/release-process.md"
   else
-    unknown "could not read and validate compatibility surface at $short"
+    unknown "could not read and validate compatibility surface at $short${contents_read_failure:+ ($contents_read_failure)}"
   fi
   pinned=""
   head_reasoned=""
@@ -389,7 +467,7 @@ if [ -n "$base_tip" ]; then
   read_surface_paths "$base_tip" 2or3 || base_surface_status=$?
 fi
 if [ -n "$base_tip" ] && [ "$base_surface_status" -ne 0 ]; then
-  unknown "could not read and validate compatibility surface at base ${base_tip:0:7}"
+  unknown "could not read and validate compatibility surface at base ${base_tip:0:7}${contents_read_failure:+ ($contents_read_failure)}"
   base_pinned=""
 elif [ -n "$base_tip" ]; then
   base_pinned="$surface_paths_result"
@@ -416,7 +494,7 @@ if [ -n "$base_tip" ] && [ -n "$base_pinned" ]; then
     merge_base_surface_status=0
     read_surface_paths "$merge_base" 2or3 || merge_base_surface_status=$?
     if [ "$merge_base_surface_status" -ne 0 ]; then
-      unknown "could not read and validate compatibility surface at merge base ${merge_base:0:7}"
+      unknown "could not read and validate compatibility surface at merge base ${merge_base:0:7}${contents_read_failure:+ ($contents_read_failure)}"
     else
       merge_base_pinned="$surface_paths_result"
       say "ok" "validated schema-$surface_schema_result compatibility surface at merge base ${merge_base:0:7}"
@@ -460,9 +538,12 @@ pins_at_commit() {
   local file="$history_cache/$sha"
   pins_at_result=""
   if ! [ -f "$file" ]; then
-    read_contents_text "$sha" "$SURFACE" || return 1
-    jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
-      <<<"$contents_text_result" >/dev/null 2>&1 || return 1
+    read_contents_retrying "$sha" "$SURFACE" || return 1
+    if ! jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
+      <<<"$contents_text_result" >/dev/null 2>&1; then
+      contents_read_failure="commit ${sha:0:12}: the pin list there is not a list of paths"
+      return 1
+    fi
     jq -r '.files[].path' <<<"$contents_text_result" | LC_ALL=C sort -u >"$file.tmp" || return 1
     mv "$file.tmp" "$file"
   fi
@@ -477,12 +558,13 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       if (.parents | type) == "array" and all(.parents[]; (.sha | type == "string") and (.sha | test("^[0-9a-fA-F]{40}$"))) then
         ([.sha] + [.parents[].sha]) | join(" ")
       else "NOPARENTS " + .sha end' <<<"$metadata_commits" 2>/dev/null) || commit_records="NOPARENTS unreadable"
+    pr_commit_shas=$(cut -d ' ' -f 1 <<<"$commit_records" | grep -E '^[0-9a-fA-F]{40}$' | tr '\n' ' ')
     history_status=0
     collected=""
     parents_union="$tmpdir/parents-union"
     while read -r -a record; do
       [ "${#record[@]}" -gt 0 ] || continue
-      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; break; fi
+      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; contents_read_failure="a commit's parent list could not be read"; break; fi
       pins_at_commit "${record[0]}" || { history_status=1; break; }
       own_file="$pins_at_result"
       : >"$parents_union"
@@ -494,7 +576,7 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       collected="$collected"$'\n'"$(LC_ALL=C comm -23 "$own_file" "$parents_union")"
     done <<<"$commit_records"
     if [ "$history_status" -ne 0 ]; then
-      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out"
+      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out (${contents_read_failure:-no detail recorded})"
     else
       withdrawn_pins=$(LC_ALL=C comm -23 <(path_set "$collected") <(path_set "$base_pinned") | LC_ALL=C comm -23 - <(path_set "$pinned"))
     fi
@@ -547,8 +629,8 @@ if [ -n "$changed" ] && [ -n "$pinned" ] && [ -n "$base_pinned" ] && [ -n "$merg
       bad "acknowledgement files are append-only; the PR also changes: $other_acks"
     fi
     if [ "$have_ack" -eq 1 ]; then
-      if ! read_contents_text "$head" "$ACK_PATH"; then
-        unknown "could not read $ACK_PATH at $short"
+      if ! read_contents_retrying "$head" "$ACK_PATH"; then
+        unknown "could not read $ACK_PATH at $short${contents_read_failure:+ ($contents_read_failure)}"
       else
         ack_text="$contents_text_result"
         ack_problems=""
@@ -610,12 +692,45 @@ fi
 # Scan destination paths and added payload lines. Removed/context lines never
 # enter the privacy scan. Binary additions are an explicit human-inspection
 # hold because their bytes are absent from a textual patch.
+# GitHub serves a pull request's diff only up to 20000 lines (HTTP 406 beyond). When it serves none, for any reason, the diff is
+# built here from the head and the merge base this gate read from the API: the head is fetched into this checkout and must be that
+# exact commit, the merge base must be its ancestor, and the options that change Git's output are pinned (attributes come from the
+# master just fetched, never from the pull request), so no local setting can make it pass: one that still applies (an attributes
+# file of this checkout, a rename limit) turns a file binary, which blocks, or fails the REST reconciliation below. On the pull
+# requests measured where GitHub did serve a diff, the scan's input (each section's path, counts and added lines) equalled GitHub's;
+# the bytes can differ in the index lines' abbreviation and in hunk-header context, which the parser does not read.
+# A fetch or a check that fails leaves the diff empty, which is INDETERMINATE, never a pass.
+local_pr_diff() {
+  local fetched
+  [ -n "$merge_base" ] || { local_diff_failure="the merge base was not read"; return 1; }
+  git -C "$gate_tree" fetch -q --no-tags origin "+refs/pull/$PR/head:refs/merge-gate/pr-head" 2>>"$errfile" </dev/null \
+    || { local_diff_failure="the head could not be fetched"; return 1; }
+  fetched=$(git -C "$gate_tree" rev-parse --verify -q 'refs/merge-gate/pr-head^{commit}' 2>>"$errfile") || fetched=""
+  [ "$fetched" = "$head" ] || { local_diff_failure="the fetched head is not $short"; return 1; }
+  git -C "$gate_tree" merge-base --is-ancestor "$merge_base" "$head" 2>>"$errfile" \
+    || { local_diff_failure="the merge base ${merge_base:0:7} is not an ancestor of the head"; return 1; }
+  diff=$(git -C "$gate_tree" --attr-source=refs/merge-gate/master -c core.quotePath=true diff --no-color --no-ext-diff \
+    --no-textconv --no-relative -M --abbrev=9 -U3 --inter-hunk-context=0 --diff-algorithm=myers --indent-heuristic \
+    --ignore-submodules=none --submodule=short --src-prefix=a/ --dst-prefix=b/ -O/dev/null "$merge_base" "$head" 2>>"$errfile") \
+    || { local_diff_failure="git diff failed"; diff=""; return 1; }
+}
 : >"$errfile"
 diff_status=0
 diff=$(gh pr diff "$PR" --repo "$REPO" 2>"$errfile") || diff_status=$?
 if [ "$diff_status" -ne 0 ] || [ -z "$diff" ]; then
-  unknown "could not read diff for the privacy scan"
+  github_diff_failure=$(head -c 200 "$errfile" | tr -cd '[:print:]')
+  diff=""
+  local_diff_failure=""
+  if local_pr_diff && [ -n "$diff" ]; then
+    say "note" "GitHub served no diff (${github_diff_failure:-an empty answer}): it was built here from merge base ${merge_base:0:7} and head $short"
+  else
+    diff=""
+    unknown "could not read diff for the privacy scan: GitHub served none, and it could not be built here (${local_diff_failure:-the built diff was empty})"
+  fi
 else
+  say "note" "the diff for the privacy scan was read from GitHub"
+fi
+if [ -n "$diff" ]; then
   # Parse Git's C-style quoted paths with the existing Python runtime. The
   # shell receives only JSON/TSV data after the parser has matched every diff
   # section, so non-ASCII destinations retain their REST filename identity.
@@ -684,6 +799,47 @@ else
     fi
     count=$(wc -l <"$lab_captures_file" | tr -d ' ')
     say "note" "lab-capture manifest: $count listed capture(s) (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$lab_capture_path" 2>/dev/null))"
+    lab_capture_stale_rows "$tip"
+  }
+  # Warns, never blocks and never changes an exemption: an entry whose path master now holds with another blob (a directory's
+  # tree id never equals a file's blob id, so a directory there counts too), or whose path master once held and has since deleted, is stale and should be removed. An entry whose path
+  # master never held is pending (its pull request has not merged) and only counted. Paths are read literally (no pathspec magic),
+  # names are redacted like any gate output, and at most eight are named.
+  lab_capture_stale_rows() {
+    local tip="$1" path blob _size _sha listing master_blob gone shown pending=0 stale=0 failed=0 checked=0 total
+    total=$(wc -l <"$lab_captures_file" | tr -d ' ')
+    while IFS=$'\t' read -r path blob _size _sha; do
+      listing=$(git --literal-pathspecs -C "$gate_tree" ls-tree "$tip" -- "$path" 2>/dev/null) || { failed=1; break; }
+      if [ -n "$listing" ]; then
+        master_blob=$(awk '{ print $3 }' <<<"$listing")
+        [ "$master_blob" = "$blob" ] && { checked=$((checked + 1)); continue; }
+        stale=$((stale + 1))
+        if [ "$stale" -le 8 ]; then
+          shown=$(sed -E 's#/(Users|home)/[^/[:space:]]+#<home>#g; s#^(Users|home)/[^/[:space:]]+#<home>#g; s#[A-Za-z]:[\\/]+Users[\\/]+[^\\/[:space:]]+#<home>#g' <<<"$path" | python3 -I "$script_dir/merge_gate_privacy.py" --redact-shapes 2>/dev/null) || shown="(path not shown)"
+          say "note" "lab-capture manifest: stale entry '${shown:0:160}': master holds another blob there; remove or update the entry, unless a pull request not yet merged replaces that capture"
+        fi
+      else
+        gone=$(git --literal-pathspecs -C "$gate_tree" log -1 --format=%h "$tip" -- "$path" 2>/dev/null) || { failed=1; break; }
+        if [ -n "$gone" ]; then
+          stale=$((stale + 1))
+          if [ "$stale" -le 8 ]; then
+            shown=$(sed -E 's#/(Users|home)/[^/[:space:]]+#<home>#g; s#^(Users|home)/[^/[:space:]]+#<home>#g; s#[A-Za-z]:[\\/]+Users[\\/]+[^\\/[:space:]]+#<home>#g' <<<"$path" | python3 -I "$script_dir/merge_gate_privacy.py" --redact-shapes 2>/dev/null) || shown="(path not shown)"
+            say "note" "lab-capture manifest: stale entry '${shown:0:160}': master deleted it at $gone; remove the entry, unless a pull request not yet merged adds it again"
+          fi
+        else
+          pending=$((pending + 1))
+        fi
+      fi
+      checked=$((checked + 1))
+    done <"$lab_captures_file"
+    if [ "$failed" -ne 0 ] && [ "$checked" -eq 0 ]; then
+      say "note" "lab-capture manifest: the stale-entry check could not run (git could not look up an entry's path on master)"; return 0
+    elif [ "$failed" -ne 0 ]; then
+      say "note" "lab-capture manifest: the stale-entry check stopped partway, after $checked of $total entries (git could not look up an entry's path on master); the notes above may be incomplete"; return 0
+    fi
+    [ "$stale" -le 8 ] || say "note" "lab-capture manifest: $stale stale entries in all (eight named above)"
+    [ "$pending" -eq 0 ] || say "note" "lab-capture manifest: $pending entr(ies) not yet on master (pending)"
+    return 0
   }
   # Reads the blob answer from a file (the bytes never pass through a shell variable) and says match, size, sha256, not-that-blob or
   # malformed. The decoded bytes must hash, as git hashes a blob, to the id that was asked for, so an answer for other bytes is caught.
@@ -744,6 +900,11 @@ PY
   load_lab_captures
   lab_exempt_count=0
   lab_exempt_examples=""
+  # The paths the manifest exempted in this run, and whether any of them is not a plain addition or change (a rename or a copy). The
+  # verdict carry below reads both: a binary change is carried only when it is wholly the manifest's (docs/release-process.md).
+  lab_exempt_paths="$tmpdir/lab-exempt-paths.txt"
+  : >"$lab_exempt_paths"
+  lab_exempt_nonplain=0
   coverage_count=0
   coverage_examples=""
   metadata_only_count=0
@@ -791,6 +952,8 @@ PY
       if [ "$binary" -eq 1 ] && lab_capture_listed "$filename" "$status"; then
         # Listed, path and blob, in the owner-approved manifest on master: the owner read these bytes when he merged the list.
         lab_exempt_count=$((lab_exempt_count + 1))
+        printf '%s\n' "$filename" >>"$lab_exempt_paths"
+        case "$status" in added) ;; *) lab_exempt_nonplain=1 ;; esac
         if [ "$lab_exempt_count" -le 8 ]; then
           lab_exempt_examples="${lab_exempt_examples}${lab_exempt_examples:+; }$(bounded_coverage_name "$filename")"
         fi
@@ -939,11 +1102,29 @@ PY
     say "note" "synthetic-UUID registry: $count listed value(s) applied (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$uuid_registry_path" 2>/dev/null))"
   }
   load_uuid_registry
+  # #2367: the scan reads the added lines with each lockfile integrity value masked as a digest, by the rule and only in the
+  # files merge_gate_privacy.py names (LOCKFILE_INTEGRITY_RE); the explain step masks the same lines by their own paths. If
+  # the masking cannot be done, the scan reads the lines unmasked and the gate is indeterminate.
+  privacy_payload="$tmpdir/privacy-payload"
+  lockfile_masked=""
+  if [ ! -s "$added_payload" ]; then
+    : >"$privacy_payload"
+  elif ! jq '{added: [range(0; .added_payload | length) as $i | {path: .added_locations[$i][0], text: .added_payload[$i]}]}' \
+         <<<"$parsed_diff" >"$tmpdir/lockfile-mask-input.json" 2>/dev/null \
+       || ! lockfile_masked=$(python3 -I "$script_dir/merge_gate_privacy.py" --mask-lockfile-integrity <"$tmpdir/lockfile-mask-input.json" 2>/dev/null) \
+       || ! jq -e '(.payload | type == "array" and all(.[]; type == "string")) and (.masked | type == "number" and floor == . and . >= 0)' \
+         <<<"$lockfile_masked" >/dev/null 2>&1 \
+       || ! jq -r '.payload[]' <<<"$lockfile_masked" >"$privacy_payload" 2>/dev/null; then
+    unknown "could not mask lockfile integrity values for the privacy scan"
+    cp "$added_payload" "$privacy_payload"
+  elif [ "$(jq -r '.masked' <<<"$lockfile_masked")" -gt 0 ]; then
+    say "note" "$(jq -r '.masked' <<<"$lockfile_masked") lockfile integrity value(s) were masked as generated digests"
+  fi
   scan_input_file="$tmpdir/privacy-scan-input"
   scan_input_write_status=0
   {
     printf '%s\n%s\n' "$privacy_metadata" "$path_text"
-    cat "$added_payload"
+    cat "$privacy_payload"
   } >"$scan_input_file" || scan_input_write_status=$?
   if [ "$scan_input_write_status" -ne 0 ]; then
     unknown "could not assemble complete privacy scan input"
@@ -1068,33 +1249,155 @@ else
     # not carried: the reviewer looks again. Master's edits elsewhere are NOT looked at, in other files or in the same file (below
     # the last hunk, or of equal length above one): they ride on master's own review and the checks at the head.
     # (git patch-id is not used: it ignores whitespace and position.)
-    # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, holds a binary change (its text hides the bytes),
-    # lists a file twice, or names other files than the pull request's current file list is never carried. What master changed
-    # in other files is not looked at: that is the checks' job at the head.
+    # The MERGE-ADVERSARY RECOMMEND line for that same older pair is carried with it, under this same proof (merge_gate_verdict.py).
+    # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, lists a file twice, or names other files than the
+    # pull request's current file list is never carried. A binary change is never carried either, because its text hides the
+    # bytes (and the `index` ids, stripped here, are the only thing that tells two versions apart, abbreviated by GitHub): except
+    # when every binary change of the pull request was exempted by the lab-capture manifest in this run (none needs the owner's
+    # attestation, none was removed, renamed or modified: only an addition, whose kept `new file mode` line binds an empty base)
+    # and the binary paths of the diff are exactly those. Each binary section is then replaced by one
+    # `binary <path> <full blob id>` line, the id read from the compare API's JSON for the same range (for the current range it
+    # must be the blob the manifest check verified), so equal digests mean the same text change and the same full blob for every
+    # binary. A refusal writes one fixed reason to a file, printed as a "verdict not carried" note. What master changed in other files is not
+    # looked at: that is the checks' job at the head.
     candidate_head=$(jq -r '.candidate_clean.head // empty' <<<"$verdict_result" 2>/dev/null)
     candidate_base=$(jq -r '.candidate_clean.base // empty' <<<"$verdict_result" 2>/dev/null)
     if [ "$(jq -r '.clean' <<<"$verdict_result" 2>/dev/null)" != "true" ] && [[ "$candidate_head" =~ ^[0-9a-f]{40}$ ]] && [[ "$candidate_base" =~ ^[0-9a-f]{40}$ ]]; then
+      # Reads the diff, the compare JSON and the exempted paths (and, for the current range, the REST blob ids the manifest check
+      # verified) from files, writes the diff with each binary section replaced by one `binary <path> <blob>` line, and exits 1,
+      # after writing one fixed reason (never file bytes) to the reason file, on anything it cannot prove: a path that is not
+      # UTF-8, a diff header it cannot read, a binary path twice, binary paths that are not exactly the exempted ones, a file list
+      # of 300 or more (GitHub truncates there), a binary path missing from it or listed twice, a status that is not "added"
+      # (the kept `new file mode` line binds an empty base; a modified binary's base blob is not bound, so it is never carried),
+      # a sha that is not 40 lowercase hex, or, in the current range, a sha other than the one the manifest check verified.
+      # No file bytes pass through a shell variable.
+      read -r -d '' carry_binary_py <<'PY' || true
+import json, re, sys
+diff_path, json_path, exempt_path, out_path, reason_path = sys.argv[1:6]
+blobs_path = sys.argv[6] if len(sys.argv) > 6 else None
+
+
+class Refuse(Exception):
+    pass
+
+
+def refuse(reason):
+    raise Refuse(reason)
+
+
+try:
+    with open(json_path, "rb") as handle:
+        doc = json.load(handle)
+    files = doc["files"]
+    if not isinstance(files, list):
+        refuse("the compare JSON has no file list")
+    if len(files) >= 300:
+        refuse("the compare JSON lists 300 or more files, so GitHub may have truncated it")
+    by_name = {}
+    for entry in files:
+        if not isinstance(entry, dict) or not isinstance(entry.get("filename"), str):
+            refuse("the compare JSON has a file entry without a name")
+        by_name.setdefault(entry["filename"], []).append(entry)
+    with open(exempt_path, "rb") as handle:
+        exempt = [line.decode("utf-8") for line in handle.read().split(b"\n") if line]
+    verified = None
+    if blobs_path is not None:
+        verified = {}
+        with open(blobs_path, "rb") as handle:
+            for line in handle.read().split(b"\n"):
+                if line:
+                    name, _, blob = line.decode("utf-8").partition("\t")
+                    verified.setdefault(name, []).append(blob)
+    with open(diff_path, "rb") as handle:
+        lines = handle.read().split(b"\n")
+    header = re.compile(rb"^diff --git a/.* b/(.*)$")
+    out, seen, path, skipping = [], [], None, False
+    for index, line in enumerate(lines):
+        if line.startswith(b"diff --git "):
+            match = header.match(line)
+            if match is None:
+                refuse("a diff header could not be read")
+            path, skipping = match.group(1).decode("utf-8"), False
+        elif not skipping and (line.startswith(b"Binary files ") or line == b"GIT binary patch"):
+            if path is None or path in seen:
+                refuse("a binary section has no file header or names a file twice")
+            seen.append(path)
+            found = by_name.get(path, [])
+            if len(found) != 1:
+                refuse("a binary path is missing from the compare JSON or appears twice in it")
+            if found[0].get("status") != "added":
+                refuse("a binary file is not a plain addition in the compare JSON (a modified binary's base blob is not bound)")
+            sha = found[0].get("sha")
+            if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+                refuse("a binary blob id in the compare JSON is not 40 lowercase hex")
+            if verified is not None and verified.get(path) != [sha]:
+                refuse("a binary blob id in the compare JSON is not the blob the manifest check verified")
+            out.append(("binary " + path + " " + sha).encode("utf-8"))
+            skipping = True
+            continue
+        if skipping:
+            if index == len(lines) - 1 and line == b"":
+                out.append(line)
+            continue
+        out.append(line)
+    if not seen or sorted(seen) != sorted(set(exempt)) or len(exempt) != len(set(exempt)):
+        refuse("the binary paths of the diff are not exactly the manifest-exempted paths")
+    with open(out_path, "wb") as handle:
+        handle.write(b"\n".join(out))
+except Refuse as why:
+    with open(reason_path, "w") as handle:
+        handle.write(str(why) + "\n")
+    sys.exit(1)
+except (OSError, ValueError, KeyError, TypeError, UnicodeError):
+    with open(reason_path, "w") as handle:
+        handle.write("the binary evidence could not be read\n")
+    sys.exit(1)
+PY
+      carry_reason_file="$tmpdir/carry-reason.txt"
+      : >"$carry_reason_file"
+      carry_refuse() { printf '%s\n' "$1" >"$carry_reason_file"; return 1; }
       own_change_digest() {
-        local diff_file="$tmpdir/patch-$1-$2.diff" names
+        local diff_file="$tmpdir/patch-$1-$2.diff" json_file="$tmpdir/compare-$1-$2.json" carried_file="$tmpdir/patch-$1-$2.carry" names digest_source verified_blobs=""
         gh api -H "Accept: application/vnd.github.diff" "repos/$REPO/compare/$1...$2" >"$diff_file" 2>>"$errfile" </dev/null || return 1
         grep -q '[^[:space:]]' "$diff_file" || return 1
-        ! grep -Eq '^(Binary files |GIT binary patch)' "$diff_file" || return 1
+        digest_source="$diff_file"
+        if grep -aEq '^(Binary files |GIT binary patch)' "$diff_file"; then
+          # Only when the manifest exempted every binary change of this pull request in this run: none left for the attestation
+          # (a removed binary is never listed, so it counts there), none renamed, copied or modified (only an addition is carried:
+          # a modified binary's base blob is not bound by the digest), and at least one exempted.
+          [ "${binary_count:-1}" -eq 0 ] || carry_refuse "a binary change of the pull request is not exempted by the lab-capture manifest, or was removed" || return 1
+          [ "${lab_exempt_count:-0}" -gt 0 ] || carry_refuse "no binary of the pull request is exempted by the lab-capture manifest" || return 1
+          [ "${lab_exempt_nonplain:-1}" -eq 0 ] || carry_refuse "a manifest-exempted binary is not a plain addition (modified, renamed or copied)" || return 1
+          [ -s "${lab_exempt_paths:-}" ] || carry_refuse "the list of exempted binary paths is empty" || return 1
+          gh api "repos/$REPO/compare/$1...$2" >"$json_file" 2>>"$errfile" </dev/null || carry_refuse "the compare JSON request failed" || return 1
+          # The current range is bound to the blob ids the manifest check verified (the pull request's files list).
+          if [ "${3:-}" = "check-files" ]; then verified_blobs="$changed_blobs"; fi
+          python3 -I -c "$carry_binary_py" "$diff_file" "$json_file" "$lab_exempt_paths" "$carried_file" "$carry_reason_file" ${verified_blobs:+"$verified_blobs"} 2>/dev/null || return 1
+          digest_source="$carried_file"
+        fi
         if [ "${3:-}" = "check-files" ]; then
           names=$(grep -E '^diff --git ' "$diff_file" | sed -E 's#^diff --git a/.* b/(.*)$#\1#') || return 1
           [ -n "$names" ] || return 1
           [ "$(printf '%s\n' "$names" | sort | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || return 1
           [ "$(printf '%s\n' "$names" | sort -u)" = "$(cut -f1 "$changed_records" | sort -u)" ] || return 1
         fi
-        LC_ALL=C grep -av '^index ' "$diff_file" | LC_ALL=C sed -E 's/^(@@ [^@]* @@).*/\1/' | shasum -a 256 | cut -c1-64
+        LC_ALL=C grep -av '^index ' "$digest_source" | LC_ALL=C sed -E 's/^(@@ [^@]* @@).*/\1/' | shasum -a 256 | cut -c1-64
       }
       old_digest=$(own_change_digest "$candidate_base" "$candidate_head") && new_digest=$(own_change_digest "$merge_base" "$head" check-files)
       if [ -n "${old_digest:-}" ] && [ "${old_digest:-}" = "${new_digest:-}" ]; then
-        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own change is byte-identical, hunk places and context included (digest ${old_digest:0:12})"
+        carried_binaries=$(grep -ac '^binary ' "$tmpdir/patch-$merge_base-$head.carry" 2>/dev/null) || carried_binaries=0
+        carried_binary_note=""
+        if [ "$carried_binaries" -gt 0 ]; then
+          carried_binary_note=", with $carried_binaries manifest-listed binary blob(s) unchanged"
+        fi
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own change is byte-identical, hunk places and context included$carried_binary_note (digest ${old_digest:0:12})"
         jq -c --arg h "$candidate_head" --arg b "$candidate_base" '. + {carried: {head: $h, base: $b}}' "$tmpdir/verdict-doc.json" >"$tmpdir/verdict-doc-carried.json" 2>/dev/null \
           && verdict_exit=0 \
           && verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc-carried.json" 2>/dev/null) || verdict_exit=$?
       else
         say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is not carried: the pull request's own lines could not be shown unchanged"
+        carry_reason=$(head -c 200 "$carry_reason_file" 2>/dev/null | tr -cd '[:print:]')
+        [ -z "$carry_reason" ] || say "note" "verdict not carried: $carry_reason"
       fi
     fi
     if ! jq -e 'type == "object" and (.status | type == "string")' <<<"$verdict_result" >/dev/null 2>&1; then
@@ -1108,6 +1411,9 @@ else
           say "ok" "the owner's MERGE-VERDICT CLEAN stands at head $short and merge base ${merge_base:0:7} (review tier one: no MERGE-ADVERSARY RECOMMEND needed)"
         else
           say "ok" "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head $short and merge base ${merge_base:0:7}"
+          if [ "$(jq -r '.recommend_carried' <<<"$verdict_result")" = "true" ]; then
+            say "ok" "the MERGE-ADVERSARY RECOMMEND line was carried to head $short with the CLEAN line, under the same proof that the pull request's own change is unchanged"
+          fi
         fi
       elif [ "$(jq -r '.status' <<<"$verdict_result")" = "block" ]; then
         bad "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND do not both stand at head $short and merge base ${merge_base:0:7}"
@@ -1118,7 +1424,7 @@ else
   fi
 fi
 gate_paths=$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)")
-if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
+if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|scripts/check-ai-attribution|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
   bad "this pull request changes the merge gate or a workflow: a verdict about the gate cannot clear a change to the gate, so the merge is the owner's own act"
 fi
 echo

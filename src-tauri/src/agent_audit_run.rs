@@ -23,6 +23,31 @@ use bridge_tax_audit::registry::{self, CallerData};
 /// 53938eb8), on one book with no cash payments: that side was checked at zero.
 pub(super) const ADMITTED: &[&str] = &["cash_44ab"];
 
+mod admitted {
+    use super::ADMITTED;
+
+    /// A test in [`ADMITTED`]: the only kind of name `run_test` takes. Its field
+    /// is private to this module, so outside it only [`AdmittedTest::parse`]
+    /// makes one, and no other ported test can be run through the tool.
+    #[derive(Clone, Copy)]
+    pub(super) struct AdmittedTest(&'static str);
+
+    impl AdmittedTest {
+        pub(super) fn parse(name: &str) -> Option<Self> {
+            ADMITTED
+                .iter()
+                .copied()
+                .find(|admitted| *admitted == name)
+                .map(Self)
+        }
+
+        pub(super) fn name(self) -> &'static str {
+            self.0
+        }
+    }
+}
+use admitted::AdmittedTest;
+
 /// Refused rather than cut short: a result past these is not one a caller
 /// can read whole.
 const MAX_FIGURES: usize = 64;
@@ -31,7 +56,6 @@ const MAX_GROUPS: usize = 20;
 const MAX_GROUP_CHARS: usize = 128;
 
 const REDACTION_UNSUPPORTED: &str = "audit_redaction_unsupported";
-const TEST_NOT_ADMITTED: &str = "audit_test_not_admitted";
 const RESULT_TOO_LARGE: &str = "audit_result_too_large";
 const RESULT_NOT_PROJECTABLE: &str = "audit_result_not_projectable";
 const AUDIT_TEST_REFUSED: &str = "audit_test_refused";
@@ -65,10 +89,11 @@ impl Server {
         if from.as_str() < RULES_YEAR_FROM || to.as_str() > RULES_YEAR_TO {
             return Err(PERIOD_OUTSIDE_RULES.to_string().into());
         }
-        let test = required_string(args, "test")?;
-        if !ADMITTED.contains(&test) {
-            return Err(TEST_NOT_ADMITTED.to_string().into());
-        }
+        // The tool's schema lists `ADMITTED` as the only values of `test`, so
+        // the catalog has refused any other as `argument_invalid:test` before
+        // this runs; the parse makes that a type rather than an assumption.
+        let test = AdmittedTest::parse(required_string(args, "test")?)
+            .ok_or_else(|| "argument_invalid:test".to_string())?;
         let roles = AuditRoles {
             cash_groups: group_list(args, "cash_groups")?,
             bank_groups: group_list(args, "bank_groups")?,
@@ -82,6 +107,17 @@ impl Server {
             return Err(GROUPS_OVERLAP.to_string().into());
         }
         let (company, identity, prior) = self.verified_company(guid).await?;
+        // A lab build with lab writes on reads only the lab's target company,
+        // as every lab tool does, so a book is kept only when the run names it.
+        #[cfg(feature = "lab-writes")]
+        let grant = if lab::env_lab_writes_enabled() {
+            Some(
+                lab::admit_audit_read_capture(self, identity.company_guid())
+                    .map_err(|failure| failure.with_prior_evidence(prior.clone()))?,
+            )
+        } else {
+            None
+        };
         let config = self.tally_config();
         let audit = match read_audit_book(
             &self.runtime,
@@ -96,6 +132,15 @@ impl Server {
             Ok(audit) => audit,
             Err(failure) => return Err(ToolFailure::from(failure.code).with_prior_evidence(prior)),
         };
+        // The read the guards admitted above is kept on this computer, for a
+        // real-book parity record; on success the answer is unchanged.
+        #[cfg(feature = "lab-writes")]
+        if let Some(grant) = grant {
+            lab::persist_audit_read(self, grant, &audit.stored).map_err(|code| {
+                ToolFailure::from(code)
+                    .with_prior_evidence(combine_evidence(prior.clone(), audit.evidence.clone()))
+            })?;
+        }
         let evidence = combine_evidence(prior, audit.evidence);
         let dump = run_test(test, &audit.engagement, &audit.book).map_err(|failure| {
             ToolFailure::from(failure.code).with_prior_evidence(evidence.clone())
@@ -116,7 +161,7 @@ impl Server {
 
 /// The test on the book, as the crate's canonical dump.
 fn run_test(
-    test: &str,
+    test: AdmittedTest,
     engagement: &bridge_tax_audit::Engagement,
     book: &bridge_tax_audit::book::Book,
 ) -> Result<Value, AuditReadFailure> {
@@ -124,7 +169,7 @@ fn run_test(
         code: AUDIT_TEST_REFUSED.to_string(),
         retryable: false,
     };
-    let ported = registry::find(test).ok_or_else(refused)?;
+    let ported = registry::find(test.name()).ok_or_else(refused)?;
     let rules = bridge_tax_audit::rules_for(engagement).map_err(|_| refused())?;
     // A refusal by the test carries the crate's detail, which can name a
     // ledger: only its rule code, when it has one, is kept.

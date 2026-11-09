@@ -1,0 +1,53 @@
+# fixture: tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml
+# parser: parse_native_statement(ProfitAndLoss)
+# source: captured
+Ok(NativeStatement {
+    kind: ProfitAndLoss,
+    lines: [
+        NativeStatementLine {
+            name: "Sales Accounts",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "1600.00",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Cost of Sales :",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "-960.00",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Opening Stock",
+            sub: Present(
+                ExactDecimal(
+                    "-1000.00",
+                ),
+            ),
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Add: Purchase Accounts",
+            sub: Present(
+                ExactDecimal(
+                    "-2600.00",
+                ),
+            ),
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Less: Closing Stock",
+            sub: Present(
+                ExactDecimal(
+                    "-2640.00",
+                ),
+            ),
+            main: Empty,
+        },
+    ],
+})

@@ -451,6 +451,27 @@ def main() -> int:
             client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
             deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
 
+    def tds_interest_201_run():
+        from tae import config as tc
+        from tae.audit_tests import tds_interest_201
+        from tae.pack import _tds_interest_defaults
+        cfg = {"tds": {k: spec[k] for k in ("previous_year_turnover_status",) if k in spec},
+               "tds_payees": {k: spec[k] for k in ("reversals", "gst_separate_by_agreement", "foreseeability")
+                              if k in spec}}
+        payees = tds_payees_run()[1]
+        partners = {k: dict(v) for k, v in spec.get("partners", {}).items()}
+        tds_payable = frozenset(spec.get("tds_payable_ledgers", []))
+        partners_result = partners_40b_194t.run(eng, rules, partners, spec.get("deed"), tds_ledgers=tds_payable)
+        uncertain = (payees.figures[f"{tds_payees.TEST_ID}.deductor_status"].value == "unknown"
+                     or tc.turnover_is_placeholder(cfg))
+        defaults = _tds_interest_defaults(
+            eng, rules, payees, partners_result, uncertain,
+            (dict(spec.get("nature_by_ledger", {})), dict(spec.get("payee_aliases", {})),
+             dict(spec.get("s194j_category_by_ledger", {}))), partners,
+            tc.tds_payees_reversals(cfg), tc.tds_payees_foreseeability(cfg), tc.tds_payees_gst_separate(cfg),
+            frozenset(spec.get("gst_ledgers", [])), tds_payable)
+        return tds_interest_201, tds_interest_201.run(eng, rules, defaults, rules["due_dates"]["audit_report"])
+
     def narration_payees_run():
         from tae.audit_tests import narration_payees
         configured = frozenset(typed(spec, "narration_payee_ledgers",
@@ -538,6 +559,7 @@ def main() -> int:
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),
         "stock": stock_run,
+        "tds_interest_201": tds_interest_201_run,
         "tds_payees": tds_payees_run,
         "tds_tcs_26as": lambda: (tds_tcs_26as, tds_tcs_26as.run(
             eng, rules, form26as=form26as, ais_rows=ais, tis_rows=tis,

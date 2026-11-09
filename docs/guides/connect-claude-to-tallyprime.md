@@ -29,8 +29,11 @@ vouchers is off by default. This page is the short path; the
    [GitHub Releases](https://github.com/ComplyEaze/bridge/releases) page, take
    the `.mcpb` file for your computer from the newest release (normally marked
    Latest; its tag starts with `mcp-`). It is not
-   yet code-signed or notarized, so your computer may warn you before opening
-   it. Each file has a same-named `.sha256` file to check the download against.
+   yet code-signed or notarized. Each file has a same-named `.sha256` file to
+   check the download against; that shows the file arrived whole, not who made
+   it. On Windows, ComplyEaze Bridge also needs Microsoft's Visual C++
+   Redistributable (x64); the [installation guide](../agent/INSTALL.md) has
+   Microsoft's download link.
 3. **If you already have a ComplyEaze Bridge, check which one.** With release
    0.4.2 installed, go on to step 4 and install the new file over it, keeping its
    data folder, which both versions use: a build of 0.5.0 made by our checks (not
@@ -78,7 +81,7 @@ vouchers is off by default. This page is the short path; the
   ComplyEaze Bridge window. No ComplyEaze
   Bridge tool can approve it for you, but software that controls your screen
   could click the window, so do not let it. On Windows the window also takes the
-  keyboard: in one test a typed y approved it while Tally was in front (#1780).
+  keyboard: in one test a typed y approved it while Tally was in front ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)).
   When you ask for a post, stop typing in Tally until you have answered it with
   the mouse. ComplyEaze Bridge cannot
   undo a posted voucher; you correct it in TallyPrime. Read *Before you turn on

@@ -23,15 +23,12 @@ use std::{collections::HashSet, fmt};
 use crate::{
     native_outstandings::NativeLedgerSnapshotPeriod,
     native_statement_reports::{
-        amount, read_text, render_built_in_report_request, NativeStatementAmount,
+        amount, read_text, render_built_in_report_request, BuiltInReport, NativeStatementAmount,
         NativeStatementError,
     },
     native_stock_summary::{quantity, NativeQuantityRead},
     tolerant_xml::sanitize_invalid_numeric_references,
 };
-
-/// The report name Tally's gateway accepts (live capture, 6 Oct 2026).
-const REPORT_ID: &str = "Negative Stock";
 
 /// Renders the only supported request: Tally's own Negative Stock by name over
 /// the period, for the named company. No TDL.
@@ -39,7 +36,7 @@ pub fn render_native_negative_stock_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
-    render_built_in_report_request(REPORT_ID, company, period)
+    render_built_in_report_request(BuiltInReport::NegativeStock, company, period)
 }
 
 /// One item Tally listed in this report, each rate and value exactly as Tally

@@ -516,6 +516,23 @@ fn a_window_of_whole_months_is_read_with_the_balances_the_parse_worked_out() {
 }
 
 #[test]
+fn a_window_tied_by_value_date_is_read_as_one_tied_by_transaction_date_is() {
+    let mut window = august("1000.00", "1179.50");
+    window["tie_out"]["basis"] = json!("statement_rows_by_value_date");
+    let file = StatementFile::read(&with_window(carried(), window)).unwrap();
+    assert_eq!(
+        file.window,
+        Ok(edges(
+            (2026, 8, 1),
+            (2026, 8, 31),
+            "1000.00",
+            "1179.50",
+            true
+        ))
+    );
+}
+
+#[test]
 fn a_window_the_parse_could_not_tie_is_not_established_with_its_reason() {
     for (reason, expected) in [
         (
@@ -1127,6 +1144,7 @@ fn server(directory: &std::path::Path, port: Option<std::net::SocketAddr>) -> Se
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -1734,6 +1752,38 @@ async fn a_company_that_is_not_loaded_is_refused_whatever_the_file_says() {
         assert_eq!(
             response["structuredContent"]["result"]["error"]["code"],
             "company_identity_not_found"
+        );
+        let remediation = response["structuredContent"]["result"]["error"]["remediation"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(remediation.contains("list_companies"), "{response}");
+    }
+}
+
+/// Behaviour change of the amount type (#1872). Before the tie-out compares the file with the
+/// book, it asks the import journal whether the file's vouchers were already built, and it
+/// reads them as a build does. A voucher whose amount is not an import amount (a sign, a zero,
+/// a missing decimal) is refused there, as `proposals_file_invalid`, where the build would
+/// refuse it later; before, the journal check passed it over and the figures were returned.
+/// The leg changed is the customer's, which the tie-out's own reader ignores.
+#[tokio::test]
+async fn a_statement_voucher_with_an_amount_no_build_would_take_is_refused_at_the_tie_out() {
+    for bad in ["300", "-300.00", "0.00", "30O.00", ""] {
+        let simulator = SequenceSimulator::spawn(company_check()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut document = proposals(BANK, Some(whole("2026-08-01", "2026-08-07")));
+        document["vouchers"][0]["entries"][1]["amount"] = json!(bad);
+        let file = publish(directory.path(), &document);
+        let response = tie_out(
+            &server(directory.path(), Some(simulator.address())),
+            &file,
+            "before_build",
+        )
+        .await;
+        assert_eq!(response["isError"], true, "{bad:?} {response}");
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], "proposals_file_invalid",
+            "{bad:?} {response}"
         );
     }
 }

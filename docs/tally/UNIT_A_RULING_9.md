@@ -130,15 +130,14 @@ Tally exposes a `Bills` collection that reportedly returns outstanding bills dir
 would sidestep reconstructing them from vouchers — and would also see opening bills. It was
 **not** probed, deliberately:
 
-- `Bills` is not a verified collection type here, and §5.3a records that an unknown collection
-  `TYPE` returns **no HTTP response at all** and raises a **modal dialog** that blocks the
-  gateway until a human clicks it. That is the failure that once cost ~44 minutes.
+- `Bills` is not a verified collection type here, and an object type Tally does not have
+  blocks the gateway until a person acts at the Tally screen (IMPLEMENTATION_GUIDE §5.3a).
 - The native outstandings path is `<TYPE>Data</TYPE>`, which standing policy forbids extending.
 - Even if it worked, §6.4 already proves Tally's own aggregates ignore the requested window, so
   a native read would need independent verification before it could be trusted.
 
-It remains a live candidate, but it needs a deliberate isolated experiment with someone at the
-Windows box to dismiss a dialog — not an unattended probe while a reconciliation run is pending.
+It remains a live candidate, but only for a deliberate, isolated lab experiment with someone at
+the Tally screen, never an unattended probe while a reconciliation run is pending.
 
 ## 4a. Ageing ran from the wrong date — the third corpus blind spot
 

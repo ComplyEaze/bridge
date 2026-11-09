@@ -387,7 +387,10 @@ trap.** A difference is a finding for a person, not a work item for code. On
 the observed instance §9.7 verified that voucher `Alter` returns
 `CREATED=1, ALTERED=0` and **makes a duplicate while leaving the target
 untouched** — tested against four different keys, all four duplicating — and
-that `Cancel` behaves the same way (§9.6). Only `Delete` works, keyed by
+that a `Cancel` sent with a hand-built request behaved the same way (§9.6).
+§9.14 later saw a `Cancel` carrying the full voucher body and its creation
+`REMOTEID` cancel the voucher in place (PARTIAL, one run, another instance);
+which difference decides is not established. `Delete` works, keyed by
 `REMOTEID`. So a caller that reads "amount differs" and reaches for an `Alter`
 to correct it would create the very duplicate this whole contract exists to
 prevent, and Tally's counters would report success.

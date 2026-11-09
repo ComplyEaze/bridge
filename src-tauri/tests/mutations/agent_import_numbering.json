@@ -1,0 +1,502 @@
+{
+  "file": "src-tauri/src/agent_import_numbering.rs",
+  "commit": "026ba163dfcbf75d515a24d0dbbf14c5245534ec",
+  "tool": "cargo-mutants 27.1.0",
+  "command": "cargo mutants --in-place -p bridge --file src/agent_import_numbering.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv/)'",
+  "tests": "the 1,873 bridge tests whose names match the filter, with the approval stand-in example built; a mutant is caught only by a failing test, so the filter can only leave a mutant alive, never mark one caught",
+  "time": "2026-10-29T21:36:54.139193Z",
+  "summary": {
+    "mutants": 25,
+    "caught": 18,
+    "missed": 0,
+    "timeout": 0,
+    "unviable": 7
+  },
+  "results": {
+    "149:7 replace * with +": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_post_refusing_every_voucher_type_is_answered_whole_at_the_guidance_budget"
+    },
+    "149:7 replace * with /": {
+      "verdict": "unviable",
+      "reason": "does not compile: the budget's compile-time floor assertion fails"
+    },
+    "171:9 replace OwnNumber::of -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the return type has no Default"
+    },
+    "172:29 replace match guard !number.trim().is_empty() with true in OwnNumber::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::numbering_tests::a_blank_voucher_number_is_no_number"
+    },
+    "172:29 replace match guard !number.trim().is_empty() with false in OwnNumber::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal"
+    },
+    "172:29 delete ! in OwnNumber::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal"
+    },
+    "208:9 replace NumberingRefusal::code -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+    },
+    "208:9 replace NumberingRefusal::code -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+    },
+    "211:35 replace == with != in NumberingRefusal::code": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+    },
+    "226:9 replace NumberingRefusal::message -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_post_refusing_every_voucher_type_is_answered_whole_at_the_guidance_budget"
+    },
+    "226:9 replace NumberingRefusal::message -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_post_refusing_every_voucher_type_is_answered_whole_at_the_guidance_budget"
+    },
+    "245:9 replace NumberingRefusal::refused_types -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+    },
+    "277:5 replace reading -> Reading with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the return type has no Default"
+    },
+    "372:5 replace admit_numbering -> Result<NumberingAdmission, NumberingRefusal> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the return type has no Default"
+    },
+    "377:46 replace && with || in admit_numbering": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+    },
+    "377:36 replace == with != in admit_numbering": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::numbering_tests::a_type_holding_numbered_and_numberless_vouchers_is_named_once"
+    },
+    "402:8 delete ! in admit_numbering": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_attempted_while_approval_is_pending_is_refused_by_name"
+    },
+    "435:9 replace NumberingAdmission::admit_at_binding -> Result<(), ApprovedImportAdmissionError> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_master_saved_after_the_numbering_read_is_refused_before_the_post"
+    },
+    "435:12 delete ! in NumberingAdmission::admit_at_binding": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_attempted_while_approval_is_pending_is_refused_by_name"
+    },
+    "439:27 replace match guard mark == self.master_mark with true in NumberingAdmission::admit_at_binding": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_master_saved_after_the_numbering_read_is_refused_before_the_post"
+    },
+    "439:27 replace match guard mark == self.master_mark with false in NumberingAdmission::admit_at_binding": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_changed_while_approval_is_pending_is_refused_by_name"
+    },
+    "439:32 replace == with != in NumberingAdmission::admit_at_binding": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_attempted_while_approval_is_pending_is_refused_by_name"
+    },
+    "456:9 replace <impl From<NumberingFailure> for ToolFailure>::from -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the return type has no Default"
+    },
+    "473:9 replace Server::admit_voucher_numbering -> Result<NumberingAdmission, NumberingFailure> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the return type has no Default"
+    },
+    "500:9 replace Server::admit_numbering_for_post -> Result<NumberingAdmission, NumberingFailure> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the return type has no Default"
+    }
+  },
+  "hand_mutations": {
+    "about": "single-change mutants written by hand for what the tool could not mutate: each verdict, guard, comparison and pair of arms of reading(), and the two Server admit functions with From<NumberingFailure> for ToolFailure. Each is applied as exact text edits to the file at the commit above and run with the same test filter (nextest stops at the first failure). before_this_change is the verdict before this change's three tests.",
+    "results": {
+      "H01": {
+        "what": "reading: Automatic with Auto Retain refuses (verdict swapped)",
+        "edits": [
+          {
+            "from": "NumberingSubMethod::AutoRetain => (\n                            None,",
+            "to": "NumberingSubMethod::AutoRetain => (\n                            not_retain,"
+          }
+        ],
+        "mutation": "819761e5fa65fba7",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_batch_attempted_while_approval_is_pending_is_refused_by_name"
+      },
+      "H02": {
+        "what": "reading: Automatic with Renumber admits (verdict swapped)",
+        "edits": [
+          {
+            "from": "NumberingSubMethod::AutoRenumber => (\n                            not_retain,",
+            "to": "NumberingSubMethod::AutoRenumber => (\n                            None,"
+          }
+        ],
+        "mutation": "5a6054cc624568cb",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+      },
+      "H03": {
+        "what": "reading: an unrecognised sub-method admits (verdict swapped)",
+        "edits": [
+          {
+            "from": "NumberingSubMethod::Unrecognised(_) => (\n                            not_retain,",
+            "to": "NumberingSubMethod::Unrecognised(_) => (\n                            None,"
+          }
+        ],
+        "mutation": "081375b6a89b6612",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_post_refusing_every_voucher_type_is_answered_whole_at_the_guidance_budget"
+      },
+      "H04": {
+        "what": "reading: an absent sub-method admits (verdict swapped)",
+        "edits": [
+          {
+            "from": "NumberingSubMethod::Absent => (\n                            not_retain,",
+            "to": "NumberingSubMethod::Absent => (\n                            None,"
+          }
+        ],
+        "mutation": "b94b71acb099c918",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_journal_into_a_journal_type_that_prints_no_sub_method_is_refused_before_the_approval"
+      },
+      "H05": {
+        "what": "reading: Renumber refuses as not_automatic, not not_retain (reason swapped)",
+        "edits": [
+          {
+            "from": "NumberingSubMethod::AutoRenumber => (\n                            not_retain,",
+            "to": "NumberingSubMethod::AutoRenumber => (\n                            Some(RefusalReason::NotAutomatic),"
+          }
+        ],
+        "mutation": "5d5e526e7bd1aa06",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+      },
+      "H06": {
+        "what": "reading: Manual with a number and duplicates prevented refuses (verdict swapped)",
+        "edits": [
+          {
+            "from": "(OwnNumber::Carried, true) => Reading {\n                        reason: None,",
+            "to": "(OwnNumber::Carried, true) => Reading {\n                        reason: Some(RefusalReason::NotAutomatic),"
+          }
+        ],
+        "mutation": "239ed78c1c33f393",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal"
+      },
+      "H07": {
+        "what": "reading: Manual with a number admits whatever the duplicate setting (guard dropped)",
+        "edits": [
+          {
+            "from": "(OwnNumber::Carried, true) => Reading {",
+            "to": "(OwnNumber::Carried, _) => Reading {"
+          }
+        ],
+        "mutation": "ce63484d1d87fcb5",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H08": {
+        "what": "reading: Manual treats every voucher as carrying a number (guard dropped)",
+        "edits": [
+          {
+            "from": "match (number, prevented) {",
+            "to": "match (OwnNumber::Carried, prevented) {"
+          }
+        ],
+        "mutation": "005fba4eb0d5c7e0",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_refusal_on_a_later_voucher_is_not_missed"
+      },
+      "H09": {
+        "what": "reading: duplicates read as prevented when they are not (comparison flipped)",
+        "edits": [
+          {
+            "from": "let prevented = matches!(duplicates, DuplicateSetting::Prevented);",
+            "to": "let prevented = matches!(duplicates, DuplicateSetting::NotPrevented);"
+          }
+        ],
+        "mutation": "c61e5ae717765485",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read"
+      },
+      "H10": {
+        "what": "reading: duplicates always read as prevented (guard dropped)",
+        "edits": [
+          {
+            "from": "let prevented = matches!(duplicates, DuplicateSetting::Prevented);",
+            "to": "let prevented = true;"
+          }
+        ],
+        "mutation": "3b540eaf8ede9dfb",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H11": {
+        "what": "reading: Automatic (Manual Override) admits (verdict swapped)",
+        "edits": [
+          {
+            "from": "SeriesNumberingMethod::AutomaticManualOverride => not_automatic(\n                    observed(\"automatic_manual_override\"),\n                    \"is numbered Automatic (Manual Override)\",\n                ),",
+            "to": "SeriesNumberingMethod::AutomaticManualOverride => Reading {\n                    reason: None,\n                    observed: observed(\"automatic_manual_override\"),\n                    in_words: \"is numbered Automatic (Manual Override)\",\n                },"
+          }
+        ],
+        "mutation": "c7458da21ecdfc0f",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H12": {
+        "what": "reading: an unrecognised method admits (verdict swapped)",
+        "edits": [
+          {
+            "from": "SeriesNumberingMethod::Unrecognised(_) => not_automatic(\n                    observed(\"unrecognised\"),\n                    \"has a numbering method ComplyEaze Bridge does not recognise\",\n                ),",
+            "to": "SeriesNumberingMethod::Unrecognised(_) => Reading {\n                    reason: None,\n                    observed: observed(\"unrecognised\"),\n                    in_words: \"has a numbering method ComplyEaze Bridge does not recognise\",\n                },"
+          }
+        ],
+        "mutation": "0f1e2788f6102645",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H13": {
+        "what": "reading: a type without exactly one series admits (verdict swapped)",
+        "edits": [
+          {
+            "from": "Some(VoucherTypeNumbering::SeriesCount(count)) => not_automatic(\n            json!({\"observation\": \"series_count\", \"count\": count}),\n            \"does not have exactly one number series\",\n        ),",
+            "to": "Some(VoucherTypeNumbering::SeriesCount(count)) => Reading {\n            reason: None,\n            observed: json!({\"observation\": \"series_count\", \"count\": count}),\n            in_words: \"does not have exactly one number series\",\n        },"
+          }
+        ],
+        "mutation": "84c7a94d1eba98a1",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H14": {
+        "what": "reading: unreadable numbering settings admit (verdict swapped)",
+        "edits": [
+          {
+            "from": "Some(VoucherTypeNumbering::FieldInvalid(code)) => not_automatic(\n            json!({\"observation\": \"field_invalid\", \"code\": code}),\n            \"has numbering settings ComplyEaze Bridge could not read\",\n        ),",
+            "to": "Some(VoucherTypeNumbering::FieldInvalid(code)) => Reading {\n            reason: None,\n            observed: json!({\"observation\": \"field_invalid\", \"code\": code}),\n            in_words: \"has numbering settings ComplyEaze Bridge could not read\",\n        },"
+          }
+        ],
+        "mutation": "825d4c5698de4297",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H15": {
+        "what": "reading: a type the read does not hold admits (verdict swapped)",
+        "edits": [
+          {
+            "from": "None => not_automatic(\n            json!({\"observation\": \"absent\"}),\n            \"was not among the voucher types Tally returned\",\n        ),",
+            "to": "None => Reading {\n            reason: None,\n            observed: json!({\"observation\": \"absent\"}),\n            in_words: \"was not among the voucher types Tally returned\",\n        },"
+          }
+        ],
+        "mutation": "1eb9e38606fab765",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H16": {
+        "what": "reading: the two duplicate settings' names swapped (arms swapped)",
+        "edits": [
+          {
+            "from": "DuplicateSetting::Prevented => \"prevented\",\n                DuplicateSetting::NotPrevented => \"not_prevented\",",
+            "to": "DuplicateSetting::Prevented => \"not_prevented\",\n                DuplicateSetting::NotPrevented => \"prevented\","
+          }
+        ],
+        "mutation": "b3b3d7e562a71f3f",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+      },
+      "H17": {
+        "what": "reading: the unrecognised and absent sub-methods' names swapped (arms swapped)",
+        "edits": [
+          {
+            "from": "\"unrecognised\",\n                            \"is numbered Automatic, with",
+            "to": "\"absent\",\n                            \"is numbered Automatic, with"
+          },
+          {
+            "from": "\"absent\",\n                            \"is numbered Automatic, and Tally",
+            "to": "\"unrecognised\",\n                            \"is numbered Automatic, and Tally"
+          }
+        ],
+        "mutation": "06778094a99fafcb",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_journal_into_a_journal_type_that_prints_no_sub_method_is_refused_before_the_approval"
+      },
+      "H18": {
+        "what": "reading: the Renumber and Retain sub-methods' names swapped (arms swapped)",
+        "edits": [
+          {
+            "from": "\"auto_retain\",",
+            "to": "\"auto_renumber_x\","
+          },
+          {
+            "from": "\"auto_renumber\",",
+            "to": "\"auto_retain\","
+          },
+          {
+            "from": "\"auto_renumber_x\",",
+            "to": "\"auto_renumber\","
+          }
+        ],
+        "mutation": "585e6f2f9bc1419c",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+      },
+      "H19": {
+        "what": "reading: the two Manual refusals' words swapped (arms swapped)",
+        "edits": [
+          {
+            "from": "\"is numbered Manual and does not prevent duplicate voucher numbers\",",
+            "to": "\"is numbered Manual\","
+          },
+          {
+            "from": "not_automatic(observed(\"manual\"), \"is numbered Manual\")",
+            "to": "not_automatic(observed(\"manual\"), \"is numbered Manual and does not prevent duplicate voucher numbers\")"
+          }
+        ],
+        "mutation": "33fb6eb3ececf3c5",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only"
+      },
+      "H20": {
+        "what": "reading: the Automatic reading drops its sub-method (statement deleted)",
+        "edits": [
+          {
+            "from": "said[\"sub_method\"] = json!(sub_method);",
+            "to": "let _ = sub_method;"
+          }
+        ],
+        "mutation": "2003c4cb1d7f7c91",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval"
+      },
+      "H21": {
+        "what": "reading: the Manual Override and unrecognised methods' names swapped (arms swapped)",
+        "edits": [
+          {
+            "from": "observed(\"automatic_manual_override\")",
+            "to": "observed(\"unrecognised_x\")"
+          },
+          {
+            "from": "observed(\"unrecognised\")",
+            "to": "observed(\"automatic_manual_override\")"
+          },
+          {
+            "from": "observed(\"unrecognised_x\")",
+            "to": "observed(\"unrecognised\")"
+          }
+        ],
+        "mutation": "7b847fdf010db8ba",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::numbering_tests::every_reading_other_than_automatic_refuses_and_says_what_was_read"
+      },
+      "S01": {
+        "what": "admit_voucher_numbering: the numbering read's evidence is not added",
+        "edits": [
+          {
+            "from": "*accumulated = combine_evidence(\n            accumulated.clone(),\n            evidence_from_runtime_read(read.evidence().clone()),\n        );",
+            "to": "let _ = evidence_from_runtime_read(read.evidence().clone());"
+          }
+        ],
+        "mutation": "90fe8e4d98d7fb85",
+        "verdict": "caught",
+        "killer": "agent::agent_import::tests::mode_tests::import_build_rechecks_captured_catalogue_before_persistence"
+      },
+      "S02": {
+        "what": "admit_voucher_numbering: a failed numbering read takes another code",
+        "edits": [
+          {
+            "from": "ToolFailure::from_runtime(\"masters_read_failed\", error)",
+            "to": "ToolFailure::from_runtime(\"tally_unreachable\", error)"
+          }
+        ],
+        "mutation": "a727a546d6ddc8a6",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_numbering_read_whose_answer_is_cut_short_fails_as_a_masters_read",
+        "before_this_change": "missed"
+      },
+      "S03": {
+        "what": "admit_numbering_for_post: the mark read's evidence is not added",
+        "edits": [
+          {
+            "from": "*accumulated = combine_evidence(accumulated.clone(), evidence);",
+            "to": "let _ = evidence;"
+          }
+        ],
+        "mutation": "13254b36afe00ec4",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::the_master_mark_read_before_the_numbering_is_in_the_refusals_evidence",
+        "before_this_change": "missed"
+      },
+      "S04": {
+        "what": "admit_numbering_for_post: an unobserved master mark reads as 0",
+        "edits": [
+          {
+            "from": "let master_mark = mark.master_value.ok_or_else(|| {\n            NumberingFailure::Read(ToolFailure::from(\"pre_import_mark_unobserved\".to_string()))\n        })?;",
+            "to": "let master_mark = mark.master_value.unwrap_or_default();"
+          }
+        ],
+        "mutation": "2b33912ed0cb4a66",
+        "verdict": "missed"
+      },
+      "S05": {
+        "what": "admit_numbering_for_post: every voucher is admitted as carrying no number",
+        "edits": [
+          {
+            "from": ".map(|voucher| voucher.numbering_at_post()),",
+            "to": ".map(|voucher| (voucher.numbering_at_post().0, OwnNumber::Absent)),"
+          }
+        ],
+        "mutation": "f1b2b1ac899705d1",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal"
+      },
+      "S06": {
+        "what": "admit_numbering_for_post: every voucher is admitted as carrying a number",
+        "edits": [
+          {
+            "from": ".map(|voucher| voucher.numbering_at_post()),",
+            "to": ".map(|voucher| (voucher.numbering_at_post().0, OwnNumber::Carried)),"
+          }
+        ],
+        "mutation": "c0578aba3c42ea92",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_journal_into_a_manual_journal_type_preventing_duplicates_is_refused_before_the_approval",
+        "before_this_change": "missed"
+      },
+      "S07": {
+        "what": "admit_numbering_for_post: the numbering is read under another master mark",
+        "edits": [
+          {
+            "from": "            master_mark,\n            payload",
+            "to": "            master_mark.saturating_add(1),\n            payload"
+          }
+        ],
+        "mutation": "ae3ab27a56a2a8c7",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_batch_gone_from_the_journal_under_the_lock_is_refused_by_name"
+      },
+      "S08": {
+        "what": "From<NumberingFailure>: a refusal always takes the not-retain code",
+        "edits": [
+          {
+            "from": "ToolFailure::from(refusal.code().to_string())",
+            "to": "ToolFailure::from(NUMBERING_NOT_RETAIN.to_string())"
+          }
+        ],
+        "mutation": "1d26c17ba24adc4e",
+        "verdict": "caught",
+        "killer": "agent::agent_import::post::e2e_tests::a_journal_into_a_manual_journal_type_is_refused_before_the_approval"
+      }
+    }
+  },
+  "accepted_survivors": {
+    "S04": {
+      "mutation": "2b33912ed0cb4a66",
+      "reason": "equivalent, by the code path: admit_numbering_for_post takes its mark from pre_import_mark, whose only source, company_high_water_mark (agent_import_verification.rs), refuses a missing ALTMSTID with pre_import_mark_unobserved first, so master_value is always Some here and the ok_or_else this mutant removes cannot fail"
+    }
+  }
+}

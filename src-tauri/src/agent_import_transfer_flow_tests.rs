@@ -4,9 +4,14 @@
 //! and every row, amount and reference is invented.
 use super::bank_tests::{
     bank_build_plans, bank_server, captured_bank_payload, record, skip_only_plans, statement_v2,
-    two_bank_plans,
+    two_bank_plans, THROUGH_BANK_NUMBERING,
 };
 use super::*;
+
+/// A synthetic GUID: version 4 shape, zeros, then `n` in hex.
+fn guid(n: u128) -> String {
+    uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | n).to_string()
+}
 
 /// `n` behind zeros to `width` characters.
 fn padn(n: u64, width: usize) -> String {
@@ -161,6 +166,12 @@ async fn run(directory: &Path, plans: Vec<ScenarioPlan>, args: Value) -> Value {
 
 fn admission_plans() -> Vec<ScenarioPlan> {
     two_bank_plans()[..REFUSED_AT_ADMISSION].to_vec()
+}
+
+/// A day read of a `tally_unchecked` row's window (#1392), refused at its first
+/// request: the row stays `tally_unchecked`.
+fn day_read_refused() -> ScenarioPlan {
+    ScenarioPlan::new(Fixture::SyntheticXml("<ENVELOPE/>".into())).with_http_status(500)
 }
 
 fn journal(directory: &Path) -> Server {
@@ -947,6 +958,7 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -1403,6 +1415,7 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
             skip_only_plans(),
             two_bank_plans(),
             skip_only_plans(),
+            vec![day_read_refused()],
             admission_plans(),
         ]
         .concat(),
@@ -1427,7 +1440,8 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(skipped_row(), "not_found", None)],
+        // the row's day was asked for and refused, so the absence is not claimed
+        vec![open_row(skipped_row(), "tally_unchecked", None)],
         "{again}"
     );
     // and the paired row is not one to withdraw
@@ -1544,20 +1558,34 @@ async fn a_transfer_posted_inline_leaves_the_other_skip_not_established_rather_t
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
-        [skip_only_plans(), skip_only_plans(), two_bank_plans()].concat(),
+        [
+            skip_only_plans(),
+            skip_only_plans(),
+            vec![day_read_refused()],
+            two_bank_plans(),
+        ]
+        .concat(),
     );
     rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let mut b_skip = record(b_skipped(), json!("skipped"), BANK_A, "inflow", false);
     b_skip["reference"] = Value::Null;
-    rig.build(statement_v2(
-        directory.path(),
-        BANK_B,
-        window(),
-        json!([]),
-        json!([b_skip]),
-    ))
-    .await;
+    // both statements now cover the day, so the skips' day is asked for
+    let recorded = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_B,
+            window(),
+            json!([]),
+            json!([b_skip]),
+        ))
+        .await;
+    assert!(
+        open_rows(&recorded["transfers"])
+            .iter()
+            .all(|row| row["state"] == "tally_unchecked"),
+        "{recorded}"
+    );
     let built = rig
         .build(json!({"company_guid": CAPTURED_GUID,
             "vouchers": [contra_voucher(b_skipped())], "withdraw_skips": [b_skipped()]}))
@@ -1592,6 +1620,7 @@ fn server_with_cap(directory: &Path, port: u16, max_bytes: usize) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -2080,7 +2109,7 @@ fn an_unreadable_journal_stops_the_view_and_the_verification_section() {
     let error = {
         let _lock = server.lock_import_admission().unwrap();
         server
-            .transfer_view_while_admitted(&canonical_batch_guid(CAPTURED_GUID), None)
+            .transfer_view_while_admitted(&canonical_batch_guid(CAPTURED_GUID), None, None)
             .unwrap_err()
     };
     assert!(
@@ -2389,4 +2418,499 @@ async fn a_written_record_is_answered_without_its_section_before_it_is_called_to
         "computed"
     );
     assert_eq!(wide["structuredContent"]["truncated"], false);
+}
+
+// ---- the transfer check at send -----------------------------------------------------
+
+pub(super) const TRANSFER_REASONS: [&str; 6] = [
+    "skip_row_already_posted",
+    "withdraw_skip_invalid",
+    "withdraw_skip_paired",
+    "skip_row_paired_elsewhere",
+    "transfer_double_booked",
+    "transfer_view_not_established",
+];
+
+/// What a post says went wrong: the error of an outcome, or of a failure.
+pub(super) async fn post_error(server: &Server, batch_id: &str) -> Value {
+    let args = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    match server.post_import(&args).await {
+        Ok(outcome) => outcome.payload["result"]["error"].clone(),
+        Err(failure) => json!({"code": failure.code}),
+    }
+}
+
+/// A post that went past the transfer check: it is not refused for a transfer
+/// reason, and its next step, a read of Tally, reached the rig (whose last plan
+/// answers it and is not a Tally the post can use). Returns what the post said.
+async fn past_the_transfer_check(rig: &Rig, batch_id: &str) -> Value {
+    let before = rig.simulator.received();
+    let error = post_error(&rig.server, batch_id).await;
+    let code = error["code"].as_str().unwrap_or_default();
+    assert!(!TRANSFER_REASONS.contains(&code), "{error}");
+    assert!(
+        rig.simulator.received() > before,
+        "the post stopped before it read Tally: {error}"
+    );
+    error
+}
+
+/// The record a verification before a send writes for a batch never sent.
+fn mark_unverified(directory: &Path, batch_id: &str) {
+    let server = journal(directory);
+    let mut line = latest(directory, batch_id);
+    line.status = "verification_incomplete".into();
+    let record = ledger::StatusRecord::from(&line);
+    let _admission = server.lock_import_admission().unwrap();
+    server.append_import_record_while_admitted(&record).unwrap();
+}
+
+/// A skip withdrawn while nothing carried it, built and never sent; then the
+/// other statement's Contra, verified, which does carry it.
+#[tokio::test]
+async fn a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_batch_is_sent() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let first = rig.build(withdrawing(directory.path())).await;
+    let batch_id = first["batch_id"].as_str().unwrap().to_string();
+    let carrying = rig
+        .build(contra_statement(directory.path(), BANK_B, booked(), None))
+        .await;
+    let carrier = carrying["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &carrier);
+    // the pre-send read of Tally has recorded its status, as it does
+    mark_unverified(directory.path(), &batch_id);
+    let before = fs::read(directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    let error = post_error(&rig.server, &batch_id).await;
+    assert_eq!(error["code"], "withdraw_skip_paired", "{error}");
+    let rows = error["paired_rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "{error}");
+    assert_eq!(rows[0]["bridge_txn_id"], skipped_row());
+    assert_eq!(rows[0]["batch_id"], carrier.as_str());
+    let step = error["next_step"].as_str().unwrap();
+    assert!(
+        step.starts_with(
+            "Nothing was sent to Tally, and any approval of this batch is withdrawn. "
+        ),
+        "{step}"
+    );
+    assert!(
+        step.ends_with(" This batch cannot be sent as built: build this statement again with the rows in paired_rows still skipped, not named in withdraw_skips."),
+        "{step}"
+    );
+    // nothing was written: no intent, no status
+    let after = fs::read(directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    assert_eq!(before, after);
+}
+
+/// What the build read, the send reads again: a batch whose facts are as they
+/// were when it was built, with a verification written for it before the send,
+/// passes.
+#[tokio::test]
+async fn an_unchanged_statement_batch_passes_the_transfer_check_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let first = rig.build(withdrawing(directory.path())).await;
+    let batch_id = first["batch_id"].as_str().unwrap().to_string();
+    mark_unverified(directory.path(), &batch_id);
+    past_the_transfer_check(&rig, &batch_id).await;
+}
+
+/// Two builds withdrew the row and neither was sent: sending one judges the row
+/// the other holds as a build of it would, so the explicit choice of the person
+/// who withdrew it stands.
+#[tokio::test]
+async fn sending_one_of_two_unsent_holders_judges_the_row_held_by_the_other() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let carrying = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_B,
+            window(),
+            json!([contra_voucher(booked()), contra_voucher(other_booked())]),
+            json!([
+                contra_record(booked(), None),
+                contra_record(other_booked(), None)
+            ]),
+        ))
+        .await;
+    mark_found(directory.path(), carrying["batch_id"].as_str().unwrap());
+    let first = rig.build(withdrawing(directory.path())).await;
+    let batch_id = first["batch_id"].as_str().unwrap().to_string();
+    // a second build of the same withdrawal, as the first build left it
+    let mut second = latest(directory.path(), &batch_id);
+    second.batch_id = format!("bridge-{}", guid(0x999));
+    journal(directory.path())
+        .append_import_ledger(&second)
+        .unwrap();
+    mark_unverified(directory.path(), &batch_id);
+    past_the_transfer_check(&rig, &batch_id).await;
+}
+
+/// An inline build (vouchers given directly, no statement) that names a skip in
+/// `withdraw_skips` records the withdrawal on the batch, so the check at send
+/// judges it as the build did and does not refuse the row it withdrew.
+#[tokio::test]
+async fn an_inline_build_that_withdraws_a_skip_records_it_and_is_not_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let built = rig
+        .build(json!({"company_guid": CAPTURED_GUID,
+            "vouchers": [contra_voucher(skipped_row())], "withdraw_skips": [skipped_row()]}))
+        .await;
+    let batch_id = built["batch_id"].as_str().unwrap().to_string();
+    // no statement was given, and the withdrawal is on the record all the same
+    let line = latest(directory.path(), &batch_id);
+    assert!(line.statement.is_none(), "{built}");
+    assert_eq!(line.withdrawn_skips, Some(vec![skipped_row().to_string()]));
+    past_the_transfer_check(&rig, &batch_id).await;
+}
+
+/// The withdrawal counts only if it was built after the newest record of the
+/// skip, as the facts judge a posted holder: here a skip of the same row is
+/// recorded after the inline build that withdrew the first, so the batch is
+/// refused at send, and a build naming the row again is newer and goes through.
+#[tokio::test]
+async fn a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let inline = json!({"company_guid": CAPTURED_GUID,
+        "vouchers": [contra_voucher(skipped_row())], "withdraw_skips": [skipped_row()]});
+    let old = rig.build(inline.clone()).await;
+    let old = old["batch_id"].as_str().unwrap().to_string();
+    // another record of the skip, after the withdrawal
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let error = post_error(&rig.server, &old).await;
+    assert_eq!(error["code"], "skip_row_paired_elsewhere", "{error}");
+    assert_eq!(error["skipped_rows"], json!([skipped_row()]), "{error}");
+    // the same inline build now is newer than the skip, and is not refused
+    let new = rig.build(inline).await;
+    let new = new["batch_id"].as_str().unwrap().to_string();
+    past_the_transfer_check(&rig, &new).await;
+}
+
+/// A skip of a row that another batch has since posted is refused at send: the
+/// batch would say that the other account carries a transfer this company
+/// already booked.
+#[tokio::test]
+async fn a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), two_bank_plans()].concat(),
+    );
+    // a batch with a Contra and a skipped row, built and never sent
+    let skipping = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_A,
+            window(),
+            json!([contra_voucher(booked())]),
+            json!([
+                contra_record(booked(), None),
+                skip_record(BANK_A, skipped_row(), None)
+            ]),
+        ))
+        .await;
+    let skipping = skipping["batch_id"].as_str().unwrap().to_string();
+    // a newer build posts the skipped row, which is allowed, and is sent
+    let posting = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_A,
+            skipped_row(),
+            None,
+        ))
+        .await;
+    let posting = posting["batch_id"].as_str().unwrap().to_string();
+    mark_sent(directory.path(), &posting);
+    let error = post_error(&rig.server, &skipping).await;
+    assert_eq!(error["code"], "skip_row_already_posted", "{error}");
+    assert_eq!(error["blocking_batch_id"], posting.as_str(), "{error}");
+    assert_eq!(error["skipped_rows"], json!([skipped_row()]), "{error}");
+    let step = error["next_step"].as_str().unwrap();
+    assert!(
+        step.starts_with(
+            "Nothing was sent to Tally, and any approval of this batch is withdrawn. "
+        ),
+        "{step}"
+    );
+    assert!(
+        step.ends_with(" This batch cannot be sent as built: build it again."),
+        "{step}"
+    );
+}
+
+/// The batch being sent is left out of the journal the check reads, whatever its
+/// own latest status says. Were it read with that status, a batch found posted
+/// would retire the skip its own withdrawal names, and the check would refuse
+/// the withdrawal as one of a skip that is not there.
+#[tokio::test]
+async fn a_batch_with_a_found_status_keeps_its_withdrawal_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let first = rig.build(withdrawing(directory.path())).await;
+    let id = first["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &id);
+    let mut line = latest(directory.path(), &id);
+    assert_eq!(line.status, "posted_verified");
+    // built after the skip it names, as a withdrawal is
+    line.built_at = "2999-01-01T00:00:00Z".into();
+    let _lock = rig.server.lock_import_admission_shared().unwrap();
+    let refusal = rig
+        .server
+        .transfers_refusal_for_send_while_admitted(&line)
+        .unwrap();
+    assert!(
+        refusal.is_none(),
+        "{:?}",
+        refusal.map(|refusal| refusal.reason())
+    );
+}
+
+/// A build reads its rows' windows after the mark and the numbering read and
+/// before the catalogue repeat and the write (#1392): the scripted refusal is
+/// answered to the first day read in that place, the build is written, and its
+/// row stays `tally_unchecked` with the planned days kept.
+#[tokio::test]
+async fn a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write() {
+    fn b_skipped() -> &'static str {
+        static TEXT: std::sync::LazyLock<String> =
+            std::sync::LazyLock::new(|| format!("st-20260901-{}b3", padn(0, 14)));
+        &TEXT
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let mut build = two_bank_plans();
+    build.insert(THROUGH_BANK_NUMBERING, day_read_refused());
+    let rig = Rig::new(directory.path(), [skip_only_plans(), build].concat());
+    // bank B's statement of only a skipped row covers the day
+    let mut b_skip = record(b_skipped(), json!("skipped"), BANK_A, "inflow", false);
+    b_skip["reference"] = Value::Null;
+    rig.build(statement_v2(
+        directory.path(),
+        BANK_B,
+        window(),
+        json!([]),
+        json!([b_skip]),
+    ))
+    .await;
+    // bank A's statement books a Contra of another amount and skips a row: the
+    // skip has no candidate, so its window is asked for
+    let mut voucher = contra_voucher(booked());
+    for entry in voucher["entries"].as_array_mut().unwrap() {
+        entry["amount"] = json!("99.00");
+    }
+    let mut contra = record(
+        booked(),
+        json!({"voucher": "Contra"}),
+        BANK_B,
+        "outflow",
+        false,
+    );
+    contra["amount"] = json!("99.00");
+    contra["reference"] = Value::Null;
+    let answer = rig
+        .server
+        .call_tool_response(
+            "build_import_xml",
+            statement_v2(
+                directory.path(),
+                BANK_A,
+                window(),
+                json!([voucher]),
+                json!([contra, skip_record(BANK_A, skipped_row(), None)]),
+            ),
+        )
+        .await
+        .value["structuredContent"]
+        .clone();
+    let built = &answer["result"];
+    assert!(built["batch_id"].is_string(), "{built}");
+    // a read refused before any answer came back adds nothing to the evidence:
+    // what the evidence holds of a failed read is the answers that came back
+    assert_eq!(answer["evidence"]["state"], "complete", "{answer}");
+    let section = &built["transfers"];
+    assert!(
+        open_rows(section).contains(&open_row(skipped_row(), "tally_unchecked", None)),
+        "{built}"
+    );
+    let kept = section["day_reads"]["kept"].as_array().unwrap();
+    assert_eq!(
+        kept.iter()
+            .map(|day| day["date"].clone())
+            .collect::<Vec<_>>(),
+        [json!("20260902"), json!("20260901"), json!("20260831")]
+    );
+    assert_ne!(kept[0]["cause"], "day_read_not_attempted");
+    assert_eq!(kept[1]["cause"], "day_read_not_attempted");
+    rig.finish();
+}
+
+/// The lab run's book through the tool (#1392). Bank A's statement skips its 13
+/// April row as carried by Bank B's Contra, and Bank B's statement skips its own
+/// row of the transfer the other way. Once both statements cover the day, the
+/// second record reads the window of 12 to 14 April: Bank A's row is
+/// `not_found` and Bank B's is `tally_unchecked`, as 13 April holds an entry on
+/// Bank A. The company's identity answers are synthetic; the catalogue and every
+/// day read are the captures.
+#[tokio::test]
+async fn a_skip_only_record_renders_not_found_from_the_lab_runs_captured_days() {
+    use crate::agent::transfer_pairing::tests::whole_day::{
+        run_day, utf16, LAB, LAB_GUID, T_CAT2, T_M2,
+    };
+    fn row(bank: &str) -> String {
+        format!("st-20260413-{}{bank}", padn(0, 14))
+    }
+    let company = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME=\"{LAB}\"><GUID>{LAB_GUID}</GUID><COMPANYNUMBER>1</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
+    let plan = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let status = || {
+        ScenarioPlan::new(Fixture::ProductStatus(
+            tally_protocol_simulator::ProductStatus::TallyPrime,
+        ))
+        .with_framing(ResponseFraming::ContentLength)
+    };
+    // one identity-bracketed, paired read
+    let bracketed = |answer: String| {
+        vec![
+            plan(company.clone()),
+            plan(answer.clone()),
+            status(),
+            plan(answer),
+            status(),
+            plan(company.clone()),
+        ]
+    };
+    let record_plans = || {
+        [
+            vec![
+                plan(company.clone()),
+                status(),
+                plan(company.clone()),
+                status(),
+            ],
+            bracketed(utf16(T_CAT2)),
+        ]
+        .concat()
+    };
+    let mut plans = [record_plans(), record_plans(), bracketed(utf16(T_M2))].concat();
+    for day in [14, 13, 12] {
+        for (_, answer) in run_day(day) {
+            plans.extend(bracketed(utf16(answer)));
+        }
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let statement = |bank: &str, other: &str, txn: &str, direction: &str| {
+        let mut skip = record(txn, json!("skipped"), other, direction, false);
+        skip["date"] = json!("2026-04-13");
+        skip["reference"] = Value::Null;
+        let mut args = statement_v2(
+            directory.path(),
+            bank,
+            json!({"from": "2026-04-02", "to": "2026-04-29"}),
+            json!([]),
+            json!([skip]),
+        );
+        args["company_guid"] = json!(LAB_GUID);
+        args
+    };
+    let rig = Rig::new(directory.path(), plans);
+    let call = |args: Value| async {
+        rig.server
+            .call_tool_response("build_import_xml", args)
+            .await
+            .value["structuredContent"]
+            .clone()
+    };
+    let first = call(statement(
+        "TLab Bank A",
+        "TLab Bank B",
+        &row("a1"),
+        "outflow",
+    ))
+    .await;
+    assert_eq!(first["result"]["state"], "skips_recorded", "{first}");
+    let lab_row =
+        |id: String, state: &str| json!({"bridge_txn_id": id, "date": "20260413", "state": state});
+    assert_eq!(
+        open_rows(&first["result"]["transfers"]),
+        vec![lab_row(row("a1"), "not_established")],
+        "{first}"
+    );
+    let second = call(statement(
+        "TLab Bank B",
+        "TLab Bank A",
+        &row("b1"),
+        "inflow",
+    ))
+    .await;
+    assert_eq!(second["result"]["state"], "skips_recorded", "{second}");
+    let section = &second["result"]["transfers"];
+    assert_eq!(
+        open_rows(section),
+        vec![
+            lab_row(row("a1"), "not_found"),
+            lab_row(row("b1"), "tally_unchecked"),
+        ],
+        "{second}"
+    );
+    assert_eq!(
+        section["day_reads"],
+        json!({"whole": 1, "empty": 2, "kept": []})
+    );
+    // the second record's evidence holds the marks and the three days it read
+    assert!(
+        second["evidence"]["bytes"].as_u64().unwrap()
+            > first["evidence"]["bytes"].as_u64().unwrap(),
+        "{first} {second}"
+    );
+    rig.finish();
 }

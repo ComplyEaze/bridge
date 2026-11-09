@@ -20,7 +20,9 @@ use bridge_tally_protocol::native_voucher_type_numbering::{
     parse_voucher_type_numbering, render_voucher_type_numbering_request, DuplicateSetting,
     NumberingJoinError, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
-use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
+use tally_protocol_simulator::{
+    encode, ObservedRequest, ScenarioPlan, SequenceSimulator, WireEncoding,
+};
 
 /// The synthetic book the masters captures came from. Its GUID is replaced by
 /// the test double's company, so a captured collection binds to it.
@@ -42,6 +44,10 @@ fn capture(kind: NativeMasterKind) -> String {
         NativeMasterKind::StockGroups => include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
         ),
+        // The item list with an item that carries two dated HSN and two dated GST entries.
+        NativeMasterKind::StockItems => include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml"
+        ),
         NativeMasterKind::CostCentres => include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
         ),
@@ -59,6 +65,7 @@ fn captured_rows(kind: NativeMasterKind) -> usize {
         NativeMasterKind::Godowns => 2,
         NativeMasterKind::Units => 4,
         NativeMasterKind::StockGroups => 3,
+        NativeMasterKind::StockItems => 12,
         NativeMasterKind::CostCentres | NativeMasterKind::CostCategories => 2,
     }
 }
@@ -330,10 +337,11 @@ fn cause<T: std::error::Error + 'static>(error: &anyhow::Error) -> Option<&T> {
 
 /// The kinds sized by the master mark before their request. Voucher types are
 /// not: they are held by the checks after the read only.
-const SIZED_KINDS: [NativeMasterKind; 5] = [
+const SIZED_KINDS: [NativeMasterKind; 6] = [
     NativeMasterKind::Godowns,
     NativeMasterKind::Units,
     NativeMasterKind::StockGroups,
+    NativeMasterKind::StockItems,
     NativeMasterKind::CostCentres,
     NativeMasterKind::CostCategories,
 ];
@@ -344,6 +352,10 @@ fn the_admission_edge_is_the_largest_mark_that_fits_and_the_next_refuses() {
         (NativeMasterKind::Godowns, 1_152),
         (NativeMasterKind::Units, 1_168),
         (NativeMasterKind::StockGroups, 1_160),
+        // The item row is allowed for several dated entries (its fixed allowance is
+        // 10,200 UTF-16 units against 4,373 measured), so the admitted mark is
+        // the lowest of the kinds. The largest AlterID in the capture is 294.
+        (NativeMasterKind::StockItems, 489),
         (NativeMasterKind::CostCentres, 1_037),
         (NativeMasterKind::CostCategories, 1_264),
     ] {
@@ -1026,24 +1038,268 @@ async fn a_numbering_pair_that_changed_between_its_reads_refuses_the_whole_read(
     assert_eq!(dispatched, 3 + 4 + 4 + 4);
 }
 
-#[tokio::test]
-async fn a_masters_pair_that_changed_still_names_the_masters_read() {
-    let masters = capture(NativeMasterKind::VoucherTypes);
-    let mut plans = opening(extent_with_mark(50_000_000));
+/// The voucher types as the lab's first read after a company load answered
+/// them, and as its second read did (#2160): the first leaves one element out
+/// of two rows. Both are captures of one book, the book `capture` came from.
+fn first_read_after_load() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_first_read_live.utf16le.xml"
+    ))
+    .replace(CAPTURE_GUID, GUID)
+}
+
+fn second_read_after_load() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_second_read_live.utf16le.xml"
+    ))
+    .replace(CAPTURE_GUID, GUID)
+}
+
+/// The opening, then a voucher-types pair that disagrees (the first read, then
+/// the second), then `rest`.
+fn after_a_disagreeing_pair(
+    opening_extent: String,
+    rest: impl FnOnce(&mut Vec<ScenarioPlan>),
+) -> Vec<ScenarioPlan> {
+    let mut plans = opening(opening_extent);
     plans.extend([
-        xml(masters.clone()),
+        xml(first_read_after_load()),
         status(),
-        xml(format!("{masters}\n")),
+        xml(second_read_after_load()),
         status(),
     ]);
+    rest(&mut plans);
+    plans
+}
+
+fn digest(text: &str) -> String {
+    sha256_hex(&encode(text, WireEncoding::Utf16Le))
+}
+
+fn joined(left: &str, right: &str) -> String {
+    sha256_hex(format!("{left}:{right}").as_bytes())
+}
+
+/// The voucher-types request's own hash, beside the pair's two reads.
+fn voucher_types_request_hash() -> String {
+    request_hash(&render_native_masters_request(
+        NativeMasterKind::VoucherTypes,
+        identity().display_name(),
+    ))
+}
+
+#[tokio::test]
+async fn a_voucher_types_pair_that_disagreed_on_the_first_read_is_read_once_more() {
+    let numbering = numbering_for(&second_read_after_load());
+    let companies = xml(companies());
+    let mut plans = after_a_disagreeing_pair(extent_with_mark(50_000_000), |plans| {
+        pair(plans, xml(second_read_after_load()));
+        pair(plans, xml(numbering));
+        pair(plans, xml(extent_with_mark(50_000_000)));
+    });
+    plans.extend([companies.clone(), status(), companies]);
+    let (result, observed) = run_observed(plans, VOUCHER_TYPES_KIND).await;
+    let (read, _) = result.unwrap();
+
+    // The 22 requests of an agreeing read, and one more pair.
+    assert_eq!(observed.len(), VOUCHER_TYPES_SEQUENCE + 4);
+    let masters = voucher_types_request_hash();
+    let hash = |at: usize| observed[at].request_body_sha256.as_str();
+    // Opening extent (twice), then the masters request four times: the pair
+    // that disagreed and the pair that agreed.
+    assert_eq!(
+        [hash(7), hash(9), hash(11), hash(13)],
+        [masters.as_str(); 4]
+    );
+    for at in [7, 9, 11, 13, 15, 17, 19, 21] {
+        assert_eq!(observed[at].method, "POST", "{at}");
+        assert_eq!(observed[at + 1].method, "GET", "{at}");
+    }
+    let MastersRows::VoucherTypes(types) = &read.rows else {
+        panic!("not voucher types");
+    };
+    assert_eq!(types.len(), captured_rows(NativeMasterKind::VoucherTypes));
+
+    // The answer records the first disagreement: the digests of that pair, the
+    // two reads the lab captured, whose bytes differ.
+    let first = read
+        .first_pair_differed
+        .expect("the first pair is recorded");
+    let (first_body, second_body) = (first_read_after_load(), second_read_after_load());
+    assert_ne!(digest(&first_body), digest(&second_body));
+    assert_eq!(first.request_sha256, joined(&masters, &masters));
+    assert_eq!(
+        first.response_sha256,
+        joined(&digest(&first_body), &digest(&second_body))
+    );
+    assert_eq!(
+        first.bytes,
+        encode(&first_body, WireEncoding::Utf16Le).len()
+            + encode(&second_body, WireEncoding::Utf16Le).len()
+    );
+    // The read's own evidence counts the first pair and the pair that agreed.
+    assert!(
+        read.evidence.bytes >= first.bytes + 2 * encode(&second_body, WireEncoding::Utf16Le).len(),
+        "{} < {}",
+        read.evidence.bytes,
+        first.bytes
+    );
+}
+
+#[tokio::test]
+async fn a_voucher_types_pair_that_agrees_records_no_first_disagreement() {
+    let (result, observed) = run_observed(voucher_types_plans(), VOUCHER_TYPES_KIND).await;
+    let (read, _) = result.unwrap();
+    assert!(read.first_pair_differed.is_none());
+    assert_eq!(observed.len(), VOUCHER_TYPES_SEQUENCE);
+}
+
+#[tokio::test]
+async fn a_voucher_types_pair_that_disagrees_twice_is_refused_after_one_more_pair() {
+    // The second pair plays the same two captured reads the other way round.
+    let plans = after_a_disagreeing_pair(extent_with_mark(50_000_000), |plans| {
+        plans.extend([
+            xml(second_read_after_load()),
+            status(),
+            xml(first_read_after_load()),
+            status(),
+        ]);
+    });
+    let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
+
+    let error = result.err().expect("refused");
+    let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
+    assert!(matches!(
+        changed,
+        PairedReadValidationError::MastersCollection
+    ));
+    assert_eq!(changed.safe_code(), "masters_collection_changed");
+    // Refused after the second pair, never a third: the mode probe and
+    // identity (3), the opening extent (4), and two pairs (8). No numbering
+    // pair, no closing extent.
+    assert_eq!(dispatched, 3 + 4 + 4 + 4);
+    // All four reads are kept as evidence, not only the last pair's.
+    let evidence = &error.downcast_ref::<RuntimeReadFailure>().unwrap().evidence;
+    let (first_body, second_body) = (first_read_after_load(), second_read_after_load());
+    let reads = 2
+        * (encode(&first_body, WireEncoding::Utf16Le).len()
+            + encode(&second_body, WireEncoding::Utf16Le).len());
+    assert!(evidence.bytes >= reads, "{} < {reads}", evidence.bytes);
+}
+
+#[tokio::test]
+async fn a_failure_of_the_second_voucher_types_pair_stays_a_transport_failure() {
+    let plans = after_a_disagreeing_pair(extent_with_mark(50_000_000), |plans| {
+        plans.push(xml(second_read_after_load()).with_http_status(500));
+    });
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
     let error = result.err().expect("refused");
     assert!(matches!(
-        cause::<PairedReadValidationError>(&error),
+        cause::<bridge_tally_transport::TallyTransportError>(&error),
+        Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 500 })
+    ));
+    assert!(cause::<MastersReadError>(&error).is_none());
+    assert!(cause::<PairedReadValidationError>(&error).is_none());
+    assert_eq!(dispatched, 3 + 4 + 4 + 1);
+}
+
+#[tokio::test]
+async fn a_book_that_moved_during_a_repeated_voucher_types_read_is_still_reported_as_moved() {
+    let numbering = numbering_for(&second_read_after_load());
+    let plans = after_a_disagreeing_pair(extent_with_mark(50_000_000), |plans| {
+        pair(plans, xml(second_read_after_load()));
+        pair(plans, xml(numbering));
+        pair(plans, xml(extent_with_mark(50_000_001)));
+    });
+    let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
+
+    assert_reported_as_moved(&result.err().expect("refused"));
+    // Refused at the closing extent: 3 + 4, two collection pairs, the numbering
+    // pair and the closing extent.
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_type_saved_during_a_repeated_numbering_read_is_still_refused_by_the_mark() {
+    let second = second_read_after_load();
+    let highest = parse_native_masters(NativeMasterKind::VoucherTypes, &second, GUID)
+        .unwrap()
+        .rows
+        .iter()
+        .map(|row| row.alter_id)
+        .max()
+        .unwrap();
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies];
+    plans.extend([
+        xml(first_read_after_load()),
+        status(),
+        xml(second.clone()),
+        status(),
+    ]);
+    pair(&mut plans, xml(second));
+    // A mark below the highest AlterID: a type was saved after the mark was read.
+    let (result, observed) = run_numbering(plans, highest - 1).await;
+    assert_numbering_premise_refusal(
+        &result.expect_err("refused"),
+        "masters_alter_id_above_master_mark",
+    );
+    assert_eq!(observed.len(), 3 + 4 + 4);
+}
+
+#[tokio::test]
+async fn the_numbering_read_repeats_a_voucher_types_pair_that_disagreed() {
+    let second = second_read_after_load();
+    let numbering = numbering_for(&second);
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies.clone()];
+    plans.extend([
+        xml(first_read_after_load()),
+        status(),
+        xml(second.clone()),
+        status(),
+    ]);
+    pair(&mut plans, xml(second));
+    pair(&mut plans, xml(numbering));
+    plans.extend([companies.clone(), status(), companies]);
+    let (result, observed) = run_numbering(plans, 50_000_000).await;
+    let read = result.unwrap();
+    assert_eq!(observed.len(), NUMBERING_READ_SEQUENCE + 4);
+    assert_eq!(
+        read.types().len(),
+        captured_rows(NativeMasterKind::VoucherTypes)
+    );
+    // The numbering pair follows the repeated masters pair.
+    let masters = voucher_types_request_hash();
+    let posts = observed
+        .iter()
+        .filter(|request| request.method == "POST")
+        .map(|request| request.request_body_sha256.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(&posts[2..6], [masters.as_str(); 4]);
+}
+
+#[tokio::test]
+async fn the_numbering_read_refuses_a_voucher_types_pair_that_disagrees_twice() {
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies];
+    plans.extend([
+        xml(first_read_after_load()),
+        status(),
+        xml(second_read_after_load()),
+        status(),
+        xml(second_read_after_load()),
+        status(),
+        xml(first_read_after_load()),
+        status(),
+    ]);
+    let (result, observed) = run_numbering(plans, 50_000_000).await;
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&result.expect_err("refused")),
         Some(PairedReadValidationError::MastersCollection)
     ));
-    assert_eq!(dispatched, 3 + 4 + 4);
+    assert_eq!(observed.len(), 3 + 4 + 4);
 }
 
 #[tokio::test]
@@ -1563,4 +1819,72 @@ async fn a_transport_failure_during_the_numbering_read_stays_a_transport_failure
     assert!(cause::<MastersReadError>(&error).is_none());
     assert!(cause::<PairedReadValidationError>(&error).is_none());
     assert_eq!(observed.len(), 3 + 4 + 1);
+}
+
+#[tokio::test]
+async fn a_tally_error_inside_a_stock_item_list_is_refused_at_once() {
+    // `ERROR` inside a rate row of a list the parser now reads: the read is
+    // refused with Tally's reported failure, never skipped as unmodelled
+    // content and never held behind the closing extent read.
+    let captured = capture(NativeMasterKind::StockItems);
+    let at = captured.find("<RATEDETAILS.LIST>").unwrap() + "<RATEDETAILS.LIST>".len();
+    let failed = format!(
+        "{}<LINEERROR>x</LINEERROR>{}",
+        &captured[..at],
+        &captured[at..]
+    );
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(failed));
+    let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
+
+    let error = result.err().expect("refused");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::TallyReportedFailure)
+    );
+    // Mode probe and identity (3), opening extent (4), the collection pair (4).
+    assert_eq!(dispatched, 11);
+}
+
+#[tokio::test]
+async fn a_stock_item_row_with_too_many_real_entries_is_the_parsers_typed_refusal() {
+    // Eight more copies of the item's real 22 September 2025 GST entry, each with
+    // a new valid date: the row exceeds the bound (16,344 UTF-16 units) and the
+    // parser refuses it, at once and by its own code.
+    let captured = capture(NativeMasterKind::StockItems);
+    let marker =
+        "<GSTDETAILS.LIST>\r\n      <APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM>";
+    let start = captured.find(marker).unwrap();
+    let end =
+        start + captured[start..].find("</GSTDETAILS.LIST>").unwrap() + "</GSTDETAILS.LIST>".len();
+    let copies = (1..=8)
+        .map(|month| captured[start..end].replace("20250922", &format!("2026{month:02}01")))
+        .collect::<String>();
+    let long_row = format!("{}{copies}{}", &captured[..end], &captured[end..]);
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(long_row));
+    let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
+
+    let error = result.err().expect("refused");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::RowExceedsBound),
+        "{error:?}"
+    );
+    // Mode probe and identity (3), opening extent (4), the collection pair (4).
+    assert_eq!(dispatched, 11);
+}
+
+#[test]
+fn stock_items_are_named_by_their_kind_and_only_by_it() {
+    assert_eq!(
+        MastersKind::parse("stock_items"),
+        Some(MastersKind::Native(NativeMasterKind::StockItems))
+    );
+    for kind in NativeMasterKind::ALL {
+        let name = MastersKind::Native(kind).as_str();
+        assert_eq!(MastersKind::parse(name), Some(MastersKind::Native(kind)));
+    }
+    assert_eq!(MastersKind::parse("stock_item"), None);
+    assert_eq!(MastersKind::parse("Stock_Items"), None);
 }

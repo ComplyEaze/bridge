@@ -538,8 +538,21 @@ one at that pair and one at the current merge base and head. The line is carried
 pair only when they are byte-identical apart from the `index` lines and the text after the hunk
 numbers (context lines and hunk numbers are part of the comparison, so a change moved in a file is
 not the same change), neither is empty or holds a binary change, the new one lists no file twice
-and names exactly the pull request's current file list. Only CLEAN is carried, never MERGE-ADVERSARY
-RECOMMEND, which must name the current pair, and every void still applies to a carried line. What
+and names exactly the pull request's current file list. A pull request whose binaries are all
+listed in the lab-capture manifest, none needing the owner's `--binary-review-sha` attestation
+and none removed, renamed or modified (only a binary addition is carried, because a modified
+binary's base blob is not bound), can still be carried: each binary section is then replaced by its
+path and its full 40-hex blob id from the compare API, so the blob ids are compared in full, the id
+for the current range must be the blob the manifest check verified, and a file list the API may
+have truncated (300 files or more) or a missing id is not carried. The gate prints the reason a
+verdict was not carried as a "verdict not carried" note. When the
+CLEAN line is carried, the MERGE-ADVERSARY RECOMMEND line is carried with it under the same proof,
+but only if it names exactly the same older head and merge base as the carried CLEAN line (never any
+other older pair, and never when CLEAN was not carried); a RECOMMEND line that names the current
+pair stands on its own. Every void applies to a carried line exactly as it does to the carried
+CLEAN line, and the gate's output says when the RECOMMEND line was carried. The review tier is
+decided at the current pair from master's classification, so a reclassification on master can
+newly require a RECOMMEND line that the older pair did not need. What
 master changed in other files, or in the same file outside the pull request's hunks, is not looked
 at: the required checks at the head cover it, not the reviewer. When the pull request's own lines
 cannot be shown unchanged the gate says so and the reviewer looks again.
@@ -593,7 +606,8 @@ the first eight binary paths in its message so the merger knows what to read. Th
 **Lab-capture manifest.** `scripts/merge-gate-lab-captures.json` (schema 1, at most 1000
 entries) lists captures the owner has already read, one entry for each: `path`, `blob` (the git
 blob id), `size`, `sha256`, `capture_id`, `lab_ref` (a note, never resolved), `company` and
-`seed_basis` (how the lab company's books were built). The gate reads the file only from the
+`seed_basis` (how the lab company's books were built: the owner's statement that the book is
+synthetic, which the gate does not check). The gate reads the file only from the
 master ref it fetched, as a regular-file blob, the way it reads the synthetic-UUID registry, so
 a pull request cannot list its own binaries. A binary addition or change is exempt from
 `--binary-review-sha` only if its path and the blob id GitHub reports for it both equal one
@@ -602,9 +616,10 @@ that blob id and have the entry's `size` and `sha256`. One different character i
 same blob at another path, a missing blob id, a removed file or differing bytes is not exempt.
 A blob request that fails, or answers malformed or with bytes that are not that blob, is
 reported as "could not check its bytes", apart from "bytes differ" (which names the size or the
-sha256), and is not exempt either. The file mode is not checked: the bytes are fixed by the
-blob id, so a listed blob committed as executable, or as a link whose target text is those
-bytes, carries nothing the owner did not read. The gate prints the exempt paths and the
+sha256), and is not exempt either. The file mode is not checked. A listed blob committed as
+executable carries exactly the bytes the owner read; committed as a link (mode 120000) it
+points at the path its bytes name up to their first NUL, a path the owner did not read, so a
+capture is committed as a regular file. The gate prints the exempt paths and the
 manifest's blob id, and anything unlisted still needs the attestation above. An invalid
 manifest, a link instead of a file, or a duplicate path means no exemptions, and the gate says
 why. Changing the manifest matches `scripts/merge-gate`, so that pull request is the owner's
@@ -612,9 +627,11 @@ own merge. There the owner reads each sitting's decoded captures (a UTF-16LE fil
 byte-order mark included, which a plain UTF-8 read shows as noise), their ownership and
 licence, their NOTICE obligation and their `PROVENANCE` entry
 (`scripts/check-fixture-provenance.mjs`), states `seed_basis`, and confirms on the file they
-read both `blob` (`git hash-object <file>`) and `sha256` (for example `shasum -a 256`), since
+read both `blob` (`git hash-object --no-filters <file>`) and `sha256` (for example `shasum -a 256`), since
 those are the values the gate checks. An entry stays valid for those bytes at that path until
-it is removed, so remove it when the capture is deleted or withdrawn. A lab branch is never
+it is removed, so remove it when the capture is deleted or withdrawn. The gate warns (never blocks)
+about a stale entry: one whose path master holds with another blob, or once held and has deleted;
+an entry whose path master never held is counted as pending. A lab branch is never
 read or trusted at gate time: lab branches are unprotected and are pushed with the owner's own
 account, so being on one proves nothing about where the bytes came from, and a branch can be
 moved or deleted later. A pointer to a lab branch or commit in a pull request body is ignored.
@@ -725,9 +742,14 @@ every note for them first, and for maintainers second.
 
 - Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) only when both of
   these hold: at least one user-visible change has landed, and CI is green on
-  both hosts. A master push may show the native, bundle and seam jobs skipped
-  when the merge queue ran them on that same commit; its job summary names the
-  queue run, and the daily scheduled run runs everything.
+  both hosts. The macOS native tests run only on a master push, the daily
+  scheduled run, a manual run and the version pull request (the release pull
+  request, which changes the version in `src-tauri/tauri.conf.json`), never on
+  another pull request or in the merge queue. A master
+  push leaves the Windows native, bundle and seam jobs out of its matrix when the merge
+  queue ran them on that same commit; its job summary names the queue run. The
+  macOS bundle and seam jobs run in the queue and on a push only when a
+  packaging path changes, and the daily scheduled run runs everything.
 - The workflow publishes each preview as a prerelease. Once its checks are
   read, the maintainer marks the newest preview as the repository's latest
   release (`gh release edit <tag> --prerelease=false --latest`), so the
@@ -777,10 +799,13 @@ patch for a fix-only release:
 It checks every file first and writes none if one fails. Then:
 
 1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
-2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`.
+2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`, and move the
+   unreleased entries into the new section (see "At cut time" under `CHANGELOG.md` below).
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
-5. After the release is published, change the tag and date in the two managed
+5. After the release is published, if the release run warned that unreleased entries were
+   listed under "Also in this build", put each in the new section of `CHANGELOG.md` and `git rm`
+   its file, or the next release lists it again. Then change the tag and date in the two managed
    spans that name the newest published build (`managed:current-release` in
    `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
    for `managed:`), and check that the install page and the repository
@@ -833,6 +858,22 @@ disagree.
   now" when the section becomes the release.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
+- An entry for a change that is not yet in a published build is a file, not lines
+  of `CHANGELOG.md`, so two pull requests never edit the same lines. It is
+  `docs/changelog/unreleased/<added|changed|removed>/<N>-<words-with-hyphens>.md`: the
+  folder names the heading it is listed under, `<N>` is the issue or pull request
+  its text cites, and the words tell two entries on one issue apart. A file holds
+  one bullet: the first line starts with `- `, every other line is indented two
+  spaces, there is no blank line, heading, rule or code fence, and the text cites `#<N>`.
+  The words are up to six lowercase words of letters and digits joined by hyphens, and
+  must not contain privacy, security, redact or egress, which the review tiers send to the
+  full tier whatever the folder (see `scripts/review-tier-paths.json`);
+  `scripts/release-notes.test.mjs` fails on a file that is malformed, misplaced (anything
+  outside the three folders is reported) or not in the one review tier. The install page joins the files into the groups of
+  the `[Unreleased]` text, and a malformed file is left out with a warning, so a bad entry
+  cannot stop a release or a deploy. The release notes list them when the tag has no
+  section of its own and, with a warning, when it has one (see "At cut time"). Entries already in `CHANGELOG.md` stay where they are
+  until a release moves them.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
   the `## [X.Y.Z]` section that matches the tag (for `mcp-vX.Y.Z` or `mcp-preview-X.Y.Z`),
   puts it above the release-notes footer, and appends GitHub's list. The
@@ -852,7 +893,15 @@ disagree.
   plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, change
   its first part's heading from "What the next build adds" to "What you can do
   now" and its "in source since" title to name the new build, and leave a fresh
-  `## [Unreleased]` above it. If the section is missing, the
+  `## [Unreleased]` above it. In the same pull request, run
+  `node scripts/release-notes.mjs unreleased --changelog CHANGELOG.md` (it stops with a
+  message on a malformed, misplaced or unreadable file; it prints one group per kind that has
+  entries), rewrite what it prints in plain words into the new section's parts, as for the
+  other draft notes (a released section has no **Added** or **Changed** groups), and `git rm`
+  the files under `docs/changelog/unreleased/`. Run the command again after the last merge of master
+  into that pull request, because the build is cut from the head of master. An entry merged
+  after that, before the dispatch, is in the build: the release notes then list it too, under "Also in this
+  build", and warn in the run; step 5 of the release steps above moves it into the section. If the section is missing, the
   release carries the `[Unreleased]` text instead (with a warning), which may
   describe changes that build does not have, so read the release body; if that
   is empty too, only the standard text and GitHub's list. Headings must read

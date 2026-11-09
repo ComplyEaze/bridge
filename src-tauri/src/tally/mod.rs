@@ -1,7 +1,9 @@
 pub(crate) mod agent_read_request;
 pub(crate) mod approved_import;
+mod box_fit;
 pub mod connection;
 pub mod connector;
+pub(crate) mod ledger_create_item;
 pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
 // Crate-internal only: `tally::runtime` is the sole consumer.
@@ -18,9 +20,10 @@ pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,
 };
 pub use runtime::{
-    CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor,
-    OutstandingsCurrencyAssertion, OutstandingsLoadResult, OutstandingsPartialReason, TallyRuntime,
-    TallySessionSnapshot, UnallocatedComposition, UnallocatedParty,
+    CurrencyExclusions, EndpointKey, ExposureDirection, ObservedTally, OpenBillRow,
+    OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
+    OutstandingsPartialReason, TallyRuntime, TallySessionSnapshot, UnallocatedComposition,
+    UnallocatedParty,
 };
 pub use xml_parser::{TallyCompany, TallyLedger};
 
@@ -125,6 +128,11 @@ impl VerifiedCompanyIdentity {
 
     pub(crate) fn company_guid(&self) -> &str {
         self.company_guid.as_str()
+    }
+
+    /// The GUID as its parsed type, for a builder that puts it in a formula.
+    pub(crate) fn company_guid_value(&self) -> &bridge_tally_core::company_guid::CompanyGuid {
+        &self.company_guid
     }
 
     pub(crate) fn company_number(&self) -> &str {

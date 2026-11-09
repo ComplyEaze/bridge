@@ -16,6 +16,14 @@ test("a named milestone passes", () => {
   assert.equal(milestoneProblem("Next (after 0.8.0)"), null);
 });
 
+test("the two milestones for unscheduled work are a problem, however they are spaced", () => {
+  assert.match(milestoneProblem("Backlog (unscheduled)"), /scheduled milestone.*Backlog \(unscheduled\)/);
+  assert.match(milestoneProblem("Planned after 1.0"), /scheduled milestone.*Planned after 1\.0/);
+  assert.notEqual(milestoneProblem("  Planned after 1.0 "), null);
+  assert.equal(milestoneProblem("1.0.0"), null, "1.0.0 is a release, not the unscheduled one");
+  assert.equal(milestoneProblem("Planned after 1.0.1"), null, "only the exact titles are refused");
+});
+
 test("none, an empty title or a blank one is a problem", () => {
   assert.match(milestoneProblem(null), /needs a milestone/);
   assert.notEqual(milestoneProblem(""), null);
@@ -29,6 +37,11 @@ test("the script exits 0 on a title and 1 on null, and fails closed on unreadabl
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /needs a milestone/);
   assert.equal(run('""').status, 1);
+  for (const unscheduled of ["Backlog (unscheduled)", "Planned after 1.0"]) {
+    const refused = run(JSON.stringify(unscheduled));
+    assert.equal(refused.status, 1, unscheduled);
+    assert.match(refused.stderr, /holds unscheduled work/);
+  }
   for (const broken of ["", "not json", "7", "[]", '{"title":"0.6.0"}']) {
     assert.notEqual(run(broken).status, 0, `input ${JSON.stringify(broken)} must not pass`);
   }

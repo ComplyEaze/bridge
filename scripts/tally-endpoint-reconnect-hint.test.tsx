@@ -41,6 +41,7 @@ test("restart restores only the endpoint hint and waits for an explicit Check Ta
     canonical_origin: "http://forged.example:9001",
   }));
   mocks.invoke.mockImplementation((command: string) => {
+    if (command === "desktop_terms_status") return Promise.resolve({ terms_version: "2026-10.1", state: "accepted", accepted: true });
     if (command === "tally_persisted_company_profiles") {
       return Promise.resolve({ profiles: [], total_profiles: 0, limit: 100, truncated: false });
     }
@@ -76,6 +77,7 @@ test.each([
   [true, "supported", "inferred", false],
 ] as const)("persists only observed XML success (status compatible=%s, XML=%s/%s)", async (compatible, state, confidence, shouldSave) => {
   mocks.invoke.mockImplementation((command: string) => {
+    if (command === "desktop_terms_status") return Promise.resolve({ terms_version: "2026-10.1", state: "accepted", accepted: true });
     if (command === "tally_persisted_company_profiles") {
       return Promise.resolve({ profiles: [], total_profiles: 0, limit: 100, truncated: false });
     }

@@ -66,7 +66,8 @@ impl From<StandardLedgerCatalogError> for StandardLedgerCatalogReadError {
             // the typed flag errors into a malformed-response code.
             StandardLedgerCatalogError::BillWiseFlagMissing
             | StandardLedgerCatalogError::BillWiseFlagInvalid
-            | StandardLedgerCatalogError::BillWiseFlagRepeated => Self::MalformedResponse,
+            | StandardLedgerCatalogError::BillWiseFlagRepeated
+            | StandardLedgerCatalogError::AlterIdInvalid => Self::MalformedResponse,
             StandardLedgerCatalogError::CompanyIdentityMismatch => Self::CompanyIdentityMismatch,
             StandardLedgerCatalogError::DuplicateIdentity => Self::DuplicateIdentity,
             StandardLedgerCatalogError::BoundsViolation => Self::BoundsViolation,

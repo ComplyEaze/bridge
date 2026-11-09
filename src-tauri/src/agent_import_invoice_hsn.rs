@@ -114,12 +114,12 @@ enum LevelAnswer {
 }
 
 fn is_date(text: &str) -> bool {
-    text.len() == 8 && text.bytes().all(|byte| byte.is_ascii_digit())
+    bridge_tally_core::TallyDate::parse(text).is_ok()
 }
 
 /// The one item in force on `as_of` (`YYYYMMDD`): the latest date not after
-/// it. `None` when no date is in force, when a date is not eight digits or
-/// when two items share the date in force.
+/// it. `None` when no date is in force, when a date is not a calendar day in
+/// `YYYYMMDD` form or when two items share the date in force.
 fn in_force<'a, T>(dated: &'a [(Option<&'a str>, T)], as_of: &str) -> Option<&'a T> {
     if dated.iter().any(|(date, _)| !date.is_some_and(is_date)) {
         return None;

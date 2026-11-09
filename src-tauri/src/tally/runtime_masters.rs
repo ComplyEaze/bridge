@@ -28,6 +28,7 @@ impl MastersKind {
             "godowns" => Some(Self::Native(NativeMasterKind::Godowns)),
             "units" => Some(Self::Native(NativeMasterKind::Units)),
             "stock_groups" => Some(Self::Native(NativeMasterKind::StockGroups)),
+            "stock_items" => Some(Self::Native(NativeMasterKind::StockItems)),
             "cost_centres" => Some(Self::Native(NativeMasterKind::CostCentres)),
             "cost_categories" => Some(Self::Native(NativeMasterKind::CostCategories)),
             "groups" => Some(Self::Groups),
@@ -41,6 +42,7 @@ impl MastersKind {
             Self::Native(NativeMasterKind::Godowns) => "godowns",
             Self::Native(NativeMasterKind::Units) => "units",
             Self::Native(NativeMasterKind::StockGroups) => "stock_groups",
+            Self::Native(NativeMasterKind::StockItems) => "stock_items",
             Self::Native(NativeMasterKind::CostCentres) => "cost_centres",
             Self::Native(NativeMasterKind::CostCategories) => "cost_categories",
             Self::Groups => "groups",
@@ -61,6 +63,9 @@ pub(crate) enum MastersRows {
 pub(crate) struct MastersRead {
     pub(crate) rows: MastersRows,
     pub(crate) evidence: RuntimeReadEvidence,
+    /// The first voucher-types pair, when it disagreed and a second pair
+    /// agreed (#2160): its evidence, which `evidence` also folds in.
+    pub(crate) first_pair_differed: Option<RuntimeReadEvidence>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -198,6 +203,51 @@ pub(crate) fn check_numbering_premise(
     Ok(())
 }
 
+/// The voucher-type collection as a pair, read as one more pair when the first
+/// disagrees with itself (#2160). Tally leaves an element out of the first
+/// voucher-types read after a company is loaded and sends it on every later
+/// one (protocol reference section 12a.25, PARTIAL), so a first pair can
+/// disagree on a book that has not changed.
+///
+/// **At most one more pair is read, here and nowhere else.** The call is
+/// straight-line, with no loop: a second pair that disagrees too is refused as
+/// `masters_collection_changed`, as a first one was before, so a book that
+/// keeps changing is not read until it settles. The bytes used are still a pair
+/// of byte-identical answers. Only what the checks after it see is still
+/// refused: a moved book extent (`masters_extent_changed`, the masters tool),
+/// or a type saved above the master mark (`masters_bound_premise_violated`).
+/// A type deleted between the pairs leaves a second pair that agrees and is
+/// accepted; whether a deletion moves the master mark is not measured.
+///
+/// The disagreeing pair's evidence is added to `evidence`, so a refusal keeps
+/// all four reads, and is also set in `first_pair_differed`, so an answer that
+/// follows can show the first disagreement without having refused.
+async fn read_voucher_type_pair(
+    client: &TallyClient,
+    request: &str,
+    evidence: &mut RuntimeReadEvidence,
+    first_pair_differed: &mut Option<RuntimeReadEvidence>,
+) -> anyhow::Result<(String, usize, String)> {
+    let disagreed = match client
+        .fetch_native_report_paired(request.to_owned())
+        .await?
+    {
+        NativePairedRead::Stable {
+            body,
+            encoded_bytes,
+            encoded_sha256,
+        } => return Ok((body, encoded_bytes, encoded_sha256)),
+        NativePairedRead::Drifted(disagreed) => disagreed,
+    };
+    *evidence = evidence.clone().combine(disagreed.clone());
+    *first_pair_differed = Some(disagreed);
+    // The one more pair (section 12a.25). Its disagreement is the refusal.
+    client
+        .fetch_native_report_paired(request.to_owned())
+        .await?
+        .require_stable(PairedReadValidationError::MastersCollection)
+}
+
 /// One native collection read as a pair against the master mark `mark`: sized
 /// by the mark first where its kind is, then held to the premise its size was
 /// admitted on. A refusal before or during the request, or an answer Bridge
@@ -209,16 +259,23 @@ async fn read_native_rows(
     native: NativeMasterKind,
     mark: u64,
     evidence: &mut RuntimeReadEvidence,
+    first_pair_differed: &mut Option<RuntimeReadEvidence>,
 ) -> anyhow::Result<Result<NativeMasters, MastersReadError>> {
     let estimate = sized_before_the_read(native)
         .then(|| admit_masters_size(native, mark))
         .transpose()?;
     let limit = limit_for(native, estimate);
     let request = render_native_masters_request(native, identity.display_name());
-    let (xml, bytes, hash) = client
-        .fetch_native_report_paired(request.clone())
-        .await?
-        .require_stable(PairedReadValidationError::MastersCollection)?;
+    let (xml, bytes, hash) = if native == NativeMasterKind::VoucherTypes {
+        // Voucher types only, and one more pair at most (protocol reference
+        // section 12a.25): every other kind is one pair, as it was.
+        read_voucher_type_pair(client, &request, evidence, first_pair_differed).await?
+    } else {
+        client
+            .fetch_native_report_paired(request.clone())
+            .await?
+            .require_stable(PairedReadValidationError::MastersCollection)?
+    };
     *evidence = evidence
         .clone()
         .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
@@ -332,14 +389,22 @@ impl TallyRuntime {
                     // numbering that does not join are held until the closing
                     // extent is read: a book that moved mid-read is reported
                     // as moved, not as the rows its new masters added.
+                    let mut first_pair_differed = None;
                     let held: Result<MastersRows, MastersReadError> = match kind {
                         MastersKind::Native(native) => {
                             let mark = extent
                                 .master_alter_id_high_water()
                                 .ok_or(OutstandingsError::MasterWitnessAbsent)?
                                 .get();
-                            match read_native_rows(&client, &identity, native, mark, &mut evidence)
-                                .await?
+                            match read_native_rows(
+                                &client,
+                                &identity,
+                                native,
+                                mark,
+                                &mut evidence,
+                                &mut first_pair_differed,
+                            )
+                            .await?
                             {
                                 Err(violated) => Err(violated),
                                 // Voucher types only: the series-level numbering is
@@ -390,6 +455,7 @@ impl TallyRuntime {
                         MastersRead {
                             rows,
                             evidence: evidence.clone(),
+                            first_pair_differed,
                         },
                         extent,
                     ))
@@ -432,12 +498,17 @@ impl TallyRuntime {
                         return Err(MastersReadError::EducationUnqualified.into());
                     }
                     bracket_verified_company_identity(&client, &identity).await?;
+                    // Not shown by the callers of this read: a re-read is in
+                    // `evidence`, folded into the chain, and in the refusal if
+                    // the second pair disagrees too.
+                    let mut first_pair_differed = None;
                     let masters = read_native_rows(
                         &client,
                         &identity,
                         NativeMasterKind::VoucherTypes,
                         master_mark,
                         &mut evidence,
+                        &mut first_pair_differed,
                     )
                     .await??;
                     let joined = read_series_numbering(

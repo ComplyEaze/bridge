@@ -115,6 +115,42 @@ fn the_python_runners_name_the_same_tests() {
     assert_eq!(python, rust);
 }
 
+/// A crate-first test is found and runs like a ported one, is never also ported, and the Python
+/// side's `CRATE_FIRST` names exactly the same tests, each refused there for having no golden.
+#[test]
+fn the_crate_first_tests_are_found_and_the_python_side_refuses_each() {
+    let text = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("parity/python_golden.py"),
+    )
+    .unwrap();
+    let block = text
+        .split("\nCRATE_FIRST = {\n")
+        .nth(1)
+        .and_then(|rest| rest.split("\n}\n").next())
+        .expect("python_golden.py has a CRATE_FIRST = { ... } block");
+    let python: Vec<&str> = block
+        .lines()
+        .map(|l| l.trim().split('"').nth(1).expect("one quoted id per line"))
+        .collect();
+    assert!(block.lines().all(|l| l.contains("no reference golden")));
+    let rust: Vec<&str> = registry::CRATE_FIRST.iter().map(|t| t.id).collect();
+    assert_eq!(python, rust);
+
+    let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    let rules = rules_for(&e).unwrap();
+    for test in registry::CRATE_FIRST {
+        assert!(PORTED.iter().all(|t| t.id != test.id), "{}", test.id);
+        let found = registry::find(test.id).unwrap();
+        assert_eq!((found.id, found.min_figures), (test.id, test.min_figures));
+        let dump = registry::run_canonical(test.id, &e, &rules, &CallerData::default()).unwrap();
+        assert!(
+            dump["figures"].as_array().unwrap().len() >= test.min_figures,
+            "{}",
+            test.id
+        );
+    }
+}
+
 #[test]
 fn an_unregistered_test_is_refused() {
     let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
@@ -123,6 +159,20 @@ fn an_unregistered_test_is_refused() {
         .unwrap_err()
         .to_string();
     assert!(err.contains("itr_3cd_tally is not a ported test"), "{err}");
+}
+
+#[test]
+fn tds_interest_201_refuses_rules_without_tds_rates() {
+    // On every book, a row or none: the synthetic read gives none.
+    let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    let mut rules = rules_for(&e).unwrap();
+    rules.tds_rates = None;
+    match registry::run_canonical("tds_interest_201", &e, &rules, &CallerData::default()) {
+        Err(bridge_tax_audit::error::AuditError::Config(m)) => {
+            assert_eq!(m, "tds_interest_201 needs rules [tds_rates]");
+        }
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]

@@ -36,6 +36,7 @@ import { JournalPostingScreen } from "./JournalPostingScreen";
 import { SourceDraftScreen } from "./SourceDraftScreen";
 import { NativeLifecycleController, hasNativeWindowRuntime, type NativeLifecycleRequest } from "./NativeLifecycleController";
 import { TrialBalanceScreen } from "./TrialBalanceScreen";
+import { TermsGate } from "./TermsGate";
 import { LedgerEntriesScreen } from "./LedgerEntriesScreen";
 import { createDrawerFocusLifecycle, ensureDrawerFocus, shouldFocusMainContentAfterViewTransition, trapDrawerTabKeydown } from "./evidence-drawer-focus";
 import { loadEndpointReconnectHint, saveEndpointReconnectHint } from "./tally-endpoint-reconnect-hint";
@@ -621,20 +622,6 @@ function App() {
         setOpenCompanyNames([]);
         setUntrustedDiscoveredCompanies([]);
         setUntrustedDiscoveryError(null);
-        if (result.profile.transports.xml_http?.safe_reason_code === "direct_company_report_untrusted") {
-          const discoveryResultsVersion = tallyResultsVersion.current;
-          try {
-            const discovered = await invoke<UntrustedCompanyCandidate[]>("fetch_tally_companies", { config });
-            if (discoveryResultsVersion === tallyResultsVersion.current) {
-              setUntrustedDiscoveredCompanies(discovered);
-              setOpenCompanyNames(discovered.map((candidate) => candidate.name));
-            }
-          } catch (error) {
-            if (discoveryResultsVersion === tallyResultsVersion.current) {
-              setUntrustedDiscoveryError(toOperatorError(error));
-            }
-          }
-        }
       }
     } catch (error) {
       if (resultsVersion === tallyResultsVersion.current) {
@@ -1536,8 +1523,8 @@ function App() {
             /* Every company Tally reports open, GUID-verified by the probe --
                NOT only the ones already saved. Requiring a save first was
                correct while company discovery could never be trusted
-               (CompanyListV1 returned no HEADER/STATUS); with CompanyListV2
-               the probe verifies every open book on every run, and a firm
+               (the old custom company report, deleted under #1872, returned
+               no HEADER/STATUS); with CompanyListV2 the probe verifies every open book on every run, and a firm
                holding ten client books will not bless each one before a
                cross-client screen works. */
             companies={completeCurrentProbeCompanies
@@ -1751,10 +1738,11 @@ function App() {
                 )}
                 {/* Switching to another client's book must not require noticing
                     that "Check Tally again" repopulates a hidden list.
-                    Bridge's company report carries no HEADER/STATUS, so the
-                    probe can never mark it trusted; the verified picker above
-                    therefore only ever lists companies already SAVED, and
-                    every other open book was unreachable once one was saved.
+                    Bridge's old company report (deleted under #1872) carried
+                    no HEADER/STATUS, so the probe could never mark it trusted;
+                    the verified picker above then listed only companies already
+                    SAVED, and every other open book was unreachable once one
+                    was saved.
                     These stay a visually separate, clearly-unverified group --
                     choosing one runs the scoped bootstrap that verifies it. */}
                 {currentProbeCompanyList.length > 0 && otherOpenCompanies.length > 0 && (
@@ -1991,7 +1979,11 @@ type RootContainer = HTMLElement & {
 const rootContainer = document.getElementById("root") as RootContainer;
 const root = rootContainer.bridgeRoot ?? ReactDOM.createRoot(rootContainer);
 rootContainer.bridgeRoot = root;
-root.render(<App />);
+root.render(
+  <TermsGate>
+    <App />
+  </TermsGate>,
+);
 
 function toTallyDate(value: string): string {
   return value.replace(/-/g, "");

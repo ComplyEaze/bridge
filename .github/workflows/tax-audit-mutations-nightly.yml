@@ -2,7 +2,7 @@ name: Tax-audit mutations (nightly)
 
 # The bridge-tax-audit crate records every mutation written against it in
 # parity/mutations.json. A pull request re-proves only the mutations its change
-# selects (parity/mutations.py --verify, in ci.yml). This run re-proves the
+# selects (parity/mutations.mjs --verify, in ci.yml). This run re-proves the
 # WHOLE list against the FULL suite on master, so a mutation whose killing tests
 # were weakened by a change elsewhere in the crate is caught within a day. Any
 # mutation not killed, not run, or with a stale committed record fails the run
@@ -14,6 +14,17 @@ on:
   schedule:
     - cron: "23 21 * * *" # daily, off the hour
   workflow_dispatch:
+    inputs:
+      mode:
+        # full: every mutation against the full suite (finds new killers). proof: each
+        # mutation with a committed killed record runs those killers first, and the full suite
+        # only when they do not kill it; every kill is still seen on this exact tree, after the
+        # full suite passed unmutated on it, which is all a pull request's records need, and
+        # every other verdict comes from the full suite. Master's runs are always full.
+        description: "full, or proof (a pull request head's records)"
+        type: choice
+        options: [full, proof]
+        default: full
 
 permissions:
   contents: read
@@ -37,26 +48,43 @@ jobs:
     timeout-minutes: 350
     strategy:
       fail-fast: false
+      # A shard runs 1 to 2 hours. Eight at once would hold 8 of the 20 runner slots the whole
+      # account shares (a pull request's checks wait behind them); four at a time takes two
+      # waves, the same job-minutes, a longer wall time.
+      max-parallel: 4
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: 1.96.0
-      # The whole list, the full suite each time: a survivor verdict must never come
-      # from a subset of the tests. Exit 1 is a mutation not killed: this step leaves it
+      # The whole list each time, and a survivor verdict never comes from a subset of the
+      # tests: a proof run's killers-first pass falls back to the full suite for any
+      # mutation its recorded killers do not kill. Exit 1 is a mutation not killed: this step leaves it
       # to the report job, which judges every shard's results file together. Any other
       # non-zero exit is the runner refusing to start (the unmutated copy does not build or
       # pass; it has written a typed refusal in place of results): this job fails, so a
       # shard that ran nothing is never green.
       - name: Run this shard's mutations
+        env:
+          MODE: ${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/master' && inputs.mode == 'proof') && 'proof' || 'full' }}
         run: |
           set +e
-          python3 src-tauri/crates/bridge-tax-audit/parity/mutations.py \
-            --full --jobs 2 --shard "${{ matrix.shard }}/8" \
+          # A proof run reads the committed records for their killer lists only; its shard's own
+          # results file starts empty, so nothing old is counted as run.
+          full=(--full)
+          if [ "$MODE" = "proof" ]; then
+            full=(--killers-from src-tauri/crates/bridge-tax-audit/parity/mutation-results.json)
+          fi
+          echo "mode: $MODE"
+          node src-tauri/crates/bridge-tax-audit/parity/mutations.mjs \
+            "${full[@]}" --jobs 2 --shard "${{ matrix.shard }}/8" \
             --workdir "$RUNNER_TEMP/mutants" \
             --results "$RUNNER_TEMP/shard-${{ matrix.shard }}.json" 2>&1 | tee "$RUNNER_TEMP/shard-${{ matrix.shard }}.log"
           rc=${PIPESTATUS[0]}
@@ -87,6 +115,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: mutation-shard-*
@@ -106,7 +137,7 @@ jobs:
           if [ "${#files[@]}" -eq 0 ]; then
             files=(shards/no-shard-wrote-a-results-file.json)
           fi
-          if python3 src-tauri/crates/bridge-tax-audit/parity/mutations.py \
+          if node src-tauri/crates/bridge-tax-audit/parity/mutations.mjs \
             --merge "${files[@]}" --results mutation-results.json --report report.md; then
             echo "failed=false" >> "$GITHUB_OUTPUT"
           else

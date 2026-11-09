@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml
+# parser: parse_native_negative_stock
+# source: captured
+Err(EmptyEnvelope)

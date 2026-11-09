@@ -31,20 +31,29 @@ pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_details;
 pub mod gst_registration;
+pub mod hsn_details;
+pub mod import_envelope;
 mod import_outcome;
 pub mod ledger_census;
 /// One ledger `Create` message. Its one caller today is the lab rebuild;
 /// this crate runs its goldens in every build.
 pub mod ledger_create;
+pub mod ledger_guid_part;
+pub mod ledger_scope;
+pub mod mailing_details;
 pub mod native_cash_flow;
 pub mod native_company_features;
 pub mod native_funds_flow;
+pub mod native_godown_summary;
 mod native_ledger_collection;
 pub mod native_masters;
 pub mod native_month_register;
+pub mod native_negative_ledgers;
 pub mod native_negative_stock;
 pub mod native_outstandings;
 pub mod native_statement_reports;
+pub mod native_stock_by_batch;
+pub mod native_stock_query;
 pub mod native_stock_summary;
 pub mod native_trial_balance;
 pub mod native_voucher_type_numbering;
@@ -53,8 +62,10 @@ pub mod native_voucher_type_numbering;
 pub mod outstandings_shared;
 pub mod parent_partition;
 mod standard_ledger_catalog;
+mod stock_tax_details;
 mod text_encoding;
 mod tolerant_xml;
+mod voucher_removal;
 pub mod xml_read_profiles;
 /// The one shared XML text-escaping routine every request renderer in this
 /// crate (and the app crate, via a `use` alias) now calls. See its module
@@ -76,10 +87,11 @@ pub use native_ledger_collection::{
     NativeLedgerAmountError, PartyLedgerMasterFields, PartyLedgerMasterRecord,
 };
 pub use standard_ledger_catalog::{
-    parse_ledger_census_slice, parse_standard_ledger_catalog,
+    parse_ledger_census_slice, parse_ledger_name_index, parse_standard_ledger_catalog,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    BillWiseFlag, StandardLedgerCatalog, StandardLedgerCatalogBinding, StandardLedgerCatalogError,
+    parse_stock_group_census_slice, parse_stock_item_census_slice, BillWiseFlag, LedgerNameRow,
+    StandardLedgerCatalog, StandardLedgerCatalogBinding, StandardLedgerCatalogError,
     StandardLedgerCatalogV2, StandardLedgerIdentityObservation, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
 };
 pub use text_encoding::{
@@ -89,8 +101,11 @@ pub use text_encoding::{
     StreamDecodedTallyText, TallyTextDecodeError, TallyTextEncoding, TallyTextStreamDecoder,
 };
 pub use tolerant_xml::mark_forbidden_numeric_references;
+pub use voucher_removal::{
+    CancelOutcome, DeleteOutcome, ImportCounter, OneAlteredCounted, OneDeletedCounted,
+    RemovalRefusal,
+};
 
-pub const BRIDGE_LEDGER_EXPORT_SCHEMA: &str = "bridge.tally.ledgers/1";
 pub const MAX_INTERACTIVE_DISCOVERY_COMPANIES: usize = 100;
 
 /// The sanitized representation of Tally's U+0004 metadata prefix.
@@ -115,6 +130,27 @@ pub fn is_tally_reserved_root(value: &str) -> bool {
         .trim()
         .strip_prefix(TALLY_SANITIZED_ROOT_MARKER)
         .is_some_and(|rest| rest.trim().eq_ignore_ascii_case("primary"))
+}
+
+/// A parent as an answer shows it: the reserved root as Tally wrote it, every
+/// other value as decoded.
+///
+/// The decoders mark the root's forbidden `&#4;` reference as
+/// [`TALLY_SANITIZED_ROOT_MARKER`] so that one spelling reaches every
+/// comparison ([`is_tally_reserved_root`]). That marker is a working form, not
+/// text for a reader: U+FFFD followed by `#4; Primary` looks like a corrupted
+/// string. A parent that [`is_tally_reserved_root`] accepts is therefore shown
+/// as `&#4; Primary`, the text Tally sent, with the rest of the value as
+/// returned. A bare `Primary` is a group a user named that and is not changed.
+/// Apply it to the row an answer carries, after any step that reads the held
+/// row's `parent` back (the `ledger_masters` group filter walks the chain from
+/// it): the shown form is not the root to [`is_tally_reserved_root`].
+pub fn tally_root_as_sent(value: &str) -> std::borrow::Cow<'_, str> {
+    if !is_tally_reserved_root(value) {
+        return std::borrow::Cow::Borrowed(value);
+    }
+    let rest = value.trim().trim_start_matches(TALLY_SANITIZED_ROOT_MARKER);
+    std::borrow::Cow::Owned(format!("&#4;{rest}"))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -298,10 +334,6 @@ pub struct ParsedSourceRecord<T> {
     pub alter_id: Option<String>,
     pub raw_source_sha256: String,
 }
-pub fn parse_companies(xml: &str) -> anyhow::Result<Vec<TallyCompany>> {
-    Ok(parse_companies_with_evidence(xml)?.records)
-}
-
 pub fn parse_companies_with_evidence(xml: &str) -> anyhow::Result<ParsedExport<TallyCompany>> {
     validate_export_response(xml)?;
     let evidence = scan_export_evidence(xml)?;
@@ -309,20 +341,10 @@ pub fn parse_companies_with_evidence(xml: &str) -> anyhow::Result<ParsedExport<T
     Ok(ParsedExport { records, evidence })
 }
 
-/// Parses the observed direct company-report form for an interactive setup
-/// probe. This must not be used for qualification, synchronization, or other
-/// evidence that requires Tally's shaped `HEADER/STATUS=1` success response.
-pub fn parse_companies_for_interactive_discovery(xml: &str) -> anyhow::Result<Vec<TallyCompany>> {
-    validate_company_list_response(xml)?;
-    parse_company_rows_with_limit(xml, Some(MAX_INTERACTIVE_DISCOVERY_COMPANIES))
-}
-
 /// Parses Tally's documented `Company` collection shape returned by
 /// `ReadOnlyProfile::CompanyListV2` (`<DATA><COLLECTION><COMPANY NAME="..">`
-/// rows, each carrying a nested `<GUID>` element). Unlike
-/// `parse_companies_for_interactive_discovery`, this requires the ordinary
-/// `HEADER/STATUS=1` export success envelope — the trust check is satisfied,
-/// not bypassed.
+/// rows, each carrying a nested `<GUID>` element). This requires the ordinary
+/// `HEADER/STATUS=1` export success envelope.
 ///
 /// Company rows are read only from beneath `ENVELOPE/BODY/DATA/COLLECTION`.
 /// A real response also carries a `BODY/DESC/CMPINFO` block of bare counter
@@ -419,13 +441,6 @@ fn normalized_standard_company_guid(value: &str) -> anyhow::Result<String> {
 }
 
 fn parse_company_rows(xml: &str) -> anyhow::Result<Vec<TallyCompany>> {
-    parse_company_rows_with_limit(xml, None)
-}
-
-fn parse_company_rows_with_limit(
-    xml: &str,
-    max_records: Option<usize>,
-) -> anyhow::Result<Vec<TallyCompany>> {
     let mut reader = configured_reader(xml);
     let mut records = Vec::new();
     loop {
@@ -433,11 +448,6 @@ fn parse_company_rows_with_limit(
             Event::Start(element)
                 if element.name().as_ref().eq_ignore_ascii_case("COMPANYINFO") =>
             {
-                if max_records.is_some_and(|limit| records.len() >= limit) {
-                    anyhow::bail!(
-                        "interactive discovery listing limit exceeded: Tally returned more than {MAX_INTERACTIVE_DISCOVERY_COMPANIES} local companies; the unverified listing was not retained"
-                    );
-                }
                 records.push(parse_company_info(&mut reader)?);
             }
             Event::Eof => break,
@@ -756,28 +766,6 @@ fn parse_gateway_yes_no(value: &str, label: &str) -> anyhow::Result<bool> {
     } else {
         anyhow::bail!("company capability collection returned an invalid {label} flag")
     }
-}
-
-pub fn parse_ledgers(xml: &str) -> anyhow::Result<Vec<TallyLedger>> {
-    Ok(parse_ledgers_with_evidence(xml)?.records)
-}
-
-pub fn parse_ledgers_with_evidence(xml: &str) -> anyhow::Result<ParsedExport<TallyLedger>> {
-    let parsed = parse_ledger_source_records_with_evidence(xml)?;
-    Ok(ParsedExport {
-        records: parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect(),
-        evidence: parsed.evidence,
-    })
-}
-
-pub fn parse_ledger_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyLedger>>> {
-    parse_ledger_source_records_for_schema(xml, BRIDGE_LEDGER_EXPORT_SCHEMA)
 }
 
 /// Why a native voucher-type, group or voucher collection was refused. The
@@ -1765,87 +1753,6 @@ fn record_identities_from_values(
     Ok(())
 }
 
-fn parse_ledger_source_records_for_schema(
-    xml: &str,
-    expected_schema: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyLedger>>> {
-    validate_export_response(xml)?;
-    let evidence = scan_export_evidence(xml)?;
-    let mut reader = configured_reader(xml);
-    let mut path = Vec::<Vec<u8>>::new();
-    let mut records = Vec::new();
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case("LEDGER") =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let name = attr_value(&element, b"NAME");
-                let identities = parsed_source_identities(&element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&element, b"ALTERID");
-                let record = parse_ledger(&mut reader, name)?;
-                records.push(ParsedSourceRecord {
-                    record,
-                    identity_kind,
-                    source_id,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256(
-                        xml,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Empty(element)
-                if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case("LEDGER") =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&element, b"ALTERID");
-                records.push(ParsedSourceRecord {
-                    record: TallyLedger {
-                        name: attr_value(&element, b"NAME").unwrap_or_default(),
-                        parent: PartyLedgerMasterFieldObservation::NotObserved,
-                        party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
-                        opening_balance: None,
-                    },
-                    identity_kind,
-                    source_id,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256(
-                        xml,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Start(element) => {
-                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
-            }
-            Event::End(element) => {
-                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    validate_scoped_export(&evidence, expected_schema, "LEDGER", records.len())?;
-    Ok(ParsedExport { records, evidence })
-}
-
 pub fn verify_company_context(
     evidence: &ExportEvidence,
     expected_guid: &str,
@@ -2085,167 +1992,6 @@ fn validate_export_response(xml: &str) -> anyhow::Result<()> {
         TallyExportStatus::Success => Ok(()),
         TallyExportStatus::Failure => {
             anyhow::bail!("Tally reported that the export request failed")
-        }
-    }
-}
-
-/// Tally's standard XML messaging response carries `HEADER/STATUS`, but report
-/// exports may emit a direct report body beneath `ENVELOPE`. Company discovery
-/// is the sole compatibility exception: it accepts that direct form only when
-/// it is an exact, complete sequence of unwrapped company rows. Accounting
-/// exports deliberately continue to require the standard success header.
-fn validate_company_list_response(xml: &str) -> anyhow::Result<()> {
-    match export_status(xml) {
-        Ok(TallyExportStatus::Success) => Ok(()),
-        Ok(TallyExportStatus::Failure) => {
-            anyhow::bail!("Tally reported that the export request failed")
-        }
-        Err(_) => validate_direct_company_list_response(xml),
-    }
-}
-
-fn validate_direct_company_list_response(xml: &str) -> anyhow::Result<()> {
-    let mut reader = configured_reader(xml);
-    let mut saw_envelope = false;
-    let mut envelope_closed = false;
-    let mut company_rows = 0_u64;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if !saw_envelope => {
-                if !element.name().as_ref().eq_ignore_ascii_case("ENVELOPE") {
-                    anyhow::bail!("Tally direct company response root must be ENVELOPE");
-                }
-                validate_only_attributes(&element, &[])?;
-                saw_envelope = true;
-            }
-            Event::Start(element)
-                if saw_envelope
-                    && !envelope_closed
-                    && element.name().as_ref().eq_ignore_ascii_case("COMPANYINFO") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                validate_direct_company_info(&mut reader)?;
-                company_rows = company_rows.saturating_add(1);
-            }
-            Event::End(element)
-                if saw_envelope
-                    && !envelope_closed
-                    && element.name().as_ref().eq_ignore_ascii_case("ENVELOPE") =>
-            {
-                envelope_closed = true;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally direct company response contained an unexpected element")
-            }
-            Event::End(_) => {
-                anyhow::bail!("Tally direct company response closed an unexpected element")
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally direct company response contained unexpected structural text")
-            }
-            Event::CData(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally direct company response contained unexpected structural CDATA")
-            }
-            Event::Comment(_) | Event::DocType(_) | Event::PI(_) => {
-                anyhow::bail!("Tally direct company response contained a forbidden XML construct")
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    if !saw_envelope || !envelope_closed || company_rows == 0 {
-        anyhow::bail!("Tally direct company response was incomplete")
-    }
-    Ok(())
-}
-
-fn validate_direct_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<()> {
-    let mut name_seen = false;
-    let mut guid_seen = false;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("COMPANYNAMEFIELD") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut name_seen, true) {
-                    anyhow::bail!("Tally direct company response repeated the company name")
-                }
-                read_direct_company_identity_text(reader, element.name())?;
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("COMPANYGUIDFIELD") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut guid_seen, true) {
-                    anyhow::bail!("Tally direct company response repeated the company identity")
-                }
-                read_direct_company_identity_text(reader, element.name())?;
-            }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case("COMPANYINFO") => {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally direct company record contained an unexpected field")
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally direct company record contained unexpected text")
-            }
-            Event::Comment(_) | Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
-                anyhow::bail!("Tally direct company record contained a forbidden XML construct")
-            }
-            Event::Eof => {
-                anyhow::bail!("Tally direct company response ended before COMPANYINFO closed")
-            }
-            _ => {}
-        }
-    }
-    if !name_seen || !guid_seen {
-        anyhow::bail!("Tally direct company response omitted a required company identity field")
-    }
-    Ok(())
-}
-
-fn read_direct_company_identity_text(
-    reader: &mut Reader<&[u8]>,
-    name: QName<'_>,
-) -> anyhow::Result<()> {
-    let mut saw_text = false;
-    loop {
-        match reader.read_event()? {
-            Event::Text(text) => {
-                let unescaped = quick_xml::escape::unescape(&text)?;
-                if saw_text || unescaped.trim().is_empty() {
-                    anyhow::bail!(
-                        "Tally direct company identity field was not one non-empty text value"
-                    )
-                }
-                saw_text = true;
-            }
-            Event::End(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .as_bytes()
-                    .eq_ignore_ascii_case(name.as_ref().as_bytes()) =>
-            {
-                if !saw_text {
-                    anyhow::bail!("Tally direct company identity field was empty")
-                }
-                return Ok(());
-            }
-            Event::Eof => {
-                anyhow::bail!("Tally direct company response ended before an identity field closed")
-            }
-            _ => anyhow::bail!(
-                "Tally direct company identity field contained a forbidden XML construct"
-            ),
         }
     }
 }
@@ -2551,7 +2297,7 @@ fn set_context_field(
 }
 
 fn validate_yyyymmdd_context(value: &str) -> anyhow::Result<()> {
-    if value.len() != 8 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+    if bridge_tally_primitives::TallyDate::parse(value).is_err() {
         anyhow::bail!("Tally company context contained an invalid date binding");
     }
     Ok(())
@@ -2565,52 +2311,6 @@ fn set_once<T>(slot: &mut Option<T>, value: T) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn validate_scoped_export(
-    evidence: &ExportEvidence,
-    expected_schema: &str,
-    expected_object_type: &str,
-    parsed_record_count: usize,
-) -> anyhow::Result<()> {
-    let company = evidence
-        .company_context
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Tally response omitted company context"))?;
-    if company.name.is_none() || company.guid.is_none() {
-        anyhow::bail!("Tally company context omitted required company identity");
-    }
-    match evidence.schema.as_deref() {
-        Some(actual) if actual == expected_schema => {}
-        Some(_) => anyhow::bail!("Tally response export schema did not match the parser"),
-        None => anyhow::bail!("Tally company context omitted export schema"),
-    }
-    match evidence.object_type.as_deref() {
-        Some(actual) if actual == expected_object_type => {}
-        Some(_) => anyhow::bail!("Tally response object type did not match the parser"),
-        None => anyhow::bail!("Tally company context omitted object type"),
-    }
-    let reported = evidence
-        .source_record_count
-        .ok_or_else(|| anyhow::anyhow!("Tally company context omitted source record count"))?;
-    let parsed = u64::try_from(parsed_record_count)
-        .map_err(|_| anyhow::anyhow!("Tally parsed record count exceeded the supported range"))?;
-    if reported != parsed {
-        anyhow::bail!("Tally source record count did not match parsed primary rows");
-    }
-    Ok(())
-}
-
-fn parsed_source_identities(
-    element: &quick_xml::events::BytesStart<'_>,
-) -> anyhow::Result<ParsedSourceIdentities> {
-    validate_unique_decodable_attributes(element)?;
-    Ok(ParsedSourceIdentities {
-        guid: validated_optional_identifier(attr_value(element, b"GUID"))?
-            .map(|guid| guid.to_ascii_lowercase()),
-        remote_id: validated_optional_identifier(attr_value(element, b"REMOTEID"))?,
-        master_id: validated_optional_identifier(attr_value(element, b"MASTERID"))?,
-    })
-}
-
 fn validated_optional_identifier(value: Option<String>) -> anyhow::Result<Option<String>> {
     let Some(value) = value else {
         return Ok(None);
@@ -2622,37 +2322,6 @@ fn validated_optional_identifier(value: Option<String>) -> anyhow::Result<Option
         anyhow::bail!("Tally record contained an invalid source identifier");
     }
     Ok(Some(value))
-}
-
-fn preferred_identity(
-    identities: &ParsedSourceIdentities,
-) -> (Option<String>, Option<ParsedSourceIdentityKind>) {
-    if let Some(guid) = &identities.guid {
-        (Some(guid.clone()), Some(ParsedSourceIdentityKind::Guid))
-    } else if let Some(remote_id) = &identities.remote_id {
-        (
-            Some(remote_id.clone()),
-            Some(ParsedSourceIdentityKind::RemoteId),
-        )
-    } else if let Some(master_id) = &identities.master_id {
-        (
-            Some(master_id.clone()),
-            Some(ParsedSourceIdentityKind::MasterId),
-        )
-    } else {
-        (None, None)
-    }
-}
-
-fn source_fragment_sha256(xml: &str, start: usize, end: usize) -> anyhow::Result<String> {
-    let fragment = xml
-        .as_bytes()
-        .get(start..end)
-        .ok_or_else(|| anyhow::anyhow!("Tally record fragment boundaries were invalid"))?;
-    if fragment.is_empty() {
-        anyhow::bail!("Tally record fragment was empty");
-    }
-    Ok(sha256_hex(fragment))
 }
 
 fn source_fragment_sha256_from_sanitized(
@@ -2697,76 +2366,6 @@ fn parse_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<TallyCompany
         }
     }
     Ok(company)
-}
-
-fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Result<TallyLedger> {
-    let mut ledger = TallyLedger {
-        name: name.unwrap_or_default(),
-        parent: PartyLedgerMasterFieldObservation::NotObserved,
-        party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
-        opening_balance: None,
-    };
-    let mut parent_seen = false;
-    let mut gstin_seen = false;
-    let mut opening_seen = false;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally ledger row repeated PARENT");
-                }
-                ledger.parent = PartyLedgerMasterFieldObservation::Returned(
-                    read_identifier_text(reader, element.name())?.unwrap_or_default(),
-                )
-            }
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARTYGSTIN") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut gstin_seen, true) {
-                    anyhow::bail!("Tally ledger row repeated PARTYGSTIN");
-                }
-                ledger.party_gstin = PartyLedgerMasterFieldObservation::Returned(
-                    read_optional_text(reader, element.name())?.unwrap_or_default(),
-                )
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("OPENINGBALANCE") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut opening_seen, true) {
-                    anyhow::bail!("Tally ledger row repeated OPENINGBALANCE");
-                }
-                ledger.opening_balance = read_optional_text(reader, element.name())?
-            }
-            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally ledger row repeated PARENT");
-                }
-                ledger.parent = PartyLedgerMasterFieldObservation::Returned(String::new());
-            }
-            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case("PARTYGSTIN") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut gstin_seen, true) {
-                    anyhow::bail!("Tally ledger row repeated PARTYGSTIN");
-                }
-                ledger.party_gstin = PartyLedgerMasterFieldObservation::Returned(String::new());
-            }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case("LEDGER") => break,
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally ledger row contained an unexpected field");
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally ledger row contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally ledger response ended before LEDGER closed"),
-            _ => {}
-        }
-    }
-    Ok(ledger)
 }
 
 fn mark_unique_field(
@@ -2884,7 +2483,9 @@ fn read_required_identifier_text(
         .ok_or_else(|| anyhow::anyhow!("Tally response contained an empty required value"))
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+/// Lowercase hex SHA-256 of `bytes`. The one digest helper for callers outside
+/// this crate that hash a rendered request.
+pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut encoded = String::with_capacity(64);
     for byte in Sha256::digest(bytes) {
         write!(&mut encoded, "{byte:02x}").expect("writing to a String cannot fail");

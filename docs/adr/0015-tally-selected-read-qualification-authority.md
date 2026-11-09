@@ -241,3 +241,14 @@ The `vouchers_v2` profile, the `bridge.tally.vouchers/2` parser that read it, an
 steps of `tools/bridge-tally-live-read` that sent it were deleted. No shipped path sent that
 report; shipped voucher reads use native Tally shapes. The `ledgers_v1` profile stays until #609
 decides it. The decision text above is unchanged.
+
+## Note (2026-10-28, part of #1570)
+
+The `ledgers_v1` profile, its renderer, the `bridge.tally.ledgers/1` parser that read it and the
+simulator corpus that only that parser read were deleted. No shipped path sent that report, and its
+only sender, `tools/bridge-tally-live-read`, was deleted under #1745. `audit_ledgers_v1` is a
+different profile and stays, as do the `bridge.tally.ledgers/1` and `bridge.tally.vouchers/3`
+strings that local database constraints name. With no Bridge-defined report left whose `$$`
+function takes a spaced identifier, no profile is refused to an Education endpoint; the check and
+its test stay, so a new such profile fails until it is guarded. The decision text above is
+unchanged.

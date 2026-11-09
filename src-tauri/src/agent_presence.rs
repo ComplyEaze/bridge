@@ -5,7 +5,9 @@
 //! `docs/adr/0017-voucher-presence-authority.md`. This file owns only the two
 //! qualified reads that produce the evidence, the typed parse of the caller's
 //! proposals, and the response shape.
+use super::vouchers::VoucherComposites;
 use super::*;
+use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
 use std::collections::BTreeSet;
 
 use bridge_tally_core::book_presence::{
@@ -124,20 +126,32 @@ impl Server {
                 .await?;
 
             let read = self
-                .read_entry_wildcard_window(
+                .read_entry_window_rows(
                     &identity,
                     &company.name,
                     &from,
                     &to,
-                    None,
-                    SmallBooks::Count,
+                    VoucherReadShape::EntryWildcard,
+                    VoucherComposites::Withhold,
+                    GstDetailsShown::Withheld,
                 )
                 .await?;
             accumulate(&mut accumulated, read.all_evidence());
             let source_marks = read.witness.as_ref().map(|witness| witness.marks);
             let counted = read.counted();
-            let rows =
-                validate_then_filter_voucher_rows(read.rows, from.as_str(), to.as_str(), None)?;
+            // A failed base read refuses by its own code: it is not an amount that cannot be read.
+            let book = self
+                .composite_base(&identity, &read.rows, &mut accumulated)
+                .await
+                .map_err(|error| {
+                    ToolFailure::from_runtime("company_currency_probe_failed", error)
+                })?;
+            let rows = validate_then_filter_voucher_rows(
+                rows_read_whole(read.rows, book.as_ref())?,
+                from.as_str(),
+                to.as_str(),
+                None,
+            )?;
 
             // The window is independent evidence about which ledgers exist.
             // A row posting to an unlisted ledger proves the first catalogue
@@ -176,7 +190,6 @@ impl Server {
                         &company.name,
                         &from,
                         &to,
-                        None,
                         source_marks,
                     )
                     .await?;
@@ -440,6 +453,26 @@ fn book_numbering_json(found: Option<&VoucherTypeNumbering>) -> (Value, bool) {
             ),
         },
     }
+}
+
+/// The window's rows, each composite read under the book's base as its rupee amount, as
+/// `vouchers` reads it (#683). Presence matches amounts, so a voucher still withheld refuses the
+/// window: it is never passed over, which could let a proposal it would have matched read as
+/// absent.
+fn rows_read_whole(
+    rows: Vec<VoucherRow>,
+    book: Option<&IdentifiedBaseCurrency>,
+) -> Result<Vec<Value>, String> {
+    rows.into_iter()
+        .map(|row| match book {
+            Some(book) => row.read_under(book),
+            None => row,
+        })
+        .map(|row| match row {
+            VoucherRow::Read(row) => Ok(row),
+            VoucherRow::Withheld(_) => Err(WITHHELD_FOREIGN_CURRENCY.to_string()),
+        })
+        .collect()
 }
 
 fn accumulate(target: &mut Option<Evidence>, next: Evidence) {

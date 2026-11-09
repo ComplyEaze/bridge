@@ -1,0 +1,419 @@
+# fixture: tests/fixtures/agent/gst-ledger-l1/s6-03nov-P-1.utf16le.xml
+# parser: parse_native_ledger_snapshot_for_company(GST LEDGER LAB)
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "430.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 Computer",
+        parent: Some(
+            "Fixed Assets",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-40000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 Discount Allowed",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 Freight Direct",
+        parent: Some(
+            "Direct Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-2000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 Freight Inward",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 Interest on GST",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-50.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 Professional Fees",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-35000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 Rent",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-514180.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "GS1 TDS Payable",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "1000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input CGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-50800.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input IGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-5400.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input SGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-51300.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output CGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-780.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output SGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-280.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-552330.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Purchase - Goods",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-10000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "SYN GS1 Customer",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "1180.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "SYN GS1 Supplier",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "708280.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+])

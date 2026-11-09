@@ -26,6 +26,27 @@ UUID_OR_DIGEST_RE = re.compile(
     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{12}|[0-9A-Fa-f]{32,}"
 )
+# A tax-audit mutation record's two 16-hex digests. A value is masked only on a line shaped as the mutation runner writes
+# a record: from its start, optional spaces or tabs, a quoted record id, a colon and `{"commit": "<40 lowercase hex>"`.
+# The scan has no path, so a line of that shape is masked wherever it sits in the scanned text; the same key and value
+# on any other line (a title, a commit message, a path, a source literal) are still scanned. On a record line, the value
+# of each `"mutation": "` and `"crate_tree": "` key that is exactly 16 of 0-9a-f with at least one letter is masked; an
+# all-digit value is still scanned. Within a masked value the scan is blind to any shape made of digits and the letters
+# a-f, up to 16 characters: a digit run of up to 15, or a lowercase PAN whose letters are all a-f.
+RECORD_LINE_RE = re.compile(r'^[ \t]*"[A-Za-z0-9_-]{1,32}": \{"commit": "[0-9a-f]{40}"[^\n]*', re.M)
+RECORD_DIGEST_RE = re.compile(r'("(?:mutation|crate_tree)": ")(?=[0-9a-f]{0,15}[a-f])[0-9a-f]{16}(")')
+# #2367: a registry integrity value in a JavaScript lockfile is base64, so the hex digest mask above never covers it, and
+# its random body can hold an identifier-shaped run that no change in the pull request can alter. It is masked as a digest
+# only where three things hold: the added line belongs to the repository's one lockfile, at exactly the path in
+# LOCKFILE_PATHS (a file of that name anywhere else is scanned as before, so a new lockfile cannot carry an exemption in);
+# the value is in the exact form pnpm writes, `resolution: {integrity: <value>`, and is followed by `}` or `,`; and the value is `sha512-` with its 86 base64 characters and
+# `==`, or `sha256-` with 43 and `=`. Anything else in a lockfile, and any such text in another file, is scanned as before.
+LOCKFILE_PATHS = frozenset(("pnpm-lock.yaml",))
+LOCKFILE_INTEGRITY_RE = re.compile(
+    r"(?<=resolution: \{integrity: )"
+    r"(?:sha512-[A-Za-z0-9+/]{86}==|sha256-[A-Za-z0-9+/]{43}=)"
+    r"(?=[},])"
+)
 ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
 # Boundaries include ordinary words plus snake/kebab field names and the first
@@ -37,8 +58,21 @@ CREDENTIAL_CONTEXT_RE = re.compile(
     r"(?:credential|session|token|bearer)(?:[_-]|(?=[A-Z])))",
     re.I,
 )
-EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)(?![A-Za-z0-9._%+-])")
+# The domain ends before any character that cannot continue it: anything but a letter or digit, or a full stop that no
+# letter or digit follows (`… .test.`, `… .test.)`, `… .test..`). A full stop followed by a letter or digit continues it.
+EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)(?!\.?[A-Za-z0-9])")
 EXAMPLE_EMAIL_DOMAINS = {"example.com", "example.org", "example.net", "example.invalid"}
+# A package specifier, such as a pnpm lockfile's name, an at sign and `1.2.3` (or `5.0.0-beta.1`), has the address
+# shape. It is not counted when its domain is a full semantic version whose last label is neither all letters nor an
+# internationalised `xn--` form: a top-level domain is always one of those two, so such a domain is never deliverable.
+# A prerelease ending in letters (`1.2.3-rc.mail.com`) is a real hostname and still counts, as do four numeric labels
+# and a leading zero. A specifier followed by an at sign, at once or after any local-part characters (full stops too),
+# still counts: its greedy domain may have taken the local part of an address written against it, which the scan
+# would otherwise never see.
+# What may follow a specifier's domain and still finish an address whose local part the domain took, or that is
+# written against it after full stops: any local-part characters, then the at sign.
+ADDRESS_TAIL_RE = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]*@")
+SEMVER_DOMAIN_RE = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?")
 # This is a single known public automated-contributor identity, not an
 # email-domain allowlist. It is eligible only in the exact Git attribution
 # trailer parsed below; PR bodies, source files, names, and all other
@@ -286,10 +320,19 @@ def tokenize_credential_literals(text, record):
     return "".join(retained)
 
 
+def is_package_specifier_domain(domain):
+    last = domain.rsplit(".", 1)[-1].lower()
+    return SEMVER_DOMAIN_RE.fullmatch(domain) is not None and not last.isalpha() and not last.startswith("xn--")
+
+
 def customer_email_count(text):
+    # A match on an example domain or a package specifier is not counted, unless an at sign follows it within
+    # local-part characters: the match may then have taken the start of an address the scan would otherwise never see.
     count = 0
     for match in EMAIL_RE.finditer(text):
-        if match.group(1).lower() not in EXAMPLE_EMAIL_DOMAINS:
+        domain = match.group(1)
+        allowed = domain.lower() in EXAMPLE_EMAIL_DOMAINS or is_package_specifier_domain(domain)
+        if not allowed or ADDRESS_TAIL_RE.match(text, match.end()):
             count += 1
     return count
 
@@ -464,6 +507,42 @@ def redact_shapes(text):
     return text
 
 
+def mask_record_digests(text):
+    """Mask the record digests on each mutation record line of `text` (RECORD_LINE_RE); return the text and the count."""
+    masked = 0
+
+    def on_line(match):
+        nonlocal masked
+        line, count = RECORD_DIGEST_RE.subn(r"\1<digest>\2", match.group(0))
+        masked += count
+        return line
+
+    return RECORD_LINE_RE.sub(on_line, text), masked
+
+
+def is_lockfile(path):
+    """Whether `path` is exactly one of LOCKFILE_PATHS, the repository's own lockfile."""
+    return path in LOCKFILE_PATHS
+
+
+def mask_lockfile_integrity(path, text):
+    """Mask each lockfile integrity value of `text` (LOCKFILE_INTEGRITY_RE) when `path` is a lockfile; return text and count."""
+    if not is_lockfile(path):
+        return text, 0
+    return LOCKFILE_INTEGRITY_RE.subn("<digest>", text)
+
+
+def mask_lockfile_payload(added):
+    """The added lines with lockfile integrity values masked, and how many were. `added` is [{"path", "text"}]."""
+    lines = []
+    masked = 0
+    for item in added:
+        line, count = mask_lockfile_integrity(item["path"], item["text"])
+        lines.append(line)
+        masked += count
+    return lines, masked
+
+
 def scan(text, head, fixture_provenance=None):
     record = result_record()
     decoded, utf16_runs = decode_utf16_runs(text)
@@ -487,8 +566,11 @@ def scan(text, head, fixture_provenance=None):
         add(record, "blockers", "privacy scan found %d customer email shape(s)" % email_count)
 
     uuid_tokenized = tokenize_uuids(credential_tokenized, allowed, record)
-    redacted = UUID_OR_DIGEST_RE.sub("<digest>", uuid_tokenized)
-    exempt = len(UUID_OR_DIGEST_RE.findall(uuid_tokenized))
+    record_masked, record_digests = mask_record_digests(uuid_tokenized)
+    if record_digests:
+        add(record, "notes", "%d mutation-record digest(s) were masked" % record_digests)
+    redacted = UUID_OR_DIGEST_RE.sub("<digest>", record_masked)
+    exempt = len(UUID_OR_DIGEST_RE.findall(record_masked))
     if exempt:
         add(record, "notes", "%d added/path line(s) carried generated UUID/digest shapes; inspect those lines" % exempt)
 
@@ -550,7 +632,7 @@ def explain(document, head, fixture_provenance=None):
         for number, line in enumerate(source["text"].split("\n"), 1):
             check(_where(source["label"], number), line)
     for item in document["added"]:
-        check(_where(item["path"], item["line"]), item["text"])
+        check(_where(item["path"], item["line"]), mask_lockfile_integrity(item["path"], item["text"])[0])
     return {"hits": hits, "truncated": truncated}
 
 
@@ -569,6 +651,11 @@ def main(argv=None):
         "(never the values) of the lines that trip the scan. Needs --head.",
     )
     parser.add_argument(
+        "--mask-lockfile-integrity", action="store_true",
+        help="Read {\"added\": [{\"path\", \"text\"}]} on stdin and print {\"payload\": [...], \"masked\": N}: "
+        "the added lines with lockfile integrity values masked.",
+    )
+    parser.add_argument(
         "--redact-public-agent-attribution-messages", action="store_true",
         help="Read a JSON array of commit messages and redact only the known public-agent address in exact Git trailers.",
     )
@@ -579,6 +666,19 @@ def main(argv=None):
         except UnicodeError:
             return 0
         sys.stdout.write(redact_shapes(text))
+        return 0
+    if args.mask_lockfile_integrity:
+        try:
+            document = json.load(sys.stdin)
+        except (UnicodeError, ValueError) as error:
+            parser.error(str(error))
+        added = document.get("added") if isinstance(document, dict) else None
+        if not isinstance(added, list) or not all(
+            isinstance(x, dict) and isinstance(x.get("path"), str) and isinstance(x.get("text"), str) for x in added
+        ):
+            parser.error("mask input is malformed")
+        lines, masked = mask_lockfile_payload(added)
+        print(json.dumps({"payload": lines, "masked": masked}))
         return 0
     if args.redact_public_agent_attribution_messages:
         try:

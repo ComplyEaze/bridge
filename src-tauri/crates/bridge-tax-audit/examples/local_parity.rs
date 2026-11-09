@@ -42,10 +42,10 @@
 //!
 //! **Identity binding.** `CLIENT_TOML`'s `[ledger_ids]`/`[group_ids]` are resolved through
 //! `Engagement::bind` (`src/binding.rs`, `docs/tax-audit/config-identity-binding-v1.md`) exactly
-//! as the reference implementation's `tae/binding.py` resolves them for its own tests, letting a
+//! as the reference implementation's binding resolves them for its own tests, letting a
 //! renamed ledger or group bound by identity in the TOML read correctly here too. `python_golden.py`
 //! binds the same way now: it calls `bind_config` before building its `Engagement`, mirroring
-//! `tae/run.py`'s own `load()`, so a renamed ledger's identity entry (or a bare name that still
+//! the reference implementation's own `load()`, so a renamed ledger's identity entry (or a bare name that still
 //! matches) resolves on both sides of the comparison, not just this one. Those two tables are
 //! written for the reference implementation's FULL pack, though, and a real client TOML typically
 //! binds many labels this port never reads (`gst_outward`, ...);

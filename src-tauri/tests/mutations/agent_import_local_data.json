@@ -1,7 +1,7 @@
 {
   "file": "src-tauri/src/agent_import_local_data.rs",
   "base_commit": "76705cfb",
-  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's own tests (agent_import_local_data_tests.rs). killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Two of the 178 hand-written mutants (L228 and L597) failed in that run, each in a different test that does not reach this file (four financial_mode_tests drain tests for L228, each timed out waiting for a request; one approved_import test_seam dialog test for L597). The failing tests were run alone three times under each mutant and three times at base, and every run passed; the whole_set run was repeated once for each of the two and both survived all 4931 tests. Those failures were flakes, not kills: L228 and L597 count as survivors of the whole_set run, as the rest do, and the record credits no flaky test as a killer. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is neither killed nor equivalent starts \"not killed, and not equivalent:\" and is counted under accepted_not_equivalent. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. A mutant whose edit does not compile is recorded as unviable with the compiler's reason, not as caught. The survivors_again run was made against the 82 tests of the file's own test module (agent::agent_import::local_data::tests::), a subset of the tool and hand runs' filter in which every test this change adds lives and the only module whose tests the change alters; the other tests of the filter are as at base, so a mutant that survived the filter at base cannot be killed by them now. The first 177 mutants of it ran with 81 tests; L651 ran after the 82nd was added. Every run was made on macOS with CARGO_INCREMENTAL=1 and CARGO_PROFILE_DEV_DEBUG=0 (the object files and incremental cache of the shared target folder were cleared during the hand run to keep each build from slowing). The file has platform-specific code: the cfg(windows) arm of local_app_data reads LOCALAPPDATA and the cfg(not(windows)) arm returns None. A mutant inside the Windows arm is not compiled into the macOS build, so the macOS runs measure it as the base; a mutant that only changes what Windows does (L450 to L453, L522, L671 and the tool's replacement of local_app_data by None) is recorded not killed and not equivalent, and is held only by tests that run in the Windows native job (on_windows_local_app_data_is_the_variable_of_that_name_and_no_other, and cfg(windows) assertions of no_path_is_in_the_json_unless_asked and the_report_command_names_the_folders_it_read_only_when_asked). Those tests were type-checked on macOS by gating them temporarily cfg(unix) and ignored; the gate is not in the commit. No mutation run was made on Windows. The new tests that need Unix permissions or links (a folder that can be read but not searched, one that cannot be read, a link for a folder, a file where a folder should be) are cfg(unix) and run on macOS and Linux; the rest run on Windows too. The two that read a folder made unreadable (entries_of_a_folder_that_cannot_be_searched_are_each_one_unreadable_entry, and the last case of a_kept_audit_read_that_cannot_be_listed_is_named_lab_and_nothing_else) return early when the folder can be read through its mode (root), as a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one does. The report command is run by a test as a child of the test binary (the same pattern as endpoint_coordination_tests and paths_tests), with the data folder, home and profile variables set to temporary folders; it reads the real coordination (lease) folder of the user read-only, as the_tool_reports_without_a_path_and_takes_no_arguments already does through tool_payload, and asserts nothing about its content. a_folder_of_exactly_the_entry_cap_is_complete_and_one_more_is_capped creates 100,001 empty files in a temporary folder (about 14 s on the Mac used). The hand-written mutants (L01 to L701) change, one at a time and by function (the count of mutants in brackets): Report::incomplete_reason (30: each reason's condition dropped, negated and with its operator changed, each reason's code, their order); Report::account (27: the file test, the link test, each counter and its increment, the oldest time and its min); the constants ENTRY_CAP (one less, one more, zero), FILE_LOCATION_SAMPLE (one less, one more, zero), DATA_FOLDER_UNREADABLE, JOURNAL_FILE, LEASES_FOLDER, JOURNAL_UNREADABLE, JOURNAL_READ_FAILED, JOURNAL_INVALID (each changed, and two made another's value); CLASSES (11: each class renamed, the first left out); import_class (47: each suffix changed and each test dropped, each || as && and the contains test); is_baseline_addition (17); is_link (7); scan_directory (42); scan_audit_reads (34); build (89: the initial report, both early returns, the classes, each subfolder's classifier and known folders, the labels, the two journal reads and their 100 ms waits, the leases scan); note_not_listed (5); is_dangling_link (7); scan_leases (24); file_sample (7); file_locations (2); file_locations_capped (38); relative_to (17); package_copy_folders (24); package_copies (7); local_app_data (6, inside and outside the Windows arm); read_journal_once (18); read_journal (1); read_journal_at (14); read_master_journal_once (10); read_master_journal (11); age_days (10); to_json (4); to_json_resolving (134: each class, key and value of the JSON, the three folder words, the journal and master journal objects, each count under its key, the paths branch and the lock folders); tool_payload (8); folders (6); run (14: the paths test, the report and the note and the streams they go to, the printed test, the clock); exit_status (16: each branch, its value and the order of the tests). Not mutated: the derive lists, the items' visibility, the doc comments and other comments, the use lines, the ClassOf alias, the test module's attribute and path, the initial values of the report built in build other than journal_line, and the exact wording of a file name the report matches that is not listed above; every edit above is one change, so none of the lists above is every possible change to the line it names. 154 edits (L02, L07, L11, L21, L23, L29, L35, L46, L49, L58, L71, L72, L84, L86, L97, L98, L99, L100, L101, L105, L108, L111, L112, L114, L115, L120, L126, L128, L138, L139, L142, L143, L145, L147, L162, L167, L181, L182, L183, L193, L194, L198, L200, L207, L210, L221, L223, L224, L229, L241, L244, L251, L253, L255, L256, L261, L265, L280, L282, L283, L285, L286, L289, L296, L304, L306, L307, L320, L322, L325, L326, L329, L330, L332, L347, L351, L357, L359, L361, L367, L375, L376, L389, L390, L398, L403, L413, L414, L421, L424, L425, L428, L431, L433, L434, L436, L437, L439, L450, L453, L457, L464, L466, L468, L470, L473, L474, L475, L476, L477, L479, L481, L484, L494, L505, L506, L509, L515, L519, L526, L537, L539, L555, L558, L571, L581, L583, L585, L595, L599, L600, L607, L608, L609, L611, L614, L619, L623, L625, L648, L649, L650, L654, L656, L660, L667, L673, L674, L681, L688, L692, L695, L696 and L697) were changed to an equivalent edit of the same kind (the replacement written with one or more trailing spaces, a no-op in Rust outside a literal), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses. Of the 701 hand-written mutants, 4 do not compile, 519 were caught at base and 178 survived the filtered run and the whole_set run; of those, this change's tests kill 136; 42 remain: 10 are equivalent and 32 are not killed and not equivalent (the reason of each is in accepted_survivors; the ones that only a Windows host can see are held by the tests named above, and the rest cannot be reached by any test on any host used). Of the 154 mutants the tool found, 11 do not compile, 121 were caught at base and 22 survived; this change's tests kill 16 of those 22 and 6 remain (1 equivalent, 5 not killed and not equivalent). In every run the file was byte for byte as at base_commit, checked after each restore (and, for the tool, after the run); the restore was a copy, never a rename. In the tool, hand and whole_set runs the test modules were as at base_commit; in survivors_again they are as this change leaves them.",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's own tests (agent_import_local_data_tests.rs). killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Two of the 180 hand-written mutants (L228 and L597) failed in that run, each in a different test that does not reach this file (four financial_mode_tests drain tests for L228, each timed out waiting for a request; one approved_import test_seam dialog test for L597). The failing tests were run alone three times under each mutant and three times at base, and every run passed; the whole_set run was repeated once for each of the two and both survived all 4931 tests. Those failures were flakes, not kills: L228 and L597 count as survivors of the whole_set run, as the rest do, and the record credits no flaky test as a killer. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is neither killed nor equivalent starts \"not killed, and not equivalent:\" and is counted under accepted_not_equivalent. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. A mutant whose edit does not compile is recorded as unviable with the compiler's reason, not as caught. The survivors_again run was made against the 82 tests of the file's own test module (agent::agent_import::local_data::tests::), a subset of the tool and hand runs' filter in which every test this change adds lives and the only module whose tests the change alters; the other tests of the filter are as at base, so a mutant that survived the filter at base cannot be killed by them now. A mutant that this run kills was run against the tests that existed when it ran (81 of the 82 for most, the 82nd having been added for L651), and every test of those is among the 82, so a mutant killed by them is killed by the 82; every mutant that remains (each entry of accepted_survivors) was run again against all 82. Every run was made on macOS with CARGO_INCREMENTAL=1 and CARGO_PROFILE_DEV_DEBUG=0 (the object files and incremental cache of the shared target folder were cleared during the hand run to keep each build from slowing). The file has platform-specific code: the cfg(windows) arm of local_app_data reads LOCALAPPDATA and the cfg(not(windows)) arm returns None. A mutant inside the Windows arm is not compiled into the macOS build, so the macOS runs measure it as the base; a mutant that only changes what Windows does (L450 to L453, L522, L671 and the tool's replacement of local_app_data by None) is recorded not killed and not equivalent, and is held only by tests that run in the Windows native job (on_windows_local_app_data_is_the_variable_of_that_name_and_no_other, and cfg(windows) assertions of no_path_is_in_the_json_unless_asked and the_report_command_names_the_folders_it_read_only_when_asked). Those tests were type-checked on macOS by gating them temporarily cfg(unix) and ignored; the gate is not in the commit. No mutation run was made on Windows. The new tests that need Unix permissions or links (a folder that can be read but not searched, one that cannot be read, a link for a folder, a file where a folder should be) are cfg(unix) and run on macOS and Linux; the rest run on Windows too. The two that read a folder made unreadable (entries_of_a_folder_that_cannot_be_searched_are_each_one_unreadable_entry, and the last case of a_kept_audit_read_that_cannot_be_listed_is_named_lab_and_nothing_else) return early when the folder can be read through its mode (root), as a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one does. The report command is run by a test as a child of the test binary (the same pattern as endpoint_coordination_tests and paths_tests), with the data folder, home and profile variables set to temporary folders; it reads the real coordination (lease) folder of the user read-only, as the_tool_reports_without_a_path_and_takes_no_arguments already does through tool_payload, and asserts nothing about its content. a_folder_of_exactly_the_entry_cap_is_complete_and_one_more_is_capped creates 100,001 empty files in a temporary folder (about 14 s on the Mac used). The hand-written mutants (L01 to L701) change, one at a time and by function (the count of mutants in brackets): Report::incomplete_reason (30: each reason's condition dropped, negated and with its operator changed, each reason's code, their order); Report::account (27: the file test, the link test, each counter and its increment, the oldest time and its min); the constants ENTRY_CAP (one less, one more, zero), FILE_LOCATION_SAMPLE (one less, one more, zero), DATA_FOLDER_UNREADABLE, JOURNAL_FILE, LEASES_FOLDER, JOURNAL_UNREADABLE, JOURNAL_READ_FAILED, JOURNAL_INVALID (each changed, and two made another's value); CLASSES (11: each class renamed, the first left out); import_class (47: each suffix changed and each test dropped, each || as && and the contains test); is_baseline_addition (17); is_link (7); scan_directory (42); scan_audit_reads (34); build (89: the initial report, both early returns, the classes, each subfolder's classifier and known folders, the labels, the two journal reads and their 100 ms waits, the leases scan); note_not_listed (5); is_dangling_link (7); scan_leases (24); file_sample (7); file_locations (2); file_locations_capped (38); relative_to (17); package_copy_folders (24); package_copies (7); local_app_data (6, inside and outside the Windows arm); read_journal_once (18); read_journal (1); read_journal_at (14); read_master_journal_once (10); read_master_journal (11); age_days (10); to_json (4); to_json_resolving (134: each class, key and value of the JSON, the three folder words, the journal and master journal objects, each count under its key, the paths branch and the lock folders); tool_payload (8); folders (6); run (14: the paths test, the report and the note and the streams they go to, the printed test, the clock); exit_status (16: each branch, its value and the order of the tests). Not mutated: the derive lists, the items' visibility, the doc comments and other comments, the use lines, the ClassOf alias, the test module's attribute and path, the initial values of the report built in build other than journal_line, and the exact wording of a file name the report matches that is not listed above; every edit above is one change, so none of the lists above is every possible change to the line it names. 154 edits (L02, L07, L11, L21, L23, L29, L35, L46, L49, L58, L71, L72, L84, L86, L97, L98, L99, L100, L101, L105, L108, L111, L112, L114, L115, L120, L126, L128, L138, L139, L142, L143, L145, L147, L162, L167, L181, L182, L183, L193, L194, L198, L200, L207, L210, L221, L223, L224, L229, L241, L244, L251, L253, L255, L256, L261, L265, L280, L282, L283, L285, L286, L289, L296, L304, L306, L307, L320, L322, L325, L326, L329, L330, L332, L347, L351, L357, L359, L361, L367, L375, L376, L389, L390, L398, L403, L413, L414, L421, L424, L425, L428, L431, L433, L434, L436, L437, L439, L450, L453, L457, L464, L466, L468, L470, L473, L474, L475, L476, L477, L479, L481, L484, L494, L505, L506, L509, L515, L519, L526, L537, L539, L555, L558, L571, L581, L583, L585, L595, L599, L600, L607, L608, L609, L611, L614, L619, L623, L625, L648, L649, L650, L654, L656, L660, L667, L673, L674, L681, L688, L692, L695, L696 and L697) were respelled with one or more added spaces, because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses. A space is added only where Rust allows whitespace between two tokens: at the end of the replacement when that falls between two tokens, otherwise inside the replacement or in context added to both the from and the to text, and never inside a string literal, a comment or an operator. Each respelled edit was checked with a lexer for Rust: the file after the edit has the same sequence of tokens (a string literal, a comment, an operator such as && or //, a name or a number each counting as one) as the file after the same edit written without the added spaces. Of the 701 hand-written mutants, 1 (L63) is unviable (it does not compile), 520 were caught at base and 180 survived the filtered run and the whole_set run; of those, this change's tests kill 137; 43 remain: 10 are equivalent and 33 are not killed and not equivalent (the reason of each is in accepted_survivors; the ones that only a Windows host can see are held by the tests named above, and the rest cannot be reached by any test on any host used). Of the 154 mutants the tool found, 11 do not compile, 121 were caught at base and 22 survived; this change's tests kill 16 of those 22 and 6 remain (1 equivalent, 5 not killed and not equivalent). In every run the file was byte for byte as at base_commit, checked after each restore (and, for the tool, after the run); the restore was a copy, never a rename. In the tool, hand and whole_set runs the test modules were as at base_commit; in survivors_again they are as this change leaves them.",
   "runs": [
     {
       "run": "tool",
@@ -23,14 +23,14 @@
       "run": "whole_set",
       "tests_at": "base",
       "tests_run": 4931,
-      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 178 hand-written mutants the filtered run missed, and for the tool's 22 missed mutants by cargo mutants --re '<their names>' -- -E 'all()'; the unmutated baseline passed all 4931 (8 skipped)",
+      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 180 hand-written mutants the filtered run missed, and for the tool's 22 missed mutants by cargo mutants --re '<their names>' -- -E 'all()'; the unmutated baseline passed all 4931 (8 skipped)",
       "tree": "base_commit"
     },
     {
       "run": "survivors_again",
       "tests_at": "this_commit",
       "tests_matching_filter": 82,
-      "command": "as the hand run with -E 'test(/agent::agent_import::local_data::tests::/)', for the 178 hand-written mutants and (by cargo mutants --re, with the same filter) the tool's 22 that survived the whole_set run",
+      "command": "as the hand run with -E 'test(/agent::agent_import::local_data::tests::/)', for the 180 hand-written mutants and (by cargo mutants --re, with the same filter) the tool's 22 that survived the whole_set run; the ones that stayed missed were then run once more, all against the 82 tests",
       "tree": "base_commit with the tests this change adds"
     }
   ],
@@ -41,13 +41,13 @@
       "unviable": 11
     },
     "hand": {
-      "caught": 655,
-      "missed": 42,
-      "unviable": 4
+      "caught": 657,
+      "missed": 43,
+      "unviable": 1
     },
     "survived_at_base": {
       "tool": 22,
-      "hand": 178
+      "hand": 180
     },
     "equivalent": {
       "tool": 1,
@@ -55,7 +55,7 @@
     },
     "accepted_not_equivalent": {
       "tool": 5,
-      "hand": 32
+      "hand": 33
     }
   },
   "tool_results": {
@@ -1851,13 +1851,14 @@
       "edits": [
         {
           "from": "\"journal\",\n    \"",
-          "to": "\"journals\",\n    \" "
+          "to": "\"journals\",\n     \""
         }
       ],
-      "mutation": "4c15512d9ce2e9a6a4eb48f2bc530c9f",
+      "mutation": "89cffbdd9d5099052e3f92d1998e83d0",
       "verdict": "caught",
-      "killer": "agent::agent_import::local_data::tests::a_symlink_is_counted_and_never_followed",
-      "killer_at": "base"
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::local_data::tests::an_empty_folder_lists_all_ten_classes_at_zero",
+      "killer_at": "this_commit"
     },
     "L73": {
       "what": "CLASSES: the class import_files renamed",
@@ -2417,11 +2418,11 @@
       "applied_to": "src-tauri/src/agent_import_local_data.rs",
       "edits": [
         {
-          "from": "masters_doubt.json\")\n        || name.ends_with(\".masters_ack",
-          "to": "masters_ack  "
+          "from": "\".masters_doubt.json\")\n        || name.ends_with(\".masters_ack",
+          "to": "   \".masters_ack"
         }
       ],
-      "mutation": "939da3c3427dc93d2a439bf00c77aea9",
+      "mutation": "4c2324d7164ab3cec3eff59573bcba3f",
       "verdict": "caught",
       "killer": "agent::agent_import::local_data::tests::files_are_classed_by_name_and_sizes_add_up",
       "killer_at": "base"
@@ -2446,11 +2447,11 @@
       "applied_to": "src-tauri/src/agent_import_local_data.rs",
       "edits": [
         {
-          "from": "masters_ack.json\")\n        || name.ends_with(\".",
-          "to": "  "
+          "from": "\".masters_ack.json\")\n        || name.ends_with(\".",
+          "to": "  \"."
         }
       ],
-      "mutation": "6cec606fb635fac839aaba61cadc85c4",
+      "mutation": "77a81b921587b813df65046e8adf0be4",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::local_data::tests::each_import_file_suffix_has_its_class_and_a_near_miss_has_none",
@@ -2533,11 +2534,11 @@
       "applied_to": "src-tauri/src/agent_import_local_data.rs",
       "edits": [
         {
-          "from": "masters_verdict.json\")\n        || name.ends_with(\".",
-          "to": " "
+          "from": "\".masters_verdict.json\")\n        || name.ends_with(\".",
+          "to": " \"."
         }
       ],
-      "mutation": "25de18a9c698dab2c625e15cb34f78ef",
+      "mutation": "8b72c9f34aaa420c1f99b8a314bb9c7c",
       "verdict": "caught",
       "killer": "agent::agent_import::local_data::tests::files_are_classed_by_name_and_sizes_add_up",
       "killer_at": "base"
@@ -3402,10 +3403,10 @@
       "edits": [
         {
           "from": "name == \".proof",
-          "to": "name != \".proof "
+          "to": "name !=  \".proof"
         }
       ],
-      "mutation": "80878ef049d2289ba27a6de1ec45ea9c",
+      "mutation": "1d54bed1d16ea29d9c4eb9621fe94b68",
       "verdict": "caught",
       "killer": "agent::agent_import::local_data::tests::files_are_classed_by_name_and_sizes_add_up",
       "killer_at": "base"
@@ -3416,10 +3417,10 @@
       "edits": [
         {
           "from": "name == \".build",
-          "to": "name != \".build "
+          "to": "name !=  \".build"
         }
       ],
-      "mutation": "9b99de6a3875053eb1512aff06e930f8",
+      "mutation": "1f9a383a893f06354d5688f67b54c9ce",
       "verdict": "caught",
       "killer": "agent::agent_import::local_data::tests::files_are_classed_by_name_and_sizes_add_up",
       "killer_at": "base"
@@ -3570,10 +3571,10 @@
       "edits": [
         {
           "from": ")),\n            Err(_) => report.unreadable += 1,\n        }\n    }\n}\n\n/// The",
-          "to": ")),\n            Err(_) => {}\n        }\n    }\n}\n\n/// The  "
+          "to": ")),\n            Err(_) => {}\n        }\n    }\n}\n\n  /// The"
         }
       ],
-      "mutation": "e0f78b076c11ce893e5b7bab171bcf87",
+      "mutation": "c79f3f368b842cca5382e16c5cbb2e64",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::local_data::tests::entries_of_a_folder_that_cannot_be_searched_are_each_one_unreadable_entry",
@@ -3629,10 +3630,10 @@
       "edits": [
         {
           "from": "     Err(error) if error.kind() == ErrorKind::NotFound => return,\n        Err(_) => {\n            note_not_listed(report, \"",
-          "to": "     Err(error) if error.kind() == ErrorKind::NotFound => {\n            note_not_listed(report, \"lab\");\n            return;\n        }\n        Err(_) => {\n            note_not_listed(report, \" "
+          "to": "     Err(error) if error.kind() == ErrorKind::NotFound => {\n            note_not_listed(report, \"lab\");\n            return;\n        }\n        Err(_) => {\n            note_not_listed(report,  \""
         }
       ],
-      "mutation": "e59675ae902a79505bb84e64b941ae94",
+      "mutation": "9472e257fa7876f453f4161abb496ce2",
       "verdict": "caught",
       "killer": "agent::agent_import::local_data::tests::a_complete_report_has_no_reason_and_each_gap_has_its_own",
       "killer_at": "base"
@@ -4074,10 +4075,10 @@
       "edits": [
         {
           "from": "read),\n            Err(_) => report.unreadable += 1,\n        }\n    }\n}\n\n/// Take",
-          "to": "read),\n            Err(_) => {}\n        }\n    }\n}\n\n/// Take "
+          "to": "read),\n            Err(_) => {}\n        }\n    }\n}\n\n  /// Take"
         }
       ],
-      "mutation": "40844ef8d1d07024b63d3e6f8f45cf71",
+      "mutation": "a40b6a0ccd7892a822c2b35612cd254e",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::local_data::tests::entries_of_a_folder_that_cannot_be_searched_are_each_one_unreadable_entry",
@@ -4287,12 +4288,13 @@
       "edits": [
         {
           "from": "ErrorKind::NotFound &",
-          "to": "ErrorKind::PermissionDenied & "
+          "to": "ErrorKind::PermissionDenied   &"
         }
       ],
-      "mutation": "dfec54617ef3d14fe019875e0547aaee",
-      "verdict": "unviable",
-      "reason": "does not compile: no implementation for `std::io::ErrorKind & &bool`"
+      "mutation": "0e8e6df1fd5cce619108b9d5d25885c0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::local_data::tests::a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one",
+      "killer_at": "base"
     },
     "L245": {
       "what": "build: the dangling-link test dropped",
@@ -5379,10 +5381,10 @@
       "edits": [
         {
           "from": "label);\n    }\n}\n\n//",
-          "to": "label);\n        report.folders_not_read.push(label);\n    }\n}\n\n// "
+          "to": "label);\n        report.folders_not_read.push(label);\n    }\n}\n\n //"
         }
       ],
-      "mutation": "19a6e24b0242dfc5c54492f437015cee",
+      "mutation": "f9b76eb84a0c52e7c962398b03a605ab",
       "verdict": "caught",
       "killer": "agent::agent_import::local_data::tests::a_folder_that_cannot_be_listed_is_named_and_not_read_as_empty",
       "killer_at": "base"
@@ -8007,12 +8009,12 @@
       "edits": [
         {
           "from": "\n    first\n}\n\n/",
-          "to": "\n    read_master_journal_once(&path)\n}\n\n/ "
+          "to": "\n    read_master_journal_once(&path)\n}\n\n /"
         }
       ],
-      "mutation": "010537ef109e31d5fedffde43d50debd",
-      "verdict": "unviable",
-      "reason": "does not compile: expected item, found `/`"
+      "mutation": "576fc37ecb6b1e22b81b9ddc72e6a5a9",
+      "verdict": "missed",
+      "equivalent": false
     },
     "L510": {
       "what": "age_days: seconds times a day",
@@ -8430,12 +8432,13 @@
       "edits": [
         {
           "from": "json!({\"state\": \"absent\"}),\n        /",
-          "to": "json!({\"state\": \"missing\"}),\n        /   "
+          "to": "json!({\"state\": \"missing\"}),\n           /"
         }
       ],
-      "mutation": "d88a40a181a3b6699843e8df54acfc4b",
-      "verdict": "unviable",
-      "reason": "does not compile: expected pattern, found `/`"
+      "mutation": "16ed5ddcb6d83f4f94855d73cc1bd276",
+      "verdict": "caught",
+      "killer": "agent::agent_import::local_data::tests::a_master_journal_with_an_open_intent_is_shown_apart_from_the_voucher_journal",
+      "killer_at": "base"
     },
     "L540": {
       "what": "to_json_resolving: the not-read journal's word changed",
@@ -10884,6 +10887,10 @@
       "mutation": "524bca7a124fb9a2028844dbdd91bc48",
       "reason": "not killed, and not equivalent: A failed read is not read again. MasterLedgerError::Unavailable comes from the reader failing to fill its buffer on an open regular file (an I/O error); a refusal for text that is not UTF-8 or for an oversized record is Invalid or RecordTooLarge, both reported as journal_invalid. No file can make that error on Unix or macOS; a byte-range lock held by another handle might on Windows, which was not tried"
     },
+    "L509": {
+      "mutation": "576fc37ecb6b1e22b81b9ddc72e6a5a9",
+      "reason": "not killed, and not equivalent: read_master_journal returns the first read when it needs no retry, and the mutant reads the file a second time and returns that one. read_master_journal_once is a function of the file alone (it opens the file and parses its bytes with read_summary, keeping nothing between calls), and the closure given as the wait, the only thing a test can run between two reads, is not called on this path: it runs only after a refusal a write could explain, and that path returns before this line. So the second read gives the first read's answer unless the file changes between the two reads, by a writer in another process or by a change of its mode or presence at that instant, which no test can arrange without a seam inside the read. It is the master journal's counterpart of L488 (the voucher journal's read_journal_at), a separate function with its own parse, and is argued here on its own"
+    },
     "L522": {
       "mutation": "c2c7918c00275f61a0e5780ed395e8d2",
       "reason": "not killed, and not equivalent: to_json giving no local app data: off Windows local_app_data() is None already, so this mutant is the base there; on Windows it drops package_copies from the --show-paths report. Held by the cfg(windows) assertion of no_path_is_in_the_json_unless_asked and by the cfg(windows) assertion of the_report_command_names_the_folders_it_read_only_when_asked (a child with %LOCALAPPDATA% set to a folder of its own). Held only in the Windows native job, unmutated; the macOS runs cannot kill it, and no mutation run was made on Windows, so the verdict stays the one measured here"
@@ -10910,7 +10917,7 @@
     },
     "L682": {
       "mutation": "408c3720c2e044c666f933408a87db70",
-      "reason": "not killed, and not equivalent: the status differs only if the write of the report to stdout fails. The test harness of a child process writes to the same stdout first and stops on the same failure, std treats a closed stdout as a sink, and /dev/full exists on Linux only; no test can make the write fail here"
+      "reason": "not killed, and not equivalent: the status differs only if the write of the report to stdout fails. No test in the module's own child process can make that write fail: the test harness of a child process writes to the same stdout first and stops on the same failure, and std treats a closed stdout as a sink. An integration test that spawns bridge_mcp --local-data-report with its stdout a pipe whose reader is dropped could make every write fail, and is not written, so nothing holds this mutant on any host"
     },
     "137:9 replace || with && in import_class": {
       "reason": "equivalent: the || between the .proof.json and .proof.md tests: no name ends in both, so the && is false for every name and the third condition of the chain, which holds for every name either test admits, decides alone, as at base"

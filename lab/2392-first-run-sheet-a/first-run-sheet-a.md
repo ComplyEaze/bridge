@@ -2,7 +2,7 @@
 
 Purpose: measure what the published 0.7.0 Windows file is and how it answers when it is started by hand, so the install text says only what was seen: its hash, the internet-zone mark a browser download gives it, whether it is signed, its import table, its manifest, and the answers its `tally_status` gives when Tally cannot be reached and when the Terms are off. This sheet measures; it is not a pass or fail of the product. Nothing is installed, and the Claude Desktop window is not driven (a separate checklist for a person covers that).
 
-Every output is a raw file in one folder, `C:\Users\Public\fr2a-hub-only`. **Nothing from that folder is copied, committed or pasted anywhere by this sheet.** (`C:\Users\Public` is readable by every account on the PC; the lab is a lab PC, and the files are handed over by hand and then removed from it by whoever the person who queued this sheet names.) The files hold the user name, paths and, possibly, Windows or antivirus text. The lab's reviewer reads them, and decides what, if anything, is committed. Write each output in full and do not tidy it.
+Every output is a raw file in one folder, `C:\Users\Public\fr2a-hub-only`. **Nothing from that folder is copied, committed or pasted anywhere by this sheet; the note may quote only `file:line` and the `tally_status` reply text, never a path or the user name.** (`C:\Users\Public` is readable by every account on the PC; the lab is a lab PC, and the files are handed over by hand and then removed from it by whoever the person who queued this sheet names.) The files hold the user name, paths and, possibly, Windows or antivirus text. The lab's reviewer reads them, and decides what, if anything, is committed. Write each output in full and do not tidy it.
 
 Marks used in the result: M = measured by this run; U = not established, say what was missing.
 
@@ -14,13 +14,14 @@ Marks used in the result: M = measured by this run; U = not established, say wha
 5. Use **one 64-bit Windows PowerShell window**, not ISE and not the 32-bit shell, so the variables stay set from step to step. Step B0 prints whether the process is 64-bit.
 
 ## Saving output
-Each step below is one block of two parts. The lines before `. { try {` set variables and functions and are pasted as they are; the part from `. { try {` to `} *>&1 | Out-File ...` runs the work and saves everything it prints to the step's file, and a stopping error is caught and written into the file as a line that starts "ERROR:" (otherwise it would reach only the console). To run a step again, paste only that part. Do not use `>` (it writes UTF-16 here) and do not use `Start-Transcript` (its header names the user and the machine).
+Each step below is one block of two parts. The lines before `. { try {` set variables and functions and are pasted as they are; the part from `. { try {` to `} *>&1 | Out-File ...` runs the work and saves everything it prints to the step's file, and a stopping error is caught and written into the file as a line that starts "ERROR:" (otherwise it would reach only the console). To run a step again, first rename its file to `fr2a-B<n>-attempt1.txt` (an `-attemptN` name still matches the search in step B7 and keeps the first result), then paste only the part from `. { try {` on. For B4 that is only the lines from `"files in the program folder:"` on, after setting `$bin` to the right folder; pasting the whole of B4 would make a second scratch folder that B8 does not delete, and `Expand-Archive` fails on files that already exist. Do not use `>` (it writes UTF-16 here) and do not use `Start-Transcript` (its header names the user and the machine).
 
 ## The input
 File: `bridge-tally-mcp-v0.7.0-windows-x64.mcpb`, from the download page `https://bridge.complyeaze.com/download.html`, 15,598,419 bytes. Its sha256 is `291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec`, as GitHub's release listing reports it (read on 9 November 2026 with `gh release view mcp-v0.7.0 --json assets`). The release also holds the `.sha256` file (107 bytes) that the install text points at. If the listing shows another name, size or hash on the day, or a newer release is the latest, stop and say so: that is a different test.
 
 ## Step B0. State of the PC (read only)
 ```powershell
+$ErrorActionPreference = "Stop"   # a failing command becomes a stopping error, which the block writes as an ERROR line
 $hub = "C:\Users\Public\fr2a-hub-only"; New-Item -ItemType Directory $hub -Force | Out-Null
 function Show-Data([string]$When) {
   "installed extension's data files, " + $When + " (name, length, last write; contents not read; this run must not change them):"
@@ -117,7 +118,7 @@ $bin = "$w\unpacked\bin\x86_64-pc-windows-msvc"
   }
 } catch { "ERROR: " + ($_ | Out-String) } } *>&1 | Out-File -Encoding utf8 "$hub\fr2a-B4.txt"
 ```
-If the architecture folder is named differently, list `$w\unpacked`, set `$bin` to the folder that holds `bridge_mcp.exe`, run the block again, and write the difference at the top of the file. This is a copy made by `Expand-Archive`, not the copy Claude Desktop would make, so its Mark of the Web says nothing about the installed one.
+If the architecture folder is named differently, list `$w\unpacked`, set `$bin` to the folder that holds `bridge_mcp.exe`, rename the file as in "Saving output", paste only the lines from `"files in the program folder:"` on, and write the difference at the top of the file. This is a copy made by `Expand-Archive`, not the copy Claude Desktop would make, so its Mark of the Web says nothing about the installed one.
 
 ## Step B5. The import table of the unpacked program
 Paste this function first. It is the reader of sheet CRT1, reproduced here so that the sheet is whole; its offsets were checked there by porting the same steps to Python on an older Windows build of the program, and the PowerShell text has to be treated as unrun until this run's file shows it worked. If it errors, the error is the result: copy it and use `dumpbin /dependents` if that is present (do not install it).
@@ -199,6 +200,7 @@ function Invoke-Status([string]$Exe, [string]$Terms, [int]$Port) {
   $psi.EnvironmentVariables["BRIDGE_AGENT_ENABLE_IMPORT"] = "true"
   $psi.EnvironmentVariables["BRIDGE_AGENT_ENABLE_WRITES"] = "false"
   $psi.EnvironmentVariables["BRIDGE_AGENT_ENABLE_TAX_AUDIT"] = "false"
+  $psi.StandardOutputEncoding = [Text.Encoding]::UTF8; $psi.StandardErrorEncoding = [Text.Encoding]::UTF8
   $p = [Diagnostics.Process]::Start($psi)
   try {
     $errTask = $p.StandardError.ReadToEndAsync()
@@ -244,9 +246,9 @@ $portBusy = [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAct
   else {
     Show-Locks
     Show-Data "before"
-    try { Invoke-Status "$bin\bridge_mcp.exe" "true" $port } catch { "ERROR (Terms=true run): " + $_.Exception.Message }
+    try { Invoke-Status "$bin\bridge_mcp.exe" "true" $port } catch { "ERROR: (Terms=true run) " + ($_ | Out-String) }
     Start-Sleep -Seconds 15
-    try { Invoke-Status "$bin\bridge_mcp.exe" "false" $port } catch { "ERROR (Terms=false run): " + $_.Exception.Message }
+    try { Invoke-Status "$bin\bridge_mcp.exe" "false" $port } catch { "ERROR: (Terms=false run) " + ($_ | Out-String) }
     Show-Locks
     Show-Data "after"
     "data folders of the two runs (names, lengths, and the Terms record, which holds a time and a Terms version):"
@@ -256,9 +258,9 @@ $portBusy = [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAct
 ```
 Everything goes to one file, `fr2a-B7.txt`: the port line, the lock files and the installed extension's data files (name, length, last write time) before and after, both runs (exit line, initialize reply, standard error capped at 4 KB, raw reply, the tool's own error flag and text) and the lock files before and after. A line that starts "ERROR" is a result, not a reason to retry: a start that Windows or an antivirus product stopped appears here as an error from starting the process, and then the block rule (limit 4) applies. To run only B7 again after a mistake in setting up, paste the `. { try {` part alone, so the port choice made above is kept. After all the steps have run, search every output for the words the block rule names:
 ```powershell
-Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied' | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
+Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|policy|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied' | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
 ```
-Copy what it prints into the note. A line that starts "ERROR:" and a hit together, outside the `tally_status` reply text, mean `block: yes` at the top of that file. A hit only inside the `tally_status` reply text (the program's own words) is not a block. An "ERROR:" line from starting the process is a block whatever the hit says. Do not repeat a call to look again.
+Copy what it prints into the note, as `file:line` only. Any hit outside the `tally_status` reply text means `block: yes` at the top of that file, except the two B0 label lines ("Smart App Control (...)" and "SmartScreenEnabled (Explorer)"), which always match and are not a block. A hit only inside the `tally_status` reply text (the program's own words) is not a block. An "ERROR:" line from starting the process is a block whatever the hit says. Do not repeat a call to look again.
 
 ## Step B8. Clean up
 ```powershell

@@ -3,6 +3,7 @@ use super::*;
 use crate::reports::statements::{
     ClosingStockUse, Established, TieOut, CLOSING_STOCK_SOURCE, OPENING_STOCK_SOURCE,
 };
+use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::native_statement_reports::NativeStatementKind;
 
 /// Unclassified ledgers returned in full up to this many; the count is always
@@ -32,9 +33,11 @@ impl Server {
         let period = crate::tally::runtime::TrialBalancePeriod::new(from, to)
             .map_err(|_| "invalid_date_range".to_string())?;
         let (company, identity, prior) = self.verified_company(guid).await?;
+        let today =
+            TallyDate::parse(tally_host_today()).map_err(|_| "current_date_invalid".to_string())?;
         let read = self
             .runtime
-            .fetch_statements(self.tally_config(), &identity, period, kind)
+            .fetch_statements(self.tally_config(), &identity, period, kind, today)
             .await
             .map_err(|error| {
                 let row = ToolFailure::inconsistent_row(&error);

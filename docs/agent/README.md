@@ -1569,8 +1569,12 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   establish with opening stock: the half-year from October and the two years
   together refuse as `stock_summary_window_not_measured`. A Stock Summary that
   lists no rows refuses as `stock_summary_not_read`. Its rows are not tied to
-  the stock items or to the report's own total, as `stock_summary` ties them;
-  only a value on every listed row is required. A
+  the stock items or to the report's own total, and once read, the answer's
+  size and row count are not checked against the admitted estimate and the
+  book's master mark, as `stock_summary` checks them; only a value on every
+  listed row is required. A window to any other month's
+  last day, February's included, is admitted by `stock_summary`'s month-end
+  rule, and no run read one. A
   company split into a new year, a non-integrated book, costing other than Avg.
   Cost or FIFO, godowns, batches and GST beside opening stock are not. A
   Profit & Loss A/c ledger whose closing is not its own opening plus the

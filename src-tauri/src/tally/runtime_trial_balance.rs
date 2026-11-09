@@ -205,10 +205,11 @@ enum ExtraSources {
 
 /// What a Trial Balance read is asked to read inside its bracket besides the
 /// Trial Balance itself.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum TrialBalanceExtras {
     Nothing,
-    Statement(NativeStatementKind),
+    /// A statement, with the host's today that bounds its Stock Summary read.
+    Statement(NativeStatementKind, TallyDate),
     /// Tally's Cash Flow over whole months. The window is built inside the
     /// bracket, once the mode's date boundary profile is known.
     CashFlow,
@@ -304,6 +305,7 @@ impl TallyRuntime {
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
         kind: NativeStatementKind,
+        today: TallyDate,
     ) -> anyhow::Result<StatementsRead> {
         let (trial_balance, sources, _) = self
             .fetch_trial_balance_sources(
@@ -311,7 +313,7 @@ impl TallyRuntime {
                 identity,
                 period,
                 TrialBalanceCurrencyScope::SingleCurrency,
-                TrialBalanceExtras::Statement(kind),
+                TrialBalanceExtras::Statement(kind, today),
             )
             .await?;
         let Some(ExtraSources::Statement(sources)) = sources else {
@@ -385,6 +387,7 @@ impl TallyRuntime {
             let identity = identity.clone();
             let from = period.from.clone();
             let to = period.to.clone();
+            let extras = extras.clone();
             async move {
                 let mut evidence = RuntimeReadEvidence::empty();
                 let result = async {
@@ -397,7 +400,7 @@ impl TallyRuntime {
                         .map_err(TrialBalanceReadError::Period)?;
                     // Before anything is sent for the report: a window that
                     // is not whole months costs no request.
-                    let cash_flow_window = match extras {
+                    let cash_flow_window = match &extras {
                         TrialBalanceExtras::CashFlow => Some(
                             WholeMonthWindow::new(profile, from.clone(), to.clone())
                                 .map_err(TrialBalanceReadError::CashFlowWindow)?,
@@ -543,7 +546,7 @@ impl TallyRuntime {
                                 cash_flow,
                             }))
                         }
-                        TrialBalanceExtras::Statement(kind) => {
+                        TrialBalanceExtras::Statement(kind, today) => {
                             let request =
                                 render_native_group_snapshot_request(identity.display_name());
                             let (xml, bytes, hash) = client
@@ -670,6 +673,7 @@ impl TallyRuntime {
                                     &identity,
                                     &extent,
                                     &period,
+                                    &today,
                                     &mut evidence,
                                 )
                                 .await
@@ -740,10 +744,13 @@ async fn read_statement_stock_rows(
     identity: &VerifiedCompanyIdentity,
     extent: &CompanyBookExtent,
     period: &NativeLedgerSnapshotPeriod,
+    today: &TallyDate,
     evidence: &mut RuntimeReadEvidence,
 ) -> crate::reports::statements::StockRows {
     use crate::reports::statements::StockRows;
-    let Some(window) = super::stock_summary::StatementStockWindow::of(period) else {
+    let Some(window) =
+        super::stock_summary::StatementStockWindow::of(period, extent.books_from(), today)
+    else {
         return StockRows::WindowNotMeasured;
     };
     let Some(mark) = extent.master_alter_id_high_water() else {

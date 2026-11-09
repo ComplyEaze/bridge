@@ -619,6 +619,7 @@ async fn a_flags_read_that_does_not_bind_to_the_company_declines_the_figure_and_
 // on them; these prove only which Stock Summary read is sent, and that its verdict is the reason.
 
 fn opening_stock_profit_and_loss() -> String {
+    // synthetic mutation: an opening stock amount on the captured empty line.
     stock_profit_and_loss().replace(
         "<DSPDISPNAME>Opening Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT>",
         "<DSPDISPNAME>Opening Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT>-100.00</PLSUBAMT>",

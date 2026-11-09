@@ -1,0 +1,2 @@
+N VOUCHER rows 1 1 equal ; the three differing lines (LEDGER 11->22, TAXUNIT 1->2, VOUCHERNUMBERSERIES 1->2) sit in CMPINFO: True
+V VOUCHER rows 1 1 equal ; the three differing lines (LEDGER 11->22, TAXUNIT 1->2, VOUCHERNUMBERSERIES 1->2) sit in CMPINFO: True

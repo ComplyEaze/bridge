@@ -1,0 +1,14 @@
+== a-s2-N-0061.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-T-types.xml: 306946 bytes
+  STATUS '1'
+  VOUCHERTYPE rows: 28
+  named 'BRIDGE Sales': 1
+   PARENT 'Sales'; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce'; NUMBERINGMETHOD 'None'; ISACTIVE 'Yes'
+   VOUCHERNUMBERSERIES.LIST elements: 1
+   series: NAME 'Default'; NUMBERINGMETHOD 'Manual'; PREVENTDUPLICATES 'Yes'
+  named 'BRIDGE Sales Keyed': 0
+== a-s2-V-0061.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0

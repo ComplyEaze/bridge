@@ -1,0 +1,13 @@
+$ python -I lm.py --tie a-lx1-X-lx1-20250401.xml a-mv-V-mv-20250401.xml a-lx2-X-lx2-20250402.xml
+a-lx1-X-lx1-20250401.xml: HEADER/STATUS 1
+a-mv-V-mv-20250401.xml: HEADER/STATUS 1
+a-lx2-X-lx2-20250402.xml: HEADER/STATUS 1
+  'BRIDGE Export Sales': DIFFERS by -86014641.25 (0.00 + 86014641.25 = 86014641.25, lx2 0.00)
+  'BRIDGE INR Customer': TIES (0.00 + -3000.00 = -3000.00)
+  'BRIDGE Import Purchases': DIFFERS by 17400.00 (0.00 + -17400.00 = -17400.00, lx2 0.00)
+  'BRIDGE Lab Bank': TIES (0.00 + -79200.00 = -79200.00)
+  'BRIDGE USD Customer': DIFFERS by -2000058.75 (0.00 + -85911941.25 = -85911941.25, lx2 -87912000.00)
+  'BRIDGE USD Supplier': DIFFERS by 100.00 (0.00 + -100.00 = -100.00, lx2 0.00)
+  'Cash': TIES (0.00 + -3000.00 = -3000.00)
+  'Profit & Loss A/c': DIFFERS by 85997241.25 (0.00 + 0 = 0.00, lx2 85997241.25)
+exit 0

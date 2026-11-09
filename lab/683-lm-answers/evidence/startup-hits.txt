@@ -1,0 +1,23 @@
+$ python -I (inline) the start-up check's hits in every file the stage reads, each with 12 characters either side (the number shown as <S>) ("inside the amount": the hit is part of $1000000.00)
+RESULTS.md (utf-8): ...the amount $<S>0.00; allowe... inside the amount
+RESULTS.md (utf-8): ...mer' Yes '-$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...Sales' No '$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...mer' Yes '-$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...Sales' No '$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+RESULTS.md (utf-8): ...is part of $<S>0.00)
+RESULT... inside the amount
+a-mv-V-mv-20250401.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mv-V-mv-20250401.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mv-V-mv-20250401.xml (utf-16-le): ...E="Amount">$<S>0.00 @ ₹ 86/... inside the amount
+a-mvl-V-mvl-usd-customer-20250401.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mvl-V-mvl-usd-customer-20250401.xml (utf-16-le): ...="Amount">-$<S>0.00 @ ₹ 86/... inside the amount
+a-mvl-V-mvl-usd-customer-20250401.xml (utf-16-le): ...E="Amount">$<S>0.00 @ ₹ 86/... inside the amount
+evidence/ledger-mvl.txt (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+evidence/ledger-mvl.txt (utf-8): ...-scoped ['-$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-mv.txt (utf-8): ...mer' Yes '-$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-mv.txt (utf-8): ...Sales' No '$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-mvl.txt (utf-8): ...mer' Yes '-$<S>0.00 @ ₹ 86/... inside the amount
+evidence/lm-mvl.txt (utf-8): ...Sales' No '$<S>0.00 @ ₹ 86/... inside the amount
+hits 20; not inside the amount: 0

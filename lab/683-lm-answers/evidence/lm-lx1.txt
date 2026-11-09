@@ -1,0 +1,11 @@
+a-lx1-X-lx1-20250401.xml: HEADER/STATUS 1
+  LEDGER rows: 8
+  'BRIDGE Export Sales' OPENINGBALANCE '0.00' reads 0.00
+  'BRIDGE INR Customer' OPENINGBALANCE '0.00' reads 0.00
+  'BRIDGE Import Purchases' OPENINGBALANCE '0.00' reads 0.00
+  'BRIDGE Lab Bank' OPENINGBALANCE '0.00' reads 0.00
+  'BRIDGE USD Customer' OPENINGBALANCE '0.00' reads 0.00
+  'BRIDGE USD Supplier' OPENINGBALANCE '0.00' reads 0.00
+  'Cash' OPENINGBALANCE '0.00' reads 0.00
+  'Profit & Loss A/c' OPENINGBALANCE '0.00' reads 0.00
+exit 0

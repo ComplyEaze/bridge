@@ -1,0 +1,36 @@
+a-mv-V-mv-20250401.xml: HEADER/STATUS 1
+  VOUCHER rows: 11
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000001 20250401 Sales '1': 2 entries
+    'BRIDGE USD Customer' Yes '-$1000000.00 @ ₹ 86/$ = -₹ 86000000.00'
+    'BRIDGE Export Sales' No '$1000000.00 @ ₹ 86/$ = ₹ 86000000.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000002 20250401 Sales '2': 2 entries
+    'BRIDGE USD Customer' Yes '-$100.00 @ ₹ 86.4125/$ = -₹ 8641.25'
+    'BRIDGE Export Sales' No '$100.00 @ ₹ 86.4125/$ = ₹ 8641.25'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000003 20250401 Receipt '1': 2 entries
+    'BRIDGE USD Customer' No '$100.00 @ ₹ 87/$ = ₹ 8700.00'
+    'BRIDGE Lab Bank' Yes '-$100.00 @ ₹ 87/$ = -₹ 8700.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000004 20250401 Journal '1': 2 entries
+    'Cash' Yes '-1000.00'
+    'BRIDGE Export Sales' No '1000.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000005 20250401 Sales '3': 2 entries
+    'BRIDGE INR Customer' Yes '-5000.00'
+    'BRIDGE Export Sales' No '5000.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000006 20250401 Receipt '2': 2 entries
+    'BRIDGE INR Customer' No '2000.00'
+    'Cash' Yes '-2000.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000007 20250401 Purchase '1': 2 entries
+    'BRIDGE USD Supplier' No '$100.00 @ ₹ 86/$ = ₹ 8600.00'
+    'BRIDGE Import Purchases' Yes '-$100.00 @ ₹ 86/$ = -₹ 8600.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000008 20250401 Purchase '2': 2 entries
+    'BRIDGE USD Supplier' No '$100.00 @ ₹ 88/$ = ₹ 8800.00'
+    'BRIDGE Import Purchases' Yes '-$100.00 @ ₹ 88/$ = -₹ 8800.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000009 20250401 Payment '1': 2 entries
+    'BRIDGE USD Supplier' Yes '-$100.00 @ ₹ 87/$ = -₹ 8700.00'
+    'BRIDGE Lab Bank' No '$100.00 @ ₹ 87/$ = ₹ 8700.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000a 20250401 Payment '2': 2 entries
+    'BRIDGE USD Supplier' Yes '-$100.00 @ ₹ 88/$ = -₹ 8800.00'
+    'BRIDGE Lab Bank' No '$100.00 @ ₹ 88/$ = ₹ 8800.00'
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000b 20250401 Receipt '3': 2 entries
+    'BRIDGE USD Customer' No '$1000.00 @ ₹ 88/$ = ₹ 88000.00'
+    'BRIDGE Lab Bank' Yes '-$1000.00 @ ₹ 88/$ = -₹ 88000.00'
+exit 0

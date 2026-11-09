@@ -1,0 +1,9 @@
+$ python -I (inline) per-ledger sums of the mv AMOUNT texts (from evidence/lm-mv.txt): entries, dollar part, rupee part
+BRIDGE Export Sales: 4 entries, dollars 1000100.00, rupees 86014641.25
+BRIDGE INR Customer: 2 entries, dollars -, rupees -3000.00
+BRIDGE Import Purchases: 2 entries, dollars -200.00, rupees -17400.00
+BRIDGE Lab Bank: 4 entries, dollars -900.00, rupees -79200.00
+BRIDGE USD Customer: 4 entries, dollars -999000.00, rupees -85911941.25
+BRIDGE USD Supplier: 4 entries, dollars 0.00, rupees -100.00
+Cash: 2 entries, dollars -, rupees -3000.00
+dollar part x 88 for each ledger with one: {'BRIDGE USD Customer': '-87912000.00', 'BRIDGE Export Sales': '88008800.00', 'BRIDGE Lab Bank': '-79200.00', 'BRIDGE USD Supplier': '0.00', 'BRIDGE Import Purchases': '-17600.00'}

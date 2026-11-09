@@ -89,6 +89,17 @@ fn movement_uses_observed_period_opening_without_inferring_account_classificatio
     }
 }
 
+/// A row the voucher source returned that does not read as a movement voucher refuses the
+/// window by the movement's own read code.
+#[test]
+fn an_unreadable_movement_row_refuses_by_the_movement_read_code() {
+    let result = parse_movement_rows(vec![json!("20260901")], "20260901", "20260902");
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some(MovementCode::ReadFailed.as_str().to_string())
+    );
+}
+
 /// Renamed rather than relabelled: this used to assert the window was refused.
 /// A Stock Journal legitimately carries no accounting entries, so refusing lost
 /// the whole window over a voucher that is exactly right -- five of twelve

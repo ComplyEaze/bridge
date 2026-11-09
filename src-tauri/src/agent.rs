@@ -4277,3 +4277,7 @@ mod financial_profile_tests;
 #[cfg(test)]
 #[path = "agent_lab_683_lm_render_tests.rs"]
 mod lab_683_lm_render_tests;
+
+#[cfg(test)]
+#[path = "agent_lab_683_tw_render_tests.rs"]
+mod lab_683_tw_render_tests;

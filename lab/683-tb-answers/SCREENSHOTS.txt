@@ -1,0 +1,9 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/*.png are the Tally window (PrintWindow, its left part); shots/*.jpg are the desktop tool's own screen captures, copied there as the whole screen.
+shots/after-tb2-desktop.jpg 113707 B b155e24535c0e6cfc5ef2644f71904619bb86c3b870aa424b23a7ca5162afe5b
+shots/after-tb2.png 45271 B 90f4e11aae10a255fbf5254f43f447c47916b7b929816636ac557283dce6f0d3
+shots/c10-select-company.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/c10-window.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/c11-window.png 45271 B 90f4e11aae10a255fbf5254f43f447c47916b7b929816636ac557283dce6f0d3
+shots/s0-gateway-desktop.jpg 113036 B fbcbe6e7757e7d10303833914cf618b4e3a009a6df640ddc35d689a9d494084f
+shots/s0-gateway.png 45271 B 90f4e11aae10a255fbf5254f43f447c47916b7b929816636ac557283dce6f0d3
+shots/s0-window.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951

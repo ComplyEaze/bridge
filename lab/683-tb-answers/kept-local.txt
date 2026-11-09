@@ -1,0 +1,9 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+evidence/c10-netstat.txt 8435 B ad643b7f66518435c564b4b6571e98f050e3f2f8b819af147a06a3bd0de3cebb (process or port listing)
+evidence/c10-tasklist.txt 54 B 5b233cb30d4bb498064882d5ff68a83dca06da99b30b1504c6b0c264455f7541 (process or port listing)
+evidence/c11-netstat.txt 8593 B 98196da2c7cd2cf774dfa281746df773bc23e3c742830cb7435a9d93fb85b56f (process or port listing)
+evidence/c11-tasklist.txt 54 B a854ca9bebb1378906674ee33b4979b676f40093947271f233ccfc51fea6eda1 (process or port listing)
+evidence/quit-tasklist.txt 64 B 943b315e065238b7073b033f534ef954b6b6461fb3f03a3f5b8555b11bc4c0a2 (process or port listing)
+evidence/s0-netstat.txt 8954 B 98efc6846b0e53b313ae33ca3084c19c2c7b1cb1e6cb07ff11435132c83a6d83 (process or port listing)
+evidence/s0-tasklist.txt 54 B d0191013375ab005875aab358d691929f6481e5d3c7ade7425ee7b348e181a8f (process or port listing)
+stage-683tb.py 11637 B ef7c896a79c88d04f430b364bc335e424ec1870ec0f5e855973bd452c46176aa (this stage script: its patterns name the lab paths)

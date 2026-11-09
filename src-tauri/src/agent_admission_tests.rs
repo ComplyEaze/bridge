@@ -1860,9 +1860,14 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// One party's open bills (#2377) add the `open_bills` detail to `outstandings`: 113 bytes, 13
 /// of enum value and 100 of description, to each list. On the tree merged with master after
 /// #1320 the lists still fit the budgets below, so no budget changed for it.
+/// Switching Sales on (#2162) offers the invoice object in every list that holds
+/// `build_import_xml`'s schema and names Sales in the tool text. On 9 Nov 2026,
+/// on master merged with the schema change (#2418), the lists measured 214,075,
+/// 240,243, 242,752 and 248,129, over the budgets by 1,175, 1,343, 1,352 and
+/// 1,229. Each budget went up by 1,500, leaving margins of 325, 157, 148 and 271.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [212_900, 238_900, 241_400, 246_900];
+const TOOL_LIST_BUDGETS: [usize; 4] = [214_400, 240_400, 242_900, 248_400];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

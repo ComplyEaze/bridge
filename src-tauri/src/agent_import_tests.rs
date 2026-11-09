@@ -3834,7 +3834,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
 fn refusal_reason_states_the_current_voucher_limit() {
     let on = native_post_refusal_reason("import_post_requires_one_voucher");
     assert!(
-        on.contains("native posting takes 1 to 50 vouchers,"),
+        on.contains("native posting takes one Sales invoice, or 1 to 50 vouchers,"),
         "{on}"
     );
     let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported");

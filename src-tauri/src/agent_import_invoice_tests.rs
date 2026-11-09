@@ -2087,12 +2087,12 @@ fn an_invoice_is_filed_under_the_type_the_caller_named() {
 }
 
 /// A Sales line another build saved can sit in the journal of a build that
-/// does not qualify Sales. Its verification does not send the invoice
-/// read-back, and does not call the voucher verified.
+/// does not qualify Sales (the list before Sales qualified). Its verification
+/// does not send the invoice read-back, and does not call the voucher verified.
 #[test]
 fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verified() {
     use crate::agent::agent_import::verification::invoice_readback_due;
-    use crate::agent::agent_import::LIVE_QUALIFIED_VOUCHER_TYPES;
+    use crate::agent::agent_import::PRE_SALES_QUALIFIED_VOUCHER_TYPES;
     let saved = [observed_voucher()];
     let matched = || {
         json!({
@@ -2100,9 +2100,9 @@ fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verifi
             "counts":{"posted_verified":1,"posted_divergent":0}
         })
     };
-    // This build: Sales is not qualified.
+    // A build that does not qualify Sales.
     let mut result = matched();
-    assert!(invoice_readback_due(&mut result, &saved, LIVE_QUALIFIED_VOUCHER_TYPES).is_none());
+    assert!(invoice_readback_due(&mut result, &saved, PRE_SALES_QUALIFIED_VOUCHER_TYPES).is_none());
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
     assert_eq!(
         result["vouchers"][0]["diffs"][0]["invoice_fields"],
@@ -2115,8 +2115,12 @@ fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verifi
     // A build that qualifies the type: the read-back is due, and nothing is
     // marked before it runs.
     let mut result = matched();
-    let (voucher, row) =
-        invoice_readback_due(&mut result, &saved, &[VoucherType::Sales]).expect("due");
+    let (voucher, row) = invoice_readback_due(
+        &mut result,
+        &saved,
+        crate::agent::agent_import::LIVE_QUALIFIED_VOUCHER_TYPES,
+    )
+    .expect("due");
     assert_eq!(
         (voucher.bridge_txn_id.as_str(), &row["alter_id"]),
         ("t1", &json!(77))
@@ -2124,7 +2128,7 @@ fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verifi
     assert_eq!(result, matched());
     // A voucher the standard readback did not match has nothing due and is
     // left as it was, qualified or not.
-    for qualified in [LIVE_QUALIFIED_VOUCHER_TYPES, &[VoucherType::Sales][..]] {
+    for qualified in [PRE_SALES_QUALIFIED_VOUCHER_TYPES, &[VoucherType::Sales][..]] {
         let unmatched = json!({
             "vouchers":[{"bridge_txn_id":"t1","status":"not_found"}],
             "counts":{"posted_verified":0,"posted_divergent":0}

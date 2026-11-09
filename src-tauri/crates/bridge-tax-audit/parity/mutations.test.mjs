@@ -1669,6 +1669,11 @@ console.log(JSON.stringify({ held, overlaps, refused }));
     let [rc, out] = await fakeCargo(outside, FAKE_CARGO, {}, () => main("B1", "R1", "--workdir", work, "--results", results));
     assert.equal(rc, 0, out); // the run's own judgement
     assert.equal(readJson(results).R1.verdict, mu.SURVIVED);
+    const view = mu.treeView("HEAD", g.repo, CRATE);
+    const b1 = readJson(results).B1;
+    assert.match(b1.inputs, /^1:[g-v]{16}$/, "a run writes the digest of the killed record's inputs");
+    assert.equal(b1.inputs, mu.inputDigest(g.muts.find((m) => m.id === "B1"), b1, view));
+    assert.ok(!("inputs" in readJson(results).R1), "a survivor names no killer, so it carries no digest");
     [rc, out] = await main("R1", "--verify", "--results", results);
     assert.equal(rc, 0, out); // the merge check
     assert.ok(out.includes("1 selected, 1 proven"), out);

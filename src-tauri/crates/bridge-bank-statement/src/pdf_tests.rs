@@ -225,7 +225,7 @@ fn the_effective_size_ignores_sign_and_rotation_and_an_unread_matrix_is_not_a_si
 }
 
 #[test]
-fn a_box_wholly_outside_the_crop_box_is_off_the_page_and_one_touching_it_is_not() {
+fn a_box_with_no_overlap_with_the_crop_box_is_off_the_page_and_one_partly_inside_is_not() {
     let off = |bounds| classes(None, 7.0, Some(bounds), None).off_page;
     // right of, left of, above and below the page
     assert!(off((612.0, 618.0, 100.0, 110.0)));

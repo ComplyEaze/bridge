@@ -244,7 +244,8 @@ pub const TINY_POINTS: f64 = 2.0;
 /// counted. A class whose value PDFium could not report counts nothing.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct ClassCounts {
-    /// Characters drawn (any render mode but 3), the denominator.
+    /// Characters drawn (any render mode but 3). The other classes also count characters in render
+    /// mode 3, so a share of all the text read is over `drawn + invisible_mode`, not `drawn`.
     pub drawn: usize,
     /// Characters in render mode 3, which are left out of the reading.
     pub invisible_mode: usize,

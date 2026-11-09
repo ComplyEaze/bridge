@@ -62,7 +62,31 @@ test("a warning with no advisory still gets a stable synthetic id", () => {
 });
 
 test("an empty report yields no findings", () => {
-  assert.deepEqual(findingsFromReport({ vulnerabilities: { found: false, list: [] } }), []);
+  assert.deepEqual(findingsFromReport({ vulnerabilities: { found: false, list: [] }, warnings: {} }), []);
+});
+
+// "No findings" and "the findings could not be read" must never look alike: the
+// second, read as the first, announces a standing advisory as gone (#2446).
+test("a report without a vulnerabilities list or a warnings object is refused, not read as clean", () => {
+  const settings = { ignore: [] };
+  for (const report of [
+    { settings },
+    { settings, vulnerabilities: null, warnings: {} },
+    { settings, vulnerabilities: { found: false }, warnings: {} },
+    { settings, vulnerabilities: { found: false, list: null }, warnings: {} },
+    { settings, vulnerabilities: { found: false, list: [] } },
+    { settings, vulnerabilities: { found: false, list: [] }, warnings: null },
+    { settings, vulnerabilities: { found: false, list: [] }, warnings: [] },
+    null,
+  ]) {
+    assert.throws(() => findingsFromReport(report), /no vulnerabilities\.list array or no warnings object/);
+    assert.throws(
+      () => findingsFromReports([{ lockfile: "src-tauri/Cargo.lock", report }]),
+      /no vulnerabilities\.list array or no warnings object/,
+    );
+  }
+  // An absent warning kind is still none.
+  assert.deepEqual(findingsFromReport({ vulnerabilities: { list: [] }, warnings: { yanked: null } }), []);
 });
 
 // Two lockfiles, one tracker. RUSTSEC-2026-0285 sat unreported in
@@ -100,12 +124,12 @@ test("auditing a second lockfile does not change the ids of an already-tracked f
   // The tracker was written from src-tauri alone. The chacha20 yank is in both
   // lockfiles; if adding tools/Cargo.lock renamed its id, the next run would
   // announce a change that moved nothing.
-  const tracked = recordedIds(issueBody(findingsFromReport(APP_ONLY_REPORT)));
+  const tracked = recordedIds(issueBody(findingsFromReport(APP_ONLY_REPORT), []));
   const both = findingsFromReports([
     { lockfile: "src-tauri/Cargo.lock", report: APP_ONLY_REPORT },
     { lockfile: "tools/Cargo.lock", report: APP_ONLY_REPORT },
   ]);
-  assert.equal(planAction(both, { number: 445, ids: tracked }).action, "unchanged");
+  assert.equal(planAction(both, { number: 445, ids: tracked }, []).action, "unchanged");
 });
 
 test("an unlabelled report keeps the single-lockfile rendering", () => {
@@ -126,7 +150,7 @@ test("--report pairs a lockfile with its report, or takes a bare path", () => {
 // run. If this breaks, every scheduled run files a duplicate issue.
 test("the issue body round-trips its recorded ids", () => {
   const findings = findingsFromReport(REPORT);
-  const body = issueBody(findings);
+  const body = issueBody(findings, []);
   assert.ok(body.includes(MARKER), "the body must carry the marker used to find it again");
   assert.deepEqual(
     recordedIds(body),
@@ -140,11 +164,11 @@ test("a body with no recorded-ids line reads as no ids, not a crash", () => {
 });
 
 test("clean run with nothing tracked does nothing", () => {
-  assert.deepEqual(planAction([], null), { action: "none" });
+  assert.deepEqual(planAction([], null, []), { action: "none" });
 });
 
 test("clean run with something tracked closes it", () => {
-  assert.deepEqual(planAction([], { number: 7, ids: ["RUSTSEC-2026-0285"] }), {
+  assert.deepEqual(planAction([], { number: 7, ids: ["RUSTSEC-2026-0285"] }, []), {
     action: "close",
     issue: 7,
   });
@@ -152,14 +176,14 @@ test("clean run with something tracked closes it", () => {
 
 test("first finding opens an issue", () => {
   const findings = findingsFromReport(REPORT);
-  const plan = planAction(findings, null);
+  const plan = planAction(findings, null, []);
   assert.equal(plan.action, "create");
   assert.deepEqual(plan.ids, findings.map((f) => f.id).sort());
 });
 
 test("an unchanged finding set is silent rather than a daily duplicate", () => {
   const findings = findingsFromReport(REPORT);
-  const plan = planAction(findings, { number: 7, ids: findings.map((f) => f.id) });
+  const plan = planAction(findings, { number: 7, ids: findings.map((f) => f.id) }, []);
   assert.equal(plan.action, "unchanged");
   assert.equal(plan.issue, 7);
 });
@@ -167,12 +191,12 @@ test("an unchanged finding set is silent rather than a daily duplicate", () => {
 test("ordering alone is not a change", () => {
   const findings = findingsFromReport(REPORT);
   const reversed = findings.map((f) => f.id).reverse();
-  assert.equal(planAction(findings, { number: 7, ids: reversed }).action, "unchanged");
+  assert.equal(planAction(findings, { number: 7, ids: reversed }, []).action, "unchanged");
 });
 
 test("a changed finding set updates and names what moved", () => {
   const findings = findingsFromReport(REPORT);
-  const plan = planAction(findings, { number: 7, ids: ["RUSTSEC-2024-0001", "RUSTSEC-1999-0000"] });
+  const plan = planAction(findings, { number: 7, ids: ["RUSTSEC-2024-0001", "RUSTSEC-1999-0000"] }, []);
   assert.equal(plan.action, "update");
   assert.deepEqual(plan.added, ["RUSTSEC-2026-0285", "yanked:chacha20@0.9.0"]);
   assert.deepEqual(plan.removed, ["RUSTSEC-1999-0000"]);
@@ -180,7 +204,7 @@ test("a changed finding set updates and names what moved", () => {
 
 test("a tracked issue whose ids cannot be read is treated as changed, not as clean", () => {
   const findings = findingsFromReport(REPORT);
-  const plan = planAction(findings, { number: 7, ids: [] });
+  const plan = planAction(findings, { number: 7, ids: [] }, []);
   assert.equal(plan.action, "update", "an unreadable body must not silently look up to date");
 });
 
@@ -213,7 +237,7 @@ test("an advisory id containing a comma or a backtick still round-trips", () => 
     { id: "RUSTSEC-2026-0001, and more", package: "p@1", summary: "s", kind: "vulnerability" },
     { id: "has`backtick", package: "q@2", summary: "s", kind: "vulnerability" },
   ];
-  assert.deepEqual(recordedIds(issueBody(findings)), ["RUSTSEC-2026-0001, and more", "has`backtick"]);
+  assert.deepEqual(recordedIds(issueBody(findings, [])), ["RUSTSEC-2026-0001, and more", "has`backtick"]);
 });
 
 test("a malformed recorded-ids line reads as no ids rather than throwing", () => {
@@ -264,7 +288,7 @@ test("close happens before the comment that announces it", () => {
 
 test("a repair rewrites the body and says nothing", () => {
   const run = fakeRun([]);
-  apply({ action: "repair", issue: 9, ids: ["A"], findings: [{ id: "A", package: "p@1", summary: "s", kind: "vulnerability" }] }, run);
+  apply({ action: "repair", issue: 9, ids: ["A"], findings: [{ id: "A", package: "p@1", summary: "s", kind: "vulnerability" }], accepted: [] }, run);
   assert.deepEqual(run.calls.map((args) => args[1]), ["edit"]);
 });
 
@@ -278,6 +302,7 @@ test("an update edits the body and names what moved", () => {
       findings: [{ id: "A", package: "p@1", summary: "s", kind: "vulnerability" }],
       added: ["A"],
       removed: ["B"],
+      accepted: [],
     },
     run,
   );
@@ -297,7 +322,7 @@ test("nothing to do means no gh calls at all", () => {
 
 test("a recorded line naming the same set twice repairs without announcing a change", () => {
   const findings = [{ id: "A", package: "p@1", summary: "s", kind: "vulnerability" }];
-  assert.equal(planAction(findings, { number: 9, ids: ["A", "A"] }).action, "repair");
+  assert.equal(planAction(findings, { number: 9, ids: ["A", "A"] }, []).action, "repair");
 });
 
 // --- accepted entries (#2446) --------------------------------------------
@@ -329,7 +354,7 @@ const ACCEPTED_REPORT = JSON.parse(readRoot("scripts/fixtures/cargo-audit-report
 const REPORTED_REPORT = JSON.parse(readRoot("scripts/fixtures/cargo-audit-report-0459-reported.json"));
 const ACCEPTED_ID = "RUSTSEC-2026-0459";
 
-const entry = (id, review_by, issue) => ({ id, review_by, issue });
+const entry = (id, review_by, issue, shared = false) => ({ id, review_by, issue, shared });
 
 test("the accepted ids are the report's settings.ignore, as cargo-audit applied them", () => {
   const accepted = acceptedFromReport(ACCEPTED_REPORT);
@@ -382,6 +407,7 @@ test("every entry in the real file carries its date, and the accepted vulnerabil
   const unic = entries.filter((e) => e.id.startsWith("RUSTSEC-2025-"));
   assert.equal(unic.length, 5);
   assert.ok(unic.every((e) => e.review_by === "2026-12-15"));
+  assert.deepEqual(unic.map((e) => e.shared), [false, true, true, true, true]);
   assert.deepEqual(acceptedEntries([ACCEPTED_REPORT], AUDIT_TOML), entries);
 });
 
@@ -407,7 +433,7 @@ test("only a date and an issue number leave a comment, and an unknown line is re
   const file = (body) => `[advisories]\nignore = [\n${body}\n]\n`;
   assert.deepEqual(
     entriesFromAuditToml(file('  # see bridge#445 and https://x/#1, then #77; **bold** text\n  # Review-by: 2027-01-02 (later)\n  "A",\n  "B"')),
-    [entry("A", "2027-01-02", 77), entry("B", "2027-01-02", 77)],
+    [entry("A", "2027-01-02", 77), entry("B", "2027-01-02", 77, true)],
   );
   assert.deepEqual(entriesFromAuditToml(file('  "A",')), [entry("A", null, null)]);
   assert.deepEqual(entriesFromAuditToml(file("")), []);
@@ -433,7 +459,7 @@ test("the issue stays open while anything is accepted, and closes only when noth
 test("a body written before the accepted list announces every accepted id once", () => {
   const plan = planAction([], { number: 7, ids: [] }, ACCEPTED);
   assert.equal(plan.action, "update");
-  assert.deepEqual(plan.newlyAccepted, ["RUSTSEC-2024-0429", "RUSTSEC-2026-0459"]);
+  assert.deepEqual(plan.newlyAccepted.map((e) => e.id), ["RUSTSEC-2024-0429", "RUSTSEC-2026-0459"]);
   assert.deepEqual([plan.added, plan.removed, plan.noLongerAccepted, plan.changed], [[], [], [], []]);
 });
 
@@ -442,7 +468,7 @@ test("a new, a removed and a renewed entry are each named once in one comment", 
   const after = [entry("A", "2027-01-08", 2432), entry("C", "2027-02-01", 9)];
   const plan = planAction([], before, after);
   assert.equal(plan.action, "update");
-  assert.deepEqual(plan.newlyAccepted, ["C"]);
+  assert.deepEqual(plan.newlyAccepted.map((e) => e.id), ["C"]);
   assert.deepEqual(plan.noLongerAccepted, ["B"]);
   assert.deepEqual(plan.changed, [{ id: "A", from: before.accepted[0], to: after[0] }]);
   const comment = updateComment(plan);
@@ -486,7 +512,7 @@ test("the body lists each accepted entry with only its id, date and issue", () =
   assert.match(body, /^- `RUSTSEC-2024-0429` -- review-by 2027-03-15, no issue named in the file$/m);
   assert.deepEqual(recordedAccepted(body), [...ACCEPTED].sort((a, b) => a.id.localeCompare(b.id)));
   assert.deepEqual(recordedAccepted(`${MARKER}\nAccepted advisory entries: {broken`), []);
-  assert.deepEqual(recordedAccepted(`${MARKER}\nAccepted advisory entries: [["A", 7, null]]`), []);
+  assert.deepEqual(recordedAccepted(`${MARKER}\nAccepted advisory entries: [["A", 7, null, false]]`), []);
 });
 
 test("the tracker refuses to run without the audit config, in either mode", () => {
@@ -507,6 +533,7 @@ test("ids sharing one comment block share its date, and two reports must each ag
   const zbus = entries.filter((e) => ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372"].includes(e.id));
   assert.equal(zbus.length, 3);
   assert.ok(zbus.every((e) => e.review_by === "2027-04-18" && e.issue === null));
+  assert.deepEqual(zbus.map((e) => e.shared), [false, true, true]);
   assert.deepEqual(acceptedEntries([ACCEPTED_REPORT, ACCEPTED_REPORT], AUDIT_TOML), entries);
   assert.throws(() => acceptedEntries([ACCEPTED_REPORT, REPORTED_REPORT], AUDIT_TOML), /only in the file: RUSTSEC-2026-0459/);
   // An id the report repeats is still one id.
@@ -517,7 +544,14 @@ test("ids sharing one comment block share its date, and two reports must each ag
 test("a recorded line naming the same entries twice repairs silently, and bad rows are not echoed", () => {
   const twice = [...ACCEPTED, ...ACCEPTED];
   assert.equal(planAction([], { number: 7, ids: [], accepted: twice }, ACCEPTED).action, "repair");
-  const rows = JSON.stringify([["A", "2026-12-09", 1], ["B", "not a date", null], ["C", null, -4], ["D", null, 1.5]]);
+  const rows = JSON.stringify([
+    ["A", "2026-12-09", 1, false],
+    ["B", "not a date", null, false],
+    ["C", null, -4, false],
+    ["D", null, 1.5, false],
+    ["E", null, null, "yes"],
+    ["F", "2026-12-09", 1],
+  ]);
   assert.deepEqual(recordedAccepted(`${MARKER}\nAccepted advisory entries: ${rows}`), [entry("A", "2026-12-09", 1)]);
 });
 
@@ -527,4 +561,46 @@ test("the scheduled workflow passes the audit config and keeps its permissions",
   assert.match(workflow, /node scripts\/audit-tracking-issue\.mjs\n\s+--report src-tauri\/Cargo\.lock=audit-report\.json\n\s+--audit-config \.cargo\/audit\.toml\n\s+--apply\n/);
   const permissions = workflow.slice(workflow.indexOf("\npermissions:\n") + 1, workflow.indexOf("\nconcurrency:"));
   assert.equal(permissions.trim(), "permissions:\n  contents: read\n  issues: write # the one permission beyond the pull-request audit's");
+});
+
+// A caller that leaves the accepted entries out must not read as "nothing
+// accepted": that is the reading that closes the issue.
+test("planAction and issueBody refuse a call without the accepted entries", () => {
+  const open = { number: 2320, ids: [], accepted: ACCEPTED };
+  assert.throws(() => planAction([], open), /planAction needs the accepted entries/);
+  assert.throws(() => planAction([], open, null), /planAction needs the accepted entries/);
+  assert.throws(() => planAction([], null), /planAction needs the accepted entries/);
+  assert.throws(() => issueBody([]), /issueBody needs the accepted entries/);
+  assert.throws(() => apply({ action: "update", issue: 9, ids: [], findings: [], added: [], removed: [] }, fakeRun([])), /issueBody needs the accepted entries/);
+});
+
+// An id with no comment of its own takes the block above it. The issue says so,
+// so a new id never looks separately dated and tracked.
+test("an id under another entry's comment is shown as sharing it, and an id with no comment as having none", () => {
+  const file = '[advisories]\nignore = [\n  "LONE",\n  # Review-by: 2027-01-02, see #77\n  "A",\n  "B",\n\n  "C",\n]\n';
+  assert.deepEqual(entriesFromAuditToml(file), [
+    entry("A", "2027-01-02", 77),
+    entry("B", "2027-01-02", 77, true),
+    entry("C", "2027-01-02", 77, true),
+    entry("LONE", null, null),
+  ]);
+  const body = issueBody([], entriesFromAuditToml(file));
+  assert.match(body, /^- `A` -- review-by 2027-01-02, #77$/m);
+  assert.match(body, /^- `B` -- review-by 2027-01-02, #77 \(shares the entry above\)$/m);
+  assert.match(body, /^- `C` -- review-by 2027-01-02, #77 \(shares the entry above\)$/m);
+  assert.match(body, /^- `LONE` -- review-by none in the file, no issue named in the file$/m);
+
+  // An id added straight under RUSTSEC-2026-0459's entry borrows its date and
+  // issue: it is named as sharing them, in the body and in the comment.
+  const added = AUDIT_TOML.replace(`"${ACCEPTED_ID}",\n`, `"${ACCEPTED_ID}",\n  "RUSTSEC-2099-0001",\n`);
+  assert.notEqual(added, AUDIT_TOML);
+  const after = entriesFromAuditToml(added);
+  assert.deepEqual(after.find((e) => e.id === "RUSTSEC-2099-0001"), entry("RUSTSEC-2099-0001", "2026-12-09", 2432, true));
+  const before = entriesFromAuditToml(AUDIT_TOML);
+  const plan = planAction([], { number: 2320, ids: [], accepted: before }, after);
+  assert.equal(updateComment(plan), "Scheduled audit update -- newly accepted in .cargo/audit.toml: RUSTSEC-2099-0001 (shares the entry above).");
+  assert.match(issueBody([], after), /^- `RUSTSEC-2099-0001` -- review-by 2026-12-09, #2432 \(shares the entry above\)$/m);
+  // The shared mark is recorded, so the re-run stays silent.
+  const body2 = issueBody([], after);
+  assert.equal(planAction([], { number: 2320, ids: [], accepted: recordedAccepted(body2) }, after).action, "unchanged");
 });

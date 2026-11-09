@@ -53,12 +53,29 @@ const TITLE = "Dependency advisories on master";
 // would run a full audit as a side effect. Keep the two in step -- especially
 // the synthetic key, which exists because a yanked-crate warning carries no
 // advisory at all and would otherwise be invisible to a set comparison.
+//
+// A report without a `vulnerabilities.list` array and a `warnings` object is
+// unreadable, not clean: read as "no findings", it would announce a standing
+// advisory as gone (#2446). Every real report carries both (the captured ones
+// under scripts/fixtures do); a warning kind that is absent is still none.
 export function findingsFromReport(report) {
+  const warnings = report?.warnings;
+  if (
+    !Array.isArray(report?.vulnerabilities?.list) ||
+    warnings === null ||
+    typeof warnings !== "object" ||
+    Array.isArray(warnings)
+  ) {
+    throw new Error(
+      "audit-tracking-issue: the report has no vulnerabilities.list array or no warnings object, so its findings " +
+        "cannot be read; refusing rather than reading it as no findings",
+    );
+  }
   const findings = new Map();
   const record = (id, detail) => {
     if (!findings.has(id)) findings.set(id, detail);
   };
-  for (const vulnerability of report.vulnerabilities?.list ?? []) {
+  for (const vulnerability of report.vulnerabilities.list) {
     record(vulnerability.advisory.id, {
       id: vulnerability.advisory.id,
       package: `${vulnerability.package.name}@${vulnerability.package.version}`,
@@ -66,8 +83,8 @@ export function findingsFromReport(report) {
       kind: "vulnerability",
     });
   }
-  for (const kind of Object.keys(report.warnings ?? {})) {
-    for (const warning of report.warnings[kind] ?? []) {
+  for (const kind of Object.keys(warnings)) {
+    for (const warning of warnings[kind] ?? []) {
       const id =
         warning.advisory?.id ?? `${kind}:${warning.package.name}@${warning.package.version}`;
       record(id, {
@@ -187,9 +204,11 @@ const REVIEW_BY_LINE = /^#\s*Review-by:\s*(\d{4}-\d{2}-\d{2})\b/;
 const ISSUE_REFERENCE = /(?<![A-Za-z0-9_/])#(\d{1,7})\b/;
 
 // Each id in `.cargo/audit.toml`'s `ignore` array, with the Review-by date and
-// first issue number from the comment block above it; ids listed one after
-// another under one block share it. Only those two values leave the comment,
-// so no comment text reaches the issue. A line the walk does not recognise
+// first issue number from the comment block above it. An id with no comment
+// line of its own between it and the id before it shares that block, and is
+// marked `shared`, so the issue says so rather than showing it as separately
+// dated and tracked. Only those two values leave the comment, so no comment
+// text reaches the issue. A line the walk does not recognise
 // inside the array is refused rather than skipped, so an id cannot go
 // unlisted because it was written in another form.
 export function entriesFromAuditToml(text) {
@@ -218,13 +237,19 @@ export function entriesFromAuditToml(text) {
     if (!id) {
       throw new Error(`audit-tracking-issue: .cargo/audit.toml line ${i + 1} is not an id or a comment inside \`ignore\`: ${line}`);
     }
+    const shared = pending.length === 0 && entries.length > 0;
     if (pending.length) {
       block = pending;
       pending = [];
     }
     const reviewBy = block.map((entry) => REVIEW_BY_LINE.exec(entry)).find(Boolean);
     const issue = block.map((entry) => ISSUE_REFERENCE.exec(entry)).find(Boolean);
-    entries.push({ id: id[1], review_by: reviewBy ? reviewBy[1] : null, issue: issue ? Number(issue[1]) : null });
+    entries.push({
+      id: id[1],
+      review_by: reviewBy ? reviewBy[1] : null,
+      issue: issue ? Number(issue[1]) : null,
+      shared,
+    });
   }
   throw new Error("audit-tracking-issue: .cargo/audit.toml's `ignore` array is not closed");
 }
@@ -269,31 +294,41 @@ export function recordedAccepted(body) {
       .filter(
         (row) =>
           Array.isArray(row) &&
-          row.length === 3 &&
+          row.length === 4 &&
+          typeof row[3] === "boolean" &&
           typeof row[0] === "string" &&
           (row[1] === null || (typeof row[1] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row[1]))) &&
           (row[2] === null || (Number.isInteger(row[2]) && row[2] > 0)),
       )
-      .map(([id, review_by, issue]) => ({ id, review_by, issue }))
+      .map(([id, review_by, issue, shared]) => ({ id, review_by, issue, shared }))
       .sort((a, b) => a.id.localeCompare(b.id));
   } catch {
     return [];
   }
 }
 
-const entryKey = (entry) => JSON.stringify([entry.id, entry.review_by, entry.issue]);
+const entryRow = (entry) => [entry.id, entry.review_by, entry.issue, entry.shared];
+const entryKey = (entry) => JSON.stringify(entryRow(entry));
 
 // What moved between the accepted entries last written and today's.
 function acceptedMoves(recorded, accepted) {
   const before = new Map(recorded.map((entry) => [entry.id, entry]));
   const after = new Map(accepted.map((entry) => [entry.id, entry]));
   return {
-    newlyAccepted: accepted.filter((entry) => !before.has(entry.id)).map((entry) => entry.id),
+    newlyAccepted: accepted.filter((entry) => !before.has(entry.id)),
     noLongerAccepted: recorded.filter((entry) => !after.has(entry.id)).map((entry) => entry.id),
     changed: accepted
       .filter((entry) => before.has(entry.id) && entryKey(before.get(entry.id)) !== entryKey(entry))
       .map((entry) => ({ id: entry.id, from: before.get(entry.id), to: entry })),
   };
+}
+
+// No default: a caller that leaves the accepted entries out would read as
+// "nothing accepted" and close the issue (#2446). It throws instead.
+function requireAccepted(accepted, caller) {
+  if (!Array.isArray(accepted)) {
+    throw new Error(`audit-tracking-issue: ${caller} needs the accepted entries (an array, empty only when nothing is accepted)`);
+  }
 }
 
 /// The whole contract, in one pure function.
@@ -303,10 +338,11 @@ function acceptedMoves(recorded, accepted) {
 /// already tracked". Collapsing them would hide a standing advisory behind the
 /// same silence as a clean run.
 ///
-/// `accepted` is the list of `acceptedEntries`. The issue closes only when
+/// `accepted` is the list of `acceptedEntries`, and required. The issue closes only when
 /// there are no findings AND nothing is accepted: an accepted id is the one
 /// thing the findings cannot show.
-export function planAction(findings, existing, accepted = []) {
+export function planAction(findings, existing, accepted) {
+  requireAccepted(accepted, "planAction");
   const ids = findings.map((finding) => finding.id).sort();
   const entries = [...accepted].sort((a, b) => a.id.localeCompare(b.id));
   if (ids.length === 0 && entries.length === 0) {
@@ -339,14 +375,19 @@ export function planAction(findings, existing, accepted = []) {
 }
 
 const describeEntry = (entry) =>
-  `review-by ${entry.review_by ?? "none in the file"}, ${entry.issue ? `#${entry.issue}` : "no issue named in the file"}`;
+  `review-by ${entry.review_by ?? "none in the file"}, ${entry.issue ? `#${entry.issue}` : "no issue named in the file"}` +
+  (entry.shared ? " (shares the entry above)" : "");
 
 // The update comment: every move, each named once.
 export function updateComment(plan) {
   const changed = [
     plan.added?.length ? `newly reported: ${plan.added.join(", ")}` : null,
     plan.removed?.length ? `no longer reported: ${plan.removed.join(", ")}` : null,
-    plan.newlyAccepted?.length ? `newly accepted in .cargo/audit.toml: ${plan.newlyAccepted.join(", ")}` : null,
+    plan.newlyAccepted?.length
+      ? `newly accepted in .cargo/audit.toml: ${plan.newlyAccepted
+          .map((entry) => (entry.shared ? `${entry.id} (shares the entry above)` : entry.id))
+          .join(", ")}`
+      : null,
     plan.noLongerAccepted?.length ? `no longer accepted: ${plan.noLongerAccepted.join(", ")}` : null,
     ...(plan.changed ?? []).map(
       ({ id, from, to }) => `accepted entry changed: ${id} (${describeEntry(from)} -> ${describeEntry(to)})`,
@@ -357,7 +398,8 @@ export function updateComment(plan) {
   return `Scheduled audit update -- ${changed}.`;
 }
 
-export function issueBody(findings, accepted = []) {
+export function issueBody(findings, accepted) {
+  requireAccepted(accepted, "issueBody");
   const lines = findings.map(
     (finding) => `- \`${finding.id}\` (${finding.kind}) ${finding.package} -- ${finding.summary}`,
   );
@@ -388,7 +430,7 @@ export function issueBody(findings, accepted = []) {
     "one orphaned.",
     "",
     `${RECORDED_PREFIX} ${JSON.stringify(findings.map((finding) => finding.id).sort())}`,
-    `${ACCEPTED_PREFIX} ${JSON.stringify(entries.map((entry) => [entry.id, entry.review_by, entry.issue]))}`,
+    `${ACCEPTED_PREFIX} ${JSON.stringify(entries.map(entryRow))}`,
   ].join("\n");
 }
 

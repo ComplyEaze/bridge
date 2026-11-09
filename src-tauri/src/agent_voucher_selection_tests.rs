@@ -603,6 +603,7 @@ async fn call_filtered_vouchers_args(
     max_bytes: usize,
     redaction: Redaction,
 ) -> Value {
+    let composites = window.contains(" @ ");
     let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(window))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength);
@@ -612,10 +613,12 @@ async fn call_filtered_vouchers_args(
     // The census of the window (#1029), then the window itself.
     plans.extend(paired_with(&cycle, &vouchers));
     plans.extend(paired_with(&cycle, &vouchers));
+    plans.extend(composites.then(unreadable_base_plan));
+    let second_catalogue = plans.len();
     plans.extend(cycle[4..10].iter().cloned());
-    // The two catalogue reads: legs 5 and 7, then 29 and 31 after the six
-    // marks, six census and six window legs.
-    for index in [5, 7, 29, 31] {
+    // The two catalogue reads: legs 5 and 7, then the second set after the six
+    // marks, six census and six window legs and any base read.
+    for index in [5, 7, second_catalogue + 1, second_catalogue + 3] {
         let body = catalogue(&plans[index].fixture.body());
         plans[index].fixture = Fixture::SyntheticXml(body);
     }
@@ -940,6 +943,9 @@ async fn a_refused_ledger_catalogue_names_its_cause_and_no_ledger() {
 // -- #674: a foreign-currency composite withholds its voucher, not the window --
 
 use crate::agent::voucher_parse::window_with_composite_vouchers;
+use crate::agent::voucher_type_class::{
+    ReservedVoucherClass, VOUCHER_TYPE_GUID_TAG, VOUCHER_TYPE_RESERVED_NAME_TAG,
+};
 
 fn decoded(bytes: &[u8]) -> String {
     String::from_utf16(
@@ -954,6 +960,13 @@ fn decoded(bytes: &[u8]) -> String {
 /// Voucher 1 of the captured three-voucher window made a composite one.
 fn window_with_a_composite_voucher() -> String {
     window_with_composite_vouchers(1)
+}
+
+/// The first leg of a base read that fails, as one with no answer does: the voucher stays withheld.
+fn unreadable_base_plan() -> ScenarioPlan {
+    ScenarioPlan::new(Fixture::SyntheticXml("<ENVELOPE></ENVELOPE>".to_string()))
+        .with_encoding(WireEncoding::Utf16Le)
+        .with_framing(ResponseFraming::ContentLength)
 }
 
 /// The `vouchers` plans of a small book (marks, census, window), each of the last two serving `window`.
@@ -1285,4 +1298,178 @@ async fn an_amount_search_over_a_window_with_a_withheld_voucher_stays_partial() 
         .as_str()
         .unwrap()
         .contains("an amount search keeps every withheld voucher"));
+}
+
+// -- #2027: an entry's GST details, read and shown only when `vouchers` asks --
+
+/// The captured three-voucher window with a taxability and one rate row added to its first entry.
+fn window_with_entry_gst_details() -> String {
+    let window = window_with_composite_vouchers(0);
+    let entry = "<ALLLEDGERENTRIES.LIST>";
+    let at = window.find(entry).expect("the window has a ledger entry") + entry.len();
+    format!(
+        "{}<GSTOVRDNTAXABILITY>Taxable</GSTOVRDNTAXABILITY><RATEDETAILS.LIST><GSTRATEDUTYHEAD>IGST</GSTRATEDUTYHEAD><GSTRATE> 5</GSTRATE></RATEDETAILS.LIST>{}",
+        &window[..at],
+        &window[at..]
+    )
+}
+
+/// Through the whole tool: with `include_e_invoice` an invoice carries its details; without it
+/// no row carries the key.
+#[tokio::test]
+async fn vouchers_returns_e_invoice_details_only_when_asked() {
+    let window = || {
+        window_with_entry_gst_details().replacen(
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><IRN TYPE=\"String\">a1b2</IRN>\
+<IRNACKNO TYPE=\"String\"></IRNACKNO>",
+            1,
+        )
+    };
+    let asked =
+        call_vouchers_with(vouchers_plans(window()), json!({"include_e_invoice": true})).await;
+    let details = asked["structuredContent"]["result"]["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find_map(|item| item.get("e_invoice"))
+        .cloned()
+        .expect("a row with details");
+    assert_eq!(details["irn"], json!({"state": "present", "value": "a1b2"}));
+    assert_eq!(details["ack_no"], json!({"state": "absent"}));
+    assert_eq!(details["ack_date"], json!({"state": "not_reported"}));
+    let plain = call_vouchers_with(vouchers_plans(window()), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    assert!(!plain.to_string().contains("e_invoice"), "{plain}");
+}
+
+/// The captured three-voucher window, resolved as the stock-line request answers: the first voucher
+/// a Delivery Note with one line, the others Sales, whose lines this read does not take.
+fn window_with_stock_lines() -> String {
+    let mut window = String::new();
+    for (index, part) in window_with_composite_vouchers(0)
+        .split_inclusive("</VOUCHERTYPENAME>")
+        .enumerate()
+    {
+        window.push_str(part);
+        if !part.ends_with("</VOUCHERTYPENAME>") {
+            continue;
+        }
+        let (reserved, class) = if index == 0 {
+            ("Delivery Note", None)
+        } else {
+            ("Sales", Some(ReservedVoucherClass::Sales))
+        };
+        window.push_str(&format!(
+            "<{VOUCHER_TYPE_GUID_TAG}>{CAPTURED_GUID}-00000099</{VOUCHER_TYPE_GUID_TAG}>\
+             <{VOUCHER_TYPE_RESERVED_NAME_TAG}>{reserved}</{VOUCHER_TYPE_RESERVED_NAME_TAG}>"
+        ));
+        for each in ReservedVoucherClass::ALL {
+            let answer = if class == Some(each) { "Yes" } else { "No" };
+            window.push_str(&format!("<{0}>{answer}</{0}>", each.tag()));
+        }
+        if index == 0 {
+            window.push_str(
+                "<ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>Soda</STOCKITEMNAME>\
+                 <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><ACTUALQTY> 1 Nos</ACTUALQTY>\
+                 </ALLINVENTORYENTRIES.LIST>",
+            );
+        }
+    }
+    window
+}
+
+/// Through the whole tool: `stock_lines` gives the voucher's lines, names the kinds it did not
+/// read, and says nothing was compared; a call that does not ask carries none of it.
+#[tokio::test]
+async fn vouchers_returns_stock_lines_and_names_the_kinds_not_read() {
+    let asked = call_vouchers_with(
+        vouchers_plans(window_with_stock_lines()),
+        json!({"stock_lines": true}),
+    )
+    .await;
+    let result = &asked["structuredContent"]["result"];
+    assert_eq!(asked["isError"], false, "{asked}");
+    let items = result["items"].as_array().unwrap();
+    assert_eq!(items[0]["stock_lines"][0]["direction"], "out", "{asked}");
+    assert_eq!(items[1]["stock_lines_not_read"], true, "{asked}");
+    assert_eq!(
+        result["kinds_not_read"],
+        json!([{"voucher_type": items[1]["voucher_type"], "vouchers": 2}]),
+        "{asked}"
+    );
+    assert_eq!(result["stock_summary_tie"], "not_compared");
+    let plain = call_vouchers_with(vouchers_plans(window_with_stock_lines()), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    for key in ["stock_lines", "kinds_not_read", "stock_summary_tie"] {
+        assert!(!plain.to_string().contains(key), "{plain}");
+    }
+}
+
+/// Through the whole tool: `include_gst_details` also reads each voucher's own GST and note
+/// details (#2027); without it no row carries the key.
+#[tokio::test]
+async fn vouchers_returns_voucher_gst_details_only_when_asked() {
+    let window = || {
+        window_with_entry_gst_details().replacen(
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>\
+<GSTNATUREOFRETURN/>",
+            1,
+        )
+    };
+    let asked = call_vouchers_with(
+        vouchers_plans(window()),
+        json!({"include_gst_details": true}),
+    )
+    .await;
+    let details = asked["structuredContent"]["result"]["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find_map(|item| item.get("voucher_gst"))
+        .cloned()
+        .expect("a row with details");
+    assert_eq!(
+        details["place_of_supply"],
+        json!({"state": "present", "value": "Maharashtra"})
+    );
+    assert_eq!(details["note_reason"], json!({"state": "absent"}));
+    assert_eq!(details["party_note_date"], json!({"state": "not_reported"}));
+    let plain = call_vouchers_with(vouchers_plans(window()), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    assert!(!plain.to_string().contains("voucher_gst"), "{plain}");
+}
+
+/// Through the whole tool: with `include_gst_details` the entry carries its details as sent;
+/// without it no entry carries the key.
+#[tokio::test]
+async fn vouchers_returns_entry_gst_details_only_when_asked() {
+    let asked = call_vouchers_with(
+        vouchers_plans(window_with_entry_gst_details()),
+        json!({"include_gst_details": true}),
+    )
+    .await;
+    let text = asked.to_string();
+    assert!(text.contains("\"gst_details\""), "{asked}");
+    let details = asked["structuredContent"]["result"]["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|item| item["amounts"].as_array().into_iter().flatten())
+        .find_map(|entry| entry.get("gst_details"))
+        .cloned()
+        .expect("an entry with details");
+    assert_eq!(
+        details["taxability"],
+        json!({"state": "value", "value": "Taxable"})
+    );
+    assert_eq!(
+        details["rates"][0]["rate"],
+        json!({"kind": "value", "raw": " 5", "decimal": "5"})
+    );
+    let plain =
+        call_vouchers_with(vouchers_plans(window_with_entry_gst_details()), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    assert!(!plain.to_string().contains("gst_details"), "{plain}");
 }

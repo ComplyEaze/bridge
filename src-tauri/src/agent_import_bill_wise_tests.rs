@@ -1,11 +1,11 @@
-use super::super::{ImportEntry, ImportVoucher};
+use super::super::{ImportAmount, ImportEntry, ImportVoucher};
 use super::*;
 use bridge_tally_protocol::StandardLedgerCatalogV2;
 
 fn entry(ledger: &str, side: EntrySide, amount: &str) -> ImportEntry {
     ImportEntry {
         ledger: ledger.into(),
-        amount: amount.into(),
+        amount: ImportAmount::parse(amount).unwrap(),
         side,
     }
 }
@@ -562,7 +562,7 @@ fn a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_dige
         Box::new(|v| v.bridge_txn_id = "txn-x".into()),
         Box::new(|v| v.voucher_type = VoucherType::Journal),
         Box::new(|v| v.entries[1].ledger = "Other Bank".into()),
-        Box::new(|v| v.entries[1].amount = "100.01".into()),
+        Box::new(|v| v.entries[1].amount = ImportAmount::parse("100.01").unwrap()),
         Box::new(|v| v.entries[1].side = EntrySide::Dr),
         Box::new(|v| v.entries.pop().map(drop).unwrap_or(())),
     ];

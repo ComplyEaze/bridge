@@ -1,0 +1,1 @@
+- When ledgers are set aside for their currency and every figure is then withheld for another reason, as when every open bill belongs to them, the partial `outstandings` answer now names those ledgers beside that reason, on the desktop and through the agent connection, as it does when it gives the other ledgers' figures (#2071).

@@ -72,6 +72,7 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let before = tally_host_today();
@@ -161,80 +162,59 @@ async fn tally_status_failure_retains_completed_sources_in_response_and_history(
             .collect::<Vec<_>>(),
     )
     .unwrap();
-    for fallback in [false, true] {
-        let mut plans = vec![ScenarioPlan::new(Fixture::ProductStatus(
-            ProductStatus::TallyPrime,
-        ))];
-        if fallback {
-            // The untouched captured bills source is a wrong-shape discovery
-            // response, so the subsequent legacy discovery request must fail.
-            plans.push(
-                ScenarioPlan::new(Fixture::SyntheticXml(wrong_shape.clone()))
-                    .with_encoding(WireEncoding::Utf16Le),
-            );
-        }
-        plans.push(
-            ScenarioPlan::new(Fixture::SyntheticXml(wrong_shape.clone()))
-                .with_encoding(WireEncoding::Utf16Le)
-                .with_http_status(503),
-        );
-        let response_bodies = plans
-            .iter()
-            .map(ScenarioPlan::response_bytes)
-            .collect::<Vec<_>>();
-        let simulator = SequenceSimulator::spawn(plans).unwrap();
-        let directory = tempfile::tempdir().unwrap();
-        let server = Server::new(Settings {
-            endpoint: TallyEndpointConfig {
-                host: simulator.address().ip().to_string(),
-                port: simulator.address().port(),
-            },
-            data_dir: directory.path().into(),
-            max_rows: 500,
-            max_bytes: 200_000,
-            redaction: Redaction::None,
-            import_enabled: false,
-            posting: Posting::Off,
-            audit_enabled: false,
-        });
-        let response = server.call_tool("tally_status", json!({})).await;
-        assert_eq!(response["isError"], true);
-        let structured = &response["structuredContent"];
-        let text: Value =
-            serde_json::from_str(response["content"][0]["text"].as_str().unwrap()).unwrap();
-        assert_eq!(&text, structured);
-        assert_eq!(
-            structured["result"]["error"]["code"],
-            "status_probe_unavailable"
-        );
-        let evidence = &structured["evidence"];
-        assert_eq!(evidence["state"], "partial");
-        assert_eq!(evidence["reason_code"], "status_probe_unavailable");
-        let requests = simulator.finish().unwrap();
-        assert_eq!(requests.len(), if fallback { 3 } else { 2 });
-        let mut expected_request = requests[0].request_body_sha256.clone();
-        let mut expected_response = sha256_hex(&response_bodies[0]);
-        let mut expected_bytes = response_bodies[0].len();
-        if fallback {
-            expected_request = sha256_hex(
-                format!("{}:{}", expected_request, requests[1].request_body_sha256).as_bytes(),
-            );
-            expected_response = sha256_hex(
-                format!("{}:{}", expected_response, sha256_hex(&response_bodies[1])).as_bytes(),
-            );
-            expected_bytes += response_bodies[1].len();
-        }
-        // The final 503 attempt is not a successfully completed source body.
-        assert_eq!(evidence["request_sha256"], expected_request);
-        assert_eq!(evidence["response_sha256"], expected_response);
-        assert_eq!(evidence["bytes"], expected_bytes);
-        let history = server.call_tool("read_evidence", json!({"limit":1})).await;
-        assert_eq!(history["isError"], false);
-        assert_eq!(
-            history["structuredContent"]["result"]["records"][0],
-            *evidence
-        );
-    }
+    // The probe sends one company request (`CompanyListV2`) and no fallback
+    // after it (#1872), so the failed attempt is the second of two.
+    let plans = vec![
+        ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime)),
+        ScenarioPlan::new(Fixture::SyntheticXml(wrong_shape))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_http_status(503),
+    ];
+    let response_bodies = plans
+        .iter()
+        .map(ScenarioPlan::response_bytes)
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let response = server.call_tool("tally_status", json!({})).await;
+    assert_eq!(response["isError"], true);
+    let structured = &response["structuredContent"];
+    let text: Value =
+        serde_json::from_str(response["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(&text, structured);
+    assert_eq!(
+        structured["result"]["error"]["code"],
+        "status_probe_unavailable"
+    );
+    let evidence = &structured["evidence"];
+    assert_eq!(evidence["state"], "partial");
+    assert_eq!(evidence["reason_code"], "status_probe_unavailable");
+    let requests = simulator.finish().unwrap();
+    assert_eq!(requests.len(), 2);
+    // The final 503 attempt is not a successfully completed source body.
+    assert_eq!(evidence["request_sha256"], requests[0].request_body_sha256);
+    assert_eq!(evidence["response_sha256"], sha256_hex(&response_bodies[0]));
+    assert_eq!(evidence["bytes"], response_bodies[0].len());
+    let history = server.call_tool("read_evidence", json!({"limit":1})).await;
+    assert_eq!(history["isError"], false);
+    assert_eq!(
+        history["structuredContent"]["result"]["records"][0],
+        *evidence
+    );
 }
 
 #[test]
@@ -305,6 +285,7 @@ fn server_at(port: u16, max_bytes: usize) -> (Server, tempfile::TempDir) {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     (server, directory)
@@ -564,6 +545,62 @@ fn a_codes_own_next_step_wins_over_the_unanswered_reasons() {
     );
 }
 
+/// #2142: a call held back while Tally drains after a cut post says what to do
+/// and when to try again, under the code itself.
+#[test]
+fn a_draining_endpoint_refusal_carries_its_step_and_retry() {
+    let (server, _directory) = server_at(9, 200_000);
+    let (code, retry) = ("tally_endpoint_draining", 10);
+    let response = server.finish_tool_response(
+        "vouchers",
+        &json!({}),
+        Utc::now(),
+        Err(ToolFailure::from(code.to_string())),
+    );
+    let error = &response.value["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], code);
+    assert_eq!(error["retry_after_s"], retry, "{error}");
+    assert_eq!(
+        error["remediation"],
+        refusal_remediation(code).unwrap(),
+        "{error}"
+    );
+}
+
+/// #2071: a refused Trial Balance takes its own step only when no other step applies. Tally
+/// not reachable keeps its step, and the Trial Balance step is the last resort, with or
+/// without a cause.
+#[test]
+fn the_trial_balance_step_is_the_last_resort() {
+    let (server, _directory) = server_at(9, 200_000);
+    let error_of = |unanswered: Option<&'static str>, cause: Option<&'static str>| {
+        let mut failure = ToolFailure::from("trial_balance_read_failed".to_string());
+        failure.unanswered = unanswered.map(Unanswered);
+        failure.cause = cause;
+        let response =
+            server.finish_tool_response("trial_balance", &json!({}), Utc::now(), Err(failure));
+        response.value["structuredContent"]["result"]["error"].clone()
+    };
+    let unreachable = error_of(Some("endpoint_unreachable"), None);
+    assert_eq!(
+        unreachable["remediation"],
+        unanswered_remediation("endpoint_unreachable").unwrap()
+    );
+    for cause in [None, Some("trial_balance_source_identity_missing")] {
+        let answered = error_of(None, cause);
+        assert_eq!(
+            answered["remediation"],
+            TRIAL_BALANCE_READ_FAILED_REMEDIATION
+        );
+    }
+    // A cause with a step of its own keeps it.
+    let identity = error_of(None, Some("company_identity_not_matched"));
+    assert_eq!(
+        identity["remediation"],
+        refusal_remediation("company_identity_not_matched").unwrap()
+    );
+}
+
 /// #697: a send the endpoint's wire gate held back is refused by its own code,
 /// with a retry hint and the step to take, and nothing reaches the port
 /// (nothing listens on it here).
@@ -693,7 +730,7 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             "bounded",
             "It does not show what the AI provider received.",
             "amounts included, is sent to the AI provider",
-            "redaction can only shorten party and ledger names and bank account numbers or drop narrations",
+            "redaction can only shorten party and ledger names, bank account numbers and ledger address lines, or drop narrations",
             "and does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references, or the last four digits of a bank statement's account number (account_last4); under mask_parties a name written inside a narration or reference stays as it is",
             "Never tell the user that no data has left their computer.",
             "no figures or book content",
@@ -749,9 +786,9 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             );
             assert!(
                 limit.contains(
-                    "fewer when the newest receipt lines do not fit in the log read's size bound"
+                    "fewer past a size bound; `omitted_for_size` counts those cut for the reply"
                 ),
-                "{name}: limit names the size bound: {limit:?}"
+                "{name}: limit names the size bound and the count: {limit:?}"
             );
         }
     }

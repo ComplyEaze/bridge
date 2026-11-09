@@ -623,6 +623,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let mut args = json!({"company_guid": COMPANY, "from": "20250701", "to": "20250731"});

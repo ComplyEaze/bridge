@@ -16,6 +16,18 @@ fn adding_days_is_constant_time_calendar_arithmetic() {
         .is_err());
 }
 
+#[test]
+fn a_date_is_shown_as_tally_shows_it() {
+    for (date, shown) in [
+        ("20260914", "14-Sep-2026"),
+        ("20260401", "1-Apr-2026"),
+        ("20241231", "31-Dec-2024"),
+        ("20240229", "29-Feb-2024"),
+    ] {
+        assert_eq!(TallyDate::parse(date).unwrap().shown(), shown);
+    }
+}
+
 fn decimal(text: &str) -> ExactDecimal {
     ExactDecimal::parse(text).unwrap()
 }

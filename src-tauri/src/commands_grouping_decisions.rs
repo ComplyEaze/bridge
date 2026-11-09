@@ -68,6 +68,7 @@ pub async fn record_grouping_decisions(
         request.config,
         &request.selected_company,
         None,
+        crate::tally::connection::ComplianceRead::Standard,
     )
     .await?;
     let planned = plan_grouping_events(
@@ -239,3 +240,7 @@ fn grouping_store_error(error: GroupingStoreError) -> TallyCommandError {
         "Retry; if it persists, check that this is the latest version of ComplyEaze Bridge.",
     )
 }
+
+#[cfg(test)]
+#[path = "commands_grouping_decisions_tests.rs"]
+mod tests;

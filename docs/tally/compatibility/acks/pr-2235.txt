@@ -1,0 +1,8 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+scripts/check-tally-request-builder-hazards.mjs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/connector.rs
+src-tauri/src/tally/tdl_engine.rs
+src/main.tsx
+reviewer: lamemustafa

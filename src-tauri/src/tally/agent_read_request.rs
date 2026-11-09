@@ -104,9 +104,8 @@ impl AgentReadRequest {
     /// exactly the verified company, rendered from the pinned
     /// `AuditCompanyObjectV1` template.
     ///
-    /// This and [`Self::invoice_company_hsn_named`] are the only ways an Object
-    /// export reaches dispatch in production ([`Self::invoice_company_hsn`], the
-    /// identity-typed builder, is used only in tests). [`Self::parse`] stays Collection-only and
+    /// This and [`Self::invoice_company_hsn`] are the only ways an Object
+    /// export reaches dispatch in production. [`Self::parse`] stays Collection-only and
     /// refuses every `TYPE=Object` envelope, so no XML from anywhere else can
     /// use this shape: the company name is the only
     /// variable, it comes from a verified identity, and it is validated and
@@ -127,28 +126,13 @@ impl AgentReadRequest {
     /// The company object an invoice build reads for the company-level
     /// HSN/SAC, rendered from the pinned `InvoiceCompanyHsnV1` template under
     /// the same rules as [`Self::company_object`]: the verified company's name
-    /// is the only variable, and the response is admitted by GUID. Production
-    /// does not call this one: the invoice admission builds the request with
-    /// [`Self::invoice_company_hsn_named`] from the verified company's name
-    /// (a follow-up types that name so the identity cannot be left out).
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the admission renders it by the identity's name")
-    )]
+    /// is the only variable, and the response is admitted by GUID, because Tally
+    /// resolves the `ID` by name. It takes the identity, not a name, so the
+    /// invoice admission cannot send it for a company it did not verify.
     pub(crate) fn invoice_company_hsn(
         identity: &super::VerifiedCompanyIdentity,
     ) -> Result<Self, AgentReadRequestError> {
-        Self::invoice_company_hsn_named(identity.display_name())
-    }
-
-    /// [`Self::invoice_company_hsn`] for a company named by the verified
-    /// identity's display name, which the invoice admission carries: the same
-    /// validation, the same template, so the request is the identity's. This is
-    /// the production builder; the response is admitted by GUID, because Tally
-    /// resolves the `ID` by name.
-    pub(crate) fn invoice_company_hsn_named(name: &str) -> Result<Self, AgentReadRequestError> {
-        let company = bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(name)
-            .map_err(|_| AgentReadRequestError)?;
+        let company = verified_company_name(identity)?;
         Ok(Self(
             bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::InvoiceCompanyHsnV1 {
                 company: &company,
@@ -157,8 +141,8 @@ impl AgentReadRequest {
         ))
     }
 
-    /// Whether this is an Object export. [`Self::company_object`] and the invoice
-    /// company HSN/SAC builders are the only ways to build one ([`Self::parse`] refuses
+    /// Whether this is an Object export. [`Self::company_object`] and
+    /// [`Self::invoice_company_hsn`] are the only ways to build one ([`Self::parse`] refuses
     /// every `Object` envelope), and only the first is sent as an audit part, so on the
     /// audit read a request that says so is that template. The text is tested, not a
     /// stored flag: a flag made `cargo clippy` fail `large_enum_variant` in `agent_import_post.rs` (measured). A

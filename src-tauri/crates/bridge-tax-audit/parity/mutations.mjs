@@ -12,6 +12,8 @@
 //     node parity/mutations.mjs --changed-since origin/master --verify   # no build: the merge check
 //     node parity/mutations.mjs --check-anchors        # no build: exit 2 on an anchor not exactly once at HEAD
 //     node parity/mutations.mjs --full --shard 2/8 --results shard.json  # nightly, one shard
+//     node parity/mutations.mjs --shard 2/8 --results shard.json --killers-from parity/mutation-results.json
+//                                                       # a pull request head's proof run, one shard
 //     node parity/mutations.mjs --merge shard*.json --results all.json --report report.md
 //
 // Run from anywhere with Node 22 or later and the pinned toolchain exported (RUSTC, RUSTDOC and PATH; see
@@ -48,7 +50,10 @@
 // tests run first (`--exact`, only their targets). If one fails or hangs, the mutation is killed
 // ("killers-first" mode, and its margin is then a lower bound). Otherwise the FULL suite runs, so any
 // verdict other than killed comes from the full suite. `--full` skips the killers-first step (the
-// nightly run).
+// nightly run). `--killers-from FILE` supplies killer lists from other records (a proof run's shards
+// start with an empty results file): those records are read for their killers only, never counted
+// or written as results. A killer subset is not run on the unmutated copy on its own, only the full
+// suite is, so a test that fails only when run alone (order or shared state) would read as a kill.
 //
 // SIGINT or SIGTERM stops the cargo runs in flight (their own process groups) and exits; records
 // already written stay. A run killed outright (SIGKILL) can leave its cargo running and a mutation
@@ -999,7 +1004,7 @@ export async function baseline(workers, timeout, buildTimeout, details = null) {
   return problems;
 }
 
-const GATE_STALE_MS = 10_000; // a takeover gate older than this was left by a run that died inside it
+const GATE_STALE_MS = 10_000; // a takeover gate that names no owner and is older than this was left by a run that died inside it
 let claimSeq = 0;
 
 function pidAlive(pid) {
@@ -1010,6 +1015,17 @@ function pidAlive(pid) {
   } catch (e) {
     return e.code === "EPERM";
   }
+}
+
+/** Whether a takeover gate was left behind. A gate names its owner's pid in a file inside it, so it is stale
+ * exactly when that run is gone, however long a live owner has been stalled (suspended, or asleep with its
+ * machine). A gate with no owner yet is one a run has just made, or one that run died before naming: only the
+ * second is older than GATE_STALE_MS. A crashed run's pid that a later process reuses keeps its gate until someone removes
+ * it, as a claim already stays with a reused pid (pidAlive cannot tell the two processes apart). */
+function gateIsStale(gate) {
+  const owner = Number.parseInt(fs.readFileSync(path.join(gate, "owner"), "utf8"), 10);
+  if (Number.isInteger(owner) && owner > 0) return !pidAlive(owner);
+  throw new Error("no owner named");
 }
 
 function claimedBy(lock) {
@@ -1061,18 +1077,35 @@ export function lockWorkdir(workdir) {
       } catch (e) {
         if (e.code !== "EEXIST") throw e;
         try {
-          if (Date.now() - fs.statSync(gate).mtimeMs > GATE_STALE_MS) fs.rmdirSync(gate);
+          let stale;
+          try {
+            stale = gateIsStale(gate);
+          } catch {
+            // No owner named yet (or the gate just went): old enough means its maker died before naming itself.
+            stale = Date.now() - fs.statSync(gate).mtimeMs > GATE_STALE_MS;
+          }
+          if (stale) fs.rmSync(gate, { recursive: true, force: true });
         } catch {
           // another run removed it first
         }
         pause(20);
         continue;
       }
+      let named = false;
       try {
+        try {
+          fs.writeFileSync(path.join(gate, "owner"), `${process.pid}\n`);
+          named = true;
+        } catch (e) {
+          // This run was suspended between making the gate and naming itself for longer than GATE_STALE_MS, and
+          // another run took the unnamed gate as abandoned: it is no longer ours to use or to remove.
+          if (e.code === "ENOENT") continue;
+          throw e;
+        }
         const again = claimedBy(lock);
         if (again !== null && !pidAlive(again)) fs.rmSync(lock, { force: true });
       } finally {
-        fs.rmdirSync(gate);
+        if (named) fs.rmSync(gate, { recursive: true, force: true });
       }
     }
     return null;
@@ -1101,11 +1134,13 @@ const OPTIONS = {
   "--merge": { key: "merge", many: true },
   "--report": { key: "report", value: "MD" },
   "--check-anchors": { key: "checkAnchors", flag: true },
+  "--killers-from": { key: "killersFrom", value: "FILE" },
 };
 
 export const USAGE = `usage: mutations.mjs [ids ...] [--changed-since BASE] [--verify] [--nightly-issues FILE] [--list]
                     [--full] [--jobs N] [--shard K/N] [--timeout SECONDS] [--build-timeout SECONDS]
-                    [--results FILE] [--workdir DIR] [--merge FILE ...] [--report MD] [--check-anchors]`;
+                    [--results FILE] [--workdir DIR] [--merge FILE ...] [--report MD] [--check-anchors]
+                    [--killers-from FILE]`;
 
 /** Read the command line (the options of the Python runner this replaces). Throws a ValueError with
  * the usage when it cannot. */
@@ -1126,6 +1161,7 @@ export function parseArgs(argv, lay = DEFAULT) {
     merge: null,
     report: null,
     checkAnchors: false,
+    killersFrom: null,
     help: false,
   };
   const fail = (message) => {
@@ -1233,6 +1269,7 @@ export function checkAnchors(args, lay = DEFAULT) {
     ["--report", args.report !== null],
     ["--full", args.full],
     ["--shard", args.shard !== null],
+    ["--killers-from", args.killersFrom !== null],
   ]
     .filter(([, set]) => set)
     .map(([name]) => name);
@@ -1258,6 +1295,27 @@ export function checkAnchors(args, lay = DEFAULT) {
 
 export async function run(args, lay = DEFAULT) {
   if (args.checkAnchors) return checkAnchors(args, lay); // before the working-tree list is read
+  // --killers-from names records read ONLY for their killer lists (a proof run's killers-first pass);
+  // they are never results: the run's own results file starts as it is, and only what this run
+  // measured is written. A missing file would quietly make every mutation run the full suite.
+  if (args.killersFrom !== null) {
+    const clash = [
+      ["--full", args.full],
+      ["--merge", args.merge !== null],
+      ["--verify", args.verify],
+      ["--list", args.list],
+    ]
+      .filter(([, set]) => set)
+      .map(([name]) => name);
+    if (clash.length) {
+      err(`refusing: --killers-from is for a run of mutations without --full: ${pyList(clash)}`);
+      return 2;
+    }
+    if (!isFile(args.killersFrom)) {
+      err(`refusing: --killers-from ${args.killersFrom} is not a file, so no mutation would run its killers first`);
+      return 2;
+    }
+  }
 
   const mutations = readJson(lay.list);
   const order = mutations.map((m) => m.id);
@@ -1371,7 +1429,8 @@ export async function run(args, lay = DEFAULT) {
     return 2;
   }
   try {
-    return await runMutations({ args, lay, mutations, order, accepted, results, resultsPath, head, tree, chosen, stale });
+    const killers = args.killersFrom === null ? dict() : loadResults(args.killersFrom);
+    return await runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale });
   } finally {
     lock.release();
   }
@@ -1384,7 +1443,7 @@ function readFailure(e) {
   return e.code === "ENOENT" ? "FileNotFoundError" : e.code === "EISDIR" ? "IsADirectoryError" : e.code === "EACCES" ? "PermissionError" : "OSError";
 }
 
-async function runMutations({ args, lay, mutations, order, accepted, results, resultsPath, head, tree, chosen, stale }) {
+async function runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale }) {
   const files = committedFiles(head, lay.repo);
   const jobs = Math.max(1, Math.min(args.jobs, chosen.length || 1));
   const workers = Array.from({ length: jobs }, (_, i) => new Worker(i, args.workdir, lay));
@@ -1426,7 +1485,9 @@ async function runMutations({ args, lay, mutations, order, accepted, results, re
         if (m === undefined) return;
         let rec;
         try {
-          rec = await runOne(w, m, has(results, m.id) ? results[m.id] : undefined, args.full, args.timeout, args.buildTimeout);
+          // This run's own record first; else a --killers-from record, used only for its killer list.
+          const prior = has(results, m.id) ? results[m.id] : has(killers, m.id) ? killers[m.id] : undefined;
+          rec = await runOne(w, m, prior, args.full, args.timeout, args.buildTimeout);
         } catch (e) {
           if (e instanceof Stopped) return;
           throw e;

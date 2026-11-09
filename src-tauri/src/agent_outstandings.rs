@@ -40,6 +40,20 @@ impl Server {
             result_evidence = combine_evidence(result_evidence.clone(), evidence_from_runtime_read(currency.evidence()));
             let assertion = currency.admit_inr_classified().map_err(str::to_string)?;
             let as_of_date = to.clone();
+            // The party detail ties the statement's bills to the ledger catalogue and the
+            // vouchers read after it, by the party's spelling. A rename between those reads
+            // would tie different spellings and answer as a finding, so the company's marks are
+            // read before the first of them and again after the last.
+            let detail_target = match (detail_request, &party_argument) {
+                (Some(kind), Some(party)) => {
+                    let (marks, evidence) = self
+                        .read_company_marks_once(&identity, &company.name)
+                        .await?;
+                    result_evidence = combine_evidence(result_evidence.clone(), evidence);
+                    Some((kind, party, marks))
+                }
+                _ => None,
+            };
             let (load, outstandings_evidence) = self
                 .runtime
                 .fetch_agent_outstandings_with_evidence(
@@ -111,7 +125,7 @@ impl Server {
                     ..
                 } => {
                     let mut detail = None;
-                    if let (Some(kind), Some(party)) = (detail_request, &party_argument) {
+                    if let Some((kind, party, opening)) = detail_target {
                         let (value, detail_evidence) = self
                             .outstandings_detail(
                                 &identity,
@@ -122,6 +136,7 @@ impl Server {
                                 reference_argument.as_deref(),
                                 &statement_open_bills,
                                 &statement_unallocated_by_party,
+                                opening,
                             )
                             .await?;
                         result_evidence = combine_evidence(result_evidence.clone(), detail_evidence);
@@ -152,10 +167,45 @@ impl Server {
                         exclusions.partial_reasons(),
                     ));
                 }
+                OutstandingsLoadResult::WithheldWithLedgersSetAside {
+                    reason, exclusions, ..
+                } if detail_request.is_some() => {
+                    return Err(super::bill_trail::detail_requires_a_complete_read(
+                        reason.reason_code.clone(),
+                        exclusions.partial_reasons(),
+                    ));
+                }
                 OutstandingsLoadResult::Partial { reason, .. } => {
                     result_evidence.state = "partial";
                     result_evidence.reason_code = Some(reason.reason_code.clone());
                     (partial_payload(&reason, self.settings.redaction), false)
+                }
+                // bridge#2071: ledgers were set aside, and every figure was
+                // then withheld for another reason, such as a book whose bills
+                // all belong to set-aside ledgers. Both reasons are given, and
+                // the set-aside ledgers are named as when figures are given.
+                OutstandingsLoadResult::WithheldWithLedgersSetAside {
+                    reason, exclusions, ..
+                } => {
+                    result_evidence.state = "partial";
+                    result_evidence.reason_code =
+                        Some(format!("{}+{}", reason.reason_code, exclusions.evidence_reason()));
+                    let mut payload = partial_payload(&reason, self.settings.redaction);
+                    let mut partial_reasons = vec![reason.reason_code.as_str()];
+                    partial_reasons.extend(exclusions.partial_reasons());
+                    payload["partial_reasons"] = json!(partial_reasons);
+                    // The lists are paged with no figures beside them, so the
+                    // page's offset sits here: a trim resumes from it.
+                    payload["offset"] = json!(bill_offset);
+                    let (foreign, mixed, truncated) = set_aside_ledgers(
+                        exclusions,
+                        bill_offset,
+                        bill_limit,
+                        self.settings.redaction,
+                    );
+                    payload["foreign_currency_ledgers_excluded"] = foreign;
+                    payload["base_currency_ledgers_mixed_excluded"] = mixed;
+                    (payload, truncated)
                 }
                 // bridge#551, #642: ledgers kept in another currency, and
                 // base-currency ledgers with a composite value, were left out.
@@ -171,32 +221,18 @@ impl Server {
                     result_evidence.state = "partial";
                     result_evidence.reason_code = Some(exclusions.evidence_reason());
                     let partial_reasons = exclusions.partial_reasons();
-                    let (foreign_currency_ledgers_excluded, mixed) = exclusions.into_parts();
                     let base = *base_currency_ledgers;
                     let (figures, figures_truncated) =
                         figures(base.statement_open_bills, base.statement_unallocated_by_party)?;
-                    let mixed_count = mixed.len();
-                    let (mixed, mixed_truncated, next_mixed_offset) =
-                        paginate_open_bills(mixed, bill_offset, bill_limit);
-                    let mixed = mixed
-                        .into_iter()
-                        .map(|ledger| redact_value(party_name_value(ledger), self.settings.redaction))
-                        .collect::<Vec<_>>();
-                    let excluded_count = foreign_currency_ledgers_excluded.len();
-                    let (excluded, excluded_truncated, next_excluded_offset) =
-                        paginate_open_bills(foreign_currency_ledgers_excluded, bill_offset, bill_limit);
-                    let excluded = excluded
-                        .into_iter()
-                        .map(|ledger| {
-                            json!({
-                                "ledger": redact_value(party_name_value(ledger.ledger), self.settings.redaction),
-                                "currency": ledger.currency,
-                            })
-                        })
-                        .collect::<Vec<_>>();
+                    let (foreign, mixed, ledgers_truncated) = set_aside_ledgers(
+                        exclusions,
+                        bill_offset,
+                        bill_limit,
+                        self.settings.redaction,
+                    );
                     (
-                        json!({"state":"partial", "partial_reason": crate::tally::CurrencyExclusions::PARTIAL_REASON, "partial_reasons": partial_reasons, "base_currency_ledgers": figures, "foreign_currency_ledgers_excluded": {"count": excluded_count, "ledgers": excluded, "truncated": excluded_truncated, "next_offset": next_excluded_offset}, "base_currency_ledgers_mixed_excluded": {"count": mixed_count, "reason": "mixed_currency_movement", "ledgers": mixed, "truncated": mixed_truncated, "next_offset": next_mixed_offset}}),
-                        figures_truncated || excluded_truncated || mixed_truncated,
+                        json!({"state":"partial", "partial_reason": crate::tally::CurrencyExclusions::PARTIAL_REASON, "partial_reasons": partial_reasons, "base_currency_ledgers": figures, "foreign_currency_ledgers_excluded": foreign, "base_currency_ledgers_mixed_excluded": mixed}),
+                        figures_truncated || ledgers_truncated,
                     )
                 }
             };
@@ -214,6 +250,41 @@ impl Server {
         .await;
         result.map_err(|failure| failure.with_prior_evidence(result_evidence))
     }
+}
+
+/// The ledgers a read set aside by currency (bridge#551, #642), each list a
+/// page of names, as party names so that redaction applies to them; and
+/// whether either page was cut short.
+fn set_aside_ledgers(
+    exclusions: crate::tally::CurrencyExclusions,
+    offset: usize,
+    limit: usize,
+    redaction: Redaction,
+) -> (Value, Value, bool) {
+    let (foreign, mixed) = exclusions.into_parts();
+    let mixed_count = mixed.len();
+    let (mixed, mixed_truncated, next_mixed_offset) = paginate_open_bills(mixed, offset, limit);
+    let mixed = mixed
+        .into_iter()
+        .map(|ledger| redact_value(party_name_value(ledger), redaction))
+        .collect::<Vec<_>>();
+    let foreign_count = foreign.len();
+    let (foreign, foreign_truncated, next_foreign_offset) =
+        paginate_open_bills(foreign, offset, limit);
+    let foreign = foreign
+        .into_iter()
+        .map(|ledger| {
+            json!({
+                "ledger": redact_value(party_name_value(ledger.ledger), redaction),
+                "currency": ledger.currency,
+            })
+        })
+        .collect::<Vec<_>>();
+    (
+        json!({"count": foreign_count, "ledgers": foreign, "truncated": foreign_truncated, "next_offset": next_foreign_offset}),
+        json!({"count": mixed_count, "reason": "mixed_currency_movement", "ledgers": mixed, "truncated": mixed_truncated, "next_offset": next_mixed_offset}),
+        foreign_truncated || mixed_truncated,
+    )
 }
 
 /// A withheld result: its reason, and the ledger a currency refusal names

@@ -1,0 +1,37 @@
+# fixture: tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml
+# parser: parse_compliance_ledger_snapshot_for_company(FOREXGROUP base)
+# source: captured
+Ok(ComplianceLedgerSnapshot {
+    base: [
+        LedgerSnapshotEntry {
+            name: "Cash",
+            parent: Some(
+                "Cash-in-Hand",
+            ),
+            closing_balance: Some(
+                ExactDecimal(
+                    "-1000.00",
+                ),
+            ),
+            opening_balance: ExactDecimal(
+                "0.00",
+            ),
+            opening_balance_observed: Some(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            bill_wise_on: false,
+            currency_name: Some(
+                "₹",
+            ),
+        },
+    ],
+    foreign: [],
+    mixed: [
+        "BRIDGE Export Sales",
+        "BRIDGE Lab Bank",
+        "BRIDGE USD Customer",
+        "Profit & Loss A/c",
+    ],
+})

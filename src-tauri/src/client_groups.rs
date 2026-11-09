@@ -8,10 +8,10 @@
 //! nor mirror state, and reading them must never resolve the mirror key or
 //! prompt the operating-system keychain.
 
+use crate::local_files::file as local_file;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const FILE_NAME: &str = "client-group-labels-v1.json";
 const SCHEMA_VERSION: u8 = 1;
@@ -238,103 +238,13 @@ pub fn save_sort_preference(
     save_bytes(directory, SORT_FILE_NAME, &contents)
 }
 
-fn save_bytes(directory: &Path, file_name: &str, contents: &[u8]) -> Result<(), std::io::Error> {
-    std::fs::create_dir_all(directory)?;
-    let path = directory.join(file_name);
-    write_file_atomically(&path, contents)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    }
-    Ok(())
-}
-
 /// Replacing the label file is a single rename after a fully written sibling
 /// exists. A process interruption can therefore retain the previous labels or
 /// the complete next labels, never a truncated JSON file that loads as none.
-fn write_file_atomically(path: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| std::io::Error::other("missing_label_parent"))?;
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| std::io::Error::other("invalid_label_file_name"))?;
-    for sequence in 1..=10_000_u32 {
-        let temporary = temporary_label_path(parent, file_name, sequence);
-        let mut file = match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-        {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error),
-        };
-        if let Err(error) = file.write_all(contents).and_then(|_| file.sync_all()) {
-            drop(file);
-            let _ = std::fs::remove_file(&temporary);
-            return Err(error);
-        }
-        drop(file);
-        if let Err(error) = replace_file(&temporary, path) {
-            let _ = std::fs::remove_file(&temporary);
-            return Err(error);
-        }
-        return Ok(());
-    }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::AlreadyExists,
-        "label_temporary_name_exhausted",
-    ))
-}
-
-#[cfg(not(windows))]
-fn replace_file(temporary: &Path, destination: &Path) -> Result<(), std::io::Error> {
-    std::fs::rename(temporary, destination)
-}
-
-#[cfg(windows)]
-fn replace_file(temporary: &Path, destination: &Path) -> Result<(), std::io::Error> {
-    use std::os::windows::ffi::OsStrExt as _;
-    use windows_sys::Win32::Storage::FileSystem::{
-        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
-    };
-
-    let temporary = temporary
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect::<Vec<_>>();
-    let destination = destination
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect::<Vec<_>>();
-    // SAFETY: both buffers are NUL-terminated and remain alive for the call.
-    // The source is a newly created sibling owned by this process. The flags
-    // provide Windows' replace-existing behavior and request durable metadata.
-    let replaced = unsafe {
-        MoveFileExW(
-            temporary.as_ptr(),
-            destination.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if replaced == 0 {
-        Err(std::io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
-
-fn temporary_label_path(parent: &Path, file_name: &str, sequence: u32) -> PathBuf {
-    parent.join(format!(
-        ".{file_name}.{}.{}.tmp",
-        std::process::id(),
-        sequence
-    ))
+fn save_bytes(directory: &Path, file_name: &str, contents: &[u8]) -> Result<(), std::io::Error> {
+    std::fs::create_dir_all(directory)?;
+    let staged = directory.join(format!(".{file_name}.{}.tmp", uuid::Uuid::new_v4()));
+    local_file::replace_private_file(&staged, &directory.join(file_name), contents)
 }
 
 fn normalize(labels: ClientGroupLabels) -> ClientGroupLabels {

@@ -1,0 +1,11 @@
+# fixture: company_marks_empty_company_no_voucher_mark_live.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE HANDIMPORT LAB",
+        guid: "9b5b6d54-4cdb-4b90-9600-cab45ee70c3a",
+        vouchers: 0,
+        masters: 210,
+    },
+])

@@ -21,6 +21,40 @@ fields. They are parser evidence only: the production request fetches the
 smaller Trial Balance field set, so its request/response pairing requires its
 own live qualification.
 
+## A Closing Stock ledger with a keyed closing balance (#2068) — 2026-10-27 and 2026-10-28
+
+Two raw answers to the production `List of Ledgers` request of
+`render_native_trial_balance_request` (the same text but for the company
+name; the lab sent it as UTF-16LE), for 1 April 2025 to 31 March 2026, from TallyPrime 7.2 Silver. Each is
+stored as received: BOM-less UTF-16LE, not decoded or edited. Both companies
+are synthetic lab books keyed by hand with invented masters: eight ledgers, a
+Closing Stock ledger under Stock-in-Hand opened at 1,000.00 Dr whose closing
+balance of 1,400.00 Dr at 31 March 2026 was keyed in the ledger's own closing
+balance field. On both, that ledger's row reads `TBALOPENING` -1000.00,
+`DEBITTOTALS` -400.00, `CREDITTOTALS` empty and `TBALCLOSING` -1000.00; every
+other row's closing is its opening plus its debit and credit totals. The marks
+read the same before and after each read.
+
+- `trial_balance_nonint_stock_ledger.utf16le.xml`: BRIDGE NONINT LAB, not
+  integrated with inventory; `lab/692-nonint-lab-answers` at `cbdc638d9537`,
+  `answers/n-r3-ledgers-fy.xml`.
+- `trial_balance_integrated_stock_ledger.utf16le.xml`: BRIDGE INTEGRATED CTRL
+  LAB, integrated with inventory; `lab/2068-integrated-write-control-answers`
+  at `c539688fd75e`, `raw/n-r3-ledgers-fy.answer.xml`.
+
+| Fixture | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `trial_balance_nonint_stock_ledger.utf16le.xml` | 12,314 | `90bf8a9a2039e7d78ca94c18d2a63c7e86542bdab6bfd439d13f2f62b7edf24b` |
+| `trial_balance_integrated_stock_ledger.utf16le.xml` | 12,314 | `5e13eee2bd16fe31bc7047ffe40942ff6b86583798a0aad7759a5a19df9f723f` |
+
+Each SHA-256 equals the lab's own `send-log.txt` line for that answer. What
+Tally's statements did with the keyed figure differs by book (the lab's
+`RESULTS.md`): on the non-integrated book its Profit and Loss and Balance
+Sheet used 1,400.00; on the integrated book they valued the stock from the
+stock item, 1,200.00. Both are in raw Profit and Loss answers on the same
+branches (`n-r1`). These captures establish the row, not either
+figure. One observation each.
+
 The following files were normalised by Git on their first commit. Their original
 captured bytes are unrecoverable: parse-level content is believed intact, but
 byte-level fidelity is not. Each is pending a future re-capture from live Tally.

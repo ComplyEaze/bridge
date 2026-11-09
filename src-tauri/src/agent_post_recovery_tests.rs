@@ -87,6 +87,7 @@ fn local_batch_at(root: &std::path::Path, port: u16) -> Server {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -202,6 +203,7 @@ async fn cancellation_after_durable_intent_finishes_the_original_response_once()
         let result = await_post(
             future,
             PostRequest {
+                tool: "post_import",
                 id: &id,
                 args: &request_args,
                 cancellation: &cancellation,
@@ -265,6 +267,7 @@ async fn cancellation_before_durable_intent_withdraws_the_controlled_future() {
     let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
+            tool: "post_import",
             id: &json!(7),
             args: &args(),
             cancellation: &cancellation,
@@ -300,6 +303,7 @@ async fn eof_after_durable_intent_drains_the_original_future() {
                 completed_response()
             },
             PostRequest {
+                tool: "post_import",
                 id: &id,
                 args: &request_args,
                 cancellation: &cancellation,
@@ -343,6 +347,7 @@ async fn output_error_after_durable_intent_drains_the_original_future() {
                 completed_response()
             },
             PostRequest {
+                tool: "post_import",
                 id: &id,
                 args: &request_args,
                 cancellation: &cancellation,
@@ -409,6 +414,7 @@ async fn buffered_post_cancellation_removes_call_before_it_can_start() {
         stops(await_post(
             stand_in(cancellation.clone()),
             PostRequest {
+                tool: "post_import",
                 id: &json!(7),
                 args: &args(),
                 cancellation: &cancellation,

@@ -489,13 +489,8 @@ fn catalogue_company_verification_preserves_typed_error_codes() {
         "source_draft_catalogue_malformed_response"
     );
 
-    assert_eq!(
-        company_verification_error_code(&command_error("untrusted_discovery_limit_exceeded")),
-        "source_draft_catalogue_bounds_invalid"
-    );
-
     // A code `tally_runtime_command_error` does not emit: exercises the documented
-    // conservative default, not one of the nine classified codes.
+    // conservative default, not one of the eight classified codes.
     assert_eq!(
         company_verification_error_code(&command_error("reviewed_company_scope_changed")),
         "source_draft_catalogue_scope_invalid"

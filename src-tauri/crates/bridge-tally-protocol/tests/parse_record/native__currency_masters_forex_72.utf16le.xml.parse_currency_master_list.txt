@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/native/currency_masters_forex_72.utf16le.xml
+# parser: parse_currency_master_list
+# source: captured
+Ok(CurrencyMasters {
+    masters: [
+        CurrencyMaster {
+            name: "$",
+            original_name: None,
+            mailing_name: "USD",
+            decimal_places: 2,
+        },
+        CurrencyMaster {
+            name: "₹",
+            original_name: None,
+            mailing_name: "INR",
+            decimal_places: 2,
+        },
+    ],
+})

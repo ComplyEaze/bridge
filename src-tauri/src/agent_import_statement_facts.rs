@@ -465,7 +465,7 @@ impl BuildLine {
             built_at: line.built_at.clone(),
             status: line.status.clone(),
             vouchers: BuildVoucher::of_vouchers(&line.vouchers),
-            ledger_identities: line.ledger_identities.clone(),
+            ledger_identities: line.binding.ledgers().map(<[_]>::to_vec),
             statement: line.statement.clone(),
             withdrawn: line.withdrawn_skips.iter().flatten().cloned().collect(),
         }
@@ -510,7 +510,7 @@ impl BuildVoucher {
                     .iter()
                     .map(|entry| BuildEntry {
                         ledger: entry.ledger.clone(),
-                        amount: entry.amount.clone(),
+                        amount: entry.amount.as_str().to_string(),
                         side: entry.side.clone(),
                     })
                     .collect(),
@@ -631,19 +631,22 @@ pub(super) struct TransferFacts {
     /// Statement Contras left out because they are not two ledgers with equal
     /// positive amounts, or have no leg on the statement's bank.
     // Counted for the tests; no tool reports it, since the coverage rule already
-    // withholds `not_found` where such a Contra sits.
+    // withholds `not_found` and `tally_unchecked` (the row reads `not_established`)
+    // where such a Contra sits.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_not_two_leg: usize,
     /// Contras of a lineage that holds statement facts, with no facts entry in
     /// any of its builds: not seen, and the days they sit on are not cover.
     // Counted for the tests; no tool reports it, since the coverage rule already
-    // withholds `not_found` where such a Contra sits.
+    // withholds `not_found` and `tally_unchecked` (the row reads `not_established`)
+    // where such a Contra sits.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_without_facts: usize,
     /// Contras of a build never sent and never found, whose row a sent or found
     /// batch of another lineage holds.
     // Counted for the tests; no tool reports it, since the coverage rule already
-    // withholds `not_found` where such a Contra sits.
+    // withholds `not_found` and `tally_unchecked` (the row reads `not_established`)
+    // where such a Contra sits.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_superseded: usize,
     /// The skips, kept or held elsewhere, that some build of the company which

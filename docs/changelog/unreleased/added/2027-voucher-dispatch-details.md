@@ -1,0 +1,1 @@
+- `vouchers` with `include_gst_details` also says, for each invoice, its dispatch details: the dispatch document number, how it was dispatched, the destination, the carrier, the bill of lading or LR-RR number and its date, and the motor vehicle number, each present with its value, absent, or not reported by this book or release (#2027).

@@ -1,0 +1,180 @@
+# fixture: tests/fixtures/agent/masters-m1-marks/ledger-index-after-probe-create.utf16le.xml
+# parser: parse_ledger_name_index(MASTERS LAB)
+# source: captured
+Ok([
+    LedgerNameRow {
+        names: [
+            "Cash",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f",
+        alter_id: 32,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Alias Target",
+            "MLab Alias Name",
+            "MLab Alias Two",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf",
+        alter_id: 233,
+    },
+    LedgerNameRow {
+        names: [
+            "MLAB CASE TARGET",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0",
+        alter_id: 219,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Dash Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2",
+        alter_id: 221,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Exact Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce",
+        alter_id: 232,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab FreshParty",
+        ],
+        row_spelling: Some(
+            "MLab Fresh Party",
+        ),
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d5",
+        alter_id: 234,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Group Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d6",
+        alter_id: 223,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Duty Cess",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de",
+        alter_id: 231,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Duty CGST",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9",
+        alter_id: 226,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Duty IGST",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da",
+        alter_id: 227,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Duty SGST UTGST",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc",
+        alter_id: 229,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Duty State Tax",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db",
+        alter_id: 228,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Duty UT Tax",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd",
+        alter_id: 230,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Party",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7",
+        alter_id: 224,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab M1 Suspense",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8",
+        alter_id: 225,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Probe Pvt. Ltd.",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000df",
+        alter_id: 235,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Slash Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3",
+        alter_id: 222,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab  Space Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1",
+        alter_id: 220,
+    },
+    LedgerNameRow {
+        names: [
+            "Profit & Loss A/c",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e",
+        alter_id: 31,
+    },
+])

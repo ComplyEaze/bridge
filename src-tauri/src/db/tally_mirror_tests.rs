@@ -3115,6 +3115,32 @@ async fn batch_identity_remains_composite_across_capability_packs() {
 }
 
 #[tokio::test]
+async fn a_batch_range_that_names_no_calendar_day_is_refused() {
+    let (repository, snapshot, company) = seeded_repository().await;
+    for (from, to) in [("20251340", "20251340"), ("20250229", "20250301")] {
+        let refused = repository
+            .begin_batch(BeginBatchInput {
+                run_id: "impossible-date-run".to_string(),
+                capability_snapshot_id: snapshot.id.clone(),
+                company_id: company.id.clone(),
+                pack_id: "india_tax".to_string(),
+                pack_schema_major: 1,
+                pack_schema_minor: 0,
+                source_transport: "xml_http".to_string(),
+                source_release: None,
+                requested_from_yyyymmdd: Some(from.to_string()),
+                requested_to_yyyymmdd: Some(to.to_string()),
+                started_at_unix_ms: 2_000,
+            })
+            .await;
+        assert!(
+            matches!(refused, Err(MirrorError::InvalidInput("date_range"))),
+            "{from}..{to}: {refused:?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn raw_multi_statement_migration_rolls_back_ddl_on_failure() {
     let pool = SqlitePoolOptions::new()
         .max_connections(1)

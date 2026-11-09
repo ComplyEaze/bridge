@@ -9,7 +9,7 @@ use crate::tally::ConnectionStatus;
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
-    compute_native_outstandings, parse_native_ledger_snapshot,
+    compute_native_outstandings, parse_native_bill_rows, parse_native_ledger_snapshot,
     parse_native_ledger_snapshot_for_company,
 };
 use std::collections::BTreeMap;
@@ -85,7 +85,9 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         groups: Vec::new(),
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
     let currency = RuntimeReadEvidence::paired("<currency/>", sha256_hex(b"currency-response"), 19);
     let baseline = TallyRuntime::party_ledger_master_source_evidence(

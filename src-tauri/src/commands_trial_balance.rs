@@ -22,6 +22,23 @@ pub struct TrialBalanceResponse {
     /// base-currency ledgers; the screen shows it with the ledgers left out
     /// (bridge#709).
     scope_limitation: Option<&'static str>,
+    /// Present only when some ledger's closing is not its opening plus its debit and credit
+    /// totals; those rows carry `movements_differ_by` (#2068). The MCP answer's words. Left out
+    /// otherwise, so such a read's response is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    movements_differ_limitation: Option<String>,
+}
+
+/// The response for a read the export store holds as `export_id`.
+fn trial_balance_response(read: TrialBalanceRead, export_id: String) -> TrialBalanceResponse {
+    TrialBalanceResponse {
+        scope_limitation: scope_limitation(&read),
+        movements_differ_limitation: crate::reports::trial_balance::movements_differ_limitation(
+            &read.report.rows,
+        ),
+        read,
+        export_id,
+    }
 }
 
 fn scope_limitation(read: &TrialBalanceRead) -> Option<&'static str> {
@@ -192,7 +209,6 @@ pub async fn fetch_tally_trial_balance(
     let read = read_desktop_trial_balance(&runtime, request.config, &identity, period)
         .await
         .map_err(read_error)?;
-    let scope_limitation = scope_limitation(&read);
     let export_id = exports.insert(read.clone()).map_err(|_| {
         local_error(
             "trial_balance_export_budget",
@@ -200,11 +216,7 @@ pub async fn fetch_tally_trial_balance(
             "Review the selected company and retry with a smaller supported source.",
         )
     })?;
-    Ok(TrialBalanceResponse {
-        read,
-        export_id,
-        scope_limitation,
-    })
+    Ok(trial_balance_response(read, export_id))
 }
 
 /// The webview sends only an opaque handle; no amounts, rows or Tally request

@@ -1,6 +1,6 @@
 {
   "macOS": [
-    ["src-tauri/crates/bridge-tally-transport/src/lib.rs", "reqwest::RequestBuilder::send", 3],
+    ["src-tauri/crates/bridge-tally-transport/src/lib.rs", "reqwest::RequestBuilder::send", 4],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpListener::bind", 1],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpStream::connect_timeout", 2],
     ["src-tauri/src/commands.rs", "std::process::Command::new", 1],
@@ -16,7 +16,7 @@
     ["src-tauri/clippy.toml", "windows_sys::Win32::UI::Shell::ShellExecuteA", 1],
     ["src-tauri/clippy.toml", "windows_sys::Win32::UI::Shell::ShellExecuteExW", 1],
     ["src-tauri/clippy.toml", "windows_sys::Win32::UI::Shell::ShellExecuteW", 1],
-    ["src-tauri/crates/bridge-tally-transport/src/lib.rs", "reqwest::RequestBuilder::send", 3],
+    ["src-tauri/crates/bridge-tally-transport/src/lib.rs", "reqwest::RequestBuilder::send", 4],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpListener::bind", 1],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpStream::connect_timeout", 2],
     ["src-tauri/src/commands.rs", "std::process::Command::new", 1],

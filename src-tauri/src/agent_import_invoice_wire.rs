@@ -422,7 +422,10 @@ impl VoucherTypeGuid {
 /// class is decided here, in the program, from that compute. Only measured
 /// primitives reach Tally: a date formula on literal dates (SVFROMDATE and
 /// SVTODATE do not limit a collection), a voucher-number equality (the form the
-/// hand-keyed invoice read used) and the class compute.
+/// hand-keyed invoice read used) and the class compute. The e-invoice details
+/// say whether a voucher holding the number carries an IRN: with them the lab's
+/// answers were the answers without them plus the three elements on each row
+/// (#2162 item 8, `lab/2162-irn-read-answers` R1, protocol reference §8.2j).
 pub(in crate::agent) fn render_invoice_number_request(
     company: &str,
     number: &InvoiceNumber,
@@ -430,7 +433,7 @@ pub(in crate::agent) fn render_invoice_number_request(
 ) -> String {
     let (number, from, to) = (number.as_str(), from.as_str(), to.as_str());
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     )
 }
@@ -439,19 +442,37 @@ pub(in crate::agent) fn render_invoice_number_request(
 /// already use).
 const SALES_CLASS_TAG: &str = "BRIDGEVCHISSALES";
 
-/// How many of the returned vouchers are Sales-class. A row whose class
-/// element is missing or is neither Yes nor No is an error: an unknown function
-/// omits its element, so a gap is never a No.
-pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
-    let mut sales = 0;
+/// The returned vouchers that are Sales-class. A row whose class element is
+/// missing or is neither Yes nor No is an error: an unknown function omits its
+/// element, so a gap is never a No.
+fn sales_rows(xml: &str) -> Result<Vec<Row>, &'static str> {
+    let mut sales = Vec::new();
     for row in rows(xml, "VOUCHER")? {
         match row.one(SALES_CLASS_TAG)? {
-            Some("Yes") => sales += 1,
+            Some("Yes") => sales.push(row),
             Some("No") => {}
             _ => return Err("invoice_number_class_unread"),
         }
     }
     Ok(sales)
+}
+
+/// How many of the returned vouchers are Sales-class.
+pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
+    sales_rows(xml).map(|sales| sales.len())
+}
+
+/// Whether a Sales-class voucher holding the number carries an IRN: an `IRN`
+/// with text. One that came back empty or did not come back says nothing (the
+/// row reader keeps no empty field, so the two are not told apart), and never
+/// makes this true.
+pub(super) fn sales_holder_has_irn(xml: &str) -> Result<bool, &'static str> {
+    for row in sales_rows(xml)? {
+        if row.one("IRN")?.is_some() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Whether the number read for a known invoice (the control) found it: a row
@@ -478,9 +499,9 @@ pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<b
 /// as ALLLEDGERENTRIES.LIST, measured on a committed Sales capture) plus the GST
 /// header fields. Measured together on the two invoices the rehearsal posted
 /// (7 Oct 2026, §9.16): every field below came back. The four GSTR-1 status
-/// fields at the end were added on 10 Oct 2026, when the lab answered this
-/// request byte for byte (§9.16; the `pilot-lab-invoice-readback-status`
-/// fixtures).
+/// fields were added on 10 Oct 2026 and `ISPOSTDATED` after them on 3 Nov 2026,
+/// each time when the lab answered this request byte for byte (§9.16; the
+/// `pilot-lab-invoice-readback-post-dated` fixtures).
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
     type_guid: &VoucherTypeGuid,
@@ -490,7 +511,7 @@ pub(in crate::agent) fn render_invoice_readback_request(
     let (type_guid, number) = (type_guid.as_str(), number.as_str());
     let (from, to) = (from.as_str(), to.as_str());
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN, ISPOSTDATED</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     )
 }
@@ -649,6 +670,7 @@ pub(super) fn readback_fields(voucher: &Row) -> Result<BTreeMap<String, String>,
         "VCHGSTSTATUSISUNCERTAIN",
         "VCHGSTSTATUSISEXCLUDED",
         "ISGSTOVERRIDDEN",
+        "ISPOSTDATED",
     ] {
         if let Some(value) = voucher.one(key)? {
             fields.insert(key.to_string(), value.to_string());
@@ -816,35 +838,46 @@ pub(super) fn parse_company_registration(
 /// the lab answered them on 12 Oct 2026 on the unrestricted request (lab
 /// request set W16, the `pilot-lab-ledger-rates-hsn` fixture;
 /// `GSTTYPEOFSUPPLY` and `GSTAPPLICABLE` are for the code warnings that
-/// follow). Since #1331 the code sends the restricted request
-/// (`render_ledger_rates_request_for_parents`); §9.16, "the rates request the
+/// follow). Since #1331 the code sends the request restricted to the named ledgers
+/// (`render_ledger_rates_request_for_ledgers`); §9.16, "the rates request the
 /// code sends", says what the lab has and has not answered of it. `window` is
 /// the financial year's start and the invoice date, as the request that was
 /// measured carried them (a ledger's rate rows came back whole; whether the
 /// window changes them was not tried).
 #[cfg(test)]
 fn render_ledger_rates_request(company: &str, window: (&TallyDate, &TallyDate)) -> String {
-    render_ledger_rates(company, window, None)
+    render_ledger_rates(
+        company,
+        window,
+        bridge_tally_protocol::native_outstandings::parent_filter_parts(None),
+    )
 }
 
-/// [`render_ledger_rates_request`] restricted to the ledgers under one
-/// [`ParentPart`]'s parents, through the same `SYSTEM` formula and `FILTERS`
-/// element the compliance listing's parts carry (#679, #1331). The fetch list
-/// is the unfiltered request's, unchanged.
-pub(in crate::agent) fn render_ledger_rates_request_for_parents(
+/// [`render_ledger_rates_request`] restricted to the ledgers one
+/// [`LedgerGuidPart`](bridge_tally_protocol::ledger_guid_part::LedgerGuidPart)
+/// names, through the same `SYSTEM` formula and `FILTERS` element a parent
+/// part's request carries (#1331). The fetch list is the unfiltered request's,
+/// unchanged. The lab answered it with exactly the named ledgers' rows, each
+/// byte-identical to the same ledger's row of the parent-filtered answer, at
+/// 18, 10,018 and 20,018 ledgers (`lab/1331-scoped-masters-answers`, 31 Oct
+/// 2026).
+pub(in crate::agent) fn render_ledger_rates_request_for_ledgers(
     company: &str,
     window: (&TallyDate, &TallyDate),
-    part: &bridge_tally_protocol::parent_partition::ParentPart,
+    part: &bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
 ) -> String {
-    render_ledger_rates(company, window, Some(part))
+    render_ledger_rates(
+        company,
+        window,
+        bridge_tally_protocol::native_outstandings::ledger_guid_filter_parts(part),
+    )
 }
 
 fn render_ledger_rates(
     company: &str,
     window: (&TallyDate, &TallyDate),
-    part: Option<&bridge_tally_protocol::parent_partition::ParentPart>,
+    (formula, filters): (String, String),
 ) -> String {
-    let (formula, filters) = bridge_tally_protocol::native_outstandings::parent_filter_parts(part);
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
@@ -1084,14 +1117,14 @@ pub(super) fn parse_ledger_rates(
     parse_ledger_rates_and_rows(xml, company_guid, wanted).map(|(rates, _)| rates)
 }
 
-/// One row of a rate listing as the scope's coverage proof reads it: the
+/// One row of a rate listing as the scope's proof reads it: the
 /// row's `NAME` attribute, its GUID and its immediate `PARENT`, the last two
-/// as the answer wrote them (no cleaning, so the reserved root compares as the
-/// catalogue carries it).
+/// as the answer wrote them (no cleaning: the parent is compared exactly with
+/// the catalogue's).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ListedLedger {
     pub(super) name: String,
-    /// `None` when the row carries none: the coverage proof refuses it there,
+    /// `None` when the row carries none: the scope's proof refuses it there,
     /// and a rate read that asks for no proof is not stopped by it.
     pub(super) guid: Option<String>,
     pub(super) parent: Option<String>,
@@ -1117,9 +1150,11 @@ pub(super) fn parse_ledger_rates_and_rows(
         .all("COLLECTION")
         .next()
         .ok_or("invoice_read_collection_absent")?;
-    // A company always has ledgers (the invoice's own were read in the
-    // compliance listing before this one), so a listing with none is a read
-    // that went wrong, never "no ledger has a rate".
+    // The request names ledgers the catalogue of this check holds, and the
+    // compliance listing read before it holds them too, so an answer with none
+    // (the lab's answer to a filter naming no ledger of the book is a complete
+    // envelope with an empty collection) means the read went wrong or the
+    // ledgers went away since: never "no ledger has a rate". It fails closed.
     if collection.all("LEDGER").next().is_none() {
         return Err("invoice_ledger_rates_listing_empty");
     }

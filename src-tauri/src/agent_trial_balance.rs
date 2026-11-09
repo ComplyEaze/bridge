@@ -1,5 +1,25 @@
 //! Thin MCP presentation of the shared native report operation.
 use super::*;
+use bridge_tally_protocol::native_trial_balance::{
+    NativeTrialBalanceMovements, NativeTrialBalanceRow,
+};
+use bridge_tally_protocol::tally_root_as_sent;
+
+/// One ledger of the answer, as Tally sent it, and whether its own columns do not add up. Such a
+/// row also carries `movements_differ_by`: closing minus opening, debit and credit (#2068).
+fn ledger_row(row: NativeTrialBalanceRow) -> (Value, bool) {
+    let movements = row.movements();
+    let mut json = json!({
+        "ledger": party_name(row.name), "guid": row.guid,
+        "parent": row.parent.returned_text().map(tally_root_as_sent), "opening": row.opening,
+        "debit": row.debit, "credit": row.credit, "closing": row.closing,
+    });
+    let differs = matches!(movements, NativeTrialBalanceMovements::Differ(_));
+    if let NativeTrialBalanceMovements::Differ(gap) = movements {
+        json["movements_differ_by"] = json!(gap);
+    }
+    (json, differs)
+}
 
 impl Server {
     pub(super) async fn trial_balance(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -37,16 +57,15 @@ impl Server {
                         ToolFailure::from_runtime("trial_balance_read_failed", error)
                             .with_prior_evidence(prior.clone())
                     })?;
+                let mut movements_differ = 0usize;
                 let rows = read
                     .report
                     .rows
                     .into_iter()
                     .map(|row| {
-                        json!({
-                            "ledger": party_name(row.name), "guid": row.guid,
-                            "parent": row.parent, "opening": row.opening,
-                            "debit": row.debit, "credit": row.credit, "closing": row.closing,
-                        })
+                        let (json, differs) = ledger_row(row);
+                        movements_differ += usize::from(differs);
+                        json
                     })
                     .collect::<Vec<_>>();
                 let read_evidence = evidence_from_runtime_read(read.evidence);
@@ -70,12 +89,16 @@ impl Server {
                             },
                         ]),
                     },
-                );
+                )
+                .with_movements_differ(movements_differ);
                 let mut frame = json!({
                     "from": read.from, "to": read.to, "currency": read.currency,
                     "read_at": read.read_at, "totals": read.totals,
                     "totals_scope": "all_returned_ledgers_numeric_observations_only",
                 });
+                if movements_differ > 0 {
+                    frame["movements_differ_ledgers"] = json!(movements_differ);
+                }
                 if let crate::tally::runtime::TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
                     base_name,
                     decimal_places,
@@ -184,6 +207,18 @@ impl Server {
             (frame["scope_label"].as_str(), limitations.as_array_mut())
         {
             list.insert(0, json!(label));
+        }
+        if let (Some(count), Some(list)) = (
+            frame["movements_differ_ledgers"].as_u64(),
+            limitations.as_array_mut(),
+        ) {
+            // After a partial read's label, which says so first (bridge#709).
+            let at = usize::from(frame["scope_label"].is_string());
+            list.insert(
+                at,
+                json!(crate::reports::trial_balance::MOVEMENTS_DIFFER_LIMITATION
+                    .replace("{count}", &count.to_string())),
+            );
         }
         result["limitations"] = limitations;
         let mut payload = json!({

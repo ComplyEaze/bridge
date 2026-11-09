@@ -267,19 +267,14 @@ fn cash_moved_between_our_own_banks_posts_once_on_each_side() {
         );
     }
     // The truthful answers: the withdrawal became business cash; the deposit
-    // came from the cash box, which waits for the cash-book check, so until
-    // then the person answers dont_know.
+    // came from the cash box, which needs its cash ledger, and until the build
+    // has projected that ledger a person unsure of it answers dont_know.
     let taken = answers(&[(&withdrawn, "business_cash", Some("Cash"))]).unwrap();
     let mut sbi = options(&taken);
     sbi.bank_ledger = "SBI CA";
     let from_sbi = build(&withdrawal, Bank::Sbi, &no_mapping(), &sbi).unwrap();
-    let boxed = answers(&[(&paid_in, "own_cash_box", None)]).unwrap();
-    let mut ubi = options(&boxed);
+    let mut ubi = options(&taken);
     ubi.bank_ledger = "UBI SB";
-    refuses(
-        build(&deposit, Bank::Ubi, &no_mapping(), &ubi),
-        "cash_answer_not_built",
-    );
     let unknown = answers(&[(&paid_in, "dont_know", None)]).unwrap();
     ubi.cash_answers = &unknown;
     let from_ubi = build(&deposit, Bank::Ubi, &no_mapping(), &ubi).unwrap();
@@ -430,13 +425,35 @@ fn an_answer_bridge_cannot_build_yet_is_refused_with_the_way_forward() {
     assert!(refusal.message.contains("dont_know"), "{refusal}");
     let deposit = deposit_statement();
     let id = first_id(&deposit, Bank::Ubi);
-    for answer in ["own_cash_box", "unbooked_cash_sales"] {
-        let given = answers(&[(&id, answer, None)]).unwrap();
-        refuses(
-            build(&deposit, Bank::Ubi, &no_mapping(), &options(&given)),
-            "cash_answer_not_built",
-        );
-    }
+    let given = answers(&[(&id, "unbooked_cash_sales", None)]).unwrap();
+    refuses(
+        build(&deposit, Bank::Ubi, &no_mapping(), &options(&given)),
+        "cash_answer_not_built",
+    );
+}
+
+#[test]
+fn a_deposit_from_the_cash_box_is_a_contra_out_of_the_named_cash_ledger() {
+    refuses(
+        answers(&[("st-x", "own_cash_box", None)]),
+        "cash_answer_without_ledger",
+    );
+    let deposit = deposit_statement();
+    let id = first_id(&deposit, Bank::Ubi);
+    let given = answers(&[(&id, "own_cash_box", Some("Petty Cash"))]).unwrap();
+    let built = build(&deposit, Bank::Ubi, &no_mapping(), &options(&given)).unwrap();
+    let voucher = built
+        .proposals
+        .iter()
+        .find(|proposal| proposal.bridge_txn_id == id)
+        .expect("the answered line's voucher");
+    assert_eq!(voucher.voucher_type, VoucherType::Contra);
+    let cash = voucher
+        .entries
+        .iter()
+        .find(|entry| entry.ledger == "Petty Cash")
+        .expect("the named ledger's leg");
+    assert_eq!(cash.side, Side::Cr);
 }
 
 #[test]
@@ -445,7 +462,7 @@ fn an_answer_for_the_other_direction_is_refused() {
     let id = first_id(&rows, Bank::Sbi);
     for (answer, ledger) in [
         ("owner_brought_in", Some("Capital")),
-        ("own_cash_box", None),
+        ("own_cash_box", Some("Cash")),
     ] {
         let given = answers(&[(&id, answer, ledger)]).unwrap();
         refuses(
@@ -595,13 +612,10 @@ fn every_not_built_reason_names_the_product_in_full() {
         CashAnswer::PaidToSomeone.not_built(),
         Some("cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
     );
-    assert_eq!(
-        CashAnswer::OwnCashBox.not_built(),
-        Some("a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
-    );
+    assert_eq!(CashAnswer::OwnCashBox.not_built(), None);
     assert_eq!(
         CashAnswer::UnbookedCashSales.not_built(),
-        Some("the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales, or the Contra from the cash box, yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
+        Some("the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
     );
     for movement in [CashMovement::Withdrawal, CashMovement::Deposit] {
         for answer in movement.question().1 {

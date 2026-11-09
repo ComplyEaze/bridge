@@ -45,7 +45,7 @@ fn the_review_shows_the_doubt_and_the_voucher() {
     for shown in [
         "Record that you reviewed ONE \"Journal\" in \"Books\"",
         "  \"Cash\"",
-        "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
+        "Date: 7-Sep-2026  Voucher number: \"2\"  ALTERID: 10",
         "\nNarration: below the dashes\nDr 1.00",
         &format!(
             "reconciliation_required.\n{}\nNarration: \"Paid\"",
@@ -179,6 +179,9 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
         ledger["amounts"][0]["ledger"] = json!(text);
         let ledger: ReadVoucher = serde_json::from_value(ledger).unwrap();
         let named = json!({"state":"posted_under_changed_masters","ledgers":[text]});
+        let ledgers = ["Cash".to_string(), "Sales".to_string()];
+        let mut typed = row(2, "Paid");
+        typed.voucher_type = Some(text.clone());
         for (source, preview) in [
             (
                 "narration",
@@ -195,6 +198,20 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
             (
                 "entry ledger",
                 review_preview(BATCH, MARKER, "Books", &doubt(), &ledger),
+            ),
+            (
+                "voucher number",
+                review_preview(
+                    BATCH,
+                    MARKER,
+                    "Books",
+                    &doubt(),
+                    &row_named(&ledgers, "Paid", &text),
+                ),
+            ),
+            (
+                "voucher type",
+                review_preview(BATCH, MARKER, "Books", &doubt(), &typed),
             ),
         ] {
             assert_eq!(preview, Err(code.to_string()), "{source} with {bad:?}");
@@ -652,7 +669,7 @@ fn the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read() {
         "its voucher mark moved by 4 (from 10 to 14); Tally reported creating 3.",
         "Not shown here: narrations, voucher numbers and types.",
         "Reviewing these vouchers covers no other voucher in this company.",
-        "Dates: 20260907 to 20260907  ALTERIDs: 10 to 12",
+        "Dates: 7-Sep-2026 to 7-Sep-2026  ALTERIDs: 10 to 12",
         "Dr 3  Cr 0  3 entries  \"Ledger 0\"",
         &format!("Batch: {BATCH}"),
         "I reviewed these 3 vouchers in Tally.",
@@ -686,6 +703,17 @@ fn the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read() {
             .err()
             .as_deref(),
         Some("ack_review_too_large")
+    );
+    // The dates run first to last, whatever order the vouchers were read in.
+    let mut dated = batch_rows(&line);
+    dated[0].date = bridge_tally_core::TallyDate::parse("20260909").unwrap();
+    dated[1].date = bridge_tally_core::TallyDate::parse("20260905").unwrap();
+    let dated = dated.iter().collect::<Vec<_>>();
+    let preview =
+        batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &dated).unwrap();
+    assert!(
+        preview.contains("Dates: 5-Sep-2026 to 9-Sep-2026"),
+        "{preview}"
     );
 }
 
@@ -913,6 +941,10 @@ fn a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale(
             "{name}: {review}"
         );
     }
+    // A record of another version binds nothing.
+    let mut record = current();
+    record.version = BATCH_RECORD_VERSION + 1;
+    assert_eq!(review_of(&record), json!({"state":"unreadable"}));
 }
 
 /// A step doubt file that says `unmatched` but holds no `target_voucher_step`
@@ -929,6 +961,19 @@ fn a_step_doubt_without_its_step_reads_unreadable() {
         review["batch_step"],
         json!({"state":"unreadable"}),
         "{review}"
+    );
+    assert_eq!(
+        admit_review(
+            imports.path(),
+            &line,
+            &verified(2),
+            &rows,
+            DoubtKind::BatchStep,
+            None,
+        )
+        .err()
+        .as_deref(),
+        Some("ack_step_record_unreadable")
     );
     // Control: with its step, the same file is a doubt with no review yet.
     fs::write(&step_doubt, STEP_DOUBT).unwrap();
@@ -1275,6 +1320,122 @@ fn a_bound_voucher_is_reviewed_by_its_guid_not_a_tag() {
         marked_row(&line, std::slice::from_ref(&tagged), None),
         Some(&tagged)
     );
+    // Two rows with the bound GUID and MasterID, or with the tag, are no one voucher.
+    let same = [row(2, "Paid by cheque"), row(2, "Paid by cheque")];
+    assert!(marked_row(&line, &same, Some(&bound)).is_none());
+    let narration = format!("Paid [BRIDGE:{tag}]");
+    let same = [row(2, &narration), row(2, &narration)];
+    assert!(marked_row(&line, &same, None).is_none());
+}
+
+/// Only a batch of several vouchers can hold a step doubt, so a review of one
+/// voucher cannot name it.
+#[test]
+fn only_a_batch_of_several_vouchers_can_name_a_step_doubt() {
+    let states = |count| {
+        DoubtKind::possible(count)
+            .iter()
+            .map(|kind| (*kind, MastersRecord::NoDoubt))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        select_doubt(Some(DoubtKind::BatchStep), &states(1)),
+        Err("ack_no_observed_doubt")
+    );
+    assert_eq!(
+        select_doubt(Some(DoubtKind::BatchStep), &states(2)),
+        Ok(DoubtKind::BatchStep)
+    );
+}
+
+/// Only a record that is absent reads as none: one that cannot be opened is
+/// unreadable, never no doubt.
+#[test]
+fn a_record_that_cannot_be_opened_is_unreadable_not_absent() {
+    let imports = std::path::Path::new("imports\0");
+    assert_eq!(
+        read_masters_records(imports, BATCH),
+        MastersRecord::Unreadable
+    );
+    assert_eq!(read_step_records(imports, BATCH), MastersRecord::Unreadable);
+    // Control: a folder with no record reads as no doubt.
+    let empty = tempfile::tempdir().unwrap();
+    assert_eq!(
+        read_masters_records(empty.path(), BATCH),
+        MastersRecord::NoDoubt
+    );
+    assert_eq!(
+        read_step_records(empty.path(), BATCH),
+        MastersRecord::NoDoubt
+    );
+}
+
+/// A record that cannot be placed says so, and is never taken for one already
+/// there. A test build's review dialog is the scripted one, so this holds a
+/// real approval.
+#[tokio::test]
+async fn a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded() {
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+    let approve = || async {
+        let one = VoucherCount::new(1).unwrap();
+        SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                ReviewAcknowledged::confirm(ReviewKind::Review, one, "review"),
+            )
+            .await
+            .unwrap()
+    };
+    let imports = tempfile::tempdir().unwrap();
+    let missing = imports.path().join("missing").join("record.json");
+    assert_eq!(
+        write_record_once(&missing, b"{}", approve().await),
+        Err("import_file_write_failed".to_string())
+    );
+    // Control: a name that holds a record keeps it, and reads as recorded.
+    let held = imports.path().join("record.json");
+    fs::write(&held, b"before").unwrap();
+    assert_eq!(
+        write_record_once(&held, b"{}", approve().await),
+        Err("ack_already_recorded".to_string())
+    );
+    assert_eq!(fs::read(&held).unwrap(), b"before");
+}
+
+/// A doubt file names each of its ledgers: an empty name is not a doubt a
+/// review can bind to.
+#[test]
+fn a_doubt_file_with_an_empty_ledger_name_reads_unreadable() {
+    let imports = tempfile::tempdir().unwrap();
+    let path = masters_doubt_path(imports.path(), BATCH);
+    fs::write(
+        &path,
+        br#"{"state":"posted_under_changed_masters","ledgers":["Cash",""]}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        read_masters_records(imports.path(), BATCH),
+        MastersRecord::Unreadable
+    );
+    // Control: with both names, the same file is a doubt.
+    let named = br#"{"state":"posted_under_changed_masters","ledgers":["Cash","Sales"]}"#;
+    fs::write(&path, named).unwrap();
+    assert_eq!(
+        read_masters_records(imports.path(), BATCH),
+        MastersRecord::Doubt {
+            raw: named.to_vec()
+        }
+    );
+}
+
+/// A batch review's 100-character line width is exact: the company's line,
+/// grown a character at a time, fits at exactly 100 and one more is refused.
+#[test]
+fn a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more() {
+    let (fit, refusal) = largest_fit(|pad| batch_review_of(&[1 + pad, 1], "N"), 100);
+    let widest = fit.lines().map(|line| line.chars().count()).max();
+    assert_eq!(widest, Some(100), "{fit}");
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
 }
 
 /// A masters record larger than `MAX_RECORD_BYTES` is unreadable, `Err(())`,
@@ -1327,7 +1488,7 @@ fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
             r#"  Line break  "Cash\r\n""#,
             "",
             "As it is in Tally now:",
-            "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
+            "Date: 7-Sep-2026  Voucher number: \"2\"  ALTERID: 10",
             "Narration: below the dashes",
             r#"Dr 1.00  Line break  "Ledger 0\r\n""#,
             "Dr 1.00  \"Ledger 1\"",
@@ -1429,7 +1590,7 @@ fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
             "",
             "As they are in Tally now:",
             "Not shown here: narrations, voucher numbers and types.",
-            "Dates: 20260907 to 20260907  ALTERIDs: 10 to 12",
+            "Dates: 7-Sep-2026 to 7-Sep-2026  ALTERIDs: 10 to 12",
             r#"Dr 3  Cr 0  3 entries  Line break  "Ledger 0\r\n""#,
             "Dr 3  Cr 0  3 entries  \"Ledger 1\"",
             r"Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.",

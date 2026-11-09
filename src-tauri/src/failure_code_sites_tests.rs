@@ -90,7 +90,7 @@ const PINNED: &[(&str, usize)] = &[
     ("src/endpoint_coordination.rs", 3),
     ("src/sync/reconciliation.rs", 27),
     ("src/sync/snapshot.rs", 8),
-    ("src/tally/approved_import.rs", 45),
+    ("src/tally/approved_import.rs", 4),
     ("src/tally/connection.rs", 20),
     ("src/tally/connector.rs", 10),
     ("src/tally/runtime.rs", 4),

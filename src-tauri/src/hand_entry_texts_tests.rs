@@ -140,7 +140,8 @@ fn char_literal_len(rest: &str) -> usize {
     }
 }
 
-/// The part of `source` before an inline test module (`#[cfg(test)]`, then `mod name {`). A test
+/// The part of `source` before an inline test module (`#[cfg(test)]`, then `mod name {` with any
+/// visibility). A test
 /// module that is only declared (`mod tests;`, often with a `#[path]`) holds no text here.
 pub(crate) fn production_part(source: &str) -> &str {
     let mut offset = 0;
@@ -150,8 +151,12 @@ pub(crate) fn production_part(source: &str) -> &str {
             let mut ahead = lines.clone();
             let module = ahead.find(|next| !next.trim_start().starts_with("#["));
             if module.is_some_and(|next| {
+                // `mod name {`, with any visibility (`pub`, `pub(crate)`, `pub(super)`).
                 let next = next.trim_start();
-                (next.starts_with("mod ") || next.starts_with("pub mod ")) && next.ends_with('{')
+                let next = next.strip_prefix("pub").map_or(next, |rest| {
+                    rest.trim_start_matches(|c| c != ' ').trim_start()
+                });
+                next.starts_with("mod ") && next.ends_with('{')
             }) {
                 return &source[..offset];
             }
@@ -389,4 +394,22 @@ fn texts_that_send_a_person_to_key_vouchers_by_hand_only_shrink() {
          they stand now:\n{table}",
         problems.join("\n")
     );
+}
+
+#[test]
+fn the_production_part_ends_at_an_inline_test_module_of_any_visibility() {
+    for head in [
+        "mod seam {",
+        "pub mod seam {",
+        "pub(crate) mod seam {",
+        "pub(super) mod seam {",
+    ] {
+        let source = format!("fn a() {{}}\n#[cfg(test)]\n{head}\n    fn b() {{}}\n}}\n");
+        assert_eq!(production_part(&source), "fn a() {}\n", "{head}");
+    }
+    // A declared module, or one that is not a test module, cuts nothing.
+    let declared = "fn a() {}\n#[cfg(test)]\nmod tests;\n";
+    assert_eq!(production_part(declared), declared);
+    let not_test = "fn a() {}\npub(crate) mod seam {\n}\n";
+    assert_eq!(production_part(not_test), not_test);
 }

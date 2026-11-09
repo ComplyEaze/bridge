@@ -1,0 +1,6 @@
+bills 29900; empty BILLPARTY 0; parties 120; admitted 120
+admitted parties by bills: 248 bills x 20, 249 bills x 60, 250 bills x 40
+s1 bills 248 name 12 B sha256 300370b79b16734afa0c7faa058d9855afa967cd0fd770709a15e3db7a6ed3d1
+m1 bills 249 name 12 B sha256 93506209f1ab8bcfe0522509aa5ccef321d11545d733e9d5fc6a3ef0737e4780
+l1 bills 250 name 12 B sha256 429655eb1b577200bbb9fe5c8f21e7317fef37b1f2be5a9765e6eec4889d7af4
+exit 0

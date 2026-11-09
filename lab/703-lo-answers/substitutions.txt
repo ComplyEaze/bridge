@@ -1,0 +1,5 @@
+company_number values in tool answers are replaced by a JSON parser. Other replacements in text files, with counts:
+<lab client name>: 1
+<lab root>: 3
+<row folder>: 3
+stop: 4

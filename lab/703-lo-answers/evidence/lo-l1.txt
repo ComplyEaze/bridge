@@ -1,0 +1,37 @@
+lo-l1: isError False; written 2026-11-09T10:20:51.052Z read 2026-11-09T10:20:55.724Z; whole time 4.672 s; state observed; basis tally_ledger_outstandings; detail open_bills; as_of 20260331; bills rows 250; on_account rows 0; bills plus on_account 250; checks bills_sum_to_ledger_closing tied, company_marks_unchanged checked; ledger_match.matched exact; verification party_bills_tied_to_ledger_closing_between_unchanged_marks
+trail (the most recent outstandings response_prepared record, receipt dcbc13af-d779-4133-b7d2-688450b4f0e4): sent 44, failed 0, omitted 12; entries kept 32, seq 13 to 44
+| seq | kind | request_bytes | response_bytes | held_ms | outcome | pair (by inference) |
+|---|---|---|---|---|---|---|
+| 13 | status |  | 51 | 0 | answered |  |
+| 14 | post | 1980 | 138074 | 29 | answered |  |
+| 15 | status |  | 51 | 0 | answered |  |
+| 16 | post | 2524 | 4012 | 4 | answered |  |
+| 17 | status |  | 51 | 0 | answered |  |
+| 18 | post | 2524 | 4012 | 4 | answered |  |
+| 19 | post | 2524 | 4012 | 4 | answered |  |
+| 20 | post | 1100 | 3854 | 2 | answered |  |
+| 21 | status |  | 51 | 0 | answered |  |
+| 22 | post | 1100 | 3854 | 5 | answered |  |
+| 23 | status |  | 51 | 0 | answered |  |
+| 24 | post | 1290 | 155514 | 28 | answered | snapshot |
+| 25 | status |  | 51 | 1 | answered |  |
+| 26 | post | 1290 | 155514 | 29 | answered | snapshot |
+| 27 | status |  | 51 | 0 | answered |  |
+| 28 | post | 820 | 206974 | 1064 | answered | Ledger Outstandings |
+| 29 | status |  | 51 | 0 | answered |  |
+| 30 | post | 820 | 206974 | 1138 | answered | Ledger Outstandings |
+| 31 | status |  | 51 | 0 | answered |  |
+| 32 | post | 1100 | 3854 | 5 | answered |  |
+| 33 | status |  | 51 | 0 | answered |  |
+| 34 | post | 1100 | 3854 | 3 | answered |  |
+| 35 | status |  | 51 | 0 | answered |  |
+| 36 | post | 2524 | 4012 | 5 | answered |  |
+| 37 | status |  | 51 | 1 | answered |  |
+| 38 | post | 2524 | 4012 | 4 | answered |  |
+| 39 | post | 2524 | 4012 | 6 | answered |  |
+| 40 | post | 982 | 3406 | 5 | answered |  |
+| 41 | status |  | 51 | 0 | answered |  |
+| 42 | post | 982 | 3406 | 3 | answered |  |
+| 43 | status |  | 51 | 0 | answered |  |
+| 44 | post | 2524 | 4012 | 4 | answered |  |
+lo-l1 summary: bills 250; whole 4.672 s; Ledger Outstandings pair seq (28, 30) held_ms [1064, 1138] sum 2202; snapshot pair seq (24, 26) held_ms [28, 29] sum 57; rest of the call 2413 ms; posts in this call 18, held_ms sum of all posts 2342

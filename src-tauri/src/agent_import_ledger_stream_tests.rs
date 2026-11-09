@@ -12,8 +12,8 @@ fn batch(id: &str, narration: &str) -> ImportLedgerLine {
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn","date":"20260901","voucher_type":"Journal",
             "narration":narration,"reference":null,"voucher_number":null,"entries":[
-                {"ledger":"Cash","amount":"1","side":"Dr"},
-                {"ledger":"Synthetic Ledger","amount":"1","side":"Cr"}]}]
+                {"ledger":"Cash","amount":"1.00","side":"Dr"},
+                {"ledger":"Synthetic Ledger","amount":"1.00","side":"Cr"}]}]
     }))
     .unwrap()
 }
@@ -511,6 +511,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -525,6 +526,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 0
         }
     );
@@ -564,8 +566,8 @@ fn plain(id: &str, txn_id: &str, entries: &[(&str, &str, &str)]) -> ImportLedger
     row_batch(id, "synthetic-guid", txn_id, 'a', entries)
 }
 
-const BANK_TO_A: &[(&str, &str, &str)] = &[("Bank", "500", "Cr"), ("Ledger A", "500", "Dr")];
-const BANK_TO_B: &[(&str, &str, &str)] = &[("Bank", "500.00", "Cr"), ("Ledger B", "500", "Dr")];
+const BANK_TO_A: &[(&str, &str, &str)] = &[("Bank", "500.00", "Cr"), ("Ledger A", "500.00", "Dr")];
+const BANK_TO_B: &[(&str, &str, &str)] = &[("Bank", "500.00", "Cr"), ("Ledger B", "500.00", "Dr")];
 
 fn sent(batch: &ImportLedgerLine) -> Vec<u8> {
     record(&StatusRecord::dispatch_native(
@@ -709,14 +711,14 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     let same = plain(
         "new",
         "t1",
-        &[("Ledger B", "500.0", "Dr"), ("Bank", "500", "Cr")],
+        &[("Ledger B", "0500.00", "Dr"), ("Bank", "500.00", "Cr")],
     );
     assert!(already_posted(journal(&old), &same));
     // Same id, other amount or date: another transaction.
     let amount = plain(
         "new",
         "t1",
-        &[("Bank", "600", "Cr"), ("Ledger B", "600", "Dr")],
+        &[("Bank", "600.00", "Cr"), ("Ledger B", "600.00", "Dr")],
     );
     assert!(!already_posted(journal(&old), &amount));
     // The shape holds the amounts and their sides, not which ledger takes
@@ -724,7 +726,7 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     let reversed = plain(
         "new",
         "t1",
-        &[("Bank", "500", "Dr"), ("Ledger B", "500", "Cr")],
+        &[("Bank", "500.00", "Dr"), ("Ledger B", "500.00", "Cr")],
     );
     assert!(already_posted(journal(&old), &reversed));
     // An extra Dr entry changes the sides, so it is not the same row.
@@ -732,9 +734,9 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
         "new",
         "t1",
         &[
-            ("Bank", "500", "Cr"),
-            ("Ledger B", "300", "Dr"),
-            ("Ledger C", "200", "Dr"),
+            ("Bank", "500.00", "Cr"),
+            ("Ledger B", "300.00", "Dr"),
+            ("Ledger C", "200.00", "Dr"),
         ],
     );
     assert!(!already_posted(journal(&old), &extra));
@@ -755,36 +757,50 @@ fn a_statement_row_is_the_same_row_although_its_shape_changed() {
         "new",
         STATEMENT_ID,
         &[
-            ("Bank", "500", "Cr"),
-            ("Ledger A", "450", "Dr"),
-            ("TDS", "50", "Dr"),
+            ("Bank", "500.00", "Cr"),
+            ("Ledger A", "450.00", "Dr"),
+            ("TDS", "50.00", "Dr"),
         ],
     );
     assert!(already_posted(vec![record(&old), sent(&old)], &split));
 }
 
-/// An amount that cannot be read does not open a way round the check.
+/// A batch line is a journal line only if its amounts are import amounts (#1872): one that is
+/// not (a sign, a zero, a missing decimal, text) is a line no build wrote, and the journal is
+/// refused whole, by every reader, with the one code. This is the cost of reading the amount
+/// where the date is read: the lines before and after it are not read either.
 #[test]
-fn an_unreadable_amount_fails_closed() {
-    let old = plain(
-        "old",
-        "t1",
-        &[("Bank", "not-a-number", "Cr"), ("Ledger A", "1", "Dr")],
-    );
+fn a_line_whose_amount_is_not_an_import_amount_refuses_the_whole_journal() {
+    let before = plain("before", "t0", BANK_TO_A);
+    let after = plain("after", "t2", BANK_TO_B);
     let candidate = plain("new", "t1", BANK_TO_B);
-    assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
-}
-
-/// The same holds when it is the candidate's own amount that cannot be read.
-#[test]
-fn an_unreadable_candidate_amount_fails_closed() {
-    let old = plain("old", "t1", BANK_TO_A);
-    let candidate = plain(
-        "new",
-        "t1",
-        &[("Bank", "not-a-number", "Cr"), ("Ledger B", "1", "Dr")],
-    );
-    assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
+    let invoice = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
+    let refused = Some("import_ledger_invalid".to_string());
+    // The refusal says what to do, and not to edit or delete the file (#1872).
+    let step = crate::agent::refusal_remediation("import_ledger_invalid").expect("a next step");
+    assert!(step.contains("local data report"), "{step}");
+    assert!(step.contains("Do not edit or delete"), "{step}");
+    for bad in ["not-a-number", "-13.00", "+13.00", "0.00", "13", "13.5", ""] {
+        let line = plain("old", "t1", BANK_TO_A);
+        let mut value = serde_json::to_value(&line).unwrap();
+        value["vouchers"][0]["entries"][0]["amount"] = json!(bad);
+        let journal = [record(&before), record(&value), record(&after)].concat();
+        let read = || Cursor::new(journal.clone());
+        assert_eq!(settlement(read()).err(), refused, "{bad:?}");
+        assert_eq!(read_history(read()).err(), refused, "{bad:?}");
+        assert_eq!(
+            rows_already_posted(read(), &candidate).err(),
+            refused,
+            "{bad:?}"
+        );
+        assert_eq!(
+            unsettled_invoice_twin(read(), &invoice).err(),
+            refused,
+            "{bad:?}"
+        );
+        // The same journal without that line reads.
+        assert!(settlement(Cursor::new([record(&before), record(&after)].concat())).is_ok());
+    }
 }
 
 /// One Sales invoice dated 1 Sep 2026 under `number`, over `entries`.
@@ -805,7 +821,7 @@ fn invoice_batch(
     line
 }
 
-const SALE: &[(&str, &str, &str)] = &[("Customer", "118", "Dr"), ("Sales", "118.00", "Cr")];
+const SALE: &[(&str, &str, &str)] = &[("Customer", "118.00", "Dr"), ("Sales", "118.00", "Cr")];
 
 /// What the journal offers as the control for a build's number read: a
 /// verified invoice of the company (its batch, number and date), preferring one of the
@@ -910,7 +926,7 @@ fn an_invoice_sent_and_not_found_posted_is_the_unsettled_twin_of_its_figures() {
         "second",
         'b',
         ("INV/2", "Sales Manual"),
-        &[("Customer", "118.00", "Dr"), ("Sales", "118", "Cr")],
+        &[("Customer", "118.00", "Dr"), ("Sales", "118.00", "Cr")],
     );
     assert_eq!(
         twin(vec![record(&first), sent(&first), record(&second)], &second),
@@ -931,7 +947,7 @@ fn an_invoice_sent_and_not_found_posted_is_the_unsettled_twin_of_its_figures() {
         "dearer",
         'c',
         ("INV/1", "Sales Manual"),
-        &[("Customer", "119", "Dr"), ("Sales", "119", "Cr")],
+        &[("Customer", "119.00", "Dr"), ("Sales", "119.00", "Cr")],
     );
     let other_type = invoice_batch("other-type", 'd', ("INV/1", "Sales Export"), SALE);
     let mut elsewhere = invoice_batch("elsewhere", 'e', ("INV/1", "Sales Manual"), SALE);
@@ -963,32 +979,6 @@ fn a_batch_sent_again_after_it_was_found_posted_is_unsettled_again() {
     assert_eq!(
         unsettled_invoice_twin(Cursor::new(journal), &second),
         Ok(Some("first".to_string()))
-    );
-}
-
-/// The guard fails closed. A saved batch whose invoice cannot be read counts
-/// as a twin once sent; an invoice of the batch itself that cannot be read is
-/// an error, never "no figures, nothing to match".
-#[test]
-fn an_invoice_that_cannot_be_read_never_switches_the_guard_off() {
-    let unreadable = invoice_batch(
-        "unreadable",
-        'a',
-        ("INV/1", "Sales Manual"),
-        &[
-            ("Customer", "not-a-number", "Dr"),
-            ("Sales", "118.00", "Cr"),
-        ],
-    );
-    let second = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
-    let journal = [record(&unreadable), sent(&unreadable), record(&second)].concat();
-    assert_eq!(
-        unsettled_invoice_twin(Cursor::new(journal), &second),
-        Ok(Some("unreadable".to_string()))
-    );
-    assert_eq!(
-        unsettled_invoice_twin(Cursor::new(Vec::new()), &unreadable),
-        Err("import_invoice_figures_unreadable".to_string())
     );
 }
 
@@ -1477,14 +1467,88 @@ fn a_rollback_seen_on_one_batch_covers_an_earlier_batch_of_the_company() {
         );
         assert_eq!(scan.records, journal.len() as u64);
     }
-    // The answer that recorded it names P1 as the batch to verify again.
+    // The answer that recorded it names what its record covers: P1, to verify
+    // again, and P2 itself.
     assert_eq!(
-        covered_by_records_of(Cursor::new(journal.concat()), "p2").unwrap(),
-        vec!["p1".to_string()]
+        covered_by_last_record(Cursor::new(journal.concat())).unwrap(),
+        vec!["p1".to_string(), "p2".to_string()]
     );
-    assert!(covered_by_records_of(Cursor::new(journal.concat()), "p1")
+    // A last record of another kind covers nothing.
+    journal.push(record(&placed(
+        "p3",
+        "BRIDGE ROLLBACK LAB",
+        Some(PLACE_ENDPOINT),
+    )));
+    assert!(covered_by_last_record(Cursor::new(journal.concat()))
         .unwrap()
         .is_empty());
+}
+
+/// #1050, a restore seen at the post: the post that read the mark has no
+/// dispatch intent yet, so its record names the first batch of its company it
+/// newly covers. That record is admitted, covers that batch, and does not
+/// cover the post, whose intent comes after the count the reading carries.
+#[test]
+fn a_posts_reading_is_recorded_on_the_first_batch_it_covers() {
+    let created = captured_outcome().counters().created;
+    assert!(created > 0);
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let poster = placed("poster", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let elsewhere = placed(
+        "elsewhere",
+        "BRIDGE ROLLBACK LAB COPY",
+        Some(PLACE_ENDPOINT),
+    );
+    let mut journal = vec![
+        record(&elsewhere),
+        intent(&elsewhere, Some(1)),
+        answered(&elsewhere),
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        record(&p2),
+        intent(&p2, Some(1 + created)),
+        answered(&p2),
+        record(&poster),
+    ];
+    let read = journal.len() as u64;
+    let named = first_newly_covered(Cursor::new(journal.concat()), "poster", 1, read).unwrap();
+    assert_eq!(
+        named.as_deref(),
+        Some("p1"),
+        "the first, not another company's"
+    );
+    // Nothing new to cover at a mark no post's floor is above.
+    assert_eq!(
+        first_newly_covered(
+            Cursor::new(journal.concat()),
+            "poster",
+            1 + 2 * created,
+            read
+        )
+        .unwrap(),
+        None
+    );
+    journal.push(seen(&p1, 1, read));
+    journal.push(intent(&poster, Some(1)));
+    for id in ["p1", "p2"] {
+        assert_eq!(
+            cover(&journal, id).covered_by,
+            Some(RollbackCover {
+                mark_read: 1,
+                seen_by: "p1".into()
+            }),
+            "{id}"
+        );
+    }
+    assert_eq!(cover(&journal, "poster").covered_by, None);
+    assert_eq!(cover(&journal, "elsewhere").covered_by, None);
+    // Once recorded, the same reading covers nothing new.
+    assert_eq!(
+        first_newly_covered(Cursor::new(journal.concat()), "poster", 1, read).unwrap(),
+        None
+    );
 }
 
 /// #1050: in the local data report's count, a native post a recorded restore
@@ -1650,7 +1714,7 @@ fn an_answer_reporting_status_zero_raises_no_floor() {
     assert!(!rollback_record_extends(Cursor::new(journal.concat()), "seer", 1, read).unwrap());
     journal.push(seen(&seer, 1, read));
     assert_eq!(cover(&journal, "refused").covered_by, None);
-    assert!(covered_by_records_of(Cursor::new(journal.concat()), "seer")
+    assert!(covered_by_last_record(Cursor::new(journal.concat()))
         .unwrap()
         .is_empty());
 }
@@ -2381,4 +2445,284 @@ fn a_settlement_voided_by_a_verified_read_can_be_made_again() {
     open.status = "reconciliation_required".into();
     let by_record = [standing, vec![record(&full), record(&open), settled(&p1)]].concat();
     assert_eq!(settlement_of(&by_record, "p1"), Ok(true));
+}
+
+/// A native post a rollback record covers: P1 answered, then a read of the
+/// mark below its floor (#1038).
+fn covered_post(line: &ImportLedgerLine) -> Vec<Vec<u8>> {
+    let mut journal = vec![record(line), intent(line, Some(1)), answered(line)];
+    let read = journal.len() as u64;
+    journal.push(seen(line, 1, read));
+    journal
+}
+
+/// The release a person would record for `line` on the journal's cover.
+fn release_on(journal: &[Vec<u8>], line: &ImportLedgerLine) -> StatusRecord {
+    let cover = cover(journal, &line.batch_id).covered_by.unwrap();
+    StatusRecord::row_release(line, &cover).unwrap()
+}
+
+fn release_after(journal: &[Vec<u8>], release: &StatusRecord) -> Result<bool, String> {
+    row_release_after(Cursor::new(journal.concat()), release)
+}
+
+/// A row release (#1038) carries the cover it rests on and the batch's
+/// company and endpoint, sets no status, and the writer's check admits it only
+/// while that cover still stands for that company and endpoint, with no
+/// release standing.
+#[test]
+fn a_row_release_is_admitted_only_while_its_cover_stands() {
+    assert!(captured_outcome().counters().created > 0);
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let release = release_on(&journal, &p1);
+    let shape = serde_json::to_value(&release).unwrap();
+    assert_eq!(shape["record_type"], "row_release");
+    assert_eq!(shape["status"], "rows_released");
+    assert_eq!(shape["release_cover"]["mark_read"], 1);
+    assert_eq!(shape["release_cover"]["seen_by"], "p1");
+    assert_eq!(
+        shape["release_cover"]["company"]["name"],
+        "BRIDGE RELEASE LAB"
+    );
+    assert_eq!(shape["release_cover"]["endpoint_origin"], PLACE_ENDPOINT);
+    assert!(shape.get("mark_read").is_none());
+    assert!(shape.get("records_before_read").is_none());
+    assert_eq!(release_after(&journal, &release), Ok(true));
+    assert_eq!(row_release(Cursor::new(journal.concat()), "p1"), Ok(false));
+
+    let mut released = journal.clone();
+    released.push(record(&release));
+    assert_eq!(row_release(Cursor::new(released.concat()), "p1"), Ok(true));
+    let snapshot = read_snapshot(Cursor::new(released.concat()), Some("p1"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.batch.status, "response_received");
+    // A second release is refused, by the writer's check and by the journal.
+    assert!(release_after(&released, &release).is_err());
+    let mut twice = released.clone();
+    twice.push(record(&release));
+    assert!(row_release(Cursor::new(twice.concat()), "p1").is_err());
+    assert!(settlement(Cursor::new(twice.concat())).is_err());
+
+    // Not covered: no rollback record, or none whose mark is below the floor.
+    let uncovered = journal[..3].to_vec();
+    assert_eq!(release_after(&uncovered, &release), Ok(false));
+    // Covered for another company field, another endpoint, or by another
+    // cover: another mark, or the same mark read by another batch.
+    let renamed = placed("p1", "BRIDGE RELEASE LAB OLD", Some(PLACE_ENDPOINT));
+    let cover_now = cover(&journal, "p1").covered_by.unwrap();
+    let on = |line: &ImportLedgerLine, cover: &RollbackCover| {
+        StatusRecord::row_release(line, cover).unwrap()
+    };
+    assert_eq!(
+        release_after(&journal, &on(&renamed, &cover_now)),
+        Ok(false)
+    );
+    let moved = placed("p1", "BRIDGE RELEASE LAB", Some("http://127.0.0.1:9002"));
+    assert_eq!(release_after(&journal, &on(&moved, &cover_now)), Ok(false));
+    let other_mark = RollbackCover {
+        mark_read: 0,
+        seen_by: "p1".into(),
+    };
+    assert_eq!(release_after(&journal, &on(&p1, &other_mark)), Ok(false));
+    let other_seer = RollbackCover {
+        mark_read: cover_now.mark_read,
+        seen_by: "p2".into(),
+    };
+    assert_eq!(release_after(&journal, &on(&p1, &other_seer)), Ok(false));
+    // A batch whose record names no address is never covered, so never released.
+    let unplaced = placed("p1", "BRIDGE RELEASE LAB", None);
+    assert!(StatusRecord::row_release(&unplaced, &cover_now).is_none());
+    // A lower restore recorded since the dialog's read moves the cover.
+    let mut lower = journal.clone();
+    lower.push(seen(&p1, 0, journal.len() as u64));
+    assert_eq!(release_after(&lower, &release), Ok(false));
+    // Only a row release is admitted by this check.
+    assert_eq!(
+        release_after(&journal, &StatusRecord::person_settlement(&p1)),
+        Ok(false)
+    );
+}
+
+/// The journal admits a row release only in its one shape: after a native
+/// intent with a pre-POST mark, while the batch does not read verified (an
+/// extra guard: a covered batch never does), with every field it names, and
+/// none of them on another kind.
+#[test]
+fn a_row_release_is_admitted_only_in_its_one_shape() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let release = serde_json::to_value(release_on(&journal, &p1)).unwrap();
+    let refused = |more: Vec<Vec<u8>>| {
+        let whole = [journal.clone(), more].concat();
+        row_release(Cursor::new(whole.concat()), "p1").is_err()
+            && settlement(Cursor::new(whole.concat())).is_err()
+    };
+    assert!(!refused(vec![record(&release)]));
+    let mut uncovered = release.clone();
+    uncovered.as_object_mut().unwrap().remove("release_cover");
+    assert!(refused(vec![record(&uncovered)]));
+    for field in ["mark_read", "seen_by", "company", "endpoint_origin"] {
+        let mut changed = release.clone();
+        changed["release_cover"]
+            .as_object_mut()
+            .unwrap()
+            .remove(field);
+        assert!(refused(vec![record(&changed)]), "{field}");
+    }
+    let mut widened = release.clone();
+    widened["release_cover"]["records_before_read"] = json!(1);
+    assert!(refused(vec![record(&widened)]));
+    let mut marked = release.clone();
+    marked["mark_read"] = json!(1);
+    assert!(refused(vec![record(&marked)]));
+    let mut counted = release.clone();
+    counted["records_before_read"] = json!(1);
+    assert!(refused(vec![record(&counted)]));
+    let mut restated = release.clone();
+    restated["status"] = json!("rollback_seen");
+    assert!(refused(vec![record(&restated)]));
+    assert!(refused(vec![verified(&p1), record(&release)]));
+    // No pre-POST mark: never covered, never released.
+    let unmarked = [record(&p1), intent(&p1, None), record(&release)];
+    assert!(row_release(Cursor::new(unmarked.concat()), "p1").is_err());
+    // Its cover on another kind, and a mark on any kind but a rollback-seen.
+    let carrier = json!({
+        "record_type":"verification_status","batch_id":p1.batch_id,
+        "batch_sha256":p1.sha256,"status":"reconciliation_required"
+    });
+    assert!(!refused(vec![record(&carrier)]));
+    for (field, value) in [
+        ("release_cover", release["release_cover"].clone()),
+        ("mark_read", json!(1)),
+    ] {
+        let mut stray = carrier.clone();
+        stray[field] = value;
+        assert!(refused(vec![record(&stray)]), "{field}");
+    }
+}
+
+/// A build that does not know the kind refuses the whole journal holding it,
+/// as an older build does this one.
+#[test]
+fn a_row_release_kind_the_build_does_not_know_refuses_the_whole_journal() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let mut changed = serde_json::to_value(release_on(&journal, &p1)).unwrap();
+    changed["record_type"] = json!("row_release_v2");
+    let whole = [journal, vec![record(&changed)]].concat();
+    assert!(row_release(Cursor::new(whole.concat()), "p1").is_err());
+    assert!(settlement(Cursor::new(whole.concat())).is_err());
+    assert!(rollback_cover(Cursor::new(whole.concat()), "p1").is_err());
+}
+
+/// A released batch holds none of its rows for the lookup every build and
+/// post reads; another batch holding the same row still does, and is named.
+/// The transfer skips' own scan is unchanged: a skip of a released row is
+/// still held.
+#[test]
+fn a_released_batch_no_longer_holds_its_rows() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let held = |journal: &[Vec<u8>]| {
+        vouchers_already_posted(
+            Cursor::new(journal.concat()),
+            &p1.company_guid,
+            None,
+            &p1.vouchers,
+        )
+        .unwrap()
+    };
+    assert_eq!(held(&journal).as_deref(), Some("p1"));
+    let mut released = journal.clone();
+    released.push(record(&release_on(&journal, &p1)));
+    assert_eq!(held(&released), None);
+    let rows = std::collections::BTreeSet::from(["txn".to_string()]);
+    assert_eq!(
+        rows_held_as_vouchers(
+            Cursor::new(released.concat()),
+            &p1.company_guid,
+            None,
+            &rows
+        )
+        .unwrap()
+        .map(|(batch_id, _)| batch_id)
+        .as_deref(),
+        Some("p1")
+    );
+    // A second batch sent with the same row is still its blocker.
+    let p2 = placed("p2", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let mut both = released.clone();
+    both.push(record(&p2));
+    both.push(intent(&p2, Some(9)));
+    assert_eq!(held(&both).as_deref(), Some("p2"));
+}
+
+/// A released batch leaves `not_settled_restored` and every other part of
+/// `unsettled` for `released_by_person`; its history stays (#1038).
+#[test]
+fn a_released_batch_moves_from_restored_to_released_by_person() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let before = settlement(Cursor::new(journal.concat())).unwrap();
+    assert_eq!(
+        (
+            before.unsettled,
+            before.unsettled_restored,
+            before.released_by_person
+        ),
+        (1, 1, 0),
+        "{before:?}"
+    );
+    let mut released = journal.clone();
+    released.push(record(&release_on(&journal, &p1)));
+    let after = settlement(Cursor::new(released.concat())).unwrap();
+    assert_eq!(
+        (
+            after.unsettled,
+            after.unsettled_restored,
+            after.released_by_person
+        ),
+        (0, 0, 1),
+        "{after:?}"
+    );
+    assert_eq!(after.settled_by_person, 0, "{after:?}");
+    assert_eq!(after.sent_or_found, 1, "{after:?}");
+    // The cover stays: the batch still reads rolled back.
+    assert!(cover(&released, "p1").covered_by.is_some());
+}
+
+/// A GUID bound only by a batch whose rows a person released is left out of
+/// those a bind refuses (#1038): after a restore, the fresh post of those rows
+/// can take the removed voucher's GUID. One another batch bound, not
+/// released, is still refused, whether or not a released batch bound it too.
+#[test]
+fn a_released_batch_s_bound_guids_may_be_bound_again() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        bound_as(&p1),
+    ];
+    let read = journal.len() as u64;
+    journal.push(seen(&p1, 1, read));
+    fn elsewhere(journal: &[Vec<u8>]) -> std::collections::BTreeSet<String> {
+        guids_bound_elsewhere(Cursor::new(journal.concat()), "p3").unwrap()
+    }
+    let guid = std::collections::BTreeSet::from(["aaaa-00000064".to_string()]);
+    assert_eq!(elsewhere(&journal), guid);
+    let mut released = journal.clone();
+    released.push(record(&release_on(&journal, &p1)));
+    assert!(elsewhere(&released).is_empty());
+    let p2 = placed("p2", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let mut both = released.clone();
+    both.extend([
+        record(&p2),
+        intent(&p2, Some(2)),
+        answered(&p2),
+        bound_as(&p2),
+    ]);
+    assert_eq!(elsewhere(&both), guid);
 }

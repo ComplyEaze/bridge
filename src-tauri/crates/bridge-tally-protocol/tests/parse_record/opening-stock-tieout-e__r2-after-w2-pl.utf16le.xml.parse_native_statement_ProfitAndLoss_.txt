@@ -1,0 +1,62 @@
+# fixture: tests/fixtures/opening-stock-tieout-e/r2-after-w2-pl.utf16le.xml
+# parser: parse_native_statement(ProfitAndLoss)
+# source: captured
+Ok(NativeStatement {
+    kind: ProfitAndLoss,
+    lines: [
+        NativeStatementLine {
+            name: "Sales Accounts",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "3700.00",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Cost of Sales :",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "-2058.82",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Opening Stock",
+            sub: Present(
+                ExactDecimal(
+                    "-2120.00",
+                ),
+            ),
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Add: Purchase Accounts",
+            sub: Present(
+                ExactDecimal(
+                    "-1350.00",
+                ),
+            ),
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Less: Closing Stock",
+            sub: Present(
+                ExactDecimal(
+                    "-1411.18",
+                ),
+            ),
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Indirect Expenses",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "-500.00",
+                ),
+            ),
+        },
+    ],
+})

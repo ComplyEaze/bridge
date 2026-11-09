@@ -1,6 +1,6 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
-use super::ledger_create_item::{LedgerCreateItem, RenderedLedgerCreate};
+use super::ledger_create_item::{LedgerCreateBatch, RenderedLedgerCreate, MAX_LEDGERS_PER_BATCH};
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
@@ -41,6 +41,10 @@ const RELEASE_BUTTON: &str = "Release the stop";
 /// same Yes/No/Cancel box as the review.
 #[cfg(not(windows))]
 const SETTLE_BUTTON: &str = "Close the batch";
+/// The row release dialog's positive button on a Mac (#1038). Windows shows
+/// the same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const RELEASE_ROWS_BUTTON: &str = "Release the rows";
 /// What the review dialog's subprocess prints, followed by the nonce it was
 /// given, when and only when the person chose the positive button.
 const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
@@ -53,14 +57,37 @@ const MASTERS_TOKEN_PREFIX: &str = "bridge-create-ledger:";
 /// The one-ledger dialog's title. The Windows box has no custom labels, so the
 /// title asks the question there as well.
 const MASTERS_TITLE: &str = "ComplyEaze Bridge — create one ledger?";
-#[cfg(not(windows))]
-const MASTERS_BUTTON: &str = "Create ledger";
-/// What a one-ledger dialog is told as its count: always one item.
+/// The count a one-ledger dialog is told (tests).
+#[cfg(test)]
 const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
+
+/// What the ledger dialog is asked with: the text the person is shown, and the
+/// count of ledgers its title, button and answer text are worded by.
+#[derive(Clone, Copy)]
+pub(super) struct MastersPrompt<'a> {
+    pub(super) text: &'a str,
+    pub(super) count: VoucherCount,
+}
+
+/// The ledger dialog's title and its Mac button for `count` ledgers. One ledger
+/// keeps the words its box was measured with; a batch is named by its count.
+/// `None` above [`MAX_LEDGERS_PER_BATCH`]: no such box is shown.
+fn masters_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((MASTERS_TITLE.into(), "Create ledger".into())),
+        Some(count) if count.get() <= MAX_LEDGERS_PER_BATCH => Some((
+            format!("ComplyEaze Bridge — create {count} ledgers?"),
+            format!("Create {count} ledgers"),
+        )),
+        Some(_) => None,
+    }
+}
 /// The same for the invoice-stop release dialog, distinct from both.
 const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
 /// The same for the settle dialog (#1709), distinct from every other.
 const SETTLE_TOKEN_PREFIX: &str = "bridge-batch-settle-acknowledged:";
+/// The same for the row release dialog (#1038), distinct from every other.
+const RELEASE_ROWS_TOKEN_PREFIX: &str = "bridge-row-release-acknowledged:";
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -156,10 +183,14 @@ pub(crate) struct InvoiceReadPlan {
     /// limits and the currency are judged by the rule the build judges them by,
     /// ahead of the reads they spare.
     pub(crate) precheck: InvoicePrechecker,
-    /// The company's own ledger count: sent only when the precheck asks for it,
-    /// for a book over the master mark.
-    pub(crate) ledger_count: AgentReadRequest,
+    /// The ledgers the compliance listing is read for: the ones the invoice
+    /// names (#1331).
+    pub(crate) listing_ledgers: bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
     pub(crate) rates: AgentReadRequest,
+    /// Each ledger the rates request names, by lower-case GUID, with the parent
+    /// the plan's catalogue gave it (#1331). The request names ledgers by GUID,
+    /// so it is unchanged when one is regrouped; this is how the queue tells.
+    pub(crate) ledger_parents: Vec<(String, String)>,
     pub(crate) voucher_types: AgentReadRequest,
     pub(crate) number: AgentReadRequest,
     /// The same read for the invoice the journal held as the number's control.
@@ -181,25 +212,13 @@ pub(crate) struct InvoicePrecheckInput<'a> {
     pub(crate) marks: &'a str,
     /// The company's Currency masters, as the queue read them.
     pub(crate) currencies: &'a str,
-    /// The company's ledger count, once the precheck has asked for it.
-    pub(crate) ledger_count: Option<&'a str>,
-    pub(crate) company_name: &'a str,
     pub(crate) company_guid: &'a str,
-}
-
-/// The precheck's answer when it refuses nothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum InvoicePrecheck {
-    /// The limits and the currency admit the book: send the rest of the plan.
-    Admitted,
-    /// The master mark is over the size gate's mark: the ledger count decides.
-    NeedsLedgerCount,
 }
 
 /// A function of the invoice module that the queue runs before the plan's
 /// reads, so that this layer does not call that one.
 pub(crate) type InvoicePrechecker =
-    fn(&InvoicePrecheckInput<'_>) -> Result<InvoicePrecheck, ApprovedImportAdmissionError>;
+    fn(&InvoicePrecheckInput<'_>) -> Result<(), ApprovedImportAdmissionError>;
 
 /// What the queue read for an [`InvoiceReadPlan`], or what the build has read
 /// of one so far: each answer is `None` until it is read. The admission's judge
@@ -208,7 +227,6 @@ pub(crate) type InvoicePrechecker =
 pub(crate) struct InvoiceAnswers {
     /// The all-company marks, as the binding reads began.
     pub(crate) marks: Option<String>,
-    pub(crate) ledger_count: Option<String>,
     pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
     pub(crate) rates: Option<String>,
     pub(crate) voucher_types: Option<String>,
@@ -253,7 +271,7 @@ impl VoucherAdmission {
     }
 }
 
-/// A master post's admission: one ledger `Create`, rendered once.
+/// A master post's admission: one request of ledger `Create`s, rendered once.
 ///
 /// `rendered` is produced once, when the admission is built, and never again,
 /// so the bytes the POST sends are the bytes whose digest the dispatch intent
@@ -262,7 +280,7 @@ impl VoucherAdmission {
 /// so no code holds an approved masters kind without that answer (P2).
 #[derive(Clone)]
 pub(super) struct MasterAdmission {
-    item: LedgerCreateItem,
+    batch: LedgerCreateBatch,
     rendered: RenderedLedgerCreate,
     /// The ledger name index read (the V3 catalogue request).
     ledger_index_request: AgentReadRequest,
@@ -278,16 +296,16 @@ pub(super) struct MasterAdmission {
 impl MasterAdmission {
     /// Renders the request once, with the two index reads for the company.
     fn new(
-        item: LedgerCreateItem,
+        batch: LedgerCreateBatch,
         company: &VerifiedCompanyIdentity,
     ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
         use super::agent_read_request::AgentReadRequestError;
         use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
         let validated =
             ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
-        let rendered = item.render_import(company);
+        let rendered = batch.render_import(company);
         Ok(Self {
-            item,
+            batch,
             rendered,
             ledger_index_request: AgentReadRequest::parse(
                 ReadOnlyProfile::StandardLedgerCatalogV3 {
@@ -305,8 +323,8 @@ impl MasterAdmission {
         })
     }
 
-    pub(super) fn item(&self) -> &LedgerCreateItem {
-        &self.item
+    pub(super) fn batch(&self) -> &LedgerCreateBatch {
+        &self.batch
     }
 
     pub(super) fn ledger_index_request(&self) -> AgentReadRequest {
@@ -343,7 +361,7 @@ pub(crate) enum QueuedAdmission<'a> {
         /// The request being posted and the company it is for, taken from the
         /// approved request itself, so the recheck reads the name and the
         /// company from the bytes' own source and no caller supplies them.
-        item: &'a LedgerCreateItem,
+        batch: &'a LedgerCreateBatch,
         company: &'a VerifiedCompanyIdentity,
         ledgers_first: &'a str,
         ledgers_second: &'a str,
@@ -417,13 +435,19 @@ impl ApprovedImport {
     /// `company` by the caller's review builder, and bound with them in the
     /// approval binding.
     pub(crate) async fn confirm_masters(
-        item: LedgerCreateItem,
+        batch: LedgerCreateBatch,
         company: &VerifiedCompanyIdentity,
         preview: &str,
         company_marks_request: AgentReadRequest,
     ) -> Result<Self, String> {
-        let admission = MasterAdmission::new(item, company)
+        let count = VoucherCount::new(batch.len()).ok_or("master_request_invalid")?;
+        let admission = MasterAdmission::new(batch, company)
             .map_err(|_| "master_request_invalid".to_string())?;
+        // The text the person is shown and the count its box is worded by.
+        let preview = MastersPrompt {
+            text: preview,
+            count,
+        };
         approve_masters(preview).await?;
         Ok(Self {
             kind: ApprovedKind::Masters(Box::new(admission)),
@@ -623,16 +647,16 @@ impl PendingPostApproval {
     /// The same for the one-ledger dialog: [`ApprovedImport::confirm_masters`]
     /// with exactly these arguments, on its own task. Its box is measured as
     /// the post's is, but a box that does not fit is refused with nothing to
-    /// note: the one-ledger text has no shorter form.
+    /// note: the ledger text, one ledger or a batch, has no shorter form.
     pub(crate) fn ask_masters(
-        item: LedgerCreateItem,
+        batch: LedgerCreateBatch,
         company: VerifiedCompanyIdentity,
         preview: String,
         company_marks_request: AgentReadRequest,
     ) -> Self {
         Self::stamped(
             async move {
-                ApprovedImport::confirm_masters(item, &company, &preview, company_marks_request)
+                ApprovedImport::confirm_masters(batch, &company, &preview, company_marks_request)
                     .await
             },
             None,
@@ -936,6 +960,13 @@ pub(crate) enum UnderLockRefusal {
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,
+    /// The aim read the company's voucher mark below a floor an earlier native
+    /// post of the company had proved (a restore), and the record of it could
+    /// not be written (#1050). No dispatch intent is recorded and nothing is
+    /// sent: once this post's vouchers raise the mark, no later reading could
+    /// see the restore.
+    #[error("post_rollback_unrecorded")]
+    RollbackUnrecorded,
     /// The approval could not be spent: it was revoked after this call took
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
@@ -977,6 +1008,11 @@ pub(crate) enum UnderLockRefusal {
     /// before the person was asked.
     #[error("{0}")]
     Transfers(&'static str),
+    /// A Store package's copy of the data folder holds a second import journal,
+    /// or whether it does could not be told, found again after the approval
+    /// dialog (#2233). The field is the cause; nothing was recorded or sent.
+    #[error("import_journal_split")]
+    JournalSplit(&'static str),
 }
 
 impl UnderLockRefusal {
@@ -988,6 +1024,7 @@ impl UnderLockRefusal {
             Self::BatchChanged => "import_batch_changed",
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
+            Self::RollbackUnrecorded => "post_rollback_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
             Self::PreImageUnrecorded => "master_pre_image_unrecorded",
             Self::PreImageWriteFailed => "master_pre_image_write_failed",
@@ -997,6 +1034,7 @@ impl UnderLockRefusal {
             Self::MasterJournalUnavailable => "master_ledger_unavailable",
             Self::CompanyStopped => "invoice_company_stopped",
             Self::Transfers(reason) => reason,
+            Self::JournalSplit(_) => "import_journal_split",
         }
     }
 }
@@ -1101,6 +1139,9 @@ pub(crate) mod test_seam {
         /// as `previews` and `reviews` (#746).
         counts: Arc<Mutex<Vec<usize>>>,
         review_counts: Arc<Mutex<Vec<usize>>>,
+        /// The ledger count each ledger dialog was asked about, in the same
+        /// order as `masters`: a box for ten ledgers must not say one.
+        master_counts: Arc<Mutex<Vec<usize>>>,
         review_kinds: Arc<Mutex<Vec<super::ReviewKind>>>,
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
@@ -1202,6 +1243,7 @@ pub(crate) mod test_seam {
                 masters: Arc::default(),
                 counts: Arc::default(),
                 review_counts: Arc::default(),
+                master_counts: Arc::default(),
                 review_kinds: Arc::default(),
                 while_pending: None,
                 held: None,
@@ -1228,6 +1270,10 @@ pub(crate) mod test_seam {
 
         pub(crate) fn review_counts(&self) -> Vec<usize> {
             self.review_counts.lock().unwrap().clone()
+        }
+
+        pub(crate) fn master_counts(&self) -> Vec<usize> {
+            self.master_counts.lock().unwrap().clone()
         }
 
         /// Which use of the review dialog each review was asked for.
@@ -1309,9 +1355,12 @@ pub(crate) mod test_seam {
     /// The test-build one-ledger dialog, scripted by the same decision
     /// (including a held dialog a test answers) and declining the same way
     /// when unscoped.
-    pub(super) async fn approve_masters(preview: &str) -> Result<(), String> {
+    pub(super) async fn approve_masters(prompt: super::MastersPrompt<'_>) -> Result<(), String> {
+        let preview = prompt.text;
+        let count = prompt.count.0.get();
         let decision = scripted_decision(|scripted| {
             scripted.masters.lock().unwrap().push(preview.to_string());
+            scripted.master_counts.lock().unwrap().push(count);
         })
         .await;
         if decision {
@@ -1397,13 +1446,18 @@ pub(crate) mod test_seam {
         assert_eq!(
             super::confirm_masters_with(
                 std::path::Path::new("/nonexistent/never-started"),
+                ONE,
                 &oversized
             )
             .await,
             Err("master_review_too_large".to_string())
         );
         assert_eq!(
-            super::confirm_masters_dialog(&oversized).await,
+            super::confirm_masters_dialog(super::MastersPrompt {
+                text: &oversized,
+                count: ONE,
+            })
+            .await,
             Err("master_review_too_large".to_string())
         );
     }
@@ -1743,7 +1797,7 @@ pub(crate) mod test_seam {
             assert_ran_to_its_end(&path, "Review", name);
             let path = standin(directory.path(), status, answer);
             assert_eq!(
-                super::confirm_masters_with(&path, "Create").await,
+                super::confirm_masters_with(&path, ONE, "Create").await,
                 Err("master_review_too_large".to_string()),
                 "one ledger: {name}"
             );
@@ -1799,7 +1853,7 @@ pub(crate) mod test_seam {
         ] {
             let path = standin(directory.path(), exit_code, answer);
             assert_eq!(
-                super::confirm_masters_with(&path, "Create").await,
+                super::confirm_masters_with(&path, ONE, "Create").await,
                 Err("master_approval_declined".to_string()),
                 "{name}"
             );
@@ -1834,7 +1888,7 @@ pub(crate) mod test_seam {
         ] {
             let path = standin(directory.path(), 0, answer);
             assert_eq!(
-                super::confirm_masters_with(&path, "Create").await,
+                super::confirm_masters_with(&path, ONE, "Create").await,
                 Err("master_approval_unavailable".to_string()),
                 "{name}"
             );
@@ -1842,7 +1896,7 @@ pub(crate) mod test_seam {
         }
         let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
         assert_eq!(
-            super::confirm_masters_with(&approves, "Create").await,
+            super::confirm_masters_with(&approves, ONE, "Create").await,
             Ok(())
         );
         assert_ran_to_its_end(&approves, "Create", "the control");
@@ -1872,7 +1926,7 @@ pub(crate) mod test_seam {
             std::fs::read_to_string(beside(path, ".args")).expect("the stand-in ran")
         };
         let masters = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
-        super::confirm_masters_with(&masters, "Create")
+        super::confirm_masters_with(&masters, ONE, "Create")
             .await
             .unwrap();
         assert_eq!(sent(&masters), "--confirm-masters");
@@ -1895,7 +1949,7 @@ pub(crate) mod test_seam {
         let mut nonces = Vec::new();
         for _ in 0..2 {
             assert_eq!(
-                super::confirm_masters_with(&approves, "Create").await,
+                super::confirm_masters_with(&approves, ONE, "Create").await,
                 Ok(())
             );
             let input = standin_input(&approves).expect("the stand-in ran");
@@ -2118,6 +2172,120 @@ pub(crate) mod test_seam {
         }
     }
 
+    /// Where the Mac alert's top is taken to sit: on the screen Part A measured,
+    /// all three rules give its 168 points; elsewhere the lowest of them is
+    /// taken (#1780).
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_alert_top_is_the_lowest_of_the_three_rules() {
+        let screen = |height, visible_top, visible_bottom| super::ScreenSpan {
+            height,
+            visible_top,
+            visible_bottom,
+        };
+        let measured = screen(982.0, 33.0, 898.0);
+        assert!((super::alert_top(measured) - 168.0).abs() < 1.0e-9);
+        // A 13.3-inch Mac at 1440 x 900, no notch, a bottom Dock: the fixed offset.
+        assert!((super::alert_top(screen(900.0, 24.0, 816.0)) - 168.0).abs() < 1.0e-9);
+        // A tall screen: its share of the height.
+        assert!(
+            (super::alert_top(screen(1440.0, 25.0, 1356.0)) - 1440.0 * 168.0 / 982.0).abs()
+                < 1.0e-9
+        );
+        // A deep menu bar: the offset below the visible frame.
+        assert!((super::alert_top(screen(982.0, 60.0, 898.0)) - 195.0).abs() < 1.0e-9);
+    }
+
+    /// The Mac alert is shown only if its top, its 150 points of title, icon and
+    /// buttons, its text and one line of slack end inside the visible frame;
+    /// one point more refuses it, and a height that is not a size fits nothing
+    /// (#1780). The dialog child's exit, `exit_unless_the_alert_fits`, asks
+    /// exactly this, and the seam gate pins that it does.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_alert_fits_only_inside_the_visible_frame_with_its_slack() {
+        let measured = super::ScreenSpan {
+            height: 982.0,
+            visible_top: 33.0,
+            visible_bottom: 898.0,
+        };
+        // 898 - 168 - 150 - 16 = 564 points of text.
+        assert!(super::alert_fits(564.0, measured));
+        assert!(!super::alert_fits(564.5, measured));
+        // The slack counts: without it 580 would fit.
+        assert!(!super::alert_fits(580.0, measured));
+        // Part A's smallest one-voucher post: 28 lines of 16 points.
+        assert!(super::alert_fits(448.0, measured));
+        for height in [f64::NAN, f64::INFINITY, -1.0] {
+            assert!(!super::alert_fits(height, measured), "{height}");
+        }
+        // Every screen must hold it, the smallest room deciding; no screen holds nothing.
+        let small = super::ScreenSpan {
+            height: 800.0,
+            visible_top: 24.0,
+            visible_bottom: 716.0,
+        };
+        assert!(super::alert_fits_every_screen(448.0, &[measured]));
+        assert!(!super::alert_fits_every_screen(448.0, &[measured, small]));
+        assert!(super::alert_fits_every_screen(382.0, &[measured, small]));
+        assert!(!super::alert_fits_every_screen(16.0, &[]));
+    }
+
+    /// AppKit lays the alert's text out as Part A saw the panel do: 16 points a
+    /// line, two lines for a 100-character prose line, 28 lines for the smallest
+    /// one-voucher post text, and one of ten 46-capital lines broken (row 1964-M,
+    /// cells A1, A5, A7 and A4e). Measured without a window (#1780). The voucher
+    /// text is Part A's `a7-smallest-voucher.txt` with its GUID and batch lines
+    /// replaced by synthetic text of the same length.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_mac_alert_text_is_measured_as_the_panel_lays_it_out() {
+        assert!((super::alert_text_height("x") - 16.0).abs() < 1.0e-9);
+        let ten = ["Calibration line"; 10].join("\n");
+        assert!((super::alert_text_height(&ten) - 160.0).abs() < 1.0e-9);
+        let prose = "Synthetic narration for the calibration row, with ordinary words and spaces in it, nothing else.";
+        assert!((super::alert_text_height(prose) - 32.0).abs() < 1.0e-9);
+        let voucher = [
+            "Click \"Post voucher\" to post this voucher into Tally. Click Cancel to cancel. Nothing is posted until you answer.",
+            "",
+            "Create ONE Payment in \"Synthetic Accounts\"",
+            "Company GUID: synthetic-guid-for-the-measure-tests",
+            "Company number: 424242  Books from: 1-Apr-2026",
+            "Tally: http://127.0.0.1:9001",
+            "Date: 1-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
+            "",
+            "Dr 1.00  \"Party 0\"",
+            "Cr 1.00  \"Cash\"",
+            "Total debit: 1  Total credit: 1",
+            "Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.",
+            "Batch: bridge-synthetic-batch-for-the-measure-test",
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+            "Do not post a file already imported manually.",
+            "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+            "After a timeout, reconcile this batch; do not rebuild or resend it.",
+            "ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.",
+            "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----",
+            "Reference: \"r1\"",
+            "Narration: \"rent\"",
+        ]
+        .join("\n");
+        // 28 lines, as the panel showed it; macOS's own fonts decide the last
+        // line, so one line either way is allowed. The panel drew 600 points
+        // where 448 + 150 is 598. This 2 and A4e's margin below share the one
+        // 16-point line of slack.
+        let height = super::alert_text_height(&voucher);
+        assert!((27.0 * 16.0..=29.0 * 16.0).contains(&height), "{height}");
+        // Ten lines of 46 capitals: the panel broke one of them (cell A4e). Nine of
+        // them fit, the widest of those (about 401.7 points) only about 0.3 points
+        // inside 402; the tenth (about 405.5) is the one 402 breaks.
+        let capitals = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(4);
+        let a4e = (0..10)
+            .map(|start| &capitals[start..start + 46])
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!((super::alert_text_height(&a4e) - 11.0 * 16.0).abs() < 1.0e-9);
+    }
+
     /// The Mac alert wraps its own text, so the parent does not break the
     /// answer text: it is one line, shown whole and first (a break of ours
     /// would be wrapped again by the alert and leave a ragged second row).
@@ -2218,7 +2386,8 @@ enum Shown {
     Review,
     StopRelease,
     Settle,
-    /// The one-ledger dialog, always about one ledger.
+    RowRelease,
+    /// The ledger dialog: one ledger, or a batch by its count.
     Masters,
 }
 
@@ -2233,6 +2402,9 @@ pub(crate) enum ReviewKind {
     /// A person's settlement of a batch Tally answered as creating none of
     /// its vouchers (#1709).
     Settle,
+    /// A person's release of the rows of a batch whose book was rolled back
+    /// (#1038).
+    RowRelease,
 }
 
 impl ReviewKind {
@@ -2241,6 +2413,7 @@ impl ReviewKind {
             Self::Review => Shown::Review,
             Self::StopRelease => Shown::StopRelease,
             Self::Settle => Shown::Settle,
+            Self::RowRelease => Shown::RowRelease,
         }
     }
 
@@ -2251,6 +2424,7 @@ impl ReviewKind {
             Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
             Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
             Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
+            Self::RowRelease => ("--confirm-row-release", RELEASE_ROWS_TOKEN_PREFIX),
         }
     }
 }
@@ -2288,8 +2462,17 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
             ),
             "Nothing is closed until you answer.",
         ),
+        Shown::RowRelease => (
+            "release this batch's rows in ComplyEaze Bridge, so that they can be built and posted \
+             again"
+                .into(),
+            "Nothing is released until you answer.",
+        ),
         Shown::Masters => (
-            "create this ledger in Tally".into(),
+            match count.batch() {
+                None => "create this ledger in Tally".into(),
+                Some(count) => format!("create these {count} ledgers in Tally"),
+            },
             "Nothing is created until you answer.",
         ),
     }
@@ -2314,7 +2497,8 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
         Shown::Settle => SETTLE_BUTTON.to_string(),
-        Shown::Masters => MASTERS_BUTTON.to_string(),
+        Shown::RowRelease => RELEASE_ROWS_BUTTON.to_string(),
+        Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -2347,6 +2531,23 @@ pub(crate) fn wrapped(text: &str, limit: usize) -> String {
         }
     }
     lines
+}
+
+/// `text`, a line of a review box, broken at spaces into lines of at most 100
+/// characters, then any word longer than a line broken where it reaches the
+/// limit, so a name without spaces cannot make the box refuse.
+pub(crate) fn wrapped_to_fit(text: String) -> String {
+    wrapped(&text, 100)
+        .lines()
+        .flat_map(|line| {
+            line.chars()
+                .collect::<Vec<_>>()
+                .chunks(100)
+                .map(|part| part.iter().collect::<String>())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// What the native box holds of a post or review text (#1780): the lines and
@@ -2383,7 +2584,8 @@ fn answer_reserve() -> (usize, usize) {
 /// at that width, or the Mac alert's one line, which the alert wraps itself).
 /// The parent measures what is shown, so a text that does not fit
 /// is refused before a window opens, never cut. A stop release has no caps
-/// beyond the byte limit.
+/// beyond the byte limit. A Mac's dialog child also measures the alert's text as
+/// the window lays it out before it shows it, [`exit_unless_the_alert_fits`].
 fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
     if shown == Shown::StopRelease {
         return true;
@@ -2513,17 +2715,22 @@ async fn confirm_review_with(
     }
 }
 
-/// The one-ledger dialog: its own subprocess mode, title, button and token,
+/// The ledger dialog: its own subprocess mode, title, button and token,
 /// answered exactly as the post dialog is, by the token for this call's nonce
-/// and a clean exit together. Always asked about one item. Like the other
+/// and a clean exit together. Asked about one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`, its title and button saying how many. Like the other
 /// dialogs, its first lines say what each answer does (#1780).
-async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
+async fn confirm_masters_dialog(preview: MastersPrompt<'_>) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
-    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
-    confirm_masters_with(&executable, &shown).await
+    let shown = displayed_text(Shown::Masters, preview.count, preview.text);
+    confirm_masters_with(&executable, preview.count, &shown).await
 }
 
-async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+async fn confirm_masters_with(
+    executable: &std::path::Path,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("master_review_too_large".into());
     }
@@ -2531,7 +2738,7 @@ async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Re
         executable,
         "--confirm-masters",
         MASTERS_TOKEN_PREFIX,
-        ONE_ITEM,
+        count,
         preview,
     )
     .await
@@ -2678,6 +2885,18 @@ pub fn run_settle_confirmation() -> bool {
     )
 }
 
+/// Entry point for the row release dialog's subprocess (#1038), under the
+/// same rules: its own window title and token, so a release of rows is never
+/// titled a review.
+pub fn run_release_rows_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_ROWS_TOKEN_PREFIX,
+        show_release_rows_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
 /// Read the parent's nonce line, count line and preview from `input`, show
 /// `dialog` with that count and preview, and
 /// write the token for that nonce to `output` only when it returns true. The
@@ -2736,10 +2955,157 @@ fn review_title(count: VoucherCount) -> String {
     }
 }
 
+// The macOS alert as row 1964-M Part A measured it (`lab/1964-mac-alert-caps-answers`,
+// macOS 26.6.2, one display, one run of each cell, so every figure here is
+// partial). The texts measured took the wide layout; whether a real text can
+// ever take the compact one, whose chrome is 68 points taller, was not measured.
+// Wide is 13-point text in a column about 402 points wide (46 capitals overflow
+// it once in ten lines, cell A4e), under 150 points of title, icon and buttons. The
+// alert opens with its top at a fixed place and is never moved up, so a tall one
+// runs off the bottom of the screen. Its top was 168 points from the top of a
+// 982-point screen whose visible frame starts 33 points down; whether that is a
+// fixed offset, an offset below the visible frame or a share of the height is
+// row 1964-C2's cell C2-2, so the alert's top is taken as the lowest of the
+// three. Which screen it opens on with more than one display is not measured,
+// so it must fit on every screen. One line of text, 16 points, is kept for a
+// hyphenated word or a second title line.
+#[cfg(not(windows))]
+const ALERT_FONT_POINTS: f64 = 13.0;
+#[cfg(not(windows))]
+const ALERT_TEXT_WIDTH: f64 = 402.0;
+#[cfg(not(windows))]
+const ALERT_CHROME: f64 = 150.0;
+#[cfg(not(windows))]
+const ALERT_SLACK: f64 = 16.0;
+#[cfg(not(windows))]
+const ALERT_TOP_FROM_SCREEN_TOP: f64 = 168.0;
+#[cfg(not(windows))]
+const ALERT_TOP_BELOW_VISIBLE_TOP: f64 = 135.0;
+#[cfg(not(windows))]
+const ALERT_TOP_SHARE_OF_HEIGHT: f64 = 168.0 / 982.0;
+
+/// A screen in points, measured down from its top edge, as the alert is placed
+/// on it: its height, and the top and bottom of its visible frame.
+#[cfg(not(windows))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ScreenSpan {
+    height: f64,
+    visible_top: f64,
+    visible_bottom: f64,
+}
+
+/// Where the alert's top edge is taken to sit on `screen` (#1780): the lowest of
+/// the three places Part A could not tell apart.
+#[cfg(not(windows))]
+fn alert_top(screen: ScreenSpan) -> f64 {
+    ALERT_TOP_FROM_SCREEN_TOP
+        .max(screen.visible_top + ALERT_TOP_BELOW_VISIBLE_TOP)
+        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)
+}
+
+/// Whether an alert whose text is `text_height` points tall ends inside the
+/// visible frame of `screen`, with its slack (#1780). A height that is not a
+/// finite size fits nothing.
+#[cfg(not(windows))]
+fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
+    text_height.is_finite()
+        && text_height >= 0.0
+        && alert_top(screen) + ALERT_CHROME + text_height + ALERT_SLACK <= screen.visible_bottom
+}
+
+/// Whether an alert whose text is `text_height` points tall fits on every one
+/// of `screens` (#1780). No screen fits nothing, so an empty list is refused.
+/// Production cannot reach that with an empty list, as `alert_screens` gives
+/// `None` for one and the dialog ends as unavailable; it stays as a defence.
+#[cfg(not(windows))]
+fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
+    !screens.is_empty()
+        && screens
+            .iter()
+            .all(|screen| alert_fits(text_height, *screen))
+}
+
+/// The height AppKit lays `text` out at in the alert's column (#1780), measured
+/// without a window.
+#[cfg(target_os = "macos")]
+fn alert_text_height(text: &str) -> f64 {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{
+        NSFont, NSFontAttributeName, NSStringDrawingOptions, NSStringNSExtendedStringDrawing,
+    };
+    use objc2_foundation::{NSDictionary, NSSize, NSString};
+    let font = NSFont::systemFontOfSize(ALERT_FONT_POINTS);
+    // SAFETY: an AppKit constant, read once.
+    let key = unsafe { NSFontAttributeName };
+    let attributes = NSDictionary::<_, AnyObject>::from_slices(&[key], &[font.as_ref()]);
+    // SAFETY: the attributes map the font key to an `NSFont`, the type AppKit
+    // reads for it.
+    let rect = unsafe {
+        NSString::from_str(text).boundingRectWithSize_options_attributes_context(
+            NSSize::new(ALERT_TEXT_WIDTH, 1.0e7),
+            NSStringDrawingOptions::UsesLineFragmentOrigin
+                | NSStringDrawingOptions::UsesFontLeading,
+            Some(&attributes),
+            None,
+        )
+    };
+    rect.size.height.ceil()
+}
+
+/// Every screen the alert could open on, each measured down from its own top
+/// edge; `None` off the main thread or with no screen.
+#[cfg(target_os = "macos")]
+fn alert_screens() -> Option<Vec<ScreenSpan>> {
+    let main_thread = objc2::MainThreadMarker::new()?;
+    let screens = objc2_app_kit::NSScreen::screens(main_thread)
+        .iter()
+        .map(|screen| {
+            let (frame, visible) = (screen.frame(), screen.visibleFrame());
+            let top = frame.origin.y + frame.size.height;
+            ScreenSpan {
+                height: frame.size.height,
+                visible_top: top - (visible.origin.y + visible.size.height),
+                visible_bottom: top - visible.origin.y,
+            }
+        })
+        .collect::<Vec<_>>();
+    (!screens.is_empty()).then_some(screens)
+}
+
+/// The alert's text height and every screen, measured in the dialog child
+/// before anything is shown.
+#[cfg(target_os = "macos")]
+fn measured_alert(text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
+    Some((alert_text_height(text), alert_screens()?))
+}
+
+/// No other platform's alert has been measured.
+#[cfg(all(not(windows), not(target_os = "macos")))]
+fn measured_alert(_text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
+    None
+}
+
+/// Ends the dialog child before anything is shown when the Mac alert would run
+/// past the bottom of any screen it could open on (#1780), with the status the
+/// parent reads as a box that did not fit the screen, as a Windows box that does
+/// not fit ends (`box_fit`). The parent then refuses the text as too large, and a batch's
+/// next ask shows its totals only (#1832). A text that could not be measured is
+/// not shown either: the child ends with no token, which the parent reads as
+/// unavailable.
+#[cfg(not(windows))]
+fn exit_unless_the_alert_fits(text: &str) {
+    match measured_alert(text) {
+        Some((height, screens)) if alert_fits_every_screen(height, &screens) => {}
+        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
+        None => std::process::exit(0),
+    }
+}
+
 /// The acknowledgement dialog. It posts nothing, so neither its title nor its
 /// button may read as approving a post.
 #[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(review_title(count))
         .set_description(preview)
@@ -2763,6 +3129,7 @@ fn release_title() -> String {
 /// title and button. It posts nothing either.
 #[cfg(not(windows))]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(release_title())
         .set_description(preview)
@@ -2786,6 +3153,7 @@ fn settle_title() -> String {
 /// button. It posts nothing either.
 #[cfg(not(windows))]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(settle_title())
         .set_description(preview)
@@ -2796,6 +3164,30 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
         ))
         .show()
         == rfd::MessageDialogResult::Custom(SETTLE_BUTTON.into())
+}
+
+/// The row release window's title: it releases a batch's rows and reviews no
+/// voucher, so it names neither a review nor a post (#1038).
+#[cfg(not(windows))]
+fn rows_title() -> String {
+    "ComplyEaze Bridge — release this batch's rows".into()
+}
+
+/// The row release dialog: the acknowledgement dialog with its own title and
+/// button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(rows_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_ROWS_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_ROWS_BUTTON.into())
 }
 
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
@@ -2931,6 +3323,47 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }
 
+/// The Windows row release box's title, a question as the review's is (#1038).
+#[cfg(windows)]
+fn rows_question() -> String {
+    "ComplyEaze Bridge — release this batch's rows to be built again?".into()
+}
+
+/// The Windows row release box: the review's box with its own title.
+#[cfg(windows)]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = rows_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
 /// The post dialog's title and positive button. One voucher keeps the
 /// single-voucher words; a batch names its count in both, so neither calls a
 /// batch one voucher (#746).
@@ -2950,6 +3383,7 @@ fn post_words(count: VoucherCount) -> (String, String) {
 
 #[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
@@ -3025,25 +3459,27 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }
 
-/// The one-ledger dialog. It is shown for one item only: a count other than
-/// one is not the parent's shape and shows nothing.
+/// The ledger dialog, for one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`: a larger count has no title or button and shows
+/// nothing.
 #[cfg(not(windows))]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
-    if count != ONE_ITEM {
+    let Some((title, button)) = masters_words(count) else {
         return false;
-    }
+    };
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
-        .set_title(MASTERS_TITLE)
+        .set_title(title)
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         // The Cancel label supplies the native Escape action. Creating
         // requires the explicitly matched positive button.
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
             "Cancel".into(),
-            MASTERS_BUTTON.into(),
+            button.clone(),
         ))
         .show()
-        == rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())
+        == rfd::MessageDialogResult::Custom(button)
 }
 
 #[cfg(windows)]
@@ -3053,11 +3489,11 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
         MB_TOPMOST, MB_YESNOCANCEL,
     };
     // As for the post dialog: No is the default, Escape and close are Cancel.
-    if count != ONE_ITEM {
+    let Some((title, _)) = masters_words(count) else {
         return false;
-    }
+    };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
-    let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832). Through `guarded` it is also
     // brought to the front once it appears, as the post's box is: its first

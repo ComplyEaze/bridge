@@ -1,0 +1,7 @@
+# fixture: agent/review-hand-company-high-water.utf16le.xml
+# parser: parse_company_high_water(REVIEW_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(207),
+    "altvchid": Number(302),
+})

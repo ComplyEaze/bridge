@@ -1,0 +1,1 @@
+- A ledger whose only twin differs from it by a trailing line break can now be posted to by its exact name, on the debit side of a Payment and off bill-wise. The approval dialog names both ledgers, each with its group, and says which one the post uses. Every other folded twin stays refused as `ledger_has_folded_twin` (#626).

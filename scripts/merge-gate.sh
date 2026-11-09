@@ -210,10 +210,12 @@ if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -
     (.sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
     (.commit | type == "object") and
     (.commit.message | type == "string") and
+    # An email is the plain form, or (#2388) exactly a GitHub bot noreply address,
+    # <digits>+<name>[bot]@users.noreply.github.com, whose local part holds brackets.
     (.commit.author | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     (.commit.committer | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     ((.author == null) or (.author | type == "object" and (.login | type == "string"))) and
     ((.committer == null) or (.committer | type == "object" and (.login | type == "string")))))
 ' <<<"$metadata_commits" >/dev/null 2>&1; then
@@ -368,6 +370,42 @@ read_contents_text() {
   contents_text_result="$decoded"
 }
 
+# The PR's own commits, space-separated, filled in by the branch history check below: a 404 for one of
+# these, or for the head, may be the contents API lagging a push. The head, base-tip and merge-base
+# reads run before it is filled in, and the acknowledgement read may run without it, so the retry
+# matches $head on its own.
+pr_commit_shas=""
+# Why the last contents read failed, for the INDETERMINATE line that reports it: the commit, the HTTP
+# status, how many tries were made and the first line of the error. Empty after a read that answered.
+contents_read_failure=""
+# Read a repository file at a commit through read_contents_text, trying again a failure that a second
+# try can cure: a server error (HTTP 5xx), a rate-limit answer (HTTP 403 or 429 whose error names a rate
+# limit), or a 404 for the head or one of the PR's own commits, pushed moments before (#2179). At most
+# 3 tries, 2 s then 4 s apart. Any other failure, or the third, fails closed.
+read_contents_retrying() {
+  local ref="$1" path="$2" try=1 status detail transient
+  contents_read_failure=""
+  while :; do
+    read_contents_text "$ref" "$path" && return 0
+    status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
+    # The first non-blank error line, printable ASCII only, a long digit run (an account id in a
+    # rate-limit message) masked, at most 160 characters.
+    detail=$(grep -m 1 -v '^[[:space:]]*$' "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | sed -E 's/[0-9]{6,}/<n>/g' | cut -c 1-160)
+    transient=0
+    case "$status" in
+      5[0-9][0-9]) transient=1 ;;
+      403|429) grep -qi 'rate limit' "$errfile" 2>/dev/null && transient=1 ;;
+      404) case " $head $pr_commit_shas " in *" $ref "*) transient=1 ;; esac ;;
+    esac
+    if [ "$transient" -ne 1 ] || [ "$try" -ge 3 ]; then
+      contents_read_failure="commit ${ref:0:12}, ${status:+HTTP $status, }after $try $([ "$try" -eq 1 ] && echo try || echo tries): ${detail:-no error text (the answer itself was unreadable)}"
+      return 1
+    fi
+    sleep $((try * 2))
+    try=$((try + 1))
+  done
+}
+
 # $2 is "3" (head: schema 3 only) or "2or3" (base tip and merge base).
 read_surface_paths() {
   local ref="$1"
@@ -377,7 +415,7 @@ read_surface_paths() {
   surface_reasoned_result=""
   surface_bad_reason_result=""
   surface_seen_schema_result=""
-  read_contents_text "$ref" "$SURFACE" || return 1
+  read_contents_retrying "$ref" "$SURFACE" || return 1
   # Remember what schema the file claims, so a stale schema-2 head gets a useful message.
   surface_seen_schema_result=$(jq -r '.schema_version? // empty | tostring' <<<"$contents_text_result" 2>/dev/null || true)
   if ! jq -e --arg accepted "$accepted" '
@@ -412,7 +450,7 @@ if [ "$head_surface_status" -ne 0 ]; then
   if [ "$surface_seen_schema_result" = "2" ]; then
     unknown "could not read and validate compatibility surface at $short: it is still schema 2 (a branch that predates schema 3); merge master into the branch and migrate the pin list to schema 3, see docs/release-process.md"
   else
-    unknown "could not read and validate compatibility surface at $short"
+    unknown "could not read and validate compatibility surface at $short${contents_read_failure:+ ($contents_read_failure)}"
   fi
   pinned=""
   head_reasoned=""
@@ -429,7 +467,7 @@ if [ -n "$base_tip" ]; then
   read_surface_paths "$base_tip" 2or3 || base_surface_status=$?
 fi
 if [ -n "$base_tip" ] && [ "$base_surface_status" -ne 0 ]; then
-  unknown "could not read and validate compatibility surface at base ${base_tip:0:7}"
+  unknown "could not read and validate compatibility surface at base ${base_tip:0:7}${contents_read_failure:+ ($contents_read_failure)}"
   base_pinned=""
 elif [ -n "$base_tip" ]; then
   base_pinned="$surface_paths_result"
@@ -456,7 +494,7 @@ if [ -n "$base_tip" ] && [ -n "$base_pinned" ]; then
     merge_base_surface_status=0
     read_surface_paths "$merge_base" 2or3 || merge_base_surface_status=$?
     if [ "$merge_base_surface_status" -ne 0 ]; then
-      unknown "could not read and validate compatibility surface at merge base ${merge_base:0:7}"
+      unknown "could not read and validate compatibility surface at merge base ${merge_base:0:7}${contents_read_failure:+ ($contents_read_failure)}"
     else
       merge_base_pinned="$surface_paths_result"
       say "ok" "validated schema-$surface_schema_result compatibility surface at merge base ${merge_base:0:7}"
@@ -494,47 +532,16 @@ is_sorted_unique() {
 # list cannot be read and parsed makes the answer indeterminate (fail closed).
 withdrawn_pins=""
 history_cache="$tmpdir/pin-history"
-# The PR's own commits, space-separated: a 404 for one of these may be the contents API lagging a push.
-pr_commit_shas=""
-# Why the last pin-list read failed, for the INDETERMINATE line below: the commit, the HTTP status and
-# the first line of the error, and how many tries were made.
-pin_read_failure=""
-# Read the pin list at one commit through the contents API into $contents_text_result. A failure that
-# a second try can cure is tried again: a server error (HTTP 5xx), a rate-limit answer (HTTP 403 or 429
-# whose error names a rate limit), or a 404 for one of the PR's own commits, pushed moments before
-# (#2179). At most 3 tries, 2 s then 4 s apart. Any other failure, or the third, fails closed.
-read_pin_list_retrying() {
-  local sha="$1" try=1 status detail transient
-  while :; do
-    read_contents_text "$sha" "$SURFACE" && return 0
-    status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
-    # The first non-blank error line, printable ASCII only, a long digit run (an account id in a
-    # rate-limit message) masked, at most 160 characters.
-    detail=$(grep -m 1 -v '^[[:space:]]*$' "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | sed -E 's/[0-9]{6,}/<n>/g' | cut -c 1-160)
-    transient=0
-    case "$status" in
-      5[0-9][0-9]) transient=1 ;;
-      403|429) grep -qi 'rate limit' "$errfile" 2>/dev/null && transient=1 ;;
-      404) case " $pr_commit_shas " in *" $sha "*) transient=1 ;; esac ;;
-    esac
-    if [ "$transient" -ne 1 ] || [ "$try" -ge 3 ]; then
-      pin_read_failure="commit ${sha:0:12}, ${status:+HTTP $status, }after $try $([ "$try" -eq 1 ] && echo try || echo tries): ${detail:-no error text (the answer itself was unreadable)}"
-      return 1
-    fi
-    sleep $((try * 2))
-    try=$((try + 1))
-  done
-}
 # The sorted, unique pin paths at one commit, in the file named by $pins_at_result.
 pins_at_commit() {
   local sha="$1"
   local file="$history_cache/$sha"
   pins_at_result=""
   if ! [ -f "$file" ]; then
-    read_pin_list_retrying "$sha" || return 1
+    read_contents_retrying "$sha" "$SURFACE" || return 1
     if ! jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
       <<<"$contents_text_result" >/dev/null 2>&1; then
-      pin_read_failure="commit ${sha:0:12}: the pin list there is not a list of paths"
+      contents_read_failure="commit ${sha:0:12}: the pin list there is not a list of paths"
       return 1
     fi
     jq -r '.files[].path' <<<"$contents_text_result" | LC_ALL=C sort -u >"$file.tmp" || return 1
@@ -557,7 +564,7 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
     parents_union="$tmpdir/parents-union"
     while read -r -a record; do
       [ "${#record[@]}" -gt 0 ] || continue
-      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; pin_read_failure="a commit's parent list could not be read"; break; fi
+      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; contents_read_failure="a commit's parent list could not be read"; break; fi
       pins_at_commit "${record[0]}" || { history_status=1; break; }
       own_file="$pins_at_result"
       : >"$parents_union"
@@ -569,7 +576,7 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       collected="$collected"$'\n'"$(LC_ALL=C comm -23 "$own_file" "$parents_union")"
     done <<<"$commit_records"
     if [ "$history_status" -ne 0 ]; then
-      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out (${pin_read_failure:-no detail recorded})"
+      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out (${contents_read_failure:-no detail recorded})"
     else
       withdrawn_pins=$(LC_ALL=C comm -23 <(path_set "$collected") <(path_set "$base_pinned") | LC_ALL=C comm -23 - <(path_set "$pinned"))
     fi
@@ -622,8 +629,8 @@ if [ -n "$changed" ] && [ -n "$pinned" ] && [ -n "$base_pinned" ] && [ -n "$merg
       bad "acknowledgement files are append-only; the PR also changes: $other_acks"
     fi
     if [ "$have_ack" -eq 1 ]; then
-      if ! read_contents_text "$head" "$ACK_PATH"; then
-        unknown "could not read $ACK_PATH at $short"
+      if ! read_contents_retrying "$head" "$ACK_PATH"; then
+        unknown "could not read $ACK_PATH at $short${contents_read_failure:+ ($contents_read_failure)}"
       else
         ack_text="$contents_text_result"
         ack_problems=""
@@ -685,12 +692,45 @@ fi
 # Scan destination paths and added payload lines. Removed/context lines never
 # enter the privacy scan. Binary additions are an explicit human-inspection
 # hold because their bytes are absent from a textual patch.
+# GitHub serves a pull request's diff only up to 20000 lines (HTTP 406 beyond). When it serves none, for any reason, the diff is
+# built here from the head and the merge base this gate read from the API: the head is fetched into this checkout and must be that
+# exact commit, the merge base must be its ancestor, and the options that change Git's output are pinned (attributes come from the
+# master just fetched, never from the pull request), so no local setting can make it pass: one that still applies (an attributes
+# file of this checkout, a rename limit) turns a file binary, which blocks, or fails the REST reconciliation below. On the pull
+# requests measured where GitHub did serve a diff, the scan's input (each section's path, counts and added lines) equalled GitHub's;
+# the bytes can differ in the index lines' abbreviation and in hunk-header context, which the parser does not read.
+# A fetch or a check that fails leaves the diff empty, which is INDETERMINATE, never a pass.
+local_pr_diff() {
+  local fetched
+  [ -n "$merge_base" ] || { local_diff_failure="the merge base was not read"; return 1; }
+  git -C "$gate_tree" fetch -q --no-tags origin "+refs/pull/$PR/head:refs/merge-gate/pr-head" 2>>"$errfile" </dev/null \
+    || { local_diff_failure="the head could not be fetched"; return 1; }
+  fetched=$(git -C "$gate_tree" rev-parse --verify -q 'refs/merge-gate/pr-head^{commit}' 2>>"$errfile") || fetched=""
+  [ "$fetched" = "$head" ] || { local_diff_failure="the fetched head is not $short"; return 1; }
+  git -C "$gate_tree" merge-base --is-ancestor "$merge_base" "$head" 2>>"$errfile" \
+    || { local_diff_failure="the merge base ${merge_base:0:7} is not an ancestor of the head"; return 1; }
+  diff=$(git -C "$gate_tree" --attr-source=refs/merge-gate/master -c core.quotePath=true diff --no-color --no-ext-diff \
+    --no-textconv --no-relative -M --abbrev=9 -U3 --inter-hunk-context=0 --diff-algorithm=myers --indent-heuristic \
+    --ignore-submodules=none --submodule=short --src-prefix=a/ --dst-prefix=b/ -O/dev/null "$merge_base" "$head" 2>>"$errfile") \
+    || { local_diff_failure="git diff failed"; diff=""; return 1; }
+}
 : >"$errfile"
 diff_status=0
 diff=$(gh pr diff "$PR" --repo "$REPO" 2>"$errfile") || diff_status=$?
 if [ "$diff_status" -ne 0 ] || [ -z "$diff" ]; then
-  unknown "could not read diff for the privacy scan"
+  github_diff_failure=$(head -c 200 "$errfile" | tr -cd '[:print:]')
+  diff=""
+  local_diff_failure=""
+  if local_pr_diff && [ -n "$diff" ]; then
+    say "note" "GitHub served no diff (${github_diff_failure:-an empty answer}): it was built here from merge base ${merge_base:0:7} and head $short"
+  else
+    diff=""
+    unknown "could not read diff for the privacy scan: GitHub served none, and it could not be built here (${local_diff_failure:-the built diff was empty})"
+  fi
 else
+  say "note" "the diff for the privacy scan was read from GitHub"
+fi
+if [ -n "$diff" ]; then
   # Parse Git's C-style quoted paths with the existing Python runtime. The
   # shell receives only JSON/TSV data after the parser has matched every diff
   # section, so non-ASCII destinations retain their REST filename identity.
@@ -1062,11 +1102,29 @@ PY
     say "note" "synthetic-UUID registry: $count listed value(s) applied (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$uuid_registry_path" 2>/dev/null))"
   }
   load_uuid_registry
+  # #2367: the scan reads the added lines with each lockfile integrity value masked as a digest, by the rule and only in the
+  # files merge_gate_privacy.py names (LOCKFILE_INTEGRITY_RE); the explain step masks the same lines by their own paths. If
+  # the masking cannot be done, the scan reads the lines unmasked and the gate is indeterminate.
+  privacy_payload="$tmpdir/privacy-payload"
+  lockfile_masked=""
+  if [ ! -s "$added_payload" ]; then
+    : >"$privacy_payload"
+  elif ! jq '{added: [range(0; .added_payload | length) as $i | {path: .added_locations[$i][0], text: .added_payload[$i]}]}' \
+         <<<"$parsed_diff" >"$tmpdir/lockfile-mask-input.json" 2>/dev/null \
+       || ! lockfile_masked=$(python3 -I "$script_dir/merge_gate_privacy.py" --mask-lockfile-integrity <"$tmpdir/lockfile-mask-input.json" 2>/dev/null) \
+       || ! jq -e '(.payload | type == "array" and all(.[]; type == "string")) and (.masked | type == "number" and floor == . and . >= 0)' \
+         <<<"$lockfile_masked" >/dev/null 2>&1 \
+       || ! jq -r '.payload[]' <<<"$lockfile_masked" >"$privacy_payload" 2>/dev/null; then
+    unknown "could not mask lockfile integrity values for the privacy scan"
+    cp "$added_payload" "$privacy_payload"
+  elif [ "$(jq -r '.masked' <<<"$lockfile_masked")" -gt 0 ]; then
+    say "note" "$(jq -r '.masked' <<<"$lockfile_masked") lockfile integrity value(s) were masked as generated digests"
+  fi
   scan_input_file="$tmpdir/privacy-scan-input"
   scan_input_write_status=0
   {
     printf '%s\n%s\n' "$privacy_metadata" "$path_text"
-    cat "$added_payload"
+    cat "$privacy_payload"
   } >"$scan_input_file" || scan_input_write_status=$?
   if [ "$scan_input_write_status" -ne 0 ]; then
     unknown "could not assemble complete privacy scan input"

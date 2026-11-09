@@ -111,7 +111,8 @@ fn shift(day: i64, lag: i64) -> Result<i64> {
         })
 }
 
-/// One open FIFO lot: its day number (see [`civil_day_number`]) and remaining paise, over zero.
+/// One open FIFO lot: its day number (see `depreciation::civil_day_number`) and remaining paise,
+/// over zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Lot {
     pub day: i64,

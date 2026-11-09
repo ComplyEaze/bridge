@@ -1,0 +1,399 @@
+{
+ "comment": "A firm's s.194C payees, each priced at the section's lower rate (1%) and higher rate (2%): 12 rows, 8 findings. Alder Carriers, classified one-off: c01 (Rs 30,000.01) is over the single-sum limit and is its own tranche on 10 May; c02 is exactly Rs 30,000 and waits; after c04 the year's total is exactly Rs 1,00,000, which is not over; c05 (1 paisa) takes it over on 25 September, so c02 to c05 (Rs 70,000) are one tranche dated 25 September; c06 (Rs 4,100), after the crossing, is its own tranche on 28 October; c07 debits Alder Carriers Rs 6,000 against the expense, a reversal that lowers nothing. Being one-off, Alder Carriers adds the three one-off totals. Birch Haulage, classified foreseeable: no credit is over the single-sum limit; its credits are read in date order, not book order: c08, dated 31 March and listed first, is the last of them and takes the total to Rs 1,16,599.99, so c08 to c11 are one tranche dated 31 March, whose own-date maximum runs c09 from 30 April (18 months), c10 from 31 December (10), c11 from 1 January (9) and c08 from 31 March (7). Cedar Cartage is two ledgers the configuration names as one payee, not classified: neither ledger alone passes Rs 1,00,000, the two together pass it on c15 (2 August), so c12 to c15 are one tranche dated 2 August; the foreseeability list also names the ledger Cedar Cartage North, which is not a payee entity and classifies nothing. c16 pays Rs 45,000 from the bank with no payee: tds_payees lists it as payee not named, and it is priced like any other payee, on 3 October, not classified.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Carriage Outward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "ti_194c-ledger-00d"
+  },
+  {
+   "name": "Alder Carriers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_194c-ledger-01d"
+  },
+  {
+   "name": "Birch Haulage",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_194c-ledger-02d"
+  },
+  {
+   "name": "Cedar Cartage North",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_194c-ledger-03d"
+  },
+  {
+   "name": "Cedar Cartage South",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_194c-ledger-04d"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_194c-ledger-05d"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_194c-ledger-06d"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Carriage Outward",
+   "opening": 0,
+   "debit": 37570000,
+   "credit": 600000,
+   "closing": 36970000
+  },
+  {
+   "ledger": "Alder Carriers",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 10410001,
+   "closing": -9810001
+  },
+  {
+   "ledger": "Birch Haulage",
+   "opening": 0,
+   "debit": 0,
+   "credit": 11659999,
+   "closing": -11659999
+  },
+  {
+   "ledger": "Cedar Cartage North",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5400000,
+   "closing": -5400000
+  },
+  {
+   "ledger": "Cedar Cartage South",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5600000,
+   "closing": -5600000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 4500000,
+   "closing": 45500000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-c01",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Carriage Outward",
+     3000001
+    ],
+    [
+     "Alder Carriers",
+     -3000001
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c02",
+   "date": "2025-06-12",
+   "base_type": "Journal",
+   "number": "CJ/02",
+   "lines": [
+    [
+     "Carriage Outward",
+     3000000
+    ],
+    [
+     "Alder Carriers",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c03",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "number": "CJ/03",
+   "lines": [
+    [
+     "Carriage Outward",
+     2000000
+    ],
+    [
+     "Alder Carriers",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c04",
+   "date": "2025-08-20",
+   "base_type": "Journal",
+   "number": "CJ/04",
+   "lines": [
+    [
+     "Carriage Outward",
+     1999999
+    ],
+    [
+     "Alder Carriers",
+     -1999999
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c05",
+   "date": "2025-09-25",
+   "base_type": "Journal",
+   "number": "CJ/05",
+   "lines": [
+    [
+     "Carriage Outward",
+     1
+    ],
+    [
+     "Alder Carriers",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c06",
+   "date": "2025-10-28",
+   "base_type": "Journal",
+   "number": "CJ/06",
+   "lines": [
+    [
+     "Carriage Outward",
+     410000
+    ],
+    [
+     "Alder Carriers",
+     -410000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c07",
+   "date": "2025-12-01",
+   "base_type": "Journal",
+   "number": "CJ/07",
+   "lines": [
+    [
+     "Alder Carriers",
+     600000
+    ],
+    [
+     "Carriage Outward",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c08",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "CJ/08",
+   "lines": [
+    [
+     "Carriage Outward",
+     2999999
+    ],
+    [
+     "Birch Haulage",
+     -2999999
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c09",
+   "date": "2025-04-30",
+   "base_type": "Journal",
+   "number": "CJ/09",
+   "lines": [
+    [
+     "Carriage Outward",
+     2810000
+    ],
+    [
+     "Birch Haulage",
+     -2810000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c10",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "number": "CJ/10",
+   "lines": [
+    [
+     "Carriage Outward",
+     2900000
+    ],
+    [
+     "Birch Haulage",
+     -2900000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c11",
+   "date": "2026-01-01",
+   "base_type": "Journal",
+   "number": "CJ/11",
+   "lines": [
+    [
+     "Carriage Outward",
+     2950000
+    ],
+    [
+     "Birch Haulage",
+     -2950000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c12",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "number": "CJ/12",
+   "lines": [
+    [
+     "Carriage Outward",
+     2600000
+    ],
+    [
+     "Cedar Cartage North",
+     -2600000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c13",
+   "date": "2025-07-02",
+   "base_type": "Journal",
+   "number": "CJ/13",
+   "lines": [
+    [
+     "Carriage Outward",
+     2700000
+    ],
+    [
+     "Cedar Cartage South",
+     -2700000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c14",
+   "date": "2025-08-01",
+   "base_type": "Journal",
+   "number": "CJ/14",
+   "lines": [
+    [
+     "Carriage Outward",
+     2800000
+    ],
+    [
+     "Cedar Cartage North",
+     -2800000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c15",
+   "date": "2025-08-02",
+   "base_type": "Journal",
+   "number": "CJ/15",
+   "lines": [
+    [
+     "Carriage Outward",
+     2900000
+    ],
+    [
+     "Cedar Cartage South",
+     -2900000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-c16",
+   "date": "2025-10-03",
+   "base_type": "Payment",
+   "number": "BP/16",
+   "lines": [
+    [
+     "Carriage Outward",
+     4500000
+    ],
+    [
+     "Main Bank",
+     -4500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Carriage Outward": "194C"
+ },
+ "payee_aliases": {
+  "Cedar Cartage North": "Cedar Cartage",
+  "Cedar Cartage South": "Cedar Cartage"
+ },
+ "foreseeability": {
+  "Alder Carriers": "one_off",
+  "Birch Haulage": "foreseeable",
+  "Cedar Cartage North": "one_off"
+ }
+}

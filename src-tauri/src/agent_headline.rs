@@ -722,6 +722,83 @@ impl CompanyFeaturesBasis {
     }
 }
 
+/// What a stock-by-batch read found (#2018), as counts of each item's state, held for its
+/// headline. It carries no item, godown or batch name and no quantity.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(super) struct StockByBatchBasis {
+    pub(super) requested: usize,
+    pub(super) tied: usize,
+    pub(super) differs: usize,
+    pub(super) not_comparable: usize,
+    pub(super) no_stock: usize,
+    pub(super) no_movement: usize,
+    pub(super) refused: usize,
+    pub(super) item_not_found: usize,
+    pub(super) name_unmeasured: usize,
+    pub(super) not_read: usize,
+    pub(super) not_sent: usize,
+    pub(super) batch_wise_off: bool,
+}
+
+impl StockByBatchBasis {
+    /// Whether every item asked for was read: no send failed.
+    pub(super) fn whole(&self) -> bool {
+        self.not_read == 0 && self.not_sent == 0
+    }
+
+    pub(super) fn headline(
+        &self,
+        company: &CompanyName,
+        as_of: &bridge_tally_core::TallyDate,
+    ) -> Headline {
+        let items = |count: usize| if count == 1 { "item" } else { "items" };
+        let mut lead = format!(
+            "Stock per godown and batch for {} at {}, from Tally's own Stock Query, quantities only: {} {} asked for.",
+            company.quoted(),
+            plain_date(as_of),
+            self.requested,
+            items(self.requested),
+        );
+        if !self.whole() {
+            lead.push_str(&format!(
+                " Partial: a send to Tally failed, so {} {} not read and {} not sent, and the book was not checked for change after the items that were read.",
+                self.not_read,
+                if self.not_read == 1 { "was" } else { "were" },
+                self.not_sent,
+            ));
+        }
+        let clauses = [
+            (self.tied, "tie to the closing quantity in Tally's stock item list"),
+            (self.differs, "differ from that closing quantity, and neither side is adjusted"),
+            (self.not_comparable, "could not be compared with it (another unit, or an alternate unit)"),
+            (self.no_stock, "hold no stock: Tally's list gives a closing of zero"),
+            (self.no_movement, "show no movement: Tally's list gives no closing, which is not the same as no stock"),
+            (self.refused, "were refused: their answer could not be read"),
+            (self.item_not_found, "were not found in the company"),
+            (self.name_unmeasured, "were not asked for, because their names hold characters not yet measured"),
+        ]
+        .into_iter()
+        .filter(|(count, _)| *count > 0)
+        .map(|(count, words)| format!("{count} {words}"))
+        .collect::<Vec<_>>();
+        if !clauses.is_empty() {
+            lead.push_str(&format!(" Of these, {}.", clauses.join("; ")));
+        }
+        if self.batch_wise_off {
+            lead.push_str(
+                " Batch-wise stock is off for this company, so every line reads Primary Batch.",
+            );
+        }
+        lead.push_str(" No value or rate is read.");
+        Headline {
+            lead,
+            rows: None,
+            page: None,
+            batch: None,
+        }
+    }
+}
+
 /// Whether a batch's readback as a whole is a confirmation: the same two
 /// words `verification_status` carries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

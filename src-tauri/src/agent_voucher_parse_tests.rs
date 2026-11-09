@@ -1433,12 +1433,10 @@ fn every_amount_consuming_parse_still_refuses_the_composite_window() {
     );
 }
 
-/// The 7.2 layout of a composite (the foreign symbol against its digits) is read as a ledger's
-/// balance, not as a voucher's amount: no 7.2 voucher answer is committed, so a voucher entry that
-/// holds one is not withheld and its window refuses, as it did before that layout was known
-/// (#683, #2071). The same entry in the captured 7.1 layout is withheld.
+/// The 7.2 layout of a composite (the foreign symbol against its digits) on a voucher entry is
+/// withheld at the parse as the 7.1 layout is, until the book's base can read it (#683, #2071).
 #[test]
-fn a_72_layout_composite_on_a_voucher_entry_still_refuses_the_window() {
+fn a_72_layout_composite_on_a_voucher_entry_withholds_its_voucher() {
     let captured = captured_forex_composite_vouchers();
     let composite = "-$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 8600.00";
     let at = captured.find(composite).unwrap();
@@ -1452,10 +1450,236 @@ fn a_72_layout_composite_on_a_voucher_entry_still_refuses_the_window() {
             "-$100.00 @ \u{20b9} 86/$ = -\u{20b9} 8600.00"
         )
     );
-    assert_eq!(
-        parse_agent_rows_withholding(&unspaced, FOREX_COMPANY_GUID).unwrap_err(),
-        "voucher_amount_invalid"
+    let rows = parse_agent_rows_withholding(&unspaced, FOREX_COMPANY_GUID).unwrap();
+    assert!(rows.iter().all(VoucherRow::is_withheld));
+}
+
+use bridge_tally_protocol::native_outstandings::parse_currency_master_list;
+
+fn read_under_the_72_book(xml: &str) -> Vec<VoucherRow> {
+    parse_agent_rows_withholding(xml, FOREX_72_COMPANY_GUID)
+        .unwrap()
+        .into_iter()
+        .map(|row| row.read_under(&captured_72_book()))
+        .collect()
+}
+
+#[test]
+fn a_captured_72_window_is_read_as_rupee_amounts_with_the_foreign_amount_apart() {
+    let captured = captured_72_vouchers();
+    let withheld = parse_agent_rows_withholding(&captured, FOREX_72_COMPANY_GUID).unwrap();
+    assert_eq!(withheld.iter().filter(|row| row.is_withheld()).count(), 8);
+    assert_eq!(withheld.len(), 11);
+
+    let rows = read_under_the_72_book(&captured)
+        .into_iter()
+        .map(|row| match row {
+            VoucherRow::Read(row) => row,
+            VoucherRow::Withheld(_) => panic!("every composite here is readable"),
+        })
+        .collect::<Vec<_>>();
+    let with_rate = |rate: &str| {
+        rows.iter()
+            .flat_map(|row| row["amounts"].as_array().unwrap())
+            .filter(|entry| entry["foreign"]["rate"] == rate)
+            .collect::<Vec<_>>()
+    };
+    let decimal_rate = with_rate("86.4125");
+    assert_eq!(decimal_rate.len(), 2);
+    for (entry, (amount, foreign)) in decimal_rate
+        .into_iter()
+        .zip([("-8641.25", "-100.00"), ("8641.25", "100.00")])
+    {
+        assert_eq!(entry["amount"], amount);
+        assert_eq!(
+            entry["foreign"],
+            json!({"currency": "$", "amount": foreign, "rate": "86.4125"})
+        );
+    }
+    let allocations = rows
+        .iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+        .flat_map(|entry| entry["bill_allocations"].as_array().unwrap())
+        .collect::<Vec<_>>();
+    assert!(allocations
+        .iter()
+        .any(|allocation| allocation["foreign"]["currency"] == "$"));
+    for allocation in allocations {
+        let amount = allocation["amount"].as_str().unwrap();
+        assert!(ExactDecimal::parse(amount.to_string()).is_ok(), "{amount}");
+    }
+    // A plain voucher of the same window comes through as it was.
+    let plain = rows
+        .iter()
+        .filter(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|entry| entry.get("foreign").is_none())
+        })
+        .count();
+    assert_eq!(plain, 3);
+}
+
+#[test]
+fn a_captured_71_voucher_is_read_under_its_own_base_symbol() {
+    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+    )))
+    .unwrap();
+    let book = masters.identify_base(Some("\u{20b9}")).unwrap();
+    let rows =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert_eq!(rows.len(), 1);
+    let row = match rows.into_iter().next().unwrap().read_under(&book) {
+        VoucherRow::Read(row) => row,
+        VoucherRow::Withheld(_) => panic!("the captured composite is readable"),
+    };
+    assert_eq!(row["amounts"][0]["amount"], "-8600.00");
+    assert_eq!(row["amounts"][0]["foreign"]["rate"], "86");
+    // The same voucher in the 7.2 book's terms: its base symbol is not this book's.
+    let other =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert!(other
+        .into_iter()
+        .all(|row| row.read_under(&captured_72_book()).is_withheld()));
+}
+
+/// A read composite carries the polarity flag a plain entry does, whichever way it disagrees.
+#[test]
+fn a_read_composite_says_when_its_polarity_disagrees_with_its_amount() {
+    let entries = |xml: &str| {
+        read_under_the_72_book(xml)
+            .into_iter()
+            .flat_map(|row| match row {
+                VoucherRow::Read(row) => row["amounts"].as_array().unwrap().clone(),
+                VoucherRow::Withheld(_) => panic!("every composite here is readable"),
+            })
+            .filter(|entry| entry.get("foreign").is_some())
+            .collect::<Vec<_>>()
+    };
+    let captured = captured_72_vouchers();
+    assert!(entries(&captured)
+        .iter()
+        .all(|entry| entry.get("polarity_disagrees_with_amount").is_none()));
+
+    let flipped = captured
+        .replace(">Yes</ISDEEMEDPOSITIVE>", ">Was</ISDEEMEDPOSITIVE>")
+        .replace(">No</ISDEEMEDPOSITIVE>", ">Yes</ISDEEMEDPOSITIVE>")
+        .replace(">Was</ISDEEMEDPOSITIVE>", ">No</ISDEEMEDPOSITIVE>");
+    let entries = entries(&flipped);
+    for negative in [true, false] {
+        let side = entries
+            .iter()
+            .filter(|entry| entry["amount"].as_str().unwrap().starts_with('-') == negative)
+            .collect::<Vec<_>>();
+        assert!(!side.is_empty());
+        assert!(side
+            .iter()
+            .all(|entry| entry["polarity_disagrees_with_amount"] == true));
+    }
+}
+
+/// Plain and composite entries on one voucher read side by side, and net in rupees.
+#[test]
+fn a_voucher_mixing_plain_and_composite_entries_is_read() {
+    let mixed = captured_72_vouchers().replace(
+        "-$100.00 @ \u{20b9} 86.4125/$ = -\u{20b9} 8641.25",
+        "-8641.25",
     );
+    let rows = read_under_the_72_book(&mixed);
+    assert!(rows.iter().all(|row| !row.is_withheld()));
+    let voucher = rows
+        .iter()
+        .map(|row| match row {
+            VoucherRow::Read(row) => row,
+            VoucherRow::Withheld(_) => unreachable!("none is withheld"),
+        })
+        .find(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["foreign"]["rate"] == "86.4125")
+        })
+        .unwrap();
+    let amounts = voucher["amounts"].as_array().unwrap();
+    assert_eq!(amounts.len(), 2);
+    let plain = amounts
+        .iter()
+        .find(|entry| entry.get("foreign").is_none())
+        .unwrap();
+    assert_eq!(plain["amount"], "-8641.25");
+    let composite = amounts
+        .iter()
+        .find(|entry| entry.get("foreign").is_some())
+        .unwrap();
+    assert_eq!(composite["amount"], "8641.25");
+}
+
+/// The first bill allocation that holds a composite, its amount changed. Its entry still reads.
+fn with_first_composite_allocation(captured: &str, amount: &str) -> String {
+    let (mut from, open) = (0, "<BILLALLOCATIONS.LIST>");
+    loop {
+        let list = from + captured[from..].find(open).unwrap();
+        let start = list + captured[list..].find("<AMOUNT>").unwrap() + "<AMOUNT>".len();
+        let end = start + captured[start..].find("</AMOUNT>").unwrap();
+        if captured[start..end].contains(" @ ") {
+            return format!("{}{amount}{}", &captured[..start], &captured[end..]);
+        }
+        from = end;
+    }
+}
+
+#[test]
+fn a_bill_allocation_that_will_not_read_withholds_its_voucher() {
+    let captured = captured_72_vouchers();
+    for (name, amount) in [
+        (
+            "unknown",
+            "-\u{20ac}100.00 @ \u{20b9} 86/\u{20ac} = -\u{20b9} 8600.00",
+        ),
+        ("zero", "$0.00 @ \u{20b9} /$ = \u{20b9} 0.00"),
+    ] {
+        let rows = read_under_the_72_book(&with_first_composite_allocation(&captured, amount));
+        assert_eq!(
+            rows.iter().filter(|row| row.is_withheld()).count(),
+            1,
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_voucher_that_will_not_read_stays_withheld_and_shows_no_amount() {
+    let captured = captured_72_vouchers();
+    // One side's base moved a paisa, so the entries no longer net to zero.
+    let unbalanced = captured.replace("= -\u{20b9} 8641.25", "= -\u{20b9} 8641.26");
+    // A symbol that is no master of this book.
+    let unknown = captured.replace(
+        "-$100.00 @ \u{20b9} 86.4125/$",
+        "-\u{20ac}100.00 @ \u{20b9} 86.4125/\u{20ac}",
+    );
+    // A shape the parse refuses, which the withholding classifier still admits.
+    let empty_rate = captured.replace("\u{20b9} 86.4125/$", "\u{20b9} /$");
+    for (name, xml) in [
+        ("unbalanced", unbalanced),
+        ("unknown", unknown),
+        ("empty_rate", empty_rate),
+    ] {
+        assert_ne!(xml, captured, "{name}");
+        let rows = read_under_the_72_book(&xml);
+        assert_eq!(
+            rows.iter().filter(|row| row.is_withheld()).count(),
+            1,
+            "{name}"
+        );
+        let view = withheld_view(rows.iter().find(|row| row.is_withheld()).unwrap());
+        assert!(view["amounts"][0].get("amount").is_none(), "{name}");
+    }
 }
 
 #[test]
@@ -2050,4 +2274,804 @@ fn a_whitespace_only_or_self_closing_bill_date_is_not_observed() {
     assert!(allocations_of(&rows)
         .iter()
         .any(|allocation| allocation["bill_date"] == "20250627"));
+}
+
+/// The first captured voucher with `elements` added as a labelled edit and made an invoice. Tally's
+/// answers for these three are the lab's (protocol reference §8.2j).
+fn invoice_with(elements: &str) -> String {
+    with_injected_voucher_element(elements).replacen(
+        "<ISINVOICE>No</ISINVOICE>",
+        "<ISINVOICE>Yes</ISINVOICE>",
+        1,
+    )
+}
+
+const ASKING_E_INVOICE: NamedVoucherFields = NamedVoucherFields {
+    e_invoice: EInvoiceFields::Asked,
+    ..NamedVoucherFields::NOT_ASKED
+};
+
+fn e_invoice_of(xml: &str) -> Value {
+    let rows = parse_agent_rows_reading_gst(
+        xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        ASKING_E_INVOICE,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    rows[0]["e_invoice"].clone()
+}
+
+const CARRIED: &str = "<IRN TYPE=\"String\">a1b2</IRN>\
+<IRNACKNO TYPE=\"String\">112233</IRNACKNO><IRNACKDATE TYPE=\"Date\">20250403</IRNACKDATE>";
+
+#[test]
+fn an_invoice_says_each_e_invoice_detail_present_absent_or_not_reported() {
+    assert_eq!(
+        e_invoice_of(&invoice_with(CARRIED)),
+        json!({"irn": {"state": "present", "value": "a1b2"},
+            "ack_no": {"state": "present", "value": "112233"},
+            "ack_date": {"state": "present", "value": "20250403"}})
+    );
+    // Tally's answer for the invoice with none: each element there, empty.
+    let none = "<IRN TYPE=\"String\"></IRN><IRNACKNO TYPE=\"String\"/>\
+<IRNACKDATE TYPE=\"Date\"></IRNACKDATE>";
+    let absent = json!({"state": "absent"});
+    assert_eq!(
+        e_invoice_of(&invoice_with(none)),
+        json!({"irn": absent, "ack_no": absent, "ack_date": absent})
+    );
+    // An element not sent is not said to be empty.
+    let said = e_invoice_of(&invoice_with("<IRN>a1b2</IRN>"));
+    assert_eq!(said["irn"]["state"], "present");
+    assert_eq!(said["ack_no"]["state"], "not_reported");
+    assert_eq!(said["ack_date"]["state"], "not_reported");
+}
+
+#[test]
+fn a_voucher_that_is_no_invoice_says_nothing_unless_it_carries_a_detail() {
+    assert!(e_invoice_of(&with_injected_voucher_element("<IRN></IRN>")).is_null());
+    assert!(e_invoice_of(&captured_native_vouchers()).is_null());
+    let said = e_invoice_of(&with_injected_voucher_element("<IRN>a1b2</IRN>"));
+    assert_eq!(said["irn"]["value"], "a1b2");
+    assert_eq!(said["ack_no"]["state"], "not_reported");
+}
+
+#[test]
+fn an_acknowledgement_date_that_is_no_date_refuses_the_read() {
+    let xml = with_injected_voucher_element("<IRNACKDATE>3-Apr-25</IRNACKDATE>");
+    assert_eq!(
+        parse_agent_rows_reading_gst(
+            &xml,
+            CAPTURED_VOUCHER_COMPANY_GUID,
+            GstDetailsShown::Withheld,
+            ASKING_E_INVOICE,
+            StockLines::NotAsked,
+        ),
+        Err("voucher_irn_ack_date_invalid".to_string())
+    );
+}
+
+/// A read that did not name the three says nothing about them, whatever the voucher holds.
+#[test]
+fn a_read_that_did_not_ask_returns_no_e_invoice_key() {
+    let xml = invoice_with(CARRIED);
+    let rows = parse_agent_rows(&xml, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+    let rows = parse_agent_changed_rows(&xml, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+    let rows = parse_agent_rows_reading_gst(
+        &xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+}
+
+const NOTES_LAB_COMPANY_GUID: &str = "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0";
+
+const ASKING_VOUCHER_GST: NamedVoucherFields = NamedVoucherFields {
+    gst: VoucherGstFields::Asked,
+    ..NamedVoucherFields::NOT_ASKED
+};
+
+fn captured_notes_lab(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The native read of the four vouchers (`fixtures/agent/gst-note-fields-lab/PROVENANCE.md`): the
+/// elements as Tally writes them, in an answer to another request than the one `vouchers` sends.
+fn notes_lab_native_answer() -> String {
+    captured_notes_lab(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/native-four-vouchers.utf16le.xml"
+    ))
+}
+
+/// The answer on the same book to the request `vouchers` sends without the six words.
+fn notes_lab_shipped_answer() -> String {
+    captured_notes_lab(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/shipped-read-credit-note.utf16le.xml"
+    ))
+}
+
+/// The answers to the window request with the six words (the 30 Oct captures of that file).
+fn notes_lab_window_answer(capture: &[u8]) -> Vec<Value> {
+    voucher_gst_of(&captured_notes_lab(capture)).unwrap()
+}
+
+fn voucher_gst_of(xml: &str) -> Result<Vec<Value>, String> {
+    Ok(parse_agent_rows_reading_gst(
+        xml,
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )?
+    .into_iter()
+    .map(|mut row| row["voucher_gst"].take())
+    .collect())
+}
+
+fn present(value: &str) -> Value {
+    json!({"state": "present", "value": value})
+}
+
+/// What the lab's four vouchers say: a note its reason and the party's own note number and date,
+/// and the Sales and the Purchase that those are absent.
+fn four_vouchers_details() -> Vec<Value> {
+    let details = |reason: Value, number: Value, date: Value| {
+        json!({
+            "place_of_supply": present("Maharashtra"),
+            "party_state": present("Maharashtra"),
+            "registration_type": present("Regular"),
+            "note_reason": reason,
+            "party_note_number": number,
+            "party_note_date": date,
+        })
+    };
+    let absent = || json!({"state": "absent"});
+    vec![
+        details(absent(), absent(), absent()),
+        details(
+            present("01-Sales Return"),
+            present("SYN-NOTE-1"),
+            present("20250513"),
+        ),
+        details(
+            present("04-Correction in Invoice"),
+            present("SYN-NOTE-2"),
+            present("20250515"),
+        ),
+        details(absent(), absent(), absent()),
+    ]
+}
+
+/// #2027, measured on the lab's four vouchers by a native read.
+#[test]
+fn each_captured_voucher_says_its_gst_and_note_details() {
+    assert_eq!(
+        voucher_gst_of(&notes_lab_native_answer()).unwrap(),
+        four_vouchers_details()
+    );
+}
+
+/// The window request's own answers: the build's read of the four vouchers says what the native
+/// read does, with each unset note field an empty element that says absent; a keyed place of supply
+/// reads apart from the party's state, and a party in another state reads as that state.
+#[test]
+fn each_window_answer_says_its_details_and_an_empty_note_field_says_absent() {
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml"
+        )),
+        four_vouchers_details()
+    );
+    let absent = json!({"state": "absent"});
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml"
+        )),
+        vec![json!({
+            "place_of_supply": present("Karnataka"),
+            "party_state": present("Karnataka"),
+            "registration_type": present("Regular"),
+            "note_reason": absent,
+            "party_note_number": absent,
+            "party_note_date": absent,
+        })]
+    );
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml"
+        )),
+        vec![json!({
+            "place_of_supply": present("Karnataka"),
+            "party_state": present("Maharashtra"),
+            "registration_type": present("Regular"),
+            "note_reason": absent,
+            "party_note_number": absent,
+            "party_note_date": absent,
+        })]
+    );
+}
+
+/// A read whose answer holds none of the six says so, and never that the voucher lacks them.
+#[test]
+fn an_answer_without_the_elements_says_not_reported() {
+    let said = voucher_gst_of(&notes_lab_shipped_answer()).unwrap();
+    let not_reported = json!({"state": "not_reported"});
+    assert_eq!(
+        said,
+        vec![json!({
+            "place_of_supply": not_reported,
+            "party_state": not_reported,
+            "registration_type": not_reported,
+            "note_reason": not_reported,
+            "party_note_number": not_reported,
+            "party_note_date": not_reported,
+        })]
+    );
+}
+
+#[test]
+fn a_read_that_did_not_ask_returns_no_voucher_gst_key() {
+    let xml = notes_lab_native_answer();
+    let rows = parse_agent_rows_reading_gst(
+        &xml,
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 4);
+    assert!(rows.iter().all(|row| row.get("voucher_gst").is_none()));
+}
+
+#[test]
+fn a_voucher_that_is_no_invoice_says_voucher_gst_only_when_it_carries_a_detail() {
+    let said = |xml: &str| {
+        let rows = parse_agent_rows_reading_gst(
+            xml,
+            CAPTURED_VOUCHER_COMPANY_GUID,
+            GstDetailsShown::Withheld,
+            ASKING_VOUCHER_GST,
+            StockLines::NotAsked,
+        )
+        .unwrap();
+        rows[0]["voucher_gst"].clone()
+    };
+    assert!(said(&captured_native_vouchers()).is_null());
+    assert!(said(&with_injected_voucher_element("<PLACEOFSUPPLY/>")).is_null());
+    let carried = said(&with_injected_voucher_element(
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>",
+    ));
+    assert_eq!(carried["place_of_supply"], present("Maharashtra"));
+    assert_eq!(carried["party_state"]["state"], "not_reported");
+}
+
+#[test]
+fn a_party_note_date_that_is_no_date_refuses_the_read() {
+    let xml = notes_lab_native_answer().replacen(
+        "<VATPARTYTRANSRETURNDATE>20250513<",
+        "<VATPARTYTRANSRETURNDATE>13-May-25<",
+        1,
+    );
+    assert_eq!(
+        voucher_gst_of(&xml),
+        Err("voucher_party_note_date_invalid".to_string())
+    );
+}
+
+fn dispatch_of(xml: &str) -> Result<Vec<Value>, String> {
+    Ok(parse_agent_rows_reading_gst(
+        xml,
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )?
+    .into_iter()
+    .map(|mut row| row["dispatch"].take())
+    .collect())
+}
+
+fn every_dispatch_detail(state: Value) -> Value {
+    json!({
+        "doc_no": state,
+        "dispatched_through": state,
+        "destination": state,
+        "carrier": state,
+        "lading_no": state,
+        "lading_date": state,
+        "vehicle_no": state,
+        "delivery_notes": state,
+    })
+}
+
+/// What an answer to the request before the Delivery Note list says: each detail `state`, and the
+/// notes not reported.
+fn dispatch_answered_without_the_list(state: Value) -> Value {
+    let mut dispatch = every_dispatch_detail(state);
+    dispatch["delivery_notes"] = json!({"state": "not_reported"});
+    dispatch
+}
+
+/// #2027: the lab's four invoices carry each dispatch element empty and one empty Delivery Note
+/// entry, so each says them absent; an answer that holds none of them says not reported.
+#[test]
+fn each_captured_invoice_says_its_dispatch_details_absent_and_a_read_without_them_not_reported() {
+    assert_eq!(
+        dispatch_of(&notes_lab_native_answer()).unwrap(),
+        vec![every_dispatch_detail(json!({"state": "absent"})); 4]
+    );
+    assert_eq!(
+        dispatch_of(&notes_lab_shipped_answer()).unwrap(),
+        vec![every_dispatch_detail(json!({"state": "not_reported"}))]
+    );
+}
+
+#[test]
+fn a_read_that_did_not_ask_returns_no_dispatch_key() {
+    let rows = parse_agent_rows_reading_gst(
+        &notes_lab_native_answer(),
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    assert!(rows.iter().all(|row| row.get("dispatch").is_none()));
+}
+
+#[test]
+fn a_voucher_that_is_no_invoice_says_dispatch_only_when_it_carries_a_detail() {
+    let said = |xml: &str| {
+        parse_agent_rows_reading_gst(
+            xml,
+            CAPTURED_VOUCHER_COMPANY_GUID,
+            GstDetailsShown::Withheld,
+            ASKING_VOUCHER_GST,
+            StockLines::NotAsked,
+        )
+        .unwrap()[0]["dispatch"]
+            .clone()
+    };
+    assert!(said(&captured_native_vouchers()).is_null());
+    assert!(said(&with_injected_voucher_element("<BASICSHIPPEDBY/>")).is_null());
+    let carried = said(&with_injected_voucher_element(
+        "<BASICSHIPPEDBY>ROADWAY</BASICSHIPPEDBY>",
+    ));
+    assert_eq!(carried["dispatched_through"], present("ROADWAY"));
+    assert_eq!(carried["doc_no"]["state"], "not_reported");
+    assert_eq!(carried["delivery_notes"]["state"], "not_reported");
+    assert!(said(&with_injected_voucher_element(
+        "<INVOICEDELNOTES.LIST>     </INVOICEDELNOTES.LIST>"
+    ))
+    .is_null());
+    let noted = said(&with_injected_voucher_element(
+        "<INVOICEDELNOTES.LIST><BASICSHIPDELIVERYNOTE>DN-9</BASICSHIPDELIVERYNOTE></INVOICEDELNOTES.LIST>",
+    ));
+    assert_eq!(
+        noted["delivery_notes"],
+        json!({"state": "present", "value": [
+            {"number": present("DN-9"), "date": {"state": "not_reported"}},
+        ]})
+    );
+    assert_eq!(noted["doc_no"]["state"], "not_reported");
+}
+
+/// #2027: under `mask_parties` the transporter, the carrier and the vehicle number are masked as a
+/// party name is; the other dispatch details, and these three without the setting, stay as the book
+/// has them.
+#[test]
+fn under_mask_parties_the_transporter_carrier_and_vehicle_number_are_masked_and_the_rest_stay() {
+    let xml = with_injected_voucher_element(
+        "<BASICSHIPDOCUMENTNO>DSP-7</BASICSHIPDOCUMENTNO><BASICSHIPPEDBY>SYN ROADLINES</BASICSHIPPEDBY>\
+         <BASICFINALDESTINATION>PUNE</BASICFINALDESTINATION><EICHECKPOST>SYN CARRIERS</EICHECKPOST>\
+         <BILLOFLADINGNO>LR-41</BILLOFLADINGNO><BASICSHIPVESSELNO>KA01AB1234</BASICSHIPVESSELNO>",
+    );
+    let marked: Vec<Value> = parse_agent_rows_reading_gst(
+        &xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )
+    .unwrap()
+    .into_iter()
+    .map(mark_voucher_party_names)
+    .collect();
+    let masked = redact_value(Value::Array(marked.clone()), Redaction::MaskParties);
+    let dispatch = &masked[0]["dispatch"];
+    for field in ["dispatched_through", "carrier", "vehicle_no"] {
+        assert_eq!(dispatch[field]["state"], "present");
+        assert_ne!(
+            dispatch[field]["value"],
+            marked[0]["dispatch"][field]["value"]
+        );
+    }
+    let text = masked.to_string();
+    assert!(
+        !text.contains("SYN ROADLINES")
+            && !text.contains("SYN CARRIERS")
+            && !text.contains("KA01AB1234"),
+        "{text}"
+    );
+    for (field, value) in [
+        ("doc_no", "DSP-7"),
+        ("destination", "PUNE"),
+        ("lading_no", "LR-41"),
+    ] {
+        assert_eq!(dispatch[field], present(value));
+    }
+    let plain = redact_value(Value::Array(marked), Redaction::None);
+    assert_eq!(
+        plain[0]["dispatch"]["dispatched_through"],
+        present("SYN ROADLINES")
+    );
+    assert_eq!(plain[0]["dispatch"]["carrier"], present("SYN CARRIERS"));
+    assert_eq!(plain[0]["dispatch"]["vehicle_no"], present("KA01AB1234"));
+}
+
+const EINVOICE_LAB_COMPANY_GUID: &str = "eb2f5190-292e-4ed8-bfd3-eace839fe699";
+
+const ASKING_E_INVOICE_AND_VOUCHER_GST: NamedVoucherFields = NamedVoucherFields {
+    e_invoice: EInvoiceFields::Asked,
+    gst: VoucherGstFields::Asked,
+};
+
+/// An answer of `fixtures/agent/einvoice-lab-dispatch/PROVENANCE.md`, read as `vouchers` reads it.
+fn einvoice_lab_rows(capture: &[u8], fields: NamedVoucherFields) -> Vec<Value> {
+    parse_agent_rows_reading_gst(
+        &captured_notes_lab(capture),
+        EINVOICE_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        fields,
+        StockLines::NotAsked,
+    )
+    .unwrap()
+}
+
+fn einvoice_lab_keyed_rows() -> Vec<Value> {
+    einvoice_lab_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-dispatch-keyed.utf16le.xml"
+        ),
+        ASKING_VOUCHER_GST,
+    )
+}
+
+fn voucher<'a>(rows: &'a [Value], voucher_type: &str, number: &str) -> &'a Value {
+    rows.iter()
+        .find(|row| row["voucher_type"] == voucher_type && row["voucher_number"] == number)
+        .unwrap_or_else(|| panic!("no {voucher_type} {number}"))
+}
+
+/// #2027: the window request's own answer, with dispatch details keyed on a Sales invoice and a
+/// Credit Note: each says them present with its value, the book's earlier invoices say each absent,
+/// and its Payment says none.
+#[test]
+fn the_captured_keyed_invoice_and_note_say_each_dispatch_detail() {
+    let rows = einvoice_lab_keyed_rows();
+    assert_eq!(rows.len(), 5);
+    let keyed = json!({
+        "doc_no": present("DD-72"),
+        "dispatched_through": present("ROADWAY"),
+        "destination": present("Mysuru"),
+        "carrier": present("CARRIER-73"),
+        "lading_no": present("LR-74"),
+        "lading_date": present("20250403"),
+        "vehicle_no": present("KA-75"),
+        "delivery_notes": {"state": "not_reported"},
+    });
+    for (voucher_type, number) in [("Sales", "3"), ("Credit Note", "1")] {
+        assert_eq!(voucher(&rows, voucher_type, number)["dispatch"], keyed);
+    }
+    for number in ["1", "2"] {
+        assert_eq!(
+            voucher(&rows, "Sales", number)["dispatch"],
+            dispatch_answered_without_the_list(json!({"state": "absent"}))
+        );
+    }
+    assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
+}
+
+/// #2027: in the captured answer, `mask_parties` masks the keyed transporter, carrier and vehicle
+/// number and leaves the other details as the book has them.
+#[test]
+fn under_mask_parties_the_captured_transporter_carrier_and_vehicle_number_are_masked() {
+    let marked: Vec<Value> = einvoice_lab_keyed_rows()
+        .into_iter()
+        .map(mark_voucher_party_names)
+        .collect();
+    let masked = redact_value(Value::Array(marked), Redaction::MaskParties);
+    let text = masked.to_string();
+    assert!(
+        !text.contains("ROADWAY") && !text.contains("CARRIER-73") && !text.contains("KA-75"),
+        "{text}"
+    );
+    let rows = masked.as_array().unwrap();
+    for (voucher_type, number) in [("Sales", "3"), ("Credit Note", "1")] {
+        let dispatch = &voucher(rows, voucher_type, number)["dispatch"];
+        for field in ["dispatched_through", "carrier", "vehicle_no"] {
+            assert_eq!(dispatch[field]["state"], "present");
+        }
+        assert_eq!(dispatch["doc_no"], present("DD-72"));
+        assert_eq!(dispatch["destination"], present("Mysuru"));
+        assert_eq!(dispatch["lading_no"], present("LR-74"));
+    }
+}
+
+/// #2027: the widest read `vouchers` sends with these words, a voucher type with the e-invoice and
+/// GST words, captured: both invoices say each dispatch detail absent beside their e-invoice and
+/// GST details, and the Payment says none.
+#[test]
+fn the_captured_class_read_with_e_invoice_says_dispatch_beside_both() {
+    let rows = einvoice_lab_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml"
+        ),
+        ASKING_E_INVOICE_AND_VOUCHER_GST,
+    );
+    assert_eq!(rows.len(), 3);
+    for number in ["1", "2"] {
+        let sale = voucher(&rows, "Sales", number);
+        assert_eq!(
+            sale["dispatch"],
+            dispatch_answered_without_the_list(json!({"state": "absent"}))
+        );
+        assert_eq!(sale["voucher_gst"]["place_of_supply"], present("Karnataka"));
+    }
+    assert_eq!(
+        voucher(&rows, "Sales", "1")["e_invoice"]["irn"]["state"],
+        "present"
+    );
+    assert_eq!(
+        voucher(&rows, "Sales", "2")["e_invoice"]["irn"]["state"],
+        "absent"
+    );
+    assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
+}
+
+const EINVOICE_LAB_DELIVERY_NOTES: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml"
+);
+
+fn einvoice_lab_delivery_note_answer() -> String {
+    captured_notes_lab(EINVOICE_LAB_DELIVERY_NOTES)
+}
+
+fn delivery_notes_of(xml: &str) -> Result<Vec<Value>, String> {
+    Ok(parse_agent_rows_reading_gst(
+        xml,
+        EINVOICE_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )?
+    .into_iter()
+    .map(|mut row| row["dispatch"]["delivery_notes"].take())
+    .collect())
+}
+
+fn delivery_note(number: &str, date: &str) -> Value {
+    json!({"number": present(number), "date": present(date)})
+}
+
+/// #2027: the window request's own answer, with one Delivery Note keyed on Sales 3 and two on
+/// Sales 4: each note is its number and date, in the order keyed; the earlier invoices say their
+/// notes and every other detail absent, and the Payment says none.
+#[test]
+fn the_captured_delivery_notes_come_with_their_dates_in_the_order_keyed() {
+    let rows = einvoice_lab_rows(EINVOICE_LAB_DELIVERY_NOTES, ASKING_VOUCHER_GST);
+    assert_eq!(rows.len(), 5);
+    let notes =
+        |number: &str| voucher(&rows, "Sales", number)["dispatch"]["delivery_notes"].clone();
+    assert_eq!(
+        notes("3"),
+        json!({"state": "present", "value": [delivery_note("DN-81", "20250401")]})
+    );
+    assert_eq!(
+        notes("4"),
+        json!({"state": "present", "value": [
+            delivery_note("DN-82", "20250402"),
+            delivery_note("DN-83", "20250401"),
+        ]})
+    );
+    for number in ["1", "2"] {
+        assert_eq!(
+            voucher(&rows, "Sales", number)["dispatch"],
+            every_dispatch_detail(json!({"state": "absent"}))
+        );
+    }
+    assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
+}
+
+/// #2027: the widest read `vouchers` sends with these words, captured with the same Delivery Notes
+/// keyed: each voucher's dispatch details, its notes among them, are the plain read's, beside the
+/// e-invoice details.
+#[test]
+fn the_captured_class_read_with_e_invoice_carries_the_plain_reads_delivery_notes() {
+    let widest = einvoice_lab_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-delivery-notes.utf16le.xml"
+        ),
+        ASKING_E_INVOICE_AND_VOUCHER_GST,
+    );
+    let plain = einvoice_lab_rows(EINVOICE_LAB_DELIVERY_NOTES, ASKING_VOUCHER_GST);
+    assert_eq!(widest.len(), 5);
+    for (voucher_type, number) in [
+        ("Sales", "1"),
+        ("Sales", "2"),
+        ("Sales", "3"),
+        ("Sales", "4"),
+        ("Payment", "1"),
+    ] {
+        assert_eq!(
+            voucher(&widest, voucher_type, number)["dispatch"],
+            voucher(&plain, voucher_type, number)["dispatch"]
+        );
+    }
+    assert_eq!(
+        voucher(&widest, "Sales", "4")["dispatch"]["delivery_notes"]["value"],
+        json!([
+            delivery_note("DN-82", "20250402"),
+            delivery_note("DN-83", "20250401"),
+        ])
+    );
+    assert_eq!(
+        voucher(&widest, "Sales", "1")["e_invoice"]["irn"]["state"],
+        "present"
+    );
+}
+
+/// #2027: a Delivery Note's number and date are the book's own, sent as they are under every
+/// setting, as `doc_no` is.
+#[test]
+fn under_mask_parties_the_captured_delivery_notes_stay() {
+    let rows = einvoice_lab_rows(EINVOICE_LAB_DELIVERY_NOTES, ASKING_VOUCHER_GST);
+    let marked: Vec<Value> = rows.into_iter().map(mark_voucher_party_names).collect();
+    let notes = |rows: Value| -> Vec<Value> {
+        rows.as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["dispatch"]["delivery_notes"].clone())
+            .collect()
+    };
+    let masked = notes(redact_value(
+        Value::Array(marked.clone()),
+        Redaction::MaskParties,
+    ));
+    assert_eq!(
+        masked,
+        notes(redact_value(Value::Array(marked), Redaction::None))
+    );
+    let text = Value::Array(masked).to_string();
+    assert!(
+        ["DN-81", "DN-82", "DN-83", "20250401", "20250402"]
+            .iter()
+            .all(|value| text.contains(value)),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_read_that_did_not_ask_reads_no_delivery_note() {
+    let bad = einvoice_lab_delivery_note_answer().replacen(
+        "<BASICSHIPPINGDATE>20250401</BASICSHIPPINGDATE>",
+        "<BASICSHIPPINGDATE>1-Apr-25</BASICSHIPPINGDATE>",
+        1,
+    );
+    let rows = parse_agent_rows_reading_gst(
+        &bad,
+        EINVOICE_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    assert!(rows.iter().all(|row| row.get("dispatch").is_none()));
+}
+
+#[test]
+fn a_delivery_note_date_that_is_no_date_refuses_the_read() {
+    let xml = einvoice_lab_delivery_note_answer().replacen(
+        "<BASICSHIPPINGDATE>20250401</BASICSHIPPINGDATE>",
+        "<BASICSHIPPINGDATE>1-Apr-25</BASICSHIPPINGDATE>",
+        1,
+    );
+    assert_eq!(
+        delivery_notes_of(&xml),
+        Err("voucher_delivery_note_date_invalid".to_string())
+    );
+}
+
+/// An entry holds only the number and the date: a note under any other element is refused, not
+/// read as no note.
+#[test]
+fn a_delivery_note_entry_with_an_unmeasured_child_refuses_the_read() {
+    let xml = einvoice_lab_delivery_note_answer().replacen(
+        "<BASICSHIPDELIVERYNOTE>DN-81</BASICSHIPDELIVERYNOTE>",
+        "<DELIVERYNOTENO>DN-81</DELIVERYNOTENO>",
+        1,
+    );
+    assert_eq!(
+        delivery_notes_of(&xml),
+        Err("voucher_delivery_note_invalid".to_string())
+    );
+}
+
+/// An entry's number and date are each read once, and hold text only.
+#[test]
+fn a_repeated_or_nested_delivery_note_element_refuses_the_read() {
+    let number = "<BASICSHIPDELIVERYNOTE>DN-81</BASICSHIPDELIVERYNOTE>";
+    for changed in [
+        format!("{number}{number}"),
+        "<BASICSHIPDELIVERYNOTE><NUMBER>DN-81</NUMBER></BASICSHIPDELIVERYNOTE>".to_string(),
+    ] {
+        let xml = einvoice_lab_delivery_note_answer().replacen(number, &changed, 1);
+        assert_eq!(
+            delivery_notes_of(&xml),
+            Err("voucher_delivery_note_invalid".to_string())
+        );
+    }
+}
+
+#[test]
+fn a_lading_date_that_is_no_date_refuses_the_read() {
+    let xml = notes_lab_native_answer().replacen(
+        "<BILLOFLADINGDATE/>",
+        "<BILLOFLADINGDATE>3-Apr-25</BILLOFLADINGDATE>",
+        1,
+    );
+    assert_eq!(
+        dispatch_of(&xml),
+        Err("voucher_lading_date_invalid".to_string())
+    );
+    let dated = notes_lab_native_answer().replacen(
+        "<BILLOFLADINGDATE/>",
+        "<BILLOFLADINGDATE TYPE=\"Date\">20250403</BILLOFLADINGDATE>",
+        1,
+    );
+    assert_eq!(
+        dispatch_of(&dated).unwrap()[0]["lading_date"],
+        present("20250403")
+    );
+}
+
+/// The six are read at the voucher's own level only, and once: the captured siblings that end in
+/// the same words stay unread, and a repeated element is refused as any voucher field is.
+#[test]
+fn voucher_gst_elements_are_read_once_at_the_voucher_level() {
+    let xml = notes_lab_native_answer();
+    assert!(xml.contains("<CONSIGNEESTATENAME>") && xml.contains("<PLACEOFSUPPLYSTATE"));
+    let nested = xml.replacen(
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>",
+        "<PLACEOFSUPPLY/><SOMEWHERE.LIST><PLACEOFSUPPLY>Elsewhere</PLACEOFSUPPLY></SOMEWHERE.LIST>",
+        1,
+    );
+    assert_eq!(
+        voucher_gst_of(&nested).unwrap()[0]["place_of_supply"],
+        json!({"state": "absent"})
+    );
+    let repeated = xml.replacen(
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>",
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY><PLACEOFSUPPLY>Goa</PLACEOFSUPPLY>",
+        1,
+    );
+    assert_eq!(
+        voucher_gst_of(&repeated),
+        Err("agent_read_protocol_invalid".to_string())
+    );
 }

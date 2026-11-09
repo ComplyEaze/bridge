@@ -1,0 +1,34 @@
+# fixture: agent/review-lab-payment-import-verification.utf16le.xml
+# parser: parse_import_verification_rows(REVIEW_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(251),
+        "amounts": Array [
+            Object {
+                "amount": String("-1.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Test Expense B"),
+            },
+            Object {
+                "amount": String("1.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Cash"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260404"),
+        "effective_date": String("20260404"),
+        "guid": String("63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fb"),
+        "is_invoice": Bool(false),
+        "master_id": String("251"),
+        "narration": String("Census row payment"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fb"),
+        "voucher_number": String("2"),
+        "voucher_type": String("Payment"),
+    },
+])

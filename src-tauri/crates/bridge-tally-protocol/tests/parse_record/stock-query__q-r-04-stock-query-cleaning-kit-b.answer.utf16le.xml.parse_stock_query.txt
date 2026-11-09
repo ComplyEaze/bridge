@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/stock-query/q-r-04-stock-query-cleaning-kit-b.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(NoLines)

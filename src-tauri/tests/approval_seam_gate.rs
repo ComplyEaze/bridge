@@ -723,6 +723,7 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
         "Some(\"--confirm-masters\") => agent::run_masters_confirmation,",
         "Some(\"--confirm-release\") => agent::run_release_confirmation,",
         "Some(\"--confirm-settle\") => agent::run_settle_confirmation,",
+        "Some(\"--confirm-row-release\") => agent::run_release_rows_confirmation,",
     ] {
         if lib.matches(arm).count() != 1 {
             problems.push(format!("expected exactly one `{arm}`"));
@@ -747,6 +748,12 @@ fn each_dialog_mode_runs_its_own_dialog() {
     );
     assert_ne!(settle_as_release, lib);
     assert!(!dialog_mode_problems(&settle_as_release).is_empty());
+    let rows_as_release = lib.replace(
+        "agent::run_release_rows_confirmation,",
+        "agent::run_release_confirmation,",
+    );
+    assert_ne!(rows_as_release, lib);
+    assert!(!dialog_mode_problems(&rows_as_release).is_empty());
     let swapped = lib
         .replace("agent::run_confirmation as fn() -> bool,", "SWAP,")
         .replace(
@@ -881,6 +888,16 @@ const SETTLE_ENTRY: &str = "pub fn run_settle_confirmation() -> bool {
     )
 }";
 
+/// The row release child's whole entry point, as [`POST_ENTRY`] (#1038).
+const RELEASE_ROWS_ENTRY: &str = "pub fn run_release_rows_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_ROWS_TOKEN_PREFIX,
+        show_release_rows_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}";
+
 /// The release child's whole entry point, as [`POST_ENTRY`] (#1828).
 const RELEASE_ENTRY: &str = "pub fn run_release_confirmation() -> bool {
     answer_with_token(
@@ -909,14 +926,15 @@ fn dialog_token_problems(source: &str) -> Vec<String> {
         REVIEW_ENTRY,
         RELEASE_ENTRY,
         SETTLE_ENTRY,
+        RELEASE_ROWS_ENTRY,
         MASTERS_ENTRY,
     ] {
         if source.matches(entry).count() != 1 {
             problems.push(format!("expected exactly one `{entry}`"));
         }
     }
-    if source.matches("answer_with_token(").count() != 6 {
-        problems.push("expected the five entry points and the definition only".into());
+    if source.matches("answer_with_token(").count() != 7 {
+        problems.push("expected the six entry points and the definition only".into());
     }
     problems
 }
@@ -966,6 +984,17 @@ fn each_dialog_answers_with_its_own_token() {
                 "show_release_acknowledgement,",
             ),
         ),
+        source.replace(
+            RELEASE_ROWS_ENTRY,
+            &RELEASE_ROWS_ENTRY.replace("RELEASE_ROWS_TOKEN_PREFIX", "RELEASE_TOKEN_PREFIX"),
+        ),
+        source.replace(
+            RELEASE_ROWS_ENTRY,
+            &RELEASE_ROWS_ENTRY.replace(
+                "show_release_rows_acknowledgement,",
+                "show_settle_acknowledgement,",
+            ),
+        ),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("show_review,", "|_, _| true,")),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
         swapped,
@@ -1004,6 +1033,7 @@ fn each_dialog_answers_with_its_own_token() {
 /// must change this gate. This pins text, not the platform's behaviour.
 const REVIEW_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(review_title(count))
         .set_description(preview)
@@ -1053,26 +1083,27 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }"#;
 
-/// The one-ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
-/// item only, with its own title, its own positive button, and the same
+/// The ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
+/// ledger or a batch, with its own title, its own positive button, and the same
 /// Escape/default-No behaviour.
 const MASTERS_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
-    if count != ONE_ITEM {
+    let Some((title, button)) = masters_words(count) else {
         return false;
-    }
+    };
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
-        .set_title(MASTERS_TITLE)
+        .set_title(title)
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         // The Cancel label supplies the native Escape action. Creating
         // requires the explicitly matched positive button.
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
             "Cancel".into(),
-            MASTERS_BUTTON.into(),
+            button.clone(),
         ))
         .show()
-        == rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())
+        == rfd::MessageDialogResult::Custom(button)
 }"#;
 
 const MASTERS_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
@@ -1082,11 +1113,11 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
         MB_TOPMOST, MB_YESNOCANCEL,
     };
     // As for the post dialog: No is the default, Escape and close are Cancel.
-    if count != ONE_ITEM {
+    let Some((title, _)) = masters_words(count) else {
         return false;
-    }
+    };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
-    let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832). Through `guarded` it is also
     // brought to the front once it appears, as the post's box is: its first
@@ -1119,6 +1150,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
@@ -1235,6 +1267,7 @@ fn release_question() -> String {
 /// The invoice-stop release dialogs (#1828), pinned as the review's are.
 const RELEASE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(release_title())
         .set_description(preview)
@@ -1296,6 +1329,7 @@ fn settle_question() -> String {
 /// The settle dialogs (#1709), pinned as the release's are.
 const SETTLE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(settle_title())
         .set_description(preview)
@@ -1342,6 +1376,68 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }"#;
 
+/// The row release window's own title and Windows question (#1038): neither
+/// may name a review or a post.
+const RELEASE_ROWS_TITLE: &str = r#"#[cfg(not(windows))]
+fn rows_title() -> String {
+    "ComplyEaze Bridge — release this batch's rows".into()
+}"#;
+
+const RELEASE_ROWS_QUESTION: &str = r#"#[cfg(windows)]
+fn rows_question() -> String {
+    "ComplyEaze Bridge — release this batch's rows to be built again?".into()
+}"#;
+
+/// The row release dialogs (#1038), pinned as the release's are.
+const RELEASE_ROWS_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(rows_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_ROWS_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_ROWS_BUTTON.into())
+}"#;
+
+const RELEASE_ROWS_ACK_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = rows_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}"#;
+
 /// Which subprocess mode and token each kind of acknowledgement uses (#1828):
 /// a release shown in the review's mode would be titled a review again, and one
 /// answered with the review's token could be answered by the review dialog.
@@ -1350,6 +1446,7 @@ const REVIEW_KIND_CHILD: &str = r#"    fn child(self) -> (&'static str, &'static
             Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
             Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
             Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
+            Self::RowRelease => ("--confirm-row-release", RELEASE_ROWS_TOKEN_PREFIX),
         }
     }"#;
 
@@ -1388,8 +1485,17 @@ const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCoun
             ),
             "Nothing is closed until you answer.",
         ),
+        Shown::RowRelease => (
+            "release this batch's rows in ComplyEaze Bridge, so that they can be built and posted \
+             again"
+                .into(),
+            "Nothing is released until you answer.",
+        ),
         Shown::Masters => (
-            "create this ledger in Tally".into(),
+            match count.batch() {
+                None => "create this ledger in Tally".into(),
+                Some(count) => format!("create these {count} ledgers in Tally"),
+            },
             "Nothing is created until you answer.",
         ),
     }
@@ -1403,7 +1509,8 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
         Shown::Settle => SETTLE_BUTTON.to_string(),
-        Shown::Masters => MASTERS_BUTTON.to_string(),
+        Shown::RowRelease => RELEASE_ROWS_BUTTON.to_string(),
+        Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -1428,6 +1535,80 @@ const DISPLAYED_TEXT: &str = r#"fn displayed_text(shown: Shown, count: VoucherCo
         }
         _ => format!("{answer}\n\n{preview}"),
     }
+}"#;
+
+const MAC_ALERT_CHECK: &str = r#"#[cfg(not(windows))]
+fn alert_top(screen: ScreenSpan) -> f64 {
+    ALERT_TOP_FROM_SCREEN_TOP
+        .max(screen.visible_top + ALERT_TOP_BELOW_VISIBLE_TOP)
+        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)
+}"#;
+
+const MAC_ALERT_FITS: &str = r#"#[cfg(not(windows))]
+fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
+    text_height.is_finite()
+        && text_height >= 0.0
+        && alert_top(screen) + ALERT_CHROME + text_height + ALERT_SLACK <= screen.visible_bottom
+}"#;
+
+const MAC_ALERT_EXIT: &str = r#"#[cfg(not(windows))]
+fn exit_unless_the_alert_fits(text: &str) {
+    match measured_alert(text) {
+        Some((height, screens)) if alert_fits_every_screen(height, &screens) => {}
+        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
+        None => std::process::exit(0),
+    }
+}"#;
+
+const MAC_ALERT_EVERY_SCREEN: &str = r#"#[cfg(not(windows))]
+fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
+    !screens.is_empty()
+        && screens
+            .iter()
+            .all(|screen| alert_fits(text_height, *screen))
+}"#;
+
+const MAC_ALERT_TEXT_HEIGHT: &str = r#"#[cfg(target_os = "macos")]
+fn alert_text_height(text: &str) -> f64 {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{
+        NSFont, NSFontAttributeName, NSStringDrawingOptions, NSStringNSExtendedStringDrawing,
+    };
+    use objc2_foundation::{NSDictionary, NSSize, NSString};
+    let font = NSFont::systemFontOfSize(ALERT_FONT_POINTS);
+    // SAFETY: an AppKit constant, read once.
+    let key = unsafe { NSFontAttributeName };
+    let attributes = NSDictionary::<_, AnyObject>::from_slices(&[key], &[font.as_ref()]);
+    // SAFETY: the attributes map the font key to an `NSFont`, the type AppKit
+    // reads for it.
+    let rect = unsafe {
+        NSString::from_str(text).boundingRectWithSize_options_attributes_context(
+            NSSize::new(ALERT_TEXT_WIDTH, 1.0e7),
+            NSStringDrawingOptions::UsesLineFragmentOrigin
+                | NSStringDrawingOptions::UsesFontLeading,
+            Some(&attributes),
+            None,
+        )
+    };
+    rect.size.height.ceil()
+}"#;
+
+const MAC_ALERT_SCREENS: &str = r#"#[cfg(target_os = "macos")]
+fn alert_screens() -> Option<Vec<ScreenSpan>> {
+    let main_thread = objc2::MainThreadMarker::new()?;
+    let screens = objc2_app_kit::NSScreen::screens(main_thread)
+        .iter()
+        .map(|screen| {
+            let (frame, visible) = (screen.frame(), screen.visibleFrame());
+            let top = frame.origin.y + frame.size.height;
+            ScreenSpan {
+                height: frame.size.height,
+                visible_top: top - (visible.origin.y + visible.size.height),
+                visible_bottom: top - visible.origin.y,
+            }
+        })
+        .collect::<Vec<_>>();
+    (!screens.is_empty()).then_some(screens)
 }"#;
 
 const FITS_THE_BOX: &str = r#"fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
@@ -2042,7 +2223,11 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
     }
 }
 
-const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(
+    executable: &std::path::Path,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("master_review_too_large".into());
     }
@@ -2050,7 +2235,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
         executable,
         "--confirm-masters",
         MASTERS_TOKEN_PREFIX,
-        ONE_ITEM,
+        count,
         preview,
     )
     .await
@@ -2068,7 +2253,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 58] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2083,6 +2268,21 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
     (ANSWER_TEXT, 1),
     (ANSWER_TEXT_WINDOWS, 1),
     (DISPLAYED_TEXT, 1),
+    // The Mac alert's measured check, with which each Mac dialog ends its child
+    // unshown when its text would run past the screen (#1780, option (c2)): where
+    // its top is taken to sit, the comparison, and the exit. Its figures are the
+    // lab rows', so they are not pinned here; the five calls are in the dialogs'
+    // own pins.
+    (MAC_ALERT_CHECK, 1),
+    (MAC_ALERT_FITS, 1),
+    (MAC_ALERT_EXIT, 1),
+    (MAC_ALERT_EVERY_SCREEN, 1),
+    (MAC_ALERT_TEXT_HEIGHT, 1),
+    (MAC_ALERT_SCREENS, 1),
+    (
+        "#[cfg(not(windows))]\nconst ALERT_TEXT_WIDTH: f64 = 402.0;",
+        1,
+    ),
     (FITS_THE_BOX, 1),
     (POST_DIALOG_WINDOWS, 1),
     (REVIEW_ACK_DIALOG, 1),
@@ -2122,33 +2322,49 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
         1,
     ),
     ("pub(crate) const REVIEW_BUTTON: &str = \"Yes\";", 1),
-    // The one-ledger dialog: its words, its count, both native dialogs, and
-    // the two functions that ask it and decide from the child's answer.
+    // The ledger dialog: its words, the words by count, its one-item count,
+    // both native dialogs, and the two functions that ask it and decide from
+    // the child's answer.
     (
         "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — create one ledger?\";",
         1,
     ),
     (
-        "#[cfg(not(windows))]\nconst MASTERS_BUTTON: &str = \"Create ledger\";",
+        r#"fn masters_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((MASTERS_TITLE.into(), "Create ledger".into())),
+        Some(count) if count.get() <= MAX_LEDGERS_PER_BATCH => Some((
+            format!("ComplyEaze Bridge — create {count} ledgers?"),
+            format!("Create {count} ledgers"),
+        )),
+        Some(_) => None,
+    }
+}"#,
         1,
     ),
     (
         "const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);",
         1,
     ),
+    // The ledger dialog is asked about the batch's own count (#690).
+    (
+        "let count = VoucherCount::new(batch.len()).ok_or(\"master_request_invalid\")?;",
+        1,
+    ),
     (MASTERS_DIALOG, 1),
     (MASTERS_DIALOG_WINDOWS, 1),
     (
-        "async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
-    let executable = std::env::current_exe().map_err(|_| \"master_approval_unavailable\")?;
-    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
-    confirm_masters_with(&executable, &shown).await
-}",
+        r#"async fn confirm_masters_dialog(preview: MastersPrompt<'_>) -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
+    let shown = displayed_text(Shown::Masters, preview.count, preview.text);
+    confirm_masters_with(&executable, preview.count, &shown).await
+}"#,
         1,
     ),
     (CONFIRM_MASTERS_WITH, 1),
     ("const RELEASE_BUTTON: &str = \"Release the stop\";", 1),
     ("const SETTLE_BUTTON: &str = \"Close the batch\";", 1),
+    ("const RELEASE_ROWS_BUTTON: &str = \"Release the rows\";", 1),
     // Each token's value, so no two modes can share one (#1828).
     (
         "const REVIEW_TOKEN_PREFIX: &str = \"bridge-review-acknowledged:\";",
@@ -2170,6 +2386,10 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
         "const SETTLE_TOKEN_PREFIX: &str = \"bridge-batch-settle-acknowledged:\";",
         1,
     ),
+    (
+        "const RELEASE_ROWS_TOKEN_PREFIX: &str = \"bridge-row-release-acknowledged:\";",
+        1,
+    ),
     (RELEASE_TITLE, 1),
     (RELEASE_QUESTION, 1),
     (RELEASE_ACK_DIALOG, 1),
@@ -2178,6 +2398,10 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
     (SETTLE_QUESTION, 1),
     (SETTLE_ACK_DIALOG, 1),
     (SETTLE_ACK_DIALOG_WINDOWS, 1),
+    (RELEASE_ROWS_TITLE, 1),
+    (RELEASE_ROWS_QUESTION, 1),
+    (RELEASE_ROWS_ACK_DIALOG, 1),
+    (RELEASE_ROWS_ACK_DIALOG_WINDOWS, 1),
     (REVIEW_KIND_CHILD, 1),
 ];
 
@@ -2189,7 +2413,8 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // non-test arm's identity function. The one-ledger dialog added one of
     // each arm of its own.
     // #1780 added one more, the test-only accessor for what a review shows.
-    ("#[cfg(test)]", 8),
+    // The ledger batch made the one-item count test-only (#690).
+    ("#[cfg(test)]", 9),
     ("#[cfg(not(test))]", 5),
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
@@ -2197,10 +2422,16 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // and the non-Windows button; #1780's follow-up, the Mac one-line answer
     // text test. #1828: the release window's question and box on Windows, and
     // its title, dialog and button on a Mac. #1709: the same for the settle
-    // window.
-    ("#[cfg(windows)]", 12),
-    ("#[cfg(not(windows))]", 17),
-    ("cfg", 43),
+    // window, and #1038 for the row release window. The ledger batch moved the
+    // Mac ledger button into the count's words, used on both systems (#690).
+    ("#[cfg(windows)]", 14),
+    // #1780's Mac check (c2): the seven measured figures, the screen span,
+    // where the top sits, the comparison, the fit on every screen, the child's
+    // exit and their two tests;
+    // and four `cfg(target_os = "macos")` items (the text's height, the screens,
+    // the two together, and the height's test) with one other-platform arm.
+    ("#[cfg(not(windows))]", 33),
+    ("cfg", 67),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2276,6 +2507,51 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
+        // A Mac dialog stops measuring its alert, or the measure drops the
+        // lowest top, the slack or the visible bottom, shows an alert it could
+        // not measure, or ends the child with a status the parent does not read
+        // as a box that did not fit (#1780, option (c2)).
+        source.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
+        replace_last(&source, "    exit_unless_the_alert_fits(preview);\n", ""),
+        source.replacen(
+            "fn show_review(count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_review(count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen("        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)\n", "", 1),
+        source.replacen(" + ALERT_SLACK <= screen.visible_bottom", " <= screen.visible_bottom", 1),
+        source.replacen("<= screen.visible_bottom", "<= screen.height", 1),
+        source.replacen("        None => std::process::exit(0),", "        None => {}", 1),
+        // The check passes on any one screen, lets an empty list of screens
+        // through, reads only the first, takes the column as wide as Part A's
+        // A4e disproved, or measures no text.
+        source.replacen(".all(|screen| alert_fits(text_height, *screen))", ".any(|screen| alert_fits(text_height, *screen))", 1),
+        // Equivalent in production, as `alert_screens` never gives an empty list;
+        // the guard is pinned as a defence.
+        source.replacen("    !screens.is_empty()\n        && screens", "    screens", 1),
+        source.replacen("(!screens.is_empty()).then_some(screens)", "Some(screens.into_iter().take(1).collect())", 1),
+        source.replacen("const ALERT_TEXT_WIDTH: f64 = 402.0;", "const ALERT_TEXT_WIDTH: f64 = 406.0;", 1),
+        source.replacen("    rect.size.height.ceil()\n}", "    rect.size.height.ceil() * 0.0\n}", 1),
+        source.replacen(
+            "        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),",
+            "        Some(_) => std::process::exit(0),",
+            1,
+        ),
         // The parent stops reading a box that did not fit as a refusal, or
         // the dialog stops measuring its box (#1832).
         source.replacen(
@@ -2369,14 +2645,26 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("\"Yes\";", "\"No\";", 1),
-        // The one-ledger dialog approves on anything but its own button,
+        // The ledger dialog approves on anything but its own button,
         // reads as the decline, or defaults to Yes (Windows MB_DEFBUTTON1).
+        // Inside the ledger dialog itself: the review's dialog compares its
+        // own `button` the same way and comes first in the file.
         source.replacen(
-            "== rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())",
-            "!= rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())",
+            MASTERS_DIALOG,
+            &MASTERS_DIALOG.replacen(
+                "== rfd::MessageDialogResult::Custom(button)",
+                "!= rfd::MessageDialogResult::Custom(button)",
+                1,
+            ),
             1,
         ),
         source.replacen("\"Create ledger\"", "\"Cancel\"", 1),
+        // A batch's box is asked about one ledger whatever the batch holds.
+        source.replacen(
+            "VoucherCount::new(batch.len())",
+            "VoucherCount::new(1)",
+            1,
+        ),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
             &MASTERS_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
@@ -2387,8 +2675,8 @@ fn each_dialog_answers_only_on_its_positive_button() {
             &MASTERS_DIALOG_WINDOWS.replacen("answer == IDYES", "answer != IDNO", 1),
             1,
         ),
-        // The one-ledger dialog's title reads as the post's, or its count
-        // guard is gone, so a batch's count would show it.
+        // The ledger dialog's title reads as the post's, or its count guard
+        // is gone, so a count over the batch limit would show it.
         source.replacen(
             "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — create one ledger?\";",
             "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — approve one voucher\";",
@@ -2396,16 +2684,16 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen(
             MASTERS_DIALOG,
-            &MASTERS_DIALOG.replacen("count != ONE_ITEM", "false", 1),
+            &MASTERS_DIALOG.replacen("masters_words(count)", "masters_words(ONE_ITEM)", 1),
             1,
         ),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
-            &MASTERS_DIALOG_WINDOWS.replacen("count != ONE_ITEM", "false", 1),
+            &MASTERS_DIALOG_WINDOWS.replacen("masters_words(count)", "masters_words(ONE_ITEM)", 1),
             1,
         ),
         source.replacen(
-            "confirm_masters_with(&executable, &shown).await\n}",
+            "confirm_masters_with(&executable, preview.count, &shown).await\n}",
             "let _ = (executable, shown);\n    Ok(())\n}",
             1,
         ),
@@ -2442,7 +2730,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen(
             CONFIRM_MASTERS_WITH,
-            &CONFIRM_MASTERS_WITH.replacen("ONE_ITEM", "VoucherCount(NonZeroUsize::MAX)", 1),
+            &CONFIRM_MASTERS_WITH.replacen("        count,\n", "        VoucherCount(NonZeroUsize::MAX),\n", 1),
             1,
         ),
         source.replacen(
@@ -2549,6 +2837,30 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen(
             SETTLE_ACK_DIALOG_WINDOWS,
             &SETTLE_ACK_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
+            1,
+        ),
+        // The row release dialogs discard their answer, read as the decline,
+        // are titled a review, or are shown in another dialog's mode (#1038).
+        source.replacen(RELEASE_ROWS_ACK_DIALOG, &discard_answer(RELEASE_ROWS_ACK_DIALOG), 1),
+        source.replacen(
+            RELEASE_ROWS_ACK_DIALOG_WINDOWS,
+            &discard_answer(RELEASE_ROWS_ACK_DIALOG_WINDOWS),
+            1,
+        ),
+        source.replacen("\"Release the rows\"", "\"Cancel\"", 1),
+        source.replacen(
+            "\"ComplyEaze Bridge — release this batch's rows\".into()",
+            "\"ComplyEaze Bridge — record that you reviewed one voucher\".into()",
+            1,
+        ),
+        source.replacen(
+            "Self::RowRelease => (\"--confirm-row-release\", RELEASE_ROWS_TOKEN_PREFIX),",
+            "Self::RowRelease => (\"--confirm-release\", RELEASE_TOKEN_PREFIX),",
+            1,
+        ),
+        source.replacen(
+            RELEASE_ROWS_ACK_DIALOG_WINDOWS,
+            &RELEASE_ROWS_ACK_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
             1,
         ),
         // A release reads as the decline, is titled a review, or is shown in the
@@ -3072,15 +3384,15 @@ fn message_box_calls_are_system_modal(source: &str) -> Vec<bool> {
 /// A Windows box opened without `MB_SYSTEMMODAL` is drawn behind Tally when the
 /// last input went to Tally seconds before it opened (#1780, #2107). Every
 /// `MessageBoxW` call of `approved_import.rs` must carry it, so a box added or
-/// changed later fails here rather than in review. The five boxes are the
-/// post's, the review's, the stop release's, the ledger creation's and the
-/// settlement's.
+/// changed later fails here rather than in review. The six boxes are the
+/// post's, the review's, the stop release's, the ledger creation's, the
+/// settlement's and the row release's.
 #[test]
 fn every_windows_message_box_is_system_modal() {
     let calls = message_box_calls_are_system_modal(&read("src-tauri/src/tally/approved_import.rs"));
     assert!(
-        calls.len() >= 5,
-        "fewer MessageBoxW calls than the five known boxes: {calls:?}"
+        calls.len() >= 6,
+        "fewer MessageBoxW calls than the six known boxes: {calls:?}"
     );
     assert!(
         calls.iter().all(|system_modal| *system_modal),

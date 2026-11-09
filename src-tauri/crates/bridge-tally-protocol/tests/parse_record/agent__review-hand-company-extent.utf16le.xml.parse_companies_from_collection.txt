@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/agent/review-hand-company-extent.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE REVIEW LAB",
+        guid: Some(
+            "63292d7c-d541-42e5-aa9d-2ab5f8b993ff",
+        ),
+        company_number: Some(
+            "100105",
+        ),
+        books_from: Some(
+            "20260401",
+        ),
+    },
+])

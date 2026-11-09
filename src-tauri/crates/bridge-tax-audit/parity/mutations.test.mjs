@@ -946,6 +946,55 @@ describe("GitRepo", () => {
     assert.ok(out.includes("2 selected, 0 proven"), out);
   });
 
+  /** A crate change outside every record's inputs: it moves the crate tree, so no record is on
+   * that tree, while every digest still matches. */
+  const unrelatedChange = () => {
+    write("src/support.rs", "// unrelated\n");
+    commit("unrelated crate change");
+  };
+  /** Whether `id`'s record would be accepted at HEAD by its digest alone. */
+  const freshByDigest = (id) => {
+    const m = g.muts.find((x) => x.id === id);
+    const rec = readJson(g.lay.results)[id];
+    const tree = mu.crateTree("HEAD", g.repo, CRATE);
+    assert.notEqual(rec.crate_tree, tree, `${id}'s record is not on this tree`);
+    return mu.fresh(m, rec, tree, null, mu.treeView("HEAD", g.repo, CRATE));
+  };
+
+  test("test_a_nightly_failing_mutation_needs_the_exact_tree_even_with_an_unchanged_digest", async () => {
+    proveWithDigests();
+    sh(g.repo, "branch", "base");
+    unrelatedChange();
+    assert.equal(freshByDigest("B1"), true, "its digest alone would accept B1");
+    let [rc, out] = await main("--verify", "--changed-since", "base");
+    assert.equal(rc, 0, out);
+    const issueFile = path.join(path.dirname(g.root), "issues.txt");
+    fs.writeFileSync(issueFile, issue(`<!-- ${mu.FAILING_MARK} B1 -->`));
+    [rc, out] = await main("--verify", "--changed-since", "base", "--nightly-issues", issueFile);
+    assert.equal(rc, 1, out);
+    assert.ok(/^B1: failing on the nightly run  \[NOT PROVEN ON THIS TREE\]$/m.test(out), out);
+    assert.ok(out.includes("1 selected, 0 proven"), out);
+  });
+
+  test("test_a_renamed_mutation_with_a_copied_record_needs_the_exact_tree", async () => {
+    proveWithDigests();
+    sh(g.repo, "branch", "base");
+    g.muts = g.muts.map((m) => (m.id === "R1" ? { ...m, id: "R1b" } : m));
+    write("parity/mutations.json", JSON.stringify(g.muts));
+    const results = mu.loadResults(g.lay.results);
+    results.R1b = results.R1;
+    delete results.R1;
+    fs.writeFileSync(g.lay.results, mu.renderResults(results, order()));
+    commit("rename R1, carrying its record");
+    unrelatedChange();
+    assert.equal(freshByDigest("R1b"), true, "the copied digest alone would accept R1b");
+    const [rc, out] = await main("--verify", "--changed-since", "base");
+    assert.equal(rc, 1, out);
+    assert.ok(/^R1b: new or edited since the base  \[NOT PROVEN ON THIS TREE\]$/m.test(out), out);
+    assert.ok(!out.includes("B1:"), "B1 is neither new nor stale: " + out);
+    assert.ok(out.includes("1 selected, 0 proven"), out);
+  });
+
   test("test_an_entry_the_runner_cannot_judge_is_refused_at_load", async () => {
     for (const [bad, why] of [
       [{ file: "src/./book.rs" }, "file 'src/./book.rs' is not a tracked crate path"],
@@ -1939,6 +1988,8 @@ describe("InputDigest", () => {
       ["build.rs", UNIT, () => write("build.rs", "fn main() { println!(\"cargo:rerun-if-changed=x\"); }\n")],
       ["a file that defines a macro", UNIT, () => write("src/macros.rs", "macro_rules! check { () => { panic!() } }\n")],
       ["a new file that defines a macro", UNIT, () => write("src/more_macros.rs", "macro_rules! other { () => {} }\n")],
+      ["a new source file that is not UTF-8", UNIT, () => fs.writeFileSync(path.join(d.root, "src/latin.rs"), Buffer.from([0x2f, 0x2f, 0xe9, 0x0a]))],
+      ["a source file that is not UTF-8, edited", UNIT, () => fs.writeFileSync(path.join(d.root, "src/latin.rs"), Buffer.from([0x2f, 0x2f, 0xe8, 0x0a]))],
     ];
     for (const [what, killers, change] of kinds) {
       const rec = proved(B, killers);

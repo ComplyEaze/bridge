@@ -139,9 +139,10 @@
 // A record gets NO digest, and is then judged by the exact-tree rule alone, when anything on the
 // way cannot be resolved from the text: no recorded killer (a hang or a survivor), a killer whose
 // file is unknown, a file that is missing or not UTF-8, a `mod x;` with no file or with both
-// `x.rs` and `x/mod.rs`, a `#[path]` attribute (bare or in `cfg_attr`), or a `mod x;` inside a
-// block. So an input this code cannot follow costs a re-proof on the exact tree, never a smaller
-// set. A record carrying any other digest version, or none, is likewise judged by the exact tree
+// `x.rs` and `x/mod.rs`, or, in a file the digest follows, a `#[path]` attribute (bare or in
+// `cfg_attr`) or a `mod x;` inside a block. A file that only declares a module on the way (an
+// ancestor) is not checked for these, so a `#[path]` there is not seen; the crate has none today.
+// So an input this code cannot follow costs a re-proof on the exact tree, never a smaller set. A record carrying any other digest version, or none, is likewise judged by the exact tree
 // alone, so records made before the digest existed keep today's rule.
 //
 // What the guarantee does NOT cover. The nightly run stays: every night it re-proves the whole list
@@ -160,6 +161,9 @@
 //   mutation whose inputs are unchanged keeps its record, and so do unselected ones, as before.
 // - A mutation killed by a hang: its record names no killing test and carries no digest, so only a
 //   change to its target file or a non-source input selects it.
+// - Source a killer reads as text at run time. A test that reads crate files (for example every
+//   file in `src/`, as `tests/accuracy_scorer.rs` does) sees a change the digest does not follow.
+//   No record names such a test as its killer today.
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";

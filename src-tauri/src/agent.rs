@@ -2468,7 +2468,7 @@ impl ArgumentRepair {
 fn unanswered_remediation(reason: &str) -> Option<&'static str> {
     match reason {
         "endpoint_unreachable" => Some(
-            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have.",
+            "Tell the user to check, in this order: (1) TallyPrime is open with a company loaded; (2) in TallyPrime, F1, Settings, Connectivity, Client/Server configuration shows \"TallyPrime acts as\" set to Both, and TallyPrime was closed and reopened after that was saved; (3) the Tally port in the ComplyEaze Bridge extension settings equals the Port number in that box (the port named in this error is the one tried). Do not repeat the request until they have.",
         ),
         "endpoint_circuit_cooldown" => Some(
             "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",

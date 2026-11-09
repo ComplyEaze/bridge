@@ -1223,7 +1223,12 @@ async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
         let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
         let Err(invoice::InvoiceAdmission::Refused(refusals)) = lab
             .server
-            .admit_sales_invoice(&lab.identity, &lab.company, &mut voucher, &pilot_catalogue())
+            .admit_sales_invoice(
+                &lab.identity,
+                &lab.company,
+                &mut voucher,
+                &pilot_catalogue(),
+            )
             .await
         else {
             panic!("{august}: not refused");

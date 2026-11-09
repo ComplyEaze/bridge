@@ -1,0 +1,6 @@
+$ python -I (inline) the start-up check's hits in the two company-object copies, each with its element and 12 characters either side (the number shown as <S>; "allowed": inside the SEARCHMAXTERMLIMIT or BTOCLTHRESHOLDVALUE value on the COMPANY row)
+answers/a-s2-O-object.number-redacted.xml (utf-16-le): SEARCHMAXTERMLIMIT: ...E="Number"> <S></SEARCHMAXT... allowed
+answers/a-s2-O-object.number-redacted.xml (utf-16-le): BTOCLTHRESHOLDVALUE: ...E="Number"> <S></BTOCLTHRES... allowed
+answers/a-s4-O-object.number-redacted.xml (utf-16-le): SEARCHMAXTERMLIMIT: ...E="Number"> <S></SEARCHMAXT... allowed
+answers/a-s4-O-object.number-redacted.xml (utf-16-le): BTOCLTHRESHOLDVALUE: ...E="Number"> <S></BTOCLTHRES... allowed
+hits 4; not allowed: 0

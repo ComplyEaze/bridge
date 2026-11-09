@@ -735,8 +735,9 @@ fn row_2162_gy_reads_the_company_gst_on_before_and_off_after() {
 }
 
 /// The company's GST setting, on edits of the captured company object (marked
-/// as edits; the captured `ISGSTON` reads `Yes`): `No` reads as off, and an
-/// element emptied, removed or holding other text reads as not stated. A
+/// as edits; the captured `ISGSTON` reads `Yes`): `No` reads as off, `Yes` and
+/// `No` padded with spaces read as the value (the edge trims), and an element
+/// emptied, removed or holding other text reads as not stated. A
 /// second `ISGSTON` fails the read, as any repeated field does.
 #[test]
 fn the_company_gst_setting_is_on_only_for_yes_and_off_only_for_no() {
@@ -748,6 +749,9 @@ fn the_company_gst_setting_is_on_only_for_yes_and_off_only_for_no() {
     assert_eq!(read(&answer), Ok(CompanyGst::On));
     for (edit, gst) in [
         ("<ISGSTON TYPE=\"Logical\">No</ISGSTON>", CompanyGst::Off),
+        // The edge trims: a padded value reads as the value.
+        ("<ISGSTON TYPE=\"Logical\"> Yes </ISGSTON>", CompanyGst::On),
+        ("<ISGSTON TYPE=\"Logical\"> No </ISGSTON>", CompanyGst::Off),
         ("<ISGSTON TYPE=\"Logical\"></ISGSTON>", CompanyGst::Unstated),
         (
             "<ISGSTON TYPE=\"Logical\"> </ISGSTON>",

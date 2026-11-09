@@ -770,6 +770,42 @@ async fn a_company_whose_gst_is_off_or_unstated_is_refused_by_name() {
     );
 }
 
+/// The GST setting is judged first, by itself: with the company's minimum
+/// HSN/SAC code length edited to 8 (marked as an edit; the answers read 4), the
+/// answer before the change refuses every sales line as not measured, and the
+/// answer with GST off, under the same edit, refuses the invoice under the GST
+/// code alone, with no line refusal beside it.
+#[tokio::test]
+async fn the_gst_setting_refuses_by_itself_before_any_sales_line_is_judged() {
+    let length = "<HSNCODELENGTH TYPE=\"Number\"> 4</HSNCODELENGTH>";
+    let longer = "<HSNCODELENGTH TYPE=\"Number\"> 8</HSNCODELENGTH>";
+    let edited = |bytes: &[u8]| {
+        let text = utf16(bytes);
+        assert_eq!(text.matches(length).count(), 1);
+        text.replace(length, longer)
+    };
+    let before = edited(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml"));
+    let off = edited(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"));
+    let (seen, _, _) = admit_on(
+        pilot_lab_replacing('O', before),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    let lines = seen.expect_err("every sales line refused");
+    assert!(!lines.is_empty());
+    assert!(lines.iter().all(|(code, ledger)| *code
+        == "invoice_sales_ledger_hsn_source_not_measured"
+        && !ledger.is_empty()));
+    let (seen, voucher, requests) = admit_on(
+        pilot_lab_replacing('O', off),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    assert_eq!(seen, Err(vec![("invoice_company_gst_off", String::new())]));
+    assert_eq!(requests.len(), 76);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+}
+
 /// A Regular customer whose GSTIN in force is the company's own is refused
 /// once the registration is read (70 requests), with no observation: Tally
 /// listed such an invoice as uncertain (section 9.16). The same customer under

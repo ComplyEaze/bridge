@@ -23,6 +23,9 @@ here is byte-equal to the file there, UTF-16LE with no byte-order mark.
 They are copies, not the bytes Tally sent. Following `evidence/o-redaction.txt` on that branch, every
 occurrence of the company number is replaced by the same number of capital `Z` characters, in the file's
 own encoding. Each file has one such replacement, in `COMPANYNUMBER`, and no other byte is changed, so
-each size equals the original's. The originals stay on the lab machine.
+each size equals the original's. The originals stay on the lab machine; the lab's record gives their
+SHA-256 as `40afcf4d...` (s2) and `c67e612d...` (s4), which ties each copy to the original it was made
+from. No field the build's parse reads is the replaced one: `parse_company_hsn` reads the company's
+`GUID`, its HSN/SAC rows and settings, `ISGSTCLASSIFON` and `ISGSTON`, never `COMPANYNUMBER`.
 
 What the row measured, and what it did not, is in `RESULTS.md` on the same branch. It is one run: partial.

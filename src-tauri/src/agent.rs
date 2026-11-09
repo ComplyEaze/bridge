@@ -2286,14 +2286,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              the invoice's date or figures to get past this.",
         ),
         "invoice_company_gst_off" => Some(
-            "GST is turned off for this company in Tally, so ComplyEaze Bridge does not \
-             issue a tax invoice in it. Nothing was sent to Tally. Tell the user, and ask \
-             whether GST should be on for this company; turning it on is their change to \
-             make in Tally, not yours. Do not record the sale another way to get past this.",
+            "GST is turned off for this company in Tally, and ComplyEaze Bridge does not \
+             post a sale into a company with GST off. Nothing was written to Tally. Tell \
+             the user, and ask them to confirm that this is the right company. Whether GST \
+             should be on for it is the user's decision, made in Tally, not yours. Do not \
+             record the sale another way to get past this.",
         ),
         "invoice_company_gst_unstated" => Some(
             "Tally's answer about the company did not say whether GST is on for it, so \
-             ComplyEaze Bridge cannot issue a tax invoice in it. Nothing was sent to Tally. \
+             ComplyEaze Bridge cannot issue a tax invoice in it. Nothing was written to Tally. \
              Check that the company is still open in Tally, then build again; if it repeats, \
              report it rather than retrying.",
         ),

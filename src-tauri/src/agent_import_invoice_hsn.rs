@@ -88,15 +88,14 @@ pub(in crate::agent::agent_import) struct CompanyHsn {
 }
 
 /// The company's own GST setting, as the company object's `ISGSTON` states
-/// it. When it was turned off on the pilot book (row 2162-GY,
-/// `lab/2162-gy-answers`, one run: partial), this element read `No` where it
-/// had read `Yes`, while the tax units, the voucher types and a stored
-/// invoice's read-back answered as before: none of those tells the build.
+/// it (protocol reference §12a.19, row 2162-GY, PARTIAL): turned off, this
+/// element read `No` where the tax units read as before, so the tax units
+/// alone do not tell the build.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::agent::agent_import) enum CompanyGst {
-    /// Exactly `Yes`.
+    /// `Yes`, after the edge's trimming (`text_of`).
     On,
-    /// Exactly `No`.
+    /// `No`, after the same trimming.
     Off,
     /// Absent, empty, or any other text: no state Tally was seen to send.
     Unstated,
@@ -459,8 +458,9 @@ pub(in crate::agent::agent_import) fn parse_group_hsn(
 
 /// The company object (`TYPE` Object, `SUBTYPE` Company, every field): its
 /// one `COMPANY` must carry the verified company's GUID. Only the HSN/SAC
-/// rows and settings and the company's GST setting are kept; the rest of the object (the company's own
-/// contact and tax identifiers among it) is dropped with the answer.
+/// rows and settings, and the GST setting, are kept; the rest of the object
+/// (the company's own contact and tax identifiers among it) is dropped with
+/// the answer.
 pub(in crate::agent::agent_import) fn parse_company_hsn(
     xml: &str,
     company_guid: &str,

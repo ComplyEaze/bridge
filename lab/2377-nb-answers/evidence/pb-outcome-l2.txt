@@ -1,0 +1,3 @@
+  headers: 'HTTP/1.1 200 OK'; Content-Type absent; CONTENT-LENGTH ['0']
+OUTCOME: response_content_type_unsupported (0 Content-Type headers)
+exit 0

@@ -1,0 +1,11 @@
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['1232']
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['1232']
+  BILLREF 'SUP/0001' BILLDATE '4-Aug-26' BILLCL '2100.00' BILLDUE '4-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: 2100.00
+ANSWER: ROWS 1 (0 On Account)
+a-s1-S-snap-20260401-20260804.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  'BRIDGE Supplier RJ': PARENT 'Sundry Creditors'; CURRENCYNAME '₹'; ISBILLWISEON 'Yes'; OPENINGBALANCE '0.00'; CLOSINGBALANCE '2100.00'; BRIDGECOMPANYGUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85'
+    CLOSINGBALANCE reads 2100.00
+OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL 2100.00 equals closing 2100.00)
+exit 0

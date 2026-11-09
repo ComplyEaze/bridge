@@ -1,0 +1,4 @@
+a-m1-M-marks.xml: HEADER/STATUS 1
+  COMPANY rows: 1
+  GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85 (the book's: yes) ALTVCHID 68 ALTMSTID 245
+exit 0

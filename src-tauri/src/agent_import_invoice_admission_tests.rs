@@ -927,6 +927,44 @@ async fn a_number_held_by_an_invoice_with_an_irn_is_refused_saying_so() {
     assert_eq!(requests.len(), order.find("e5s5se").unwrap() + 6);
 }
 
+/// Every month of the year is judged, not only the two the lab found rows in.
+/// SYNTHETIC placement: August's captured answer (`U`), which holds the book's
+/// first invoice `BP/26-27/0001`, is served at each month in turn, and the
+/// empty month (`K`) at August when August is not the month under test. The
+/// invoice is numbered `bp/26-27/01`, which folds to the same number, so it is
+/// refused at that month's answer and no later month is read.
+#[tokio::test]
+async fn a_number_held_in_any_month_of_the_year_is_refused_at_that_month() {
+    for (index, letter) in "123456789xyz".chars().enumerate() {
+        let mut order = ADMISSION_ORDER.replace("e5s5se", "eKsKse");
+        let slot = if letter == '5' { 'K' } else { letter };
+        order = order.replace(&format!("e{slot}s{slot}se"), "eUsUse");
+        assert_eq!(order.matches("eUsUse").count(), 1, "{letter}");
+        let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+        voucher.voucher_number = Some("bp/26-27/01".to_string());
+        let (seen, voucher, requests) = admit_on(pilot_lab_over(&order), voucher).await;
+        assert_eq!(
+            seen,
+            Err(vec![(
+                "invoice_number_already_used",
+                "bp/26-27/01".to_string()
+            )]),
+            "month {letter}"
+        );
+        assert_eq!(
+            requests.len(),
+            order.find("eUsUse").unwrap() + 6,
+            "month {letter}"
+        );
+        assert_eq!(
+            months_sent(&order, &requests),
+            month_shas_paired()[..2 * (index + 1)],
+            "month {letter}"
+        );
+        assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+    }
+}
+
 /// The re-read a post makes before its approval window, and again after it,
 /// is a whole admission (136 requests when it reaches the company's tax units, 142
 /// once the company object is read, which the admitted invoice does).

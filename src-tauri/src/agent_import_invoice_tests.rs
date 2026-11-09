@@ -1631,6 +1631,23 @@ fn a_missing_control_refusal_says_what_the_answer_held() {
     );
 }
 
+/// A date is placed in its month from the month's first day to its last, both
+/// included, for every month of a financial year; a date outside the year is
+/// in none. A control dated on a month's last day is looked for in that month.
+#[test]
+fn every_month_holds_its_first_and_last_day() {
+    let date = |text: &str| bridge_tally_core::TallyDate::parse(text).expect("a YYYYMMDD date");
+    let months = wire::calendar_months(&date("20260401"), &date("20270331")).expect("a year");
+    assert_eq!(months.len(), 12);
+    for (index, (first, last)) in months.iter().enumerate() {
+        assert_eq!(month_holding(&months, first.as_str()), Some(index));
+        assert_eq!(month_holding(&months, last.as_str()), Some(index));
+    }
+    assert_eq!(months[10].1.as_str(), "20270228");
+    assert_eq!(month_holding(&months, "20260331"), None);
+    assert_eq!(month_holding(&months, "20270401"), None);
+}
+
 #[test]
 fn the_book_size_guard_admits_at_each_bound_and_refuses_one_past_it() {
     assert_eq!(voucher_mark_refusal(Some(25_000)), None);

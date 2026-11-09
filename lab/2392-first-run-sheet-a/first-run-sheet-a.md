@@ -14,7 +14,7 @@ Marks used in the result: M = measured by this run; U = not established, say wha
 5. Use **one 64-bit Windows PowerShell window**, not ISE and not the 32-bit shell, so the variables stay set from step to step. Step B0 prints whether the process is 64-bit.
 
 ## Saving output
-Each step below is one block of two parts. The lines before `. { try {` set variables and functions and are pasted as they are; the part from `. { try {` to `} *>&1 | Out-File ...` runs the work and saves everything it prints to the step's file, and a stopping error is caught and written into the file as a line that starts "ERROR:" (otherwise it would reach only the console). To run a step again, first rename its file to `fr2a-B<n>-attempt1.txt` (an `-attemptN` name still matches the search in step B7 and keeps the first result), then paste only the part from `. { try {` on. For B4 that is only the lines from `"files in the program folder:"` on, after setting `$bin` to the right folder; pasting the whole of B4 would make a second scratch folder that B8 does not delete, and `Expand-Archive` fails on files that already exist. Do not use `>` (it writes UTF-16 here) and do not use `Start-Transcript` (its header names the user and the machine).
+Each step below is one block of two parts. The lines before `. { try {` set variables and functions and are pasted as they are; the part from `. { try {` to `} *>&1 | Out-File ...` runs the work and saves everything it prints to the step's file, and a stopping error is caught and written into the file as a line that starts "ERROR:" (otherwise it would reach only the console). To run a step again, first rename its file to `fr2a-B<n>-attempt1.txt` (an `-attemptN` name still matches the search in step B7 and keeps the first result), then paste only the part from `. { try {` to the end of the block. For B4, paste that part without its `Copy-Item` and `Expand-Archive` lines and with `$bin` set to the right folder: the whole of B4 would make a second scratch folder that B8 does not delete, and `Expand-Archive` fails on files that already exist. Do not use `>` (it writes UTF-16 here) and do not use `Start-Transcript` (its header names the user and the machine).
 
 ## The input
 File: `bridge-tally-mcp-v0.7.0-windows-x64.mcpb`, from the download page `https://bridge.complyeaze.com/download.html`, 15,598,419 bytes. Its sha256 is `291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec`, as GitHub's release listing reports it (read on 9 November 2026 with `gh release view mcp-v0.7.0 --json assets`). The release also holds the `.sha256` file (107 bytes) that the install text points at. If the listing shows another name, size or hash on the day, or a newer release is the latest, stop and say so: that is a different test.
@@ -118,7 +118,7 @@ $bin = "$w\unpacked\bin\x86_64-pc-windows-msvc"
   }
 } catch { "ERROR: " + ($_ | Out-String) } } *>&1 | Out-File -Encoding utf8 "$hub\fr2a-B4.txt"
 ```
-If the architecture folder is named differently, list `$w\unpacked`, set `$bin` to the folder that holds `bridge_mcp.exe`, rename the file as in "Saving output", paste only the lines from `"files in the program folder:"` on, and write the difference at the top of the file. This is a copy made by `Expand-Archive`, not the copy Claude Desktop would make, so its Mark of the Web says nothing about the installed one.
+If the architecture folder is named differently, list `$w\unpacked`, set `$bin` to the folder that holds `bridge_mcp.exe`, rename the file as in "Saving output", paste the part from `. { try {` to the end of the block without its `Copy-Item` and `Expand-Archive` lines, and write the difference at the top of the file. If a command in this step reports "Cannot find path" for a file the listing just showed, the file may have been removed by antivirus after the unpack: tell the person who queued this sheet, and put `block: yes, step B4` at the top of the file. This is a copy made by `Expand-Archive`, not the copy Claude Desktop would make, so its Mark of the Web says nothing about the installed one.
 
 ## Step B5. The import table of the unpacked program
 Paste this function first. It is the reader of sheet CRT1, reproduced here so that the sheet is whole; its offsets were checked there by porting the same steps to Python on an older Windows build of the program, and the PowerShell text has to be treated as unrun until this run's file shows it worked. If it errors, the error is the result: copy it and use `dumpbin /dependents` if that is present (do not install it).
@@ -214,8 +214,8 @@ function Invoke-Status([string]$Exe, [string]$Terms, [int]$Port) {
     $replies = @()
     foreach ($n in 1, 2) {
       $task = $p.StandardOutput.ReadLineAsync()
-      if (-not $task.Wait(30000)) { $p.Kill(); $errTask.Wait(2000) | Out-Null; throw ("no reply " + $n + " within 30 s; standard error: " + $(if ($errTask.IsCompleted) { $errTask.Result } else { "not yet read" })) }
-      if ($null -eq $task.Result) { $p.WaitForExit(5000) | Out-Null; $errTask.Wait(2000) | Out-Null; throw ("reply " + $n + ": the output stream closed; " + $(if ($p.HasExited) { "exit code " + $p.ExitCode } else { "process still running" }) + "; standard error: " + $(if ($errTask.IsCompleted) { $errTask.Result } else { "not yet read" })) }
+      if (-not $task.Wait(30000)) { $p.Kill(); $errTask.Wait(2000) | Out-Null; throw ("no reply " + $n + " within 30 s; replies so far: " + ($replies -join " | ") + "; standard error: " + $(if ($errTask.IsCompleted) { $errTask.Result } else { "not yet read" })) }
+      if ($null -eq $task.Result) { $p.WaitForExit(5000) | Out-Null; $errTask.Wait(2000) | Out-Null; throw ("reply " + $n + ": the output stream closed; replies so far: " + ($replies -join " | ") + "; " + $(if ($p.HasExited) { "exit code " + $p.ExitCode } else { "process still running" }) + "; standard error: " + $(if ($errTask.IsCompleted) { $errTask.Result } else { "not yet read" })) }
       $replies += $task.Result
     }
     $sw.Close()
@@ -233,13 +233,14 @@ function Invoke-Status([string]$Exe, [string]$Terms, [int]$Port) {
       if ($r1.error) { "NOTE: the call answered with a protocol error (not the tool's own refusal)" }
       "tool flagged its own answer as an error (isError): " + $r1.result.isError
       $text = ($r1.result.content | ForEach-Object { $_.text }) -join "`n"
-      "tally_status reply, the text a person's assistant is given:"; $text
+      "tally_status text, the words a person's assistant is given:"; ($text -split "`n") | ForEach-Object { "tally_status text| " + $_ }
     } catch { "tally_status reply is not JSON: " + $_.Exception.Message }
   } finally { try { if (-not $p.HasExited) { $p.Kill() } } catch { } }
 }
 $port = 9099
 if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { $port = 9199 }
 $portBusy = [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+$tc = New-Object Net.Sockets.TcpClient; try { $tc.Connect("localhost", $port); $portBusy = $true } catch { } finally { $tc.Close() }   # a refused connection is what we want
 . { try {
   "closed port used: " + $port
   if ($portBusy) { "ERROR: ports 9099 and 9199 both have a listener; nothing was started. Choose another port, set the variable port to it, check it the same way and run this block again." }
@@ -258,9 +259,11 @@ $portBusy = [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAct
 ```
 Everything goes to one file, `fr2a-B7.txt`: the port line, the lock files and the installed extension's data files (name, length, last write time) before and after, both runs (exit line, initialize reply, standard error capped at 4 KB, raw reply, the tool's own error flag and text) and the lock files before and after. A line that starts "ERROR" is a result, not a reason to retry: a start that Windows or an antivirus product stopped appears here as an error from starting the process, and then the block rule (limit 4) applies. To run only B7 again after a mistake in setting up, paste the `. { try {` part alone, so the port choice made above is kept. After all the steps have run, search every output for the words the block rule names:
 ```powershell
-Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|policy|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied' | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
+Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|policy|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied' | Where-Object { $_.Line -notmatch '^(initialize reply:|standard error:|tally_status |block: yes|prompt: |Smart App Control \(|SmartScreenEnabled \(|Status\s*:|StatusMessage\s*:)' } | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
 ```
-Copy what it prints into the note, as `file:line` only. Any hit outside the `tally_status` reply text means `block: yes` at the top of that file, except the two B0 label lines ("Smart App Control (...)" and "SmartScreenEnabled (Explorer)"), which always match and are not a block. A hit only inside the `tally_status` reply text (the program's own words) is not a block. An "ERROR:" line from starting the process is a block whatever the hit says. Do not repeat a call to look again.
+The `Where-Object` leaves out lines that are the program's own words (`initialize reply:`, `standard error:`, and every line that starts `tally_status `), the two fixed B0 labels, the lines you added yourself (`block: yes`, `prompt: `), and the `Status` and `StatusMessage` lines of B3 and B4 (for an unsigned file Windows words that message with "execution policy"; read those two lines in the files, with the indented lines `Format-List` wraps under them, and record them; they are not a block). Any other line it prints means `block: yes` at the top of that file. Any "ERROR:" line in B7 goes to the person who queued this sheet; it is `block: yes` if it comes from starting the process, or if the exit code or the closed output stream shows the process was stopped from outside.
+
+Copy what it prints into the note, as `file:line` only. Do not repeat a call to look again.
 
 ## Step B8. Clean up
 ```powershell

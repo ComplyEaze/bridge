@@ -1,0 +1,51 @@
+== a-s2-N-0010.xml a-s5r-N-0010.xml
+  @@ -11 +11 @@
+  -    <LEDGER>0</LEDGER>
+  +    <LEDGER>22</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>0</CURRENCY>
+  +    <CURRENCY>1</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>0</TAXUNIT>
+  +    <TAXUNIT>2</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>3</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>2</VOUCHER>
+== a-s2-R-0010.xml a-s5r-R-0010.xml
+  @@ -11 +11 @@
+  -    <LEDGER>0</LEDGER>
+  +    <LEDGER>22</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>0</CURRENCY>
+  +    <CURRENCY>1</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>0</TAXUNIT>
+  +    <TAXUNIT>2</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>3</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>2</VOUCHER>
+  @@ -79 +79 @@
+  -     <ALTERID TYPE="Number"> 17</ALTERID>
+  +     <ALTERID TYPE="Number"> 69</ALTERID>
+== a-s2-M-marks.xml a-s5r-M-marks.xml
+  @@ -11 +11 @@
+  -    <LEDGER>0</LEDGER>
+  +    <LEDGER>22</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>0</CURRENCY>
+  +    <CURRENCY>1</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>0</TAXUNIT>
+  +    <TAXUNIT>2</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>3</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>2</VOUCHER>
+  @@ -50 +50 @@
+  -     <ALTVCHID TYPE="Number"> 68</ALTVCHID>
+  +     <ALTVCHID TYPE="Number"> 69</ALTVCHID>

@@ -1,0 +1,41 @@
+== a-s4-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+== a-s4-N-0010.xml: 5604 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'BP/26-27/0010' DATE '20260801' BRIDGEVCHISSALES 'Yes'
+== a-s4-N-0040.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s4-R-0010.xml: 94474 bytes
+  STATUS '1'
+  VOUCHER rows: 1
+   DATE '20260801'
+   VOUCHERNUMBER 'BP/26-27/0010'
+   VOUCHERTYPENAME 'BRIDGE Sales'
+   REFERENCE 'BP/26-27/0010'
+   REFERENCEDATE '20260801'
+   PARTYLEDGERNAME 'BRIDGE Walk-in'
+   PARTYGSTIN ''
+   STATENAME 'Rajasthan'
+   PLACEOFSUPPLY 'Rajasthan'
+   GSTREGISTRATIONTYPE 'Unregistered/Consumer'
+   ISINVOICE 'Yes'
+   ISCANCELLED 'No'
+   ISOPTIONAL 'No'
+   GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b'
+   ALTERID '17'
+   VCHGSTSTATUSISINCLUDED 'Yes'
+   VCHGSTSTATUSISUNCERTAIN 'No'
+   VCHGSTSTATUSISEXCLUDED 'No'
+   ISGSTOVERRIDDEN 'No'
+   ISPOSTDATED 'No'
+   leg 'BRIDGE Walk-in' | 'Yes' | '-1051.00'
+   leg 'BRIDGE Svc 998313 5%' | 'No' | '600.40'
+   leg 'BRIDGE Svc 998314 5%' | 'No' | '400.40'
+   leg 'BRIDGE CGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE SGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE Round Off' | 'No' | '0.16'

@@ -1,0 +1,5 @@
+03:44:34	N-0040.xml	a-s3r-N-0040.xml	curl 0	5608 bytes
+03:44:34	R-0040.xml	a-s3r-R-0040.xml	curl 0	94478 bytes
+03:44:34	N-0010.xml	a-s3r-N-0010.xml	curl 0	5606 bytes
+03:44:35	R-0010.xml	a-s3r-R-0010.xml	curl 0	94476 bytes
+03:44:35	M-marks.xml	a-s3r-M-marks.xml	curl 0	3396 bytes

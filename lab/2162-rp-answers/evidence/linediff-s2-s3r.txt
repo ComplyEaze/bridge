@@ -1,0 +1,48 @@
+== a-s2-N-0010.xml a-s3r-N-0010.xml
+  @@ -11 +11 @@
+  -    <LEDGER>0</LEDGER>
+  +    <LEDGER>11</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>0</CURRENCY>
+  +    <CURRENCY>1</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>0</TAXUNIT>
+  +    <TAXUNIT>1</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>2</VOUCHER>
+== a-s2-R-0010.xml a-s3r-R-0010.xml
+  @@ -11 +11 @@
+  -    <LEDGER>0</LEDGER>
+  +    <LEDGER>11</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>0</CURRENCY>
+  +    <CURRENCY>1</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>0</TAXUNIT>
+  +    <TAXUNIT>1</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>2</VOUCHER>
+== a-s2-M-marks.xml a-s3r-M-marks.xml
+  @@ -11 +11 @@
+  -    <LEDGER>0</LEDGER>
+  +    <LEDGER>11</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>0</CURRENCY>
+  +    <CURRENCY>1</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>0</TAXUNIT>
+  +    <TAXUNIT>1</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>2</VOUCHER>
+  @@ -50 +50 @@
+  -     <ALTVCHID TYPE="Number"> 68</ALTVCHID>
+  +     <ALTVCHID TYPE="Number"> 69</ALTVCHID>

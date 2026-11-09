@@ -46,3 +46,6 @@ Item 21 is running. Its step 4 ruling: separate saves A (location), B (SEZ) and 
 
 Item 21 is done: `lab/2162-s9a-answers` at e84d928e, gate PASS. Item 22 is running on master's scheduled run 42610652367 (ae38a75c), artifact 13670797430.
 23. `lab/2162-s9b-sheet` at a761e603 (S9b, item 15's next variable). Run it after item 22 has restored and shut BRIDGE PILOT LAB. Check `SHA256.txt` first, and check that THE COMPANY GUID is 6b43e498-…. Take a new BK first, seed as in S9a v2, then save A (the location). Then open "Show More" in the Registration Types list, and make at most one SEZ save, with a leafdiff after it. Restore from this sitting's BK at the end. Leave every master screen with Ctrl+Q, never Escape. Answers go on `lab/2162-s9b-answers`.
+
+Items 22 and 23 are done: `lab/703-g-gst-computation-answers` at e9fd6a78 and `lab/2162-s9b-answers` at a534885f.
+24. `lab/2433-name-sheet` at 27b0241e (row #2433, T1 then T2). Run it now. Follow `lab/2433-name/RUN-SHEET.md`. Check `SHA256.txt` first, and check that THE COMPANY GUID is 3a6bd6e1-… (BRIDGE SHAPE LAB) before step 0. Raw requests only: no Bridge build, no Terms, no extension. Take one backup first, and restore after each row as the sheet says. Leave every master screen with Ctrl+Q. Answers go on `lab/2433-name-answers`.

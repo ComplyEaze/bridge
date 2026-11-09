@@ -629,6 +629,62 @@ class MergeGateControls(unittest.TestCase):
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
+    def test_dependabots_signoff_line_in_a_well_formed_commit_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    def test_dependabots_signoff_line_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    def test_dependabots_signoff_line_without_a_final_newline_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer-no-final-newline", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    def test_dependabots_signoff_line_beside_the_public_agent_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-with-agent-trailer", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    def test_dependabots_signoff_line_outside_a_commit_trailer_still_blocks(self):
+        for scenario in (
+            "bot-signoff-in-pr-body",
+            "bot-signoff-in-source-payload",
+            "bot-signoff-nonfooter",
+            "bot-signoff-before-another-paragraph",
+            "bot-signoff-with-malformed-line",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_dependabots_signoff_line_with_another_key_name_or_spelling_still_blocks(self):
+        for scenario in (
+            "bot-signoff-other-key",
+            "bot-signoff-coauthor-key",
+            "bot-signoff-lowercase-key",
+            "bot-signoff-prefixed-key",
+            "bot-signoff-other-name",
+            "bot-signoff-name-case",
+            "bot-signoff-name-with-address",
+            "bot-signoff-double-space",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_dependabots_signoff_line_with_anything_after_the_bracket_or_no_bracket_still_blocks(self):
+        for scenario in (
+            "bot-signoff-extra-payload",
+            "bot-signoff-unclosed",
+            "bot-signoff-trailing-space",
+            "bot-signoff-second-address",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_another_address_under_dependabots_signoff_line_still_blocks(self):
+        self.assert_blocked("bot-signoff-other-address", "customer email shape")
+
+    def test_mixed_line_endings_around_dependabots_signoff_line_still_block(self):
+        self.assert_blocked("bot-signoff-mixed-line-endings", "customer email shape")
+
+    def test_a_customer_trailer_beside_dependabots_signoff_line_still_blocks(self):
+        self.assert_blocked("bot-signoff-with-customer-trailer", "customer email shape")
+
     # -- AI attribution is a note, never a block (owner practice of 25 Oct 2026) ------------
 
     def assert_noted(self, scenario, text):

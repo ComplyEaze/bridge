@@ -7,7 +7,7 @@ answers/a-s3r-C-compliance.xml 40648 B 514251182ea0ddfd4c0ecee912ff7da58f1a823da
 answers/a-s3r-K-rj.xml 34730 B 68e27d7e72ca5ed2cc55f3e9b902052e6e8aa629e79e41bfd449f426a29561a2 (GSTIN shape (the invented GSTINs stay local))
 answers/a-s4r-C-compliance.xml 40656 B f849835796df223390a031ce8ce50a853860897557edc6496a94b5efe5ad3def (GSTIN shape (the invented GSTINs stay local))
 answers/a-s4r-K-rj.xml 35756 B 1fdad219fff2eab1f701d638f5ecc1586cc5262f6d34c5f7b656e7fdd1ea8112 (GSTIN shape (the invented GSTINs stay local))
-answers/a-s5r-C-compliance.xml 41284 B 176fa6421ed99f55c5982a45b579706923b6c4fff4485b12d8147f0bf0a297f4 (GSTIN shape (the invented GSTINs stay local))
+answers/a-s5r-C-compliance.xml 41284 B 176fa6421ed99f55c5982a45b579706923b6c4fff4485b12d8147f0bf0a297f4 (GSTIN shape (the invented GSTINs stay local); published byte for byte by a later commit, see substitutions.txt)
 answers/a-s5r-K-rj.xml 36628 B 78acc2b34eff1e95d79f013095eb0bdcee177eaf24a67c9f522115e14e2230d8 (GSTIN shape (the invented GSTINs stay local))
 answers/a-s9-C-compliance.xml 38278 B 4976bbece519394b53b37b616b169f12d3438b625445d90a3380994393e07216 (GSTIN shape (the invented GSTINs stay local))
 evidence/bk-after-listing.txt 148 B 9b4afd10b2f08b104506382493d58d73ea3a12e3a213b73ee048bd76cfd45475 (folder listing)

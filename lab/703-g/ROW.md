@@ -51,7 +51,7 @@ It decides nothing about TallyPrime 7.1, other books, other screen actions, a GS
    - Unarmed, it forwards each request byte for byte and sends no request of its own. Nothing is ever written to `arm`.
    - Start it before the phase's process and stop it after that process has ended. Start and stop it with `relayrun.py`, the wrapper row 703-C used, which stays on the lab PC: 2014 B, sha256 `4b2718877a98dcb5f366a017e710fb28d1b28eac95de09048209ea03a1674a7c`, as `lab/703-c-answers/kept-local.txt` lists it. Check its hash first; another hash = STOP. It sends Ctrl+C to the relay's own console, then opens and closes one connection to 9002 with no byte sent (`lab/703-c-answers` RESULTS.md, deviation 1). EXPECT the relay's exit code 3221225786 (0xC000013A, the Ctrl+C exit). A plain Ctrl+C does not stop the relay, because it waits in `accept()`. Never kill it.
    - Record that neither `relay.jsonl` holds a `front_send`, `bridge_cut`, `tally_closed` or `relay_error` record, except a `relay_error` after the last answer, which `compare.py` prints as teardown.
-4. **Processes.** One stdio process per phase, P1 for step 3, P2 for step 7 and P3 for step 9, each with `BRIDGE_TALLY_PORT=9002` (the relay) and its own `BRIDGE_AGENT_DATA_DIR`: `C:\bridge-lab\703-g\data-p1`, `...\data-p2` and `...\data-p3`. One more process, PB, is started after the backup with `BRIDGE_TALLY_PORT=9001` (no relay) and `...\data-pb`, for step 5's one marks read only. Each data folder is listed first: absent or empty, else STOP. All four take `BRIDGE_TALLY_HOST=127.0.0.1` and `BRIDGE_TERMS_ACCEPTED=true` (allowed for the lab on 25 Oct 2026), with redaction, `BRIDGE_AGENT_MAX_BYTES` and `BRIDGE_AGENT_MAX_ROWS` unset and writes off. Each is ended by its stop file, never by killing it; record its exit code and error stream. The stdio client records, for each call, the UTC time it was written and the time its answer was read, to the millisecond.
+4. **Processes.** One stdio process per phase, P1 for step 3, P2 for step 7 and P3 for step 9, each with `BRIDGE_TALLY_PORT=9002` (the relay) and its own `BRIDGE_AGENT_DATA_DIR`: `C:\bridge-lab\703-g\data-p1`, `...\data-p2` and `...\data-p3`. One more process, PB, is started after the backup with `BRIDGE_TALLY_PORT=9001` (no relay) and `...\data-pb`, for step 5's `list_companies` and one marks read only. Each data folder is listed first: absent or empty, else STOP. All four take `BRIDGE_TALLY_HOST=127.0.0.1` and `BRIDGE_TERMS_ACCEPTED=true` (allowed for the lab on 25 Oct 2026), with redaction, `BRIDGE_AGENT_MAX_BYTES` and `BRIDGE_AGENT_MAX_ROWS` unset and writes off. Each is ended by its stop file, never by killing it; record its exit code and error stream. The stdio client records, for each call, the UTC time it was written and the time its answer was read, to the millisecond.
 5. **Screens.** During each `vouchers` call, a screenshot of Tally's whole window at about 10 s after it is sent, by screen capture only (no click, no focus change, no key in Tally). A dialog there is C7. `vouchers` and `gst_status` on this book through this build are NEW SHAPES under C3, so a screenshot follows each before the next request.
 6. **After a refusal.** A refusal of any code is a result, not a STOP: record its code, cause and next step text whole, and carry on with the phase. After a refusal for a deadline (`request_deadline_exceeded`, or any cause that names a time), wait 180 s with a screenshot every 30 s, then ONE `GET /status` to 9001 (C3's 10-minute rule applies) and record how long it took. A refused call is still a position in `compare.py`'s comparison. A call refused in one phase and answered in the other is row 2.
 7. **One Tally.** At step 0 and at the end, C2 a and b apply: exactly one `tally.exe`, and it owns port 9001. The relay owns 9002 while it runs, and nothing else does.
@@ -64,7 +64,7 @@ It decides nothing about TallyPrime 7.1, other books, other screen actions, a GS
    - It is answered Y only after a screenshot shows it, and only if its text is that sentence, word for word, with any count in place of <n>. Record the count.
    - Any other text, a second prompt, or any other dialog: C7 (screenshot, no key, report).
 
-C2 d as applied: step 0 runs with no company loaded, and its MARKS read is met by step 3's `ledger_masters`. C5's "one MARKS read" after the backup is step 5's PB read (MB). Licensed mode only; Education mode = STOP.
+C2 d as applied: step 0 runs with no company loaded, and its MARKS read is met by step 3's `ledger_masters`. C5's "one MARKS read" after the backup is step 5's PB read (MB). C6's "MARKS first" after the restore is met by the first `ledger_masters` of Phase RESTORED, which follows only `tools/list` and the `list_companies` the tool needs for its GUID. Licensed mode only; Education mode = STOP.
 
 ## Build
 `bridge_mcp.exe` from the `unsigned-bundle-smoke-windows-latest` artifact of the CI run of the newest master push before the sitting, at or after ae38a75c. The run coordinator sends the commit, the run, the artifact id and the exe's sha256 with this sheet; record all four before step 0. Copy the exe to `C:\bridge-lab\703-g\bin\bridge_mcp.exe`. Hash it before the first call and after the last: another sha256 = STOP.
@@ -78,7 +78,7 @@ C2 d as applied: step 0 runs with no company loaded, and its MARKS read is met b
 2. (P1) `list_companies`: EXPECT exactly THE COMPANY by its GUID, `identity_state` `verified_tuple`; record `books_from`. Another GUID = STOP (row 1).
 3. **Phase BEFORE** (P1, rule 2). For each call record the whole time, the answer whole, and `isError`. From `ledger_masters`, record the marks: M0 is the first read and M1 the last. From `vouchers`, record `result.total` and the `snapshot` block. From each `gst_status`, record `result.total`, `result.counts` and `result.state`. Then `egress_log` with `limit` 50, saved whole. Stop P1, then stop the relay (rule 3).
 4. M1: EXPECT equal to M0 (the phase did not change the book). Else STOP: the book moved under reads alone.
-5. **BK-703-G** by C5, to the new empty local folder `C:\bridge-lab\703-g\bk`, with THE COMPANY loaded. Record the file's name, bytes and sha256, and the backup's time to the minute. Then start PB (rule 4), `ledger_masters` basic only: MB. Stop PB. MB: EXPECT equal to M1, else STOP: the backup moved a mark.
+5. **BK-703-G** by C5, to the new empty local folder `C:\bridge-lab\703-g\bk`, with THE COMPANY loaded. Record the file's name, bytes and sha256, and the backup's time to the minute. Then start PB (rule 4), `list_companies` (EXPECT THE COMPANY by its GUID, else STOP), then `ledger_masters` basic: MB. Stop PB. MB: EXPECT equal to M1, else STOP: the backup moved a mark.
 6. **The screen action** (rules 8 and 9), only once step 5 has recorded the backup's sha256 and MB equal to M1.
    1. Alt+G, `GST Annual Computation`; a screenshot of the Go To list; Enter only if its highlighted row reads `GST Annual Computation`, else press no key, screenshot, STOP and report (rule 8).
    2. Screenshot the prompt, then press Y.
@@ -87,7 +87,7 @@ C2 d as applied: step 0 runs with no company loaded, and its MARKS read is met b
    5. If no prompt appeared and the report opened, record that (row 3): press Escape once, screenshot the Gateway, and go on.
 7. **Phase AFTER.** Start the relay into `after`, start P2, then `tools/list` (saved whole) and `list_companies`. Then the same phase as step 3, with the same records. M2 is its first marks read and M3 its last. Then `egress_log` with `limit` 50. Stop P2, then stop the relay.
 8. `python -I compare.py C:\bridge-lab\703-g\before C:\bridge-lab\703-g\after`: record every line it prints and its exit code. Every Tally request P1 sends lands in `before` and every one P2 sends lands in `after`, steps 1 and 2 and 7's opening calls included. The comparison by position relies on two fresh processes making the same calls sending the same requests in the same order. If they do not, `compare.py` exits 1 (row 2). Also record, for each `gst_status` call, whether `result.counts` and the `items` (each as JSON, sorted) are equal across the phases, with the first difference if they are not. Do the same for `vouchers`' `result` rows. Fields outside the rows (times, ids, `read_cost`) are not compared.
-9. **Restore BK-703-G** by C6 (the plan, the listings before and after, Replace). Load THE COMPANY alone and take C6's two screenshots. Then **Phase RESTORED**: start the relay into `restored`, start P3, then `tools/list` (saved whole) and `list_companies`. Then the same phase as step 3, with the same records. M4 is its first marks read and M5 its last: EXPECT both equal to M0. Then `egress_log` with `limit` 50. Stop P3, then stop the relay. Then `python -I compare.py C:\bridge-lab\703-g\before C:\bridge-lab\703-g\restored`: record its lines and exit code, EXPECT 0. Marks not equal to M0, or exit 4, = STOP and report: the book is not back as Bridge read it before (C8). Exit 1 = report it; the restore is then proved by the marks alone, and RESULTS.md says so. Hash the exe. LAB-COMMON C10: a screenshot at the Gateway with the current date unchanged; Company > Shut; Select Company with none loaded; one `tally.exe`; 9001 LISTENING; nothing on 9002; `GET /status` 200.
+9. **Restore BK-703-G** by C6 (the plan, the listings before and after, Replace). Load THE COMPANY alone and take C6's two screenshots. Then **Phase RESTORED**: start the relay into `restored`, start P3, then `tools/list` (saved whole) and `list_companies`. Then the same phase as step 3, with the same records. M4 is its first marks read and M5 its last: EXPECT both equal to M0. Then `egress_log` with `limit` 50. Stop P3, then stop the relay. Then `python -I compare.py C:\bridge-lab\703-g\before C:\bridge-lab\703-g\restored`: record its lines and exit code, EXPECT 0. Marks not equal to M0, or exit 4, = STOP and report: the book is not back as Bridge read it before (C8). Exit 1 = STOP and report: the restore is not proved. Hash the exe. LAB-COMMON C10: a screenshot at the Gateway with the current date unchanged; Company > Shut; Select Company with none loaded; one `tally.exe`; 9001 LISTENING; nothing on 9002; `GET /status` 200.
 10. Notes, the pre-push scan and the evidence commit (Keep). Send its sha to the run coordinator; push on its yes.
 
 STOP RULES:
@@ -97,7 +97,7 @@ STOP RULES:
 - Ctrl+Q or Escape at the Gateway.
 - An exe sha256 not the one named.
 - Anything written to `arm`.
-- A restore that does not bring the marks back to M0, or after which `compare.py` (before, restored) exits 4.
+- A restore that does not bring the marks back to M0, or after which `compare.py` (before, restored) does not exit 0.
 
 ## What to report
 | step | result |
@@ -105,11 +105,11 @@ STOP RULES:
 | build: commit, run, artifact id, exe sha256 before and after | |
 | steps 1 to 2: tools, company | |
 | phase BEFORE: M0, M1; `vouchers` total and time; each `gst_status` total, counts, state | |
-| BK-703-G: file, bytes, sha256, time | |
+| BK-703-G: file, bytes, sha256, time; MB | |
 | step 6: the prompt's text and count, Y or not; the report's period and three counts | |
 | phase AFTER: M2, M3; the same records as BEFORE | |
 | `compare.py`: its lines and exit code; the `gst_status` items and `vouchers` rows equal or not | |
-| relay: no `front_send`, `bridge_cut`, `tally_closed` or `relay_error` before the last answer, in either folder | |
+| relay: no `front_send`, `bridge_cut`, `tally_closed` or `relay_error` before the last answer, in any of the three folders | |
 | restore: plan, listings; M4, M5; `compare.py` (before, restored) lines and exit code; close | |
 | any dialog, skip or deviation | |
 

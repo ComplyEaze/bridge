@@ -3298,20 +3298,23 @@ fn a_resolved_code_is_warned_about_and_an_unresolved_one_refused() {
 }
 
 /// The divergent invoice's next step must not promise that saving the invoice again repairs it.
-/// What it says a later verification does with a re-saved invoice is row 2162-RS's, PARTIAL (one
-/// run): an unchanged save kept the GUID and MASTERID and moved only the AlterID and fields the
-/// read-back does not read, and a verification judges the invoice on the fields the build wrote
-/// (ADR 0004, the 2026-10-31 checklist, item 8; the re-save test below pins it on those bytes).
+/// What it says of a re-saved invoice is row 2162-RS's, PARTIAL (one run, an invoice that had read
+/// back as built): an unchanged save kept the GUID and MASTERID and moved, of the fields read,
+/// only the AlterID and fields the read-back fetches and does not compare. It says that a save of
+/// an invoice that read back divergent was not tried (ADR 0004, the 2026-10-31 checklist, item 8;
+/// the re-save test below pins it on those bytes).
 #[test]
 fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
     let text = crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP;
     assert!(!text.contains("then open the invoice and save it again"));
     assert!(!text.contains("has not been established"));
     assert!(text.contains(
-        "Saving an invoice again in Tally, unchanged, kept its identity on a test company and \
-         changed only its AlterID and fields this check does not read"
+        "Saving an invoice that had read back as built again in Tally, unchanged, kept its \
+         identity on a test company (one run) and changed, of the fields read, only its AlterID \
+         and fields this check does not compare; a later verification judges an invoice on the \
+         fields it compares. That was not tried on an invoice that read back divergent."
     ));
-    assert!(text.contains("so it reads confirmed only when they match what was built."));
+    assert!(!text.contains("on the fields ComplyEaze Bridge wrote"));
     assert!(text.ends_with("Do not post it again."));
 }
 
@@ -3334,15 +3337,16 @@ fn read_one(xml: &str) -> wire::ReadInvoice {
     }
 }
 
-/// The save moved the AlterID and filled two leg fields, and the read-back reads neither of those
-/// fields, so the invoice reads back as built on both reads. Its identity check compares the
+/// The save moved the AlterID and filled two leg fields, which the read-back fetches and does not
+/// compare, so the invoice reads back as built on both reads. Its identity check compares the
 /// read-back with the voucher the same verification matched, which the save moved too, so it
-/// agrees. A field the read-back compares, changed, still reads divergent. ADR 0004, the
+/// agrees. A field the read-back compares, changed, still reads divergent: a header field and a leg's
+/// amount. ADR 0004, the
 /// 2026-10-31 checklist, item 8: PARTIAL, one run.
 #[test]
 fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id() {
     let (before_xml, after_xml) = (utf16le(RESAVE_BEFORE), utf16le(RESAVE_AFTER));
-    // What the save changed in the bytes: two leg fields the read-back does not read.
+    // What the save changed in the bytes: two leg fields the read-back fetches and does not compare.
     assert!(!before_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
     assert!(after_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
     assert_eq!(before_xml.matches("<RATEOFINVOICETAX.LIST").count(), 0);
@@ -3359,7 +3363,7 @@ fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id()
     assert_eq!(alter_id(&mut after).as_deref(), Some("70"));
     assert_eq!(
         before, after,
-        "the read-back reads nothing else that the save changed"
+        "the read-back's parse keeps nothing else the save changed"
     );
     // Both reads are the invoice as built.
     let built = pilot_posted("BP/26-27/0057");
@@ -3392,6 +3396,14 @@ fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id()
     assert_eq!(
         invoice_readback_differences(&built, &read_one(&changed), "20260801"),
         vec!["REFERENCE"]
+    );
+    // And a leg: one sales leg's amount, changed by a paisa.
+    let amount = "<AMOUNT>600.40</AMOUNT>";
+    assert_eq!(after_xml.matches(amount).count(), 1);
+    let leg_changed = after_xml.replacen(amount, "<AMOUNT>600.41</AMOUNT>", 1);
+    assert_eq!(
+        invoice_readback_differences(&built, &read_one(&leg_changed), "20260801"),
+        vec!["legs"]
     );
 }
 

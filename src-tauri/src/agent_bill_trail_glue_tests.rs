@@ -447,6 +447,15 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             Some(&crate::agent::PlannedReads {
                 needed_at_least: needed,
                 allowed: 2,
+                // The refusal is decided from the census: its three vouchers on
+                // one day are more than the two one-voucher requests allowed
+                // carry (#2372).
+                certainly_refused: Some(crate::agent::CertainlyRefused {
+                    from: chrono::NaiveDate::from_ymd_opt(2026, 8, 1).unwrap(),
+                    to: chrono::NaiveDate::from_ymd_opt(2026, 8, 1).unwrap(),
+                    vouchers_counted: 3,
+                    vouchers_allowed_at_most: 2,
+                }),
             }),
             "{code}"
         );

@@ -366,14 +366,8 @@ fn private_dir(dir: &std::path::Path) -> Result<(), String> {
 }
 
 fn write_private_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
-    fs::write(path, bytes).map_err(|_| "lab_evidence_write_failed".to_string())?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-            .map_err(|_| "lab_evidence_write_failed".to_string())?;
-    }
-    Ok(())
+    super::local_file::write_private_file(path, bytes)
+        .map_err(|_| "lab_evidence_write_failed".to_string())
 }
 
 /// A `post_read` that additionally persists the exchange (§ above) before

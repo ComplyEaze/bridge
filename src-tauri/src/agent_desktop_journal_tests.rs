@@ -252,7 +252,7 @@ fn service_debiting(
     if line.on_account_approved.is_none() {
         // A record from before the bill-wise field had the older fields: the
         // post reaches its bill-wise check only past theirs.
-        line.ledger_identities = Some(Vec::new());
+        line.binding = LedgerBinding::bound(Some(Vec::new()));
         line.cash_in_hand_ledgers = Some(Vec::new());
     }
     super::super::ensure_private_directory(&root).unwrap();
@@ -376,6 +376,74 @@ async fn a_saved_journal_refused_for_its_text_says_to_build_it_again() {
     );
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, the desktop's post is refused before approval with a message of its
+/// own: what was found, where to post from, and to move or delete neither folder.
+#[tokio::test]
+async fn a_journal_beside_a_second_journal_says_where_to_post_from() {
+    use super::split_journal::{tests::layout, REFUSED_MESSAGE};
+    let at = layout();
+    std::fs::write(
+        at.copy.join(super::local_data::JOURNAL_FILE),
+        super::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let result = post_with_journals_at(&at).await;
+    assert_eq!(result["error"]["message"], REFUSED_MESSAGE, "{result}");
+}
+
+/// A post refused because no second journal could be told apart says so, not where to post
+/// from: there is no other copy known to post from (#2233). This service's response budget
+/// drops the cause from the answer, and the message still follows it.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_journal_with_no_second_journal_known_names_no_copy_to_post_from() {
+    use super::split_journal::{tests::layout, REFUSED_MESSAGE};
+    let at = layout();
+    std::fs::remove_dir_all(at.local.join("Packages")).unwrap();
+    std::fs::write(at.local.join("Packages"), b"not a folder").unwrap();
+    let result = post_with_journals_at(&at).await;
+    let message = result["error"]["message"].as_str().unwrap();
+    assert_ne!(message, REFUSED_MESSAGE, "{result}");
+    assert!(message.contains("Restart this computer"), "{result}");
+}
+
+/// A saved batch posted from `at`'s data folder and refused for its journals, before approval.
+async fn post_with_journals_at(at: &super::split_journal::tests::Layout) -> Value {
+    use super::split_journal::{IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA};
+    // Made again, private, by the service.
+    std::fs::remove_dir(&at.data).unwrap();
+    let (service, mut line) = service(at.data.clone());
+    line.batch_id = "bridge-00000000-0000-4000-8000-000000000002".into();
+    line.binding = LedgerBinding::bound(Some(Vec::new()));
+    line.cash_in_hand_ledgers = Some(Vec::new());
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(xml.as_bytes());
+    service
+        .server
+        .append_import_ledger_while_admitted(&line)
+        .unwrap();
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        &xml,
+    )
+    .unwrap();
+    let operation = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            service.post(&line.batch_id, &line.sha256, &line.company_guid),
+        )
+        .await;
+    let result = operation.result["result"].clone();
+    assert_eq!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{result}");
+    assert_eq!(result["attempt_recorded"], false, "{result}");
+    result
+}
+
 /// A Journal whose approval window is too large to show whole is refused with a
 /// message that says what that means and what to do, not that no attempt was
 /// recorded and to review the error (#1780).
@@ -384,7 +452,7 @@ async fn a_journal_whose_approval_window_is_too_large_says_so() {
     let directory = tempfile::tempdir().unwrap();
     let (service, mut line) = service(directory.path().join("agent"));
     line.batch_id = "bridge-00000000-0000-4000-8000-000000000004".into();
-    line.ledger_identities = Some(Vec::new());
+    line.binding = LedgerBinding::bound(Some(Vec::new()));
     line.cash_in_hand_ledgers = Some(Vec::new());
     let leg = |side: &str, amount: &str| {
         serde_json::from_value::<ImportEntry>(json!({"ledger":"Cash","amount":amount,"side":side}))

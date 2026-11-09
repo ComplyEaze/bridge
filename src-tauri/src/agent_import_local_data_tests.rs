@@ -11,7 +11,7 @@ fn write(path: &Path, bytes: &[u8]) {
 }
 
 /// A minimal journal: one built batch, optionally sent.
-fn journal(sent: bool) -> Vec<u8> {
+pub(in crate::agent::agent_import) fn journal(sent: bool) -> Vec<u8> {
     let line: super::super::ImportLedgerLine = serde_json::from_value(serde_json::json!({
         "batch_id":"b1","company_guid":"synthetic-guid","company":null,
         "txn_ids":["txn"],"date_from":"20260901","date_to":"20260901",
@@ -19,8 +19,8 @@ fn journal(sent: bool) -> Vec<u8> {
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn","date":"20260901","voucher_type":"Journal",
             "narration":"n","reference":null,"voucher_number":null,"entries":[
-                {"ledger":"Cash","amount":"1","side":"Dr"},
-                {"ledger":"Synthetic Ledger","amount":"1","side":"Cr"}]}]
+                {"ledger":"Cash","amount":"1.00","side":"Dr"},
+                {"ledger":"Synthetic Ledger","amount":"1.00","side":"Cr"}]}]
     }))
     .unwrap();
     let mut bytes = serde_json::to_vec(&line).unwrap();
@@ -290,6 +290,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -305,6 +306,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 1
         })
     );
@@ -325,6 +327,7 @@ fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
         unsettled_reviewed: 0,
         unsettled_restored: 0,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -598,17 +601,34 @@ fn a_listing_past_its_cap_says_so() {
 /// without regard to letter case; another folder is not.
 #[test]
 fn a_folder_is_matched_under_local_app_data_without_regard_to_case() {
-    let base = Path::new("/srv/Profile/AppData/Local");
+    // an absolute base on each platform (Windows needs a drive)
+    let root = if cfg!(windows) { "C:\\" } else { "/" };
+    let base = PathBuf::from(root)
+        .join("srv")
+        .join("Profile")
+        .join("AppData")
+        .join("Local");
+    let lower = PathBuf::from(base.display().to_string().to_lowercase());
     assert_eq!(
-        relative_to(base, Path::new("/srv/profile/appdata/local/Bridge/agent")),
+        relative_to(&base, &lower.join("Bridge").join("agent")),
         Some(PathBuf::from("Bridge").join("agent"))
     );
+    let sibling = base.parent().unwrap().join("LocalLow").join("Bridge");
+    assert_eq!(relative_to(&base, &sibling), None);
+    assert_eq!(relative_to(&base, base.parent().unwrap()), None);
+    assert_eq!(relative_to(&base, &base), Some(PathBuf::new()));
+    // a remainder that climbs out of the base, or a base that is not absolute,
+    // names no folder inside it
+    assert_eq!(relative_to(&base, &base.join("Bridge").join("..")), None);
     assert_eq!(
-        relative_to(base, Path::new("/srv/Profile/AppData/LocalLow/Bridge")),
+        relative_to(&base, &base.join("..").join("..").join("Bridge")),
         None
     );
-    assert_eq!(relative_to(base, Path::new("/srv/Profile")), None);
-    assert_eq!(relative_to(base, base), Some(PathBuf::new()));
+    assert_eq!(relative_to(Path::new(""), &base), None);
+    assert_eq!(
+        relative_to(Path::new("Local"), &Path::new("Local").join("Bridge")),
+        None
+    );
 }
 
 /// `package_copies` finds a copy of a data folder whose `%LOCALAPPDATA%` part
@@ -633,6 +653,11 @@ fn package_copies_match_without_regard_to_case() {
         serde_json::json!([copy.display().to_string()])
     );
     assert_eq!(package_copies(&base, &base), "not_under_local_app_data");
+    // a folder spelled with `..` below the base is not a package copy's name
+    assert_eq!(
+        package_copies(&base, &base.join("Bridge").join("..")),
+        "not_under_local_app_data"
+    );
 }
 
 /// A data folder that is a link (a folder moved to another disk) is followed,
@@ -656,8 +681,9 @@ fn a_data_folder_that_is_a_link_is_still_located() {
     assert_eq!(shown["folder_file_locations"]["files"], 1, "{shown}");
 }
 
-/// The report follows no link: a linked lease folder is not entered, and a
-/// linked journal's target is not resolved.
+/// A lease folder that is itself a link is not entered, and a journal file
+/// that is itself a link is not resolved; a link above them is followed (see
+/// `a_data_folder_that_is_a_link_is_still_located`).
 #[cfg(unix)]
 #[test]
 fn a_link_is_not_followed_for_a_path_shown() {
@@ -878,6 +904,98 @@ fn a_half_written_last_line_is_read_again_once() {
         Journal::Read(_)
     ));
     assert!(!waited);
+}
+
+/// A line whose amount is not an import amount (#1872) is a line the report cannot read: the
+/// journal is shown as invalid, as for any other record the build refuses, and it is read twice
+/// before it is said.
+#[test]
+fn a_journal_line_with_a_signed_amount_is_shown_as_invalid() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let whole = String::from_utf8(journal(true)).unwrap();
+    assert_eq!(whole.matches("\"amount\":\"1.00\"").count(), 2, "{whole}");
+    write(
+        &path,
+        whole
+            .replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1)
+            .as_bytes(),
+    );
+    let mut waited = false;
+    assert_eq!(
+        read_journal(directory.path(), || waited = true),
+        Journal::NotRead(JOURNAL_INVALID)
+    );
+    assert!(waited);
+}
+
+/// A line whose ledger binding disagrees with its cash projection is refused by its own code
+/// (#1761), and the report shows it as it shows an invalid line, naming that line.
+#[test]
+fn the_report_names_the_line_of_a_binding_that_disagrees_with_its_projection() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let first = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| first.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    assert_eq!(first.matches("\"vouchers\":").count(), 1, "{first}");
+    let projection = format!(
+        "\"cash_projection\":{{\"ledgers\":[\"Cash\"],\"from\":\"20260901\",\
+         \"to\":\"20270331\",\"book_sha256\":\"{}\"}},\"vouchers\":",
+        "0".repeat(64)
+    );
+    let bad = with_id("b2").replacen("\"vouchers\":", &projection, 1);
+    let journal_text = format!("{first}{bad}{}", with_id("b3"));
+    assert_eq!(
+        super::super::ledger::settlement(std::io::Cursor::new(journal_text.as_bytes())).map(drop),
+        Err(super::super::IMPORT_LEDGER_BINDING_MISMATCH.to_string())
+    );
+    write(&path, journal_text.as_bytes());
+    assert_eq!(
+        read_journal_at(directory.path(), || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(2))
+    );
+}
+
+/// The report names the line it refused, and only the report does (#1872). A bad amount sits
+/// between two good lines; the field is the 1-based line, and a journal that reads has none.
+/// A half-written last line is named too: it is the line after the last whole one.
+#[test]
+fn the_report_names_the_line_of_a_bad_amount_between_two_good_ones() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let first = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| first.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    let bad = with_id("b2").replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1);
+    write(&path, format!("{first}{bad}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert_eq!(report.journal, Journal::NotRead(JOURNAL_INVALID));
+    assert_eq!(report.journal_line, Some(2));
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(shown["journal"]["state"], "not_read");
+    assert_eq!(shown["journal"]["reason"], "journal_invalid");
+    assert_eq!(shown["journal"]["line"], 2);
+    // Without the bad line the journal reads and names no line.
+    write(&path, format!("{first}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert!(matches!(report.journal, Journal::Read(_)), "{report:?}");
+    assert_eq!(report.journal_line, None);
+    assert!(to_json(&report, SystemTime::now(), None)["journal"]["line"].is_null());
+    // A half-written last line is the line after the last whole one.
+    let mut cut = format!("{first}{}", with_id("b3")).into_bytes();
+    cut.extend_from_slice(b"{\"record_type\":\"dispat");
+    write(&path, &cut);
+    assert_eq!(
+        read_journal_at(directory.path(), || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(3))
+    );
+    // Another reason a journal is not read names no line.
+    let missing = tempfile::tempdir().unwrap();
+    assert_eq!(
+        read_journal_at(missing.path(), || {}),
+        (Journal::Absent, None)
+    );
 }
 
 /// A folder that exists but cannot be listed is named, not read as empty. A file
@@ -1223,6 +1341,7 @@ fn a_reviewed_batch_is_its_own_class_of_unsettled_batch() {
         unsettled_reviewed: 1,
         unsettled_restored: 0,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -1248,6 +1367,7 @@ fn restored_posts_are_their_own_class_of_unsettled_batch() {
         unsettled_reviewed: 0,
         unsettled_restored: 2,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -1272,10 +1392,37 @@ fn a_settled_batch_is_reported_outside_not_settled() {
         unsettled_reviewed: 0,
         unsettled_restored: 0,
         settled_by_person: 2,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
     assert_eq!(journal["not_settled"], 3);
     assert_eq!(journal["settled_by_person"], 2);
+    assert_eq!(journal["not_settled_not_verified"], 1);
+}
+
+/// A restored batch whose rows a person released is reported in its own
+/// count, outside `not_settled` and `not_settled_restored` (#1038).
+#[test]
+fn a_released_batch_is_reported_outside_not_settled() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 4,
+        sent_or_found: 4,
+        unsettled: 2,
+        unsettled_no_response: 0,
+        unsettled_binding_refused: 0,
+        unsettled_reviewed: 0,
+        unsettled_restored: 1,
+        settled_by_person: 0,
+        released_by_person: 2,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 2);
+    assert_eq!(journal["not_settled_restored"], 1);
+    assert_eq!(journal["released_by_person"], 2);
+    assert_eq!(journal["settled_by_person"], 0);
     assert_eq!(journal["not_settled_not_verified"], 1);
 }

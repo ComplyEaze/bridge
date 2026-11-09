@@ -57,9 +57,9 @@ const DIRECT_EXPENSES_GROUP: &str = "Direct Expenses";
 const DIRECT_INCOMES_GROUP: &str = "Direct Incomes";
 const INDIRECT_EXPENSES_GROUP: &str = "Indirect Expenses";
 const INDIRECT_INCOMES_GROUP: &str = "Indirect Incomes";
-const CREDIT_BALANCE_GROUPS: [&str; 3] =
+pub(crate) const CREDIT_BALANCE_GROUPS: [&str; 3] =
     [SALES_GROUP, DIRECT_INCOMES_GROUP, INDIRECT_INCOMES_GROUP];
-const PL_GROUPS: [&str; 6] = [
+pub(crate) const PL_GROUPS: [&str; 6] = [
     SALES_GROUP,
     PURCHASE_GROUP,
     DIRECT_EXPENSES_GROUP,

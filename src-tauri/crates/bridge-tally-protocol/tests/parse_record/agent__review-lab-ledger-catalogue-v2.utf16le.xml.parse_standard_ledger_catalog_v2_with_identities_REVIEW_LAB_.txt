@@ -1,0 +1,44 @@
+# fixture: tests/fixtures/agent/review-lab-ledger-catalogue-v2.utf16le.xml
+# parser: parse_standard_ledger_catalog_v2_with_identities(REVIEW LAB)
+# source: captured
+Ok(StandardLedgerCatalogV2 {
+    catalog: StandardLedgerCatalog {
+        entries: [
+            StandardLedgerCatalogEntry {
+                name: "Cash",
+                stored_name: None,
+                aliases: [],
+                guid: "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000001f",
+                parent: Some(
+                    "Cash-in-Hand",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Profit & Loss A/c",
+                stored_name: None,
+                aliases: [],
+                guid: "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000001e",
+                parent: Some(
+                    "�#4; Primary",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Test Expense B",
+                stored_name: None,
+                aliases: [],
+                guid: "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000cd",
+                parent: Some(
+                    "Indirect Expenses",
+                ),
+                parent_unsupported: false,
+            },
+        ],
+    },
+    flags: [
+        Off,
+        Off,
+        Off,
+    ],
+})

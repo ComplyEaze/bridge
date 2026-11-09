@@ -1,0 +1,21 @@
+# fixture: stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml
+# parser: parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(114),
+        "amounts": Array [],
+        "cancelled": Bool(false),
+        "date": String("20260513"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000057"),
+        "is_invoice": Bool(false),
+        "master_id": String("87"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("Chem Supplier 1"),
+        "post_dated": Bool(false),
+        "stock_lines_not_read": Bool(true),
+        "voucher_number": String("1"),
+        "voucher_type": String("Receipt Note"),
+    },
+])

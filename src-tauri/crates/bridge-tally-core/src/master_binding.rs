@@ -2045,6 +2045,39 @@ pub fn canonical_master_key(name: &str) -> String {
     out
 }
 
+/// The keys of one name for deciding whether Tally might take two names for one
+/// master, computed once per name. The one rule for two names Bridge would
+/// write together (a batch) or hold against each other (open dispatches).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MasterNameKeys {
+    canonical: String,
+    twin: [String; 3],
+    letters_and_digits: String,
+}
+
+impl MasterNameKeys {
+    pub fn of(name: &str) -> Self {
+        Self {
+            canonical: canonical_master_key(name),
+            twin: twin_fold_keys(name),
+            letters_and_digits: letters_and_digits_key(name),
+        }
+    }
+
+    /// Two names may be one master when they agree on either key the master name
+    /// index matches on, or on any `twin_fold_keys` fold in any position. The
+    /// index's `absence_key` is twin key 2, so the twin comparison covers it;
+    /// the canonical key is compared on its own, because lowercasing and NFC do
+    /// not commute and a name can agree on it and on no twin key. The index's
+    /// letters-and-digits key is compared too, so two names in one batch that
+    /// differ only by a space or a symbol are refused as the book check would.
+    pub fn may_be_one_master(&self, other: &Self) -> bool {
+        self.canonical == other.canonical
+            || self.letters_and_digits == other.letters_and_digits
+            || self.twin.iter().any(|key| other.twin.contains(key))
+    }
+}
+
 /// A historical candidate index, retained for deterministic ordering.
 ///
 /// It may be broader than qualified gateway measurements and cannot resolve a

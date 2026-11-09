@@ -1,0 +1,11 @@
+# fixture: tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-company-object.utf16le.xml
+# parser: admit_audit_company_part(BRIDGE SFT LAB)
+# source: captured
+Ok(AuditCompanyPart {
+    name: "BRIDGE SFT LAB",
+    guid: "00f0c618-b0df-43bd-bd69-b4c7b92c616f",
+    books_from_yyyymmdd: "20250401",
+    is_integrated: Some(
+        "No",
+    ),
+})

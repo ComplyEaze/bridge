@@ -1,0 +1,8 @@
+# fixture: tests/fixtures/stock_group_census_slice_stock_lab_0_300_live.utf16le.xml
+# parser: parse_stock_group_census_slice(max 300)
+# source: captured
+Ok([
+    "1edb9b05-8d35-4c0c-9959-dce655730463-000000de",
+    "1edb9b05-8d35-4c0c-9959-dce655730463-000000e3",
+    "1edb9b05-8d35-4c0c-9959-dce655730463-000000d2",
+])

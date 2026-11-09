@@ -390,10 +390,7 @@ fn content_differences(voucher: &ImportVoucher, row: &ReadVoucher) -> Vec<&'stat
         .entries
         .iter()
         .map(|entry| {
-            let signed = match entry.side {
-                EntrySide::Dr => format!("-{}", entry.amount),
-                EntrySide::Cr => entry.amount.clone(),
-            };
+            let signed = entry.amount.signed_lexeme(&entry.side);
             canonical_verification_amount(&signed).map(|amount| {
                 (
                     entry.ledger.clone(),

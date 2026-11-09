@@ -2004,6 +2004,7 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
         failure = failure.with_planned_reads(PlannedReads {
             needed_at_least: 5,
             allowed: 2,
+            certainly_refused: None,
         });
         failure.window_timings = Some(Box::new(WindowReadTimings::new(
             tally_date("20260401"),

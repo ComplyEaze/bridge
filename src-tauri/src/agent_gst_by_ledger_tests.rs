@@ -35,7 +35,7 @@ fn captured_index() -> MasterIndex {
     let groups = GroupIndex::build(
         parse_native_group_snapshot(&groups, COMPANY_GUID).expect("the live group capture parses"),
     );
-    MasterIndex::build(records.iter(), &groups, Vec::new()).expect("masters index")
+    MasterIndex::build(records.iter(), &groups).expect("masters index")
 }
 
 /// The one voucher of each captured day, in day order: V1, V4, V5, V6, V7, V4b, V8, V9, V10,
@@ -378,11 +378,12 @@ fn a_partial_window_has_no_totals() {
     let window = RegisterWindow {
         index: captured_index(),
         rows: captured_rows(),
+        withheld_reason: WITHHELD_FOREIGN_CURRENCY,
         state: "partial",
         reason: Some("nonempty_window_unqualified"),
     };
     assert_eq!(
-        CompleteWindow::admit(window).err(),
+        CompleteWindow::admit(window, ("20251101", "20251130")).err(),
         Some("gst_by_ledger_window_partial".to_string())
     );
 }
@@ -453,4 +454,210 @@ fn a_parent_that_is_tally_root_is_shown_as_tally_sent_it_and_is_not_masked() {
             "{redaction:?}"
         );
     }
+}
+
+/// A withheld voucher leaves the totals short, so the window refuses; it is checked against the
+/// window's dates first, so one dated outside the window refuses as any row does (#674, #683).
+#[test]
+fn a_withheld_voucher_refuses_the_totals_and_one_outside_the_window_refuses_as_not_honoured() {
+    let window = || RegisterWindow {
+        index: captured_index(),
+        rows: crate::agent::voucher_parse::captured_72_register_window(),
+        withheld_reason: WITHHELD_FOREIGN_CURRENCY,
+        state: "complete",
+        reason: None,
+    };
+    assert_eq!(
+        CompleteWindow::admit(window(), ("20250402", "20250430")).err(),
+        Some("window_not_honoured".to_string())
+    );
+    assert_eq!(
+        CompleteWindow::admit(window(), ("20250401", "20250401")).err(),
+        Some("gst_by_ledger_window_partial".to_string())
+    );
+}
+
+/// The same book's masters and groups as its December read found them, after a second supplier
+/// and a second copy of one supplier invoice were typed on Tally's screen (`gst-ledger-l3`
+/// PROVENANCE table).
+fn december_index() -> MasterIndex {
+    let masters = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/l3-dec-L-1.utf16le.xml"
+    ));
+    let groups = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/l3-dec-g-1.utf16le.xml"
+    ));
+    let records = parse_native_party_ledger_master_records_with_evidence(&masters, COMPANY_GUID)
+        .expect("the live master capture parses")
+        .records
+        .into_iter()
+        .map(|row| row.record)
+        .collect::<Vec<_>>();
+    let groups = GroupIndex::build(
+        parse_native_group_snapshot(&groups, COMPANY_GUID).expect("the live group capture parses"),
+    );
+    MasterIndex::build(records.iter(), &groups).expect("masters index")
+}
+
+/// December 2025's six vouchers: Purchase 57, which opens supplier invoice GS1/P/0001 (New Ref);
+/// Purchase 58, the same invoice keyed again, Agst Ref that bill; an optional Purchase 60 and a
+/// cancelled Purchase 59; Journal 5; and Payment 3, Agst Ref the bill with no GST entry.
+fn december_rows() -> Vec<Value> {
+    let rows = parse_agent_rows(
+        &utf16(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/l3-dec-w-1.utf16le.xml"
+        )),
+        COMPANY_GUID,
+    )
+    .expect("the live window parses");
+    assert_eq!(rows.len(), 6);
+    rows
+}
+
+fn numbered<'a>(rows: &'a mut [Value], number: &str) -> &'a mut Value {
+    rows.iter_mut()
+        .find(|row| row["voucher_number"] == number)
+        .unwrap_or_else(|| panic!("no voucher {number}"))
+}
+
+/// Sets every entry on `ledger`, and each bill allocation on it, to `amount`.
+fn set_amount(row: &mut Value, ledger: &str, amount: &str) {
+    for entry in row["amounts"].as_array_mut().unwrap() {
+        if entry["ledger"] == ledger {
+            entry["amount"] = json!(amount);
+            for allocation in entry["bill_allocations"].as_array_mut().unwrap() {
+                allocation["amount"] = json!(amount);
+            }
+        }
+    }
+}
+
+fn agst_ref_numbers(totals: &GstByLedger) -> Vec<&Value> {
+    totals
+        .agst_ref_purchases
+        .iter()
+        .map(|item| &item["voucher_number"])
+        .collect()
+}
+
+#[test]
+fn a_supplier_invoice_keyed_twice_has_its_copy_set_aside_and_its_opener_counted() {
+    let index = december_index();
+    let totals = fold(&index, &december_rows()).unwrap();
+    assert_eq!(totals.observed, 6);
+    assert_eq!(totals.not_in_books, 2);
+    assert_eq!(totals.without_gst_entry, 1);
+    let goods = &totals.ledgers["Purchase - Goods"];
+    assert_eq!(goods.vouchers, 1);
+    assert_eq!(heads(&goods.debit), both("-900"));
+    let copy = &totals.set_aside[&SetAside::BillAlreadyOpened];
+    assert_eq!(copy.vouchers, 1);
+    assert_eq!(heads(&copy.debit), both("-900"));
+    assert!(copy.credit.0.is_empty());
+    assert_eq!(copy.listed[0]["voucher_number"], "58");
+    assert_eq!(copy.listed[0]["voucher_class"], "Purchase");
+    assert_eq!(totals.set_aside.len(), 1);
+    // Journal 5's input tax stays on GS1 Rent.
+    assert_eq!(heads(&totals.ledgers["GS1 Rent"].debit), both("-450"));
+    assert!(totals.agst_ref_purchases.is_empty());
+    let result = gst_by_ledger_result(&index, &totals, Redaction::None);
+    assert_eq!(
+        result["set_aside"]["bill_already_opened"]["listed"]["total"],
+        1
+    );
+    assert_eq!(result["agst_ref_purchase"]["total"], 0);
+}
+
+#[test]
+fn an_agst_ref_purchase_whose_amounts_differ_is_counted_and_listed() {
+    let index = december_index();
+    // A supplementary invoice of half the value, its tax halved with it.
+    let mut rows = december_rows();
+    let second = numbered(&mut rows, "58");
+    set_amount(second, "Purchase - Goods", "-5000.00");
+    set_amount(second, "Input CGST", "-450.00");
+    set_amount(second, "Input SGST", "-450.00");
+    set_amount(second, "SYN GS1 Supplier B", "5900.00");
+    let totals = fold(&index, &rows).unwrap();
+    let goods = &totals.ledgers["Purchase - Goods"];
+    assert_eq!(goods.vouchers, 2);
+    assert_eq!(heads(&goods.debit), both("-1350"));
+    assert!(totals.set_aside.is_empty());
+    assert_eq!(agst_ref_numbers(&totals), ["58"]);
+    // The same tax on a different value is not the same invoice either.
+    let mut rows = december_rows();
+    let second = numbered(&mut rows, "58");
+    set_amount(second, "Purchase - Goods", "-10100.00");
+    set_amount(second, "SYN GS1 Supplier B", "11900.00");
+    let totals = fold(&index, &rows).unwrap();
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2);
+    assert!(totals.set_aside.is_empty());
+    assert_eq!(agst_ref_numbers(&totals), ["58"]);
+    let result = gst_by_ledger_result(&index, &totals, Redaction::None);
+    assert_eq!(result["agst_ref_purchase"]["total"], 1);
+    assert_eq!(
+        result["agst_ref_purchase"]["listed"][0]["voucher_number"],
+        "58"
+    );
+}
+
+#[test]
+fn the_same_bill_on_another_party_is_not_a_copy() {
+    let index = december_index();
+    let mut rows = december_rows();
+    let second = numbered(&mut rows, "58");
+    for entry in second["amounts"].as_array_mut().unwrap() {
+        if entry["ledger"] == "SYN GS1 Supplier B" {
+            entry["ledger"] = json!("SYN GS1 Supplier");
+        }
+    }
+    let totals = fold(&index, &rows).unwrap();
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2);
+    assert!(totals.set_aside.is_empty());
+    assert_eq!(agst_ref_numbers(&totals), ["58"]);
+}
+
+#[test]
+fn a_debit_note_or_journal_against_the_bill_stays_counted_and_unlisted() {
+    let index = december_index();
+    for class in ["Debit Note", "Journal"] {
+        let mut rows = december_rows();
+        numbered(&mut rows, "58")["voucher_class"] = json!(class);
+        let totals = fold(&index, &rows).unwrap();
+        assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2, "{class}");
+        assert!(totals.set_aside.is_empty(), "{class}");
+        assert!(totals.agst_ref_purchases.is_empty(), "{class}");
+    }
+}
+
+#[test]
+fn a_copy_that_opens_a_bill_of_its_own_or_has_no_counted_opener_stays_counted() {
+    let index = december_index();
+    // No. 58 also opening a bill: an opener is never set aside, so two vouchers can never set
+    // each other aside.
+    let mut rows = december_rows();
+    for entry in numbered(&mut rows, "58")["amounts"].as_array_mut().unwrap() {
+        if entry["ledger"] == "SYN GS1 Supplier B" {
+            let mut opened = entry["bill_allocations"][0].clone();
+            opened["bill_type"] = json!("New Ref");
+            opened["reference"]["name"] = json!("GS1/P/0002");
+            entry["bill_allocations"]
+                .as_array_mut()
+                .unwrap()
+                .push(opened);
+        }
+    }
+    let totals = fold(&index, &rows).unwrap();
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2);
+    assert!(totals.set_aside.is_empty());
+    assert_eq!(agst_ref_numbers(&totals), ["58"]);
+    // No. 57 cancelled: the bill's opener is not counted, so No. 58 carries the invoice's tax.
+    let mut rows = december_rows();
+    numbered(&mut rows, "57")["cancelled"] = json!(true);
+    let totals = fold(&index, &rows).unwrap();
+    let goods = &totals.ledgers["Purchase - Goods"];
+    assert_eq!(goods.vouchers, 1);
+    assert_eq!(heads(&goods.debit), both("-900"));
+    assert!(totals.set_aside.is_empty());
+    assert_eq!(agst_ref_numbers(&totals), ["58"]);
 }

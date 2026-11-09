@@ -103,12 +103,13 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "negative_ledgers",
         "negative_stock",
         "outstandings",
-        "parse_bank_statement_csv",
         "profit_and_loss",
         "purchase_register",
         "read_evidence",
         "sales_register",
         "statement_tie_out",
+        "stock_by_batch",
+        "stock_by_godown",
         "stock_summary",
         "tally_status",
         "trial_balance",
@@ -140,6 +141,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer (for a statement of only skipped rows, no import file: one record of those rows); writes nothing to Tally."),
         // A new file each call: additive.
         ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
+        ("parse_bank_statement_csv", false, "Reads the CSV bank statement you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
         // Each verification adds its own proof files beside the earlier ones
         // and replaces nothing (#911): additive.
         ("verify_import", false, "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally."),
@@ -1820,9 +1822,47 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// change adds 78 bytes to each list (205,255, 231,071, 233,569 and 238,542). Only the
 /// second budget went up, by 1,000 bytes, as the other three keep margins of 431 or
 /// more.
+/// On 31 Oct 2026 `stock_by_godown` (#2017), which is in the default list, added 1,422 bytes to
+/// every list: its entry is 1,421 bytes and a comma is 1. Its base measured 205,358, 231,174,
+/// 233,672 and 238,788 bytes, so with it the lists measure 206,780, 232,596, 235,094 and
+/// 240,210, over every budget by 780, 596, 1,094 and 1,210. Each budget went up by 1,500,
+/// leaving margins of 720, 904, 406 and 290. Its review fixes then added 64 bytes to every
+/// list, 30 in its `as_of` text and 34 in its description, counted from the text rather
+/// than measured, which leaves margins of 656, 840, 342 and 226 before any other change.
+/// On 2 Nov 2026 master measured 206,855, 232,849, 235,347 and 240,463 bytes, derived from
+/// measured merges by their known deltas. The outstandings withheld clause and the two
+/// changes waiting behind it add 334 bytes between them, which puts the last two lists
+/// over by 181 and 297. Those two budgets went up by 500, leaving margins of 319
+/// and 203 once all three have landed; the first two lists stay within theirs.
+/// Also on 2 Nov 2026, provenance detail came out of the `vouchers`, `masters`, `ledger_masters`
+/// and `post_import` texts, 1,298 bytes off the first list and 1,424 off the other three. On the
+/// merged tree the lists measure 205,920, 231,813, 234,322 and 239,440 bytes, leaving margins of
+/// 1,580, 1,687, 1,678 and 1,560. The budgets stay: that room is for the changes behind it.
+/// Creating several ledgers in one request added 259 bytes to the master-writes list alone,
+/// measured on the merged tree: the lists are 205,920, 231,813, 234,322 and 239,699 bytes,
+/// leaving margins of 1,580, 1,687, 1,678 and 1,301.
+/// `stock_by_batch` (#2018), in the default list, adds 1,714 bytes to each list: on the merged
+/// tree they measure 207,634, 233,527, 236,036 and 241,413, over by 134, 27, 36 and 413. Each
+/// budget went up by 1,400. The e-invoice argument (#1378) and the review of a twin ledger (#626)
+/// add 362 bytes between them, leaving margins of 904, 1,011, 1,002 and 625 once all have landed.
+/// The release of a rolled-back batch's rows (#1038) adds the `rolled_back` doubt to
+/// `acknowledge_post_review`, which only the three lists with posting on hold. With its first
+/// text, 212 bytes (198 of description, 14 of enum value), the lists measured 208,571,
+/// 234,676, 237,185 and 242,562 on 3 Nov 2026, so its base measures 208,571, 234,464, 236,973
+/// and 242,350: merges since the margins above took the rest. Its review fixes add 45 bytes of
+/// description, so with it the lists measured 208,571, 234,721, 237,230 and 242,607 the same
+/// day, the last 207 over its old budget. That budget went up by 500, leaving margins of
+/// 329, 179, 170 and 293.
+/// On 8 Nov 2026 `parse_bank_statement_csv` (#1320) became a tool that writes proposals and took
+/// the arguments of `parse_bank_statement`, which adds 3,403 bytes to each list. On the tree
+/// merged with master the lists were over every budget by 3,231, 3,381, 3,390 and 3,267. Each
+/// budget went up by 4,000, leaving margins of 769, 619, 610 and 733.
+/// One party's open bills (#2377) add the `open_bills` detail to `outstandings`: 113 bytes, 13
+/// of enum value and 100 of description, to each list. On the tree merged with master after
+/// #1320 the lists still fit the budgets below, so no budget changed for it.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [206_000, 232_000, 234_000, 239_000];
+const TOOL_LIST_BUDGETS: [usize; 4] = [212_900, 238_900, 241_400, 246_900];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

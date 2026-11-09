@@ -269,3 +269,79 @@ Contra vouchers, and 5 Journals).
   So a bound GUID can name another voucher once a restored book is keyed
   past the post's mark; the rolled-back check sees a restore only while the
   mark reads below that floor.
+
+## Amendment — 2026-11-03: a person's release of a rolled-back post's rows
+
+A native post a rollback record covers reads `book_rolled_back` for good
+(bridge#1050), and its rows stay held, so a rebuild of them is refused
+(bridge#876). Its vouchers may be gone, and nothing in this contract can tell:
+a voucher keyed again by hand with any difference matches no fingerprint. So
+the post-span basis never frees the rows; a person may (bridge#1038).
+
+- **The release.** `acknowledge_post_review` with `doubt` set to
+  `rolled_back`, after the person has checked in Tally that none of the
+  batch's vouchers is in the book, including any keyed again with other
+  figures. It is recorded only after its own native dialog, which the model
+  cannot answer and which lists every voucher of the batch, and only while a
+  recorded rollback covers the batch, as a fresh readback reports
+  (`book_rolled_back`). The dialog shows the voucher mark the cover's
+  verification read, not the mark now, which a newer backup restored since
+  can put at or above the post's. The `row_release` record is made by one
+  constructor, from the batch's line and the `RollbackCover` the cover's scan
+  returns, whose fields are private. Its `release_cover` names the cover it
+  rests on (`mark_read`, `seen_by`) and the batch's company and endpoint, and
+  it is written under the exclusive admission lock only if the batch's records
+  are unchanged since the dialog's read and that cover still stands for that
+  company and endpoint (`row_release_after`). A release is never undone.
+- **What it changes, and only that.** The lookup of rows already posted
+  (`vouchers_already_posted`) leaves the batch out, so the rows can go through
+  an ordinary fresh build and post, with the book check and the approval
+  dialog every batch meets, and fresh REMOTEIDs. The GUIDs a bind refuses to
+  claim again (`guids_bound_elsewhere`) leave out those only a released batch
+  bound: after a restore the next voucher created took a removed voucher's
+  GUID (one lab run on 7.1), so the fresh post must be able to bind it. The
+  batch keeps its records and still reads `book_rolled_back`; no verdict,
+  status or binding of it changes. The skips' own scan
+  (`rows_held_as_vouchers`) is not changed: a statement that skips a released
+  row is still refused, which fails closed.
+- **The type limit is an allow-list.** Only a batch of Journal, Payment and
+  Receipt vouchers is released (`ack_release_type_not_admitted` otherwise). A
+  Sales invoice is also held by the invoice readers and a Contra by the
+  transfer view, which a release does not reach; a voucher type added later is
+  refused until it is named, so it fails closed.
+- **The person is the only guard** against a voucher keyed again with any
+  difference: the fresh post's book check matches by content. So a batch
+  whose vouchers the dialog cannot all list (more than ten, or one it cannot
+  show within its limits) is never released (`ack_release_vouchers_not_listed`),
+  and its rows are entered by hand. A
+  later restore of a newer backup that holds the original vouchers, after the
+  fresh post, leaves both in the book; nothing here detects it.
+- **A downgrade.** A release older than this record refuses the whole import
+  journal holding one, not only the released rows: every import and
+  verification on that computer stops there, Journal, Payment, Receipt and
+  Contra included (`scan_records`, `StatusKind`). That fails closed, as the
+  stop release, the content review and the settlement already do (ADR 0004,
+  the 3 November 2026 entry). `mcp-v0.7.0` (`fcfb5ff6`) knows eight status
+  kinds and not `row_release`, so the oldest release that reads such a journal
+  is the one that ships this change, planned as `mcp-v0.8.0`.
+  - **The recovery** is to install that release, or a later one, again. The
+    journal is never edited by hand.
+  - **The release notes** say: once a person has released a restored batch's
+    rows, do not install a release older than the one named; it can refuse
+    this computer's import journal, and then every import and verification
+    stops there; to recover, install that release or a later one again; do
+    not edit the journal by hand.
+  - **What holds it.** `a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads`
+    (`src-tauri/src/agent_import_post_e2e_tests.rs`) runs the flow, post,
+    restore seen, release and a fresh post of the released row, and checks
+    that every record kind it writes is one of the eight that tag's
+    `StatusKind` holds except `row_release`, that every batch line holds no
+    field path or enum value beyond those that tag wrote for the Sales replay,
+    with a Journal's voucher type, and that every other status record holds no
+    field beyond those of that tag's `StatusRecord`.
+- **Evidence owed (P1).** One lab row on a synthetic book on TallyPrime 7.1
+  Silver, after the build exists: post a small batch, restore a backup taken
+  before it, verify, release, then build and post the same rows (expected
+  `posted_verified`), with a control in which one row is keyed again by hand
+  with the same figures (expected `import_preexisting_identity`, nothing sent).
+  Until that row exists the release is unverified against a real Tally.

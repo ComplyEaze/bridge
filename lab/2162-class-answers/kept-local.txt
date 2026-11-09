@@ -1,0 +1,13 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backup-1/TDBK1800_<company number>.001 33477 B 6b355839ae1d45e859fca71d92dca79210ebc199c3d227ac2ab8290130de358e (the S2 backup)
+answers/a-y1.xml 5808 B 55140b2cc536f881ad54e39fa6d8774f2d3f5539e6279d336001562a8549a8f2 (10+ digit run)
+answers/a-y3.xml 5808 B 7ba8cf5024c9b1fb939f237170562563061950852c2a7f4eaf80591c3503bb57 (10+ digit run)
+evidence/c10-netstat.txt 7835 B e76de94a3ccf5faa2384f29de16913312180426fe69bf0a1f3532d163160e8e9 (process or port listing)
+evidence/c10-tasklist.txt 54 B 603b31fc4e89058112f31fe36d3df1db2ead8aba993898087ba1170978a26462 (process or port listing)
+evidence/restore-plan.txt 759 B 396d04a0806dc537c0816f014f56e15b569369ff1cbed772644f151983c90ea1 (the restore plan: the company number and the data path)
+evidence/s0-netstat.txt 8133 B 28a0d29e0f0926213a08ec779f83bbb115efba98eaa2136283ff24ba568e51fa (process or port listing)
+evidence/s0-tasklist.txt 54 B f91c76dd00e1469fa1a9fa8c57f80cbf82a21c577aefa03fd6138bb08c915eab (process or port listing)
+evidence/s2-bk-before.txt 75 B 6ab055f0fa6db2dbb41db062980324d695fac1d2f00af22e1463070f4df6d585 (folder listing)
+evidence/s6-data-after.txt 675 B d8a2c82c8bd69db6fc5df2737d0b046911f3428fe9196d3960b69c88df59a8fc (folder listing)
+evidence/s6-data-before.txt 968 B d92ed56d4df4e804f1ff51aeff80f33f754fc6d21d67269fab8f72d8eb98fea0 (folder listing)
+stage-cx.py 7230 B 12408a6a4b1d233fd8f13a4e7e550640ad24bd2fa6c84d033757b0c657d9ed93 (this stage script: its patterns name the lab paths)

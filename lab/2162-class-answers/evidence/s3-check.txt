@@ -1,0 +1,40 @@
+$ check_c.py marks answers/a-cm1.xml
+COMPANY rows: 1
+  GUID 9ab5002c... ALTVCHID 7 ALTMSTID 214
+exit 0
+$ check_c.py marks answers/a-cm2.xml
+COMPANY rows: 1
+  GUID 9ab5002c... ALTVCHID 8 ALTMSTID 214
+exit 0
+$ check_c.py types answers/a-vt1.xml
+VOUCHERTYPE rows: 25
+  'Attendance' (10 characters) PARENT 'Attendance' NUMBERINGMETHOD 'Default' MASTERID ' 78' ALTERID ' 80'
+  'Contra' (6 characters) PARENT 'Contra' NUMBERINGMETHOD 'Default' MASTERID ' 32' ALTERID ' 34'
+  'Credit Note' (11 characters) PARENT 'Credit Note' NUMBERINGMETHOD 'Default' MASTERID ' 40' ALTERID ' 42'
+  'Debit Note' (10 characters) PARENT 'Debit Note' NUMBERINGMETHOD 'Default' MASTERID ' 42' ALTERID ' 44'
+  'Delivery Note' (13 characters) PARENT 'Delivery Note' NUMBERINGMETHOD 'Default' MASTERID ' 48' ALTERID ' 50'
+  'IX SALES' (8 characters) PARENT 'Sales' NUMBERINGMETHOD 'None' MASTERID ' 210' ALTERID ' 214'
+  'Job Work In Order' (17 characters) PARENT 'Job Work In Order' NUMBERINGMETHOD 'Default' MASTERID ' 82' ALTERID ' 84'
+  'Job Work Out Order' (18 characters) PARENT 'Job Work Out Order' NUMBERINGMETHOD 'Default' MASTERID ' 84' ALTERID ' 86'
+  'Journal' (7 characters) PARENT 'Journal' NUMBERINGMETHOD 'Default' MASTERID ' 38' ALTERID ' 40'
+  'Material In' (11 characters) PARENT 'Material In' NUMBERINGMETHOD 'Default' MASTERID ' 88' ALTERID ' 90'
+  'Material Out' (12 characters) PARENT 'Material Out' NUMBERINGMETHOD 'Default' MASTERID ' 86' ALTERID ' 88'
+  'Memorandum' (10 characters) PARENT 'Memorandum' NUMBERINGMETHOD 'Default' MASTERID ' 60' ALTERID ' 62'
+  'Payment' (7 characters) PARENT 'Payment' NUMBERINGMETHOD 'Default' MASTERID ' 34' ALTERID ' 36'
+  'Payroll' (7 characters) PARENT 'Payroll' NUMBERINGMETHOD 'Default' MASTERID ' 80' ALTERID ' 82'
+  'Physical Stock' (14 characters) PARENT 'Physical Stock' NUMBERINGMETHOD 'Default' MASTERID ' 56' ALTERID ' 58'
+  'Purchase' (8 characters) PARENT 'Purchase' NUMBERINGMETHOD 'Default' MASTERID ' 46' ALTERID ' 48'
+  'Purchase Order' (14 characters) PARENT 'Purchase Order' NUMBERINGMETHOD 'Default' MASTERID ' 66' ALTERID ' 68'
+  'Receipt' (7 characters) PARENT 'Receipt' NUMBERINGMETHOD 'Default' MASTERID ' 36' ALTERID ' 38'
+  'Receipt Note' (12 characters) PARENT 'Receipt Note' NUMBERINGMETHOD 'Default' MASTERID ' 50' ALTERID ' 52'
+  'Rejections In' (13 characters) PARENT 'Rejections In' NUMBERINGMETHOD 'Default' MASTERID ' 54' ALTERID ' 56'
+  'Rejections Out' (14 characters) PARENT 'Rejections Out' NUMBERINGMETHOD 'Default' MASTERID ' 52' ALTERID ' 54'
+  'Reversing Journal' (17 characters) PARENT 'Reversing Journal' NUMBERINGMETHOD 'Default' MASTERID ' 62' ALTERID ' 64'
+  'Sales' (5 characters) PARENT 'Sales' NUMBERINGMETHOD 'Default' MASTERID ' 44' ALTERID ' 46'
+  'Sales Order' (11 characters) PARENT 'Sales Order' NUMBERINGMETHOD 'Default' MASTERID ' 64' ALTERID ' 66'
+  'Stock Journal' (13 characters) PARENT 'Stock Journal' NUMBERINGMETHOD 'Default' MASTERID ' 58' ALTERID ' 60'
+exit 0
+$ check_c.py vouchers answers/a-y1.xml
+VOUCHER rows: 1
+  'IX-0003' type 'IX SALES' ISCANCELLED 'No' BRIDGEVCHISSALES 'Yes'
+exit 0

@@ -97,10 +97,25 @@ export const VERSION_FILES = {
   },
 };
 
-// The release date the program reports in tally_status once a build is old (#2391). It is written
-// with the version, so a build between releases carries the last release's date.
-export const RELEASE_DATE_FILE = "src-tauri/src/agent.rs";
-const RELEASE_DATE_LINE = /(const RELEASE_DATE: &str = ")(\d{4}-\d{2}-\d{2})(";)/;
+// The release date the program reports in tally_status once a build is old (#2391): one line,
+// YYYY-MM-DD in UTC, in a file that build.rs reads at build time. It is written with the version, so
+// a build made between releases carries the last release's date (the notice then comes early).
+export const RELEASE_DATE_FILE = "src-tauri/release-date.txt";
+
+export function utcDay(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+// Refuses a date the notice would then misstate: one that is not a real YYYY-MM-DD day, one before
+// the last release tag's day (a wrong clock), or one after today in UTC.
+export function checkReleaseDate(date, { tagDay, today = utcDay() }) {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  const real = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(parsed.getTime()) && utcDay(parsed) === date;
+  if (!real) throw new Error(`release date ${JSON.stringify(date)} is not a YYYY-MM-DD day`);
+  if (tagDay && date < tagDay) throw new Error(`release date ${date} is earlier than the last release tag's day, ${tagDay}; check this computer's clock`);
+  if (date > today) throw new Error(`release date ${date} is later than today, ${today} (UTC)`);
+  return date;
+}
 
 export function readVersions(base = root) {
   return Object.fromEntries(
@@ -108,7 +123,7 @@ export function readVersions(base = root) {
   );
 }
 
-export function writeVersions(next, base = root, date = new Date().toISOString().slice(0, 10)) {
+export function writeVersions(next, base = root, date = utcDay()) {
   // Check every file before writing any, so a refusal leaves none half-bumped.
   const updates = Object.entries(VERSION_FILES).map(([file, spec]) => {
     const path = resolve(base, file);
@@ -123,11 +138,8 @@ export function writeVersions(next, base = root, date = new Date().toISOString()
   const sentences = (readmeText.match(new RegExp(sentence.source, "g")) ?? []).length;
   if (sentences !== 1) throw new Error(`README.md: expected exactly one current-version sentence, found ${sentences}`);
   updates.push([readme, readmeText.replace(sentence, (_, a, _old, b) => `${a}${next}${b}`)]);
-  const source = resolve(base, RELEASE_DATE_FILE);
-  const sourceText = readFileSync(source, "utf8");
-  const dateLines = (sourceText.match(new RegExp(RELEASE_DATE_LINE.source, "g")) ?? []).length;
-  if (dateLines !== 1) throw new Error(`${RELEASE_DATE_FILE}: expected exactly one RELEASE_DATE line, found ${dateLines}`);
-  updates.push([source, sourceText.replace(RELEASE_DATE_LINE, (_, a, _old, b) => `${a}${date}${b}`)]);
+  checkReleaseDate(date, { today: date });
+  updates.push([resolve(base, RELEASE_DATE_FILE), `${date}\n`]);
   for (const [path, text] of updates) writeFileSync(path, text);
 }
 
@@ -336,8 +348,11 @@ async function main() {
   if (result.lowered) console.log(`WARNING: --level ${result.level} is lower than the proposed ${result.proposedLevel}; the labels say this release changes more than that.`);
   console.log(`\n${draftNotes(result.classified)}\n`);
   if (process.argv.includes("--apply")) {
-    writeVersions(result.next);
-    console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md, and today's date as RELEASE_DATE in ${RELEASE_DATE_FILE}`);
+    // The tag's own day, in UTC, so a computer with a wrong clock cannot write a date before it.
+    const tagDay = utcDay(new Date(Number(run("git", ["log", "-1", "--format=%ct", since]).trim()) * 1000));
+    const date = checkReleaseDate(utcDay(), { tagDay });
+    writeVersions(result.next, root, date);
+    console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md, and today's UTC date to ${RELEASE_DATE_FILE}`);
     console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: the pull request that commits them needs an acknowledgement file (see docs/release-process.md).");
   }
 }

@@ -59,8 +59,14 @@ impl Server {
             // The host date every omitted date defaults to (YYYYMMDD).
             "today": today,
         });
+        // Once per session: only the first status read after the server starts carries it (#2391).
         if let Some(notice) = build_age_notice(RELEASE_DATE, &today) {
-            result["build_notice"] = json!(notice);
+            if !self
+                .build_notice_sent
+                .swap(true, std::sync::atomic::Ordering::SeqCst)
+            {
+                result["build_notice"] = json!(notice);
+            }
         }
         Ok((result, evidence))
     }
@@ -233,16 +239,21 @@ mod identity_tests;
 #[path = "agent_company_tuple_tests.rs"]
 mod tuple_tests;
 
-/// The one line `tally_status` adds when this build's release is more than
-/// [`BUILD_NOTICE_AFTER_DAYS`] days before `today` (YYYYMMDD, the computer's date). It makes no
-/// request: the date is compiled in. An unreadable date on either side gives no notice, never a
-/// false claim that the build is old (#2391).
-pub(super) fn build_age_notice(release_date: &str, today: &str) -> Option<&'static str> {
+/// The one line `tally_status` adds, once per session, when this build's release date is more than
+/// [`BUILD_NOTICE_AFTER_DAYS`] days before `today` (YYYYMMDD, the computer's date). It states the
+/// two dates and where releases are listed and claims nothing else: it cannot know that a newer
+/// release exists, and a wrong computer clock shows in the line itself. It makes no request. An
+/// unreadable date on either side gives no notice (#2391).
+pub(super) fn build_age_notice(release_date: &str, today: &str) -> Option<String> {
     let released = chrono::NaiveDate::parse_from_str(release_date, "%Y-%m-%d").ok()?;
     let today = chrono::NaiveDate::parse_from_str(today, "%Y%m%d").ok()?;
-    ((today - released).num_days() > BUILD_NOTICE_AFTER_DAYS).then_some(
-        "This build of ComplyEaze Bridge was released more than 60 days ago, so a newer release may exist: https://github.com/ComplyEaze/bridge/releases . Tell the person once, plainly; installing a newer release is their step, and nothing is updated by itself.",
-    )
+    ((today - released).num_days() > BUILD_NOTICE_AFTER_DAYS).then(|| {
+        format!(
+            "This build is dated {}; this computer's date is {}. Releases are listed at https://github.com/ComplyEaze/bridge/releases .",
+            released.format("%Y-%m-%d"),
+            today.format("%Y-%m-%d")
+        )
+    })
 }
 
 #[cfg(test)]
@@ -251,7 +262,8 @@ mod build_age_tests {
 
     #[test]
     fn the_notice_starts_after_sixty_days_and_not_before() {
-        assert_eq!(build_age_notice("2026-10-30", "20261129"), None, "30 days");
+        assert_eq!(build_age_notice("2026-10-30", "20261128"), None, "29 days");
+        assert_eq!(build_age_notice("2026-10-30", "20261228"), None, "59 days");
         assert_eq!(build_age_notice("2026-10-30", "20261229"), None, "60 days");
         assert!(
             build_age_notice("2026-10-30", "20261230").is_some(),
@@ -261,6 +273,11 @@ mod build_age_tests {
             build_age_notice("2026-10-30", "20260101"),
             None,
             "a clock before the release"
+        );
+        assert_eq!(
+            build_age_notice("2026-10-30", "20261230").as_deref(),
+            Some("This build is dated 2026-10-30; this computer's date is 2026-12-30. Releases are listed at https://github.com/ComplyEaze/bridge/releases ."),
+            "states the two dates and claims nothing else"
         );
     }
 
@@ -283,6 +300,7 @@ mod build_age_tests {
 
     #[test]
     fn the_compiled_in_date_is_a_real_date() {
+        // An empty date (no release-date.txt at build time) would silently turn the notice off.
         assert!(chrono::NaiveDate::parse_from_str(super::RELEASE_DATE, "%Y-%m-%d").is_ok());
     }
 }

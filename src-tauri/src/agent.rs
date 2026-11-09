@@ -174,11 +174,11 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufRea
 
 const SERVER_NAME: &str = "bridge-tally";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
-/// The date (YYYY-MM-DD) of the release this build belongs to. `scripts/next-version.mjs --apply`
-/// writes it with the version, so a build made between releases carries the last release's date (the
-/// notice then comes a little late; the version pull request's date can also precede the tag's) (#2391).
-const RELEASE_DATE: &str = "2026-10-30";
-/// A build older than this many days gets the notice in `tally_status`.
+/// The date (YYYY-MM-DD) of the release this build belongs to, from `release-date.txt` through
+/// `build.rs`. `scripts/next-version.mjs --apply` writes it with the version. A build made between
+/// releases carries the last release's date, so its notice comes early, never late (#2391).
+const RELEASE_DATE: &str = env!("BRIDGE_RELEASE_DATE");
+/// A build whose date is more than this many days before the computer's date gets the notice.
 const BUILD_NOTICE_AFTER_DAYS: i64 = 60;
 const MAX_EVIDENCE_RECORDS: usize = 256;
 const SUPPORTED_PROTOCOL_VERSIONS: [&str; 2] = ["2025-06-18", "2024-11-05"];
@@ -816,6 +816,8 @@ struct Server {
     /// answers an MCP client is built by [`Server::for_mcp`], which closes it until the user has
     /// accepted the Terms (see `agent_terms.rs`).
     terms: terms::TermsGate,
+    /// Whether this session has already been given `tally_status`'s build notice (#2391).
+    build_notice_sent: std::sync::atomic::AtomicBool,
 }
 
 struct ToolOutcome {
@@ -2846,6 +2848,7 @@ impl Server {
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
+            build_notice_sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

@@ -1,0 +1,3 @@
+# lab/2390-clean-pc-sheet
+
+One sheet for #2390: the new Windows `bridge_mcp.exe` (the C runtime linked in) started on a PC with no Visual C++ Redistributable. It first proves the PC is clean (read only), then reads the file's import table, starts it for `initialize` and `tools/list`, and starts the 0.7.0 file as a control that is expected to fail. It needs the `.mcpb` that a CI run of the pull request produced, handed to the lab by the person who queues the sheet (see "The input"), and a Windows PC without the runtime, which the lab may not have; whether one exists is the owner's question. No Tally, no install, no uninstall. See `clean-pc-run.md`. Results go to `reviews/ds1/lab-results/CRT3/`.

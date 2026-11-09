@@ -1137,6 +1137,22 @@ def state():
             "+a harmless last line\n"
         )
 
+    elif scenario in {"lockfile-integrity", "lockfile-integrity-outside-lockfile"}:
+        # #2367: one pnpm resolution line whose base64 body holds an identifier-shaped run (built from parts).
+        path = "pnpm-lock.yaml" if scenario == "lockfile-integrity" else "docs/example.md"
+        body = "Q" * 30 + "AB" + "CDE" + "12" + "34" + "F" + "Q" * 46
+        s["files"] = [{"filename": path, "status": "added", "additions": 1, "deletions": 0}]
+        s["changed_files_expected"] = 1
+        s["diff"] = (
+            "diff --git a/" + path + " b/" + path + "\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/" + path + "\n"
+            "@@ -0,0 +1 @@\n"
+            "+    resolution: {integrity: sha512-" + body + "==}\n"
+        )
+
     elif scenario in {"merge-commit-conflict-comment-block", "merge-commit-conflict-block-customer-address"}:
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
@@ -1399,6 +1415,22 @@ def state():
             "@@ -0,0 +1 @@\n"
             "+content\n"
         )
+
+    elif scenario in ("author-email-bot-noreply", "author-email-bracket-elsewhere",
+                      "author-email-bot-other-domain", "author-email-empty"):
+        email = {
+            "author-email-bot-noreply": "49699333+dependabot[bot]@users.noreply.github.com",
+            "author-email-bracket-elsewhere": "dev[bot]@example.invalid",
+            "author-email-bot-other-domain": "49699333+dependabot[bot]@example.invalid",
+            "author-email-empty": "",
+        }[scenario]
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = {
+            "message": "safe commit metadata",
+            "author": {"name": "dependabot[bot]", "email": email},
+            "committer": {"name": "GitHub", "email": "noreply@example.invalid"},
+        }
+        s["commits"] = [commit]
 
     elif scenario == "author-email-localhost":
         commit = dict(DEFAULT_COMMIT)

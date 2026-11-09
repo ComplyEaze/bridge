@@ -210,10 +210,12 @@ if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -
     (.sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
     (.commit | type == "object") and
     (.commit.message | type == "string") and
+    # An email is the plain form, or (#2388) exactly a GitHub bot noreply address,
+    # <digits>+<name>[bot]@users.noreply.github.com, whose local part holds brackets.
     (.commit.author | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     (.commit.committer | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     ((.author == null) or (.author | type == "object" and (.login | type == "string"))) and
     ((.committer == null) or (.committer | type == "object" and (.login | type == "string")))))
 ' <<<"$metadata_commits" >/dev/null 2>&1; then
@@ -1100,11 +1102,29 @@ PY
     say "note" "synthetic-UUID registry: $count listed value(s) applied (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$uuid_registry_path" 2>/dev/null))"
   }
   load_uuid_registry
+  # #2367: the scan reads the added lines with each lockfile integrity value masked as a digest, by the rule and only in the
+  # files merge_gate_privacy.py names (LOCKFILE_INTEGRITY_RE); the explain step masks the same lines by their own paths. If
+  # the masking cannot be done, the scan reads the lines unmasked and the gate is indeterminate.
+  privacy_payload="$tmpdir/privacy-payload"
+  lockfile_masked=""
+  if [ ! -s "$added_payload" ]; then
+    : >"$privacy_payload"
+  elif ! jq '{added: [range(0; .added_payload | length) as $i | {path: .added_locations[$i][0], text: .added_payload[$i]}]}' \
+         <<<"$parsed_diff" >"$tmpdir/lockfile-mask-input.json" 2>/dev/null \
+       || ! lockfile_masked=$(python3 -I "$script_dir/merge_gate_privacy.py" --mask-lockfile-integrity <"$tmpdir/lockfile-mask-input.json" 2>/dev/null) \
+       || ! jq -e '(.payload | type == "array" and all(.[]; type == "string")) and (.masked | type == "number" and floor == . and . >= 0)' \
+         <<<"$lockfile_masked" >/dev/null 2>&1 \
+       || ! jq -r '.payload[]' <<<"$lockfile_masked" >"$privacy_payload" 2>/dev/null; then
+    unknown "could not mask lockfile integrity values for the privacy scan"
+    cp "$added_payload" "$privacy_payload"
+  elif [ "$(jq -r '.masked' <<<"$lockfile_masked")" -gt 0 ]; then
+    say "note" "$(jq -r '.masked' <<<"$lockfile_masked") lockfile integrity value(s) were masked as generated digests"
+  fi
   scan_input_file="$tmpdir/privacy-scan-input"
   scan_input_write_status=0
   {
     printf '%s\n%s\n' "$privacy_metadata" "$path_text"
-    cat "$added_payload"
+    cat "$privacy_payload"
   } >"$scan_input_file" || scan_input_write_status=$?
   if [ "$scan_input_write_status" -ne 0 ]; then
     unknown "could not assemble complete privacy scan input"

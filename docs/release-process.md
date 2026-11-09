@@ -809,7 +809,9 @@ It checks every file first and writes none if one fails. Then:
    spans that name the newest published build (`managed:current-release` in
    `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
    for `managed:`), and check that the install page and the repository
-   description name the same build.
+   description name the same build. Move the `version` of `registry/server.json` in the same
+   pull request; `scripts/release-text-agreement.test.mjs` fails until the two spans and the
+   registry file name one version.
    Also update the sentences that say a tool is "in source but not in the
    0.3.0 release" in `docs/agent/README.md` (name the build that now has it),
    and the `README.md` lines that describe the published package, so no line
@@ -917,6 +919,14 @@ disagree.
   fails until each stamp names the version in `packaging/mcpb/manifest.json` and the page
   names the tools the catalog serves, so a version bump cannot merge with answers nobody
   has reread.
+  In the same pull request, move the `README.md` sentences that name the build in source:
+  "At a glance, release X.", "release X installs" and "current development source is version"
+  (the last is written by `next-version.mjs --apply`). `scripts/release-text-agreement.test.mjs`
+  fails until all three name the manifest's version. The same test holds the post-release
+  pull request to its half: the `managed:current-release` span in `README.md`, the
+  `managed:latest-preview` span in `SECURITY.md` and the `version` of `registry/server.json`
+  must name one version, the two spans must carry one date, and none may be ahead of the manifest.
+  They stay on the previous published build in the version pull request, which the test allows.
 - The install page shows this file's headings, paragraphs and bullets, so a
   claim added here is a claim on the public site. Fenced code is left out, and
   tables and quotes show as plain text. Escape nothing by hand: the renderer

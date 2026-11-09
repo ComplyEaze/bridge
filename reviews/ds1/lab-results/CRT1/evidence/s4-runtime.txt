@@ -1,0 +1,10 @@
+﻿
+Name               Version          Length
+----               -------          ------
+vcruntime140.dll   14.50.35719.0    123472
+vcruntime140_1.dll 14.50.35719.0     47264
+msvcp140.dll       14.50.35719.0    553552
+ucrtbase.dll       10.0.19041.3636 1046080
+
+
+

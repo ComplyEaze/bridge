@@ -1,0 +1,4 @@
+﻿import:      ADVAPI32.dll
+import:      GDI32.dll
+import:      KERNEL32.dll
+import:      USER32.dll

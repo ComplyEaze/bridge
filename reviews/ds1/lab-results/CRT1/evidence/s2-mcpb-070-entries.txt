@@ -1,0 +1,13 @@
+mcpb 15598419 B sha256 291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec
+entries 9
+  32705536    11869269  bin/x86_64-pc-windows-msvc/bridge_mcp.exe
+   7211520     3640672  bin/x86_64-pc-windows-msvc/pdfium.dll
+     15503       14294  icon.png
+     11356        4028  LICENSE
+      8297        3147  manifest.json
+      6464        3013  NOTICE
+      8418        2016  THIRD_PARTY_LICENSES.txt
+    109658       28565  THIRD_PARTY_LICENSES_PDFIUM.txt
+    677163       32317  THIRD_PARTY_LICENSES_RUST.txt
+entry sha256 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d  32705536  bin/x86_64-pc-windows-msvc/bridge_mcp.exe
+entry sha256 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118  7211520  bin/x86_64-pc-windows-msvc/pdfium.dll

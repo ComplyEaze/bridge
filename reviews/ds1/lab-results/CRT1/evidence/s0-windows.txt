@@ -1,0 +1,5 @@
+﻿utc 2026-11-09T07:33:15.8821212Z
+ProductName Windows 10 Home Single Language
+DisplayVersion 22H2
+CurrentBuild 19045.6466
+EditionID CoreSingleLanguage

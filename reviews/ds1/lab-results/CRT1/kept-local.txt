@@ -1,0 +1,5 @@
+Kept on the lab PC by the lab's standing rules, by size and sha256, with the reason:
+evidence/s1-find-raw.txt 3071 B 88714ea6eca6e8f5ee5896ba4197d83f3a70be2c00226c513e5565d8821da4d8 (the user name)
+evidence/s2-hashes-raw.txt 761 B 86426e33b0c236f15a795413c63544bd22215a48043144fc9c40ffffe17b1232 (the user name)
+bridge-tally-mcp-v0.7.0-windows-x64.mcpb 15598419 B 291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec (the 0.7.0 bundle measured; a release file, not lab evidence)
+stage-crt.py 3202 B b1af7124b1590cb0f7b92851101e2443501626c6affdeb2d1258f31e588f7e1e (this stage script: its patterns name the lab paths)

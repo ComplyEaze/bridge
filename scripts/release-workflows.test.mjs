@@ -166,6 +166,23 @@ function assertReleaseWorkflow(release) {
     packageJob.steps.indexOf(windowsSetup) < packageJob.steps.indexOf(cargoBuild),
     "Windows prerequisites must run before Cargo",
   );
+  // #2390: the Windows binary is built with the C runtime linked in, and the packed file is checked.
+  assert.equal(
+    cargoBuild.env.RUSTFLAGS,
+    "${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}",
+    "only the Windows build of the shipped binary sets the static C runtime",
+  );
+  const runtimeCheck = step(packageJob, "Prove the packed Windows binary imports no C runtime");
+  assert.equal(runtimeCheck.if, "runner.os == 'Windows'");
+  assert.equal(runtimeCheck["continue-on-error"], undefined, "the runtime check must not continue after failure");
+  assert.match(runtimeCheck.run, /node scripts\/check-static-runtime\.mjs packaging\/mcpb\/stage\/bin\/x86_64-pc-windows-msvc\/bridge_mcp\.exe/);
+  const stageStep = step(packageJob, "Stage the reviewed release binary, PDFium and legal resources");
+  const packStep = step(packageJob, "Validate, archive, and exercise the real MCPB");
+  assert.ok(
+    packageJob.steps.indexOf(stageStep) < packageJob.steps.indexOf(runtimeCheck) &&
+      packageJob.steps.indexOf(runtimeCheck) < packageJob.steps.indexOf(packStep),
+    "the runtime check runs on the staged file, before it is packed",
+  );
 
   const releaseStep = step(publish, "Create the immutable GitHub preview release");
   assertUnconditional(releaseStep, "immutable release step");

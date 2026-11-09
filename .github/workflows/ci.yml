@@ -852,6 +852,16 @@ jobs:
       # tauri build uses --bins, including the auto-discovered bridge_mcp.
       # Stage that fresh release binary instead of rebuilding without Tauri's
       # custom-protocol feature and native build environment.
+      # #2390: the shipped Windows MCP binary links the C runtime in. The release workflow builds it
+      # with this flag; so does this job, so that the import check below, and the stdio smoke test
+      # after it, run on the same kind of file. It replaces the Tauri build's bridge_mcp.exe; the
+      # desktop app and the installer stay as Tauri built them.
+      - name: Rebuild the MCP server with the C runtime linked in
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: cargo build --locked --release --manifest-path src-tauri/Cargo.toml --bin bridge_mcp
       # bridge#583: no shipped executable may hold the test-only approval seam.
       # tauri build already ran this as its beforeBundleCommand; it is repeated
       # here on the exact files uploaded. The positive control, that the
@@ -871,6 +881,10 @@ jobs:
           node scripts/package-mcpb.mjs
           --binary src-tauri/target/release/bridge_mcp${{ runner.os == 'Windows' && '.exe' || '' }}
           --pdfium "$RUNNER_TEMP/mcpb-pdfium"
+      - name: Prove the staged Windows binary imports no C runtime
+        if: runner.os == 'Windows'
+        shell: bash
+        run: node scripts/check-static-runtime.mjs packaging/mcpb/stage/bin/x86_64-pc-windows-msvc/bridge_mcp.exe
       - name: Validate and pack MCPB with the official schema
         run: |
           npx --yes @anthropic-ai/mcpb@2.1.2 validate packaging/mcpb/stage/manifest.json

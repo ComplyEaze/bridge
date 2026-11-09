@@ -1,0 +1,1 @@
+- The Windows MCP server in the `.mcpb` is built with the C runtime linked into the program, and the build checks the packed file's import table and fails if it still names a runtime DLL, so the `.mcpb` should start on a PC without the Visual C++ Redistributable. A PC without it has not run this build yet, so the download page and install guide still say to install it (#2390).

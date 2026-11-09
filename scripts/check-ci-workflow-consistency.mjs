@@ -194,13 +194,13 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "3d84b5d1b3a818c0cf867ceee2bb4ba64a952443a4dc9d67ecc2d5609c4cc0c1"],
+  ], "953695d842ac9b5ac022127f237f6a424f871de331b3726bd51d7f9db1d8177a"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}",
-  ], "b8f6b70bdced2019e32e8fee1c1d20a7dcce0d270384849636182953702a384a"],
+  ], "b9faa8f13b67f7a275bcccd56145b3a01551ae3ec845ab6ceabfda688044436d"],
 ]) {
   if (stepBlock(jobBlock(source, job), expected[0]) !== expected.join("\n")) {
     failures.push(`${job}: step "${expected[0].trim()}" changed shape; review it and update its pinned copy`);

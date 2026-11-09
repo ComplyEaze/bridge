@@ -3303,9 +3303,8 @@ fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
 }
 
 /// Row 2162-S9b's customer after `Regular - SEZ` was chosen on Tally's Ledger Alteration screen
-/// and saved: the build's compliance read answered on `BRIDGE PILOT LAB`, captured, with one
-/// declared substitution (`lab/2162-s9b-answers` at db52c37b, `substitutions.txt`): each GSTIN
-/// set to a synthetic value of the same length that keeps the original's check character. The
+/// and saved: the build's compliance read answered on `BRIDGE PILOT LAB`, byte for byte as
+/// captured (`lab/2162-s9b-answers` at 6c80eb43). The
 /// ledger holds two dated entries, 20260401 `Regular` and 20260915 `Regular - SEZ`
 /// (voucher-writes reference §9.16).
 fn s9b_customer() -> bridge_tally_protocol::PartyLedgerMasterRecord {
@@ -3338,10 +3337,11 @@ fn a_customer_made_sez_on_screen_is_refused_from_the_date_of_its_new_entry() {
             date,
         )
     };
-    const COPIED: &str = "08ZZZZZ0000Z1ZO";
+    // The synthetic GSTIN the setup seed gave the customer, as the capture holds it.
+    const CUSTOMER: &str = "08ZZZZZ0000Z3ZO";
     let in_force = |kind: &str| {
         (
-            GstinEvidence::InForce(COPIED.to_string()),
+            GstinEvidence::InForce(CUSTOMER.to_string()),
             Some(kind.to_string()),
         )
     };
@@ -3350,18 +3350,16 @@ fn a_customer_made_sez_on_screen_is_refused_from_the_date_of_its_new_entry() {
     assert_eq!(on("20260914"), in_force("Regular"));
     assert_eq!(on("20260915"), in_force("Regular - SEZ"));
 
-    // The substitution kept the original's check character, so the copied GSTIN fails the check
-    // digit and would be refused as invalid before its type is read. The judge is given the
-    // valid synthetic GSTIN of the same state and the entry's type as the read gives it.
-    assert!(!gstin_valid(COPIED));
+    // Both GSTINs the answer holds pass the build's check digit: the customer's, and the
+    // company's own registration in the same answer.
+    assert!(gstin_valid(CUSTOMER));
+    assert!(gstin_valid("08ZZZZZ0000Z2ZP"));
+    // The judge is given the GSTIN and the entry's type exactly as the read gives them.
     let judged = |date: &str| {
         let (gstin, kind) = on(date);
         let mut facts = good_facts();
         let party = facts.get_mut("Customer A").unwrap();
-        party.gstin = match gstin {
-            GstinEvidence::InForce(_) => GstinEvidence::InForce(GSTIN_RJ.to_string()),
-            other => other,
-        };
+        party.gstin = gstin;
         party.registration_type = kind;
         classify_sales_invoice(&voucher(), &facts, RAJ, date)
     };

@@ -184,7 +184,7 @@ Ok(ParsedExport {
                             GstRegistrationEntry {
                                 applicable_from: "20260401",
                                 gstin: Some(
-                                    "08ZZZZZ0000Z1ZO",
+                                    "08ZZZZZ0000Z3ZO",
                                 ),
                                 registration_type: Some(
                                     "Regular",
@@ -193,7 +193,7 @@ Ok(ParsedExport {
                             GstRegistrationEntry {
                                 applicable_from: "20260915",
                                 gstin: Some(
-                                    "08ZZZZZ0000Z1ZO",
+                                    "08ZZZZZ0000Z3ZO",
                                 ),
                                 registration_type: Some(
                                     "Regular - SEZ",
@@ -223,7 +223,7 @@ Ok(ParsedExport {
             alter_id: Some(
                 "248",
             ),
-            raw_source_sha256: "8627c9e73857d54be7fe05f89d4f39ffb606f60789541b65e0f6066eb3e1047a",
+            raw_source_sha256: "7427112d9604ca8813cb6dd4456aa268b909e21fb9db53f232b563f03bef6461",
         },
         ParsedSourceRecord {
             record: PartyLedgerMasterRecord {

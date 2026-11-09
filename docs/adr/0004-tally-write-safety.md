@@ -1000,3 +1000,49 @@ The cost is one more open and lock per acquisition. An earlier unpackaged build 
 **Not measured.** An actual overlap before #1641 (the split is shown by a holder of the AppData file alone, not by a build from before #1641, and the overlap it allowed is not measured); whether the extension's own AppData files are redirected; the extension as Claude Desktop starts it as an acquirer; whether a server Claude Desktop starts from a config entry also runs inside the package; whether the direct installer is also MSIX-packaged.
 
 **Rollback.** This amendment changes no code. Reverting #1641 restores one lock folder, and with it the split on a Store install.
+
+## Amendment — 2026-11-09: Sales switched on in code, held as a draft (#2162)
+
+**State at this change: Sales is in `LIVE_QUALIFIED_VOUCHER_TYPES` (`src-tauri/src/agent_import.rs`), and the change that adds it stays a draft.** The paragraphs above that say "Sales stays off" describe the tree at their own dates and stand. This amendment records what the switching-on change does, what it rests on and what is still owed, by the numbers of the 31 October checklist. It closes no owed item. The change leaves draft only when each item under "Still owed" is closed by its own measurement or build, or the owner accepts it in writing in #2162.
+
+**What the change does.** It adds one entry, `VoucherType::Sales`, to the list, and changes the text that names the list. Every guard on an invoice was built earlier and is keyed on the voucher being an invoice:
+
+- the type must be on the list at the build and again at the post (`refuse_unqualified_types`);
+- the build refuses an invoice while posting is off (`invoice_post_not_enabled`);
+- an invoice is alone in its batch (`invoice_one_per_batch`, `voucher_type_shapes_mixed`), at the build and on the saved batch;
+- the Sales type's one series must read Manual with prevent-duplicates Yes (`resolve_voucher_type`), at the build and again on the answers read before the post;
+- the number control (`invoice_number_control_missing`) sits in the judge that the build and the post share;
+- the read-back compares the stored voucher number with the one sent.
+
+The desktop's post still admits one Journal only (`PostScope::JournalOnly`, refusing an invoice as `import_post_requires_one_journal`).
+
+**Evidence: PARTIAL.** The rows behind the switch are on synthetic books and one TallyPrime release (section 9.16 of the voucher-writes reference), and `voucher_schema` says so in its rule on Sales. In particular, a Sales type that numbers automatically stored an imported invoice under its own next number, and the answer did not say so (PARTIAL; #2436 writes it into section 9.16). The series check above refuses such a type before any request, so no further guard is added for it.
+
+**Item 7 (switching on).** Done here, except the ruling below:
+
+- the tool text and the schema's invoice object name Sales;
+- the posting setting's title is unchanged, and its description names Sales invoices;
+- the change-list entry carries the downgrade paragraph that the slice 4 amendment prescribes, which is the recovery step.
+
+The owner's ruling on the setting's new description (Terms of Use 9.2) is owed.
+
+**Still owed, by item.**
+
+- **2.** Tests on the captured rates listing; the GST-details rate case; S11.
+- **3.** The answers this change rests on, committed as captured fixtures where possible.
+- **8.** What a verification reads after a person saves a posted invoice again.
+- **9.** The six buyer and consignee fields in the read-back, or the gap accepted.
+- **10.** How the GSTR-1 view splits the taxable value.
+- **11.** The month-at-a-time number read (#2423), a replay, and a blank number's read-back.
+- **12.** The control cases (S8).
+- **13.** A release path for a control Tally still shows (#2423), and the owner's ratification.
+- **14.** A number from an earlier financial year: a row, then a build refusal.
+- **15.** The customer's party type: a read and a refusal (S9).
+- **16.** The rest of S9.
+- **17.** One end-to-end run of this head (S12).
+- **18.** A registered customer of another PAN.
+- **19.** Why the rehearsal's company read its registration as invalid, and a buyer of another PAN.
+
+Items 1 and 6 are closed by a refusal at the build (#2321). Item 4 is done (#2307). Item 5 is done, PARTIAL (#2379).
+
+**Rollback.** Remove the entry. Sales is then refused again before any request. A journal that already holds an invoice record stays readable by this release and by any later one.

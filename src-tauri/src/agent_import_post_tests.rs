@@ -4753,6 +4753,12 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
     // Postable now that Sales is qualified, and not against the list before it
     // was, however the batch came to be saved.
     assert!(admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1).is_ok());
+    // The desktop's review was built for one Journal: its scope refuses the
+    // invoice itself, not only the numbering guard behind it.
+    assert_eq!(
+        admit_saved_journal(&line, &endpoint).unwrap_err(),
+        "import_post_requires_one_journal"
+    );
     assert_eq!(
         super::super::TEST_QUALIFIED_VOUCHER_TYPES
             .sync_scope(super::super::PRE_SALES_QUALIFIED_VOUCHER_TYPES, || {

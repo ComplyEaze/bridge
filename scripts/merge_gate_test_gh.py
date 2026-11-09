@@ -1412,7 +1412,7 @@ def state():
         commit["commit"] = {
             "message": "safe commit metadata",
             "author": {"name": "dependabot[bot]", "email": email},
-            "committer": {"name": "GitHub", "email": "noreply@github.com"},
+            "committer": {"name": "GitHub", "email": "noreply@example.invalid"},
         }
         s["commits"] = [commit]
 

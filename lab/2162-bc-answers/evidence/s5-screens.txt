@@ -1,0 +1,106 @@
+Step 5: Tally's GSTR-1 screens, written down word for word from the screen (BRIDGE PILOT LAB, 1-Aug-26 to 31-Aug-26), after the four invoices. Read only.
+
+== 5.1 Alt+G, "GSTR-1" typed; the List of Reports showed under GST Reports: GSTR-1, GSTR-1 Reconciliation, GSTR-1 Filed Summary - Downloaded. Enter: GSTR-1 opened directly on GST Registration 08ZZZZZ0000Z1ZQ (no list of registrations).
+
+== 5.2 Alt+F2: "Change Period", From 1-8-2026, To 31-8-2026 (already so); typed From 1-8-2026, Enter, To 31-8-2026, Enter. Capture shots/s5-summary.png.
+Title: GSTR-1 | BRIDGE PILOT LAB | 1-Aug-26 to 31-Aug-26
+GST Registration : 08ZZZZZ0000Z1ZQ
+Status : Not Filed
+ARN :
+ARN Date :
+Last online GST activity: No Activity Found
+Particulars | Voucher Count
+Total Vouchers | 43
+  Included in Return | 31
+    Ready for Upload | 31
+      Not Uploaded | 2
+      Modified in Books After Upload/Export | 29
+  Not Relevant for This Return | 7
+  Uncertain Transactions (Corrections needed) | 5
+Check Vouchers Having Potential Conflicts with Masters | Yes
+Particulars | Vch Count (Summary) | Taxable Amount | IGST | CGST | SGST/UTGST | Cess | Tax Amount | Invoice Amount
+Return View
+B2B Invoices - 4A, 4B, 4C, 6B, 6C | 2 | 2,001.60 | | 50.04 | 50.04 | | 100.08 | 2,102.00
+B2C (Large) Invoices - 5A, 5B | (blank)
+Exports Invoices - 6A | (blank)
+Credit or Debit Notes (Registered) - 9B | (blank)
+Credit or Debit Notes (Unregistered) - 9B | (blank)
+Amended B2B Invoices - 9A | (blank)
+Amended B2C (Large) Invoices - 9A | (blank)
+Amended Exports Invoices - 9A | (blank)
+Amended Credit or Debit Notes (Registered) - 9C | (blank)
+Amended Credit or Debit Notes (Unregistered) - 9C | (blank)
+B2C (Small) Invoices - 7 | 29 (2) | 15,510.30 | | 433.30 | 433.28 | | 866.58 |
+Nil Rated Invoices - 8A, 8B, 8C, 8D | (blank)
+Amendment B2C (Small) Invoices - 10 | (blank)
+Tax Liability (Advances Received) - 11A(1), 11A(2) | (blank)
+Adjustment of Advances - 11B(1), 11B(2) | (blank)
+(the list continues below the window: "4" with a down mark at its foot; not scrolled in this step)
+Total | | 17,511.90 | | 483.34 | 483.32 | | 966.66 | 2,102.00
+
+== 5.3 B2B. Down arrows to B2B Invoices - 4A, 4B, 4C, 6B, 6C, Enter. Capture shots/s5-b2b.png.
+Title: GSTR-1 - Summary | BRIDGE PILOT LAB | 1-Aug-26 to 31-Aug-26
+GST Registration : 08ZZZZZ0000Z1ZQ
+Details of : B2B Invoices - 4A, 4B, 4C, 6B, 6C
+Particulars | Party Name | Voucher Count | Taxable Amount | IGST | CGST | SGST/UTGST | Cess | Tax Amount | Invoice Amount
+08ZZZZZ0000Z3ZO | BRIDGE Customer RJ | 2 | 2,001.60 | | 50.04 | 50.04 | | 100.08 | 2,102.00
+Total | | | 2,001.60 | | 50.04 | 50.04 | | 100.08 | 2,102.00
+Esc: back to the summary.
+
+B2C (Small). Down arrows to B2C (Small) Invoices - 7, Enter. Capture shots/s5-b2c.png.
+Title: GSTR-1 - Summary | BRIDGE PILOT LAB | 1-Aug-26 to 31-Aug-26
+GST Registration : 08ZZZZZ0000Z1ZQ
+Details of : B2C (Small) Invoices - 7
+Particulars | Taxable Amount | IGST | CGST | SGST/UTGST | Cess | Tax Amount
+Rajasthan - 5% | 14,810.30 | | 370.30 | 370.28 | | 740.58
+Rajasthan - 18% | 700.00 | | 63.00 | 63.00 | | 126.00
+Total | 15,510.30 | | 433.30 | 433.28 | | 866.58
+Esc: back to the summary.
+
+== 5.4 Uncertain Transactions (Corrections needed) showed 5. Up arrows to it, Enter. Capture shots/s5-uncertain.png.
+Title: GSTR-1 - Uncertain Transactions | BRIDGE PILOT LAB | 1-Aug-26 to 31-Aug-26
+GST Registration : 08ZZZZZ0000Z1ZQ
+Details of : Uncertain Transactions (Corrections needed)
+Particulars | Voucher/Summary Count
+Transactions with Incomplete/Mismatch in Information | 5
+Outward Supplies
+  Invalid or Missing Information
+    HSN/SAC is invalid, mismatched, or not specified | 2
+  Mismatch in Information Between Masters and Transactions
+    Mismatch between Expected Tax Amount and Modified Tax Amount in transaction | 3
+
+Cause 1: Down to "HSN/SAC is invalid, mismatched, or not specified", Enter. Capture shots/s5-cause-hsn.png.
+Title: GSTR-1 - Resolution of Uncertain Transactions | BRIDGE PILOT LAB | 1-Aug-26 to 31-Aug-26
+Vouchers of : HSN/SAC is invalid, mismatched, or not specified
+Date | Particulars | Vch Type | Vch No. | Taxable Amount | IGST | CGST | SGST/UTGST | Cess | Tax Amount | Invoice Amount
+7-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | 5 | 100.00 | | 2.50 | 2.50 | | 5.00 | 105.00
+          BRIDGE Svc INH 5% 100.00
+7-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | 6 | 100.00 | | 2.50 | 2.50 | | 5.00 | 105.00
+          BRIDGE Svc INH2 5% 100.00
+Buttons shown by Tally, none pressed: S: Set GST Status, V: Accept As Is (Format); at the foot Q: Quit, Enter: Alter, Space: Select.
+Esc: back to the list of causes.
+
+Cause 2: Down to "Mismatch between Expected Tax Amount and Modified Tax Amount in transaction", Enter. Capture shots/s5-cause-tax.png.
+Title: GSTR-1 - Resolution of Uncertain Transactions | BRIDGE PILOT LAB | 1-Aug-26 to 31-Aug-26
+Vouchers of : Mismatch between Expected Tax Amount and Modified Tax Amount in transaction
+Date | Particulars | Vch Type | Vch No. | Taxable Amount | Tax Amount: Expected Tax Amount | Modified Tax Amount | Difference
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0002 | 1,001.00 | 50.06 | 50.05 | 0.01
+          CGST @ 2.50 % | 1,001.00 | 25.03 | 25.03 |
+          SGST/UTGST @ 2.50 % | 1,001.00 | 25.03 | 25.02 | 0.01
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0003 | 1,001.00 | 50.06 | 50.04 | 0.02
+          CGST @ 2.50 % | 1,001.00 | 25.03 | 25.02 | 0.01
+          SGST/UTGST @ 2.50 % | 1,001.00 | 25.03 | 25.02 | 0.01
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0008 | 1,001.00 | 50.06 | 50.05 | 0.01
+          CGST @ 2.50 % | 1,001.00 | 25.03 | 25.03 |
+          SGST/UTGST @ 2.50 % | 1,001.00 | 25.03 | 25.02 | 0.01
+Buttons shown by Tally, none pressed: J: Accept As Is, S: Set GST Status; at the foot Q: Quit, Enter: Alter, Space: Select.
+Esc: back to the list of causes.
+
+== 5.5 Esc (to the summary), Esc (to the Gateway). Capture shots/s5-gateway.png.
+
+== For each invoice, every section or cause that names it
+No screen opened in this step names any of BP/26-27/0053 to 0056 by number: B2B and B2C (Small) show lines by party or by place and rate, and neither cause names any of them (cause 1 names 5 and 6; cause 2 names 0002, 0003 and 0008).
+What the screens show by count and value, against item 2162-M1's read of the same screens an hour before (B2B blank; B2C (Small) 27 (2), Rajasthan - 5% 12,808.70; Total Vouchers 39, Included 27, Uncertain 5):
+- 0053 and 0054 (BRIDGE Customer RJ, 08ZZZZZ0000Z3ZO): B2B, one line for that GSTIN, Voucher Count 2, 2,001.60 (each invoice's taxable value 1,000.80). They are the only invoices to that party.
+- 0055 and 0056 (BRIDGE Walk-in): B2C (Small) - 7, Rajasthan - 5%, up from 12,808.70 to 14,810.30 (+2,001.60); the section's count up from 27 to 29.
+- None of the four under Uncertain Transactions: its count is 5 before and after.

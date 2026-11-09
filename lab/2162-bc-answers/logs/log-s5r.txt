@@ -1,0 +1,4 @@
+12:27:21	R-0053.xml	a-s5r-R-0053.xml	curl 0	94496 bytes
+12:27:21	R-0054.xml	a-s5r-R-0054.xml	curl 0	94496 bytes
+12:27:22	R-0055.xml	a-s5r-R-0055.xml	curl 0	94478 bytes
+12:27:22	R-0056.xml	a-s5r-R-0056.xml	curl 0	94478 bytes

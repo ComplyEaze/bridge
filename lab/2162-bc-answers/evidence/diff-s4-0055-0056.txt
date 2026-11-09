@@ -1,0 +1,9 @@
+== --diff a-s4cr-R-0055.xml a-s4dr-R-0056.xml
+   ALTERID: '71' -> '72'
+   GUID: '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002f' -> '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000030'
+   MASTERID: '47' -> '48'
+   REFERENCE: 'BP/26-27/0055' -> 'BP/26-27/0056'
+   VOUCHERKEY: '<15-digit voucher key>' -> '<15-digit voucher key>'
+   VOUCHERNUMBER: 'BP/26-27/0055' -> 'BP/26-27/0056'
+   VOUCHERRETAINKEY: '137' -> '141'
+   legs: 6 -> 6

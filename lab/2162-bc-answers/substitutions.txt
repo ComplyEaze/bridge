@@ -1,0 +1,4 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/diff-s4-0053-0054.txt: original 422 B sha256 b502eb1f4c03a075e66b0e9377d2b83597f578d93e9f35350f0e626775e94f06 (kept on the lab PC); the voucher keys of 1 VOUCHERKEY diff line(s) -> <15-digit voucher key> (the values are in the answers)
+evidence/diff-s4-0055-0056.txt: original 422 B sha256 e98013471bf394e993b5d76e717b27546cd7a06cc2c436699031594678cd2026 (kept on the lab PC); the voucher keys of 1 VOUCHERKEY diff line(s) -> <15-digit voucher key> (the values are in the answers)
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>

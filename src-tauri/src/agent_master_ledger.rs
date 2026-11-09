@@ -318,18 +318,9 @@ impl MasterDispatchIntent {
     }
 }
 
-/// Tally's import counters, as the response reported them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct MasterCounters {
-    pub(super) created: u64,
-    pub(super) altered: u64,
-    pub(super) deleted: u64,
-    pub(super) ignored: u64,
-    pub(super) errors: u64,
-    pub(super) cancelled: u64,
-    pub(super) exceptions: u64,
-}
+// Tally's import counters, as the response reported them. The protocol crate's
+// type has this journal's field names, so records written before it read alike.
+pub(super) use bridge_tally_protocol::ImportCounters as MasterCounters;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

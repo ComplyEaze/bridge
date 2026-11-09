@@ -376,11 +376,12 @@ pub(super) fn resolve_voucher_type(
     // series).
     // Its "prevent duplicates" flag is the guard the number read's control
     // relies on when no invoice of the company stands as sent (its first, or
-    // every one after a person's release). On a Sales type with one Manual
-    // series it declined a number already in the book in the import's answer,
-    // with no dialog (measured, §9.16, the bullet on two invoices that differ
-    // only by their number: one type, one sitting, PARTIAL); §9.8 measured it
-    // on Journal and Payment vouchers before.
+    // every one after a person's release). On two Sales types with one Manual
+    // series, in two sittings on one book, it declined a number already in the
+    // book in the import's answer, with no dialog (PARTIAL: row S4, §9.16, the
+    // bullet on two invoices that differ only by their number; row 2162-KD,
+    // ADR 0004's amendment of 2026-11-09, item 12); §9.8 measured it on Journal
+    // and Payment vouchers before.
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {

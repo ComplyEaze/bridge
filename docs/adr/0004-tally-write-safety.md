@@ -1034,7 +1034,7 @@ The owner's ruling on the setting's new description (Terms of Use 9.2) is owed.
 - **9.** The six buyer and consignee fields in the read-back, or the gap accepted.
 - **10.** How the GSTR-1 view splits the taxable value.
 - **11.** The month-at-a-time number read (#2423), a replay, and a blank number's read-back.
-- **12.** The control cases (S8).
+- **12.** The type's guard is measured on two Sales types of one book, `BRIDGE PILOT LAB`, each declining a reused number in the answer with no dialog (PARTIAL, one release): row S4, 3 November 2026, on the type keyed for the rehearsal (section 9.16); and row 2162-KD, 9 November 2026, on a type keyed with Manual numbering and prevent-duplicates Yes in its own sitting, where a fresh number was stored as sent and the same number sent again gave `CREATED` 0 and `EXCEPTIONS` 1 with no `LINEERROR` (`lab/2162-keyed-dup-answers` at `b9886b6a`). Owed: the control cases (S8), and a number held by another Sales type.
 - **13.** A release path for a control Tally still shows (#2423), and the owner's ratification.
 - **14.** A number from an earlier financial year: a row, then a build refusal.
 - **15.** The customer's party type: a read and a refusal (S9).

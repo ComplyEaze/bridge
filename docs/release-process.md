@@ -801,6 +801,16 @@ It checks every file first and writes none if one fails. Then:
 1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`, and move the
    unreleased entries into the new section (see "At cut time" under `CHANGELOG.md` below).
+2a. In the same pull request, check the two things a reader meets first:
+   - the new `CHANGELOG.md` section opens with "In plain words" and its "Should I upgrade?"
+     block (see below); the release run only warns when the section is missing or unreadable,
+     and the release page then carries the standard text alone, with no plain-words opening;
+   - the static lines of `site/download.html` that name a release (`At a glance, release`,
+     `Not in release`, and the sentence about the file a run used) name the new build, and the
+     "If you already have an older release" list says, for the previous release installed
+     over, whether it was measured or "has not been measured". The buttons follow the newest
+     release by themselves, so a page edited later offers the new build under the old
+     description until it is deployed.
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
 5. After the release is published, if the release run warned that unreleased entries were

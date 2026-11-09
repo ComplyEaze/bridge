@@ -1,0 +1,3 @@
+BODY/DATA/COLLECTION: 1; COMPANY rows: 1
+GUID: 3a6bd6e1-b835-4bff-89dd-8a6af138c346 (matches)
+the stored name is A whole: L-ledgers-a-stored.utf16le.xml is not needed and is not written

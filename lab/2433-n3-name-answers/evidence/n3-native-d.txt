@@ -1,0 +1,10 @@
+BODY/DATA/COLLECTION: 1; COMPANY rows: 1
+GUID: 3a6bd6e1-b835-4bff-89dd-8a6af138c346 (matches)
+NAME attribute present: yes; NAME elements: 1
+NAME attribute: chars 120, utf8_bytes 360, sha256 80af7109bb397656bfc82f160ac7ddbf19e3bab9b180e78125f15ec73003e2a5
+NAME attribute: the whole name, 120 characters
+NAME attribute as stored: ककककककककककखखखखखखखखखखगगगगगगगगगगघघघघघघघघघघङङङङङङङङङङचचचचचचचचचचछछछछछछछछछछजजजजजजजजजजझझझझझझझझझझञञञञञञञञञञटटटटटटटटटटठठठठठठठठठठ
+NAME element 1: chars 120, utf8_bytes 360, sha256 80af7109bb397656bfc82f160ac7ddbf19e3bab9b180e78125f15ec73003e2a5
+NAME element 1: the whole name, 120 characters
+NAME element 1 as stored: ककककककककककखखखखखखखखखखगगगगगगगगगगघघघघघघघघघघङङङङङङङङङङचचचचचचचचचचछछछछछछछछछछजजजजजजजजजजझझझझझझझझझझञञञञञञञञञञटटटटटटटटटटठठठठठठठठठठ
+attribute equal to element 1: yes

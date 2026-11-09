@@ -1,0 +1,13 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+bk/TDBK1800_<company number>.001 90051 B 948ba6b3d05d293658ca6f6a86db98ce9faa49bcae44e7e482779d0101bf0ad8 (BK, taken at step 1 of this sitting and restored at step 7)
+restore-plan.txt 742 B 7ec1e72a4bb8ab99938ad191692b666201802c56e8b6b83ce2e38bd5a816094d (the restore plan, written after the restore: the company number and the data path)
+answers/a-s3r-V-0057.xml 52788 B e44de99f6a4667cf25b06a0809261b39109ab3a4d2b06d5ce29cff46ea0dbca6 (GSTIN shape (the invented GSTINs stay local))
+answers/a-s4-V-0057.xml 52788 B e44de99f6a4667cf25b06a0809261b39109ab3a4d2b06d5ce29cff46ea0dbca6 (GSTIN shape (the invented GSTINs stay local))
+answers/a-s6-V-0057.xml 52890 B 925722003fc35e3b8799f3f811b88e78438440567554e8f729e52fe288ff54ee (GSTIN shape (the invented GSTINs stay local))
+answers/a-s6b-V-0057.xml 52890 B 925722003fc35e3b8799f3f811b88e78438440567554e8f729e52fe288ff54ee (GSTIN shape (the invented GSTINs stay local))
+evidence/c10-data-after-close.txt 1365 B 65ad6d19d104a6c563e52e70d783cc9f8f51a14723c7be873b1b364f96fda919 (folder listing)
+evidence/c10-netstat.txt 7680 B cbe3aad92c61074b8a39176df2b99aa856e96229a724f4c8198b2ba4a7a2e97e (process or port listing)
+evidence/c10-tasklist.txt 54 B 1c3ee7433e4c34597546e135b7986958d32e01532defd4a4e5871b50710aacf5 (process or port listing)
+evidence/s0-netstat.txt 7689 B 2f9f7079cb0d976936756f12c3a5d5604d9099f659475629143999b01eb51aaf (process or port listing)
+evidence/s0-tasklist.txt 54 B 892671f9792dca2179df84a16ad0ec26765e6471b1b24f8b47c98a7cc8c030ab (process or port listing)
+stage-2162rs.py 10055 B 332a83de1a907dad8f46a2ec3df3a2785f674871731b51130e42a4b9eee805d5 (this stage script: its patterns name the lab paths)

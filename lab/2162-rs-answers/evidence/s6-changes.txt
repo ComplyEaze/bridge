@@ -1,0 +1,12 @@
+What the unchanged re-save changed, s4 against s6 (line diff in rawdiff-s4-s6.txt; s6b byte-equal to s6):
+Marks (M-marks): ALTVCHID 69 -> 70; ALTMSTID 245 -> 245; GUID the book's.
+R-0057 (the voucher, Invoice Voucher View):
+ - ALTERID 69 -> 70; GUID ...-0000002d unchanged; VOUCHERNUMBER, DATE, party, legs and amounts unchanged; legs 6 -> 6.
+ - VCHGSTSTATUSISINCLUDED Yes, ISUNCERTAIN No, ISEXCLUDED No: unchanged.
+ - VATEXPAMOUNT, empty on s4, now filled on the five non-party legs with each leg's amount: Svc 998313 600.40, Svc 998314 400.40, CGST 25.02, SGST 25.02, Round Off 0.16 (the "5 differ" of ALLLEDGERENTRIES.LIST). The party leg is unchanged.
+ - RATEOFINVOICETAX.LIST with RATEOFINVOICETAX 2.50 added on the CGST 2.5% and SGST 2.5% legs.
+V-0057 (the voucher object):
+ - ALTERID 69 -> 70; MASTERID 45 unchanged; direct children 729 -> 729.
+ - REMOTEALTGUID empty -> the book's GUID (6b43e498-430c-4d5c-bfef-d32e2ab93c85).
+Both answers' DESC/CMPINFO counts (Tally's count of objects, not voucher fields): LEDGER 11 -> 33, CURRENCY 1 -> 2, TAXUNIT 1 -> 3, VOUCHERNUMBERSERIES 1 -> 4, VOUCHER 2 -> 4.
+Nothing else differs.

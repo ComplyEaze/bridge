@@ -1,0 +1,4 @@
+20:24:48	N-0057.xml	a-s2-N-0057.xml	curl 0	3022 bytes
+20:24:48	R-0057.xml	a-s2-R-0057.xml	curl 0	3022 bytes
+20:24:48	V-0057.xml	a-s2-V-0057.xml	curl 0	3022 bytes
+20:24:48	R-0010.xml	a-s2-R-0010.xml	curl 0	94474 bytes

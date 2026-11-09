@@ -1,0 +1,13 @@
+== --diff a-s4-R-0057.xml a-s6-R-0057.xml
+   ALTERID: '69' -> '70'
+   list ALLLEDGERENTRIES.LIST: 6 -> 6, 5 differ
+   lists compared: 1
+   legs: 6 -> 6
+== --diff a-s4-V-0057.xml a-s6-V-0057.xml
+   ALTERID: '69' -> '70'
+   REMOTEALTGUID: '' -> '6b43e498-430c-4d5c-bfef-d32e2ab93c85'
+   lists compared: 2
+   legs: 0 -> 0
+== a-s6-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'70'", "'245'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+before-write exit 0

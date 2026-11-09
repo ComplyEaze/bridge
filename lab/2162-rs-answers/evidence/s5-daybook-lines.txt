@@ -1,0 +1,15 @@
+Day Book, BRIDGE PILOT LAB, For 1-Aug-26 (Alt+F2 Change Period: From 1-8-2026, To 1-8-2026), as listed top to bottom:
+Date | Particulars | Vch Type | Vch No. | Debit Amount
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0001 | 1,050.00
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0002 | 1,051.05
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0003 | 1,051.04
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0004 | 1,051.05
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0005 | 1,051.05
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0006 | 1,050.02
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0007 | 1,050.00
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0008 | 1,051.05
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0009 | 1,456.00
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0011 | 1,051.06
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0010 | 1,051.00
+1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0057 | 1,051.00
+12 lines; Credit Amount column empty on every line. Before the period change the Day Book opened For 15-Sep-26 with one line (BRIDGE Walk-in, BRIDGE Sales, BP/26-27/0020, 210.20).

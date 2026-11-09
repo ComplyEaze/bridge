@@ -1,0 +1,3 @@
+20:30:38	R-0057.xml	a-s6b-R-0057.xml	curl 0	95182 bytes
+20:30:38	V-0057.xml	a-s6b-V-0057.xml	curl 0	52890 bytes
+20:30:38	M-marks.xml	a-s6b-M-marks.xml	curl 0	3396 bytes

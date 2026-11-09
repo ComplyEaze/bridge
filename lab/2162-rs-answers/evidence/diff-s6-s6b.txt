@@ -1,0 +1,6 @@
+== --diff a-s6-R-0057.xml a-s6b-R-0057.xml
+   lists compared: 1
+   legs: 6 -> 6
+== --diff a-s6-V-0057.xml a-s6b-V-0057.xml
+   lists compared: 2
+   legs: 0 -> 0

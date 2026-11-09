@@ -1,0 +1,8 @@
+== --diff a-s3r-R-0057.xml a-s4-R-0057.xml
+   lists compared: 1
+   legs: 6 -> 6
+== --diff a-s3r-V-0057.xml a-s4-V-0057.xml
+   lists compared: 2
+   legs: 0 -> 0
+== a-s4-M-marks.xml against a-s3r-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'245'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'245'")
+  equal

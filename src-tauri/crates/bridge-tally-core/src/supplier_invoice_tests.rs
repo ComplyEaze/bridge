@@ -38,7 +38,16 @@ fn a_number_is_folded_to_upper_case_with_one_separator_and_refused_only_when_emp
     assert_eq!(reference(" INV//12. ").exact(), "INV/12");
     assert_eq!(reference("GS1/P/0001").exact(), "GS1/P/0001");
     assert_eq!(reference("inv 12").raw(), "inv 12");
-    for empty in ["", "   ", "-/ .", "\t"] {
+    for empty in [
+        "",
+        "   ",
+        "-/ .",
+        "\t",
+        "\u{200B}",
+        "\u{200E}",
+        " \u{202A}\u{202C} - \u{FEFF}",
+        "\u{FE0F}",
+    ] {
         assert_eq!(
             SupplierInvoiceRef::parse(empty),
             Err(SupplierInvoiceRefError::Empty),
@@ -63,6 +72,21 @@ fn the_gstr1_shape_is_reported_never_required() {
 fn the_financial_year_begins_on_1_april() {
     assert_eq!(FinancialYear::of(&date("20260331")).starting_year(), 2025);
     assert_eq!(FinancialYear::of(&date("20260401")).starting_year(), 2026);
+    // A leap day belongs to the year that began the previous April.
+    assert_eq!(FinancialYear::of(&date("20240229")).starting_year(), 2023);
+}
+
+#[test]
+fn the_same_number_across_the_31_march_and_1_april_boundary_is_another_invoice() {
+    let new = incoming("INV/0001", "20260401");
+    assert_eq!(
+        compare(&new, &booked("INV/0001", Some("20260331"), "20260331")),
+        InvoiceMatch::Different
+    );
+    assert_eq!(
+        compare(&new, &booked("INV/0001", Some("20260402"), "20260402")),
+        InvoiceMatch::Booked
+    );
 }
 
 #[test]
@@ -232,6 +256,11 @@ fn a_number_copied_with_typographic_dashes_digits_or_invisible_characters_is_the
         "INV\u{FF0D}12\u{FF0F}A",
         "INV-1\u{200B}2/A",
         "INV-\u{00AD}12/A",
+        "INV-1\u{200E}2/A",
+        "\u{202A}INV-12/A\u{202C}",
+        "INV-\u{2066}12\u{2069}/A",
+        "INV-1\u{061C}2/A",
+        "INV-12\u{FE0F}/A",
         "INV-\u{FF11}\u{FF12}/A",
         "INV-\u{0967}\u{0968}/A",
     ] {
@@ -328,4 +357,11 @@ fn every_folded_character_reads_as_its_ascii_form() {
     ] {
         assert_eq!(reference(copied).exact(), expected, "{copied:?}");
     }
+}
+
+#[test]
+fn a_number_with_multibyte_characters_is_kept_and_never_panics() {
+    let kept = reference("INV-\u{1F4C4}-12\u{00C9}");
+    assert!(kept.exact().contains('\u{1F4C4}'));
+    assert!(!kept.fits_gstr1());
 }

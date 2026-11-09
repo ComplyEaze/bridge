@@ -39,7 +39,7 @@ const GSTR1_MAX_CHARS: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SupplierInvoiceRefError {
-    /// Nothing but separators and whitespace: no number to compare.
+    /// Nothing but separators, whitespace and characters that draw nothing: no number to compare.
     Empty,
 }
 
@@ -193,12 +193,23 @@ fn without_year(exact: &str) -> String {
     }
 }
 
-/// A character that draws nothing (a soft hyphen, a zero-width space or joiner, a byte-order
-/// mark): dropped, so a copied number reads as it was printed.
+/// A character that draws nothing (a soft hyphen, a zero-width space or joiner, a direction
+/// mark or embedding control, an invisible operator, a variation selector, a byte-order mark):
+/// dropped, so a copied number reads as it was printed. The list is closed: a character not on it
+/// is kept, and Unicode normalisation is not applied.
 fn is_invisible(ch: char) -> bool {
     matches!(
         ch,
-        '\u{00AD}' | '\u{200B}'..='\u{200D}' | '\u{2060}' | '\u{FEFF}'
+        '\u{00AD}'
+            | '\u{034F}'
+            | '\u{061C}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{2064}'
+            | '\u{2066}'..='\u{2069}'
+            | '\u{FE00}'..='\u{FE0F}'
+            | '\u{FEFF}'
     )
 }
 

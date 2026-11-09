@@ -1,0 +1,7 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/diff-s4r-vs-control.txt: original 756 B sha256 88e7ee5d1e27cfb31f6d81fd8a59cec496c0e29671347998fb8c421ad9270f2f (kept on the lab PC); the voucher keys of 1 VOUCHERKEY diff line(s) -> <15-digit voucher key> (the values are in the answers)
+evidence/notes.txt: original 3748 B sha256 fdb730388848067219aa22018b7564530acad8974907f9d16b05e4ac9ee466c2 (kept on the lab PC); 1 x -> <backup folder>; 1 x -> stop
+RESULTS.md: original 21127 B sha256 c1716058e57a764f024adc31bd186405a10ac179b4fb6c8fa9951a0020e92155 (kept on the lab PC); the voucher keys of 1 VOUCHERKEY diff line(s) -> <15-digit voucher key> (the values are in the answers); 4 x -> <the before-write option>; 1 x -> stop
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 391 B sha256 30293a0546974a3cccefd4d08ff7082e52d7068ecc69c65f1fd2fa8d144361fa (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/send.sh: original 751 B sha256 de48d47f83cdb3dfbf0c2cea13d23c886d9680fe5630a512cb0b602633660aaa (kept on the lab PC); 1 x -> <LAB_DIR>

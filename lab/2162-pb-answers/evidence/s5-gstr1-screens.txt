@@ -1,0 +1,43 @@
+Row 2162-PB, step 5: Tally's GSTR-1 screen, read only. Times UTC, 9 Nov 2026. The customer's GSTIN is written 08<PAN-B>3ZN.
+
+16:30:33Z  The Gateway (s5-1-gateway). BRIDGE PILOT LAB alone; current period 1-Apr-26 to 31-Mar-27; current date Tuesday, 15-Sep-2026.
+Keys: "G: Go To" clicked (its label; the sheet says Alt+G). GSTR-1 typed. List of Reports, GST Reports: GSTR-1, GSTR-1 Reconciliation, GSTR-1 Filed Summary - Downloaded; no line highlighted. Down once: GSTR-1 highlighted. Enter.
+No list of GST registrations appeared.
+
+16:31:08Z  GSTR-1 (s5-2-gstr1-summary). GST Registration 08ZZZZZ0000Z1ZQ; Status Not Filed; ARN and ARN Date empty; 1-Aug-26 to 31-Aug-26; "Last online GST activity: No Activity Found". Button bar: F2: Period, F3: Company, F5: Nature View, F6: Validate Party GSTIN/UIN, F7: Validate HSN/SAC, F10: Mark as Filed, B: Basis of Values, H: Change View, J: Exception Reports, L: Save View, J: Stat Adjustment, V: Open GST Portal, A: Manually Update ARN, F12: Configure. No Alt+F2. No period key was pressed.
+  Total Vouchers 40
+  Included in Return 28
+    Ready for Upload 28
+      Not Uploaded 1
+      Modified in Books After Upload/Export 27
+  Not Relevant for This Return 7
+  Uncertain Transactions (Corrections needed) 5
+  Check Vouchers Having Potential Conflicts with Masters: Yes
+  Return View (Vch Count (Summary) / Taxable / IGST / CGST / SGST/UTGST / Cess / Tax / Invoice):
+  B2B Invoices - 4A, 4B, 4C, 6B, 6C: 1 / 1,000.80 / - / 25.02 / 25.02 / - / 50.04 / 1,051.00
+  B2C (Large) Invoices - 5A, 5B: empty
+  Exports Invoices - 6A: empty
+  Credit or Debit Notes (Registered) - 9B: empty
+  Credit or Debit Notes (Unregistered) - 9B: empty
+  Amended B2B Invoices - 9A: empty
+  Amended B2C (Large) Invoices - 9A: empty
+  Amended Exports Invoices - 9A: empty
+  Amended Credit or Debit Notes (Registered) - 9C: empty
+  Amended Credit or Debit Notes (Unregistered) - 9C: empty
+  B2C (Small) Invoices - 7: 27 (2) / 13,508.70 / - / 383.26 / 383.24 / - / 766.50 / empty
+  Nil Rated Invoices - 8A, 8B, 8C, 8D: empty
+  Amendment B2C (Small) Invoices - 10: empty
+  Tax Liability (Advances Received) - 11A(1), 11A(2): empty
+  Adjustment of Advances - 11B(1), 11B(2): empty
+  (more lines below, "4" with a down mark; not scrolled to)
+  Total: 14,509.50 / - / 408.28 / 408.26 / - / 816.54 / 1,051.00
+Step 5.3 does not apply: 0053 read included (s4r: included Yes, uncertain No).
+Keys: Down 6 times (to Uncertain Transactions, highlighted, not opened), Down once (Check Vouchers Having Potential Conflicts with Masters, not opened), Down once (B2B Invoices - 4A, 4B, 4C, 6B, 6C). Enter.
+
+16:31:47Z  "GSTR-1 - Summary", BRIDGE PILOT LAB, GST Registration 08ZZZZZ0000Z1ZQ, Details of B2B Invoices - 4A, 4B, 4C, 6B, 6C, 1-Aug-26 to 31-Aug-26 (s5-4-b2b-summary). One line:
+  Particulars 08<PAN-B>3ZN (the GSTIN sent) / Party Name BRIDGE Customer RJ / Voucher Count 1 / Taxable 1,000.80 / IGST - / CGST 25.02 / SGST/UTGST 25.02 / Cess - / Tax 50.04 / Invoice 1,051.00
+  Total: 1,000.80 / 25.02 / 25.02 / 50.04 / 1,051.00
+  Button bar: F2: Period, F3: Company, F5: Voucher-wise, B: Basis of Values, H: Change View, J: Exception Reports (greyed), L: Save View, F12: Configure. The line is a party, not a voucher: no voucher number is shown; F5 was not pressed (step 5.4 asks for the list as it opens). Nothing was pressed on the line.
+Keys: Esc (back to GSTR-1, the B2B line highlighted), Esc (the Gateway).
+
+16:32:12Z  The Gateway (s5-5-gateway), byte-equal to s5-1-gateway. No prompt and no dialog appeared at any point.

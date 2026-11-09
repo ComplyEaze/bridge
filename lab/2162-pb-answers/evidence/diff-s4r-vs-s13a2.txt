@@ -1,0 +1,4 @@
+== --diff S13A2-a-s4r-R-0053.xml a-s4r-R-0053.xml
+   PARTYGSTIN: '08ZZZZZ0000Z3ZO' -> '08<PAN-B>3ZN'
+   lists compared: 1
+   legs: 6 -> 6

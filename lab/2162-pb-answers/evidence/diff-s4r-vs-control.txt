@@ -1,0 +1,15 @@
+== --diff a-s2-R-0010.xml a-s4r-R-0053.xml
+   ALTERID: '17' -> '69'
+   GSTREGISTRATIONTYPE: 'Unregistered/Consumer' -> 'Regular'
+   GUID: '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b' -> '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d'
+   MASTERID: '11' -> '45'
+   PARTYGSTIN: '' -> '08<PAN-B>3ZN'
+   PARTYLEDGERNAME: 'BRIDGE Walk-in' -> 'BRIDGE Customer RJ'
+   REFERENCE: 'BP/26-27/0010' -> 'BP/26-27/0053'
+   VOUCHERKEY: '<15-digit voucher key>' -> '<15-digit voucher key>'
+   VOUCHERNUMBER: 'BP/26-27/0010' -> 'BP/26-27/0053'
+   VOUCHERRETAINKEY: '41' -> '129'
+   list ALLLEDGERENTRIES.LIST: 6 -> 6, 1 differ
+   lists compared: 1
+   legs: 6 -> 6
+   leg 1: ["'BRIDGE Walk-in'", "'Yes'", "'-1051.00'"] -> ["'BRIDGE Customer RJ'", "'Yes'", "'-1051.00'"]

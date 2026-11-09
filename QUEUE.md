@@ -49,3 +49,6 @@ Item 21 is done: `lab/2162-s9a-answers` at e84d928e, gate PASS. Item 22 is runni
 
 Items 22 and 23 are done: `lab/703-g-gst-computation-answers` at e9fd6a78 and `lab/2162-s9b-answers` at a534885f.
 24. `lab/2433-name-sheet` at 27b0241e (row #2433, T1 then T2). Run it now. Follow `lab/2433-name/RUN-SHEET.md`. Check `SHA256.txt` first, and check that THE COMPANY GUID is 3a6bd6e1-… (BRIDGE SHAPE LAB) before step 0. Raw requests only: no Bridge build, no Terms, no extension. Take one backup first, and restore after each row as the sheet says. Leave every master screen with Ctrl+Q. Answers go on `lab/2433-name-answers`.
+
+After item 24: one substitution commit on `lab/2162-s9b-answers`, as I asked in chat. It is the s5r C answer with the seed GSTIN replaced by the all-Z synthetic one, at the same length, recorded in substitutions.txt.
+25. `lab/2162-fy14-sheet` at e5d30d23 (row 2162-FY14, item 14). Run it after item 24 and the substitution commit. Check `SHA256.txt` first. The book is BRIDGE PILOT LAB: check its GUID is 6b43e498-… before step 0. Take BK first and restore at the end. Raw requests only: no build and no screen keying. s4 is the control (a fresh next-year number) and s5 is the variable (a number already held this year, dated next year). The two requests differ only in number and REMOTEID. Answers go on `lab/2162-fy14-answers`.

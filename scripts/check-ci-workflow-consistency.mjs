@@ -173,6 +173,73 @@ const nightlyWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/
 if (jobBlock(nightlyWorkflow, "shard").match(/^ {6}max-parallel: .*$/gm)?.join("\n") !== "      max-parallel: 4") {
   failures.push("the mutation shards must run four at a time (strategy.max-parallel: 4 in tax-audit-mutations-nightly.yml)");
 }
+// The nightly shard fetches the locked crates in a step of its own, before the mutation run, so a failed download is
+// a named fetch failure (a typed refusal in place of results) and not a mutation result; the build of the unmutated copy
+// then finds the crates already downloaded. The step is pinned by its position (after the toolchain, before the run),
+// its locked fetch, and its bound of three attempts. The report job lists the outside inputs changed since the last
+// green night after judging and before the issue is written, so the issue can carry the list.
+function nightlySteps(block) {
+  const lines = block.split("\n");
+  const heads = [];
+  lines.forEach((line, index) => {
+    const named = /^ {6}- name: (.*)$/.exec(line);
+    if (named) heads.push({ name: named[1], index });
+    else if (/^ {6}- uses: /.test(line)) heads.push({ name: line.trim(), index });
+  });
+  return heads.map((head, i) => {
+    const stop = i + 1 < heads.length ? heads[i + 1].index : lines.length;
+    // A full-line comment at step indentation belongs to the step after it, not to this one.
+    let end = stop;
+    while (end > head.index + 1 && /^ {6}#/.test(lines[end - 1])) end -= 1;
+    return { name: head.name, text: lines.slice(head.index, end).join("\n") };
+  });
+}
+const FETCH_STEP = "Fetch the locked crates, retrying a network failure";
+const MUTATION_STEP = "Run this shard's mutations";
+const LISTING_STEP = "List the outside inputs changed since the last green night";
+const ISSUE_STEP = "Open, update or close the tracking issue";
+const shardSteps = nightlySteps(jobBlock(nightlyWorkflow, "shard"));
+const fetchAt = shardSteps.findIndex((step) => step.name === FETCH_STEP);
+if (shardSteps.filter((step) => step.name === FETCH_STEP).length !== 1
+  || fetchAt !== shardSteps.findIndex((step) => step.name === MUTATION_STEP) - 1
+  || !/dtolnay\/rust-toolchain@/.test(shardSteps[fetchAt - 1]?.name ?? "")) {
+  failures.push(`the mutation shard must fetch the locked crates in one step named "${FETCH_STEP}", directly after the toolchain step and directly before "${MUTATION_STEP}"`);
+} else {
+  const fetchText = shardSteps[fetchAt].text;
+  const fetchLines = fetchText.split("\n").map((line) => line.trim());
+  if (!fetchLines.includes("cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-unknown-linux-gnu 2>&1 | tee \"$log\"")
+    || fetchLines.filter((line) => line === "attempts=3").length !== 1
+    || fetchLines.filter((line) => /^attempts=/.test(line)).length !== 1
+    || !fetchLines.includes("if [ \"$attempt\" -ge \"$attempts\" ]; then")
+    || fetchLines.filter((line) => line === "attempt=1").length !== 1
+    || fetchLines.filter((line) => line === "break").length !== 2
+    || fetchLines.filter((line) => line === "attempt=$((attempt + 1))").length !== 1
+    || !fetchLines.some((line) => line.startsWith("node -e 'const fs = require(\"fs\");") && line.includes("fs.writeFileSync(process.argv[2], JSON.stringify({ refused: { shard: process.argv[3] + \"/8\""))
+    || fetchLines.at(-1) !== "exit 1"
+    || /^ {8}(if|shell|continue-on-error|working-directory):/m.test(fetchText)
+    || /^ {8}(if|continue-on-error):/m.test(shardSteps.find((step) => step.name === MUTATION_STEP)?.text ?? "")) {
+    failures.push(`the "${FETCH_STEP}" step must run "cargo fetch --locked" for the shard's target, start at attempt 1, make at most three attempts (attempts=3, the attempt-bound test and its two breaks), write the typed refusal, end in exit 1, and set none of if, shell, continue-on-error or working-directory; the "${MUTATION_STEP}" step must set neither if nor continue-on-error`);
+  }
+}
+const reportBlock = jobBlock(nightlyWorkflow, "report");
+const reportSteps = nightlySteps(reportBlock);
+const listingAt = reportSteps.findIndex((step) => step.name === LISTING_STEP);
+const judgeAt = reportSteps.findIndex((step) => step.name === "Merge the shards and judge the whole list");
+const issueAt = reportSteps.findIndex((step) => step.name === ISSUE_STEP);
+if (reportSteps.filter((step) => step.name === LISTING_STEP).length !== 1 || !(judgeAt !== -1 && judgeAt < listingAt && listingAt < issueAt)
+  || !reportSteps[listingAt]?.text.includes("node scripts/nightly-outside-inputs.mjs --base \"$base\" --head \"$HEAD_SHA\" --reason \"$reason\" > outside-inputs.md")
+  || !reportSteps[listingAt]?.text.includes("if: ${{ github.ref == 'refs/heads/master' && steps.judge.outputs.failed == 'true' }}")
+  || !reportSteps[listingAt]?.text.includes("if ! last=\"$(gh run list --repo \"$GITHUB_REPOSITORY\" --workflow tax-audit-mutations-nightly.yml --branch master --status success --limit 1 --json headSha --jq '.[0].headSha // \"\"')\"; then")
+  || !reportSteps[listingAt]?.text.includes("reason=\"could not read the run list (the gh command failed)\"")
+  || !reportSteps[listingAt]?.text.includes("reason=\"no earlier green run was found\"")
+  || !reportSteps[listingAt]?.text.includes("base=\"$last\"")
+  || !reportSteps[listingAt]?.text.includes("|| [ ! -s outside-inputs.md ]; then")
+  || !reportSteps[listingAt]?.text.includes("Could not be computed: the listing step failed. This is not the same as \"none changed\"")
+  || !reportSteps[issueAt]?.text.includes("cat outside-inputs.md")
+  || !/^ {10}fetch-depth: 0$/m.test(reportSteps.find((step) => step.name.startsWith("- uses: actions/checkout@"))?.text ?? "")
+  || !/^ {6}actions: read$/m.test(reportBlock)) {
+  failures.push(`the nightly report job must run "${LISTING_STEP}" once, after the judging step and before "${ISSUE_STEP}", on master failures only, with full history (fetch-depth: 0) and actions: read, and the issue step must append outside-inputs.md`);
+}
 // Line-based readers split on \n (and \r\n); a lone \r, U+0085, U+2028 or U+2029 is a line break to other
 // YAML readers but not to them, so neither workflow may contain one.
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {

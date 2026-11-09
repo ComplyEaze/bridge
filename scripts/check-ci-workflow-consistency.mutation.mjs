@@ -405,3 +405,69 @@ for (const [name, replacement] of [
       "the mutation shards must run four at a time");
   });
 }
+
+// The nightly shard's crate fetch is its own step, before the run, bounded at three attempts; the report job lists the
+// outside inputs between judging and the issue.
+const NIGHTLY = ".github/workflows/tax-audit-mutations-nightly.yml";
+const FETCH_MESSAGE = "the mutation shard must fetch the locked crates in one step";
+const FETCH_BODY_MESSAGE = "step must run \"cargo fetch --locked\"";
+const LISTING_MESSAGE = "the nightly report job must run \"List the outside inputs changed since the last green night\" once";
+function nightlyStepBlock(text, name) {
+  const lines = text.split("\n");
+  const start = lines.indexOf(`      - name: ${name}`);
+  let end = start + 1;
+  while (end < lines.length && !/^ {6}(- |#)/.test(lines[end]) && !/^ {2}[A-Za-z0-9_-]+:\s*$/.test(lines[end])) end += 1;
+  return { lines, start, end };
+}
+function removeNightlyStep(text, name) {
+  const { lines, start, end } = nightlyStepBlock(text, name);
+  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+}
+for (const [name, mutate, message] of [
+  ["the fetch step removed", (text) => removeNightlyStep(text, "Fetch the locked crates, retrying a network failure"), FETCH_MESSAGE],
+  ["the fetch step renamed", (text) => text.replace("- name: Fetch the locked crates, retrying a network failure", "- name: Fetch crates"), FETCH_MESSAGE],
+  ["the fetch step moved after the mutation run", (text) => {
+    const { lines, start, end } = nightlyStepBlock(text, "Fetch the locked crates, retrying a network failure");
+    const block = lines.slice(start, end);
+    const rest = [...lines.slice(0, start), ...lines.slice(end)];
+    const upload = rest.findIndex((line) => line.startsWith("      - uses: actions/upload-artifact@"));
+    return [...rest.slice(0, upload), ...block, ...rest.slice(upload)].join("\n");
+  }, FETCH_MESSAGE],
+  ["the fetch step duplicated", (text) => {
+    const { lines, start, end } = nightlyStepBlock(text, "Fetch the locked crates, retrying a network failure");
+    return [...lines.slice(0, end), ...lines.slice(start, end), ...lines.slice(end)].join("\n");
+  }, FETCH_MESSAGE],
+  ["the fetch no longer locked", (text) => text.replace("cargo fetch --locked --manifest-path", "cargo fetch --manifest-path"), FETCH_BODY_MESSAGE],
+  ["the retry bound raised to four", (text) => text.replace("          attempts=3\n", "          attempts=4\n"), FETCH_BODY_MESSAGE],
+  ["the retry bound removed (unbounded)", (text) => text.replace("          attempts=3\n", ""), FETCH_BODY_MESSAGE],
+  ["the attempt-bound test removed", (text) => text.replace("            if [ \"$attempt\" -ge \"$attempts\" ]; then\n", "            if false; then\n"), FETCH_BODY_MESSAGE],
+  ["the final failure no longer exits non-zero", (text) => text.replace("          exit 1\n      # The whole list each time", "          exit 0\n      # The whole list each time"), FETCH_BODY_MESSAGE],
+  ["the attempt counter started at zero", (text) => text.replace("          attempt=1\n          while true", "          attempt=0\n          while true"), FETCH_BODY_MESSAGE],
+  ["a retry loop without its break on a non-network failure", (text) => text.replace("(not a network failure), not retrying\"\n              break\n", "(not a network failure), not retrying\"\n"), FETCH_BODY_MESSAGE],
+  ["the typed refusal no longer written", (text) => text.replace("fs.writeFileSync(process.argv[2]", "fs.writeFileSync(process.argv[2] + \".unused\""), FETCH_BODY_MESSAGE],
+  ["the fetch step skipped (if: false)", (text) => text.replace("      - name: Fetch the locked crates, retrying a network failure\n", "      - name: Fetch the locked crates, retrying a network failure\n        if: false\n"), FETCH_BODY_MESSAGE],
+  ["the fetch step run in sh", (text) => text.replace("      - name: Fetch the locked crates, retrying a network failure\n", "      - name: Fetch the locked crates, retrying a network failure\n        shell: sh\n"), FETCH_BODY_MESSAGE],
+  ["the mutation step made to run after a fetch failure (if: always())", (text) => text.replace("      - name: Run this shard's mutations\n", "      - name: Run this shard's mutations\n        if: always()\n"), FETCH_BODY_MESSAGE],
+  ["the fetch failure ignored (continue-on-error)", (text) => text.replace("      - name: Fetch the locked crates, retrying a network failure\n", "      - name: Fetch the locked crates, retrying a network failure\n        continue-on-error: true\n"), FETCH_BODY_MESSAGE],
+]) {
+  test(`nightly shard fetch: ${name} is refused`, () => {
+    refused(withChange(NIGHTLY, mutate), message);
+  });
+}
+for (const [name, mutate] of [
+  ["the listing step removed", (text) => removeNightlyStep(text, "List the outside inputs changed since the last green night")],
+  ["the listing step renamed", (text) => text.replace("- name: List the outside inputs changed since the last green night", "- name: List inputs")],
+  ["the listing no longer limited to master failures", (text) => text.replace("if: ${{ github.ref == 'refs/heads/master' && steps.judge.outputs.failed == 'true' }}\n        env:\n          GH_TOKEN", "if: ${{ always() }}\n        env:\n          GH_TOKEN")],
+  ["the listing run without the reason", (text) => text.replace(" --reason \"$reason\" > outside-inputs.md", " > outside-inputs.md")],
+  ["the run list read for any status", (text) => text.replace(" --status success --limit 1", " --limit 1")],
+  ["the run list read for any branch", (text) => text.replace(" --branch master --status success", " --status success")],
+  ["the unreadable run list treated as no reason", (text) => text.replace("            reason=\"could not read the run list (the gh command failed)\"\n", "            reason=\"\"\n")],
+  ["the empty-output fallback removed", (text) => text.replace(" || [ ! -s outside-inputs.md ]; then", "; then")],
+  ["the full history removed", (text) => text.replace("          persist-credentials: false\n          fetch-depth: 0\n", "          persist-credentials: false\n")],
+  ["the actions read permission removed", (text) => text.replace("      actions: read\n      contents: read\n      issues: write\n", "      contents: read\n      issues: write\n")],
+  ["the issue no longer carrying the listing", (text) => text.replace("cat outside-inputs.md 2>/dev/null", "echo none")],
+]) {
+  test(`nightly outside-input listing: ${name} is refused`, () => {
+    refused(withChange(NIGHTLY, mutate), LISTING_MESSAGE.replace(/ once$/, ""));
+  });
+}

@@ -26,6 +26,8 @@
 // scripts/audit-review-by.test.mjs. The ids come from the report's own
 // `settings.ignore`, which is what cargo-audit applied; the file adds each
 // entry's Review-by date and issue number, and the two must name the same ids.
+// The report's other settings must equal a recorded baseline, so a severity
+// floor or a target filter cannot narrow the findings unannounced.
 // The issue therefore stays open while anything is accepted, and a newly
 // accepted id, a removed one or a changed date is announced once.
 //
@@ -254,6 +256,33 @@ export function entriesFromAuditToml(text) {
   throw new Error("audit-tracking-issue: .cargo/audit.toml's `ignore` array is not closed");
 }
 
+// The report's other settings, as both captured reports hold them (cargo-audit
+// 0.22.2, 2026-11-09, scripts/fixtures/cargo-audit-report-0459-*.json): no
+// severity floor, no target filter, and three informational kinds. A floor, a
+// filter or a dropped kind can narrow what cargo-audit reports while the
+// accepted ids, and so the issue, stay the same. Any difference therefore
+// fails the run and names the setting; a deliberate change updates this
+// baseline in the same pull request, where a reviewer sees it.
+const BASELINE_SETTINGS = {
+  severity: null,
+  target_arch: [],
+  target_os: [],
+  informational_warnings: ["notice", "unmaintained", "unsound"],
+};
+
+export function requireBaselineSettings(report) {
+  for (const [key, expected] of Object.entries(BASELINE_SETTINGS)) {
+    const value = report.settings[key];
+    if (JSON.stringify(Array.isArray(value) ? [...value].sort() : value) !== JSON.stringify(expected)) {
+      throw new Error(
+        `audit-tracking-issue: the report's settings.${key} is ${JSON.stringify(value) ?? "absent"}, not ` +
+          `${JSON.stringify(expected)}; a changed setting changes what cargo-audit reports, so refusing ` +
+          "(a deliberate change updates BASELINE_SETTINGS in scripts/audit-tracking-issue.mjs)",
+      );
+    }
+  }
+}
+
 // The accepted entries for the issue: the file's entries, once every report's
 // `settings.ignore` names exactly the same ids. A difference either way means
 // the file the job read is not the file cargo-audit read (the wrong working
@@ -263,6 +292,7 @@ export function acceptedEntries(reports, auditTomlText) {
   const inFile = entries.map((entry) => entry.id);
   for (const report of reports) {
     const inReport = acceptedFromReport(report);
+    requireBaselineSettings(report);
     const onlyInFile = inFile.filter((id) => !inReport.includes(id));
     const onlyInReport = inReport.filter((id) => !inFile.includes(id));
     if (onlyInFile.length || onlyInReport.length) {

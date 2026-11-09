@@ -1,0 +1,38 @@
+Step 6, Tally's e-Invoice report on BRIDGE EINVOICE LAB after the import of invoice 5, read only (9 Nov 2026, 09:58Z to
+09:59Z). Words as on the screen; GSTINs written as <the book's GSTIN> and <the customer's GSTIN>. Captures stay on the
+lab PC. The invoice sent as number 5 was stored as Sales 3 (MASTERID 4, GUID <the book's GUID>-00000004); it is named
+here as "3 (sent as 5, MASTERID 4)", identified by MASTERID and GUID from s6r, never by number alone.
+
+Opened by Alt+G (Go To), "e-Invoice" typed, Enter on "e-Invoice" under "GST Reports". No refresh dialog this time; the
+report opened directly. Period already 1-Apr-25 to 3-Apr-25; Alt+F2 not pressed.
+
+1. e-Invoice (shots/s6-1-summary.png)
+   GST Registration : <the book's GSTIN>            1-Apr-25 to 3-Apr-25
+   Particulars                                      Voucher Count
+   Missing/Invalid Information
+     Information required for e-Invoice not provided   2
+   IRN Generated
+     IRN updated without QR Code                    1
+
+2. Enter on "Information required for e-Invoice not provided": e-Invoice - Resolution of Uncertain Transactions
+   (shots/s6-2-info-required-vouchers.png)
+   Vouchers of : Information required for e-Invoice not provided
+   Date      Particulars          Party GSTIN/UIN            Vch Type  Vch No.  Taxable Amount  IGST    CGST  SGST/UTGST  Cess
+   3-Apr-25  BRIDGE IRN Customer  <the customer's GSTIN>     Sales     2        1,000.00        180.00
+   3-Apr-25  BRIDGE IRN Customer  <the customer's GSTIN>     Sales     3          100.00         18.00
+   More columns to the right ("4 >" marker), not scrolled to. Right: "R: Ignore Validation", "S: Set GST Status",
+   "V: Accept GSTIN/UIN"; bottom: "Enter: Alter", "Space: Select". None pressed. Esc to the summary.
+
+3. Down to "IRN updated without QR Code", Enter: e-Invoice - Voucher Register (shots/s6-3-irn-generated-register.png)
+   Vouchers of : IRN updated without QR Code
+   Date      Particulars          GSTIN/UIN                  Vch Type  Vch No.  Invoice Amount
+   3-Apr-25  BRIDGE IRN Customer  <the customer's GSTIN>     Sales     1        1,180.00
+   Right: "F10: Cancel IRN", "Manually Update IRN Info", "Get IRN Info". None pressed. Esc, Esc to the Gateway
+   (shots/s6-gateway.png), no dialog.
+
+Every line and cause naming each invoice:
+   1: IRN Generated > IRN updated without QR Code (count 1). Invoice Amount 1,180.00.
+   2: Missing/Invalid Information > Information required for e-Invoice not provided (count 2). Taxable 1,000.00, IGST 180.00.
+   3 (sent as 5, MASTERID 4): Missing/Invalid Information > Information required for e-Invoice not provided (count 2),
+      beside 2. Taxable 100.00, IGST 18.00.
+Keys pressed in step 6's report: Alt+G, the text "e-Invoice", Enter; Enter; Esc; Down, Enter; Esc, Esc.

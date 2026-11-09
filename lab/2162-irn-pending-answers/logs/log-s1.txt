@@ -1,0 +1,6 @@
+15:17:07	M-marks.xml	a-s1-M-marks.xml	curl 0	3398 bytes
+15:17:07	L-list.xml	a-s1-L-list.xml	curl 0	10214 bytes
+15:17:07	V-named.xml	a-s1-V-named.xml	curl 0	10826 bytes
+15:17:07	K-igst.xml	a-s1-K-igst.xml	curl 0	34016 bytes
+15:17:07	K-sales.xml	a-s1-K-sales.xml	curl 0	39030 bytes
+15:17:07	K-customer.xml	a-s1-K-customer.xml	curl 0	35872 bytes

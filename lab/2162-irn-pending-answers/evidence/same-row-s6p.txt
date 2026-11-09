@@ -1,0 +1,2 @@
+== a-s6p-M-marks.xml against a-s6r-M-marks.xml: GUID, ALTVCHID, ALTMSTID ('eb2f5190-292e-4ed8-bfd3-eace839fe699', '4', '216') against ('eb2f5190-292e-4ed8-bfd3-eace839fe699', '4', '216')
+  equal

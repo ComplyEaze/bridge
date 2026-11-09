@@ -1,0 +1,14 @@
+2026-11-09T09:47:06.847Z s1 M-marks.xml L-list.xml V-named.xml K-igst.xml K-sales.xml K-customer.xml
+2026-11-09T09:48:54.042Z s2m M-marks.xml
+2026-11-09T09:50:45.272Z s3 M-marks.xml
+2026-11-09T09:50:56.219Z s4m M-marks.xml
+2026-11-09T09:53:55.618Z s4r M-marks.xml K-igst.xml
+2026-11-09T09:54:57.766Z s5m-pre M-marks.xml (sent with the refresh dialog up, on the run lead's word)
+2026-11-09T09:55:26.715Z s5m-post M-marks.xml (report open after Yes)
+2026-11-09T09:56:28.643Z s5m M-marks.xml
+2026-11-09T09:56:42.845Z s6m M-marks.xml
+2026-11-09T09:56:44.174Z s6 I-5-sent.xml (write)
+2026-11-09T09:56:58.450Z s6r V-named.xml F-5.xml L-list.xml M-marks.xml
+2026-11-09T09:59:12.984Z s6p M-marks.xml
+2026-11-09T09:59:27.237Z s6v KV-sales-type.xml (lab read of the Sales voucher type, on the run lead's word)
+2026-11-09T10:02:06.659Z s9 M-marks.xml L-list.xml V-named.xml K-igst.xml

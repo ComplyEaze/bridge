@@ -1,0 +1,6 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/notes.txt: original 10736 B sha256 f20b50ba47038d3a782a9e77b2bb0248aaaccd6606cc5e59d6cd906e907f1581 (kept on the lab PC); 1 x -> stop; 7 x -> run lead
+evidence/s5-screens.txt: original 3504 B sha256 1e9c87e329a857ec210d6757b4bec88204a98e20585d38e94ef9e4b36eaa6da9 (kept on the lab PC); 2 x -> run lead
+evidence/sends-utc.txt: original 888 B sha256 eb9f655439ed68a3cb495fa8a8279d22f068be3885af83a9d9db3358f59fab49 (kept on the lab PC); 2 x -> run lead
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 368 B sha256 d81660f2ad3237f753aedb409fafa10e380c9fc34c2258d9e7e4de57e604a72e (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>

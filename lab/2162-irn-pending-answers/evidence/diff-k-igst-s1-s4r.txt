@@ -1,0 +1,6 @@
+3c3
+<    NAME 'BRIDGE IRN IGST' PARENT 'Duties & Taxes' ISBILLWISEON 'No' TAXTYPE 'GST' GSTDUTYHEAD '' GSTIN values held: 0 distinct: 0
+---
+>    NAME 'BRIDGE IRN IGST' PARENT 'Duties & Taxes' ISBILLWISEON 'No' TAXTYPE 'GST' GSTDUTYHEAD 'IGST' GSTIN values held: 0 distinct: 0
+6a7
+>     GSTDUTYHEAD 'IGST'

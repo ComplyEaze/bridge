@@ -1,0 +1,2 @@
+a13dd089005b39b664e732a1b6ceb8ac2cb7127fc8fc97cb33922e691acf1a4a 1282 KV-sales-type.xml
+b'\xff\xfe'

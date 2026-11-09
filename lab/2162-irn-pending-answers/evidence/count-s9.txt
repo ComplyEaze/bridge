@@ -1,0 +1,48 @@
+== a-s9-K-igst.xml: 34016 bytes, GSTIN shapes 0
+  STATUS '1'
+  LEDGER rows: 1
+   NAME 'BRIDGE IRN IGST' PARENT 'Duties & Taxes' ISBILLWISEON 'No' TAXTYPE 'GST' GSTDUTYHEAD '' GSTIN values held: 0 distinct: 0
+    TAXTYPE 'GST'
+    TAXCLASSIFICATIONNAME 'Not Applicable'
+    GSTTYPE 'Not Applicable'
+    EXCISEDUTYTYPE 'Not Applicable'
+    ISTCSAPPLICABLE 'No'
+    ISTDSAPPLICABLE 'No'
+    ISFBTAPPLICABLE 'No'
+    ISGSTAPPLICABLE 'No'
+    ISEXCISEAPPLICABLE 'No'
+    ISEDLIAPPLICABLE 'No'
+    APPROPRIATETAXVALUE 'No'
+    ISBEHAVEASDUTY 'No'
+    FORSERVICETAX 'No'
+    ISABATEMENTAPPLICABLE 'No'
+    TDSDEDUCTEEISSPECIALRATE 'No'
+    RATEOFTAXCALCULATION '0'
+    TDSDEDUCTEESPECIALRATE '0'
+    TRANSACTIONTYPEVERSION '0'
+   IGST ledger reads as a GST Integrated Tax ledger: no
+== a-s9-L-list.xml: 10214 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 3
+   '1' '20250403' 'Sales' MASTERID '1'
+   '2' '20250403' 'Sales' MASTERID '2'
+   '1' '20250403' 'Payment' MASTERID '3'
+== a-s9-M-marks.xml: 3398 bytes, GSTIN shapes 0
+  STATUS '1'
+  COMPANY: GUID is the book's: yes ALTVCHID '3' ALTMSTID '215'
+  COMPANY rows: 1
+== a-s9-V-named.xml: 10826 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 3
+   row '1' 'Sales' DATE '20250403'
+    IRN: 1, TYPE 'String', length 64
+    IRNACKNO: 1, TYPE 'String', '112233'
+    IRNACKDATE: 1, TYPE 'Date', '20250403'
+   row '2' 'Sales' DATE '20250403'
+    IRN: 1, TYPE 'String', length 0
+    IRNACKNO: 1, TYPE 'String', ''
+    IRNACKDATE: 1, TYPE 'Date', ''
+   row '1' 'Payment' DATE '20250403'
+    IRN: 1, TYPE 'String', length 0
+    IRNACKNO: 1, TYPE 'String', ''
+    IRNACKDATE: 1, TYPE 'Date', ''

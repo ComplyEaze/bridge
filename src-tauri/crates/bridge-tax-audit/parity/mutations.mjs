@@ -76,7 +76,8 @@
 // `parity/mutation-results.json` is committed. It holds one record per mutation, one line each:
 // the verdict, the killing tests qualified by their target (`tests/edge_books.rs::name`,
 // `src/lib.rs::book::tests::name`), the mode, the commit and time, a hash of the mutation's own
-// definition, and `crate_tree`, a hash of this crate's committed tree without the results file.
+// definition, `crate_tree`, a hash of this crate's committed tree without the results file, and,
+// when its inputs resolve, `inputs`, the input digest below.
 //
 // `parity/accepted-survivors.json` lists the mutations no test is expected to kill, each with the
 // hash of its definition, why, and where that is documented. A `survived` verdict counts as passing
@@ -93,12 +94,16 @@
 // At merge, `--verify --changed-since <base>` (in CI, no build) requires:
 // - every mutation in the list applies exactly once to the merged tree;
 // - no record for a mutation no longer in the list (retiring a mutation deletes its record); and
-// - every mutation SELECTED by the change has a killed record made on exactly the merged crate
-//   tree. A mutation is selected when
+// - every mutation SELECTED by the change has a killed record that is fresh at the merged crate
+//   tree: made on exactly that tree, or carrying an input digest equal to the digest of the same
+//   inputs there. A mutation selected as new or edited since the base, or as failing on the
+//   nightly run, must have a record made on exactly the merged tree. A mutation is selected when
 //   - its target file changed;
 //   - a file holding one of its recorded killing tests changed, or a file that file pulls in with
 //     `include_str!`/`include_bytes!`, or `tests/common` for an integration-test killer;
 //   - its own definition changed, it has no killed record, or a killer's file is unknown;
+//   - its record carries an input digest that differs from its inputs' digest at HEAD, or its
+//     inputs no longer resolve ("an input changed since its proof");
 //   - ANY crate file other than Rust source under `src/` and `tests/` changed (fixtures, goldens,
 //     rules, parity scripts, the Markdown tests read, `Cargo.toml`, `build.rs`): then the whole
 //     list is selected, because tests read such files at run time in ways no file name reveals.
@@ -114,21 +119,47 @@
 //     carry that line, and the ids of all of them are required together; if any open issue lacks
 //     it, every crate change is refused until a maintainer closes that issue.
 //
-// CI hashes the pull request's MERGE commit, so when master has changed any crate file since the
-// branch was proven, update the branch from master and re-run the selection before pushing.
+// CI hashes the pull request's MERGE commit, so when master has changed an input of a selected
+// mutation since the branch was proven, update the branch from master and re-run the selection
+// before pushing.
 //
-// What the guarantee does NOT cover. The nightly run re-proves the whole list against the full suite
-// on master, so each of these carries up to about a day of exposure:
-// - Inputs outside this crate. Selection and `crate_tree` see only this crate's own files, so a
-//   change to any of these selects nothing: the path dependencies `bridge-tally-protocol` and
-//   `bridge-tally-primitives`; that protocol crate's `tests/fixtures/native`, read by
-//   `tests/tally_text_rule.rs`; the workspace `src-tauri/Cargo.toml`, whose `[workspace.lints]`
-//   this crate inherits; `src-tauri/Cargo.lock`; and the root `rust-toolchain.toml`.
-// - A change to crate source that is neither a mutation's target nor a killer's file but still
-//   weakens a killer: a test helper in another module, or a `mod` line that stops compiling a
-//   test module.
-// - A mutation killed by a hang: its record names no killing test, so only a change to its target
-//   file or a non-source input selects it.
+// ## The input digest
+//
+// A record's input digest (`"1:"` and 16 letters, #2361) hashes the path, mode and object id of each file its
+// verdict is taken to rest on, read from the committed tree:
+// - its own inputs: the target file; each killer's file; every file those pull in, transitively,
+//   with `include_str!`/`include_bytes!` or with `mod x;`; the files that declare each library
+//   module on the way from `src/lib.rs` to any of them (their own text, not their other modules);
+//   and all of `tests/common` when a killer is an integration test;
+// - shared inputs, the same for every record: every crate file that is not Rust source under `src/`
+//   or `tests/` (fixtures, goldens, rules, parity scripts, `Cargo.toml`, `build.rs`, examples), as
+//   the whole-list rule above takes them, every Rust file that defines a `macro_rules!` macro, and
+//   any source file that is not UTF-8. The runner's own files and the list are left out, as
+//   selection leaves them out.
+// A record gets NO digest, and is then judged by the exact-tree rule alone, when anything on the
+// way cannot be resolved from the text: no recorded killer (a hang or a survivor), a killer whose
+// file is unknown, a file that is missing or not UTF-8, a `mod x;` with no file or with both
+// `x.rs` and `x/mod.rs`, a `#[path]` attribute (bare or in `cfg_attr`), or a `mod x;` inside a
+// block. So an input this code cannot follow costs a re-proof on the exact tree, never a smaller
+// set. A record carrying any other digest version, or none, is likewise judged by the exact tree
+// alone, so records made before the digest existed keep today's rule.
+//
+// What the guarantee does NOT cover. The nightly run stays: every night it re-proves the whole list
+// against the full suite on master, whatever the records' trees and digests say. Each gap below
+// carries up to about a day of exposure until it runs:
+// - Inputs outside this crate. Selection, `crate_tree` and the digest see only this crate's own
+//   files, so a change to any of these selects nothing: the path dependencies
+//   `bridge-tally-protocol` and `bridge-tally-primitives`; that protocol crate's
+//   `tests/fixtures/native`, read by `tests/tally_text_rule.rs`; the workspace
+//   `src-tauri/Cargo.toml`, whose `[workspace.lints]` this crate inherits; `src-tauri/Cargo.lock`;
+//   and the root `rust-toolchain.toml`.
+// - Crate source a killer runs but the digest does not follow. The digest follows files, not calls:
+//   a callee or a test helper in another module, a trait impl, or a `#[cfg]` elsewhere can weaken a
+//   killer while every input of the record stays unchanged. Before the digest, a SELECTED mutation
+//   had to be proven on exactly the merged tree, which caught these by accident; now a selected
+//   mutation whose inputs are unchanged keeps its record, and so do unselected ones, as before.
+// - A mutation killed by a hang: its record names no killing test and carries no digest, so only a
+//   change to its target file or a non-source input selects it.
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -330,15 +361,31 @@ function isFile(p) {
   }
 }
 
-/** Whether the crate file `file` defines a function named `fn`. */
-function defines(crate, file, fn) {
-  let text;
+/** UTF-8 text, or null when the bytes are not UTF-8. */
+function utf8(data) {
   try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(fs.readFileSync(path.join(crate, file)));
+    return new TextDecoder("utf-8", { fatal: true }).decode(data);
   } catch {
-    return false;
+    return null;
   }
-  return new RegExp(`\\bfn\\s+${escapeRegExp(fn)}\\s*[(<]`).test(text);
+}
+
+/** How the helpers below see the crate's files: the working tree under `crate`. `rel` is the crate
+ * path from the workspace (`crates/bridge-tax-audit`), as cargo prints a doc test's file. */
+export function fsView(crate) {
+  return {
+    rel: path.relative(path.dirname(path.dirname(crate)), crate).split(path.sep).join("/"),
+    isFile: (f) => isFile(path.join(crate, f)),
+    text: (f) => (isFile(path.join(crate, f)) ? utf8(fs.readFileSync(path.join(crate, f))) : null),
+  };
+}
+
+const asView = (crate) => (typeof crate === "string" ? fsView(crate) : crate);
+
+/** Whether the crate file `file` defines a function named `fn`. */
+function defines(view, file, fn) {
+  const text = view.text(file);
+  return text !== null && new RegExp(`\\bfn\\s+${escapeRegExp(fn)}\\s*[(<]`).test(text);
 }
 
 /** The crate-relative source file that holds a qualified killing test, or null when unknown.
@@ -350,31 +397,32 @@ function defines(crate, file, fn) {
  * unknown killer file selects its mutation on every change. A crashed library binary names no
  * test, so its file is unknown too. */
 export function killerFile(killer, crate = ROOT) {
+  const view = asView(crate);
   const at = killer.indexOf("::");
   const target = at < 0 ? killer : killer.slice(0, at);
   const name = at < 0 ? "" : killer.slice(at + 2);
   if (target === "doc") {
     let file = name.split(" - ")[0].trim();
-    const prefix = path.relative(path.dirname(path.dirname(crate)), crate).split(path.sep).join("/") + "/";
+    const prefix = view.rel + "/";
     if (file.startsWith(prefix)) file = file.slice(prefix.length);
-    return file.endsWith(".rs") && isFile(path.join(crate, file)) ? file : null;
+    return file.endsWith(".rs") && view.isFile(file) ? file : null;
   }
   if (name === CRASHED) {
-    return target.startsWith("tests/") && isFile(path.join(crate, target)) ? target : null;
+    return target.startsWith("tests/") && view.isFile(target) ? target : null;
   }
   const parts0 = name.split("::");
   const fn = parts0[parts0.length - 1];
-  if (target.startsWith("tests/")) return defines(crate, target, fn) ? target : null;
+  if (target.startsWith("tests/")) return defines(view, target, fn) ? target : null;
   if (target === "src/lib.rs") {
     let parts = parts0.slice(0, -1); // the module path; the last part is the test fn
     while (parts.length) {
       // `book::tests` is src/book/tests.rs if that file exists, else src/book.rs
       for (const candidate of [`src/${parts.join("/")}.rs`, `src/${parts.join("/")}/mod.rs`]) {
-        if (isFile(path.join(crate, candidate))) return defines(crate, candidate, fn) ? candidate : null;
+        if (view.isFile(candidate)) return defines(view, candidate, fn) ? candidate : null;
       }
       parts = parts.slice(0, -1);
     }
-    return defines(crate, "src/lib.rs", fn) ? "src/lib.rs" : null;
+    return defines(view, "src/lib.rs", fn) ? "src/lib.rs" : null;
   }
   return null;
 }
@@ -384,26 +432,14 @@ const INCLUDE = /include_(?:str|bytes)!\(\s*"([^"]+)"\s*\)/g;
 /** Crate-relative files `sourceFile` pulls in with `include_str!`/`include_bytes!`, followed
  * transitively; each path resolves against the including file's directory, as rustc does. */
 export function included(sourceFile, crate = ROOT) {
+  const view = asView(crate);
   const seen = new Set();
   const todo = [sourceFile];
   while (todo.length) {
     const f = todo.pop();
-    let text;
-    try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(fs.readFileSync(path.join(crate, f)));
-    } catch {
-      continue;
-    }
-    for (const match of text.matchAll(INCLUDE)) {
-      const parts = [];
-      for (const p of [...f.split("/").slice(0, -1), ...match[1].split("/")]) {
-        if (p === "..") {
-          if (parts.length) parts.pop();
-        } else if (p !== "." && p !== "") {
-          parts.push(p);
-        }
-      }
-      const file = parts.join("/");
+    const text = view.text(f);
+    if (text === null) continue;
+    for (const file of includeTargets(f, text)) {
       if (!seen.has(file)) {
         seen.add(file);
         todo.push(file);
@@ -411,6 +447,23 @@ export function included(sourceFile, crate = ROOT) {
     }
   }
   return seen;
+}
+
+/** The crate-relative files `text` (the file `f`) names in `include_str!`/`include_bytes!`. */
+function includeTargets(f, text) {
+  const files = [];
+  for (const match of text.matchAll(INCLUDE)) {
+    const parts = [];
+    for (const p of [...f.split("/").slice(0, -1), ...match[1].split("/")]) {
+      if (p === "..") {
+        if (parts.length) parts.pop();
+      } else if (p !== "." && p !== "") {
+        parts.push(p);
+      }
+    }
+    files.push(parts.join("/"));
+  }
+  return files;
 }
 
 /** Crate-relative Rust source that the file-level selection rules understand. */
@@ -466,17 +519,265 @@ export function select(mutations, results, changed, crate = ROOT, accepted = nul
   return picked;
 }
 
-/** Whether `rec` proves `m` killed (or an accepted survivor) on exactly the crate tree `tree`,
- * for this definition. */
-export function fresh(m, rec, tree, accepted = null) {
-  return passes(m, rec, accepted) && rec.crate_tree === tree && rec.mutation === mutationHash(m);
+// ------------------------------------------------------------------------------------ input digest
+// A record may carry `inputs`, a digest of the files its verdict rests on (#2361). A record whose
+// digest equals the digest of those same files at the merged tree is as fresh as one made on that
+// exact tree. Anything this code cannot resolve gives no digest, and the record is then judged by the
+// exact-tree rule alone. The header's input digest section lists what goes in.
+
+/** The digest format this runner writes and trusts. A record carrying any other version, or none, is
+ * judged by the exact-tree rule alone. */
+export const DIGEST_VERSION = 1;
+const DIGEST_FORMAT = new RegExp(`^${DIGEST_VERSION}:[g-v]{16}$`);
+
+/** 16 hex digits written as the letters g to v, one per digit. The merge gate scans each record line
+ * for identifier shapes made of digits (a phone number, a PAN) and masks only the `mutation` and
+ * `crate_tree` hex values; a value made of letters alone can hold no such shape, so it needs no mask. */
+export const letters = (hex) => [...hex].map((c) => String.fromCharCode(103 + Number.parseInt(c, 16))).join("");
+
+/** Repo-relative paths outside the crate whose tracked files enter every digest. Empty: the digest
+ * sees what `crate_tree` sees, and the header's list of what the guarantee does not cover names the
+ * inputs outside the crate. */
+export const EXTERNAL_INPUTS = [];
+
+/** The crate's committed files at `ref`, read through git: what a digest is made of. `blob(f)` is
+ * the file's mode and object id, so a change to its bytes or its mode changes the digest. */
+export function treeView(ref = "HEAD", repo = DEFAULT.repo, crate = DEFAULT.crate) {
+  const entries = new Map();
+  const external = new Map();
+  for (const [into, paths] of [[entries, [crate]], [external, EXTERNAL_INPUTS]]) {
+    if (!paths.length) continue;
+    const listing = gitRaw(["ls-tree", "-r", "-z", ref, "--", ...paths], { cwd: repo });
+    for (const row of listing.toString("utf8").split("\0").filter(Boolean)) {
+      const tab = row.indexOf("\t");
+      const [mode, kind, sha] = row.slice(0, tab).split(" ");
+      const file = row.slice(tab + 1);
+      if (into === entries) {
+        if (file.startsWith(crate + "/")) entries.set(file.slice(crate.length + 1), { mode, kind, sha });
+      } else {
+        into.set(file, { mode, kind, sha });
+      }
+    }
+  }
+  const texts = new Map();
+  const view = {
+    rel: crate.split("/").slice(-2).join("/"),
+    files: () => sorted(entries.keys()),
+    external: () => sorted(external.keys()).map((f) => `${f}\t${external.get(f).mode} ${external.get(f).sha}`),
+    isFile: (f) => entries.has(f) && entries.get(f).kind === "blob",
+    blob: (f) => `${entries.get(f).mode} ${entries.get(f).sha}`,
+    text: (f) => {
+      if (!view.isFile(f)) return null;
+      if (!texts.has(f)) texts.set(f, utf8(gitRaw(["cat-file", "blob", entries.get(f).sha], { cwd: repo })));
+      return texts.get(f);
+    },
+    cache: new Map(),
+  };
+  return view;
+}
+
+const CHAR_LITERAL = /b?'(?:\\(?:u\{[0-9a-fA-F]{1,6}\}|x[0-9a-fA-F]{2}|[^\n])|[^\\'\n])'/y;
+const RAW_STRING = /b?r(#*)"/y;
+const IDENT_CHAR = /[A-Za-z0-9_]/;
+
+/** `text` with comments and string, byte-string and char literals blanked to spaces, line breaks
+ * kept, so a search sees code only. A lifetime (`'a`) is code. */
+export function rustCode(text) {
+  const out = [];
+  let i = 0;
+  const blank = (from, to) => {
+    for (let j = from; j < to; j++) out.push(text[j] === "\n" ? "\n" : " ");
+  };
+  while (i < text.length) {
+    const c = text[i];
+    const after = text[i + 1];
+    const prev = i > 0 ? text[i - 1] : "";
+    if (c === "/" && after === "/") {
+      const end = text.indexOf("\n", i);
+      const to = end < 0 ? text.length : end;
+      blank(i, to);
+      i = to;
+    } else if (c === "/" && after === "*") {
+      let depth = 1;
+      let j = i + 2;
+      while (j < text.length && depth) {
+        if (text[j] === "/" && text[j + 1] === "*") (depth += 1), (j += 2);
+        else if (text[j] === "*" && text[j + 1] === "/") (depth -= 1), (j += 2);
+        else j += 1;
+      }
+      blank(i, j);
+      i = j;
+    } else if ((c === "r" || c === "b") && !IDENT_CHAR.test(prev) && ((RAW_STRING.lastIndex = i), RAW_STRING.exec(text))) {
+      RAW_STRING.lastIndex = i;
+      const m = RAW_STRING.exec(text);
+      const close = '"' + m[1];
+      const end = text.indexOf(close, i + m[0].length);
+      const to = end < 0 ? text.length : end + close.length;
+      blank(i, to);
+      i = to;
+    } else if (c === '"' || (c === "b" && after === '"' && !IDENT_CHAR.test(prev))) {
+      let j = c === "b" ? i + 2 : i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
+      blank(i, Math.min(j + 1, text.length));
+      i = j + 1;
+    } else if ((c === "'" || (c === "b" && after === "'" && !IDENT_CHAR.test(prev))) && ((CHAR_LITERAL.lastIndex = i), CHAR_LITERAL.test(text))) {
+      const to = CHAR_LITERAL.lastIndex;
+      blank(i, to);
+      i = to;
+    } else {
+      out.push(c);
+      i += 1;
+    }
+  }
+  return out.join("");
+}
+
+const MOD_DECL = /(?<![A-Za-z0-9_])mod\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\s*;/g;
+const PATH_ATTRIBUTE = /#\s*!?\s*\[\s*(?:path\b|cfg_attr\s*\([^\]]*\bpath\b)/;
+
+/** The names of the file modules `text` declares (`mod x;`), or null when they cannot be found from
+ * the text alone: a `#[path]` attribute (bare or in `cfg_attr`), or a `mod x;` inside a block, whose
+ * file depends on the enclosing inline module. */
+export function modDecls(text) {
+  const code = rustCode(text);
+  if (PATH_ATTRIBUTE.test(code)) return null;
+  const names = [];
+  let depth = 0;
+  let at = 0;
+  for (const m of code.matchAll(MOD_DECL)) {
+    for (; at < m.index; at++) depth += code[at] === "{" ? 1 : code[at] === "}" ? -1 : 0;
+    if (depth !== 0) return null;
+    names.push(m[1]);
+  }
+  return names;
+}
+
+/** Whether `f` is a file whose `mod x;` resolves beside it (a crate root or a `mod.rs`), rather than
+ * in a directory named after it. */
+function modRoot(f) {
+  const base = f.split("/").pop();
+  return ["lib.rs", "main.rs", "mod.rs"].includes(base) || /^(tests|examples|benches|src\/bin)\/[^/]+\.rs$/.test(f) || f === "build.rs";
+}
+
+/** The two files rustc may take `mod name;` in `f` from. */
+export function modCandidates(f, name) {
+  const dir = f.split("/").slice(0, -1);
+  const own = modRoot(f) ? dir : [...dir, f.split("/").pop().replace(/\.rs$/, "")];
+  const prefix = own.length ? own.join("/") + "/" : "";
+  return [`${prefix}${name}.rs`, `${prefix}${name}/mod.rs`];
+}
+
+/** The files that declare the library module `f` lives in, from `src/lib.rs` down, or null when one
+ * is not a file (an inline module). [] for a file outside `src/`. */
+export function ancestors(f, view) {
+  if (!f.startsWith("src/") || f === "src/lib.rs") return [];
+  const mods = f.slice(4).replace(/\.rs$/, "").replace(/\/mod$/, "").split("/");
+  const files = ["src/lib.rs"];
+  for (let n = 1; n < mods.length; n++) {
+    const found = [`src/${mods.slice(0, n).join("/")}.rs`, `src/${mods.slice(0, n).join("/")}/mod.rs`].filter((c) => view.isFile(c));
+    if (found.length !== 1) return null;
+    files.push(found[0]);
+  }
+  return files;
+}
+
+/** Crate files every record's digest covers: each file a test may read at run time (every crate file
+ * that is not Rust source under `src/` or `tests/`: fixtures, goldens, rules, parity scripts,
+ * `Cargo.toml`, `build.rs`, examples), and each Rust file that defines a macro, since a killer may
+ * use a macro from any file. A source file that is not UTF-8 is taken in too. The runner's inert
+ * files are left out, as selection leaves them out. */
+export function sharedInputs(view) {
+  if (!view.cache.has("shared")) {
+    const files = view.files().filter((f) => !INERT.includes(f) && (!isSource(f) || /\bmacro_rules\s*!/.test(view.text(f) ?? "macro_rules!")));
+    view.cache.set("shared", files);
+  }
+  return view.cache.get("shared");
+}
+
+/** The crate files the record's own verdict rests on, or null when they cannot be resolved: no
+ * recorded killer (a hang or a survivor), a killer whose file is unknown, or a file reached that is
+ * missing, not UTF-8, ambiguous or declared in a way `modDecls` cannot follow. They are the target
+ * file, each killer's file, everything those pull in with `include_str!`/`include_bytes!` or `mod`,
+ * the files declaring each library module on the way from `src/lib.rs` (their own text only, not
+ * their other modules), and `tests/common/**` when a killer is an integration test. */
+export function recordInputs(m, rec, view) {
+  const killers = rec?.killers ?? [];
+  if (!killers.length) return null;
+  const roots = [m.file];
+  let integration = false;
+  for (const k of killers) {
+    const f = killerFile(k, view);
+    if (f === null) return null;
+    roots.push(f);
+    if (f.startsWith("tests/")) integration = true;
+  }
+  // An ancestor is taken in for its own text (the `mod` line and the attributes on it), not followed:
+  // its other modules are not on the way to this record's files.
+  const files = new Set();
+  const followed = new Set();
+  const todo = roots.map((f) => [f, true]);
+  while (todo.length) {
+    const [f, follow] = todo.pop();
+    if (followed.has(f) || (!follow && files.has(f))) continue;
+    if (!view.isFile(f)) return null;
+    files.add(f);
+    if (f.endsWith(".rs") && view.text(f) === null) return null;
+    const up = ancestors(f, view);
+    if (up === null) return null;
+    todo.push(...up.map((a) => [a, false]));
+    if (!follow) continue;
+    followed.add(f);
+    if (!f.endsWith(".rs")) continue;
+    const text = view.text(f);
+    todo.push(...includeTargets(f, text).map((i) => [i, true]));
+    const mods = modDecls(text);
+    if (mods === null) return null;
+    for (const name of mods) {
+      const found = modCandidates(f, name).filter((c) => view.isFile(c));
+      if (found.length !== 1) return null;
+      todo.push([found[0], true]);
+    }
+  }
+  if (integration) for (const f of view.files()) if (f.startsWith("tests/common/")) files.add(f);
+  return files;
+}
+
+/** The record's input digest at the tree `view` shows, or null when its inputs cannot be resolved
+ * (the record is then judged by the exact-tree rule alone). */
+export function inputDigest(m, rec, view) {
+  const own = recordInputs(m, rec, view);
+  if (own === null) return null;
+  const lines = sorted(new Set([...own, ...sharedInputs(view)])).map((f) => `${f}\t${view.blob(f)}`);
+  return `${DIGEST_VERSION}:${letters(sha16([...lines, ...view.external()].join("\n")))}`;
+}
+
+/** Whether `rec` proves `m` killed (or an accepted survivor) for this definition, on the crate tree
+ * `tree`: made on exactly that tree, or, when `view` (that tree's files) is given, carrying an input
+ * digest of this version equal to its inputs' digest there. */
+export function fresh(m, rec, tree, accepted = null, view = null) {
+  if (!passes(m, rec, accepted) || rec.mutation !== mutationHash(m)) return false;
+  if (rec.crate_tree === tree) return true;
+  return view !== null && typeof rec.inputs === "string" && DIGEST_FORMAT.test(rec.inputs) && rec.inputs === inputDigest(m, rec, view);
+}
+
+/** The ids of the mutations whose record carries an input digest of this version that differs from
+ * its inputs' digest at the tree `view` shows (or whose inputs no longer resolve): selection adds
+ * these to what the changed file names pick, so a change to any input re-proves the record. */
+export function staleDigests(mutations, results, view) {
+  const ids = [];
+  for (const m of mutations) {
+    const rec = has(results, m.id) ? results[m.id] : undefined;
+    if (typeof rec?.inputs === "string" && DIGEST_FORMAT.test(rec.inputs) && rec.inputs !== inputDigest(m, rec, view)) ids.push(m.id);
+  }
+  return ids;
 }
 
 /** What stops a merge: each chosen mutation without a fresh record, and each record for a
- * mutation no longer in the list. */
-export function verify(chosen, results, tree, order, accepted = null) {
+ * mutation no longer in the list. A mutation in `exact` (new or edited since the base, or failing on
+ * the nightly run) must be proven on exactly the merged tree; the others may be fresh by digest. */
+export function verify(chosen, results, tree, order, accepted = null, view = null, exact = new Set()) {
   const problems = chosen
-    .filter((m) => !fresh(m, has(results, m.id) ? results[m.id] : undefined, tree, accepted))
+    .filter((m) => !fresh(m, has(results, m.id) ? results[m.id] : undefined, tree, accepted, exact.has(m.id) ? null : view))
     .map((m) => `${m.id}: not proven on crate tree ${tree}`);
   const inList = new Set(order);
   for (const i of sorted(Object.keys(results).filter((k) => !inList.has(k)))) {
@@ -1372,9 +1673,12 @@ export async function run(args, lay = DEFAULT) {
   const tree = crateTree(head, lay.repo, lay.crate);
   let reasons = new Map();
   let changed = [];
+  let view = null; // the crate's files at HEAD, as digests see them
   if (args.changedSince) {
     changed = changedSince(args.changedSince, lay.repo, lay.crate);
     reasons = select(mutations, results, changed, lay.root, accepted, baseDefinitions(args.changedSince, lay.repo, lay.crate));
+    view = treeView(head, lay.repo, lay.crate);
+    for (const i of staleDigests(mutations, results, view)) reasons.set(i, [...(reasons.get(i) ?? []), "an input changed since its proof"]);
   }
   if (args.nightlyIssues && changed.length) {
     const required = failingIds(fs.readFileSync(args.nightlyIssues, "utf8"));
@@ -1397,14 +1701,21 @@ export async function run(args, lay = DEFAULT) {
   const record = (m) => (has(results, m.id) ? results[m.id] : undefined);
 
   if (args.list || args.verify) {
+    // A mutation that is new or edited since the base, or failing on the nightly run, must be proven on
+    // exactly this tree; any other may be fresh by its input digest.
+    view ??= treeView(head, lay.repo, lay.crate);
+    const exact = new Set(
+      [...reasons].filter(([, why]) => why.includes("new or edited since the base") || why.includes("failing on the nightly run")).map(([i]) => i),
+    );
+    const isFresh = (m) => fresh(m, record(m), tree, accepted, exact.has(m.id) ? null : view);
     for (const m of chosen) {
       const why = (reasons.get(m.id) ?? ["listed"]).join("; ");
-      out(`${m.id}: ${why}` + (fresh(m, record(m), tree, accepted) ? "" : "  [NOT PROVEN ON THIS TREE]"));
+      out(`${m.id}: ${why}` + (isFresh(m) ? "" : "  [NOT PROVEN ON THIS TREE]"));
     }
-    const problems = [...verify(chosen, results, tree, order, accepted), ...survivorProblems(mutations, accepted)];
-    const unproven = chosen.filter((m) => !fresh(m, record(m), tree, accepted)).length;
+    const problems = [...verify(chosen, results, tree, order, accepted, view, exact), ...survivorProblems(mutations, accepted)];
+    const unproven = chosen.filter((m) => !isFresh(m)).length;
     for (const p of problems) if (!p.includes("not proven on crate tree")) out(p);
-    out(`\n${chosen.length} selected, ${chosen.length - unproven} proven on crate tree ${tree}`);
+    out(`\n${chosen.length} selected, ${chosen.length - unproven} proven on crate tree ${tree} or by an unchanged input digest`);
     if (args.verify) {
       if (problems.length) {
         err(
@@ -1430,7 +1741,7 @@ export async function run(args, lay = DEFAULT) {
   }
   try {
     const killers = args.killersFrom === null ? dict() : loadResults(args.killersFrom);
-    return await runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale });
+    return await runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale, view });
   } finally {
     lock.release();
   }
@@ -1443,8 +1754,9 @@ function readFailure(e) {
   return e.code === "ENOENT" ? "FileNotFoundError" : e.code === "EISDIR" ? "IsADirectoryError" : e.code === "EACCES" ? "PermissionError" : "OSError";
 }
 
-async function runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale }) {
+async function runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale, view }) {
   const files = committedFiles(head, lay.repo);
+  view ??= treeView(head, lay.repo, lay.crate);
   const jobs = Math.max(1, Math.min(args.jobs, chosen.length || 1));
   const workers = Array.from({ length: jobs }, (_, i) => new Worker(i, args.workdir, lay));
   const onSignal = () => {
@@ -1494,6 +1806,9 @@ async function runMutations({ args, lay, mutations, order, accepted, results, ki
         }
         rec.commit = head;
         rec.crate_tree = tree;
+        const digest = inputDigest(m, rec, view);
+        if (digest === null) delete rec.inputs;
+        else rec.inputs = digest;
         done.set(m.id, rec);
         state.madeVerdict = true;
         const kill = rec.killers.length ? ` by ${rec.killers.length}: ${rec.killers.join(", ")}` : "";

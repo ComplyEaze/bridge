@@ -877,6 +877,75 @@ describe("GitRepo", () => {
     assert.equal(mu.crateTree("HEAD", g.repo, CRATE), tree, "the results file is not in the tree");
   };
 
+  /** Commit killed records for every mutation made on the current tree, each carrying its input
+   * digest there, as a run writes them. */
+  const proveWithDigests = () => {
+    const tree = mu.crateTree("HEAD", g.repo, CRATE);
+    const view = mu.treeView("HEAD", g.repo, CRATE);
+    const results = {};
+    for (const m of g.muts) {
+      results[m.id] = record(m, ["tests/registry.rs::registry_ok"], { tree });
+      results[m.id].inputs = mu.inputDigest(m, results[m.id], view);
+      assert.match(results[m.id].inputs, /^1:[g-v]{16}$/);
+    }
+    fs.writeFileSync(g.lay.results, mu.renderResults(results, order()));
+    commit("prove with digests");
+  };
+  /** The branch of #2355's history, replayed: it edits both targets and is proven, then edits again. */
+  const branchProven = () => {
+    const base = sh(g.repo, "rev-parse", "HEAD").trim();
+    write("src/book.rs", "// book\n// branch edit\n#[test] fn a() {}\n#[test] fn b() {}\n");
+    write("src/read.rs", "// branch edit\n#[cfg(test)]\nmod tests;\n");
+    commit("the branch edits both targets");
+    proveWithDigests();
+    return base;
+  };
+
+  test("test_a_source_change_after_the_proof_needs_only_its_dependents_proven_again", async () => {
+    const base = branchProven();
+    let [rc, out] = await main("--verify", "--changed-since", base);
+    assert.equal(rc, 0, out);
+    assert.ok(out.includes("2 selected, 2 proven"), out);
+    write("src/book.rs", "// book\n// a second edit, as e2d91dea made\n#[test] fn a() {}\n#[test] fn b() {}\n");
+    commit("a second edit to one target");
+    [rc, out] = await main("--verify", "--changed-since", base);
+    assert.equal(rc, 1, out);
+    assert.ok(out.includes("2 selected, 1 proven"), out);
+    assert.ok(/^B1: .*\[NOT PROVEN ON THIS TREE\]$/m.test(out), out);
+    assert.ok(/^R1: [^\n]*$/m.test(out) && !/^R1: .*NOT PROVEN/m.test(out), "R1's inputs did not change: " + out);
+    // the same records without a digest are judged by the exact tree alone, as before
+    const results = readJson(g.lay.results);
+    for (const r of Object.values(results)) delete r.inputs;
+    fs.writeFileSync(g.lay.results, mu.renderResults(results, order()));
+    commit("records without digests");
+    [rc, out] = await main("--verify", "--changed-since", base);
+    assert.equal(rc, 1, out);
+    assert.ok(out.includes("2 selected, 0 proven"), out);
+  });
+
+  test("test_a_change_to_a_shared_test_helper_needs_all_its_dependents_proven_again", async () => {
+    const base = branchProven();
+    write("tests/common/mod.rs", "pub fn fixtures() -> &'static str { \"tests/other\" }\n");
+    commit("edit the shared helper");
+    let [rc, out] = await main("--verify", "--changed-since", base);
+    assert.equal(rc, 1, out);
+    assert.ok(out.includes("2 selected, 0 proven"), out);
+    [rc, out] = await main("--list", "--changed-since", "HEAD~1");
+    for (const i of ["B1", "R1"]) {
+      assert.ok(new RegExp(`^${i}: .*an input changed since its proof.*\\[NOT PROVEN ON THIS TREE\\]$`, "m").test(out), out);
+    }
+  });
+
+  test("test_a_change_to_an_input_no_file_name_selects_still_selects_the_record", async () => {
+    branchProven();
+    write("src/lib.rs", "pub mod book;\npub mod read;\n#[cfg(test)]\nmod tests { #[test] fn root_level() {} }\n");
+    commit("edit the module root only");
+    const [rc, out] = await main("--verify", "--changed-since", "HEAD~1");
+    assert.equal(rc, 1, out);
+    for (const i of ["B1", "R1"]) assert.ok(new RegExp(`^${i}: an input changed since its proof  \\[NOT PROVEN ON THIS TREE\\]$`, "m").test(out), out);
+    assert.ok(out.includes("2 selected, 0 proven"), out);
+  });
+
   test("test_an_entry_the_runner_cannot_judge_is_refused_at_load", async () => {
     for (const [bad, why] of [
       [{ file: "src/./book.rs" }, "file 'src/./book.rs' is not a tracked crate path"],
@@ -1368,8 +1437,8 @@ console.log(JSON.stringify({ held, overlaps, refused }));
     assert.deepEqual(asked.filter((l) => l.startsWith("rev-parse")), ["rev-parse HEAD"], "HEAD is read once");
     assert.deepEqual(
       asked.filter((l) => l.startsWith("ls-tree") && !l.includes("--name-only")),
-      [`ls-tree -r ${head} -- ${CRATE}`, `ls-tree -r -z ${head} -- src-tauri rust-toolchain.toml`],
-      "the tree and the files both use that commit",
+      [`ls-tree -r ${head} -- ${CRATE}`, `ls-tree -r -z ${head} -- src-tauri rust-toolchain.toml`, `ls-tree -r -z ${head} -- ${CRATE}`],
+      "the tree, the files and the input digest all use that commit",
     );
     await fakeCargo(outside, FAKE_CARGO, {}, async () => {
       assert.equal(rc, 1, out); // R1 survives: the fake suite ignores it
@@ -1775,5 +1844,181 @@ describe("ResultsFile", () => {
     for (const key of ["file", "from", "to"]) {
       assert.notEqual(mu.mutationHash(m), mu.mutationHash({ ...m, [key]: "changed" }), key);
     }
+  });
+});
+
+// A record's input digest (#2361): what enters it, what gives none, and how --verify and selection
+// use it.
+describe("InputDigest", () => {
+  let d;
+  beforeEach(() => {
+    const t = tempDir();
+    const repo = path.join(t, "repo");
+    const root = path.join(repo, CRATE);
+    crateLayout(root);
+    const extra = {
+      "src/lib.rs": "pub mod book;\npub mod other;\npub mod support;\n#[cfg(test)]\nmod tests { #[test] fn root_level() {} }\n",
+      "Cargo.toml": '[package]\nname = "bridge-tax-audit"\n',
+      "build.rs": "fn main() {}\n",
+      "src/macros.rs": "macro_rules! check { () => {} }\n",
+      "src/other.rs": "pub fn unrelated() {}\n",
+      "src/support.rs": '#[cfg(test)]\nmod helpers;\n#[test] fn tables() { let _ = include_str!("text_tables.rs"); }\n',
+      "src/support/helpers.rs": "pub fn helper() {}\n",
+    };
+    for (const [rel, text] of Object.entries(extra)) {
+      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), text);
+    }
+    fs.writeFileSync(path.join(repo, "rust-toolchain.toml"), '[toolchain]\nchannel = "1.96.0"\n');
+    fs.writeFileSync(path.join(repo, "src-tauri/Cargo.lock"), "version = 4\n");
+    sh(repo, "init", "-q", "-b", "master");
+    d = { t, repo, root };
+    commit("base");
+  });
+  afterEach(() => fs.rmSync(d.t, { recursive: true, force: true }));
+
+  const write = (rel, text) => {
+    const p = path.join(d.root, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, text);
+  };
+  const commit = (message) => {
+    sh(d.repo, "add", "-A");
+    sh(d.repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", message);
+  };
+  const view = () => mu.treeView("HEAD", d.repo, CRATE);
+  const tree = () => mu.crateTree("HEAD", d.repo, CRATE);
+  const B = { ...mutation("B", "src/book.rs"), from: "// book", to: "// koob" };
+  const INTEGRATION = ["tests/edge_books.rs::every_edge_book_matches_the_reference"];
+  const UNIT = ["src/lib.rs::support::tables"];
+  /** A killed record for `m` made at HEAD, carrying its digest there. */
+  const proved = (m, killers) => {
+    const rec = record(m, killers, { tree: tree() });
+    rec.inputs = mu.inputDigest(m, rec, view());
+    return rec;
+  };
+
+  test("test_a_digest_is_versioned_and_stable_at_one_tree", () => {
+    const rec = proved(B, INTEGRATION);
+    assert.match(rec.inputs, /^1:[g-v]{16}$/, "letters only: no digit run the merge gate's scan reads as an identifier");
+    assert.equal(mu.inputDigest(B, rec, view()), rec.inputs);
+    assert.equal(mu.letters("0123456789abcdef"), "ghijklmnopqrstuv");
+  });
+
+  test("test_a_change_outside_a_records_inputs_leaves_it_fresh", () => {
+    for (const [n, killers] of [INTEGRATION, UNIT].entries()) {
+      const rec = proved(B, killers);
+      write("src/other.rs", `pub fn unrelated() { let _ = ${n}; }\n`); // a sibling module the ancestor declares
+      write(`src/new_module_${n}.rs`, "pub fn added() {}\n");
+      commit("unrelated source");
+      assert.notEqual(tree(), rec.crate_tree, "the crate tree moved");
+      assert.equal(mu.fresh(B, rec, tree(), null, view()), true, killers[0]);
+      assert.deepEqual(mu.staleDigests([B], { B: rec }, view()), []);
+      assert.deepEqual(mu.verify([B], { B: rec }, tree(), ["B"], null, view()), []);
+    }
+  });
+
+  test("test_a_change_to_each_input_kind_stales_the_record", () => {
+    // [what, killers, change]: each change alone must stale a record proven just before it
+    const kinds = [
+      ["the target", INTEGRATION, () => write("src/book.rs", "// book\n// edited\n")],
+      ["the target's mode", INTEGRATION, () => fs.chmodSync(path.join(d.root, "src/book.rs"), 0o755)],
+      ["an ancestor module file", INTEGRATION, () => write("src/lib.rs", "#[cfg(any())]\npub mod book;\npub mod other;\npub mod support;\n")],
+      ["a killer's file", INTEGRATION, () => write("tests/edge_books.rs", "mod common;\n#[test] fn every_edge_book_matches_the_reference() { }\n")],
+      ["tests/common, edited", INTEGRATION, () => write("tests/common/mod.rs", "pub fn fixtures() -> &'static str { \"elsewhere\" }\n")],
+      ["tests/common, a new file", INTEGRATION, () => write("tests/common/more.rs", "pub fn more() {}\n")],
+      ["an included file", UNIT, () => write("src/text_tables.rs", "// regenerated\n")],
+      ["a mod file the killer's file declares", UNIT, () => write("src/support/helpers.rs", "pub fn helper() { panic!() }\n")],
+      ["a non-source file", INTEGRATION, () => write("tests/fixtures/golden/x.json", "{\"a\": 1}\n")],
+      ["Cargo.toml", UNIT, () => write("Cargo.toml", '[package]\nname = "bridge-tax-audit"\nedition = "2024"\n')],
+      ["build.rs", UNIT, () => write("build.rs", "fn main() { println!(\"cargo:rerun-if-changed=x\"); }\n")],
+      ["a file that defines a macro", UNIT, () => write("src/macros.rs", "macro_rules! check { () => { panic!() } }\n")],
+      ["a new file that defines a macro", UNIT, () => write("src/more_macros.rs", "macro_rules! other { () => {} }\n")],
+    ];
+    for (const [what, killers, change] of kinds) {
+      const rec = proved(B, killers);
+      change();
+      commit(what);
+      assert.notEqual(mu.inputDigest(B, rec, view()), rec.inputs, what);
+      assert.equal(mu.fresh(B, rec, tree(), null, view()), false, what);
+      assert.deepEqual(mu.staleDigests([B], { B: rec }, view()), ["B"], what);
+      assert.deepEqual(mu.verify([B], { B: rec }, tree(), ["B"], null, view()), [`B: not proven on crate tree ${tree()}`], what);
+    }
+  });
+
+  test("test_a_change_to_an_input_outside_the_crate_stales_the_record", () => {
+    const saved = [...mu.EXTERNAL_INPUTS];
+    mu.EXTERNAL_INPUTS.splice(0, mu.EXTERNAL_INPUTS.length, "src-tauri/Cargo.lock", "rust-toolchain.toml");
+    try {
+      const rec = proved(B, UNIT);
+      fs.writeFileSync(path.join(d.repo, "src-tauri/Cargo.lock"), "version = 4\n# a bumped dependency\n");
+      commit("the lock file");
+      assert.equal(tree(), rec.crate_tree, "the crate's own tree did not move");
+      assert.notEqual(mu.inputDigest(B, rec, view()), rec.inputs);
+    } finally {
+      mu.EXTERNAL_INPUTS.splice(0, mu.EXTERNAL_INPUTS.length, ...saved);
+    }
+  });
+
+  test("test_an_input_that_cannot_be_resolved_gives_no_digest", () => {
+    const rec = (killers) => record(B, killers, { tree: tree() });
+    assert.equal(mu.inputDigest(B, rec([]), view()), null, "no killer: a hang or a survivor");
+    assert.equal(mu.inputDigest(B, rec(["tests/edge_books.rs::gone"]), view()), null, "an unknown killer file");
+    const unresolved = [
+      ["a #[path] attribute", "src/support.rs", '#[path = "elsewhere.rs"]\nmod helpers;\n#[test] fn tables() {}\n'],
+      ["a cfg_attr path", "src/support.rs", '#[cfg_attr(test, path = "elsewhere.rs")]\nmod helpers;\n#[test] fn tables() {}\n'],
+      // rustc takes this one from src/support/inner/helpers.rs, not the src/support/helpers.rs that exists
+      ["a mod inside a block", "src/support.rs", "mod inner { mod helpers; }\n#[test] fn tables() {}\n"],
+      ["a mod with two candidate files", "src/support.rs", "mod helpers;\n#[test] fn tables() {}\n", () => write("src/support/helpers/mod.rs", "\n")],
+      ["a mod with no file", "src/support.rs", "mod missing;\n#[test] fn tables() {}\n"],
+      ["an included file that is gone", "src/support.rs", '#[test] fn tables() { let _ = include_str!("no_such.rs"); }\n'],
+      ["a target that is not UTF-8", "src/book.rs", Buffer.from([0x2f, 0x2f, 0xff, 0xfe, 0x0a])],
+      ["an ancestor that is not UTF-8", "src/lib.rs", Buffer.from([0xff, 0x0a])],
+    ];
+    for (const [what, file, text, also] of unresolved) {
+      sh(d.repo, "checkout", "-q", "master");
+      sh(d.repo, "checkout", "-q", "-B", `case-${unresolved.findIndex((u) => u[0] === what)}`);
+      write(file, text);
+      also?.();
+      commit(what);
+      assert.equal(mu.inputDigest(B, rec(UNIT), view()), null, what);
+    }
+    sh(d.repo, "checkout", "-q", "master");
+    write("src/support.rs", '// #[path = "x.rs"] in a comment\nconst S: &str = "#[path = \\"y\\"] mod z;";\n#[cfg(test)]\nmod helpers;\n#[test] fn tables() {}\n');
+    commit("path text in a comment and a string only");
+    assert.notEqual(mu.inputDigest(B, rec(UNIT), view()), null, "a comment or a string is not an attribute");
+  });
+
+  test("test_a_record_without_a_digest_of_this_version_is_judged_by_its_tree_alone", () => {
+    const rec = proved(B, INTEGRATION);
+    const hex = rec.inputs.slice(2);
+    write("src/other.rs", "pub fn unrelated() { let _ = 2; }\n");
+    commit("unrelated source");
+    assert.equal(mu.fresh(B, rec, tree(), null, view()), true, "control: this version, unchanged inputs");
+    const variants = [
+      ["no digest", (({ inputs, ...r }) => r)(rec)],
+      ["an older version", { ...rec, inputs: `0:${hex}` }],
+      ["a newer version", { ...rec, inputs: `2:${hex}` }],
+      ["no version", { ...rec, inputs: hex }],
+      ["not a string", { ...rec, inputs: { 1: hex } }],
+      ["a malformed digest", { ...rec, inputs: `1:${hex.toUpperCase()}` }],
+      ["the hex form", { ...rec, inputs: `1:${[...hex].map((c) => (c.charCodeAt(0) - 103).toString(16)).join("")}` }],
+    ];
+    for (const [what, r] of variants) {
+      assert.equal(mu.fresh(B, r, tree(), null, view()), false, what);
+      assert.equal(mu.fresh(B, r, r.crate_tree, null, view()), true, `${what}: still fresh on its own tree`);
+      assert.deepEqual(mu.staleDigests([B], { B: r }, view()), [], `${what}: selection is today's`);
+    }
+    assert.equal(mu.fresh(B, rec, tree(), null, null), false, "no view: the exact-tree rule alone");
+    assert.equal(mu.fresh({ ...B, to: "edited" }, rec, tree(), null, view()), false, "an edited definition");
+  });
+
+  test("test_a_new_edited_or_nightly_failing_mutation_needs_the_exact_tree", () => {
+    const rec = proved(B, INTEGRATION);
+    write("src/other.rs", "pub fn unrelated() { let _ = 3; }\n");
+    commit("unrelated source");
+    assert.deepEqual(mu.verify([B], { B: rec }, tree(), ["B"], null, view()), [], "control: fresh by digest");
+    assert.deepEqual(mu.verify([B], { B: rec }, tree(), ["B"], null, view(), new Set(["B"])), [`B: not proven on crate tree ${tree()}`]);
+    assert.deepEqual(mu.verify([B], { B: { ...rec, crate_tree: tree() } }, tree(), ["B"], null, view(), new Set(["B"])), [], "made on this tree");
   });
 });

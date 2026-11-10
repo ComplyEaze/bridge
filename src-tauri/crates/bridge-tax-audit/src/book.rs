@@ -260,6 +260,15 @@ pub enum OpeningStockUnknown {
     NotAtBooksStart,
     /// The stock-items part did not parse; `stock` refuses on it with the typed error.
     Unreadable,
+    /// The stock-items part parsed but lists no stock item, so no opening stock is read; it is
+    /// not taken as zero (#1602, a declared behaviour difference from the reference).
+    NoStockItems,
+    /// The stock-items part lists items, but none carries an opening value, so no opening stock is
+    /// read; it is not taken as zero (#1602, a declared behaviour difference from the reference).
+    NoOpeningValues,
+    /// The stock items' opening values add up to more than the paise total can hold. No real
+    /// book reaches it; the total is never wrapped or taken in part (#1602).
+    TooLarge,
 }
 
 impl OpeningStockUnknown {
@@ -270,6 +279,11 @@ impl OpeningStockUnknown {
                 "not taken: the read does not show the trial balance starting on the books' first day"
             }
             Self::Unreadable => "unreadable",
+            Self::NoStockItems => "not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil",
+            Self::NoOpeningValues => "not taken: no stock item carries an opening value",
+            Self::TooLarge => {
+                "not taken: the stock items' opening values add up to more than can be held"
+            }
         }
     }
 }
@@ -291,12 +305,21 @@ fn opening_stock(
         return OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart);
     }
     match crate::stock_read::stock_item_masters(items) {
-        Ok(masters) => OpeningStock::Valued(
-            masters
-                .values()
-                .map(|m| m.opening_value_paise.unwrap_or(0))
-                .sum(),
-        ),
+        Ok(masters) if masters.is_empty() => {
+            OpeningStock::Unknown(OpeningStockUnknown::NoStockItems)
+        }
+        Ok(masters) if masters.values().all(|m| m.opening_value_paise.is_none()) => {
+            OpeningStock::Unknown(OpeningStockUnknown::NoOpeningValues)
+        }
+        Ok(masters) => masters
+            .values()
+            .try_fold(0_i64, |total, m| {
+                total.checked_add(m.opening_value_paise.unwrap_or(0))
+            })
+            .map_or(
+                OpeningStock::Unknown(OpeningStockUnknown::TooLarge),
+                OpeningStock::Valued,
+            ),
         Err(_) => OpeningStock::Unknown(OpeningStockUnknown::Unreadable),
     }
 }
@@ -2245,6 +2268,59 @@ mod tests {
         assert_eq!(
             opening_stock(Some(true), Some(&items), None, None),
             OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+        );
+        // #1602, declared behaviour differences from the reference (which takes both as a known
+        // zero): a part that lists no stock item, and items none of which carries an opening value,
+        // give no opening stock. One item without a value beside valued ones still counts as
+        // nothing, as above. These pin the change until a Chartered Accountant's hand-worked answer
+        // for such a book is recorded.
+        assert_eq!(
+            opening_stock(
+                Some(true),
+                Some(&stock_items_part("")),
+                Some(&from),
+                Some(&from)
+            ),
+            OpeningStock::Unknown(OpeningStockUnknown::NoStockItems)
+        );
+        let unvalued = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"></STOCKITEM><STOCKITEM NAME=\"Hook\"></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&unvalued), Some(&from), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::NoOpeningValues)
+        );
+        let zero_valued = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>0.00</OPENINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Hook\"></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&zero_valued), Some(&from), Some(&from)),
+            OpeningStock::Valued(0),
+            "an opening value of zero is a value"
+        );
+        // Opening values whose total would not fit are not taken, in either direction, and never
+        // wrapped (#1602). Each value alone parses.
+        for (one, other) in [
+            ("-60000000000000000.00", "-60000000000000000.00"),
+            ("60000000000000000.00", "60000000000000000.00"),
+        ] {
+            let huge = stock_items_part(&format!(
+                "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>{one}</OPENINGVALUE></STOCKITEM>\
+                 <STOCKITEM NAME=\"Latch\"><OPENINGVALUE>{other}</OPENINGVALUE></STOCKITEM>"
+            ));
+            assert_eq!(
+                opening_stock(Some(true), Some(&huge), Some(&from), Some(&from)),
+                OpeningStock::Unknown(OpeningStockUnknown::TooLarge),
+                "{one} {other}"
+            );
+        }
+        let one_huge = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>-60000000000000000.00</OPENINGVALUE></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&one_huge), Some(&from), Some(&from)),
+            OpeningStock::Valued(6_000_000_000_000_000_000)
         );
         let broken = stock_items_part(
             "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>nine</OPENINGVALUE></STOCKITEM>",

@@ -1,0 +1,7 @@
+a-mvlu1-V-mvly-usd-customer-20250401-20260331.xml: HEADER/STATUS 1
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000c 20250430 Sales '4' ISCANCELLED No ISOPTIONAL No: 2 entries
+    'BRIDGE USD Customer' Yes '-$100.00 @ ₹ 88/$ = -₹ 8800.00' COMPOSITE
+    'BRIDGE Export Sales' No '$100.00 @ ₹ 88/$ = ₹ 8800.00' COMPOSITE
+  Sales '4': ALL COMPOSITE (2)
+DAY 20250430: 1 vouchers, 4 on other days
+exit 0

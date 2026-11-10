@@ -1,0 +1,2 @@
+BRIDGE FOREXGROUP LAB: folder <N>, GUID hits 1, excluded GUID hits 0
+folders named so: 1

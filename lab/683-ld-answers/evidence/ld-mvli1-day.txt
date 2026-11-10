@@ -1,0 +1,7 @@
+a-mvli1-V-mvly-inr-customer-20250401-20260331.xml: HEADER/STATUS 1
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000d 20250430 Receipt '4' ISCANCELLED No ISOPTIONAL No: 2 entries
+    'BRIDGE INR Customer' No '2000.00' PLAIN
+    'Cash' Yes '-2000.00' PLAIN
+  Receipt '4': ALL PLAIN (2)
+DAY 20250430: 1 vouchers, 2 on other days
+exit 0

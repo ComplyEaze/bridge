@@ -1,0 +1,10 @@
+a-mvlu1-V-mvly-usd-customer-20250401-20260331.xml: HEADER/STATUS 1
+a-mv1-V-mvy-20250401-20260331.xml: HEADER/STATUS 1
+  ledger 'BRIDGE USD Customer': ledger-scoped 5 vouchers, book-scoped with an entry on it 5
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000001: ledger-scoped ['-$1000000.00 @ ₹ 86/$ = -₹ 86000000.00'] book-scoped ['-$1000000.00 @ ₹ 86/$ = -₹ 86000000.00']
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000002: ledger-scoped ['-$100.00 @ ₹ 86.4125/$ = -₹ 8641.25'] book-scoped ['-$100.00 @ ₹ 86.4125/$ = -₹ 8641.25']
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000003: ledger-scoped ['$100.00 @ ₹ 87/$ = ₹ 8700.00'] book-scoped ['$100.00 @ ₹ 87/$ = ₹ 8700.00']
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000b: ledger-scoped ['$1000.00 @ ₹ 88/$ = ₹ 88000.00'] book-scoped ['$1000.00 @ ₹ 88/$ = ₹ 88000.00']
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000c: ledger-scoped ['-$100.00 @ ₹ 88/$ = -₹ 8800.00'] book-scoped ['-$100.00 @ ₹ 88/$ = -₹ 8800.00']
+LEDGER SAME
+exit 0

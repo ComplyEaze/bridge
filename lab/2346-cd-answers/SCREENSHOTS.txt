@@ -1,0 +1,13 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/*.png are the Tally window (PrintWindow, its left part).
+shots/bk-accept.png 51562 B 8e9d2aa190ea23d22079e312ef1cd11eb56d8570f856790c9d14814e279f75e5
+shots/c10-no-company.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/c10-window.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/s0-gateway.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/s0-select.png 36274 B ae0932cd41c00490736d8eb8eb55dfd290d7a9a2ee0f06719f525924bf1a9ea6
+shots/s0-window.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/s3-after-send.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/s4-after-send.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/s5-accept.png 34850 B 3a9afc55e777942612a9f887273e131b588759664d11272e4ef0a7adeef0178e
+shots/s5-folder-exists.png 41832 B 597c92464e81a5f8d6f13a27f5f018ddb3bb88c644b0abac818ecf6b4950f2c6
+shots/s5-reloaded.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/s5-restore-list.png 38448 B 7b152ab54ac451835f8985536e5ea1c2b05ea2ab102fb782f06fe6327b186810

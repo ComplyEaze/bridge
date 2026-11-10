@@ -8839,7 +8839,11 @@ async fn a_month_read_that_fails_after_a_clean_read_back_ends_the_invoice_diverg
         let run = pilot_post_on((simulator, server, directory)).await;
         let result = &run.response["structuredContent"]["result"];
         let voucher = &result["vouchers"][0];
-        assert_eq!(voucher["status"], "posted_divergent", "{how}: {}", run.response);
+        assert_eq!(
+            voucher["status"], "posted_divergent",
+            "{how}: {}",
+            run.response
+        );
         assert_eq!(
             voucher["diffs"],
             json!([{"invoice_fields": ["invoice_number_read_failed"]}]),

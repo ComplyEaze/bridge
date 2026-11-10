@@ -470,8 +470,9 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         months.extend(std::iter::repeat_n(wrap(""), 11));
         months
     };
-    let judge =
-        |month: String, posted: Option<&str>| number_after_post_difference(&year(month), "9", posted);
+    let judge = |month: String, posted: Option<&str>| {
+        number_after_post_difference(&year(month), "9", posted)
+    };
     let posted = Some("BRIDGE Sales");
     assert_eq!(judge(wrap(&row("BRIDGE Sales", "Yes")), posted), None);
     // A month answer holds every number of the month: only the posted one counts.
@@ -493,7 +494,10 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
     );
     // A Purchase-class voucher holding the number is no clash after the post either.
     assert_eq!(
-        judge(wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))), posted),
+        judge(
+            wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))),
+            posted
+        ),
         None
     );
     // The read-back reads the posted type only; these reads name each other type.

@@ -1824,8 +1824,7 @@ impl super::super::Server {
                         );
                         match self.post_read(identity, request).await {
                             Ok((month_xml, month_evidence)) => {
-                                evidence =
-                                    super::super::combine_evidence(evidence, month_evidence);
+                                evidence = super::super::combine_evidence(evidence, month_evidence);
                                 answers.push(month_xml);
                             }
                             Err(_) => {

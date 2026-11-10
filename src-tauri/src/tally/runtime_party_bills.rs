@@ -5,13 +5,19 @@
 //! from the books' first day to the same to-date. Both reads are paired, and the
 //! answer is told only when its bills sum to the ledger's closing
 //! ([`PartyBillsAnswer::tie`](bridge_tally_protocol::native_outstandings::PartyBillsAnswer::tie)).
+//!
+//! Tally answers a party it reports nothing for with no body at all, the same for a name no
+//! ledger carries and for a bill-wise party with no balance at the date (protocol reference
+//! §12a.27). The answer cannot tell those apart, so the snapshot does, and neither is told as
+//! "no open bills".
 use super::*;
+use crate::tally::connection::PartyBillsAnswerBody;
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 use bridge_tally_protocol::native_outstandings::{
     parse_ledger_outstandings_answer, parse_native_ledger_snapshot_for_company,
-    render_ledger_outstandings_request, render_native_ledger_snapshot_request,
-    NativeLedgerSnapshotPeriod, NativeLedgerSnapshotPeriodError, PartyBillsAnswerError,
-    PartyBillsRead, PartyBillsRefusal,
+    render_ledger_outstandings_request, render_native_ledger_snapshot_request, LedgerSnapshotEntry,
+    NativeLedgerSnapshotPeriod, NativeLedgerSnapshotPeriodError, PartyBillsAnswer,
+    PartyBillsAnswerError, PartyBillsRead, PartyBillsRefusal,
 };
 
 /// A party's open bills, tied to its ledger at `to`.
@@ -32,6 +38,14 @@ pub(crate) enum PartyBillsReadError {
     NotInSnapshot,
     #[error("party_not_billwise")]
     NotBillWise,
+    /// The report sent nothing for a bill-wise party whose snapshot closing is empty. Whether it
+    /// has open bills is not established: a zero balance may still hold an open bill against an
+    /// on-account advance (protocol reference §12a.27).
+    #[error("party_bills_none_reported")]
+    NoneReported,
+    /// The report sent nothing for a bill-wise party whose snapshot shows a closing: not measured.
+    #[error("party_bills_answer_missing")]
+    AnswerMissing,
     #[error("{}", .0.code())]
     Answer(PartyBillsAnswerError),
     #[error("{}", .0.code())]
@@ -45,10 +59,41 @@ impl PartyBillsReadError {
             Self::Period(_) => "party_bills_period_not_honoured",
             Self::NotInSnapshot => "party_not_in_book",
             Self::NotBillWise => "party_not_billwise",
+            Self::NoneReported => "party_bills_none_reported",
+            Self::AnswerMissing => "party_bills_answer_missing",
             Self::Answer(error) => error.code(),
             Self::Refused(refusal) => refusal.code(),
         }
     }
+}
+
+/// The party's answer told against its ledger in the snapshot. The snapshot is consulted first,
+/// so a name it does not carry and a ledger that keeps no bills refuse by those codes whatever
+/// the report answered. `answer` is `None` for the empty answer (protocol reference §12a.27),
+/// which is never told as no open bills: a bill-wise party whose closing is empty refuses as
+/// `party_bills_none_reported`, and one with a closing as `party_bills_answer_missing`.
+fn tie_to_snapshot(
+    snapshot: Vec<LedgerSnapshotEntry>,
+    party: &str,
+    answer: Option<Result<PartyBillsAnswer, PartyBillsAnswerError>>,
+) -> Result<PartyBillsRead, PartyBillsReadError> {
+    let ledger = snapshot
+        .into_iter()
+        .find(|entry| entry.name == party)
+        .ok_or(PartyBillsReadError::NotInSnapshot)?;
+    if !ledger.bill_wise_on {
+        return Err(PartyBillsReadError::NotBillWise);
+    }
+    let Some(answer) = answer else {
+        return Err(match ledger.closing_balance {
+            None => PartyBillsReadError::NoneReported,
+            Some(_) => PartyBillsReadError::AnswerMissing,
+        });
+    };
+    answer
+        .map_err(PartyBillsReadError::Answer)?
+        .tie(ledger.closing_balance.as_ref())
+        .map_err(PartyBillsReadError::Refused)
 }
 
 impl TallyRuntime {
@@ -95,32 +140,25 @@ impl TallyRuntime {
 
                     let request =
                         render_ledger_outstandings_request(identity.display_name(), &party, &to);
-                    let (xml, bytes, hash) = client
-                        .fetch_native_report_paired(request.clone())
-                        .await?
-                        .require_stable(PairedReadValidationError::PartyBills)?;
+                    let (body, bytes, hash) =
+                        client.fetch_party_bills_paired(request.clone()).await?;
                     evidence = evidence
                         .clone()
                         .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                     // Held until the closing extent is read: a book that moved
                     // mid-read is reported as moved, not as what its answer broke.
-                    let answer = parse_ledger_outstandings_answer(&xml, &books_from, &to);
+                    let answer = match &body {
+                        PartyBillsAnswerBody::Rows(xml) => {
+                            Some(parse_ledger_outstandings_answer(xml, &books_from, &to))
+                        }
+                        PartyBillsAnswerBody::Empty => None,
+                    };
 
                     let closing_extent = client.fetch_company_book_extent(&identity).await?;
                     if closing_extent != extent {
                         return Err(PairedReadValidationError::NativeLedgerExtent.into());
                     }
-                    let ledger = snapshot?
-                        .into_iter()
-                        .find(|entry| entry.name == party.as_str())
-                        .ok_or(PartyBillsReadError::NotInSnapshot)?;
-                    if !ledger.bill_wise_on {
-                        return Err(PartyBillsReadError::NotBillWise.into());
-                    }
-                    let read = answer
-                        .map_err(PartyBillsReadError::Answer)?
-                        .tie(ledger.closing_balance.as_ref())
-                        .map_err(PartyBillsReadError::Refused)?;
+                    let read = tie_to_snapshot(snapshot?, party.as_str(), answer)?;
                     bracket_verified_company_identity(&client, &identity).await?;
                     evidence = evidence
                         .clone()

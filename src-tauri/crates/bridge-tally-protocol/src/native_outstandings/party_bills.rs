@@ -101,8 +101,10 @@ impl PartyBillsAnswer {
                 ledger_closing: ledger_closing.clone(),
             });
         }
-        // What Tally answers for a bill-wise party with no open bills is not
-        // measured, so an answer with no rows is not told as one (P1).
+        // An envelope with no rows has not been seen, so it is not told as no
+        // open bills (P1). Tally's answer with no bytes at all, which it sends a
+        // party it reports nothing for, never reaches this parse: the runtime
+        // tells it against the snapshot (protocol reference §12a.27).
         if self.bills.is_empty() {
             return Err(PartyBillsRefusal::NoRowsNotEstablished);
         }

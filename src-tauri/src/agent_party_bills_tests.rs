@@ -22,6 +22,14 @@ fn each_refusal_of_the_read_reaches_the_caller_by_its_own_code() {
         (PartyBillsReadError::NotInSnapshot, "party_not_in_book"),
         (PartyBillsReadError::NotBillWise, "party_not_billwise"),
         (
+            PartyBillsReadError::NoneReported,
+            "party_bills_none_reported",
+        ),
+        (
+            PartyBillsReadError::AnswerMissing,
+            "party_bills_answer_missing",
+        ),
+        (
             PartyBillsReadError::EducationUnqualified,
             "party_bills_education_unqualified",
         ),
@@ -59,14 +67,24 @@ fn a_drifted_pair_is_the_read_s_failure_with_the_drift_as_its_cause() {
     assert_eq!(failure.cause, Some("party_bills_drifted"));
 }
 
-/// Tally's answer to a name it does not match, refused at the transport
-/// (`runtime_party_bills_tests.rs`), reaches the caller as the read's failure.
+/// An empty head that is not the captured one stays the transport's refusal
+/// (`runtime_party_bills_tests.rs`), and reaches the caller as the read's failure; the empty
+/// answer itself, should any read meet it unasked, is reported with the same cause.
 #[test]
 fn the_empty_answer_s_transport_refusal_is_the_read_s_failure() {
-    let failure = tool_failure(anyhow::Error::new(TallyTransportError::InvalidEncoding {
-        code: "response_content_type_unsupported",
-    }));
-    assert_eq!(failure.code, "party_bills_read_failed");
+    for transport in [
+        TallyTransportError::InvalidEncoding {
+            code: "response_content_type_unsupported",
+        },
+        TallyTransportError::EmptyAnswer,
+    ] {
+        let failure = tool_failure(anyhow::Error::new(transport));
+        assert_eq!(failure.code, "party_bills_read_failed");
+        assert_eq!(
+            shown_cause(&failure.code, failure.cause, failure.unanswered),
+            Some("response_content_type_unsupported")
+        );
+    }
 }
 
 #[test]

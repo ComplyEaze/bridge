@@ -5522,6 +5522,16 @@
       "size": 1636
     },
     {
+      "blob": "89381fb500c92fe95e6122f7a3b9af55ccfdbdb7",
+      "capture_id": "ledger-snapshot-supplier-rj-20260731.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2377-nb-answers at 61a5c1bf, file answers/a-s2-S-snap-20260401-20260731.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-snapshot-supplier-rj-20260731.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2377",
+      "sha256": "552bc05e5ff566f3b51372b3bd5e9f3ce56e1b49b40aa12e4b0585dfeaac423f",
+      "size": 25298
+    },
+    {
       "blob": "95f179b38fe053953ac91ccf516d117112cb9ff1",
       "capture_id": "r1-groups.utf16le.xml",
       "company": "BRIDGE TIEOUT E",

@@ -1,0 +1,16 @@
+a-mv0-V-mvy-20250401-20260331.xml: HEADER/STATUS 1
+a-twmvy-V-mvy-20250401-20260331.xml: HEADER/STATUS 1
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000001: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000002: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000003: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000004: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000005: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000006: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000007: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000008: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-00000009: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000a: SAME (2 entries)
+  1bb48be5-baba-45b2-90d8-7593244915a9-0000000b: SAME (2 entries)
+vouchers: movement 11, capture 11
+CAPTURE SAME
+exit 0

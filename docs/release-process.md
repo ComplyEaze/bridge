@@ -257,26 +257,26 @@ sorted position still conflict in the pin list itself. Resolve it by keeping bot
 entries (see "When the surface conflicts in a merge"); the cap is no longer part of
 it.
 
-#### What the coverage report shows
+#### What no check sees when code moves
 
-`scripts/surface_coverage_report.py` prints a surface coverage report. Run it by
-hand before opening a pull request that moves code. It never fails. Against the
-merge-base with `origin/master` (override with `--base`) it lists two things the
-gate cannot see: a pin that was dropped, and a module declared directly by a
-pinned module and newly left unpinned. Modules left unpinned before the branch
-are not reprinted, test-only modules are only counted, and feature-gated ones are
-labelled.
+A dropped pin is refused: `scripts/check-surface-ack.mjs` fails a pull request that
+removes a pin without a `removed-pin:` line, or that loses a pin one of its own
+commits added (see "What checks it"). Nothing checks that code leaving a pinned
+file stays pinned. Before opening a pull request that moves code, look for each of
+these yourself:
 
-**A clean report is not evidence that nothing left the pinned surface.** It does
-not see code moved between files that already existed; a new module declared by
-an *unpinned* module, even one carved out of a pinned file (a new file under an
-unpinned `db/mod.rs`, say); deeper descendants of a pinned module; a pinned
-file that stops being compiled; a test-only or feature-gated module becoming
-production; or a new crate root. The script's docstring keeps the full list.
+- a new module declared by a pinned module and left unpinned;
+- a new module declared by an *unpinned* module, even one carved out of a pinned
+  file (a new file under an unpinned `db/mod.rs`, say);
+- a deeper descendant of a pinned module;
+- code moved between files that already existed;
+- a pinned file that stops being compiled;
+- a test-only or feature-gated module becoming production;
+- a new crate root.
 
-Read it, then pin each listed file that decides what Bridge posts or lets leave
-the machine, and leave the rest; see the module documentation of
-`compatibility_surface_stays_whole` for the rule and bridge#416 for the reasoning.
+Pin each such file that decides what Bridge posts or lets leave the machine, and
+leave the rest; see the module documentation of `compatibility_surface_stays_whole`
+for the rule and bridge#416 for the reasoning.
 
 #### When the surface conflicts in a merge or rebase
 

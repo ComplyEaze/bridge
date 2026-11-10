@@ -461,7 +461,6 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - if: steps.merge-gate-scope.outputs.run == 'true'
         run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4
-      - run: python3 scripts/surface_coverage_report.test.py
 
   tally-portable:
     name: Tally portable core

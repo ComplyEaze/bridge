@@ -1,0 +1,4 @@
+  a-r6a-L-lo-at-20260801.xml: 896 bytes, sha256 22ad6aa26c058043816ded8324ae45dfe7a7cf8aa93af9ad698d3777e23564a7
+  a-r6b-L-lo-at-20260801.xml: 896 bytes, sha256 22ad6aa26c058043816ded8324ae45dfe7a7cf8aa93af9ad698d3777e23564a7
+SAME: EQUAL
+exit 0

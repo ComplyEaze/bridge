@@ -1,0 +1,4 @@
+  a-r4a-L-lo-dq-20260801.xml: 896 bytes, sha256 3b313034c1e95ea0f726009ff4b0d3a059a9206159d8bc2de5235deb61d5519d
+  a-r4b-L-lo-dq-20260801.xml: 896 bytes, sha256 3b313034c1e95ea0f726009ff4b0d3a059a9206159d8bc2de5235deb61d5519d
+SAME: EQUAL
+exit 0

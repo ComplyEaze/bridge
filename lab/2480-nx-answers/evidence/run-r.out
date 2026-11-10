@@ -1,0 +1,35 @@
+2026-11-10T22:21:05.301Z start bash r.sh
+== lr.sh r1a pl exit 3
+== lr.sh r1b pl exit 3
+r1 pl: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r2a cm exit 3
+== lr.sh r2b cm exit 3
+r2 cm: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r3a us exit 3
+== lr.sh r3b us exit 3
+r3 us: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r4a dq exit 3
+== lr.sh r4b dq exit 3
+r4 dq: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r5a ps exit 3
+== lr.sh r5b ps exit 3
+r5 ps: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r6a at exit 3
+== lr.sh r6b at exit 3
+r6 at: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r7a hs exit 3
+== lr.sh r7b hs exit 3
+r7 hs: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r8a cl exit 3
+== lr.sh r8b cl exit 3
+r8 cl: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r9a pc exit 3
+== lr.sh r9b pc exit 3
+r9 pc: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r10a st exit 3
+== lr.sh r10b st exit 3
+r10 st: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r11a ex exit 3
+== lr.sh r11b ex exit 3
+r11 ex: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+2026-11-10T22:21:58.110Z end, exit 0

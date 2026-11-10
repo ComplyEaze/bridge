@@ -1,0 +1,82 @@
+N-0261.xml: 3022 bytes
+N-0262.xml: 3022 bytes
+N-0263.xml: 3022 bytes
+N-0264.xml: 3022 bytes
+N-0265.xml: 3022 bytes
+N-0266.xml: 3022 bytes
+N-0267.xml: 3022 bytes
+N-0268.xml: 3022 bytes
+N-0269.xml: 3022 bytes
+N-0270.xml: 3022 bytes
+N-0271.xml: 3022 bytes
+B-bills.xml: 46 bytes
+S-snap-20260401-20260801.xml: 25480 bytes
+M-marks.xml: 3394 bytes
+== a-s2-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Nx Plain': 0 groups
+  cm 'BRIDGE Nx Ak, Am': 0 groups
+  us 'BRIDGE Nx Bk_Bm': 0 groups
+  dq 'BRIDGE Nx "Ck" Cm': 0 groups
+  ps 'BRIDGE Nx Dk + Dm': 0 groups
+  at 'BRIDGE Nx Ek @ Em': 0 groups
+  hs 'BRIDGE Nx Fk #12': 0 groups
+  cl 'BRIDGE Nx Gk: Gm': 0 groups
+  pc 'BRIDGE Nx Hk 15% Hm': 0 groups
+  st 'BRIDGE Nx Jk * Jm': 0 groups
+  ex 'BRIDGE Nx Kk!': 0 groups
+  groups of any other party: 0
+== a-s2-S-snap-20260401-20260801.xml
+a-s2-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Nx Plain': no row
+  cm 'BRIDGE Nx Ak, Am': no row
+  us 'BRIDGE Nx Bk_Bm': no row
+  dq 'BRIDGE Nx "Ck" Cm': no row
+  ps 'BRIDGE Nx Dk + Dm': no row
+  at 'BRIDGE Nx Ek @ Em': no row
+  hs 'BRIDGE Nx Fk #12': no row
+  cl 'BRIDGE Nx Gk: Gm': no row
+  pc 'BRIDGE Nx Hk 15% Hm': no row
+  st 'BRIDGE Nx Jk * Jm': no row
+  ex 'BRIDGE Nx Kk!': no row
+exit 0
+== a-s2-N-0261.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0262.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0263.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0264.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0265.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0266.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0267.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0268.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0269.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0270.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0271.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0

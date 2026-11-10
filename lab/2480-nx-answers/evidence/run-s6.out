@@ -1,0 +1,7 @@
+2026-11-10T22:20:19.232Z start bash s6.sh
+== send.sh s6m M-marks.xml exit 0
+== send.sh s6sa S-snap-20260401-20260801.xml exit 0
+== send.sh s6sb S-snap-20260401-20260801.xml exit 0
+== send.sh s6ba B-bills.xml exit 0
+== send.sh s6bb B-bills.xml exit 0
+2026-11-10T22:20:22.810Z end, exit 0

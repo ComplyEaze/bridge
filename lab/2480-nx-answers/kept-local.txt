@@ -1,0 +1,13 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backup-1/TDBK1800_<company number>.001 90051 B 4bc89ed31d61115f1d2180cd592f1e37c926ee82ec416ed4c67fd23889c0723f (BK, taken at step 1 to the sheet's backup-1 folder; restored at step 8)
+evidence/bk-after-listing.local 190 B bef63121c12df82e8d3272dd4f39d7ad4b5b091491d92da5898ae58ae0a49210 (Tally data folder or backup folder listing)
+evidence/bk-before-listing.txt 71 B 2f5983add4ff12852e2e6db83d9a19cb0d721668101c13767299b00de80c516b (Tally data folder or backup folder listing)
+evidence/c10-netstat.txt 8700 B 22caf48a0f1060a849404160073d3def211fd743b2e505dcb34bb56741ead802 (process or port listing)
+evidence/c10-tasklist.txt 54 B c2b6a76783e8a800db64bc44865ac45af05789f93e9505afe3a4e2569d6db9ad (process or port listing)
+evidence/s1-netstat.txt 32727 B 56c397cee73f29da1920d5daa61e5a56c04674cf4031ce70af9667f3bbbc0646 (process or port listing)
+evidence/s1-tasklist.txt 54 B 7f1a6db857f52661b409efd4fbceda55649c0d25e4814aa963e6bc6086aeca8e (process or port listing)
+evidence/s8-data-after-restore.txt 1257 B 38deeb6e3674ee030f5817fb75727f85f48ba73e832ebab1095a7d0b262d8fad (Tally data folder or backup folder listing)
+evidence/s8-data-before-restore.txt 1744 B 31f65bdc1d2278ccc557c732f7b0a6007de60feec075cb5eaad52452997eb896 (Tally data folder or backup folder listing)
+restore-plan-s8.txt 863 B 1c92144e658a03d86a1884cf757aa1b39ba95f75f46cdd1449f4d7faf1559aeb (a restore plan, written before the shut; it names the company number; restore-plan.txt is equal to restore-plan-s8.txt)
+restore-plan.txt 863 B 1c92144e658a03d86a1884cf757aa1b39ba95f75f46cdd1449f4d7faf1559aeb (a restore plan, written before the shut; it names the company number; restore-plan.txt is equal to restore-plan-s8.txt)
+stage-2480nx.py 11390 B 7b581bdd9e9729bba308b7fab73ebb57d8bb08cb513c3851b3307e68e12672e5 (this stage script: its patterns name the lab paths)

@@ -1,0 +1,4 @@
+Window captures each looked at and found to be the Gateway of Tally with BRIDGE PILOT LAB, period 1-Apr-26 to 31-Mar-27, current date Tuesday, 15-Sep-2026, and no dialog. w.sh accepts a capture after an import only if its sha256 is one of these; any other capture ends w.sh with exit 6 and nothing more sent.
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a shots/p1-after.png: Tally focused (the same image as each step-0 capture of NS, NC and this row)
+2b2eafc7b488d9c60ce6e0461650ac4727982f6b8ea503cb9dbb4344e87e4280 shots/p3-after.png (p3 to p11): Tally not the focused window; the bars drawn grey instead of blue, the content the same
+a38b1ad3a4cb20e05583ae0ce15e4759a061442f4b6e1182b2fb378a9acd7e1c shots/focus-check.png: Tally focused again by a click on its title bar that landed on the search box; it differs from p1-after's only in the search box (x 578 to 1138, y 8 to 44 of the capture), drawn tinted

@@ -1,0 +1,26 @@
+2026-11-10T22:19:14.426Z start bash wid.sh ex
+== a-s4exm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'78'", "'255'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s4ex exit 0
+LM-ex.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4ex-after.png
+2026-11-10T22:19:17.087Z
+capture 2b2eafc7b488d9c60ce6e0461650ac4727982f6b8ea503cb9dbb4344e87e4280, one of the Gateway captures in evidence/gateway-refs.txt
+a-s4ex-LM-ex.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4ex LM-ex.xml exit 0
+== a-s5exm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'78'", "'256'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s5ex exit 0
+I-ex.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5ex-after.png
+2026-11-10T22:19:20.385Z
+capture 2b2eafc7b488d9c60ce6e0461650ac4727982f6b8ea503cb9dbb4344e87e4280, one of the Gateway captures in evidence/gateway-refs.txt
+a-s5ex-I-ex.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 55, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5ex I-ex.xml exit 0
+2026-11-10T22:19:20.809Z end, exit 0

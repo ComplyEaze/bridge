@@ -1,0 +1,10 @@
+  BILLREF 'BP/26-27/0264' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: -1051.00
+ANSWER: ROWS 1 (0 On Account)
+  Bills Receivable groups named 'BRIDGE Nx "Ck" Cm': 1
+    BILLREF 'BP/26-27/0264'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+a-s6sa-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  snapshot CLOSINGBALANCE: '-1051.00'
+  rows 1, groups 1; the one bill is this ledger's own (BP/26-27/0264): yes; sum of BILLCL -1051.00, equals the closing
+AGAINST: EQUAL (L rows against the groups)
+exit 0

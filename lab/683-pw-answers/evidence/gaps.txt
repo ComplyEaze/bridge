@@ -1,0 +1,30 @@
+$ each send's time to answer and the gap from the previous send's answer to its start, seconds, from evidence/sends-utc.txt
+m0: started 15:27:55.690Z
+m0: answered in 0.5 s
+x0: started 15:28:04.439Z; gap after m0 answered: 8.2 s
+x0: answered in 0.5 s
+tb10: started 15:28:06.785Z; gap after x0 answered: 1.9 s
+tb10: answered in 0.6 s
+mv0: started 15:28:09.432Z; gap after tb10 answered: 2.1 s
+mv0: answered in 0.6 s
+mb: started 15:30:15.727Z; gap after mv0 answered: 125.7 s
+mb: answered in 0.5 s
+mc: started 15:31:53.494Z; gap after mb answered: 97.2 s
+mc: answered in 0.5 s
+m1: started 15:42:45.940Z; gap after mc answered: 652.0 s
+m1: answered in 0.4 s
+x1: started 15:42:48.318Z; gap after m1 answered: 2.0 s
+x1: answered in 0.5 s
+tb3p: started 15:42:50.936Z; gap after x1 answered: 2.1 s
+tb3p: answered in 0.6 s
+tb3p2: started 15:42:59.846Z; gap after tb3p answered: 8.3 s
+tb3p2: answered in 0.6 s
+tb1p: started 15:43:02.686Z; gap after tb3p2 answered: 2.3 s
+tb1p: answered in 0.6 s
+m1r: started 15:43:35.354Z; gap after tb1p answered: 32.1 s
+m1r: answered in 0.4 s
+m2: started 15:48:06.807Z; gap after m1r answered: 271.0 s
+m2: answered in 0.6 s
+mv2: started 15:48:09.034Z; gap after m2 answered: 1.6 s
+mv2: answered in 0.6 s
+K2's save (15:42:13Z, by the capture k2-8-after-save) to tb3p's start: 37 s

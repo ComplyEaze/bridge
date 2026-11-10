@@ -9,7 +9,7 @@
 //! a vendored rules excerpt ([`rules`]), and serialise the result canonically ([`canonical`]) so
 //! [`compare`] can diff it against the reference engine's dump under the same rules the
 //! reference's own comparer applies. A module with its own invariant (`depreciation`'s DEP-1/DEP-2,
-//! `financial_statements`' FS-1/FS-2, `trial_balance`'s TB-1/TB-2, `stale_balances_41_1`'s STL-1,
+//! `financial_statements`' FS-1/FS-2, `trial_balance`'s TB-1/TB-2/TB-3, `stale_balances_41_1`'s STL-1,
 //! `ledger_scrutiny`'s LSC-1, `cash_book_integrity`'s CBI-1/CBI-2) threads it through
 //! [`canonical::canonical_test_result`]'s `module_check` parameter.
 //!
@@ -1429,7 +1429,7 @@ pub fn statutory_dues_43b_on(
 }
 
 /// Run `trial_balance` on a book and return its canonical parity dump, with the module's own
-/// TB-1/TB-2 check. Reads no engagement configuration beyond binding.
+/// TB-1/TB-2/TB-3 check. Reads no engagement configuration beyond binding.
 pub fn trial_balance_on(
     engagement: &Engagement,
     book: &book::Book,

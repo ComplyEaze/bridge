@@ -68,6 +68,17 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The differences an invoice's read-back names for the company registration Tally filed it
+    /// under (#2464).
+    pub(crate) enum InvoiceRegistrationCode {
+        /// The registration's name or its GSTIN did not come back, or came back empty.
+        Missing = "invoice_registration_missing",
+        /// The GSTIN is not a valid GSTIN of the company's state the build recorded.
+        Differs = "invoice_registration_differs",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

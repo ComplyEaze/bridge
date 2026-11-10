@@ -60,3 +60,40 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
         assert!(seen.insert(text), "{text} is declared twice");
     }
 }
+
+/// The read-back's registration differences (#2464), declared new, so each string is pinned as
+/// declared, with every check above made for them too.
+const INVOICE_REGISTRATION: &[(InvoiceRegistrationCode, &str)] = &[
+    (
+        InvoiceRegistrationCode::Missing,
+        "invoice_registration_missing",
+    ),
+    (
+        InvoiceRegistrationCode::Differs,
+        "invoice_registration_differs",
+    ),
+];
+
+#[test]
+fn the_registration_codes_are_pinned_and_have_the_receipts_code_shape() {
+    let pinned: Vec<InvoiceRegistrationCode> =
+        INVOICE_REGISTRATION.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, InvoiceRegistrationCode::ALL);
+    let mut seen = GstUncertainCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    for (code, string) in INVOICE_REGISTRATION {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()), "{string}");
+        assert!(
+            string
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+            "{string}"
+        );
+        assert!(seen.insert(string), "{string} is declared twice");
+    }
+}

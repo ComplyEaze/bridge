@@ -1139,7 +1139,11 @@ pub(super) fn resolve_import_arguments(
                                 bridge_bank_statement::proposals::CASH_PAYMENT_ID_SUFFIX,
                             ) == Some(row_id)
                         })
-                        .ok_or_else(|| "proposals_file_invalid".to_string())?,
+                        .ok_or_else(|| {
+                            failure_code::BankStatementImportCode::ProposalsFileInvalid
+                                .as_str()
+                                .to_string()
+                        })?,
                     if payee {
                         record["paid_to"]["ledger"].as_str()
                     } else {

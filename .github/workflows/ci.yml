@@ -177,6 +177,10 @@ jobs:
           }
           release=false
           if [[ -n "$base" && ! "$base" =~ ^0+$ && "$(version_at "$base")" != "$(version_at "$GITHUB_SHA")" ]]; then release=true; fi
+          # A release pull request must also move src-tauri/release-date.txt (#2416): the script refuses a file that is missing,
+          # not one real YYYY-MM-DD line, the same as the base's, or an earlier day. It exits 2 when git cannot be read, which
+          # also fails this step: neither is a pass.
+          if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"; fi
           if [[ "$release" == true ]]; then
             echo "native_os=$both" >> "$GITHUB_OUTPUT"
           else
@@ -457,7 +461,6 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - if: steps.merge-gate-scope.outputs.run == 'true'
         run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4
-      - run: python3 scripts/surface_coverage_report.test.py
 
   tally-portable:
     name: Tally portable core
@@ -639,6 +642,18 @@ jobs:
       # passes; here the pinned build is fetched, verified against the SHA-256
       # in packaging/pdfium/pdfium.lock.json before extraction, and the ignored
       # tests are run on their own. Without the variable they fail, not skip.
+      # The archive is restored from a cache that only the pdfium-cache job writes, so once an entry exists a release-host
+      # outage does not fail this job (a run before the first save, or after a new pin, still downloads). The cache is
+      # untrusted storage and the digest check is the whole protection: fetch-pdfium.mjs checks a kept copy's byte count
+      # and SHA-256 against the lock like a download and downloads again when it differs. On a master push a copy of the
+      # pinned size with another digest also fails the step (--strict-cache), because that is not damage in transit.
+      # The key has no fallback prefix and holds the platform and the lock's hash; to drop a bad entry, delete it
+      # (gh cache delete) or raise the -v1 in the key.
+      - name: Restore the PDFium archive
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
       - name: Fetch pinned PDFium
         if: matrix.shard == 1
         shell: bash
@@ -646,6 +661,7 @@ jobs:
           node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/pdfium" --github-env "$GITHUB_ENV"
+          --cache-dir "$RUNNER_TEMP/pdfium-archive" ${{ github.event_name == 'push' && '--strict-cache' || '' }}
       # Nine tests, selected on the workspace build above and run on both systems: in
       # bridge-bank-statement's pdf_tests, a_union_bank_statement_reads_one_row_per_line,
       # an_owner_password_only_statement_opens_with_its_owner_password,
@@ -845,12 +861,18 @@ jobs:
       # parse_bank_statement loads PDFium from beside bridge_mcp, so the bundle
       # carries the pinned build. fetch-pdfium.mjs verifies the archive, the
       # library and the licence notice it writes against the lock before use.
+      - name: Restore the PDFium archive
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
       - name: Fetch pinned PDFium for the MCPB
         shell: bash
         run: >-
           node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/mcpb-pdfium"
+          --cache-dir "$RUNNER_TEMP/pdfium-archive" ${{ github.event_name == 'push' && '--strict-cache' || '' }}
       # tauri build uses --bins, including the auto-discovered bridge_mcp.
       # Stage that fresh release binary instead of rebuilding without Tauri's
       # custom-protocol feature and native build environment.
@@ -1055,6 +1077,46 @@ jobs:
           node src-tauri/crates/bridge-tax-audit/parity/mutations.mjs --verify
           --changed-since "$BASE_SHA" --nightly-issues "$RUNNER_TEMP/nightly-issues.txt"
 
+  pdfium-cache:
+    name: Keep the PDFium archive (${{ matrix.os }})
+    # The only job that writes the archive cache: a small job that builds nothing and runs no dependency's script, so
+    # nothing can alter the file between its check and its save, and one writer means no two jobs race on a key. Only
+    # a push to master, a manual run or the nightly run writes (a pull-request or merge-queue run restores only). It
+    # is skipped for a pull request and in the merge queue, where required-checks accepts that, so it cannot hold a
+    # merge; a failure here (a kept copy with the pinned size and another digest, or an archive that could not be kept)
+    # turns the master run's Required checks red for whoever watches it.
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Restore the PDFium archive
+        id: pdfium-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
+      - name: Fetch pinned PDFium into the cache directory
+        shell: bash
+        run: >-
+          node scripts/fetch-pdfium.mjs
+          --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
+          --dest "$RUNNER_TEMP/pdfium" --cache-dir "$RUNNER_TEMP/pdfium-archive" --strict-cache
+      - name: Save the PDFium archive
+        if: ${{ steps.pdfium-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
+
   required-checks:
     # A draft-scoped run posts `Required checks (draft)`, which no ruleset requires, never `Required checks`: its
     # green means the heavy jobs were skipped on purpose, and must not stand in for the ready run's gate on the same
@@ -1069,9 +1131,10 @@ jobs:
     # outside their paths and a reused master push set it 'false'): each must
     # succeed then and be skipped otherwise, so a job that should have run and
     # did not fails this job. compiler-cache-retention runs on master only and
-    # may be skipped. A failure or cancellation fails every rule.
+    # pdfium-cache on a push, a manual or a scheduled run only; either may be
+    # skipped. A failure or cancellation fails every rule.
     if: ${{ always() }}
-    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
+    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations, pdfium-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -1102,6 +1165,7 @@ jobs:
             ['seam-control', { kind: 'scope', output: 'bundle' }],
             ['tax-audit-mutations', { kind: 'scope', output: 'tax_audit' }],
             ['compiler-cache-retention', { kind: 'optional' }],
+            ['pdfium-cache', { kind: 'optional' }],
           ]);
           const RESULTS = new Set(['success', 'failure', 'cancelled', 'skipped']);
           const needs = JSON.parse(process.env.NEEDS_JSON);

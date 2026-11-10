@@ -2294,6 +2294,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              details in Tally, and the date they apply from, then build again. Do not change \
              the invoice's date or figures to get past this.",
         ),
+        "invoice_company_gst_off" => Some(
+            "GST is turned off for this company in Tally, and ComplyEaze Bridge does not \
+             post a sale into a company with GST off. Nothing was written to Tally. Tell \
+             the user, and ask them to confirm that this is the right company. Whether GST \
+             should be on for it is the user's decision, made in Tally, not yours. Do not \
+             record the sale another way to get past this.",
+        ),
+        "invoice_company_gst_unstated" => Some(
+            "Tally's answer about the company did not say whether GST is on for it, so \
+             ComplyEaze Bridge cannot issue a tax invoice in it. Nothing was written to Tally. \
+             Check that the company is still open in Tally, then build again; if it repeats, \
+             report it rather than retrying.",
+        ),
         "invoice_company_registration_unread" | "invoice_tax_unit_without_guid" => Some(
             "Tally's answer about the company's GST registrations could not be read: it \
              listed no tax unit at all, or a unit without its identifier. Nothing was \
@@ -2586,7 +2599,13 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
              did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
              and on that book a read sent straight after was refused for time as well. Do not \
              repeat the same call, and do not send another read of this company straight away: \
-             tell the user, wait, then call `tally_status` once, and go on only when it answers. On \
+             tell the user, wait, then call `tally_status` once, and go on only when it answers. If the user needs one party's \
+             outstanding at this date, ask them, and once it answers call `outstandings` with \
+             that `party`, the same `as_of` and `detail` `open_bills`: that reads the party's \
+             bills through Tally's Ledger Outstandings report, not this one, beside the book's \
+             list of ledgers, and gives no total for the whole book (on that book, sent directly \
+             and not through ComplyEaze Bridge, that report answered for each of its three \
+             largest parties in about a second). On \
              that book an earlier `as_of`, with fewer bills open, answered; whether one does here \
              depends on how many bills were open then, and choosing it is the user's call.",
         ),

@@ -752,6 +752,33 @@ fn an_unallocated_row_carries_its_composition_and_opening_through_the_json_and_r
     assert_ne!(json["party"], "Synthetic Debtor");
 }
 
+/// The `detail` parameter's own text names every value its schema admits (#2377), so a
+/// value added to the enum, as `open_bills` was, cannot be left out of the line an agent
+/// reads beside it.
+#[test]
+fn the_detail_parameter_text_names_every_detail_value() {
+    let definitions = tool_definitions(true, false);
+    let detail = &definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "outstandings"))
+        .expect("outstandings tool definition")["inputSchema"]["properties"]["detail"];
+    let text = detail["description"]
+        .as_str()
+        .expect("detail parameter text");
+    let values = detail["enum"].as_array().expect("detail enum");
+    assert!(values
+        .iter()
+        .any(|value| value == super::super::party_bills::OPEN_BILLS_DETAIL));
+    // Whole words, so a value that is only part of another word is not taken as named.
+    let words = text
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .collect::<Vec<_>>();
+    for value in values {
+        let value = value.as_str().expect("detail value");
+        assert!(words.contains(&value), "{value}: {text}");
+    }
+}
+
 #[test]
 fn the_outstandings_description_says_what_decides_receivable_and_payable() {
     // Tally's Bills Receivable and Bills Payable reports scope by the sign of each
@@ -1737,9 +1764,38 @@ const BILLS_REPORT_DEADLINE_STEP: &str = "Tally took longer to answer one reques
     29,900 it did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
     and on that book a read sent straight after was refused for time as well. Do not repeat the \
     same call, and do not send another read of this company straight away: tell the user, wait, \
-    then call `tally_status` once, and go on only when it answers. On that book an earlier \
+    then call `tally_status` once, and go on only when it answers. If the user needs one party's \
+    outstanding at this date, ask them, and once it answers call `outstandings` with that \
+    `party`, the same `as_of` and `detail` `open_bills`: that reads the party's bills through \
+    Tally's Ledger Outstandings report, not this one, beside the book's list of ledgers, and gives \
+    no total for the whole book (on that book, sent directly and not through ComplyEaze Bridge, \
+    that report answered for each of its three largest parties in about a second). On that book an earlier \
     `as_of`, with fewer bills open, answered; whether one does here depends on how many bills \
     were open then, and choosing it is the user's call.";
+
+/// The Bills report's next step names the read that answers one party without that report (#2377):
+/// `outstandings` with `party` and `detail` `open_bills`, which goes on to the party's own Ledger
+/// Outstandings (`agent_outstandings.rs`, before any whole-book read).
+#[test]
+fn the_bills_deadline_step_names_the_one_party_read() {
+    let step = outstandings_cause_remediation(
+        crate::tally::runtime::BillsReportDeadlineExceeded::SAFE_CODE,
+    )
+    .expect("the Bills deadline has a next step");
+    // The detail value is the one the tool routes on, not a copy of its spelling.
+    let open_bills = format!("`{}`", super::super::party_bills::OPEN_BILLS_DETAIL);
+    for named in [
+        "`outstandings`",
+        "`party`",
+        "the same `as_of`",
+        "`detail`",
+        &open_bills,
+        "Ledger Outstandings",
+        "ask them",
+    ] {
+        assert!(step.contains(named), "{named}: {step}");
+    }
+}
 
 /// Only a Bills report post cut at the limit gets the Bills report's next step (#2119). Before,
 /// the step was chosen for any request of the outstandings read cut at the limit, and so blamed

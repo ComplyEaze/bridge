@@ -4,7 +4,7 @@
 //! on a later server below the mark the post left, as a later run of the app would
 //! after a backup was restored over the company.
 use super::*;
-use crate::agent::agent_import::release::{release_preview, NEXT_STEP};
+use crate::agent::agent_import::release::{release_preview, shown_rolled_back, NEXT_STEP};
 use crate::tally::approved_import::test_seam::review_fits;
 use crate::tally::approved_import::{ReviewKind, VoucherCount};
 
@@ -190,7 +190,17 @@ async fn a_rolled_back_batch_s_rows_are_released_only_by_the_person() {
     let mut upper = release_args(&line);
     upper["company_guid"] = json!(GUID.to_uppercase());
     let approval = ScriptedApproval::approving();
-    let response = release(&server, upper, approval.clone()).await;
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            approval.clone(),
+            server.call_tool_response("acknowledge_post_review", upper),
+        )
+        .await;
+    assert_eq!(
+        response.egress.company_guid.as_deref(),
+        Some(line.company_guid.as_str())
+    );
+    let response = response.value;
     let released = result(&response);
     assert_eq!(released["state"], "rows_released", "{response}");
     assert_eq!(released["batch_id"], line.batch_id.as_str(), "{response}");
@@ -199,6 +209,8 @@ async fn a_rolled_back_batch_s_rows_are_released_only_by_the_person() {
         released["verification_status"], "posted_verified",
         "{response}"
     );
+    let status = released["verification_status"].clone();
+    assert!(status.is_string(), "{response}");
     assert_eq!(approval.review_kinds(), [ReviewKind::RowRelease]);
     assert_eq!(approval.review_counts(), [1]);
     let listed = super::super::listed_voucher_lines(&line).unwrap().unwrap();
@@ -259,6 +271,7 @@ async fn a_rolled_back_batch_s_rows_are_released_only_by_the_person() {
         verified["verification_status"], "posted_verified",
         "{verified}"
     );
+    assert_eq!(verified["verification_status"], status, "{verified}");
     let _ = sent(simulator);
 
     // The row is no longer held: the other batch of it goes on to Tally.
@@ -349,7 +362,7 @@ async fn refused_before_any_read(server: &Server, args: Value, code: &str) {
 }
 
 /// Refused before any read or dialog, and nothing is recorded: a batch never
-/// sent, one named under another company, one whose post recorded no
+/// sent, one sent with no vouchers, one named under another company, one whose post recorded no
 /// pre-POST mark (no rollback record can cover it), one holding a Contra, one
 /// holding a Journal and then a Contra (every voucher must be admitted, not
 /// one), a Sales invoice, and one of more vouchers than the dialog lists. No
@@ -359,6 +372,8 @@ async fn a_batch_a_release_cannot_rest_on_is_refused_before_any_read() {
     let directory = tempfile::tempdir().unwrap();
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let server = server_at(simulator.address(), directory.path());
+    // With no journal yet, no release stands.
+    assert_eq!(server.import_row_release("bridge-none"), Ok(false));
     let fresh = || format!("bridge-{}", Uuid::new_v4());
 
     let unsent = saved_line_as(&server, &fresh(), ROW);
@@ -369,6 +384,14 @@ async fn a_batch_a_release_cannot_rest_on_is_refused_before_any_read() {
     let mut elsewhere = release_args(&marked);
     elsewhere["company_guid"] = json!("ffffffff-0000-4000-8000-00000000ffff");
     refused_before_any_read(&server, elsewhere, "import_batch_company_mismatch").await;
+
+    let empty = saved_captured_line_edited(&server, |line| {
+        line.batch_id = fresh();
+        line.vouchers.clear();
+        line.txn_ids.clear();
+    });
+    sent_natively(&server, &empty, None);
+    refused_before_any_read(&server, release_args(&empty), "ack_batch_not_posted").await;
 
     let unmarked = saved_line_as(&server, &fresh(), ROW);
     sent_natively(&server, &unmarked, None);
@@ -599,4 +622,128 @@ fn the_release_dialog_lists_every_voucher_and_fits_the_box() {
         VoucherCount::new(1).unwrap(),
         &preview
     ));
+}
+
+/// A Payment batch and a Receipt batch are admitted as a Journal batch is:
+/// each goes on to the read, and is answered as the Journal batch is.
+#[tokio::test]
+async fn a_payment_or_receipt_batch_goes_on_to_the_read_as_a_journal_batch_does() {
+    let mut codes = Vec::new();
+    for voucher_type in [
+        VoucherType::Journal,
+        VoucherType::Payment,
+        VoucherType::Receipt,
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let line = saved_captured_line_edited(&server, |line| {
+            line.batch_id = format!("bridge-{}", Uuid::new_v4());
+            line.vouchers[0].voucher_type = voucher_type.clone();
+        });
+        sent_natively(&server, &line, Some(10));
+        let approval = ScriptedApproval::approving();
+        let response = release(&server, release_args(&line), approval.clone()).await;
+        assert!(approval.reviews().is_empty(), "{response}");
+        assert!(!sent(simulator).is_empty(), "{voucher_type:?}: {response}");
+        codes.push(result(&response)["error"]["code"].clone());
+    }
+    assert_ne!(codes[0], "ack_release_type_not_admitted", "{codes:?}");
+    assert_eq!(codes[1], codes[0], "{codes:?}");
+    assert_eq!(codes[2], codes[0], "{codes:?}");
+}
+
+/// A release another call writes while the dialog is open is refused by the
+/// journal's own rule, so this one reads as a change and writes nothing more:
+/// the journal holds the other call's one release.
+#[tokio::test]
+async fn a_release_written_while_the_dialog_is_open_is_not_written_twice() {
+    let Restored {
+        directory,
+        server,
+        simulator: _simulator,
+        line,
+    } = posted_then_read(rolled_back_reads(1)).await;
+    let server = std::sync::Arc::new(server);
+    let (other, other_line) = (std::sync::Arc::clone(&server), line.clone());
+    let approval = ScriptedApproval::approving_after(move || {
+        let cover = other
+            .rollback_scan(&other_line.batch_id)
+            .unwrap()
+            .covered_by
+            .unwrap();
+        let record = ledger::StatusRecord::row_release(&other_line, &cover).unwrap();
+        let _lock = other.lock_import_admission().unwrap();
+        other.append_import_record_while_admitted(&record).unwrap();
+    });
+    let response = release(&server, release_args(&line), approval.clone()).await;
+    assert_eq!(
+        result(&response)["error"]["code"],
+        "ack_changed_while_reviewing",
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [1]);
+    assert_eq!(records_of(directory.path(), "row_release").len(), 1);
+}
+
+/// The dialog shows the mark the cover's verification read, not the mark
+/// recorded before the post: here a read at 9, below the 10 before the post.
+#[tokio::test]
+async fn the_release_dialog_shows_the_mark_the_cover_read() {
+    let Restored {
+        directory: _directory,
+        server,
+        simulator: _simulator,
+        line,
+    } = posted_then_read(span_readback(empty_collection(), 9)).await;
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, release_args(&line), approval.clone()).await;
+    assert_eq!(result(&response)["state"], "rows_released", "{response}");
+    let listed = super::super::listed_voucher_lines(&line).unwrap().unwrap();
+    assert_eq!(approval.reviews(), [release_preview(&line, 9, &listed)]);
+}
+
+/// A read shows the book rolled back only when its binding reads
+/// `book_rolled_back` and its status is not `posted_verified`.
+#[test]
+fn a_read_shows_the_book_rolled_back_only_by_its_binding_and_its_status() {
+    let read = |status: &str, state: &str| {
+        shown_rolled_back(&json!({
+            "verification_status": status,
+            "post_span_binding": {"state": state},
+        }))
+    };
+    assert!(read("reconciliation_required", "book_rolled_back"));
+    assert!(!read("posted_verified", "book_rolled_back"));
+    assert!(!read("reconciliation_required", "bound"));
+    assert!(!read("posted_verified", "bound"));
+    assert!(!shown_rolled_back(&json!({})));
+}
+
+/// The dialog names the company by its GUID when the batch recorded no name
+/// or an empty one, and shows a character that could reorder what the person
+/// reads, in the batch id, as `?`.
+#[test]
+fn the_release_dialog_names_a_nameless_company_by_its_guid_and_shows_no_reordering_character() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let line = saved_captured_line(&server);
+    let listed = super::super::listed_voucher_lines(&line).unwrap().unwrap();
+    let named_by_guid = format!("\nCompany: {}\n", line.company_guid);
+
+    let mut unnamed = line.clone();
+    unnamed.company = None;
+    let preview = release_preview(&unnamed, 10, &listed);
+    assert!(preview.contains(&named_by_guid), "{preview}");
+
+    let mut empty = line.clone();
+    empty.company.as_mut().unwrap().name = String::new();
+    let preview = release_preview(&empty, 10, &listed);
+    assert!(preview.contains(&named_by_guid), "{preview}");
+
+    let mut reordering = line.clone();
+    reordering.batch_id = "bridge-\u{202E}a".into();
+    let preview = release_preview(&reordering, 10, &listed);
+    assert!(preview.contains("\nBatch: bridge-?a\n"), "{preview}");
+    assert!(!preview.contains('\u{202E}'), "{preview}");
 }

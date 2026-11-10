@@ -14,14 +14,14 @@ So row 683-LD's change needs the vouchers dated 30 April (and the date of last e
 
 **The controls:**
 - **Before the BK:** `tb3a` at 1-Apr-2025 on the book as found. EXPECT byte-equal to row 683-TW's `tb3` answer (row 683-CD read the same bytes). And `mv0`, the book-scoped window, EXPECT byte-equal to row 683-TW's `mvy`; the restore is checked against it.
-- **After the write, at 30-Apr-2025:** `tb3w`, row 683-LD's condition repeated. EXPECT byte-equal to row 683-LD's `tb3` answer. Then a difference in `tb3v` is about the current date, not the vouchers as keyed this time.
+- **After the write, at 30-Apr-2025:** `tb3w`, row 683-LD's condition repeated. EXPECT byte-equal to row 683-LD's `tb3` answer. Then a difference in `tb3v` is about the current date, not the vouchers as keyed this time. One thing of the read history differs: row 683-LD sent its opening export (`x1`) just before its `tb3`, and this row sends no export. Row 683-LD's `x1` and `tb3` each differed from their controls inside CMPINFO, so `tb3w` is compared with `cmpinfo.py`, and Decides counts a CMPINFO-only difference as "as row 683-LD's".
 - **After `tb3v`:** the date back to 30-Apr-2025, and `tb3w2`. EXPECT byte-equal to `tb3w`. A `tb3w2` that differs means the date's return did not return the answer, and `tb3v` then decides nothing until that is explained (P5).
 
 Every request is master's own builder, sent raw, and each has been sent on this book before (rows 683-TW, 683-LD and 683-CD). No request is new and nothing is rendered for this row.
 
 ## Book
 `BRIDGE FOREXGROUP LAB` (synthetic), GUID `1bb48be5-baba-45b2-90d8-7593244915a9`, TallyPrime 7.2. THE COMPANY in `LAB-COMMON.md` means this book.
-- **Synthetic:** it is in master's registry, `scripts/merge-gate-synthetic-uuids.json` line 201 ("created in the lab on 28 October 2026 with invented masters and vouchers keyed by hand").
+- **Synthetic:** it is in master's registry, `scripts/merge-gate-synthetic-uuids.json` lines 201 and 202 ("created in the lab on 28 October 2026 with invented masters and vouchers keyed by hand").
 - **Not an excluded book:** its GUID is not the register lab book's (`REGISTER_LAB_GUID`, `captured_parse_record.rs:302`), and not the one the private exclusion list names.
 - **Pinned by GUID.** The `BOOK` of `lm.py` and `tb.py` is this GUID. m0 must print one COMPANY row, `the book's: yes`, or the row STOPs before any other send.
 - **Its last state:** row 683-LD restored it from its backup, then m2 byte-equal to m0 (V 11, M 214) and the book-scoped window byte-equal to the one found; the Gateway then showed current date Tuesday, 1-Apr-2025, period 1-Apr-25 to 31-Mar-26, last entry 1-Apr-25. Row 683-CD wrote nothing, by its marks, and set the date back to 1-Apr-2025. `a-ldm2-M-marks.xml` here is row 683-LD's m2; m0 checks that nothing has written to the book since.
@@ -58,7 +58,7 @@ Expected screens, none of them a STOP (each was seen in row 683-LD):
 - the Dispatch Details box and the Party Details box after K1's party, each passed by Enter on every field as offered;
 - the Forex Rate of Exchange box where K1 says;
 - the Bill-wise Details and Pending Bills the steps name;
-- after K2's credit line, Tally offering `By` `Cash` with the debit as offered.
+- after K2's credit line, Tally offering `By` `Cash`, its ledger list with `Cash` highlighted, and the debit as offered.
 
 If Tally adds a gain or loss line, press no key: screenshot it, write it down, and ask the run coordinator before Ctrl+A. Do not add one.
 
@@ -67,7 +67,7 @@ If Tally adds a gain or loss line, press no key: screenshot it, write it down, a
 **K1, F8 Sales** (from the Gateway, Vouchers, F8):
 1. **Voucher No.:** write down what Tally offers. EXPECT `4`. If it offers any other number, STOP before any other key: `1`, `2` or `3` would reuse a number, and anything else means the book is not as its answers show.
 2. **Date:** F2, type `30-4-2025`, Enter. Write down the date the box offered. The voucher must then show 30-Apr-25 Wednesday. If it shows anything else, or Tally answers with a message: STOP.
-3. **Party A/c name:** `BRIDGE USD Customer`, Enter on the one row listed. Dispatch Details and Party Details: Enter only.
+3. **Party A/c name:** `BRIDGE USD Customer`, typed in keystroke chunks, Enter on the one row listed. Dispatch Details and Party Details: Enter only. If a "Spelling Error" box comes up or the field stays empty: press no key, and ask. Row 683-LD cleared that box on the run lead's word by typing one `B` as a single keystroke, then `RIDGE`, ` USD` and ` Customer` as keystrokes; that is done here only on the run coordinator's word.
 4. **Particulars:** `BRIDGE Export Sales`, Enter on the one row listed; the amount typed `$100`, Enter. Where the Forex Rate of Exchange box opens: Enter on the forex amount, `88` typed over the rate, Enter, the value as offered (8,800.00 expected), Enter. If no such box opens, or the line does not then show `$100.00 @ ₹ 88/$`: STOP before Ctrl+A.
 5. **Bill-wise Details:** `New Ref`; Name typed `LD1`, replacing what is offered; Due Date empty; `$100.00` and `Dr` as offered. Write down each value shown.
 6. **Screenshot the whole screen before Ctrl+A.** Write down the Voucher No., the date and each line as Tally shows it. Then Ctrl+A. If "Accept ?" is asked, Yes. Row 683-LD's Ctrl+A saved with no prompt; record which it was.
@@ -77,7 +77,7 @@ If Tally adds a gain or loss line, press no key: screenshot it, write it down, a
 2. **Date:** if the screen does not already show 30-Apr-25, F2, type `30-4-2025`, Enter. Write down which it was. If it then shows anything else: STOP.
 3. **To** `BRIDGE INR Customer`, **Credit** `2000`. If a Forex Rate of Exchange box opens: STOP, press nothing.
 4. **Bill-wise Details:** `Agst Ref`, choose `R1` (the pending amount offered is expected to be 3,000.00 Dr), then the Amount typed `2000` Cr, replacing what is offered. If R1 is not in Pending Bills: STOP.
-5. **By** `Cash`, **Debit** as offered (2,000.00 expected).
+5. **By:** Tally offers `By` `Cash` (row 683-LD: "Cash was offered by Tally, not typed"). Enter on By; the ledger list opens with `Cash` highlighted: do not type it, Enter on it; **Debit** as offered (2,000.00 expected), Enter. If the highlighted row is not `Cash`: press no key, and ask.
 6. **Screenshot the whole screen before Ctrl+A.** Write down every line. Then Ctrl+A, with Yes to "Accept ?" if it is asked; record which it was.
 
 After each save, Tally shows a blank voucher screen. Screenshot its title, then leave it with Ctrl+Q (C7). Never press Esc on a voucher screen, and never press Ctrl+Q at the Gateway. After K2, screenshot the whole Tally window at the Gateway, and write down its current date and date of last entry (30-Apr-2025 and 30-Apr-25 expected), before `m1` is sent (C3).
@@ -103,7 +103,7 @@ The screen paths for load and close are those of rows 683-TW, 683-LD and 683-CD:
 - C5's: a message that only says the backup is done (screenshot it, accept once), and the backup's "Accept ?" = Yes;
 - C6's two: "Accept ?" = Yes, and "Company data folder (<the book's number>) already exists ..." = Replace;
 - each voucher's own "Accept ?" on Ctrl+A = Yes, if it is asked;
-- the screens the write names: Change Voucher Date (F2), Dispatch Details, Party Details, the Forex Rate of Exchange box, Bill-wise Details and Pending Bills;
+- the screens the write names: Change Voucher Date (F2), Dispatch Details, Party Details, the Forex Rate of Exchange box, Bill-wise Details, Pending Bills, and the ledger and party lists of K1 and K2;
 - the Gateway's Change Current Date box.
 
 **Any other dialog, message box, sub-screen or prompt, at any step, is unnamed:** press no key, screenshot the whole window, copy its text exactly, and send nothing while it is up. Then ask the run coordinator (C7). It stays on the screen until the run coordinator answers.
@@ -115,7 +115,7 @@ The screen paths for load and close are those of rows 683-TW, 683-LD and 683-CD:
 ## The wedge rule
 A read that Tally is still building keeps the gateway busy for every company, and giving up on it does not stop Tally's work. So:
 - **One request at a time, by `run.py`.** It never abandons a request: curl waits for its answer.
-- **The book is small:** 13 vouchers and 8 ledgers after the write. This row's largest answer on record is the book-scoped window, 59,524 B. Every read of row 683-LD answered within about a second.
+- **The book is small:** 13 vouchers and 8 ledgers after the write. This row's largest answer is the book-scoped window, 59,524 B as found; row 683-LD's with the two vouchers was 69,734 B. Every read of row 683-LD answered within about a second.
 - **If any send has not answered 5 minutes after it began:**
   - press nothing, and do not end curl;
   - send nothing more, not even `GET /status`;
@@ -178,7 +178,7 @@ Run each send as `python3 -I run.py http://127.0.0.1:9001 <label> <file>`, and w
    - **`m2`:** `M-marks.xml`, and `python3 -I lm.py --same-row a-m0-M-marks.xml a-m2-M-marks.xml`. EXPECT SAME MARKS.
    - **`mv2`:** `V-mvy-20250401-20260331.xml`, and `python3 -I lm.py --capture a-mv2-V-mvy-20250401-20260331.xml a-mv0-V-mvy-20250401-20260331.xml`. EXPECT CAPTURE SAME, with 11 and 11. Record whether `a-mv2` is byte-equal to `a-mv0`.
    - MARKS DIFFER or CAPTURE DIFFERS: STOP, and report "the restore of bk-683vd did not return the book to m0". Nothing more is sent or keyed.
-9. **Tally's date:** read the Gateway's current date, period and date of last entry, and write them down. EXPECT 1-Apr-2025, 1-Apr-25 to 31-Mar-26 and 1-Apr-25, as at step 0 (row 683-LD's restore left them so). If any differs, press nothing to change it: record it and report it. The run coordinator decides.
+9. **Tally's date:** read the Gateway's current date, period and date of last entry, and write them down. EXPECT 1-Apr-2025, 1-Apr-25 to 31-Mar-26 and 1-Apr-25, as at step 0 (row 683-LD's restore left them so). If any differs, press nothing to change it: record it and report it before step 10. The run coordinator says whether it is set by the Gateway path first; step 10 runs on that word.
 10. **Close** by C10, with `GET /status` after the last request (C11). One `tally.exe` must own 9001.
 
 Steps 2 and 6 never stop the row on an answer that differs from an estimate. Each such answer is a result and is recorded in full. Only the STOPs named stop the row.
@@ -195,7 +195,7 @@ Press no key, screenshot the whole window, and report before anything else is pr
 - the path rule applies;
 - m2 or mv2 is not as EXPECT after the restore.
 
-From step 3 on, a STOP is followed by the restore (step 8) on the word step 3 gives, except in the three cases step 3 names.
+From step 3 on, a STOP is followed by the restore (step 8) on the word step 3 gives, except in the three cases step 3 names. If the BK itself fails or is not recorded, nothing has been written yet: STOP there, with no restore, and close by C10 on the run coordinator's word.
 
 ## Record
 - Each answer's bytes and sha256, and each request's sha256 (as `SHA256.txt` lists; any other is the Stop of C3).

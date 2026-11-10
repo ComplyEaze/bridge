@@ -1,0 +1,5 @@
+07:15:36	N-0091.xml	a-s5r-N-0091.xml	curl 0	5606 bytes
+07:15:36	R-0091.xml	a-s5r-R-0091.xml	curl 0	87968 bytes
+07:15:36	V-0091.xml	a-s5r-V-0091.xml	curl 0	52472 bytes
+07:15:36	V-0010.xml	a-s5r-V-0010.xml	curl 0	52784 bytes
+07:15:36	M-marks.xml	a-s5r-M-marks.xml	curl 0	3394 bytes

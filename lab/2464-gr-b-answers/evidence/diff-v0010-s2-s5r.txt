@@ -1,0 +1,4 @@
+== --diff a-s2-V-0010.xml a-s5r-V-0010.xml
+   lists compared: 2
+   legs: 0 -> 0
+exit 0

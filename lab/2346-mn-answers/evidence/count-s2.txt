@@ -1,0 +1,44 @@
+== a-s2-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+== a-s2-R-MC1.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s2-R-MD1.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s2-T-types.xml: 306946 bytes
+  STATUS '1'
+  VOUCHERTYPE rows: 28
+  GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e8: []
+  GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e9: []
+  GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ea: []
+  named 'Credit Note': 1
+   PARENT 'Credit Note'; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000028'; NUMBERINGMETHOD 'Default'; ISACTIVE 'Yes'
+   VOUCHERNUMBERSERIES.LIST elements: 1
+   series: NAME 'Default'; NUMBERINGMETHOD 'Automatic'; NUMBERINGSUBMETHOD 'Auto Retain'; PREVENTDUPLICATES 'No'; DUPLICATECONTROL ''; BEGINNINGNUMBER '1'
+   RESTARTFROMLIST.LIST elements: 1 children: [4]
+   restart [1] DATE '20260401'
+   restart [1] RESTARTFROM 'Yearly'
+   restart [1] PERIODBEGINNIGNUM '1'
+   unit leaf /ALLOWMULTIPLETAXUNITSPERSERIES[1] 'No'
+  named 'Debit Note': 1
+   PARENT 'Debit Note'; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002a'; NUMBERINGMETHOD 'Default'; ISACTIVE 'Yes'
+   VOUCHERNUMBERSERIES.LIST elements: 1
+   series: NAME 'Default'; NUMBERINGMETHOD 'Automatic'; NUMBERINGSUBMETHOD 'Auto Retain'; PREVENTDUPLICATES 'No'; DUPLICATECONTROL ''; BEGINNINGNUMBER '1'
+   RESTARTFROMLIST.LIST elements: 1 children: [4]
+   restart [1] DATE '20260401'
+   restart [1] RESTARTFROM 'Yearly'
+   restart [1] PERIODBEGINNIGNUM '1'
+   unit leaf /ALLOWMULTIPLETAXUNITSPERSERIES[1] 'No'
+  named 'BRIDGE Credit Note Manual': 0
+  named 'BRIDGE Debit Note Manual': 0
+  named 'BRIDGE Credit Note Manual 2': 0
+== a-s2-V-CN.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s2-V-DN.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0

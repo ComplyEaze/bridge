@@ -1,0 +1,6 @@
+== --type-diff a-s4r-T-types.xml a-s5r-T-types.xml: VOUCHERTYPE rows 30 -> 31
+   type 'BRIDGE Credit Note Manual': 0 leaves differ
+   type 'BRIDGE Credit Note Manual 2': in the second only
+   type 'BRIDGE Debit Note Manual': 0 leaves differ
+   type 'Credit Note': 0 leaves differ
+   type 'Debit Note': 0 leaves differ

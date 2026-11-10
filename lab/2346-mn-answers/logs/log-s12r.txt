@@ -1,0 +1,4 @@
+09:34:31	V-CN.xml	a-s12r-V-CN.xml	curl 0	152614 bytes
+09:34:31	N-CNc.xml	a-s12r-N-CNc.xml	curl 0	10976 bytes
+09:34:31	N-CNd.xml	a-s12r-N-CNd.xml	curl 0	10962 bytes
+09:34:31	M-marks.xml	a-s12r-M-marks.xml	curl 0	3398 bytes

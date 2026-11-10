@@ -1,0 +1,12 @@
+== a-s8-I-MC1-again.xml: 540 bytes
+  root RESPONSE
+  CREATED '0'
+  ALTERED '1'
+  DELETED '0'
+  LASTVCHID '45'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'

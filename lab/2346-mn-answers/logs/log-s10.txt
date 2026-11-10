@@ -1,0 +1,7 @@
+09:33:17	N-0010s.xml	a-s10-N-0010s.xml	curl 0	5606 bytes
+09:33:17	N-0010c.xml	a-s10-N-0010c.xml	curl 0	5624 bytes
+09:33:17	N-0010d.xml	a-s10-N-0010d.xml	curl 0	5620 bytes
+09:33:18	N-CNc.xml	a-s10-N-CNc.xml	curl 0	5676 bytes
+09:33:18	N-CNd.xml	a-s10-N-CNd.xml	curl 0	5670 bytes
+09:33:18	N-DNc.xml	a-s10-N-DNc.xml	curl 0	5670 bytes
+09:33:18	N-DNd.xml	a-s10-N-DNd.xml	curl 0	5668 bytes

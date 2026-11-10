@@ -1,0 +1,35 @@
+== a-s10-N-0010c.xml: 5624 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'BP/26-27/0010' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Sales' BRIDGEVCHISCREDITNOTE 'No'
+  rows with no class element: 0
+== a-s10-N-0010d.xml: 5620 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'BP/26-27/0010' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Sales' BRIDGEVCHISDEBITNOTE 'No'
+  rows with no class element: 0
+== a-s10-N-0010s.xml: 5606 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'BP/26-27/0010' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Sales' BRIDGEVCHISSALES 'Yes'
+  rows with no class element: 0
+== a-s10-N-CNc.xml: 5676 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'CN/26-27/0001' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Credit Note Manual' BRIDGEVCHISCREDITNOTE 'Yes'
+  rows with no class element: 0
+== a-s10-N-CNd.xml: 5670 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'CN/26-27/0001' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Credit Note Manual' BRIDGEVCHISDEBITNOTE 'No'
+  rows with no class element: 0
+== a-s10-N-DNc.xml: 5670 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'DN/26-27/0001' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Debit Note Manual' BRIDGEVCHISCREDITNOTE 'No'
+  rows with no class element: 0
+== a-s10-N-DNd.xml: 5668 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'DN/26-27/0001' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Debit Note Manual' BRIDGEVCHISDEBITNOTE 'Yes'
+  rows with no class element: 0

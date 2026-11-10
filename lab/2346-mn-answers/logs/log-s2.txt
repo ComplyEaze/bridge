@@ -1,0 +1,6 @@
+09:20:42	T-types.xml	a-s2-T-types.xml	curl 0	306946 bytes
+09:20:42	V-CN.xml	a-s2-V-CN.xml	curl 0	3022 bytes
+09:20:42	V-DN.xml	a-s2-V-DN.xml	curl 0	3022 bytes
+09:20:42	R-MC1.xml	a-s2-R-MC1.xml	curl 0	3022 bytes
+09:20:42	R-MD1.xml	a-s2-R-MD1.xml	curl 0	3022 bytes
+09:20:42	M-marks.xml	a-s2-M-marks.xml	curl 0	3394 bytes

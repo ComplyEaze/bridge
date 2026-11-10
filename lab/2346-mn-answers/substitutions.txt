@@ -1,0 +1,7 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/bk.txt: original 173 B sha256 d40fea0f6475239c27ddc5a6f7dab8ac9654fd378de89e350b0dfa119afd54da (kept on the lab PC); the company number replaced in 1 place(s)
+evidence/notes.txt: original 17308 B sha256 9c3236a4537ed1239755f2c167854922e9d1f435a219bcd407f736273b2184b9 (kept on the lab PC); 9 x -> <the before-write option>; 1 x -> <Tally data folder>
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 383 B sha256 8b9a63d6d6532870718ce9696f5aa242694a13621831eb06bc940cf46c72c84f (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/send.sh: original 720 B sha256 1c30c9aed661e870c23a0c09d1510c98de2fdad785fd3bb24aa9070c96f37d3c (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/prep-c6.sh: original 2198 B sha256 4abe17b12cb736955cb3365e450cac13ef69baed5196107600b5969da0dba5f2 (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> <Tally data folder>

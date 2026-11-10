@@ -1,0 +1,4 @@
+== --diff a-s6r-R-MC1.xml a-s8r-R-MC1.xml
+   ALTERID: '69' -> '71'
+   lists compared: 1
+   legs: 6 -> 6

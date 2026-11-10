@@ -1,0 +1,24 @@
+Step 5, Voucher Type Creation (title bar "Voucher Type Creation", BRIDGE PILOT LAB), every field and value as the screen showed it before the save (shots/s5-vt-before-save.png), cursor on "Use effective dates for vouchers":
+Name: BRIDGE Credit Note Manual 2
+(alias): (blank)
+General
+Select type of voucher: Credit Note
+Abbreviation: C/Note (Tally's fill)
+Activate this Voucher Type: Yes
+Method of Voucher Numbering: Manual
+  Prevent creating duplicate Voucher Nos.: Yes
+Show unused vch nos. in transactions for Retain Original Voucher No. behaviour: No (greyed)
+Use effective dates for vouchers: No
+Allow zero-valued transactions: No
+Make this voucher type as 'Optional' by default: No
+Allow narration in voucher: Yes
+Provide narrations for each ledger in voucher: No
+Enable default accounting allocations: No
+WhatsApp voucher after saving: No
+Printing
+Print voucher after saving: No
+Default jurisdiction: (blank)
+Default template to print (Invoice Mode): Not Applicable
+Default title to print: (blank)
+Set/Alter Terms and Conditions: No
+Name of Class: (blank)

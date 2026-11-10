@@ -1112,6 +1112,10 @@
     {
       "uuid": "ffa928f6-5934-48e2-bbd6-474936e71546",
       "note": "company identifier of the synthetic lab company BRIDGE TIEOUT E, made for #692's opening-stock run, as Tally returned it in the ten ledger and group answers of that run on 5 Nov 2026 (listed in kept-local.txt on lab branch lab/692-opening-stock-fixtures at 2f776b59, whose other 39 answers carry no identifier); the ledger and group identifiers in those answers are this value with a suffix"
+    },
+    {
+      "uuid": "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1",
+      "note": "company identifier of the synthetic lab company BRIDGE STOCK CREATE LAB, created on Tally's screen for #1381's row 1381-M on 5 Nov 2026 (lab branch lab/1381-stock-item-create-answers at d8948467: no such company existed before it), as TallyPrime 7.2 returned it first in that row's company marks read; copied from row 1381-R1's marks answer a-m0.xml (sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1), and the read answers of rows 1381-M and 1381-R1 listed in kept-local.txt on that branch and on lab/1381-r1-answers at e870ba8c carry it"
     }
   ]
 }

@@ -6316,6 +6316,11 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
     let _ = file;
     Ok(())
 }
+
+/// The request bytes of every app builder, pinned by hash (#2397).
+#[cfg(test)]
+#[path = "agent_import_request_bytes_tests.rs"]
+mod request_bytes_tests;
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;

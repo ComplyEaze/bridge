@@ -379,11 +379,14 @@ for (const [name, replacement] of [
 // The merge gate's test is wired to the merge-gate-scope step's output. A step that runs it always, never, or twice, or that
 // loses the scope step, changes what a merge-queue run proves.
 for (const [name, change] of [
-  ["its condition inverted", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py", "      - if: steps.merge-gate-scope.outputs.run != 'true'\n        run: python3 scripts/merge-gate.test.py")],
-  ["its condition dropped", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py", "      - run: python3 scripts/merge-gate.test.py")],
+  ["its condition inverted", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4", "      - if: steps.merge-gate-scope.outputs.run != 'true'\n        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4")],
+  ["its condition dropped", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4", "      - run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4")],
   ["its condition made always()", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n", "      - if: always()\n")],
-  ["the test step deleted", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py\n", "")],
+  ["the test step deleted", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4\n", "")],
   ["the scope step renamed", (text) => text.replace("      - id: merge-gate-scope\n", "      - id: merge-gate-scoped\n")],
+  ["the shard count lowered to one", (text) => text.replace("scripts/merge-gate.test.py 4\n", "scripts/merge-gate.test.py 1\n")],
+  ["the shard count dropped", (text) => text.replace("scripts/merge-gate.test.py 4\n", "scripts/merge-gate.test.py\n")],
+  ["another test file", (text) => text.replace("shard-unittest.py scripts/merge-gate.test.py 4", "shard-unittest.py scripts/check-ai-attribution.test.mjs 4")],
 ]) {
   test(`merge gate test wiring: ${name} is refused`, () => {
     refused(withChange(".github/workflows/ci.yml", change), "the merge gate's test must run once, exactly when the merge-gate-scope step says so");
@@ -393,6 +396,12 @@ test("merge gate scope: a base SHA taken from the pull request's head is refused
   const scope = "      - id: merge-gate-scope\n        env:\n          EVENT_NAME: ${{ github.event_name }}\n          PR_BASE_SHA: ${{ github.event.pull_request.";
   refused(withChange(".github/workflows/ci.yml", (text) => text.replace(`${scope}base.sha }}\n`, `${scope}head.sha }}\n`)),
     "the merge-gate-scope step must read the event name and the pull request's base SHA");
+});
+
+// The driver that splits the merge gate's test across processes is pinned by its bytes: any edit to it, even a comment
+// or a count, is refused until the pin and its acknowledgement move with it.
+test("the sharding driver: any change to its bytes is refused", () => {
+  refused(withChange("scripts/shard-unittest.py", (text) => text.replace("[index::count]\n    if not chosen", "[0::count]\n    if not chosen")), "scripts/shard-unittest.py changed");
 });
 
 // The nightly records run must not hold eight of the account's twenty runner slots at once.

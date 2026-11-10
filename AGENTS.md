@@ -226,7 +226,10 @@ behaviour, the comment cites the reference section rather than restating it.
 - Any credential path changes require a security-focused reviewer comment.
 - Any platform-sensitive change must be validated on affected Windows and macOS hosts,
   or the missing platform evidence must be called out explicitly in the PR.
-  A pull request run covers the native, bundle and seam jobs on Windows only, and a draft
+  A pull request run covers the native jobs on Windows only, and the bundle and seam jobs on
+  Windows only when the change touches a packaging path, a crate manifest, the Windows resource
+  script or the Windows setup action, or is a release pull request; for any other change the
+  merge queue run is the proof for those two before merge. A draft
   pull request runs none of them until it is marked ready. macOS evidence for the bundle
   and seam jobs comes from the merge queue run when the change touches a packaging path,
   and for the native tests from the master push and the nightly run, so say so in the PR

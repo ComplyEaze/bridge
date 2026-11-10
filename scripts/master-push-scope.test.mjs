@@ -168,7 +168,8 @@ test("a release pull request, whose version differs from its base's, runs the na
 test("a pull request and the merge queue run the native tests on Windows only; the queue adds the macOS bundle and seam jobs for a packaging change", () => {
   const nativeAndBundle = ["src-tauri/src/x.rs"];
   const packaging = ["src-tauri/src/x.rs", "src-tauri/tauri.conf.json"];
-  assert.deepEqual(systems(runScope("pull_request", { changed: nativeAndBundle }).outputs), { native: WIN, bundle: WIN });
+  // A pull request runs the bundle and seam jobs only for a packaging path (or a release, below); the queue runs them for both.
+  assert.deepEqual(systems(runScope("pull_request", { changed: nativeAndBundle }).outputs), { native: WIN, bundle: null });
   assert.deepEqual(systems(runScope("pull_request", { changed: packaging }).outputs), { native: WIN, bundle: WIN });
   assert.deepEqual(systems(runScope("merge_group", { changed: nativeAndBundle }).outputs), { native: WIN, bundle: WIN });
   assert.deepEqual(systems(runScope("merge_group", { changed: packaging }).outputs), { native: WIN, bundle: BOTH });
@@ -216,8 +217,41 @@ test("a pull request or merge group is scoped by its diff, as before, whatever t
   for (const event of ["pull_request", "merge_group"]) {
     assert.deepEqual(heavy(runScope(event, { script: "both", changed: ["docs/a.md"] }).outputs),
       { native: "false", bundle: "false", tax_audit: "false" }, `${event} docs only`);
+    // Native code: the queue also runs the bundle and seam jobs; a pull request leaves them to the queue.
     assert.deepEqual(heavy(runScope(event, { script: "both", changed: ["src-tauri/src/x.rs"] }).outputs),
-      { native: "true", bundle: "true", tax_audit: "false" }, `${event} native code`);
+      { native: "true", bundle: event === "merge_group" ? "true" : "false", tax_audit: "false" }, `${event} native code`);
+  }
+});
+
+test("a pull request runs the bundle and seam jobs only for a packaging path or a release; the queue and every other event run them for the whole list", () => {
+  // Paths that select the jobs by the long list but are neither packaging paths nor one of the three Windows paths.
+  const sourceOnly = ["src/App.tsx", "src-tauri/src/x.rs", "src-tauri/crates/bridge-tally-core/src/lib.rs", "src-tauri/examples/x.rs", "vite.config.ts", "tsconfig.json", "postcss.config.js", "index.html"];
+  for (const file of sourceOnly) {
+    assert.deepEqual(systems(runScope("pull_request", { changed: [file] }).outputs).bundle, null, `pull_request ${file}`);
+    assert.deepEqual(systems(runScope("merge_group", { changed: [file] }).outputs).bundle, WIN, `merge_group ${file}`);
+  }
+  // The three Windows paths select them on a pull request too, though they are not packaging paths (the macOS decisions leave them out).
+  for (const file of ["scripts/check-windows-bundle-resources.ps1", "src-tauri/crates/bridge-tally-core/Cargo.toml", "src-tauri/crates/bridge-tax-audit/Cargo.toml", ".github/actions/setup-windows-native/action.yml"]) {
+    assert.deepEqual(systems(runScope("pull_request", { changed: [file] }).outputs).bundle, WIN, `pull_request ${file}`);
+    assert.deepEqual(systems(runScope("pull_request", { changed: [...sourceOnly, file] }).outputs).bundle, WIN, `pull_request with source ${file}`);
+    assert.deepEqual(systems(runScope("merge_group", { changed: [file] }).outputs).bundle, WIN, `merge_group ${file}`);
+  }
+  // A toolchain bump alone changes the compiler of the shipped binary: it selects the jobs on a pull request and in the queue (it was in no list the queue read before).
+  assert.deepEqual(systems(runScope("pull_request", { changed: ["rust-toolchain.toml"] }).outputs).bundle, WIN, "pull_request rust-toolchain.toml alone");
+  assert.deepEqual(systems(runScope("merge_group", { changed: ["rust-toolchain.toml"] }).outputs).bundle, BOTH, "merge_group rust-toolchain.toml alone");
+  // One packaging path anywhere in the list selects them on a pull request, as it did before.
+  for (const file of [".github/workflows/ci.yml", "src-tauri/tauri.conf.json", "src-tauri/icons/icon.png", "src-tauri/build.rs", "src-tauri/Cargo.lock", "src-tauri/Cargo.toml", "src-tauri/.cargo/config.toml", ".cargo/config.toml", "package.json", "pnpm-lock.yaml", ".node-version", "rust-toolchain.toml", "packaging/mcpb/manifest.json", "packaging/pdfium/pdfium.lock.json", "LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt", "scripts/package-mcpb.mjs", "scripts/fetch-pdfium.mjs", "scripts/check-no-test-seam.mjs", "src-tauri/crates/bridge-mcpb-check/src/lib.rs"]) {
+    assert.deepEqual(systems(runScope("pull_request", { changed: [...sourceOnly, file] }).outputs).bundle, WIN, `pull_request ${file}`);
+  }
+  // Nothing else changes: the native scope, a release, a missing base, a draft, and every other event.
+  assert.equal(runScope("pull_request", { changed: sourceOnly }).outputs.native, "true");
+  assert.deepEqual(systems(runScope("pull_request", { changed: sourceOnly, versions: ["0.6.0", "0.6.1"] }).outputs).bundle, BOTH, "a release pull request");
+  assert.deepEqual(systems(runScope("pull_request", { changed: sourceOnly, versions: ["0.6.0", "0.6.0"] }).outputs).bundle, null, "the same version");
+  assert.deepEqual(systems(runScope("pull_request", { env: { PR_BASE_SHA: "" } }).outputs).bundle, WIN, "a missing base is a full run");
+  assert.equal(runScope("pull_request", { changed: [...sourceOnly, "package.json"], draft: "true" }).outputs.bundle, "false", "a draft");
+  assert.equal(runScope("pull_request", { changed: ["docs/a.md"] }).outputs.bundle, "false", "docs only");
+  for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) {
+    assert.equal(runScope(event, { changed: sourceOnly }).outputs.bundle, "true", event);
   }
 });
 
@@ -235,7 +269,8 @@ test("a change list larger than a pipe buffer is still scoped by its first heavy
 });
 
 test("a draft pull request runs no native or bundle job, and keeps the tax-audit scope", () => {
-  const changed = ["src-tauri/crates/bridge-tax-audit/src/lib.rs"];
+  // package.json is a packaging path, so a ready run of this change selects the bundle and seam jobs as well.
+  const changed = ["src-tauri/crates/bridge-tax-audit/src/lib.rs", "package.json"];
   assert.deepEqual(heavy(runScope("pull_request", { changed, draft: "true" }).outputs),
     { native: "false", bundle: "false", tax_audit: "true" }, "draft");
   // Only the exact payload value `true` is a draft; ready_for_review and every later push carry `false`.
@@ -250,7 +285,7 @@ test("a draft pull request runs no native or bundle job, and keeps the tax-audit
 });
 
 test("a draft payload is checked against the live pull request, so a re-run of an old draft run is scoped in full once the pull request is ready", () => {
-  const changed = ["src-tauri/crates/bridge-tax-audit/src/lib.rs"];
+  const changed = ["src-tauri/crates/bridge-tax-audit/src/lib.rs", "package.json"];
   const full = { native: "true", bundle: "true", tax_audit: "true" };
   const asked = runScope("pull_request", { changed, draft: "true" });
   assert.equal(asked.ghArgs, "api repos/o/r/pulls/7 --jq .draft");

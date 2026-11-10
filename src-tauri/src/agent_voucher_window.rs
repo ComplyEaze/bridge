@@ -638,7 +638,9 @@ impl HeldCensuses {
 
     /// The census held for `key`, when the marks `fresh` read equal the marks
     /// it was counted at, with when it was read. A held census whose marks
-    /// differ is dropped: marks only move forward.
+    /// differ in either mark is dropped, whichever way they moved: equality is
+    /// the test, not order, because a restore of a copy can take them back (the
+    /// lab's restore did).
     fn find(&mut self, fresh: &FreshMarks, key: &CensusKey) -> Option<(WindowCensus, String)> {
         self.purge_expired();
         let position = self.held.iter().position(|held| held.key == *key)?;

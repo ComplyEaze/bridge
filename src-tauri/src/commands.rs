@@ -1931,7 +1931,6 @@ fn verify_observed_company_tuple_from_companies(
     selected: &SelectedCompanyIdentity,
     companies: Vec<TallyCompany>,
 ) -> Result<VerifiedCompanyIdentity, TallyCommandError> {
-    validate_company_name(&selected.display_name).map_err(|_| company_name_invalid())?;
     let selected_guid = normalize_company_guid(&selected.company_guid).map_err(|_| {
         tally_command_error(
             "company_selection_invalid",
@@ -1967,6 +1966,9 @@ fn verify_observed_company_tuple_from_companies(
                 "Do not use this company here. Write to contact@complyeaze.com with this company's name.",
             )
         })?;
+    // The name is judged after the selection itself, so an empty selection is
+    // answered as one, not as a company to rename.
+    validate_company_name(&selected.display_name).map_err(|_| company_name_invalid())?;
     VerifiedCompanyIdentity::from_observed_companies(
         selected.display_name.clone(),
         selected_guid,

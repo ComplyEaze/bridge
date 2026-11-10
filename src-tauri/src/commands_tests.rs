@@ -326,6 +326,30 @@ fn setup_refuses_a_name_no_request_can_carry_with_its_own_code() {
     }
 }
 
+/// With nothing selected, the name is blank too. That is answered as a
+/// selection to make again, not as a company to rename: the name is judged
+/// only after the GUID, number and date of the selection (#2433).
+#[test]
+fn an_empty_selection_with_a_blank_name_is_a_selection_error_not_a_rename() {
+    for name in ["", "   "] {
+        let selected = SelectedCompanyIdentity {
+            display_name: name.to_string(),
+            company_guid: String::new(),
+            company_number: String::new(),
+            books_from_yyyymmdd: String::new(),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, Vec::new())
+            .expect_err("an empty selection must not become an identity");
+
+        assert_eq!(error.code, "company_selection_invalid", "{name:?}");
+        assert!(
+            !error.remediation.contains("Rename"),
+            "{name:?}: {}",
+            error.remediation
+        );
+    }
+}
+
 /// Regression for the destination-picker leak: `select_party_statement_
 /// destination` used to build the folder's IPC string with
 /// `to_string_lossy()`, which replaces invalid UTF-8 byte sequences with

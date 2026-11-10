@@ -1188,6 +1188,7 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
 /// reference the number gives.
 #[tokio::test]
 async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_answer() {
+    let mut read_bytes = Vec::new();
     for (number, expected, order) in [
         (
             "BP/26-27/0010",
@@ -1201,12 +1202,13 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
         ),
     ] {
         let lab = pilot_lab_over(order);
-        let (differences, alter_id, guid, _, _) = lab
+        let (differences, alter_id, guid, _, evidence) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &pilot_saved(number, true))
             .await
             .expect("a read-back after a post is never an error");
         assert_eq!(differences, expected, "{number}");
+        read_bytes.push(evidence.bytes);
         assert_eq!(alter_id.as_deref(), Some("17"), "{number}");
         assert_eq!(
             guid,
@@ -1222,6 +1224,15 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
             assert_eq!(months_sent(order, &requests), month_shas_paired());
         }
     }
+    // The read-back's evidence counts the month reads after it: the two cases
+    // share the marks and the read-back's answer, so they differ by exactly
+    // the twelve month answers, each read twice.
+    // August's answer `U` is the captured August.
+    let months: usize = super::lab_number_months()
+        .iter()
+        .map(|month| month.3.len())
+        .sum();
+    assert_eq!(read_bytes[0] - read_bytes[1], months * 2);
 }
 
 // ---- BRIDGE PILOT LAB: the Sales stop ----

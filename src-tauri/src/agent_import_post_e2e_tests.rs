@@ -8125,7 +8125,13 @@ async fn pilot_post_changed(changes: &[Changed]) -> PilotRun {
 
 /// As [`pilot_post_changed`], over another order of requests.
 async fn pilot_post_changed_in(order: &str, changes: &[Changed]) -> PilotRun {
-    let (simulator, server, directory) = pilot_lab_changed(order, changes);
+    pilot_post_on(pilot_lab_changed(order, changes)).await
+}
+
+/// The build and the post of the pilot lab's invoice, over a replay.
+async fn pilot_post_on(
+    (simulator, server, directory): (SequenceSimulator, Server, tempfile::TempDir),
+) -> PilotRun {
     let remote_id = Uuid::parse_str("00000000-0000-4000-8000-000000000777").unwrap();
     let (response, journal_after_build) = TEST_QUALIFIED_VOUCHER_TYPES
         .scope(PILOT_QUALIFIED, async {
@@ -8804,6 +8810,55 @@ fn pilot_readback_uncertain() -> String {
     }
     assert_ne!(answer, included);
     answer
+}
+
+/// A month read after a clean read-back that fails is a difference, never a
+/// pass (#2162): the month reads end there, and the invoice ends
+/// `posted_divergent` with `invoice_number_read_failed` alone. March's first
+/// send, the last month read, fails both ways the transport can: Tally
+/// answering with an HTTP error, and the connection reset before the answer.
+#[tokio::test]
+async fn a_month_read_that_fails_after_a_clean_read_back_ends_the_invoice_divergent() {
+    let after_post = PILOT_ORDER.len() - PILOT_NUMBER_READ_AFTER_POST.len();
+    let failing = after_post + PILOT_NUMBER_READ_AFTER_POST.find('z').unwrap();
+    for (how, plan) in [
+        (
+            "an HTTP error",
+            ScenarioPlan::new(Fixture::SyntheticXml("<ENVELOPE/>".into())).with_http_status(500),
+        ),
+        (
+            "a reset",
+            pilot_plan('z').with_delivery(tally_protocol_simulator::Delivery::ResetBeforeBody),
+        ),
+    ] {
+        let mut plans: Vec<ScenarioPlan> = PILOT_ORDER[..failing].chars().map(pilot_plan).collect();
+        plans.push(plan);
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let run = pilot_post_on((simulator, server, directory)).await;
+        let result = &run.response["structuredContent"]["result"];
+        let voucher = &result["vouchers"][0];
+        assert_eq!(voucher["status"], "posted_divergent", "{how}: {}", run.response);
+        assert_eq!(
+            voucher["diffs"],
+            json!([{"invoice_fields": ["invoice_number_read_failed"]}]),
+            "{how}"
+        );
+        assert_eq!(result["counts"]["posted_divergent"], 1, "{how}");
+        assert_eq!(result["counts"]["posted_verified"], 0, "{how}");
+        // The month reads before March were each the build's own request;
+        // nothing was sent after the failed one.
+        assert_eq!(run.observed.len(), failing + 1, "{how}");
+        for (position, request) in run.observed.iter().enumerate().skip(after_post) {
+            let letter = PILOT_ORDER.as_bytes()[position] as char;
+            assert_eq!(
+                request.request_body_sha256,
+                pilot_request_sha256(letter),
+                "{how} at {position}"
+            );
+        }
+    }
 }
 
 /// #691: an invoice posted on the pilot lab's answers whose read-back Tally's

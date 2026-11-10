@@ -68,6 +68,14 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The refusals of `import_bank_statement` when it reads a proposals file.
+    pub(crate) enum BankStatementImportCode {
+        /// The proposals file does not hold what its parse would have written.
+        ProposalsFileInvalid = "proposals_file_invalid",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

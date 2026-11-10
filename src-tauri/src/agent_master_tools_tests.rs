@@ -2039,6 +2039,7 @@ fn a_book_that_was_not_read_back_is_told_what_to_do_by_what_stopped_it() {
         "company_identity_incomplete",
         "company_identity_mismatch",
         "company_number_invalid",
+        "company_name_invalid",
     ] {
         assert_eq!(
             not_read_back_next_step(code),

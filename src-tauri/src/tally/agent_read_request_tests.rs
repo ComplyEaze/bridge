@@ -54,18 +54,8 @@ fn the_company_object_constructor_renders_the_pinned_profile_for_the_verified_na
         };
     assert_eq!(expected.id().as_str(), "audit_company_object_v1");
     assert_eq!(
-        AgentReadRequest::company_object(&identity)
-            .unwrap()
-            .into_xml(),
+        AgentReadRequest::company_object(&identity).into_xml(),
         expected.render()
-    );
-    let invalid = crate::tally::VerifiedCompanyIdentity::test_fixture(
-        "line\nbreak",
-        "00000000-0000-4000-8000-000000000001",
-    );
-    assert_eq!(
-        AgentReadRequest::company_object(&invalid).unwrap_err(),
-        AgentReadRequestError
     );
 }
 
@@ -85,21 +75,11 @@ fn the_invoice_company_constructor_renders_its_own_pinned_profile() {
         company: &company,
     };
     assert_eq!(expected.id().as_str(), "invoice_company_hsn_v1");
-    let rendered = AgentReadRequest::invoice_company_hsn(&identity)
-        .unwrap()
-        .into_xml();
+    let rendered = AgentReadRequest::invoice_company_hsn(&identity).into_xml();
     assert_eq!(rendered, expected.render());
     assert!(rendered.contains("<FETCHLIST><FETCH>*</FETCH></FETCHLIST>"));
     assert_eq!(
         AgentReadRequest::parse(rendered).unwrap_err(),
-        AgentReadRequestError
-    );
-    let invalid = crate::tally::VerifiedCompanyIdentity::test_fixture(
-        "line\nbreak",
-        "00000000-0000-4000-8000-000000000001",
-    );
-    assert_eq!(
-        AgentReadRequest::invoice_company_hsn(&invalid).unwrap_err(),
         AgentReadRequestError
     );
 }
@@ -110,9 +90,7 @@ fn parse_refuses_every_object_export_including_the_company_part() {
         "BRIDGE SYNTHETIC BOOK",
         "00000000-0000-4000-8000-000000000001",
     );
-    let company_object = AgentReadRequest::company_object(&identity)
-        .unwrap()
-        .into_xml();
+    let company_object = AgentReadRequest::company_object(&identity).into_xml();
     assert!(company_object.contains("<TYPE>Object</TYPE>"));
     let collection =
         bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2.render();

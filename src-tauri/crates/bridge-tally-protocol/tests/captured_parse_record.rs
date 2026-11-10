@@ -3569,6 +3569,12 @@ const PILOT_LAB_W18_REPLAY: &str = "an answer of the pilot lab's W18, W18b and W
      with no row here: the app crate's HSN/SAC warning replay (src/agent_import_w18_replay_tests.rs) \
      feeds it through the build, the post and the verification and pins what each parse returns; \
      pilot-lab-w18/PROVENANCE.md says what it is";
+const PILOT_LAB_GY_COMPANY_GST: &str = "a company object answer of the pilot lab's row 2162-GY \
+     (9 Nov 2026), before and after the company's GST was turned off, a copy with the company number \
+     replaced, with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs) parses \
+     it, and its tests (src/agent_import_invoice_hsn_tests.rs and \
+     src/agent_import_invoice_admission_tests.rs) pin what each parse returns; \
+     pilot-lab-gy/PROVENANCE.md says what it is";
 const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on the Windows lab \
      (12 Oct 2026), with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs \
      and src/agent_import_invoice_wire.rs) parses it, and its tests \
@@ -4033,6 +4039,15 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-vouchers-after-post.utf8.xml",
         PILOT_LAB_EVIDENCE,
+    ),
+    // Row 2162-GY's company object answers, before and after the company's GST was turned off.
+    (
+        "tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml",
+        PILOT_LAB_GY_COMPANY_GST,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml",
+        PILOT_LAB_GY_COMPANY_GST,
     ),
     // The W18 replay answers (the build's reads on the book with the four-digit ledger).
     (

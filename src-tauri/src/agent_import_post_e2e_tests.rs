@@ -8553,6 +8553,36 @@ async fn a_company_registration_that_lapsed_after_the_approval_is_refused_in_the
     );
 }
 
+/// The company's GST turned off while the approval waited: the queue's re-read
+/// of the company object is answered by row 2162-GY's answer with GST off
+/// (`pilot-lab-gy`, a copy with the company number replaced; see its
+/// PROVENANCE.md), the build having been admitted on the pilot lab's own.
+/// Refused under the admission's own code before any write.
+#[tokio::test]
+async fn a_company_whose_gst_was_turned_off_after_the_approval_is_refused_in_the_queue() {
+    let off = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"
+    ));
+    assert_eq!(
+        off.matches("<ISGSTON TYPE=\"Logical\">No</ISGSTON>")
+            .count(),
+        1
+    );
+    assert_eq!(pilot_text('O').matches(">Yes</ISGSTON>").count(), 1);
+    let positions = pilot_queue_positions('O');
+    assert!(!positions.is_empty());
+    let run = pilot_post_changed(&[Changed {
+        positions,
+        body: off,
+    }])
+    .await;
+    pilot_refused_in_the_queue(
+        &run,
+        "invoice_company_gst_off",
+        PILOT_ORDER.find('Z').unwrap(),
+    );
+}
+
 /// The customer given the company's own GSTIN while the approval waited (its
 /// registration row in the queue's listing edited, as in the build test):
 /// refused under the admission's own code, not as a master that moved.

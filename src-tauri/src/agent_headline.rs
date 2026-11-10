@@ -59,7 +59,7 @@ const MAX_COMPANY_NAME_CHARS: usize = 200;
 /// Unicode General_Category Cf and Default_Ignorable_Code_Point (the same rule
 /// the native approval screen applies to the names it shows), so U+061C, the
 /// tag characters and every future format character are covered without a list.
-fn is_invisible_format(character: char) -> bool {
+pub(super) fn is_invisible_format(character: char) -> bool {
     use icu_properties::{
         props::{DefaultIgnorableCodePoint, GeneralCategory},
         CodePointMapData, CodePointSetData,

@@ -219,6 +219,21 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     }
 }
 
+/// The company-read code, pinned as above (#2433).
+#[test]
+fn the_company_read_code_is_pinned() {
+    let pinned: &[(CompanyReadCode, &str)] =
+        &[(CompanyReadCode::NameInvalid, "company_name_invalid")];
+    assert_eq!(
+        pinned.iter().map(|(code, _)| *code).collect::<Vec<_>>(),
+        CompanyReadCode::ALL
+    );
+    for (code, string) in pinned {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+    }
+}
+
 /// The census-reuse refusal (#2399), pinned the same way as the codes above: written out here, so
 /// a changed string fails a test.
 const CENSUS_REUSE: &[(CensusReuseCode, &str)] =

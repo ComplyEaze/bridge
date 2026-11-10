@@ -7407,6 +7407,18 @@ async fn a_master_saved_after_the_numbering_read_is_refused_before_the_post() {
     assert_eq!(observed, through_aim, "the POST is never sent: {response}");
 }
 
+/// The number reads of the invoice's financial year (#2162 item 11): one
+/// paired read per calendar month, April to March, `1` to `9` then `x`, `y`
+/// and `z` (row 2162-M1's answers, `lab_number_months`).
+macro_rules! pilot_number_months {
+    () => {
+        concat!(
+            "e1s1se", "e2s2se", "e3s3se", "e4s4se", "e5s5se", "e6s6se", "e7s7se", "e8s8se",
+            "e9s9se", "exsxse", "eysyse", "ezszse"
+        )
+    };
+}
+
 /// The invoice's masters, read again in the endpoint queue after the approval
 /// (#1337): the build's own reads from its currency read to the tax units, in
 /// the same order and without the marks (the queue's binding marks are the
@@ -7420,7 +7432,7 @@ macro_rules! pilot_queue_block {
             "ese",
             "eQsQse",
             "eTsTse",
-            "eNsNse",
+            pilot_number_months!(),
             "eCsCse",
             "eOsOse",
             "eGsGse"
@@ -7450,7 +7462,8 @@ macro_rules! pilot_queue_block {
 // L compliance listing, Q the same listing with each ledger's GST rate and
 // rounding and the HSN/SAC rows, restricted to the invoice's ledgers by GUID
 // (DERIVED, above), P paired listing, g groups, T
-// voucher types, N number read, k ledger catalogue, w/W the 1-Aug window
+// voucher types, 1 to 9, x, y and z the number's month reads (`pilot_number_months!`;
+// 5, August, is DERIVED: `lab_numbers_august_without_0010`), k ledger catalogue, w/W the 1-Aug window
 // before/after, C tax units, O the company object (W16, read after the
 // classification admits), X the voucher types bounded by the master mark and Y
 // their series-level numbering (both read at the build and again before the
@@ -7461,11 +7474,17 @@ macro_rules! pilot_queue_block {
 // `pilot_queue_block!`) before its closing profile and the aim marks (#1337).
 const PILOT_ORDER: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQse",
-    "eTsTseeNsNseeCsCseeOsOseemsmseseeXsXsYsYseseekskseewswseseseeses",
+    "eTsTse",
+    pilot_number_months!(),
+    "eCsCseeOsOseemsmseseeXsXsYsYseseekskseewswseseseeses",
     "emsmseewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsP",
-    "sgsgsbsbseseeQsQseeTsTseeNsNseeCsCseeOsOseecscseseemsmseseeXsXsY",
+    "sgsgsbsbseseeQsQseeTsTse",
+    pilot_number_months!(),
+    "eCsCseeOsOseecscseseemsmseseeXsXsY",
     "sYseseekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQse",
-    "eTsTseeNsNseeCsCseeOsOseseemekskseecscse",
+    "eTsTse",
+    pilot_number_months!(),
+    "eCsCseeOsOseseemekskseecscse",
     // The invoice's masters, read again in the queue after the approval (#1337).
     pilot_queue_block!(),
     "seeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
@@ -7507,9 +7526,11 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml
         'g' => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f", // r07-groups.xml
         'T' => "c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00", // r08-voucher-types.xml
-        // r09-number-new-invoice.xml with the e-invoice words added (DERIVED,
-        // `LAB_NUMBER_NEW_INVOICE_SHA256`).
-        'N' => super::super::tests::LAB_NUMBER_NEW_INVOICE_SHA256,
+        // The month reads row 2162-M1 sent (`lab_number_months`).
+        'U' => super::super::tests::lab_number_months()[4].2,
+        month @ ('1'..='9' | 'x' | 'y' | 'z') => {
+            super::super::tests::lab_number_months()[pilot_month(month)].2
+        }
         'k' => "28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0", // r13-ledger-catalogue-v2.xml
         'w' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'W' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
@@ -7520,6 +7541,12 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'Y' => "e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276", // r19-numbering-series.xml
         other => panic!("no request for kind {other}"),
     }
+}
+
+/// The month of the financial year a number read's letter stands for, from 0
+/// for April.
+fn pilot_month(letter: char) -> usize {
+    "123456789xyz".find(letter).expect("a month letter")
 }
 
 const PILOT_QUALIFIED: &[VoucherType] = &[
@@ -7629,8 +7656,11 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'P' => super::super::tests::lab_invoice_balances(),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
-        'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
-        'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
+        // DERIVED: see `lab_numbers_august_without_0010`.
+        '5' => super::super::tests::lab_numbers_august_without_0010(),
+        // The captured August, which holds `BP/26-27/0010`.
+        'U' => super::super::tests::lab_number_months()[4].3,
+        month @ ('1'..='9' | 'x' | 'y' | 'z') => super::super::tests::lab_number_months()[pilot_month(month)].3,
         'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"),
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
@@ -8513,14 +8543,14 @@ async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue(
 }
 
 /// A number another voucher took while the approval waited is refused under
-/// the admission's own code, not as a master that moved. SYNTHETIC answer: the
-/// pilot lab's own answer for a number its book uses (`BP/26-27/0001`, the
-/// first invoice) is served for the read of `BP/26-27/0010`; it stands for a
-/// number taken, and is not Tally's answer to that request.
+/// the admission's own code, not as a master that moved. The queue's August
+/// read is served the captured August answer, which holds `BP/26-27/0010`
+/// (the build's was the same answer without that row): it stands for the
+/// number taken in between, which the lab did not stage.
 #[tokio::test]
 async fn a_number_taken_after_the_approval_is_refused_in_the_queue_under_its_own_code() {
     let run = pilot_post_changed(&[Changed {
-        positions: pilot_queue_positions('N'),
+        positions: pilot_queue_positions('5'),
         body: pilot_text('U'),
     }])
     .await;
@@ -8549,6 +8579,36 @@ async fn a_company_registration_that_lapsed_after_the_approval_is_refused_in_the
     pilot_refused_in_the_queue(
         &run,
         "invoice_company_registration_not_regular",
+        PILOT_ORDER.find('Z').unwrap(),
+    );
+}
+
+/// The company's GST turned off while the approval waited: the queue's re-read
+/// of the company object is answered by row 2162-GY's answer with GST off
+/// (`pilot-lab-gy`, a copy with the company number replaced; see its
+/// PROVENANCE.md), the build having been admitted on the pilot lab's own.
+/// Refused under the admission's own code before any write.
+#[tokio::test]
+async fn a_company_whose_gst_was_turned_off_after_the_approval_is_refused_in_the_queue() {
+    let off = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"
+    ));
+    assert_eq!(
+        off.matches("<ISGSTON TYPE=\"Logical\">No</ISGSTON>")
+            .count(),
+        1
+    );
+    assert_eq!(pilot_text('O').matches(">Yes</ISGSTON>").count(), 1);
+    let positions = pilot_queue_positions('O');
+    assert!(!positions.is_empty());
+    let run = pilot_post_changed(&[Changed {
+        positions,
+        body: off,
+    }])
+    .await;
+    pilot_refused_in_the_queue(
+        &run,
+        "invoice_company_gst_off",
         PILOT_ORDER.find('Z').unwrap(),
     );
 }

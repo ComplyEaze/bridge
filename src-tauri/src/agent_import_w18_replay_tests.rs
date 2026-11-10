@@ -14,23 +14,49 @@
 //! order the build, the post's reads before its dialog and a verification each
 //! asked in, as observed against a replay of those answers; it is not an order
 //! read off the code. Each position is checked against the SHA-256 of the
-//! request the lab answered. Legend as `PILOT_ORDER` in the parent module,
-//! except that `N` is the number read for `BP/26-27/0040` and `w` is W18b's
+//! request the lab answered. Legend as `PILOT_ORDER` in the parent module
+//! (the month letters `1` to `z` included), except that `w` is W18b's
 //! verification window of 1 Aug 2026, which holds the eleven vouchers of the
 //! book.
 use super::*;
 
-/// The build: 122 requests, no write.
+/// The build: 188 requests, no write.
 const W18_BUILD: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
-    "sTseeNsNseeCsCseeOsOseemsmseseeXsXsYsYseseekskseewswsese",
+    "sTse",
+    "e1s1se",
+    "e2s2se",
+    "e3s3se",
+    "e4s4se",
+    "e5s5se",
+    "e6s6se",
+    "e7s7se",
+    "e8s8se",
+    "e9s9se",
+    "exsxse",
+    "eysyse",
+    "ezszse",
+    "eCsCseeOsOseemsmseseeXsXsYsYseseekskseewswsese",
 );
 
 /// The post's reads before its dialog: the verification readback, then the
-/// admission's reads again. 140 requests.
+/// admission's reads again. 206 requests.
 const W18_POST_BEFORE_DIALOG: &str = concat!(
     "seesesemsmseewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese",
-    "eQsQseeTsTseeNsNseeCsCseeOsOseecscseseemsmseseeXsXsYsYsese",
+    "eQsQseeTsTse",
+    "e1s1se",
+    "e2s2se",
+    "e3s3se",
+    "e4s4se",
+    "e5s5se",
+    "e6s6se",
+    "e7s7se",
+    "e8s8se",
+    "e9s9se",
+    "exsxse",
+    "eysyse",
+    "ezszse",
+    "eCsCseeOsOseecscseseemsmseseeXsXsYsYsese",
 );
 
 /// A verification of the saved batch, no post: 26 requests.
@@ -39,10 +65,8 @@ const W18_VERIFY: &str = "seesesemsmseewswseewswsese";
 const W18_GUID: &str = PILOT_GUID;
 
 /// The SHA-256 of the request the build sends for each kind of read. Each is
-/// a request the lab answered, as in the 9 Oct replay, except: the number
-/// read, which is `w18-number-0040.xml` (`../r09-number-new-invoice.xml` with
-/// the number changed only) with the e-invoice words added (DERIVED, see
-/// `W18_NUMBER_SHA256`); `L` and `P`, the listing by GUID, and `Q`, the
+/// a request the lab answered, as in the 9 Oct replay (the month reads are
+/// row 2162-M1's, sent on this company), except: `L` and `P`, the listing by GUID, and `Q`, the
 /// rates request by GUID, which are the code's and were never sent with these GUIDs (a
 /// test derives its pin from the lab's 31 Oct 2026 request naming five other
 /// ledgers; see `w18_scoped_rates_hsn`); and `X` and `Y`, which are the code's requests the
@@ -50,7 +74,6 @@ const W18_GUID: &str = PILOT_GUID;
 /// `w18_types_as_of_the_book`).
 fn w18_request_sha256(letter: char) -> &'static str {
     match letter {
-        'N' => super::super::super::tests::W18_NUMBER_SHA256,
         // The listing by GUID (#1331): the code's requests for this invoice's
         // six ledgers, never sent with these GUIDs. Their answers are cut from
         // W18c's whole-book ones, sent with the dates these carry (SVTODATE
@@ -125,7 +148,12 @@ fn w18_plan(letter: char) -> ScenarioPlan {
         'P' => super::super::super::tests::w18_invoice_balances(),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-voucher-types.utf16le.xml"),
-        'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-number-0040.utf16le.xml"),
+        // DERIVED pairing: the month reads were not sent on this book. Row
+        // 2162-M1's answers (`lab_number_months`) are of a later state of the
+        // same company, which holds every voucher this one does and more; none
+        // is numbered `BP/26-27/0040`, as this book's own number read for it
+        // found (`w18-number-0040.utf16le.xml`, byte-equal to the empty month).
+        month @ ('1'..='9' | 'x' | 'y' | 'z') => super::super::super::tests::lab_number_months()[pilot_month(month)].3,
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-tax-units.utf16le.xml"),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-company-object.utf16le.xml"),
         'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"),
@@ -184,7 +212,7 @@ fn w18_kinds(observed: &[tally_protocol_simulator::ObservedRequest]) -> String {
             if (request.method.as_str(), request.path.as_str()) == ("GET", "/status") {
                 's'
             } else {
-                "ebcLQOPgTNkwCmXY"
+                "ebcLQOPgT123456789xyzkwCmXY"
                     .chars()
                     .find(|letter| w18_request_sha256(*letter) == request.request_body_sha256)
                     .unwrap_or('?')

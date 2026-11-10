@@ -1800,9 +1800,56 @@ impl super::super::Server {
         let Ok((xml, evidence)) = self.post_read(identity, request).await else {
             return only("invoice_readback_failed", mark_evidence);
         };
-        let evidence = super::super::combine_evidence(mark_evidence, evidence);
-        let (differences, alter_id, guid, lines) =
-            readback_outcome(wire::parse_invoice_readback(&xml), voucher, date);
+        let mut evidence = super::super::combine_evidence(mark_evidence, evidence);
+        let parsed = wire::parse_invoice_readback(&xml);
+        let posted_type = match &parsed {
+            Ok(wire::Readback::One(read)) => read.fields.get("VOUCHERTYPENAME").cloned(),
+            _ => None,
+        };
+        let (mut differences, alter_id, guid, lines) = readback_outcome(parsed, voucher, date);
+        // The read-back finds the invoice in its own type only, so a Sales
+        // voucher of another type holding the number is seen only by the
+        // number's month reads the build sends, sent again here for every
+        // month of the invoice's financial year (#2162). A month that fails
+        // ends the reads, and the post is not verified.
+        if differences.is_empty() {
+            let mut answers = Vec::new();
+            let mut failed = false;
+            match wire::calendar_months(&year.0, &year.1) {
+                Some(months) => {
+                    for month in &months {
+                        let request = super::super::invoice_window_numbers_read(
+                            &company.name,
+                            (&month.0, &month.1),
+                        );
+                        match self.post_read(identity, request).await {
+                            Ok((month_xml, month_evidence)) => {
+                                evidence = super::super::combine_evidence(evidence, month_evidence);
+                                answers.push(month_xml);
+                            }
+                            Err(_) => {
+                                failed = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                None => failed = true,
+            }
+            if failed {
+                differences.push(
+                    crate::agent::failure_code::InvoiceNumberAfterPostCode::ReadFailed
+                        .as_str()
+                        .to_owned(),
+                );
+            } else {
+                differences.extend(wire::number_after_post_difference(
+                    &answers,
+                    number.as_str(),
+                    posted_type.as_deref(),
+                ));
+            }
+        }
         Ok((differences, alter_id, guid, lines, evidence))
     }
 }
@@ -2066,12 +2113,12 @@ fn admitted(
 /// mark. A voucher mark Tally did not give never admits.
 fn size_gate(marks: &str, company_guid: &str) -> Result<super::PreImportMark, Verdict> {
     let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
-    // The duplicate-number read and the read-back each walk the book's
-    // vouchers (a formula decides the rows, so Tally evaluates every
-    // voucher): at the build, at both re-reads (a redeemed approval repeats
-    // them), in the endpoint queue, after the post and at every later
-    // verification. The voucher mark
-    // bounds that walk.
+    // The duplicate number's month reads walk the book's vouchers (a formula
+    // decides the rows, so Tally evaluates every voucher) at the build, at
+    // both re-reads (a redeemed approval repeats them) and in the endpoint
+    // queue; after the post and at every later verification the read-back
+    // walks them, and so do the month reads again when the read-back is
+    // clean. The voucher mark bounds that walk.
     if let Some(refusal) = voucher_mark_refusal(mark.value) {
         return Err(refusing(refusal));
     }

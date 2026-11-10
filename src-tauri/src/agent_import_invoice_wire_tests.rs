@@ -456,6 +456,147 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
 }
 
 #[test]
+fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_only() {
+    let wrap = |rows: &str| {
+        format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
+    };
+    let row_numbered = |number: &str, kind: &str, class: &str| {
+        format!("<VOUCHER><VOUCHERNUMBER>{number}</VOUCHERNUMBER><VOUCHERTYPENAME>{kind}</VOUCHERTYPENAME><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
+    };
+    let row = |kind: &str, class: &str| row_numbered("9", kind, class);
+    // The year's month answers: the month given, then eleven empty ones.
+    let year = |month: String| {
+        let mut months = vec![month];
+        months.extend(std::iter::repeat_n(wrap(""), 11));
+        months
+    };
+    let judge = |month: String, posted: Option<&str>| {
+        number_after_post_difference(&year(month), "9", posted)
+    };
+    let posted = Some("BRIDGE Sales");
+    assert_eq!(judge(wrap(&row("BRIDGE Sales", "Yes")), posted), None);
+    // A month answer holds every number of the month: only the posted one counts.
+    assert_eq!(
+        judge(
+            wrap(&(row("BRIDGE Sales", "Yes") + &row_numbered("8", "Sales", "Yes"))),
+            posted
+        ),
+        None
+    );
+    // The same number as the build counts it: letter case and the leading
+    // zeros of a run of digits ignored.
+    assert_eq!(
+        judge(
+            wrap(&(row("BRIDGE Sales", "Yes") + &row_numbered("09", "Sales", "Yes"))),
+            posted
+        ),
+        Some("invoice_number_in_another_type: Sales".to_string())
+    );
+    // A Purchase-class voucher holding the number is no clash after the post either.
+    assert_eq!(
+        judge(
+            wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))),
+            posted
+        ),
+        None
+    );
+    // The read-back reads the posted type only; these reads name each other type.
+    assert_eq!(
+        judge(
+            wrap(
+                &(row("BRIDGE Sales", "Yes")
+                    + &row("BRIDGE Sales Keyed", "Yes")
+                    + &row("Sales", "Yes"))
+            ),
+            posted,
+        ),
+        Some("invoice_number_in_another_type: BRIDGE Sales Keyed, Sales".to_string())
+    );
+    assert_eq!(
+        judge(wrap(&row("BRIDGE Sales", "Yes").repeat(2)), posted),
+        Some("invoice_number_not_unique".to_string())
+    );
+    // The year is judged whole: the number in two months is held twice.
+    let mut two_months = year(wrap(&row("BRIDGE Sales", "Yes")));
+    two_months[7] = wrap(&row("BRIDGE Sales", "Yes"));
+    assert_eq!(
+        number_after_post_difference(&two_months, "9", posted),
+        Some("invoice_number_not_unique".to_string())
+    );
+    let mut elsewhere = year(wrap(&row("BRIDGE Sales", "Yes")));
+    elsewhere[11] = wrap(&row("Sales", "Yes"));
+    assert_eq!(
+        number_after_post_difference(&elsewhere, "9", posted),
+        Some("invoice_number_in_another_type: Sales".to_string())
+    );
+    // The reads that miss the invoice the read-back found are never a pass.
+    assert_eq!(
+        judge(wrap(""), posted),
+        Some("invoice_number_read_missed_invoice".to_string())
+    );
+    assert_eq!(
+        number_after_post_difference(&[], "9", posted),
+        Some("invoice_number_read_missed_invoice".to_string())
+    );
+    assert_eq!(
+        judge(wrap(&row("BRIDGE Sales", "Yes")), None),
+        Some("invoice_number_type_unread".to_string())
+    );
+    assert_eq!(
+        judge(
+            wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><BRIDGEVCHISSALES>Yes</BRIDGEVCHISSALES></VOUCHER>"),
+            posted,
+        ),
+        Some("invoice_number_type_unread".to_string())
+    );
+    assert_eq!(
+        judge(wrap(&row("BRIDGE Sales", "Maybe")), posted),
+        Some("invoice_number_class_unread".to_string())
+    );
+    // One month that cannot be read spoils the year, wherever it stands.
+    let mut unread = year(wrap(&row("BRIDGE Sales", "Yes")));
+    unread[6] = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER></ENVELOPE>".to_string();
+    assert_eq!(
+        number_after_post_difference(&unread, "9", posted),
+        Some("invoice_read_collection_absent".to_string())
+    );
+    // Tally's answers to the build's class-wide number read for
+    // `BP/26-27/0010` (row 2162-ST), served here as one month's answer: their
+    // rows have the month reads' shape. Held once, on BRIDGE Sales; then also
+    // on a second Sales type, which took the number.
+    let number = "BP/26-27/0010";
+    let held = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml"));
+    assert_eq!(
+        number_after_post_difference(&year(held.clone()), number, posted),
+        None
+    );
+    // As the build counts it, `bp/26-27/10` is the same number.
+    assert_eq!(
+        number_after_post_difference(&year(held), "bp/26-27/10", posted),
+        None
+    );
+    let two_types = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml"));
+    for (posted, other) in [
+        ("BRIDGE Sales", "BRIDGE Sales Keyed"),
+        ("BRIDGE Sales Keyed", "BRIDGE Sales"),
+    ] {
+        assert_eq!(
+            number_after_post_difference(&year(two_types.clone()), number, Some(posted)),
+            Some(format!("invoice_number_in_another_type: {other}")),
+            "{posted}"
+        );
+    }
+    // And one where a Payment holds the number beside the Sales invoice.
+    let beside_payment = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
+    ));
+    assert_eq!(
+        number_after_post_difference(&year(beside_payment), "1", Some("Sales")),
+        None
+    );
+}
+
+#[test]
 fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
     let wrap = |rows: &str| {
         format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")

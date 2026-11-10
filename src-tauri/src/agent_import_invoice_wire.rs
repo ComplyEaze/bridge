@@ -606,6 +606,71 @@ pub(super) fn number_holding(xml: &str, number: &str) -> Result<NumberHolding, &
     Ok(holding)
 }
 
+/// The number's month reads sent again after a post (#2162): the posted
+/// invoice, found by the read-back in `posted_type`, must be the only
+/// Sales-class voucher of its financial year whose number folds to its own,
+/// compared as the build compares it (`number_holding`). The read-back filters
+/// on the posted type's GUID, so a Sales voucher of another type holding the
+/// number is seen only here. `months` are the answers of every month of the
+/// year, which the caller sends only when each came back. The difference names
+/// each other type that holds the number, as Tally answered it; there is none
+/// when exactly one such row came back in the whole year, in the posted type.
+/// A month or row that cannot be read is a difference, never a pass (P3).
+pub(super) fn number_after_post_difference(
+    months: &[String],
+    number: &str,
+    posted_type: Option<&str>,
+) -> Option<String> {
+    use crate::agent::failure_code::InvoiceNumberAfterPostCode as Code;
+    let code = |code: Code| Some(code.as_str().to_owned());
+    let wanted = folded_number(number);
+    let mut holders = Vec::new();
+    for xml in months {
+        let sales = match sales_rows(xml) {
+            Ok(sales) => sales,
+            Err(unread) => return Some(unread.to_owned()),
+        };
+        for row in sales {
+            match row.one("VOUCHERNUMBER") {
+                Ok(held) if wanted.is_some() && held.and_then(folded_number) == wanted => {
+                    holders.push(row);
+                }
+                Ok(_) => {}
+                Err(unread) => return Some(unread.to_owned()),
+            }
+        }
+    }
+    let Some(posted_type) = posted_type else {
+        return code(Code::TypeUnread);
+    };
+    let mut types = Vec::with_capacity(holders.len());
+    for row in &holders {
+        match row.one("VOUCHERTYPENAME") {
+            Ok(Some(name)) => types.push(name),
+            Ok(None) => return code(Code::TypeUnread),
+            Err(unread) => return Some(unread.to_owned()),
+        }
+    }
+    let others: std::collections::BTreeSet<&str> = types
+        .iter()
+        .copied()
+        .filter(|name| *name != posted_type)
+        .collect();
+    if !others.is_empty() {
+        let named: Vec<&str> = others.into_iter().collect();
+        return Some(format!(
+            "{}: {}",
+            Code::InAnotherType.as_str(),
+            named.join(", ")
+        ));
+    }
+    match types.len() {
+        1 => None,
+        0 => code(Code::ReadMissedInvoice),
+        _ => code(Code::NotUnique),
+    }
+}
+
 /// Whether the number read for a known invoice (the control) found it: a row
 /// carrying exactly that number and that date, read as Sales class. Any other
 /// row is not the control, and a row whose class cannot be read is an error,

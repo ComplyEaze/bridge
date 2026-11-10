@@ -1,0 +1,4 @@
+== --type-diff a-s3-T-types.xml a-s4-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 2 leaves differ
+     /ALTERID[1]: '212' -> '248'
+     /DEFAULTGSTREGISTRATION[1]: '' -> 'Rajasthan Registration'

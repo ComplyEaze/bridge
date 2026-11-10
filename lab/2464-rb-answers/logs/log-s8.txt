@@ -1,0 +1,8 @@
+11:49:29	M-marks.xml	a-s8-M-marks.xml	curl 0	3394 bytes
+11:49:29	U-taxunits.xml	a-s8-U-taxunits.xml	curl 0	22636 bytes
+11:49:29	T-types.xml	a-s8-T-types.xml	curl 0	306946 bytes
+11:49:30	N-0105.xml	a-s8-N-0105.xml	curl 0	3022 bytes
+11:49:30	N-0107.xml	a-s8-N-0107.xml	curl 0	3022 bytes
+11:49:30	R-0010.xml	a-s8-R-0010.xml	curl 0	94474 bytes
+11:49:30	RC-0010.xml	a-s8-RC-0010.xml	curl 0	94744 bytes
+11:49:30	V-0010.xml	a-s8-V-0010.xml	curl 0	52784 bytes

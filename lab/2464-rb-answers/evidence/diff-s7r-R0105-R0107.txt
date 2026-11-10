@@ -1,0 +1,10 @@
+== --diff a-s5r-R-0105.xml a-s7r-R-0107.xml
+   ALTERID: '69' -> '70'
+   GUID: '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d' -> '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002e'
+   MASTERID: '45' -> '46'
+   REFERENCE: 'BP/26-27/0105' -> 'BP/26-27/0107'
+   VOUCHERKEY: '<15-digit voucher key>' -> '<15-digit voucher key>'
+   VOUCHERNUMBER: 'BP/26-27/0105' -> 'BP/26-27/0107'
+   VOUCHERRETAINKEY: '129' -> '133'
+   lists compared: 1
+   legs: 6 -> 6

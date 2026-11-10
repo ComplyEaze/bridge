@@ -1,0 +1,5 @@
+== --diff a-s7r-R-0107.xml a-s7r-RC-0107.xml
+   CMPGSTIN: <absent> -> '08ZZZZZ0000Z1ZQ'
+   GSTREGISTRATION: <absent> -> 'Rajasthan Registration'
+   lists compared: 1
+   legs: 6 -> 6

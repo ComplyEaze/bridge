@@ -1,0 +1,7 @@
+11:46:26	N-0107.xml	a-s7r-N-0107.xml	curl 0	5608 bytes
+11:46:27	R-0107.xml	a-s7r-R-0107.xml	curl 0	87970 bytes
+11:46:27	RC-0107.xml	a-s7r-RC-0107.xml	curl 0	88240 bytes
+11:46:27	V-0107.xml	a-s7r-V-0107.xml	curl 0	52682 bytes
+11:46:27	V-0105.xml	a-s7r-V-0105.xml	curl 0	52632 bytes
+11:46:27	V-0010.xml	a-s7r-V-0010.xml	curl 0	52786 bytes
+11:46:28	M-marks.xml	a-s7r-M-marks.xml	curl 0	3396 bytes

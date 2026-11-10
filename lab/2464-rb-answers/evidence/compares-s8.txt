@@ -1,0 +1,18 @@
+== a-s8-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  equal
+exit 0
+== --unit-diff a-s2-U-taxunits.xml a-s8-U-taxunits.xml: TAXUNIT names ['Default Tax Unit', 'Rajasthan Registration'] -> ['Default Tax Unit', 'Rajasthan Registration']
+   unit 'Default Tax Unit': 0 leaves differ
+   unit 'Rajasthan Registration': 0 leaves differ
+exit 0
+== --type-diff a-s2-T-types.xml a-s8-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 0 leaves differ
+exit 0
+== --diff a-s2-R-0010.xml a-s8-R-0010.xml
+   lists compared: 1
+   legs: 6 -> 6
+exit 0
+== --diff a-s2-RC-0010.xml a-s8-RC-0010.xml
+   lists compared: 1
+   legs: 6 -> 6
+exit 0

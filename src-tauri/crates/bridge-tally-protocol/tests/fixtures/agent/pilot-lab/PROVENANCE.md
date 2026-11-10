@@ -97,6 +97,14 @@ Answers of row S4 on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, s
 | `pilot-lab-number-dropped-zero.utf16le.xml` | 3,024 | `a36e6e43961ffe12722b224ef53fa046835dccf3d9090cba3a5d52d315e91d36` | `answers/a-s4-N-z051.xml` | the number read for `BP/26-27/051`, with `BP/26-27/0051` in the book: no row |
 | `pilot-lab-invoice-post-duplicate-declined.utf16le.xml` | 538 | `09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874` | `answers/a-s5-I-0051b.xml` | the answer to an invoice numbered `BP/26-27/0051` sent to that book: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, `LASTVCHID` 0, no `LINEERROR`. The invoice numbered `bp/26-27/0051` was answered with the same bytes |
 
+## An invoice with a stock-item line (2026-11-10, #1379)
+
+The read-back answer of row 1379-IT on `BRIDGE PILOT LAB`, TallyPrime (`tally.exe` 1.1.7.2), on 10 Nov 2026, sent with curl, not through a build, and published on `lab/1379-it-answers` at a5b9d603 (the request files on `lab/1379-it-sheet` at bab72dc8). The file here is byte-equal to the file there, UTF-16LE with no byte order mark, as received. The invoice `BP/26-27/0093` it reads was imported by that row from a request written for shape discovery (one amount-only stock-item line in place of the two service lines), not by the build; the build sends no item line. The request is the build's read-back with that number (`R-0093.xml`, 2,278 bytes, sha256 `de46a575`). The book was restored from its backup afterwards. One import, one sitting, one book, one release.
+
+| Fixture | Bytes | SHA-256 | Published as | What it is |
+| --- | ---: | --- | --- | --- |
+| `pilot-lab-invoice-readback-item-line.utf16le.xml` | 90,662 | `dff8c724dd8c70811e99340e38fe003331a2c8a8569ed01d30a9d1d04aa4de0a` | `answers/a-s4r-R-0093.xml` | the read-back of `BP/26-27/0093`: five legs; under the `BRIDGE Svc 998313 5%` leg one `INVENTORYALLOCATIONS.LIST` for `BRIDGE Item A`, with an empty rate and quantities, the leg's amount, the HSN/SAC Tally filled from the ledger, and one batch allocation (`Main Location`, `Primary Batch`) Tally added; the leg's own five HSN/SAC elements empty |
+
 ## The parent-filter round (2026-10-10, #1331)
 
 Four read-only requests sent by the same contributor on the same company, the same way (one at a time, each answer written straight to a file with `curl.exe -o`, once each; curl exit 0 and HTTP 200 for all). The requests are on `lab/1331-capture-requests` (commit `5876c342`), the answers on `lab/1331-capture-answers` (commit `b5c0ff86`); each file here is byte-equal to the file there and its SHA-256 equals the one in that branch's hash table. The book is the one after the later #1342 rounds: fifteen ledgers, so these answers are not paired with the invoice round's answers above, which describe eleven. `pilot-lab-ledger-catalogue-v2-10oct` and the two scoped answers are one coherent set: the catalogue, and the rates request filtered to the parents of the lab invoices' legs.

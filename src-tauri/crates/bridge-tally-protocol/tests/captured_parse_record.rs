@@ -3927,6 +3927,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_READBACK,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml",
         PILOT_LAB_REPLAY,
     ),

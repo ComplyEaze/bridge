@@ -524,6 +524,102 @@ pub(super) struct ReadLeg {
     /// Bill allocations of the leg: name, type, amount.
     pub(super) allocations: Vec<(Option<String>, Option<String>, String)>,
     pub(super) hsn: LegHsn,
+    /// The stock items Tally holds under the leg.
+    pub(super) items: LegItems,
+}
+
+impl ReadLeg {
+    /// The HSN/SAC Tally used for the line: on an item line it is the one Tally
+    /// filled on the item's allocation (from the ledger, on the measured book),
+    /// and the leg's own elements are empty (row 1379-IT, 10 Nov 2026).
+    pub(super) fn line_hsn(&self) -> &LegHsn {
+        match &self.items {
+            LegItems::One(item) => &item.hsn,
+            LegItems::None | LegItems::Several => &self.hsn,
+        }
+    }
+}
+
+/// The stock items under one ledger entry. Row 1379-IT (TallyPrime 7.2,
+/// 10 Nov 2026, one amount-only item line on a book with one godown and no
+/// batches) found the line read back as its ledger's entry, with the item in
+/// one `INVENTORYALLOCATIONS.LIST` under it and no inventory list on the
+/// voucher. How Tally answers with two items under one entry is not measured
+/// (unverified): this parse groups an item's elements by their list, and it
+/// does not rely on that grouping for more than one, so several are only
+/// counted, and refused. The test of several is built from the one measured
+/// item, repeated.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum LegItems {
+    None,
+    One(Box<ReadItem>),
+    Several,
+}
+
+/// One stock item under a ledger entry, as row 1379-IT read it back.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ReadItem {
+    pub(super) item: EntryText,
+    pub(super) deemed_positive: EntryText,
+    pub(super) amount: EntryText,
+    pub(super) rate: EntryText,
+    pub(super) actual_qty: EntryText,
+    pub(super) billed_qty: EntryText,
+    /// Batch allocations: godown, batch, amount. Tally wrote one, naming the
+    /// book's one godown and `Primary Batch`, where the request named neither.
+    pub(super) batches: Vec<(Option<String>, Option<String>, String)>,
+    /// The line's HSN/SAC, which Tally keeps here on an item line.
+    pub(super) hsn: LegHsn,
+}
+
+const ITEM: &str = "INVENTORYALLOCATIONS.LIST/";
+
+impl LegItems {
+    fn read(entry: &Row) -> Result<Self, &'static str> {
+        let path = |tag: &str| format!("{ITEM}{tag}");
+        // An item is counted by any of the three elements every line carries,
+        // present with text or empty; a whitespace-only list holds none of them.
+        let count = ["STOCKITEMNAME", "ISDEEMEDPOSITIVE", "AMOUNT"]
+            .iter()
+            .map(|tag| {
+                let path = path(tag);
+                entry.all(&path).count() + entry.empties.iter().filter(|key| **key == path).count()
+            })
+            .max()
+            .unwrap_or_default();
+        if count > 1 {
+            return Ok(Self::Several);
+        }
+        if count == 0 {
+            return Ok(Self::None);
+        }
+        let batch = |tag: &str| {
+            entry
+                .all(&path(&format!("BATCHALLOCATIONS.LIST/{tag}")))
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        let (godowns, names, amounts) = (batch("GODOWNNAME"), batch("BATCHNAME"), batch("AMOUNT"));
+        let batches = (0..godowns.len().max(names.len()).max(amounts.len()))
+            .map(|index| {
+                (
+                    godowns.get(index).cloned(),
+                    names.get(index).cloned(),
+                    amounts.get(index).cloned().unwrap_or_default(),
+                )
+            })
+            .collect();
+        Ok(Self::One(Box::new(ReadItem {
+            item: entry.entry_text(&path("STOCKITEMNAME"))?,
+            deemed_positive: entry.entry_text(&path("ISDEEMEDPOSITIVE"))?,
+            amount: entry.entry_text(&path("AMOUNT"))?,
+            rate: entry.entry_text(&path("RATE"))?,
+            actual_qty: entry.entry_text(&path("ACTUALQTY"))?,
+            billed_qty: entry.entry_text(&path("BILLEDQTY"))?,
+            batches,
+            hsn: LegHsn::read(entry, ITEM)?,
+        })))
+    }
 }
 
 /// One element of a ledger entry as Tally answered it. Tally writes an element
@@ -555,13 +651,16 @@ pub(super) struct LegHsn {
 }
 
 impl LegHsn {
-    fn read(entry: &Row) -> Result<Self, &'static str> {
+    /// The five elements at `prefix` below the entry: the entry's own (`""`),
+    /// or its stock item's.
+    fn read(entry: &Row, prefix: &str) -> Result<Self, &'static str> {
+        let at = |tag: &str| entry.entry_text(&format!("{prefix}{tag}"));
         Ok(Self {
-            code: entry.entry_text("GSTHSNNAME")?,
-            source_type: entry.entry_text("HSNSOURCETYPE")?,
-            ledger_source: entry.entry_text("HSNLEDGERSOURCE")?,
-            group_source: entry.entry_text("HSNGROUPSOURCE")?,
-            applicability: entry.entry_text("GSTHSNINFERAPPLICABILITY")?,
+            code: at("GSTHSNNAME")?,
+            source_type: at("HSNSOURCETYPE")?,
+            ledger_source: at("HSNLEDGERSOURCE")?,
+            group_source: at("HSNGROUPSOURCE")?,
+            applicability: at("GSTHSNINFERAPPLICABILITY")?,
         })
     }
 
@@ -640,7 +739,8 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Readback, &'static str
                 .to_string(),
             deemed_positive: entry.one("ISDEEMEDPOSITIVE")?.map(str::to_string),
             allocations,
-            hsn: LegHsn::read(entry)?,
+            hsn: LegHsn::read(entry, "")?,
+            items: LegItems::read(entry)?,
         });
     }
     Ok(Readback::One(ReadInvoice { fields, legs }))

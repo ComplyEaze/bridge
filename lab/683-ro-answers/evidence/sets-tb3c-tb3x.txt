@@ -1,0 +1,14 @@
+a-tb3c-T-tb3-20250401-20250401.xml: HEADER/STATUS '1'
+a-tb3x-T-tb3-20250401-20250401.xml: HEADER/STATUS '1'
+a-tb3c-T-tb3-20250401-20250401.xml:
+SET FOREIGN (0): []
+SET MIXED (2): ['BRIDGE Import Purchases', 'BRIDGE Lab Bank']
+SET PLAIN (6): ['BRIDGE Export Sales', 'BRIDGE INR Customer', 'BRIDGE USD Customer', 'BRIDGE USD Supplier', 'Cash', 'Profit & Loss A/c']
+SET UNREAD (0): []
+a-tb3x-T-tb3-20250401-20250401.xml:
+SET FOREIGN (0): []
+SET MIXED (2): ['BRIDGE Import Purchases', 'BRIDGE Lab Bank']
+SET PLAIN (6): ['BRIDGE Export Sales', 'BRIDGE INR Customer', 'BRIDGE USD Customer', 'BRIDGE USD Supplier', 'Cash', 'Profit & Loss A/c']
+SET UNREAD (0): []
+SETS SAME
+exit 0

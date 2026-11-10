@@ -53,8 +53,8 @@ this computer: its receipt log, the evidence it kept for a read, the voucher
 format it accepts, and a report of what it has stored (section 4).
 
 It writes to Tally only if you turn posting on, and then only a Journal,
-Payment, Receipt or Contra it prepared and saved: one voucher at a time, or a
-saved batch of 2 to 50, each post after you approve it in a separate ComplyEaze
+Payment, Receipt, Contra or Sales invoice it prepared and saved: one voucher at
+a time, or a saved batch of 2 to 50 with no invoice, each post after you approve it in a separate ComplyEaze
 Bridge window (for a batch, its summary). No ComplyEaze Bridge tool can approve
 it. From 0.6.0, one setting covers both. It is a new setting:
 if you turned posting on in an earlier version, turn it on again. In 0.5.1 and

@@ -8,8 +8,8 @@ The developer configuration below remains for supported client integrations.
 `bridge_mcp` is Bridge's newline-delimited JSON-RPC 2.0 MCP server. It uses
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
-parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra, or
-a saved batch of 2 to 50) is off by default because of the limits under
+parsing by default. Voucher posting (one Journal, Payment, Receipt, Contra or Sales
+invoice, or a saved batch of 2 to 50 with no invoice) is off by default because of the limits under
 *Approved voucher posting* below; the **Allow voucher posting, one voucher or a
 batch of up to 50** setting adds it, with separate native approval for each new
 attempt. Command-line installations
@@ -2613,7 +2613,8 @@ reads Tally, saves local proof files and writes nothing to Tally), and
 `build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
-Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
+Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, and
+`Sales` while posting is on, each
 with freshly observed supported TallyPrime product and licence mode before and
 after the build reads. Release and licence tier are returned as observed facts;
 they do not independently refuse a file. `tally_status` reports the observed
@@ -2653,7 +2654,8 @@ Historical batch records remain readable. None of this qualifies every host,
 licence mode, or manually imported file. An unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
 per approval (a voucher that carries a voucher number is refused), and a saved
-batch of 2 to 50 posts in one import after one approval of its summary. One
+batch of 2 to 50 posts in one import after one approval of its summary. A Sales
+invoice carries its number and is posted alone, one per approval. One
 posting setting covers both, in the MCPB extension and on the command line (#1090).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
@@ -3023,7 +3025,7 @@ Positive historical readback remains available on an unqualified profile.
 A failed profile probe remains a read failure.
 
 Safety boundary: local loopback only, bounded responses, verified company tuple
-selection, append-only receipts, and separately approved Journal, Payment, Receipt or Contra
+selection, append-only receipts, and separately approved Journal, Payment, Receipt, Contra or Sales
 dispatch. Unsupported:
 Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,

@@ -4607,7 +4607,7 @@ fn an_hsn_warning_changes_the_checked_line_and_never_the_windows_size() {
 
 /// The approval a person gives to a GST invoice shows what they are agreeing to,
 /// inside the dialog's caps, with a round off (five legs, one sales leg),
-/// and a saved invoice is not posted while Sales is not a qualified type.
+/// and a saved invoice is posted only while Sales is a qualified type.
 #[test]
 fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualified() {
     let (line, endpoint) = invoice_batch(json!([
@@ -4750,9 +4750,21 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
         with(&|voucher| voucher.narration = Some("many words ".repeat(60))),
         "import_review_too_large"
     );
-    // Not postable, however the batch came to be saved, until Sales is qualified.
+    // Postable now that Sales is qualified, and not against the list before it
+    // was, however the batch came to be saved.
+    assert!(admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1).is_ok());
+    // The desktop's review was built for one Journal: its scope refuses the
+    // invoice itself, not only the numbering guard behind it.
     assert_eq!(
-        admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1).unwrap_err(),
+        admit_saved_journal(&line, &endpoint).unwrap_err(),
+        "import_post_requires_one_journal"
+    );
+    assert_eq!(
+        super::super::TEST_QUALIFIED_VOUCHER_TYPES
+            .sync_scope(super::super::PRE_SALES_QUALIFIED_VOUCHER_TYPES, || {
+                admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1)
+            })
+            .unwrap_err(),
         "import_voucher_type_unqualified"
     );
     // A registered customer that is not bill-wise says so, and a long customer name still fits.

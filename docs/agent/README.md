@@ -4595,7 +4595,10 @@ its own cause, `native_bills_report_deadline_exceeded` (#2119); another request 
 same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
 repeat the call. Tally can go on building the report after the limit (a read sent straight after
 was refused for time too), so it also says to wait and let `tally_status` answer before the next
-read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
+read, that one party's open bills at the same `as_of` can still be read, after asking the user,
+with `party` and `detail` `open_bills` (that party's Ledger Outstandings beside the book's list of
+ledgers, not the Bills report, and no total for the book), and that an
+earlier `as_of` with fewer open bills answered on that book. Where the limit
 falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
 flight and sends nothing more (#778).
 

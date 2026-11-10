@@ -1,7 +1,7 @@
 //! Structural payload admission; live identity, masters and balance remain runtime checks.
 use super::{
-    LIVE_QUALIFIED_VOUCHER_TYPES, MAX_MASTER_NAMES, MAX_MASTER_NAME_CHARS, MAX_TEXT_CHARS,
-    MAX_VOUCHERS,
+    VoucherType, LIVE_QUALIFIED_VOUCHER_TYPES, MAX_MASTER_NAMES, MAX_MASTER_NAME_CHARS,
+    MAX_TEXT_CHARS, MAX_VOUCHERS,
 };
 use serde_json::{json, Value};
 
@@ -27,6 +27,14 @@ const BLANK_LEDGER: &str =
     r"^[\u000A\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]*$";
 
 pub(in crate::agent) fn voucher_input_schema() -> Value {
+    voucher_input_schema_for(LIVE_QUALIFIED_VOUCHER_TYPES)
+}
+
+/// The schema offering `types`. The invoice object is described only while
+/// Sales is among them: it returns with the type when Sales is switched on
+/// (ADR 0004, the 6 October amendment's "Qualification." paragraph, #2162
+/// item 7), and never names an object the build would refuse.
+fn voucher_input_schema_for(types: &[VoucherType]) -> Value {
     let text = json!({
         "type":"string", "minLength":1, "maxLength":MAX_TEXT_CHARS,
         "not":{"anyOf":[{"pattern":CONTROLS},{"pattern":RESERVED_MARKER}]},
@@ -50,7 +58,7 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
             "side":{"enum":["Dr","Cr"]}
         }
     });
-    let voucher = json!({
+    let mut voucher = json!({
         "type":"object", "additionalProperties":false,
         "required":["bridge_txn_id","date","voucher_type","entries"],
         "properties":{
@@ -63,7 +71,7 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
                 "not":{"pattern":LINE_TERMINATORS}
             },
             "voucher_type":{
-                "enum":LIVE_QUALIFIED_VOUCHER_TYPES,
+                "enum":types,
                 "description":"Journal takes any balanced set of entries and may carry voucher_number and reference. Payment, Receipt and Contra take two or more entries (for more than two, one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified; no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), at least one debit and one credit and no ledger on both sides, and neither of those fields, and are refused unless every money-side entry names a ledger whose live group ancestry reaches Bank Accounts or Cash-in-Hand: every credit on a Payment, every debit on a Receipt, every leg on a Contra. Every remaining leg of a Payment or Receipt must be established as holding no money: any money group there means the voucher is really a Contra, and a ledger whose group ancestry cannot be resolved is refused as well. These rules span fields and live masters, so the server enforces them after admission rather than here."
             },
             "narration":text, "reference":text,
@@ -74,6 +82,9 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
             "entries":{"type":"array", "minItems":2, "items":entry}
         }
     });
+    if types.contains(&VoucherType::Sales) {
+        voucher["properties"]["invoice"] = invoice_schema();
+    }
     json!({
         "type":"object", "additionalProperties":false,
         "required":["company_guid"],
@@ -116,4 +127,93 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
             }
         }
     })
+}
+
+/// The invoice object of a Sales voucher, as `InvoiceDetail` admits it from a
+/// caller (`validate_invoice_voucher`): `observed` is the build's own and is
+/// refused when supplied, so it is not offered.
+fn invoice_schema() -> Value {
+    // A master name with no control character and no space at either end
+    // (the `plain` rule of `validate_invoice_voucher`).
+    let name = |description: &str| {
+        json!({
+            "type":"string", "minLength":1, "maxLength":MAX_MASTER_NAME_CHARS,
+            "not":{"anyOf":[{"pattern":CONTROLS},{"pattern":r"^\s|\s$"}]},
+            "description":description
+        })
+    };
+    json!({
+        "type":"object", "additionalProperties":false,
+        "required":["voucher_type_name","place_of_supply"],
+        "description":"Required on a Sales voucher and refused on any other voucher (invoice_detail_required, invoice_detail_on_non_invoice). A Sales voucher also needs voucher_number, the invoice number: 1 to 16 ASCII letters, digits, / or -, with no space (invoice_number_required, invoice_number_invalid), and takes no reference (invoice_reference_not_for_sales). The build fills in what it read from Tally; an observed object supplied here is refused (invoice_observed_not_input).",
+        "properties":{
+            "voucher_type_name":name("The exact name of the Sales voucher type in this book that the invoice is filed under, as masters lists it (invoice_voucher_type_name_invalid otherwise). ComplyEaze Bridge never picks one: a book can hold several, so the build checks this name against Tally."),
+            "place_of_supply":{
+                "type":"string", "minLength":1,
+                "not":{"pattern":LINE_TERMINATORS},
+                "description":"The state the supply is made in, as Tally names it (invoice_place_of_supply_unknown otherwise). Only a supply within the company's own state is built (invoice_place_of_supply_not_company_state)."
+            },
+            "round_off_ledger":name("The ledger that carries the invoice's round off, when its total is rounded. It must also be one of the voucher's entries (invoice_round_off_ledger_invalid otherwise).")
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{voucher_input_schema, voucher_input_schema_for, VoucherType};
+    use serde_json::{json, Value};
+
+    fn voucher_properties(schema: &Value) -> &Value {
+        &schema["properties"]["vouchers"]["items"]["properties"]
+    }
+
+    /// The invoice object returns with Sales and is absent without it, and it
+    /// offers exactly the fields the build reads from a caller: every one of
+    /// them deserialises into the build's own `InvoiceDetail`, and `observed`,
+    /// the build's own, is not offered.
+    #[test]
+    fn the_invoice_object_is_offered_with_sales_and_matches_what_the_build_reads() {
+        assert!(voucher_properties(&voucher_input_schema())
+            .get("invoice")
+            .is_none());
+        let with_sales = voucher_input_schema_for(&[
+            VoucherType::Journal,
+            VoucherType::Payment,
+            VoucherType::Receipt,
+            VoucherType::Contra,
+            VoucherType::Sales,
+        ]);
+        let offered = voucher_properties(&with_sales);
+        assert_eq!(
+            offered["voucher_type"]["enum"],
+            json!(["Journal", "Payment", "Receipt", "Contra", "Sales"])
+        );
+        let invoice = &offered["invoice"];
+        assert_eq!(invoice["additionalProperties"], json!(false));
+        assert_eq!(
+            invoice["required"],
+            json!(["voucher_type_name", "place_of_supply"])
+        );
+        let mut fields: Vec<&String> = invoice["properties"]
+            .as_object()
+            .expect("properties")
+            .keys()
+            .collect();
+        fields.sort();
+        assert_eq!(
+            fields,
+            ["place_of_supply", "round_off_ledger", "voucher_type_name"]
+        );
+        let every_field = json!({
+            "voucher_type_name": "Sales",
+            "place_of_supply": "Rajasthan",
+            "round_off_ledger": "Round Off"
+        });
+        let read: super::super::invoice::InvoiceDetail =
+            serde_json::from_value(every_field).expect("the build reads every offered field");
+        assert!(read.observed.is_none());
+        let only_required = json!({"voucher_type_name": "Sales", "place_of_supply": "Rajasthan"});
+        serde_json::from_value::<super::super::invoice::InvoiceDetail>(only_required)
+            .expect("the required fields alone are enough");
+    }
 }

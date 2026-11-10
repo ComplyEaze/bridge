@@ -2682,6 +2682,15 @@ const ROWS: &[Row] = &[
     // Party ledger masters: src/agent_ledgers_tests.rs, src/agent_register_tests.rs; the
     // compliance read's other replays (src/tally/runtime_party_evidence_tests.rs,
     // src/agent_register_server_tests.rs) by the same parser.
+    // Row 2162-S9b's compliance read, captured with each GSTIN set to a synthetic value of the
+    // same length (pilot-lab/PROVENANCE.md): src/agent_import_invoice_tests.rs reads its
+    // customer's two dated registration entries.
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab/pilot-lab-s9b-customer-sez-compliance.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(PILOT LAB)",
+        parse: |_, text| party_masters(text, PILOT_LAB_GUID),
+    },
     Row {
         fixture: "tests/fixtures/agent/native-ledger-masters-duty-heads.utf16le.xml",
         source: Source::Captured,
@@ -3560,6 +3569,11 @@ const PILOT_LAB_READBACK: &str =
      row here: the app crate's invoice tests (src/agent_import_invoice_tests.rs, and the replay in \
      src/agent_import_post_e2e_tests.rs) parse it with the read-back's own parser and pin what it \
      returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_RESAVE_READBACK: &str =
+    "a read-back answer of the pilot lab's row 2162-RS (9 Nov 2026), before or after a person \
+     saved the invoice again unchanged, with no row here: the app crate's invoice tests \
+     (src/agent_import_invoice_tests.rs) parse it with the read-back's own parser and pin what it \
+     returns; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_NUMBER_MONTHS: &str = "a month answer of the invoice number's read of the pilot \
      lab's financial year 2026-27 (row 2162-M1, 9 Nov 2026), with no row here: the app crate's \
      replays (src/agent_import_post_e2e_tests.rs, src/agent_import_invoice_admission_tests.rs) \
@@ -3900,6 +3914,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml",
         PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-after.utf16le.xml",
+        PILOT_LAB_RESAVE_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-before.utf16le.xml",
+        PILOT_LAB_RESAVE_READBACK,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-resaved.utf16le.xml",

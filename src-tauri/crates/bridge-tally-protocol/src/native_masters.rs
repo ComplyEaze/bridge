@@ -24,7 +24,7 @@ use crate::native_ledger_guid_has_company_prefix;
 use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::stock_tax_details::StockTaxLists;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
-use crate::xml_text::escape_text as xml_escape;
+use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
     name::QName,
@@ -241,8 +241,12 @@ const _: () = {
 pub fn render_native_masters_request(kind: NativeMasterKind, company: &str) -> String {
     let (collection, is_modify, master_type, fetch) = kind.request_shape();
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="{collection}" ISMODIFY="{is_modify}"><TYPE>{master_type}</TYPE><FETCH>{fetch}</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="{collection}" ISMODIFY="{is_modify}"><TYPE>{master_type}</TYPE><FETCH>{fetch}</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        static_variables = static_variables_for_unvalidated_company(
+            company,
+            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+            "",
+        ),
     )
 }
 

@@ -1,4 +1,5 @@
-//! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra);
+//! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra,
+//! or one Sales invoice);
 //! subsequent calls only reconcile its identity.
 use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined, PreviewForm};
 use super::*;
@@ -21,8 +22,9 @@ pub(super) const IMPORT_POST_WINDOW_NOT_BOUNDED: &str = "import_post_window_not_
 /// read's parts together are its size. A verification that reported nothing is
 /// refused, not assumed small.
 /// Which saved batches a caller may post. The agent's `post_import` posts one
-/// Journal, Payment, Receipt or Contra (ADR 0004, amended 2026-09-22); the
-/// desktop's review and approval were built for one Journal and stay so.
+/// Journal, Payment, Receipt or Contra (ADR 0004, amended 2026-09-22), or one
+/// Sales invoice (#2162); the desktop's review and approval were built for one
+/// Journal and stay so.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::agent) enum PostScope {
     JournalOnly,

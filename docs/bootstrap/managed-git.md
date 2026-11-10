@@ -41,8 +41,11 @@ personal information.
   run the native tests on Windows only, and a master push, the nightly run, a
   manual run and a release pull request (one that changes the version in
   `src-tauri/tauri.conf.json`) add macOS; a pull request runs the bundle and seam
-  jobs on Windows only unless it is a release pull request, and the queue and a
-  push add macOS only when a packaging path changes, named in the scope job; a draft pull request runs no native, bundle or seam job, reports
+  jobs on Windows only, and only when it changes a packaging path, a crate manifest,
+  the Windows resource script or the Windows setup action, or is a release
+  pull request (which adds macOS); the queue runs them for every change they cover,
+  and the queue and a push add macOS only when a packaging path changes, named in
+  the scope job; a draft pull request runs no native, bundle or seam job, reports
   its gate as `Required checks (draft)`, which is not a required context, and
   marking it ready starts a run that does); require the
   gate rather than those individual matrix contexts, because they are

@@ -34,7 +34,7 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
 /// Sales is among them: it returns with the type when Sales is switched on
 /// (ADR 0004, the 6 October amendment's "Qualification." paragraph, #2162
 /// item 7), and never names an object the build would refuse.
-fn voucher_input_schema_for(types: &[VoucherType]) -> Value {
+pub(super) fn voucher_input_schema_for(types: &[VoucherType]) -> Value {
     let text = json!({
         "type":"string", "minLength":1, "maxLength":MAX_TEXT_CHARS,
         "not":{"anyOf":[{"pattern":CONTROLS},{"pattern":RESERVED_MARKER}]},
@@ -72,7 +72,7 @@ fn voucher_input_schema_for(types: &[VoucherType]) -> Value {
             },
             "voucher_type":{
                 "enum":types,
-                "description":"Journal takes any balanced set of entries and may carry voucher_number and reference. Payment, Receipt and Contra take two or more entries (for more than two, one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified; no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), at least one debit and one credit and no ledger on both sides, and neither of those fields, and are refused unless every money-side entry names a ledger whose live group ancestry reaches Bank Accounts or Cash-in-Hand: every credit on a Payment, every debit on a Receipt, every leg on a Contra. Every remaining leg of a Payment or Receipt must be established as holding no money: any money group there means the voucher is really a Contra, and a ledger whose group ancestry cannot be resolved is refused as well. These rules span fields and live masters, so the server enforces them after admission rather than here."
+                "description":"Journal takes any balanced set of entries and may carry voucher_number and reference. Sales is a GST invoice within the company's own state: it needs invoice and voucher_number, and is the only voucher of its batch. Payment, Receipt and Contra take two or more entries (for more than two, one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified; no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), at least one debit and one credit and no ledger on both sides, and neither of those fields, and are refused unless every money-side entry names a ledger whose live group ancestry reaches Bank Accounts or Cash-in-Hand: every credit on a Payment, every debit on a Receipt, every leg on a Contra. Every remaining leg of a Payment or Receipt must be established as holding no money: any money group there means the voucher is really a Contra, and a ledger whose group ancestry cannot be resolved is refused as well. These rules span fields and live masters, so the server enforces them after admission rather than here."
             },
             "narration":text, "reference":text,
             "voucher_number":{
@@ -160,7 +160,7 @@ fn invoice_schema() -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{voucher_input_schema, voucher_input_schema_for, VoucherType};
+    use super::{voucher_input_schema, voucher_input_schema_for};
     use serde_json::{json, Value};
 
     fn voucher_properties(schema: &Value) -> &Value {
@@ -170,19 +170,14 @@ mod tests {
     /// The invoice object returns with Sales and is absent without it, and it
     /// offers exactly the fields the build reads from a caller: every one of
     /// them deserialises into the build's own `InvoiceDetail`, and `observed`,
-    /// the build's own, is not offered.
+    /// the build's own, is not offered. The shipped schema offers it, since
+    /// Sales is qualified.
     #[test]
     fn the_invoice_object_is_offered_with_sales_and_matches_what_the_build_reads() {
-        assert!(voucher_properties(&voucher_input_schema())
-            .get("invoice")
-            .is_none());
-        let with_sales = voucher_input_schema_for(&[
-            VoucherType::Journal,
-            VoucherType::Payment,
-            VoucherType::Receipt,
-            VoucherType::Contra,
-            VoucherType::Sales,
-        ]);
+        let without_sales =
+            voucher_input_schema_for(super::super::PRE_SALES_QUALIFIED_VOUCHER_TYPES);
+        assert!(voucher_properties(&without_sales).get("invoice").is_none());
+        let with_sales = voucher_input_schema();
         let offered = voucher_properties(&with_sales);
         assert_eq!(
             offered["voucher_type"]["enum"],

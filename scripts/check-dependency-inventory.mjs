@@ -12,6 +12,7 @@ const firstPartyRustPackages = new Set([
   "bridge",
   "bridge-approval-standin",
   "bridge-bank-statement",
+  "bridge-mcpb-check",
   "bridge-tally-core",
   "bridge-tally-primitives",
   "bridge-tally-protocol",

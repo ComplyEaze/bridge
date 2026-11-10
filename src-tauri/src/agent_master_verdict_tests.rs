@@ -611,12 +611,22 @@ fn the_gstin_check_fails_for_another_gstin_or_none_or_one_never_sent() {
 }
 
 #[test]
-fn each_counter_outside_one_created_none_altered_no_errors_no_exceptions_fails() {
+fn each_counter_outside_one_created_and_nothing_else_fails() {
+    let one = counters(1, 0, 0, 0);
     for (label, counters) in [
         ("none created", counters(0, 0, 0, 0)),
         ("two created", counters(2, 0, 0, 0)),
         ("errors", counters(1, 0, 1, 0)),
         ("exceptions", counters(1, 0, 0, 1)),
+        ("deleted", MasterCounters { deleted: 1, ..one }),
+        ("ignored", MasterCounters { ignored: 1, ..one }),
+        (
+            "cancelled",
+            MasterCounters {
+                cancelled: 1,
+                ..one
+            },
+        ),
     ] {
         let mut world = World::clean(suspense());
         world.counters = Some(counters);

@@ -539,3 +539,6 @@ mod hand_entry_texts_tests;
 
 #[cfg(test)]
 mod company_variable_writer_tests;
+
+#[cfg(test)]
+mod failure_code_sites_tests;

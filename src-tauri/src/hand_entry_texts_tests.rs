@@ -41,6 +41,18 @@ fn string_literals(source: &str) -> Vec<String> {
 /// newline, anything else becomes a space) so the code has the same byte offsets as `source`, and
 /// the text of its string literals, read as [`string_literals`] describes.
 pub(crate) fn lex(source: &str) -> (String, Vec<String>) {
+    let (code, spans) = lex_spans(source);
+    (code, spans.into_iter().map(|(_, _, text)| text).collect())
+}
+
+/// [`string_literals`] with where each literal sits: the byte index of its opening (the `r`, `br`
+/// or quote) and the byte index just past its closing quote.
+pub(crate) fn string_literal_spans(source: &str) -> Vec<(usize, usize, String)> {
+    lex_spans(source).1
+}
+
+/// [`lex`], with each literal's text paired with where it sits, as [`string_literal_spans`] gives it.
+fn lex_spans(source: &str) -> (String, Vec<(usize, usize, String)>) {
     let bytes = source.as_bytes();
     let mut code = String::with_capacity(source.len());
     let mut literals = Vec::new();
@@ -74,9 +86,11 @@ pub(crate) fn lex(source: &str) -> (String, Vec<String>) {
             let end = source[body_start..]
                 .find(&closing)
                 .map_or(bytes.len(), |at| body_start + at);
-            literals.push(source[body_start..end].to_string());
-            i = (end + closing.len()).min(bytes.len());
+            let close = (end + closing.len()).min(bytes.len());
+            literals.push((i, close, source[body_start..end].to_string()));
+            i = close;
         } else if bytes[i] == b'"' {
+            let open = i;
             let mut text = String::new();
             i += 1;
             while i < bytes.len() && bytes[i] != b'"' {
@@ -95,8 +109,8 @@ pub(crate) fn lex(source: &str) -> (String, Vec<String>) {
                 text.push(ch);
                 i += ch.len_utf8();
             }
-            literals.push(text);
             i = (i + 1).min(bytes.len());
+            literals.push((open, i, text));
         } else if bytes[i] == b'\'' && char_literal_len(rest) > 1 {
             i += char_literal_len(rest);
         } else {

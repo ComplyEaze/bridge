@@ -629,6 +629,62 @@ class MergeGateControls(unittest.TestCase):
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
+    def test_dependabots_signoff_line_in_a_well_formed_commit_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer")
+
+    def test_dependabots_signoff_line_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer-crlf")
+
+    def test_dependabots_signoff_line_without_a_final_newline_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer-no-final-newline")
+
+    def test_dependabots_signoff_line_beside_the_public_agent_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-with-agent-trailer")
+
+    def test_dependabots_signoff_line_outside_a_commit_trailer_still_blocks(self):
+        for scenario in (
+            "bot-signoff-in-pr-body",
+            "bot-signoff-in-source-payload",
+            "bot-signoff-nonfooter",
+            "bot-signoff-before-another-paragraph",
+            "bot-signoff-with-malformed-line",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_dependabots_signoff_line_with_another_key_name_or_spelling_still_blocks(self):
+        for scenario in (
+            "bot-signoff-other-key",
+            "bot-signoff-coauthor-key",
+            "bot-signoff-lowercase-key",
+            "bot-signoff-prefixed-key",
+            "bot-signoff-other-name",
+            "bot-signoff-name-case",
+            "bot-signoff-name-with-address",
+            "bot-signoff-double-space",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_dependabots_signoff_line_with_anything_after_the_bracket_or_no_bracket_still_blocks(self):
+        for scenario in (
+            "bot-signoff-extra-payload",
+            "bot-signoff-unclosed",
+            "bot-signoff-trailing-space",
+            "bot-signoff-second-address",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_another_address_under_dependabots_signoff_line_still_blocks(self):
+        self.assert_blocked("bot-signoff-other-address", "customer email shape")
+
+    def test_mixed_line_endings_around_dependabots_signoff_line_still_block(self):
+        self.assert_blocked("bot-signoff-mixed-line-endings", "customer email shape")
+
+    def test_a_customer_trailer_beside_dependabots_signoff_line_still_blocks(self):
+        self.assert_blocked("bot-signoff-with-customer-trailer", "customer email shape")
+
     # -- AI attribution is a note, never a block (owner practice of 25 Oct 2026) ------------
 
     def assert_noted(self, scenario, text):
@@ -1645,6 +1701,20 @@ class MergeGateControls(unittest.TestCase):
         result = self.assert_pass("author-email-localhost")
         self.assertNotIn("could not prove complete head-bound PR commit metadata", result.stdout)
 
+    def test_2388_github_bot_noreply_author_email_is_accepted(self):
+        # Dependabot authors as <digits>+dependabot[bot]@users.noreply.github.com. The
+        # plain email class admits no bracket, so every Dependabot PR went INDETERMINATE.
+        result = self.assert_pass("author-email-bot-noreply")
+        self.assertNotIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_2388_a_bracket_outside_the_bot_noreply_form_is_refused(self):
+        for scenario in ("author-email-bracket-elsewhere", "author-email-bot-other-domain"):
+            with self.subTest(scenario=scenario):
+                self.assert_indeterminate(scenario, "could not prove complete head-bound PR commit metadata")
+
+    def test_2388_an_empty_author_email_is_refused(self):
+        self.assert_indeterminate("author-email-empty", "could not prove complete head-bound PR commit metadata")
+
     def test_finding374_helpers_resolve_relative_to_the_script(self):
         """#374: the gate must locate its own helper scripts by $script_dir.
 
@@ -2116,6 +2186,17 @@ class PrivacyLocationAndCommentBlockTests(unittest.TestCase):
         self.assertTrue(self.redacted(message).endswith("\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"), "the block is returned unchanged")
         crlf = message.replace("\n", "\r\n")
         self.assertEqual(self.emails(crlf), 0)
+
+    def test_dependabots_signoff_before_a_git_conflict_comment_block_is_still_the_terminal_trailer(self):
+        support = "support" + "@" + "github.com"
+        bot = "Signed-off-by: dependabot[bot] <" + support + ">"
+        message = "Merge master\n\n" + bot + "\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"
+        self.assertEqual(self.emails(message), 0)
+        self.assertTrue(self.redacted(message).endswith("\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"), "the block is returned unchanged")
+        self.assertEqual(self.emails(message.replace("\n", "\r\n")), 0)
+        self.assertEqual(self.emails("Merge\n\n" + bot + "\n\n# Conflicts:\n# " + self.CUSTOMER), 1, "an address in the block still counts")
+        self.assertEqual(self.emails("Merge\n\n# Conflicts:\n#\ta\n\n" + bot), 0, "a terminal sign-off after the block is unchanged behaviour")
+        self.assertEqual(self.emails("Merge\n\nnote: see <" + support + ">\n\n# Conflicts:\n#\ta"), 1, "the address outside a sign-off line still counts")
 
     def test_an_address_inside_or_after_the_comment_block_is_still_counted(self):
         inside = "Merge\n\nCo-Authored-By: Claude <" + self.AGENT + ">\n\n# Conflicts:\n# " + self.CUSTOMER
@@ -3183,6 +3264,49 @@ class PrivacyLockfileIntegrity(unittest.TestCase):
         record, masked = self.record("pnpm-lock.yaml", line)
         self.assert_blocks(record)
         self.assertEqual(masked, 1)
+
+    # The other shape a random base64 body can hold: a long digit run (RUN above is an identifier shape). Built from
+    # parts for the same reason.
+    DIGITS = "4081" + "7362" + "951"
+
+    def digit_body(self, length):
+        return "Q" * 10 + self.DIGITS + "Q" * (length - 10 - len(self.DIGITS))
+
+    def digit_line(self):
+        return "    resolution: {integrity: sha512-" + self.digit_body(86) + "==}"
+
+    def sha256_digit_line(self):
+        return "    resolution: {integrity: sha256-" + self.digit_body(43) + "=}"
+
+    def assert_a_digit_run_and_nothing_else(self, text):
+        # The fixture's own shape, measured with each pattern the scan applies, so a pass below cannot come from another
+        # shape: exactly one long digit run, no identifier, and none of the shapes whose digits the scan adds.
+        normalized = self.privacy.normalize_whitespace(text)
+        self.assertEqual(self.privacy.nonplaceholder_count(self.privacy.LONG_RUN_RE, text), 1, text)
+        self.assertEqual(self.privacy.nonplaceholder_count(self.privacy.IDENTIFIER_RE, text), 0, text)
+        for pattern in (self.privacy.PHONE_RE, self.privacy.LANDLINE_RE, self.privacy.STANDARD_LANDLINE_RE):
+            self.assertIsNone(pattern.search(normalized), (pattern.pattern, text))
+        self.assertEqual(self.privacy.grouped_numbers(text), "", text)
+
+    def test_a_long_digit_run_in_a_pnpm_integrity_value_is_masked(self):
+        for line in (self.digit_line(), self.sha256_digit_line()):
+            self.assert_a_digit_run_and_nothing_else(line)
+            self.assert_blocks(self.privacy.scan(line, HEAD))
+            record, masked = self.record("pnpm-lock.yaml", line)
+            self.assert_clean(record)
+            self.assertEqual(masked, 1, line)
+
+    def test_the_same_digit_run_outside_the_integrity_value_still_blocks(self):
+        for path, line, expected_masked in (
+            ("pnpm-lock.yaml", "    version: " + self.DIGITS, 0),
+            ("pnpm-lock.yaml", self.digit_line()[:-1] + ", tarball: " + self.DIGITS + "}", 1),
+            ("pnpm-lock.yaml", '      "integrity": "sha512-' + self.digit_body(86) + '==",', 0),
+            ("package-lock.json", '      "integrity": "sha512-' + self.digit_body(86) + '==",', 0),
+            ("sub/pnpm-lock.yaml", self.digit_line(), 0),
+        ):
+            record, masked = self.record(path, line)
+            self.assert_blocks(record)
+            self.assertEqual(masked, expected_masked, (path, line))
 
     def test_explain_masks_by_each_line_s_own_path(self):
         document = {"sources": [], "added": [

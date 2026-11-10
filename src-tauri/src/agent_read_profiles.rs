@@ -695,16 +695,14 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_voucher_types_request(company))
 }
 
-/// The vouchers carrying one invoice number in one financial year, with the
-/// measured per-row Sales-class compute, for the duplicate-number check.
-pub(super) fn invoice_number_read(
+/// Every voucher of one window (a calendar month of an invoice's financial
+/// year), with the measured per-row Sales-class compute, for the
+/// duplicate-number check: the program compares the numbers (#2162 item 11).
+pub(super) fn invoice_window_numbers_read(
     company: &str,
-    number: &agent_import::invoice::InvoiceNumber,
     window: (&TallyDate, &TallyDate),
 ) -> ReadRequest {
-    ReadRequest(agent_import::invoice::render_invoice_number_request(
-        company, number, window,
-    ))
+    ReadRequest(agent_import::invoice::render_invoice_window_numbers_request(company, window))
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.

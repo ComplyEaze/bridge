@@ -180,6 +180,18 @@ fn full_records(batch: &MasterBatch) -> Vec<MasterRecord> {
     ]
 }
 
+/// The counters keep the bytes the journal has always written for them, and
+/// still refuse a field they do not know.
+#[test]
+fn counters_keep_the_journal_shape_earlier_releases_wrote() {
+    let text = r#"{"created":2,"altered":0,"deleted":0,"ignored":1,"errors":0,"cancelled":0,"exceptions":0}"#;
+    let counters: MasterCounters = serde_json::from_str(text).unwrap();
+    assert_eq!(counters.ignored, 1);
+    assert_eq!(serde_json::to_string(&counters).unwrap(), text);
+    let extra = text.replace('}', r#","line_errors":0}"#);
+    assert!(serde_json::from_str::<MasterCounters>(&extra).is_err());
+}
+
 #[test]
 fn every_record_round_trips_and_the_journal_reports_its_state() {
     let id = batch_id();

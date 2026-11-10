@@ -1,0 +1,8 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed (no captured byte is altered):
+evidence/build.txt: original 1906 B sha256 a0ea6738385209e96493b78820c5035eba94bf2e905bc1a6a61cf12485761b22 (kept on the lab PC); 5 x -> <CI run id>; 4 x -> <artifact id>
+evidence/notes.txt: original 6903 B sha256 5a83fa50623d86daf5038d7fc55a37724b6d4350f6365f0c9f731460bb205580 (kept on the lab PC); 1 x -> stop
+RESULTS.md: original 23572 B sha256 d6e7009c3fb7b6ccd5ddf5004a834594758575f0b56d8267929197776b323b5f (kept on the lab PC); 5 x -> <CI run id>; 4 x -> <artifact id>
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 523 B sha256 319eb635b92bd40a2c51e48b879192af23f497f3925d2a7a0311048bd78777ef (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/client.py: original 4777 B sha256 1e6b490f10d2534a14d3c14d913815a6ba127bdb79da712a2be8d9d25186e324 (kept on the lab PC); 1 x -> lab-client; 4 x -> stop
+scripts/mkresults-2399d.py: original 2906 B sha256 e2507cfd8b740c92a7df1d46b56c4bbfc160b1bb3a495b595a247b1a7f93bd3e (kept on the lab PC); 1 x -> <LAB_DIR>

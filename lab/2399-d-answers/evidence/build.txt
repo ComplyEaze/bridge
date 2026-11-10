@@ -1,0 +1,11 @@
+$ step 0, the build (UTC 2026-11-10T18:57:58Z)
+the run, looked up by its head commit (actions/runs?branch=master&event=push&head_sha=d69b2ea8f71394eb7a948dcada541079e899eaa0): two push runs on master for that commit; the ci.yml one is run <CI run id>, Bridge CI, .github/workflows/ci.yml, event push, head_branch master, completed, success
+artifact <artifact id> unsigned-bundle-smoke-windows-latest, 60401470 B, digest sha256:ba5382c6afae35ecb7f94ce7dc887563cba1a2df8da8d6c75853eef0ca346e83, expired false, expires 2026-11-17T18:34:28Z, workflow_run.id <CI run id>; downloaded 2026-11-10T18:56:08Z to 18:56:46Z by gh api .../actions/artifacts/<artifact id>/zip
+zip 60401470 B sha256 ba5382c6afae35ecb7f94ce7dc887563cba1a2df8da8d6c75853eef0ca346e83; GitHub digest sha256:ba5382c6afae35ecb7f94ce7dc887563cba1a2df8da8d6c75853eef0ca346e83: EQUAL
+zip entries: bridge-tally.mcpb, msi/Bridge_0.7.0_x64_en-US.msi, mcpb-smoke.json, nsis/Bridge_0.7.0_x64-setup.exe
+bridge-tally.mcpb sha256 6b788c3559b4205e220f7f28a16d6a7aefe7e0d2b0a7b5bed564a0c9688c2c54; mcpb-smoke.json archive_sha256 6b788c3559b4205e220f7f28a16d6a7aefe7e0d2b0a7b5bed564a0c9688c2c54: EQUAL
+bridge_mcp.exe 35684352 B sha256 3f880c1e1bca963ccfbe949ee8ca61f4d6f2d8c12e53e5bee6d51a0d1adf4056; mcpb-smoke.json binary_sha256 3f880c1e1bca963ccfbe949ee8ca61f4d6f2d8c12e53e5bee6d51a0d1adf4056: EQUAL
+pdfium.dll sha256 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118; mcpb-smoke.json pdfium_library_sha256: EQUAL
+manifest.json version 0.7.0; it names no commit
+the run's head_sha (actions/runs/<CI run id>): d69b2ea8f71394eb7a948dcada541079e899eaa0, the Build line's commit: EQUAL
+the tie, in three links: 1. the zip's sha256 equals GitHub's digest of artifact <artifact id>: EQUAL; 2. artifact <artifact id> belongs to run <CI run id> (its workflow_run.id): EQUAL; 3. run <CI run id>'s head_sha is d69b2ea8f71394eb7a948dcada541079e899eaa0: EQUAL

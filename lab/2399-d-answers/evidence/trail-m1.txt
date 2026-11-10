@@ -1,0 +1,8 @@
+line 1	2026-11-10T19:00:13.394Z	list_companies	81a7dc31-c896-44ea-b3fc-c24db018bc86	sent 4	omitted 0	failed 0	listed 4 (post 2, status 2)	listed request bytes 5048	listed response bytes 8126
+line 3	2026-11-10T19:00:47.279Z	ledger_masters	818bc0ec-1bf0-419c-b4c2-a63efe802846	sent 26	omitted 0	failed 0	listed 26 (post 14, status 12)	listed request bytes 23804	listed response bytes 309748
+line 5	2026-11-10T19:01:07.973Z	vouchers	ab17d5ad-2201-4eb9-8362-042d56717233	sent 52	omitted 20	failed 0	listed 32 (post 21, status 11)	listed request bytes 43216	listed response bytes 6054161
+line 7	2026-11-10T19:01:38.704Z	vouchers	b29df0bd-259a-4d27-b809-4ea1767ddc4a	sent 28	omitted 0	failed 0	listed 28 (post 18, status 10)	listed request bytes 36520	listed response bytes 5646950
+line 9	2026-11-10T19:02:00.510Z	ledger_masters	598776b3-71e6-4f71-a6b1-097f0371e6ae	sent 26	omitted 0	failed 0	listed 26 (post 14, status 12)	listed request bytes 23804	listed response bytes 309748
+records printed 5
+lines read 10; records by type {'response_prepared': 5, 'stdio_write_completed': 5}
+exit 0

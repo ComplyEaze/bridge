@@ -1,0 +1,2 @@
+ls: cannot access 'C:/lab/2399-d/data': No such file or directory
+exit 2

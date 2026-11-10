@@ -1,0 +1,4 @@
+run\answers\004-c2.json: 119827 bytes, sha256 60ca3e7fadd973b043968371bfd852795bfa5f2fdf6d2b16948b9d56acf1a151
+C:\lab\2399-d\rpc\c2.json: 119528 bytes, sha256 fa3fd024b3113da7912f2db6f2aea855b5a526321030376352ff8830020acedd, equal to the response value: True
+message holds: result
+exit 0

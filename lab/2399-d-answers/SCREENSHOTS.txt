@@ -1,0 +1,8 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/*.png are the Tally window (PrintWindow, its left part).
+shots/c10-gateway.png 45331 B f572f3ea2dda43f8bc67585c878f46a65044ec0132eb74100add524ac25e3a04
+shots/c10-no-company.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/c10-window.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/s0-gateway.png 45331 B f572f3ea2dda43f8bc67585c878f46a65044ec0132eb74100add524ac25e3a04
+shots/s0-select.png 36942 B a1eeed62b353223d7a94ef9dd10187b6ddf4f950958a4aa1925323ac8a0d89fc
+shots/s0-startup.png 45878 B 082b0e1784ce00af343f0c498b6db90ad588259842cecc4d1dd758335f09a9e9
+shots/s0-window.png 45878 B 082b0e1784ce00af343f0c498b6db90ad588259842cecc4d1dd758335f09a9e9

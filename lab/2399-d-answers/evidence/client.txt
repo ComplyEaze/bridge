@@ -1,0 +1,3 @@
+$ the row's client: run/client.py, row 2399-R's run/client.py byte for byte (the file that ran there, sha256 1e6b490f10d2534a14d3c14d913815a6ba127bdb79da712a2be8d9d25186e324)
+run/client.py sha256 1e6b490f10d2534a14d3c14d913815a6ba127bdb79da712a2be8d9d25186e324
+lab/2399-r-answers/scripts/client.py at 0500c600 is the pushed text of that file, sha256 6d783d5521be8432a8cfbb26ee8d856f3e55d393aaa4ebe4af88083dd4c4d2ce: its substitutions.txt lists the five changed words (the clientInfo name and four upper-case words), and nothing else differs

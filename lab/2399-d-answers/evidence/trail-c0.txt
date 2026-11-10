@@ -1,0 +1,5 @@
+line 1	2026-11-10T19:00:13.394Z	list_companies	81a7dc31-c896-44ea-b3fc-c24db018bc86	sent 4	omitted 0	failed 0	listed 4 (post 2, status 2)	listed request bytes 5048	listed response bytes 8126
+records printed 1
+lines read 2; records by type {'response_prepared': 1, 'stdio_write_completed': 1}
+calibration ok: the last list_companies record has sent 4
+exit 0

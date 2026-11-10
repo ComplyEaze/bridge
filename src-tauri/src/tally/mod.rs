@@ -45,8 +45,8 @@ pub struct VerifiedCompanyIdentity {
 /// Carries no observed text, so its Debug cannot print a company name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerifiedCompanyIdentityError {
-    /// The observed name is not one a request can carry: empty after trim,
-    /// over 255 bytes, or holding a control character (#2397).
+    /// The observed name is not one a request can carry: the rule of
+    /// `ValidatedCompanyName` (#2397, #2433).
     InvalidCompanyName,
     InvalidCompanyNumber,
     InvalidBooksFrom,

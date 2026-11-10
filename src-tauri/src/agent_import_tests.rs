@@ -7072,3 +7072,39 @@ fn each_captured_alias_names_its_ledger_and_a_case_variant_names_none() {
         }
     }
 }
+
+/// #2433: a company list that holds a marked company, one whose name no
+/// request can carry, still builds a batch for an unmarked company in the same
+/// book. Before, the list was refused for every company in it. The build reads
+/// what it read before, and the batch is the same.
+#[tokio::test]
+async fn an_unmarked_company_builds_beside_a_marked_one() {
+    let marked = "<COMPANY NAME=\"Lab&#x1;\"><GUID>00000000-0000-4000-8000-000000002433</GUID><COMPANYNUMBER>2</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION>";
+    let mut lists = 0;
+    let plans = whole_build(build_numbering_plans(&[]))
+        .into_iter()
+        .map(|mut plan| {
+            let body = plan.fixture.body().into_owned();
+            if body.contains("<COLLECTION><COMPANY NAME=\"WR2 Unicode Lab\">") {
+                lists += 1;
+                plan.fixture = Fixture::SyntheticXml(body.replace("</COLLECTION>", marked));
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    assert!(lists > 0, "the build's company lists were found");
+    let simulator = SequenceSimulator::spawn(plans).expect("captured build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
+        .await
+        .expect("the unmarked company builds");
+    assert_eq!(built.payload["result"]["voucher_count"], 2);
+    let requests = simulator.finish().unwrap();
+    assert_eq!(
+        requests.len(),
+        QUALIFIED_BUILD_REQUESTS,
+        "the same reads as before"
+    );
+}

@@ -99,7 +99,7 @@ fn identity_named(name: &str) -> Result<VerifiedCompanyIdentity, VerifiedCompany
 #[test]
 fn identity_refuses_a_name_no_request_can_carry() {
     for name in [
-        "A".repeat(256),
+        "A".repeat(bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES + 1),
         "line\nbreak".to_string(),
         "tab\tinside".to_string(),
         "nul\u{0}inside".to_string(),
@@ -119,21 +119,28 @@ fn identity_refuses_a_name_no_request_can_carry() {
     }
 }
 
-/// The limit is the existing 255-byte rule, counted in bytes, not characters.
+/// The identity refuses what the name type refuses and admits a name at the
+/// type's limit, counted in bytes. The boundary itself is pinned in the
+/// protocol crate (#2433).
 #[test]
-fn identity_admits_a_255_byte_name_and_refuses_one_of_256() {
-    let ascii = "A".repeat(255);
-    let devanagari = "क".repeat(85);
-    assert_eq!(devanagari.len(), 255);
-    for name in [&ascii, &devanagari] {
-        let identity = identity_named(name).expect("a 255-byte name is admitted");
-        assert_eq!(identity.display_name(), name.as_str());
-    }
-    for name in [format!("{ascii}A"), format!("{devanagari}A")] {
-        assert_eq!(name.len(), 256);
+fn identity_admits_a_name_at_the_limit_and_refuses_what_the_type_refuses() {
+    let limit = bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES;
+    let ascii = "A".repeat(limit);
+    let identity = identity_named(&ascii).expect("a name at the limit is admitted");
+    assert_eq!(identity.display_name(), ascii.as_str());
+    for name in [
+        format!("{ascii}A"),
+        "Client\u{1}Book".to_string(),
+        "   ".to_string(),
+    ] {
+        assert!(
+            bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::refusal(&name)
+                .is_some()
+        );
         assert_eq!(
             identity_named(&name).err(),
-            Some(VerifiedCompanyIdentityError::InvalidCompanyName)
+            Some(VerifiedCompanyIdentityError::InvalidCompanyName),
+            "{name:?}"
         );
     }
 }
@@ -153,7 +160,7 @@ fn identity_holds_a_markup_and_devanagari_name_byte_exact() {
 /// ambiguous, duplicated or missing, or with a bad number, is refused as a name.
 #[test]
 fn a_bad_name_is_refused_before_the_number_and_ambiguity_checks() {
-    let name = "A".repeat(256);
+    let name = "A".repeat(bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES + 1);
     let sibling = observed_row(&format!(" {} ", name.to_ascii_lowercase()), "2");
     let target = observed_row(&name, CAPTURED_NUMBER);
     for (number, companies) in [

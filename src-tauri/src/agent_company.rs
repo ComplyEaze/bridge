@@ -133,6 +133,12 @@ impl Server {
                 }
                 let (company, observed_guid) =
                     matches.into_iter().next().expect("one checked above");
+                // Every read of a company passes here. A company whose name a
+                // request cannot carry is listed, marked, and refused here,
+                // before any request names it (#2433).
+                if ValidatedCompanyName::refusal(&company.name).is_some() {
+                    return Err(super::failure_code::CompanyReadCode::NameInvalid.into());
+                }
                 let company_number = company
                     .company_number
                     .clone()
@@ -152,10 +158,10 @@ impl Server {
                 )
                 .map_err(|error| {
                     match error {
-                        // No test reaches this arm: `normalized_standard_value`, in
-                        // the company-list parser, refuses such a name first.
+                        // The name check above refuses such a name first; this arm
+                        // gives the same declared code if that order ever changes.
                         crate::tally::VerifiedCompanyIdentityError::InvalidCompanyName => {
-                            "company_name_invalid"
+                            super::failure_code::CompanyReadCode::NameInvalid.as_str()
                         }
                         crate::tally::VerifiedCompanyIdentityError::InvalidCompanyNumber => {
                             "company_number_invalid"
@@ -228,7 +234,44 @@ pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Valu
         .company_number
         .as_deref()
         .is_some_and(|value| !crate::tally::validators::is_valid_company_number(value));
-    json!({"name": company.name, "guid": guid, "company_number": company.company_number, "books_from": company.books_from, "identity_state": if duplicate_guid {"ambiguous_duplicate_guid"} else if missing.is_some() {"incomplete_tuple"} else if invalid_guid {"invalid_guid"} else if invalid_number {"invalid_company_number"} else if invalid_books_from {"invalid_books_from"} else {"verified_tuple"}, "missing_field": missing})
+    // A name is shown with each control or invisible format character written
+    // as `\u{..}`, so a name holding one never draws like the same name without
+    // it, no text is hidden in it and none reorders the text around it. A
+    // sendable name keeps the zero-width joiner and non-joiner, anywhere: they
+    // are part of how Indic and Persian names are written, so a name made of
+    // them alone draws as nothing. A backslash is not escaped, so a name that
+    // spells a `\u{..}` code out as text draws like one holding the character
+    // (#2433).
+    let name_refusal = ValidatedCompanyName::refusal(&company.name);
+    let name = match name_refusal {
+        Some(_) => escaped_company_name(&company.name, |character| {
+            character.is_control() || super::headline::is_invisible_format(character)
+        }),
+        None => escaped_company_name(&company.name, |character| {
+            !matches!(character, '\u{200c}' | '\u{200d}')
+                && super::headline::is_invisible_format(character)
+        }),
+    };
+    let mut row = json!({"name": name, "guid": guid, "company_number": company.company_number, "books_from": company.books_from, "identity_state": if duplicate_guid {"ambiguous_duplicate_guid"} else if missing.is_some() {"incomplete_tuple"} else if invalid_guid {"invalid_guid"} else if invalid_number {"invalid_company_number"} else if invalid_books_from {"invalid_books_from"} else {"verified_tuple"}, "missing_field": missing});
+    // Only a marked row carries the key, so every other company block is unchanged.
+    if let Some(refusal) = name_refusal {
+        row["name_refusal"] = json!(refusal.code());
+    }
+    row
+}
+
+/// The name byte for byte, except that each character `escape` picks becomes
+/// its `\u{..}` code.
+fn escaped_company_name(name: &str, escape: impl Fn(char) -> bool) -> String {
+    name.chars()
+        .map(|character| {
+            if escape(character) {
+                format!("\\u{{{:04x}}}", u32::from(character))
+            } else {
+                character.to_string()
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -326,3 +369,7 @@ mod build_age_tests {
         assert!(chrono::NaiveDate::parse_from_str(super::RELEASE_DATE, "%Y-%m-%d").is_ok());
     }
 }
+
+#[cfg(test)]
+#[path = "agent_company_name_tests.rs"]
+mod name_tests;

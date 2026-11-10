@@ -1,0 +1,10 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backup-1/TDBK1800_<company number>.001 90051 B 8cf8030428523f79f99a42fce21cb76bf0cb607e4e662f2a582a2095945bea7c (BK, taken at step 1 to the sheet's backup-1 folder; not restored: the row stopped before step 3, nothing was keyed after BK, and MARKS read after the stop was byte-equal to s1)
+answers/a-s2-U-taxunits.xml 22636 B e40ef83cc01ffc18ee38a48745dd712d2f0f89f282cd2fe1e716a7ff71835989 (GSTIN shape (answers holding a GSTIN stay local))
+answers/a-s2-V-0010.xml 52784 B 4bf8b111c33edc1378933a2583021ce677d8ae4641972f88b8dc6343cfc60456 (GSTIN shape (answers holding a GSTIN stay local))
+evidence/bk-after-listing.txt 74 B 22d6cb553a210e7fd198a7f4c6d7e662e63f59391bfd4974d0920a6ddcc479ef (Tally data folder or backup folder listing)
+evidence/c10-netstat.txt 8068 B 772066ab12306450118f68ea8892313a163025fd6ad1c691f7f0092b4e561d5d (process or port listing)
+evidence/c10-tasklist.txt 54 B 773ea0e207df616fe41fc54e6728303de76a7374ed9c23c91cec63f30c8fcbe2 (process or port listing)
+evidence/s0-netstat.txt 8503 B 74836393a2016de0a70fd7cb580b80790fc787301400bd7ef570e2c0b34645c7 (process or port listing)
+evidence/s0-tasklist.txt 54 B 8b0fe47fbc19b25a72577cef4a1d774df5c51c39948c53f9aded1db9650feadb (process or port listing)
+stage-2464gr.py 10868 B 48d837edc96b07da86de320b57e6e5d9537ddfa40cb66f814f05cfe65f12339b (this stage script: its patterns name the lab paths)

@@ -1,0 +1,13 @@
+tally start 00:02:34Z
+c9 shut start-up company 00:03:38Z
+2026-11-10T00:03:38.859Z s0 step 0: capture 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6; a. tasklist exit 0, 1 tally.exe line(s), PID 18740; b. netstat exit 0, 9001 LISTENING PIDs ['18740'], other LISTENING lines 35; c. GET /status curl 0 "200 51"; ok True
+loaded BRIDGE PILOT LAB, no prompt; gateway 1-Apr-26 to 31-Mar-27, Tuesday 15-Sep-2026, last entry 15-Sep-26 00:04:15Z
+bk taken: Accept ? y, back at the gateway, no other prompt 00:06:15Z (file mtime 00:05:56Z)
+s2 read: U byte-equal to row 2162-RU's s2 (22,636 B, e40ef83c); T BRIDGE Sales: no DEFAULTGSTREGISTRATION element, LASTGSTTAXUNIT Rajasthan Registration, TAXUNITNAME Any; R-0010 one row, BRIDGE Walk-in, included Yes, 6 legs; V-0010 Rajasthan Registration / 08ZZZZZ0000Z1ZQ / Rajasthan / Regular; M 68/245.
+s2 N-0041: 1 row, not the EXPECT of 0: BP/26-27/0041, BRIDGE Sales, DATE 20260820, MASTERID 40, ISCANCELLED Yes, ISDELETED No, GUID tail -00000028 (the cancelled voucher rows 2162-B2C, 2162-KC, 2162-SC and 2162-S5 also read). The sheet: "One row or more: stop before step 3." stop here, before step 3. Nothing keyed after BK; nothing written. Tally left at the Gateway with the book loaded; no restore (C8: only on the run lead's word).
+stop recorded 00:07:18Z
+m2 M (the run lead's word, after the stop): byte-equal to s1 (68/245, 8a0c4268...) 00:08:04Z
+c10 shut: K: Company label, Shut, BRIDGE PILOT LAB alone, Enter, no prompt; Select Company, no company loaded 00:08:26Z
+2026-11-10T00:08:26.581Z c10 step 0: capture 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951; a. tasklist exit 0, 1 tally.exe line(s), PID 18740; b. netstat exit 0, 9001 LISTENING PIDs ['18740'], other LISTENING lines 35; c. GET /status curl 0 "200 51"; ok True
+quit: Q: Quit clicked at Select Company, no prompt; tasklist shows no tally.exe 00:08:44Z
+bk folder before BK: C:/lab/2464-gr/backup-1 made new, ls -A count 0 at 00:02:26Z (printed by the tool, not kept as a file)

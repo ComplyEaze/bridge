@@ -14,6 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_core::ExactDecimal;
 
+use super::failure_code::{FailureCode, GstByLedgerCode, ReadCode};
 use super::*;
 
 const INDIRECT_EXPENSES: &str = "Indirect Expenses";
@@ -107,18 +108,18 @@ struct HeadTotals(BTreeMap<String, ExactDecimal>);
 impl HeadTotals {
     /// Every total starts from zero, so one amount and a sum print alike, in the canonical form
     /// the voucher summaries print (`-3600`, not `-3600.00`).
-    fn add(&mut self, head: &str, amount: &ExactDecimal) -> Result<(), String> {
+    fn add(&mut self, head: &str, amount: &ExactDecimal) -> Result<(), FailureCode> {
         let total = self
             .0
             .get(head)
             .unwrap_or(&ExactDecimal::zero())
             .checked_add(amount)
-            .map_err(|_| "voucher_amount_invalid".to_string())?;
+            .map_err(|_| ReadCode::VoucherAmountInvalid)?;
         self.0.insert(head.to_string(), total);
         Ok(())
     }
 
-    fn absorb(&mut self, other: &Self) -> Result<(), String> {
+    fn absorb(&mut self, other: &Self) -> Result<(), FailureCode> {
         other
             .0
             .iter()
@@ -161,7 +162,7 @@ fn flagged(row: &Value, key: &str) -> bool {
 
 /// Decide one voucher. A ledger the masters do not list refuses the whole read, as in the
 /// registers.
-fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
+fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, FailureCode> {
     if ["cancelled", "optional", "post_dated"]
         .iter()
         .any(|key| flagged(row, key))
@@ -171,7 +172,7 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
     let entries = row
         .get("amounts")
         .and_then(Value::as_array)
-        .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+        .ok_or(ReadCode::ReadProtocolInvalid)?;
     let (mut debit, mut credit) = (HeadTotals::default(), HeadTotals::default());
     let mut found = BTreeSet::new();
     let mut counters = BTreeSet::new();
@@ -181,21 +182,21 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
         let name = entry
             .get("ledger")
             .and_then(Value::as_str)
-            .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+            .ok_or(ReadCode::ReadProtocolInvalid)?;
         let amount = ExactDecimal::parse(
             entry
                 .get("amount")
                 .and_then(Value::as_str)
-                .ok_or_else(|| "voucher_amount_invalid".to_string())?,
+                .ok_or(ReadCode::VoucherAmountInvalid)?,
         )
-        .map_err(|_| "voucher_amount_invalid".to_string())?;
+        .map_err(|_| ReadCode::VoucherAmountInvalid)?;
         balance = balance
             .checked_add(&amount)
-            .map_err(|_| "voucher_amount_invalid".to_string())?;
+            .map_err(|_| ReadCode::VoucherAmountInvalid)?;
         let ledger = index
             .by_name
             .get(name)
-            .ok_or_else(|| "ledger_snapshot_drifted".to_string())?;
+            .ok_or(ReadCode::LedgerSnapshotDrifted)?;
         match (ledger.group, &ledger.head) {
             (LedgerGroup::DutiesAndTaxes, GstDutyHeadObservation::Recognized { head, .. }) => {
                 any_gst = true;
@@ -211,7 +212,7 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
                 let head = serde_json::to_value(head)
                     .ok()
                     .and_then(|value| value.as_str().map(str::to_string))
-                    .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+                    .ok_or(ReadCode::ReadProtocolInvalid)?;
                 let side = if is_debit { &mut debit } else { &mut credit };
                 side.add(&head, &amount)?;
             }
@@ -291,9 +292,7 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
             credit,
         },
         None => Disposition::Attributed {
-            ledger: counters
-                .pop_first()
-                .ok_or_else(|| "agent_read_protocol_invalid".to_string())?,
+            ledger: counters.pop_first().ok_or(ReadCode::ReadProtocolInvalid)?,
             debit,
             credit,
         },
@@ -373,7 +372,7 @@ fn invoice_figures(
     ledger: &str,
     debit: &HeadTotals,
     credit: &HeadTotals,
-) -> Result<InvoiceFigures, String> {
+) -> Result<InvoiceFigures, FailureCode> {
     let mut taxable = ExactDecimal::zero();
     let entries = row.get("amounts").and_then(Value::as_array);
     for entry in entries.into_iter().flatten() {
@@ -385,10 +384,10 @@ fn invoice_figures(
             .get("amount")
             .and_then(Value::as_str)
             .and_then(|amount| ExactDecimal::parse(amount.to_string()).ok())
-            .ok_or_else(|| "voucher_amount_invalid".to_string())?;
+            .ok_or(ReadCode::VoucherAmountInvalid)?;
         taxable = taxable
             .checked_add(&amount)
-            .map_err(|_| "voucher_amount_invalid".to_string())?;
+            .map_err(|_| ReadCode::VoucherAmountInvalid)?;
     }
     Ok(InvoiceFigures {
         taxable,
@@ -410,7 +409,7 @@ fn settle_repeated_bills(
     index: &MasterIndex,
     rows: &[Value],
     dispositions: &mut [Disposition],
-) -> Result<Vec<Value>, String> {
+) -> Result<Vec<Value>, FailureCode> {
     let mut purchases = Vec::with_capacity(rows.len());
     for (row, disposition) in rows.iter().zip(dispositions.iter()) {
         let purchase = match disposition {
@@ -491,7 +490,7 @@ struct GstByLedger {
     agst_ref_purchases: Vec<Value>,
 }
 
-fn fold(index: &MasterIndex, rows: &[Value]) -> Result<GstByLedger, String> {
+fn fold(index: &MasterIndex, rows: &[Value]) -> Result<GstByLedger, FailureCode> {
     let mut dispositions = rows
         .iter()
         .map(|row| dispose(index, row))
@@ -545,13 +544,13 @@ impl CompleteWindow {
     /// A window whose label is `complete`, every row dated inside it, and no voucher withheld:
     /// a withheld voucher's tax could not be read, so totals without it would be short (#683).
     /// A withheld voucher's date is checked with the rest, before it refuses (#674).
-    fn admit(window: RegisterWindow, (from, to): (&str, &str)) -> Result<Self, String> {
+    fn admit(window: RegisterWindow, (from, to): (&str, &str)) -> Result<Self, ToolFailure> {
         if window.state != "complete" {
-            return Err("gst_by_ledger_window_partial".to_string());
+            return Err(GstByLedgerCode::WindowPartial.into());
         }
         let rows = validate_then_filter_voucher_rows(window.rows, from, to, None)?;
         if rows.iter().any(|row| row.get(WITHHELD_MARKER).is_some()) {
-            return Err("gst_by_ledger_window_partial".to_string());
+            return Err(GstByLedgerCode::WindowPartial.into());
         }
         Ok(Self {
             index: window.index,
@@ -632,7 +631,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         if from > to {
-            return Err("invalid_date_range".to_string().into());
+            return Err(ReadCode::InvalidDateRange.into());
         }
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {

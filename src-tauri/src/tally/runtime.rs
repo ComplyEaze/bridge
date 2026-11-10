@@ -1316,6 +1316,81 @@ impl ClassifiedCompanyCurrencyRead {
 #[error("{0}")]
 pub(crate) struct CurrencyAdmissionRefusal(pub(crate) &'static str);
 
+/// Whether an opening read admits a book with several Currency masters (#683).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SeveralCurrencyOpening {
+    /// Refused as `company_several_currency_masters`: every reader but one.
+    Refused,
+    /// Admitted at the book's first day only, for `ledger_movement`.
+    AtFirstDay,
+}
+
+/// Proof that an opening read of a book with several Currency masters was
+/// pinned at the book's first day, through the INR base Tally identifies.
+///
+/// Only from that day does a composite mark every foreign balance; from a later
+/// day a foreign party balance reads as a plain rupee figure that no composite
+/// test sees (TALLY_PROTOCOL_REFERENCE §8.2n). So [`Self::at`] builds none for a
+/// later date, and nothing that sets ledgers aside by currency is reachable
+/// without one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SeveralCurrencyFirstDay {
+    /// The ledgers whose opening at that day is a currency composite (rule 3).
+    composite_openings: std::collections::BTreeSet<String>,
+}
+
+impl SeveralCurrencyFirstDay {
+    /// Built only after Tally identified an INR base among the masters, and
+    /// only when `from` is the book's first day.
+    fn at(
+        books_from: &TallyDate,
+        from: &TallyDate,
+        _base: &IdentifiedBaseCurrency,
+    ) -> Option<Self> {
+        (books_from == from).then(|| Self {
+            composite_openings: std::collections::BTreeSet::new(),
+        })
+    }
+
+    /// A first-day admission with the given rule-3 set, for the movement's
+    /// tests, which classify captured answers without a runtime read.
+    #[cfg(test)]
+    pub(crate) fn for_tests(composite_openings: std::collections::BTreeSet<String>) -> Self {
+        Self { composite_openings }
+    }
+
+    /// The ledgers whose opening export gave a composite at the first day.
+    pub(crate) fn composite_openings(&self) -> &std::collections::BTreeSet<String> {
+        &self.composite_openings
+    }
+}
+
+/// Rule 3 (#683): the ledgers whose opening is a currency composite, judged by
+/// the classifier `trial_balance` uses.
+fn composite_opening_names(ledgers: &[TallyLedger]) -> std::collections::BTreeSet<String> {
+    ledgers
+        .iter()
+        .filter(|ledger| {
+            ledger
+                .opening_balance
+                .as_deref()
+                .is_some_and(bridge_tally_protocol::currency_composite::is_balance_composite)
+        })
+        .map(|ledger| ledger.name.clone())
+        .collect()
+}
+
+/// `ledger_movement`'s opening read: the ledgers, the extent they were read
+/// under, and, for a book with several Currency masters, its first-day
+/// admission (#683).
+#[derive(Debug)]
+pub(crate) struct MovementLedgerOpening {
+    pub(crate) ledgers: Vec<TallyLedger>,
+    pub(crate) extent: CompanyBookExtent,
+    pub(crate) several_currency: Option<SeveralCurrencyFirstDay>,
+    pub(crate) evidence: RuntimeReadEvidence,
+}
+
 /// One BOOKSFROM-pinned ledger export and the book extent it was read under:
 /// the opening and closing extents were equal, or the read refused.
 #[derive(Debug)]
@@ -1332,6 +1407,7 @@ pub(crate) struct LedgerListing {
 struct LedgerOpeningRead {
     listing: LedgerListing,
     groups: Option<Vec<bridge_tally_protocol::TallyNamedMaster>>,
+    several_currency: Option<SeveralCurrencyFirstDay>,
 }
 
 /// The compliance ledger records, the group collection read with them, the
@@ -2103,11 +2179,32 @@ pub(crate) enum NativeLedgerIdentityAdmissionError {
     InvalidMasterId,
 }
 
+#[cfg(test)]
 fn admit_native_ledger_opening_rows(
     xml: &str,
     company_guid: &str,
 ) -> anyhow::Result<Vec<TallyLedger>> {
-    let parsed = parse_native_ledger_source_records_with_evidence(xml, company_guid)?;
+    admit_native_ledger_opening_rows_as(xml, company_guid, SeveralCurrencyOpening::Refused)
+}
+
+fn admit_native_ledger_opening_rows_as(
+    xml: &str,
+    company_guid: &str,
+    several_currency: SeveralCurrencyOpening,
+) -> anyhow::Result<Vec<TallyLedger>> {
+    let parsed = match several_currency {
+        SeveralCurrencyOpening::Refused => {
+            parse_native_ledger_source_records_with_evidence(xml, company_guid)?
+        }
+        // A composite opening is kept as text, to set its ledger aside by name
+        // (§8.2n); any other value that is not a decimal still refuses.
+        SeveralCurrencyOpening::AtFirstDay => {
+            bridge_tally_protocol::parse_native_ledger_source_records_keeping_composite_openings(
+                xml,
+                company_guid,
+            )?
+        }
+    };
     if !parsed.evidence.duplicate_identities.is_empty() {
         return Err(NativeLedgerIdentityAdmissionError::Duplicate.into());
     }
@@ -3041,6 +3138,7 @@ impl TallyRuntime {
             identity,
             None,
             false,
+            SeveralCurrencyOpening::Refused,
             // Sent once, as the movement catalogue is: a catalogue that outlived
             // its deadline is abandoned, and sending it again queues more work
             // behind a gateway still building the response (#485, #937).
@@ -3066,6 +3164,7 @@ impl TallyRuntime {
                 identity,
                 None,
                 true,
+                SeveralCurrencyOpening::Refused,
                 // Sent once, as above (#485, #937).
                 ReadRetryPolicy::SINGLE_ATTEMPT,
             )
@@ -3096,6 +3195,7 @@ impl TallyRuntime {
             identity,
             Some(from),
             false,
+            SeveralCurrencyOpening::Refused,
             // Sent once. A catalogue that outlived its deadline is abandoned, and
             // sending it again queues more work behind a gateway still building
             // the response: agent voucher reads take the same rule (#485, #937).
@@ -3105,12 +3205,43 @@ impl TallyRuntime {
         .map(|read| (read.listing.ledgers, read.listing.evidence))
     }
 
+    /// `ledger_movement`'s opening read at `from`. As
+    /// [`Self::fetch_ledger_opening_at_with_evidence`], except that a book with
+    /// several Currency masters is admitted when `from` is the book's first
+    /// day and Tally identifies an INR base among them (#683, §8.2n). A later
+    /// `from` still refuses as `company_several_currency_masters`, before any
+    /// ledger request.
+    pub(crate) async fn fetch_movement_ledger_opening_at(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        from: TallyDate,
+    ) -> anyhow::Result<MovementLedgerOpening> {
+        self.fetch_ledger_opening_with_evidence(
+            config,
+            identity,
+            Some(from),
+            false,
+            SeveralCurrencyOpening::AtFirstDay,
+            // Sent once, as above (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
+        )
+        .await
+        .map(|read| MovementLedgerOpening {
+            ledgers: read.listing.ledgers,
+            extent: read.listing.extent,
+            several_currency: read.several_currency,
+            evidence: read.listing.evidence,
+        })
+    }
+
     async fn fetch_ledger_opening_with_evidence(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         opening_date: Option<TallyDate>,
         read_groups: bool,
+        several_currency: SeveralCurrencyOpening,
         retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -3156,11 +3287,49 @@ impl TallyRuntime {
                             (1, true) => None,
                             (0, _) => Some("company_currency_probe_failed"),
                             (1, false) => Some("company_base_currency_not_inr"),
+                            // Several masters: admitted for the movement read at
+                            // the book's first day only (#683, §8.2n), checked
+                            // before anything more is sent.
+                            _ if several_currency == SeveralCurrencyOpening::AtFirstDay
+                                && opening_date.as_ref() == Some(opening_extent.books_from()) =>
+                            {
+                                None
+                            }
                             _ => Some("company_several_currency_masters"),
                         };
                         if let Some(code) = refusal {
                             return Err(anyhow::Error::new(CurrencyAdmissionRefusal(code)));
                         }
+                        let mut first_day = if currency.currency_count > 1 {
+                            let masters = parse_currency_master_list(&body)?;
+                            let identified = identify_base_among_several(
+                                &client,
+                                &identity,
+                                &mut evidence,
+                                masters,
+                            )
+                            .await?
+                            .ok_or(CurrencyAdmissionRefusal(
+                                "company_base_currency_undetermined",
+                            ))?;
+                            if !identified.is_inr() {
+                                return Err(anyhow::Error::new(CurrencyAdmissionRefusal(
+                                    "company_base_currency_not_inr",
+                                )));
+                            }
+                            let first_day = opening_date.as_ref().and_then(|from| {
+                                SeveralCurrencyFirstDay::at(
+                                    opening_extent.books_from(),
+                                    from,
+                                    &identified,
+                                )
+                            });
+                            Some(first_day.ok_or(CurrencyAdmissionRefusal(
+                                "company_several_currency_masters",
+                            ))?)
+                        } else {
+                            None
+                        };
                         let period = ledger_opening_period(
                             boundary_profile,
                             opening_extent.books_from(),
@@ -3178,8 +3347,20 @@ impl TallyRuntime {
                             encoded_sha256,
                             encoded_bytes,
                         ));
-                        let ledgers =
-                            admit_native_ledger_opening_rows(&body, identity.company_guid())?;
+                        let ledgers = admit_native_ledger_opening_rows_as(
+                            &body,
+                            identity.company_guid(),
+                            if first_day.is_some() {
+                                SeveralCurrencyOpening::AtFirstDay
+                            } else {
+                                SeveralCurrencyOpening::Refused
+                            },
+                        )?;
+                        // Rule 3 (#683): a composite opening sets its ledger
+                        // aside; the parse kept no other non-decimal.
+                        if let Some(first_day) = first_day.as_mut() {
+                            first_day.composite_openings = composite_opening_names(&ledgers);
+                        }
                         let groups = if read_groups {
                             let request =
                                 render_native_group_snapshot_request(identity.display_name());
@@ -3213,6 +3394,7 @@ impl TallyRuntime {
                                 evidence: evidence.clone(),
                             },
                             groups,
+                            several_currency: first_day,
                         })
                     }
                     .await;

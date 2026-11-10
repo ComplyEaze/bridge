@@ -148,6 +148,26 @@ pub(super) fn parse_agent_changed_rows(
     parse_agent_rows_with_accounting_state(xml, true, company_guid)
 }
 
+/// [`parse_agent_changed_rows`] under [`CompositePolicy::NameLedger`]: an entry
+/// whose amount is a currency composite carries `"currency_composite": true`
+/// and its amount as Tally sent it, which no caller may sum. Only
+/// `ledger_movement`'s first-day read of a several-currency book parses this
+/// way (#683).
+pub(super) fn parse_agent_changed_rows_naming_composite_ledgers(
+    xml: &str,
+    company_guid: &str,
+) -> Result<Vec<Value>, String> {
+    refused_composites(parse_voucher_rows(
+        xml,
+        true,
+        false,
+        company_guid,
+        CompositePolicy::NameLedger,
+        GstDetailsShown::Withheld,
+        (NamedVoucherFields::NOT_ASKED, StockLines::NotAsked),
+    )?)
+}
+
 /// Changed rows plus `effective_date`, which only import verification reads.
 /// The public voucher tools do not fetch it and their rows do not carry it.
 pub(super) fn parse_import_verification_rows(
@@ -583,12 +603,30 @@ enum CompositePolicy {
     Refuse,
     /// A Tally composite withholds its voucher; anything else still fails.
     Withhold,
+    /// `ledger_movement` on a several-currency book at its first day (#683): a
+    /// composite entry is kept with no figure and marked, so its ledger is set
+    /// aside by name. The movement's window answers each bill allocation
+    /// amount-only, as its fetch names no allocation field (§8.2n), and an
+    /// amount-only allocation is a placeholder, skipped under every policy. One
+    /// with a `BILLTYPE` and a composite amount, which that window has not been
+    /// seen to send, still fails it. Anything else still fails.
+    NameLedger,
 }
 
 impl CompositePolicy {
     fn withholds(self, amount: &str) -> bool {
-        self == Self::Withhold && is_balance_composite(amount) && composite_signs_agree(amount)
+        self == Self::Withhold && is_currency_composite(amount)
     }
+
+    fn names_ledger(self, amount: &str) -> bool {
+        self == Self::NameLedger && is_currency_composite(amount)
+    }
+}
+
+/// A composite as a voucher amount carries it: the shared classifier, with one
+/// sign on both amounts.
+fn is_currency_composite(amount: &str) -> bool {
+    is_balance_composite(amount) && composite_signs_agree(amount)
 }
 
 /// A voucher with an amount Tally stored as a composite, read with the base amount as `amount`
@@ -1149,6 +1187,7 @@ fn parse_voucher_rows(
                             .get("AMOUNT")
                             .filter(|value| !value.trim().is_empty())
                             .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+                        let mut entry_composite = false;
                         let parsed_amount =
                             match bridge_tally_core::ExactDecimal::parse(amount.clone()) {
                                 Ok(parsed) => Some(parsed),
@@ -1156,8 +1195,13 @@ fn parse_voucher_rows(
                                     withheld = true;
                                     None
                                 }
+                                Err(_) if composites.names_ledger(amount) => {
+                                    entry_composite = true;
+                                    None
+                                }
                                 Err(_) => return Err("voucher_amount_invalid".to_string()),
                             };
+
                         let polarity = entry_row
                             .get("ISDEEMEDPOSITIVE")
                             .filter(|value| !value.trim().is_empty())
@@ -1226,6 +1270,9 @@ fn parse_voucher_rows(
                             !tally_entry_polarity_agrees(parsed, is_deemed_positive)
                         }) {
                             parsed_entry["polarity_disagrees_with_amount"] = Value::Bool(true);
+                        }
+                        if entry_composite {
+                            parsed_entry["currency_composite"] = Value::Bool(true);
                         }
                         entries.push(parsed_entry);
                     }

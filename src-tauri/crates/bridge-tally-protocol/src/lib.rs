@@ -80,6 +80,7 @@ pub use import_outcome::{
     MAX_TALLY_LINE_ERROR_BYTES, MAX_TALLY_LINE_ERROR_CHARS,
 };
 pub use native_ledger_collection::{
+    parse_native_ledger_source_records_keeping_composite_openings,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_leaving_unparsed,
     parse_native_party_ledger_master_records_with_evidence,

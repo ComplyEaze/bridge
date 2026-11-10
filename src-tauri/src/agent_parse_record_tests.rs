@@ -24,9 +24,10 @@ use chrono::NaiveDate;
 use sha2::{Digest, Sha256};
 
 use super::{
-    parse_agent_rows, parse_agent_rows_withholding, parse_all_company_marks,
-    parse_company_high_water, parse_company_marks, parse_company_marks_as_answered,
-    parse_import_verification_rows, parse_voucher_census, AlterIdSpan,
+    parse_agent_changed_rows, parse_agent_changed_rows_naming_composite_ledgers, parse_agent_rows,
+    parse_agent_rows_withholding, parse_all_company_marks, parse_company_high_water,
+    parse_company_marks, parse_company_marks_as_answered, parse_import_verification_rows,
+    parse_voucher_census, AlterIdSpan,
 };
 use crate::source_draft_xml::parse_source_xml;
 
@@ -950,6 +951,33 @@ fn rows() -> Vec<Row> {
         "agent/vouchers-forex-unspaced-20250401.utf16le.xml",
         "parse_agent_rows_withholding(FX_72_LAB)",
         |_, t| withholding(t, FX_72_LAB)
+    ));
+    // `ledger_movement` from a several-currency book's first day (#683): its window answers, read
+    // by the change feed's parse (which refuses a composite) and by the movement's own, which names
+    // each composite entry's ledger (`agent_movement_currency_tests.rs`).
+    rows.push(row!(
+        "agent/movement-forexgroup-book-20250401.utf16le.xml",
+        "parse_agent_changed_rows(FX_72_LAB)",
+        |_, t| coded(parse_agent_changed_rows(t, FX_72_LAB))
+    ));
+    rows.push(row!(
+        "agent/movement-forexgroup-book-20250401.utf16le.xml",
+        "parse_agent_changed_rows_naming_composite_ledgers(FX_72_LAB)",
+        |_, t| coded(parse_agent_changed_rows_naming_composite_ledgers(
+            t, FX_72_LAB
+        ))
+    ));
+    rows.push(row!(
+        "agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+        "parse_agent_changed_rows(FX_72_LAB)",
+        |_, t| coded(parse_agent_changed_rows(t, FX_72_LAB))
+    ));
+    rows.push(row!(
+        "agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+        "parse_agent_changed_rows_naming_composite_ledgers(FX_72_LAB)",
+        |_, t| coded(parse_agent_changed_rows_naming_composite_ledgers(
+            t, FX_72_LAB
+        ))
     ));
     // A synthetic voucher-import file, read as bytes (`source_draft_xml_tests.rs`).
     rows.push(Row {

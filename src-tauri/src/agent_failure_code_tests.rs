@@ -60,3 +60,37 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
         assert!(seen.insert(text), "{text} is declared twice");
     }
 }
+
+/// `MovementCurrencyCode`'s strings, written out as `GST_UNCERTAIN`'s are.
+const MOVEMENT_CURRENCY: &[(MovementCurrencyCode, &str)] = &[
+    (MovementCurrencyCode::InvalidDateRange, "invalid_date_range"),
+    (
+        MovementCurrencyCode::SnapshotDrifted,
+        "ledger_snapshot_drifted",
+    ),
+    (
+        MovementCurrencyCode::ScopeUnmatched,
+        "ledger_currency_scope_unmatched",
+    ),
+    (
+        MovementCurrencyCode::ScopeInconclusive,
+        "ledger_currency_scope_inconclusive",
+    ),
+    (MovementCurrencyCode::SetAside, "ledger_currency_set_aside"),
+];
+
+/// The movement's currency codes: one pin each, in declaration order, each the string its site
+/// wrote, as a variant, a [`FailureCode`] and a tool failure, with no string declared twice.
+#[test]
+fn each_movement_currency_code_is_pinned_once_and_is_its_string() {
+    let pinned: Vec<MovementCurrencyCode> =
+        MOVEMENT_CURRENCY.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, MovementCurrencyCode::ALL);
+    let mut seen = std::collections::BTreeSet::new();
+    for (code, string) in MOVEMENT_CURRENCY {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!(seen.insert(*string), "{string} is declared twice");
+    }
+}

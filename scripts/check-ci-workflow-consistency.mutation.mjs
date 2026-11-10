@@ -518,6 +518,15 @@ for (const [name, mutate, message] of [
   ["the fetch step skipped (if: false)", (text) => text.replace("      - name: Fetch the locked crates, retrying a network failure\n", "      - name: Fetch the locked crates, retrying a network failure\n        if: false\n"), FETCH_BODY_MESSAGE],
   ["the fetch step run in sh", (text) => text.replace("      - name: Fetch the locked crates, retrying a network failure\n", "      - name: Fetch the locked crates, retrying a network failure\n        shell: sh\n"), FETCH_BODY_MESSAGE],
   ["the mutation step made to run after a fetch failure (if: always())", (text) => text.replace("      - name: Run this shard's mutations\n", "      - name: Run this shard's mutations\n        if: always()\n"), FETCH_BODY_MESSAGE],
+  ["the per-attempt time bound removed", (text) => text.replace("timeout --kill-after=30s \"$fetch_timeout\" cargo fetch", "cargo fetch"), FETCH_BODY_MESSAGE],
+  ["the per-attempt time bound raised to six hours", (text) => text.replace("${FETCH_TIMEOUT:-15m}", "${FETCH_TIMEOUT:-6h}"), FETCH_BODY_MESSAGE],
+  ["the per-attempt time bound set again after the pin", (text) => text.replace("          attempt=1\n          while true", "          fetch_timeout=6h\n          attempt=1\n          while true"), FETCH_BODY_MESSAGE],
+  ["the time bound set by the step's environment", (text) => text.replace("        env:\n          SHARD: ${{ matrix.shard }}\n        run: |\n          set +e\n          attempts=3", "        env:\n          SHARD: ${{ matrix.shard }}\n          FETCH_TIMEOUT: 6h\n        run: |\n          set +e\n          attempts=3"), FETCH_BODY_MESSAGE],
+  ["the unknown-failure default changed", (text) => text.replace("            kind=other\n", "            kind=network\n"), FETCH_BODY_MESSAGE],
+  ["a timed-out attempt no longer read as a timeout", (text) => text.replace("if [ \"$rc\" -eq 124 ] || [ \"$rc\" -eq 137 ]; then", "if false; then"), FETCH_BODY_MESSAGE],
+  ["the missing-crate check removed", (text) => text.replace("elif grep -Eq 'successful HTTP response from .* got (404|410)([^0-9]|$)|no matching package named' \"$log\"; then", "elif false; then"), FETCH_BODY_MESSAGE],
+  ["the missing-crate check widened to every 4xx", (text) => text.replace("got (404|410)([^0-9]|$)", "got 4[0-9][0-9]([^0-9]|$)"), FETCH_BODY_MESSAGE],
+  ["a missing crate retried (its break removed)", (text) => text.replace("a permanent answer), not retrying\"\n              break\n", "a permanent answer), not retrying\"\n"), FETCH_BODY_MESSAGE],
   ["the fetch failure ignored (continue-on-error)", (text) => text.replace("      - name: Fetch the locked crates, retrying a network failure\n", "      - name: Fetch the locked crates, retrying a network failure\n        continue-on-error: true\n"), FETCH_BODY_MESSAGE],
 ]) {
   test(`nightly shard fetch: ${name} is refused`, () => {

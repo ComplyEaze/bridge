@@ -207,18 +207,27 @@ if (shardSteps.filter((step) => step.name === FETCH_STEP).length !== 1
 } else {
   const fetchText = shardSteps[fetchAt].text;
   const fetchLines = fetchText.split("\n").map((line) => line.trim());
-  if (!fetchLines.includes("cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-unknown-linux-gnu 2>&1 | tee \"$log\"")
+  if (!fetchLines.includes("timeout --kill-after=30s \"$fetch_timeout\" cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-unknown-linux-gnu 2>&1 | tee \"$log\"")
+    || fetchLines.filter((line) => line === "fetch_timeout=\"${FETCH_TIMEOUT:-15m}\"").length !== 1
+    || fetchLines.filter((line) => /^fetch_timeout=/.test(line)).length !== 1
+    || !fetchLines.includes("if [ \"$rc\" -eq 124 ] || [ \"$rc\" -eq 137 ]; then")
+    || !fetchLines.includes("elif grep -Eq 'successful HTTP response from .* got (404|410)([^0-9]|$)|no matching package named' \"$log\"; then")
+    || (nightlyWorkflow.match(/FETCH_TIMEOUT/g) ?? []).length !== 1
+    || fetchLines.filter((line) => line === "kind=other").length !== 1
+    || fetchLines.filter((line) => line === "kind=timeout").length !== 1
+    || fetchLines.filter((line) => line === "kind=missing").length !== 1
+    || !fetchLines.includes("if [ \"$kind\" = missing ]; then")
+    || fetchLines.filter((line) => /^break$/.test(line)).length !== 3
     || fetchLines.filter((line) => line === "attempts=3").length !== 1
     || fetchLines.filter((line) => /^attempts=/.test(line)).length !== 1
     || !fetchLines.includes("if [ \"$attempt\" -ge \"$attempts\" ]; then")
     || fetchLines.filter((line) => line === "attempt=1").length !== 1
-    || fetchLines.filter((line) => line === "break").length !== 2
     || fetchLines.filter((line) => line === "attempt=$((attempt + 1))").length !== 1
     || !fetchLines.some((line) => line.startsWith("node -e 'const fs = require(\"fs\");") && line.includes("fs.writeFileSync(process.argv[2], JSON.stringify({ refused: { shard: process.argv[3] + \"/8\""))
     || fetchLines.at(-1) !== "exit 1"
     || /^ {8}(if|shell|continue-on-error|working-directory):/m.test(fetchText)
     || /^ {8}(if|continue-on-error):/m.test(shardSteps.find((step) => step.name === MUTATION_STEP)?.text ?? "")) {
-    failures.push(`the "${FETCH_STEP}" step must run "cargo fetch --locked" for the shard's target, start at attempt 1, make at most three attempts (attempts=3, the attempt-bound test and its two breaks), write the typed refusal, end in exit 1, and set none of if, shell, continue-on-error or working-directory; the "${MUTATION_STEP}" step must set neither if nor continue-on-error`);
+    failures.push(`the "${FETCH_STEP}" step must run "cargo fetch --locked" for the shard's target, start at attempt 1, make at most three attempts (attempts=3, the attempt-bound test and its three breaks), cut each attempt off after the pinned bound (FETCH_TIMEOUT named once in the workflow, so no step, job or workflow environment sets it; timeout, exit 124 and 137 read as a timeout that is retried), end at once on a missing crate (404 or 410), write the typed refusal, end in exit 1, and set none of if, shell, continue-on-error or working-directory; the "${MUTATION_STEP}" step must set neither if nor continue-on-error`);
   }
 }
 const reportBlock = jobBlock(nightlyWorkflow, "report");

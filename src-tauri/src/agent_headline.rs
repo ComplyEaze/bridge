@@ -82,10 +82,18 @@ pub(super) enum Gap {
     /// how many ledgers were set aside, in each of the two ways. Even with
     /// none set aside this is partial: the tool's own scope
     /// (`ledgers_scope: base_currency_ledgers_only`) and its first limitation
-    /// say so, and the headline agrees with them and says that nothing was
-    /// left out, rather than calling a different scope whole.
+    /// say so, and the headline agrees with them rather than calling a
+    /// different scope whole. It never says that no ledger was left out:
+    /// which ledgers are set aside rests on what Tally marked in this one
+    /// answer, and the lab has read the same request on the same book with
+    /// six, two and no ledgers marked (#2481), so the lead says
+    /// [`MARKS_DECIDE_SCOPE`] once after the counts, whatever they are.
     BaseCurrencyLedgersOnly { foreign: usize, mixed: usize },
 }
+
+/// What the set-aside of a several-currency book rests on (#2481): Tally's
+/// marks in this answer, not the ledger's vouchers.
+const MARKS_DECIDE_SCOPE: &str = "Which ledgers are base-currency rests on what Tally marked in this answer: a ledger is set aside only when the answer names another currency for it or shows one of its values in another currency, and one sent with base-currency figures alone is not checked against its vouchers.";
 
 impl Gap {
     /// What is partial, in a few words, and what it costs the reader.
@@ -94,7 +102,7 @@ impl Gap {
             Self::BaseCurrencyLedgersOnly {
                 foreign: 0,
                 mixed: 0,
-            } => "base-currency ledgers only, and no ledger was left out".to_string(),
+            } => "base-currency ledgers only, as Tally marked them in this answer".to_string(),
             Self::BaseCurrencyLedgersOnly { .. } => {
                 "base-currency ledgers only, so debit and credit totals are not expected to match"
                     .to_string()
@@ -102,11 +110,20 @@ impl Gap {
         }
     }
 
+    /// Whether what this gap sets aside rests on Tally's marks in the answer,
+    /// so the lead says [`MARKS_DECIDE_SCOPE`]. Every gap answers this, so a
+    /// new kind of gap decides it rather than inheriting it.
+    fn rests_on_marks(&self) -> bool {
+        match self {
+            Self::BaseCurrencyLedgersOnly { .. } => true,
+        }
+    }
+
     /// The counts behind it.
     fn detail(&self) -> String {
         match self {
             Self::BaseCurrencyLedgersOnly { foreign: 0, mixed: 0 } => {
-                "The book has several currency masters, so only its base-currency ledgers were read."
+                "The book has several currency masters, so only its base-currency ledgers were read, and none was set aside."
                     .to_string()
             }
             Self::BaseCurrencyLedgersOnly { foreign, mixed } => format!(
@@ -281,7 +298,12 @@ impl TrialBalanceBasis {
             let gaps = &self.completeness.gaps;
             let short = gaps.iter().map(Gap::short).collect::<Vec<_>>().join("; ");
             let detail = gaps.iter().map(Gap::detail).collect::<Vec<_>>().join(" ");
-            format!("Partial {subject}: {short}. {detail}")
+            let marks = if gaps.iter().any(Gap::rests_on_marks) {
+                format!(" {MARKS_DECIDE_SCOPE}")
+            } else {
+                String::new()
+            };
+            format!("Partial {subject}: {short}. {detail}{marks}")
         };
         if self.movements_differ > 0 {
             let count = self.movements_differ;

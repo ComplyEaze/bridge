@@ -1,0 +1,217 @@
+// SPDX-License-Identifier: Apache-2.0
+
+import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { FORBIDDEN_IMPORTS, PeReadError, checkStaticRuntime, main, readPeImports } from "./check-static-runtime.mjs";
+
+// Two real executables, 2,560 bytes each, written by rustc 1.96.0 and rust-lld for
+// x86_64-pc-windows-msvc from a no_std source whose only import is ExitProcess from kernel32
+// (declared raw-dylib). NO_RUNTIME is that; WITH_RUNTIME adds one raw-dylib import of
+// __CxxFrameHandler3 from VCRUNTIME140. Their import tables were read with llvm-objdump -p
+// and equal what readPeImports returns (kernel32.dll; kernel32.dll and VCRUNTIME140.dll).
+// Not hand-written bytes: a linker produced them (AGENTS.md, P1). The first run on a real
+// bridge_mcp.exe is the bundle smoke job's.
+const NO_RUNTIME = Buffer.from(
+  "TVp4AAEAAAAEAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAAAAA4fug4AtAnNIbgB" +
+  "TM0hVGhpcyBwcm9ncmFtIGNhbm5vdCBiZSBydW4gaW4gRE9TIG1vZGUuJAAAUEUAAGSGAwBSkPFqAAAAAAAAAADwACIACwIOAAAC" +
+  "AAAABAAAAAAAAAAQAAAAEAAAAAAAQAEAAAAAEAAAAAIAAAYAAAAAAAAABgAAAAAAAAAAQAAAAAQAAAAAAAADAGCBAAAQAAAAAAAA" +
+  "EAAAAAAAAAAAEAAAAAAAABAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAQCAAACgAAAAAAAAAAAAAAAAwAAAMAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAgAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHggAAAQAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAALnRleHQAAAAOAAAAABAAAAACAAAABAAAAAAAAAAAAAAAAAAAIAAAYC5yZGF0YQAArAAAAAAgAAAAAgAAAAYAAAAA" +
+  "AAAAAAAAAAAAAEAAAEAucGRhdGEAAAwAAAAAMAAAAAIAAAAIAAAAAAAAAAAAAAAAAABAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEiD7Cgxyf8VbBAAAA8LzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAAFKQ8WoAAAAAAgAAACIAAAAcIAAAHAYAAFJTRFOJQwkxcVMp" +
+  "bkxMRCBQREIuAQAAAHBsYWluLnBkYgAAAGggAAAAAAAAAAAAAJYgAAB4IAAAAAAAAAAAAAAAAAAAAAAAAAAAAACIIAAAAAAAAAAA" +
+  "AAAAAAAAiCAAAAAAAAAAAAAAAAAAAAAARXhpdFByb2Nlc3MAa2VybmVsMzIuZGxsAAABBAEABEIAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAADhAAAKQgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAA==",
+  "base64",
+);
+const WITH_RUNTIME = Buffer.from(
+  "TVp4AAEAAAAEAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAAAAA4fug4AtAnNIbgB" +
+  "TM0hVGhpcyBwcm9ncmFtIGNhbm5vdCBiZSBydW4gaW4gRE9TIG1vZGUuJAAAUEUAAGSGAwBSkPFqAAAAAAAAAADwACIACwIOAAAC" +
+  "AAAABAAAAAAAAAAQAAAAEAAAAAAAQAEAAAAAEAAAAAIAAAYAAAAAAAAABgAAAAAAAAAAQAAAAAQAAAAAAAADAGCBAAAQAAAAAAAA" +
+  "EAAAAAAAAAAAEAAAAAAAABAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAPCAAADwAAAAAAAAAAAAAAAAwAAAMAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAgAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJggAAAgAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAALnRleHQAAAAUAAAAABAAAAACAAAABAAAAAAAAAAAAAAAAAAAIAAAYC5yZGF0YQAABAEAAAAgAAAAAgAAAAYAAAAA" +
+  "AAAAAAAAAAAAAEAAAEAucGRhdGEAAAwAAAAAMAAAAAIAAAAIAAAAAAAAAAAAAAAAAABAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEiD7Cj/FZ4QAAAxyf8VhhAAAA8LzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM" +
+  "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAAFKQ8WoAAAAAAgAAAB8AAAAcIAAAHAYAAFJTRFPnTJWwMh6c" +
+  "G0xMRCBQREIuAQAAAHZjLnBkYgAAeCAAAAAAAAAAAAAA3CAAAJggAACIIAAAAAAAAAAAAADpIAAAqCAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAuCAAAAAAAAAAAAAAAAAAAMYgAAAAAAAAAAAAAAAAAAC4IAAAAAAAAAAAAAAAAAAAxiAAAAAAAAAAAAAAAAAAAAAARXhp" +
+  "dFByb2Nlc3MAAABfX0N4eEZyYW1lSGFuZGxlcjMAAGtlcm5lbDMyLmRsbABWQ1JVTlRJTUUxNDAuZGxsAAAAAQQBAARCAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAFBAAAPwgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+  "AAAAAAAAAAAAAA==",
+  "base64",
+);
+
+const copy = (bytes) => new Uint8Array(Buffer.from(bytes));
+const file = (name, bytes) => {
+  const path = join(mkdtempSync(join(tmpdir(), "bridge-static-runtime-")), name);
+  writeFileSync(path, bytes);
+  return path;
+};
+const run = (path) => {
+  const lines = [];
+  const code = main([path], (line) => lines.push(line));
+  return { code, text: lines.join("\n") };
+};
+
+// The .rdata section starts at file offset 0x600 and has a 0x200 byte raw area; the patches below
+// write into its unused end.
+const RDATA_FILE_OFFSET = 0x600;
+const RDATA_RVA = 0x2000;
+
+test("a real executable with only kernel32 passes, counted", () => {
+  const result = checkStaticRuntime(copy(NO_RUNTIME));
+  assert.deepEqual(result.names, ["kernel32.dll"]);
+  assert.deepEqual(result.forbidden, []);
+  const out = run(file("no-runtime.exe", NO_RUNTIME));
+  assert.equal(out.code, 0);
+  assert.match(out.text, /1 imported DLLs/);
+  assert.match(out.text, /ok: 0 runtime imports/);
+});
+
+test("a real executable importing VCRUNTIME140 fails with exit 1 and names it", () => {
+  const result = checkStaticRuntime(copy(WITH_RUNTIME));
+  assert.deepEqual(result.names, ["kernel32.dll", "VCRUNTIME140.dll"]);
+  assert.deepEqual(result.forbidden, ["VCRUNTIME140.dll"]);
+  const out = run(file("with-runtime.exe", WITH_RUNTIME));
+  assert.equal(out.code, 1);
+  assert.match(out.text, /FAILED: 1 runtime import\(s\): VCRUNTIME140\.dll/);
+});
+
+test("a runtime named only in the delay-load table fails", () => {
+  const bytes = copy(NO_RUNTIME);
+  const view = new DataView(bytes.buffer);
+  const descriptor = RDATA_FILE_OFFSET + 0x120;
+  const name = RDATA_FILE_OFFSET + 0x160;
+  view.setUint32(descriptor + 4, RDATA_RVA + 0x160, true);
+  bytes.set(Buffer.from("ucrtbase.dll\0"), name);
+  // Data directory 13 (delay import), after the optional header's 112-byte fixed part.
+  const peOffset = view.getUint32(0x3c, true);
+  const directory = peOffset + 24 + 112 + 13 * 8;
+  view.setUint32(directory, RDATA_RVA + 0x120, true);
+  view.setUint32(directory + 4, 64, true);
+  const result = checkStaticRuntime(bytes);
+  assert.deepEqual(readPeImports(bytes).delayImports, ["ucrtbase.dll"]);
+  assert.deepEqual(result.names, ["kernel32.dll", "delay-load:ucrtbase.dll"]);
+  assert.deepEqual(result.forbidden, ["ucrtbase.dll"]);
+});
+
+test("a file that is not understood is exit 2, never a pass", () => {
+  assert.equal(run(file("empty.exe", Buffer.alloc(0))).code, 2);
+  assert.equal(run(file("text.exe", Buffer.from("MZ not really a PE file at all, just text".repeat(4)))).code, 2);
+  assert.equal(run(file("cut.exe", WITH_RUNTIME.subarray(0, 0x300))).code, 2);
+  const missing = join(mkdtempSync(join(tmpdir(), "bridge-static-runtime-")), "absent.exe");
+  const out = run(missing);
+  assert.equal(out.code, 2);
+  assert.match(out.text, /cannot read .*ENOENT/);
+  assert.equal(main([], () => {}), 2);
+  assert.throws(() => readPeImports(new Uint8Array(10)), PeReadError);
+});
+
+test("a file whose headers end early is exit 2 (not a thrown error, not the forbidden-import code)", () => {
+  // MZ, e_lfanew 0x40, the PE signature, and nothing after: SizeOfOptionalHeader is 0.
+  const short = Buffer.alloc(88);
+  short.write("MZ", 0, "latin1");
+  short.writeUInt32LE(0x40, 0x3c);
+  short.writeUInt32LE(0x00004550, 0x40);
+  const out = run(file("short.exe", short));
+  assert.equal(out.code, 2);
+  assert.match(out.text, /was not understood/);
+  // The same with a claimed optional header that runs past the end of the file.
+  const claimed = Buffer.from(short);
+  claimed.writeUInt16LE(240, 0x40 + 20);
+  assert.equal(run(file("claimed.exe", claimed)).code, 2);
+  // And an import name whose RVA falls in the memory-only part of its section is refused.
+  const bytes = copy(NO_RUNTIME);
+  const view = new DataView(bytes.buffer);
+  const peOffset = view.getUint32(0x3c, true);
+  const directory = peOffset + 24 + 112 + 1 * 8;
+  const descriptor = view.getUint32(directory, true);
+  const at = RDATA_FILE_OFFSET + (descriptor - RDATA_RVA);
+  view.setUint32(at + 12, RDATA_RVA + 0x200, true);
+  assert.throws(() => checkStaticRuntime(bytes), PeReadError);
+});
+
+test("an import table without kernel32 is unreadable, not clean", () => {
+  const bytes = copy(WITH_RUNTIME);
+  const at = Buffer.from(bytes).indexOf("kernel32.dll");
+  assert.ok(at > 0);
+  bytes.set(Buffer.from("kernelxx.dll"), at);
+  assert.throws(() => checkStaticRuntime(bytes), /no kernel32\.dll/);
+  assert.equal(run(file("renamed.exe", Buffer.from(bytes))).code, 2);
+});
+
+test("the 0.7.0 bridge_mcp.exe import list has exactly twelve runtime names", () => {
+  // The 22 names the lab read from the published 0.7.0 file (recorded run, #2390).
+  const published = [
+    "advapi32.dll", "api-ms-win-core-synch-l1-2-0.dll",
+    ...["convert", "environment", "filesystem", "heap", "locale", "math", "runtime", "stdio", "string", "time", "utility"].map(
+      (part) => `api-ms-win-crt-${part}-l1-1-0.dll`,
+    ),
+    "bcryptprimitives.dll", "combase.dll", "CRYPT32.dll", "kernel32.dll", "ntdll.dll", "shell32.dll", "user32.dll",
+    "VCRUNTIME140.dll", "WS2_32.dll",
+  ];
+  assert.equal(published.length, 22);
+  const forbidden = published.filter((name) => FORBIDDEN_IMPORTS.some((pattern) => pattern.test(name.toLowerCase())));
+  assert.equal(forbidden.length, 12);
+  assert.ok(forbidden.includes("VCRUNTIME140.dll"));
+  assert.equal(forbidden.filter((name) => name.startsWith("api-ms-win-crt-")).length, 11);
+});
+
+test("the other runtime families are refused and ordinary system DLLs are not", () => {
+  for (const name of ["VCRUNTIME140_1.dll", "MSVCP140.dll", "msvcr100.dll", "CONCRT140.dll", "VCOMP140.dll", "UCRTBASE.dll", "vccorlib140.dll", "VCAMP140.dll", "mfc140u.dll", "atl110.dll"]) {
+    assert.ok(FORBIDDEN_IMPORTS.some((pattern) => pattern.test(name.toLowerCase())), name);
+  }
+  for (const name of ["kernel32.dll", "ADVAPI32.dll", "ws2_32.dll", "api-ms-win-core-synch-l1-2-0.dll", "bcryptprimitives.dll", "ntdll.dll"]) {
+    assert.ok(!FORBIDDEN_IMPORTS.some((pattern) => pattern.test(name.toLowerCase())), name);
+  }
+});

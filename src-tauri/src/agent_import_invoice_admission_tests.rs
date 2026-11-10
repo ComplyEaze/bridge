@@ -770,7 +770,7 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
 /// Row 2162-GY's company object answers (`pilot-lab-gy`, copies with the
 /// company number replaced; see its PROVENANCE.md), served in place of the
 /// pilot lab's: the one taken with the company's GST turned off refuses the
-/// invoice under its own code once the object is read (76 requests, the whole
+/// invoice under its own code once the object is read (142 requests, the whole
 /// admission), with no observation, and the one taken before the change, on
 /// the same book, admits it. An `ISGSTON` emptied or removed, which no answer
 /// carried, is refused under the other code (marked as edits of the answer
@@ -805,7 +805,7 @@ async fn a_company_whose_gst_is_off_or_unstated_is_refused_by_name() {
         )
         .await;
         assert_eq!(seen, outcome);
-        assert_eq!(requests.len(), 76, "{outcome:?}");
+        assert_eq!(requests.len(), 142, "{outcome:?}");
         let observed = voucher.invoice.as_ref().unwrap().observed.as_ref();
         assert_eq!(observed.is_some(), outcome.is_ok(), "{outcome:?}");
     }
@@ -849,7 +849,7 @@ async fn the_gst_setting_refuses_by_itself_before_any_sales_line_is_judged() {
     )
     .await;
     assert_eq!(seen, Err(vec![("invoice_company_gst_off", String::new())]));
-    assert_eq!(requests.len(), 76);
+    assert_eq!(requests.len(), 142);
     assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
 }
 

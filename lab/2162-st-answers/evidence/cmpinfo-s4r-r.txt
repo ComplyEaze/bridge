@@ -1,0 +1,9 @@
+$ the R-0010 answer at s4r against s2's: the lines that differ (UTF-16LE decoded; line numbers of the answer)
+lines: s2 1311, s4r 1311; CMPINFO is lines 8 to 44 in both
+line 11: s2 <LEDGER>0</LEDGER> | s4r <LEDGER>11</LEDGER>
+line 18: s2 <VOUCHERTYPE>0</VOUCHERTYPE> | s4r <VOUCHERTYPE>1</VOUCHERTYPE>
+line 19: s2 <CURRENCY>0</CURRENCY> | s4r <CURRENCY>1</CURRENCY>
+line 39: s2 <TAXUNIT>0</TAXUNIT> | s4r <TAXUNIT>1</TAXUNIT>
+line 42: s2 <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES> | s4r <VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>
+line 43: s2 <VOUCHER>0</VOUCHER> | s4r <VOUCHER>2</VOUCHER>
+every other line equal

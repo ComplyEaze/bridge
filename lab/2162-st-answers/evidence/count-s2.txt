@@ -1,0 +1,111 @@
+== a-s2-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+== a-s2-N-0010s.xml: 5604 bytes
+  STATUS '1'
+  VOUCHER rows: 1 of which with a VOUCHERNUMBER: 1 without one: 0
+   'BP/26-27/0010' DATE '20260801' VOUCHERTYPENAME 'BRIDGE Sales' BRIDGEVCHISSALES 'Yes'
+  rows with no class element: 0
+== a-s2-R-0010.xml: 94474 bytes
+  STATUS '1'
+  VOUCHER rows: 1
+   DATE '20260801'
+   VOUCHERNUMBER 'BP/26-27/0010'
+   VOUCHERTYPENAME 'BRIDGE Sales'
+   REFERENCE 'BP/26-27/0010'
+   REFERENCEDATE '20260801'
+   PARTYLEDGERNAME 'BRIDGE Walk-in'
+   PARTYGSTIN ''
+   STATENAME 'Rajasthan'
+   PLACEOFSUPPLY 'Rajasthan'
+   GSTREGISTRATIONTYPE 'Unregistered/Consumer'
+   ISINVOICE 'Yes'
+   ISCANCELLED 'No'
+   ISOPTIONAL 'No'
+   GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b'
+   ALTERID '17'
+   VCHGSTSTATUSISINCLUDED 'Yes'
+   VCHGSTSTATUSISUNCERTAIN 'No'
+   VCHGSTSTATUSISEXCLUDED 'No'
+   ISGSTOVERRIDDEN 'No'
+   ISPOSTDATED 'No'
+   GSTREGISTRATION <absent>
+   CMPGSTIN <absent>
+   leg 'BRIDGE Walk-in' | 'Yes' | '-1051.00'
+   leg 'BRIDGE Svc 998313 5%' | 'No' | '600.40'
+   leg 'BRIDGE Svc 998314 5%' | 'No' | '400.40'
+   leg 'BRIDGE CGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE SGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE Round Off' | 'No' | '0.16'
+   bills on 'BRIDGE Walk-in': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Svc 998313 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Svc 998314 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE CGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE SGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Round Off': 0 with NAME, 1 whitespace-only, 1 lists
+   ALLINVENTORYENTRIES.LIST elements: 0
+   INVENTORYENTRIES.LIST elements: 0
+   LEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+   ALLLEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+== a-s2-T-types.xml: 306946 bytes
+  STATUS '1'
+  VOUCHERTYPE rows: 28
+  named 'BRIDGE Sales': 1
+   PARENT 'Sales'; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce'; NUMBERINGMETHOD 'None'; ISACTIVE 'Yes'
+   VOUCHERNUMBERSERIES.LIST elements: 1
+   series: NAME 'Default'; NUMBERINGMETHOD 'Manual'; NUMBERINGSUBMETHOD 'Default'; PREVENTDUPLICATES 'Yes'; DUPLICATECONTROL ''; BEGINNINGNUMBER '1'
+   RESTARTFROMLIST.LIST elements: 1 children: [0]
+   unit leaf /LASTSERIESBYGSTTAXUNIT.LIST[1]@TYPE 'String'
+   unit leaf /LASTSERIESBYGSTTAXUNIT.LIST[1]/LASTSERIESBYGSTTAXUNIT[1] 'Default_BRIDGE Sales'
+   unit leaf /LASTGSTTAXUNITBYSERIES.LIST[1]@TYPE 'String'
+   unit leaf /LASTGSTTAXUNITBYSERIES.LIST[1]/LASTGSTTAXUNITBYSERIES[1] 'Rajasthan Registration'
+   unit leaf /TAXUNITNAME[1] 'Any'
+   unit leaf /LASTGSTTAXUNIT[1] 'Rajasthan Registration'
+   unit leaf /ALLOWMULTIPLETAXUNITSPERSERIES[1] 'No'
+  named 'BRIDGE Sales Keyed': 0
+== a-s2-V-0010.xml: 52784 bytes
+  STATUS '1'
+  VOUCHER rows: 1
+   GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b'
+   MASTERID '11'
+   ALTERID '17'
+   DATE '20260801'
+   VOUCHERNUMBER 'BP/26-27/0010'
+   VOUCHERTYPENAME 'BRIDGE Sales'
+   PARTYLEDGERNAME 'BRIDGE Walk-in'
+   BASICBUYERNAME 'BRIDGE Walk-in'
+   PARTYMAILINGNAME 'BRIDGE Walk-in'
+   CONSIGNEEMAILINGNAME 'BRIDGE Walk-in'
+   CONSIGNEESTATENAME 'Rajasthan'
+   CONSIGNEECOUNTRYNAME 'India'
+   VATDEALERTYPE 'Regular'
+   COUNTRYOFRESIDENCE 'India'
+   PARTYGSTIN ''
+   GSTREGISTRATIONTYPE 'Unregistered/Consumer'
+   VCHGSTSTATUSISINCLUDED 'Yes'
+   VCHGSTSTATUSISUNCERTAIN 'No'
+   VCHGSTSTATUSISEXCLUDED 'No'
+   GSTREGISTRATION 'Rajasthan Registration'
+   CMPGSTIN '08ZZZZZ0000Z1ZQ'
+   CMPGSTSTATE 'Rajasthan'
+   CMPGSTREGISTRATIONTYPE 'Regular'
+   PLACEOFSUPPLY 'Rajasthan'
+   STATENAME 'Rajasthan'
+   REFERENCE 'BP/26-27/0010'
+   REFERENCEDATE '20260801'
+   GSTNATUREOFRETURN ''
+   VATPARTYTRANSRETURNNUMBER ''
+   VATPARTYTRANSRETURNDATE ''
+   ISINVOICE 'Yes'
+   VCHENTRYMODE 'Accounting Invoice'
+   PERSISTEDVIEW 'Invoice Voucher View'
+   GSTREGISTRATION attributes {}
+   LEDGERENTRIES.LIST elements: 0
+   ALLLEDGERENTRIES.LIST elements: 0
+   ALLINVENTORYENTRIES.LIST elements: 0
+   INVENTORYENTRIES.LIST elements: 0
+   LEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+   ALLLEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+   direct children: 729

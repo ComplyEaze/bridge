@@ -1,0 +1,4 @@
+== --type-diff a-s2-T-types.xml a-s3r-T-types.xml: VOUCHERTYPE rows 28 -> 29
+   type 'BRIDGE Sales': 0 leaves differ
+   type 'BRIDGE Sales Keyed': in the second only
+exit 0

@@ -1,0 +1,4 @@
+10:50:34	N-0010s.xml	a-s4r-N-0010s.xml	curl 0	8206 bytes
+10:50:34	V-0010.xml	a-s4r-V-0010.xml	curl 0	102590 bytes
+10:50:35	R-0010.xml	a-s4r-R-0010.xml	curl 0	94476 bytes
+10:50:35	M-marks.xml	a-s4r-M-marks.xml	curl 0	3396 bytes

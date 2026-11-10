@@ -246,16 +246,17 @@ async function runDownload({ calls, fetchImpl }) {
   return { code, pauses, calls, logs, output: output.join("") };
 }
 
-test("the retry budget is three attempts with two pauses of one and three seconds", () => {
-  assert.equal(DOWNLOAD_ATTEMPTS, 3);
-  assert.deepEqual(RETRY_PAUSES_MS, [1000, 3000]);
+test("the retry budget is five attempts with four pauses of 5, 15, 45 and 90 seconds", () => {
+  assert.equal(DOWNLOAD_ATTEMPTS, 5);
+  assert.deepEqual(RETRY_PAUSES_MS, [5000, 15000, 45000, 90000]);
+  assert.equal(RETRY_PAUSES_MS.length, DOWNLOAD_ATTEMPTS - 1);
 });
 
 test("a 502 and then the pinned archive succeeds on the second attempt, after one pause", async () => {
   const { code, pauses, calls } = await runDownload(scripted(new Response("bad gateway", { status: 502 }), ok(archive)));
   assert.equal(code, 0);
   assert.equal(calls.length, 2);
-  assert.deepEqual(pauses, [1000]);
+  assert.deepEqual(pauses, [5000]);
   assert.equal(readFileSync(join(root, "out", "libpdfium.dylib"), "utf8"), "library bytes");
 });
 
@@ -263,7 +264,7 @@ test("a network error, then a 429, then the pinned archive succeeds on the third
   const { code, pauses, calls } = await runDownload(scripted(new TypeError("fetch failed"), new Response("slow down", { status: 429 }), ok(archive)));
   assert.equal(code, 0);
   assert.equal(calls.length, 3);
-  assert.deepEqual(pauses, [1000, 3000]);
+  assert.deepEqual(pauses, [5000, 15000]);
 });
 
 test("a body stream that breaks mid-download is retried", async () => {
@@ -273,14 +274,14 @@ test("a body stream that breaks mid-download is retried", async () => {
   assert.equal(calls.length, 2);
 });
 
-test("three 503 answers are refused after exactly three attempts, naming the status", async () => {
+test("five 503 answers are refused after exactly five attempts, naming the status", async () => {
   const run = runDownload(scripted(new Response("", { status: 503 })));
-  await assert.rejects(run, (error) => error instanceof Refusal && /HTTP 503/.test(error.message) && /tried 3 times/.test(error.message));
+  await assert.rejects(run, (error) => error instanceof Refusal && /HTTP 503/.test(error.message) && /tried 5 times/.test(error.message));
   const probe = scripted(new Response("", { status: 503 }));
   const pauses = [];
   await main(["--platform", "test", "--dest", join(root, "out2")], { lockPath: lockPath(), fetchImpl: probe.fetchImpl, sleep: async (ms) => pauses.push(ms), log: () => {} }).catch(() => {});
-  assert.equal(probe.calls.length, 3);
-  assert.deepEqual(pauses, [1000, 3000]);
+  assert.equal(probe.calls.length, 5);
+  assert.deepEqual(pauses, [5000, 15000, 45000, 90000]);
 });
 
 test("a 404 is refused on the first sight, without a retry or a pause", async () => {
@@ -322,8 +323,8 @@ test("a retry that succeeds still verifies the library and the notice (a good ar
 test("each retry writes one line saying why, so a flaky host leaves a trace in the job log", async () => {
   const { logs } = await runDownload(scripted(new Response("", { status: 502 }), new TypeError("fetch failed"), ok(archive)));
   assert.equal(logs.length, 2);
-  assert.match(logs[0], /HTTP 502.*attempt 1 of 3/);
-  assert.match(logs[1], /fetch failed.*attempt 2 of 3/);
+  assert.match(logs[0], /HTTP 502.*attempt 1 of 5/);
+  assert.match(logs[1], /fetch failed.*attempt 2 of 5/);
 });
 
 for (const status of [408, 500]) {

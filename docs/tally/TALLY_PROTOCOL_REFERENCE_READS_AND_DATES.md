@@ -1008,11 +1008,11 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   length in the head (measured on a capped `curl` of the same request), which is why nothing was owed at that date. A separate
   standard `ledger_masters` call sent about half a second later answered whole, every row equal to the standard read
   at the same state and the marks unchanged, in three of three tries. A mailing read cut at the 20 s limit, and the
-  drain after one, were not reached on this book. Since #2142 an oversize Tally declares owes the drain, because its
+  drain after one, were not reached on that book (they were on another, below). Since #2142 an oversize Tally declares owes the drain, because its
   body is left unread (§11c.2). After one, the party/ledger master export reads the book once more with the standard
   request inside the same operation (#2214), once the drain clears; neither that read nor those probes have been run
   against Tally. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
-  still be working on that read; such a cut mailing read has not been seen live. After any other failure of that read
+  still be working on that read; a cut at the time limit has since been seen live (the next entry). After any other failure of that read
   it reads the book once more without the details, and the workbook names the failure (the maintainers' ruling on
   #2074; none reached on this book): an answer that broke off, could not be read, did not decode or never came, an
   HTTP error status, a post that did not reach Tally, the pair's two answers differing, or any refusal of a whole
@@ -1022,6 +1022,24 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   of these (#2142). So after any of them, an HTTP error status and a declared oversize among them, while the standard post is refused as draining before anything of it was sent,
   the export waits and tries again, for at most 60 s, a bound not measured on this read, and fails past it. The
   standard read keeps every refusal it has without the mailing details.
+- **A mailing read cut at the 20 s limit owes the drain, and the standard read admitted after it answers whole.
+  PARTIAL: TallyPrime 7.2 Silver, 2026-11-03 and 2026-11-08, one synthetic book, two sittings, master builds at
+  a6c64b8b and 1f5dc024 (`lab/2074-2214-export-cut-answers`, `lab/2074-2214-w4-answers`).** The book held about 172
+  ledgers and 32,000 dated entries; on 2026-11-03 its mailing answer, about 30 MB, came whole in three pages with
+  Tally idle. An import of Journals sent by another client just ahead kept Tally busy, and Bridge cut the mailing
+  read's post at the 20 s limit. On 2026-11-03 this was `ledger_masters` with `include_mailing_details`, three times,
+  through the server alone, with no byte of the answer received before the cut; in the third, the import had ended
+  1.6 s before the cut, so Tally had the read under way. Each call was refused `party_ledger_master_read_failed`
+  (`request_deadline_exceeded`), and the drain record read owed at once. Standard `ledger_masters` calls were then
+  refused `tally_endpoint_draining` (`retry_after_s` 10) with no post sent, one to three times, and the first one
+  admitted read the book whole, every row equal to the read after it, its end 17 s to 51 s after the drain record was
+  read owed. The master mark did not move and the voucher mark moved by the import's Journals alone. On 2026-11-08
+  the party/ledger master export's own mailing read was cut the same way: the server refused four standard calls as
+  draining and admitted the fifth, ending 68 s after the owed record, whole. The export failed with its withheld
+  message and wrote no file, but the desktop app that ran it was a 2026-10-30 build (0.6.1), older than the export's
+  re-read without the details (#2188), so that step is not evidence for later builds; the server rows ran on the
+  bundle's own server. Not measured: the export step on a later build, a cut with no other client's work ahead of it,
+  a cut of another read, the export's retry after a declared oversize, another book, and another release.
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
   `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one

@@ -21,8 +21,9 @@ use checker::{Failure, Limits, LIMITS};
 
 fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("src-tauri has a parent")
+        .ancestors()
+        .nth(3)
+        .expect("src-tauri/crates/bridge-mcpb-check is three levels below the repository")
         .to_path_buf()
 }
 

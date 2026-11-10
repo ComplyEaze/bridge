@@ -1,0 +1,1 @@
+- A ledger create is reported as posted and verified only when Tally's counters show the batch's creates and nothing else. A response that also counts a deleted, ignored or cancelled object now leaves the batch for reconciliation, as one with an error or an exception already did (#2398).

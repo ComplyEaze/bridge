@@ -364,19 +364,7 @@ fn counters_json(counters: Option<&MasterCounters>) -> Value {
 fn reported_counters(
     outcome: Option<&bridge_tally_protocol::TallyImportOutcome>,
 ) -> Option<MasterCounters> {
-    let counters = outcome?.counters();
-    counters
-        .counter_presence
-        .all_reported()
-        .then_some(MasterCounters {
-            created: counters.created,
-            altered: counters.altered,
-            deleted: counters.deleted,
-            ignored: counters.ignored,
-            errors: counters.errors,
-            cancelled: counters.cancelled,
-            exceptions: counters.exceptions,
-        })
+    outcome?.counters().reported_counters()
 }
 
 fn empty_evidence() -> Evidence {

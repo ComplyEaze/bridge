@@ -112,6 +112,39 @@ DEFAULT_COMMIT = {
 }
 PUBLIC_AGENT_ADDRESS = "noreply" + "@" + "anthropic.com"
 CUSTOMER_ADDRESS = "customer" + "@" + "company.test"
+BOT_SIGNOFF_ADDRESS = "support" + "@" + "github.com"
+_BOT_LINE = "Signed-off-by: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">"
+_BOT_HEAD = (
+    "Bump example-package from 1.2.3 to 1.2.4\n\n"
+    "Bumps example-package from 1.2.3 to 1.2.4.\n\n"
+    "---\nupdated-dependencies:\n- dependency-name: example-package\n  dependency-type: direct:production\n...\n\n"
+)
+# The message of each commit scenario about Dependabot's sign-off line: the two that are admitted, then the placements
+# and spellings that are not (every one still counts the address as a customer email).
+BOT_SIGNOFF_MESSAGES = {
+    "bot-signoff-trailer": _BOT_HEAD + _BOT_LINE + "\n",
+    "bot-signoff-trailer-crlf": (_BOT_HEAD + _BOT_LINE + "\n").replace("\n", "\r\n"),
+    "bot-signoff-trailer-no-final-newline": _BOT_HEAD + _BOT_LINE,
+    "bot-signoff-nonfooter": _BOT_LINE + "\n\nThis is ordinary commit body text, not a trailer footer.\n",
+    "bot-signoff-before-another-paragraph": _BOT_HEAD + _BOT_LINE + "\n\nA closing paragraph.\n",
+    "bot-signoff-other-key": _BOT_HEAD + "Reviewed-by: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-coauthor-key": _BOT_HEAD + "Co-Authored-By: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-lowercase-key": _BOT_HEAD + "signed-off-by: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-prefixed-key": _BOT_HEAD + "X-Signed-off-by: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-other-name": _BOT_HEAD + "Signed-off-by: A Person <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-name-case": _BOT_HEAD + "Signed-off-by: Dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-name-with-address": _BOT_HEAD + "Signed-off-by: " + BOT_SIGNOFF_ADDRESS + " <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-extra-payload": _BOT_HEAD + _BOT_LINE + " extra\n",
+    "bot-signoff-trailing-space": _BOT_HEAD + _BOT_LINE + " \n",
+    "bot-signoff-second-address": _BOT_HEAD + _BOT_LINE + " <" + CUSTOMER_ADDRESS + ">\n",
+    "bot-signoff-with-agent-trailer": _BOT_HEAD + "Co-Authored-By: Example Agent <" + PUBLIC_AGENT_ADDRESS + ">\n" + _BOT_LINE + "\n",
+    "bot-signoff-unclosed": _BOT_HEAD + "Signed-off-by: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + "\n",
+    "bot-signoff-double-space": _BOT_HEAD + "Signed-off-by:  dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n",
+    "bot-signoff-other-address": _BOT_HEAD + "Signed-off-by: dependabot[bot] <" + CUSTOMER_ADDRESS + ">\n",
+    "bot-signoff-mixed-line-endings": _BOT_HEAD + _BOT_LINE + "\r\n",
+    "bot-signoff-with-customer-trailer": _BOT_HEAD + "Co-Authored-By: Customer <" + CUSTOMER_ADDRESS + ">\n" + _BOT_LINE + "\n",
+    "bot-signoff-with-malformed-line": _BOT_HEAD + _BOT_LINE + "\nthis footer line is not a trailer\n",
+}
 
 
 def schema2(paths):
@@ -1107,6 +1140,27 @@ def state():
             "Co-Authored-By: Customer Contributor <" + CUSTOMER_ADDRESS + ">\r\n"
         )
         s["commits"] = [commit]
+
+    elif scenario in BOT_SIGNOFF_MESSAGES:
+        # Dependabot's own sign-off line, and one scenario per way it may not be used (#2411).
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        commit["commit"]["message"] = BOT_SIGNOFF_MESSAGES[scenario]
+        s["commits"] = [commit]
+
+    elif scenario == "bot-signoff-in-pr-body":
+        s["body"] = DEFAULT_BODY + "Signed-off-by: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n"
+
+    elif scenario == "bot-signoff-in-source-payload":
+        s["diff"] = (
+            "diff --git a/docs/example.md b/docs/example.md\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/docs/example.md\n"
+            "@@ -0,0 +1 @@\n"
+            "+Signed-off-by: dependabot[bot] <" + BOT_SIGNOFF_ADDRESS + ">\n"
+        )
 
     elif scenario == "public-agent-email-in-pr-body":
         s["body"] = DEFAULT_BODY + "Public agent contact: " + PUBLIC_AGENT_ADDRESS + "\n"

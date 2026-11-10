@@ -206,7 +206,14 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
         other => panic!("unknown kind {other}"),
     };
-    answer(utf16(bytes))
+    // DERIVED for the read-back: answered before the request fetched the
+    // registration (see `with_registration`).
+    match letter {
+        'R' => answer(crate::agent::agent_import::invoice::with_registration(
+            &utf16(bytes),
+        )),
+        _ => answer(utf16(bytes)),
+    }
 }
 
 /// The ledger catalogue the build reads, as the pilot lab answered it on
@@ -950,10 +957,12 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
 /// the same read-back (a complete envelope with no voucher).
 const READBACK_ORDER: &str = "eMsMseeRsRse";
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
-/// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
-/// line's HSN/SAC and `ISPOSTDATED` (`R-0010.xml` of the 2162-S1 sheet, the
-/// request the code sends; the lab answered it on 3 Nov 2026).
-const LAB_R12_SHA256: &str = "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21";
+/// The read-back of `BP/26-27/0010` with the GSTR-1 status fields, each line's
+/// HSN/SAC, `ISPOSTDATED`, and the registration's `GSTREGISTRATION` and
+/// `CMPGSTIN` (`RC-0010.xml` of the 2464-GN sheet, the request the code sends:
+/// the 2162-S1 sheet's `R-0010.xml` with the last two names added; the lab
+/// answered it on 10 Nov 2026).
+const LAB_R12_SHA256: &str = "bd9717c7830df5217a21ef3d8f4fb1ffb1bc0bc150a7d66dc5cefe12ebe852b5";
 
 /// The posted invoice the pilot lab's book took, as the build saved it.
 fn pilot_saved(number: &str, observed: bool) -> ImportVoucher {

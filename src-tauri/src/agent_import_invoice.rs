@@ -12,6 +12,7 @@
 //! (never from a ledger's name: duty heads, reserved groups), the arithmetic,
 //! and the rendering. The reads that fill `LedgerFacts` belong to the build.
 
+use super::super::failure_code::InvoiceRegistrationCode;
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
 use crate::tally::approved_import::{
     ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheckInput, InvoiceReadPlan,
@@ -1445,6 +1446,9 @@ fn invoice_readback_differences(
     want("ISINVOICE", Some("Yes"), &mut diffs);
     want("ISCANCELLED", Some("No"), &mut diffs);
     want("ISOPTIONAL", Some("No"), &mut diffs);
+    if let Some(code) = registration_difference(&read.fields, &observed.company_state) {
+        diffs.push(code.as_str().to_string());
+    }
     // Legs: the same multiset of (ledger, signed amount, side).
     let key = |ledger: &str, amount: i128, positive: bool| (ledger.to_string(), amount, positive);
     let mut expected_legs = expected
@@ -1508,6 +1512,63 @@ fn invoice_readback_differences(
             .map(|difference| difference.code().to_string()),
     );
     diffs
+}
+
+/// The company registration Tally filed the invoice under, as the read-back
+/// returns it: the unit's name (`GSTREGISTRATION`) and its GSTIN (`CMPGSTIN`).
+/// On the one-registration book, Tally filed the build's request under that
+/// registration, naming none in it (row 2464-GN, `BP/26-27/0010`). Either
+/// field not back, or back empty, is missing: the read keeps no voucher-level
+/// empty, so it cannot tell the two apart. A GSTIN that is not a valid GSTIN of
+/// the company's state the build recorded differs. The name is not compared,
+/// since the build records no unit's name, and a second registration in the
+/// same state is not told apart by the GSTIN's state. The registration's state
+/// and type (`CMPGSTSTATE`, `CMPGSTREGISTRATIONTYPE`) are not fetched, so an
+/// invoice that stored its name and GSTIN with those two empty reads no
+/// difference here (row 2464-RB, `BP/26-27/0107`); its GSTR-1 status and its
+/// lines' HSN/SAC are judged on their own.
+fn registration_difference(
+    fields: &BTreeMap<String, String>,
+    company_state: &str,
+) -> Option<InvoiceRegistrationCode> {
+    let text = |name: &str| fields.get(name).filter(|value| !value.is_empty());
+    match (text("GSTREGISTRATION"), text("CMPGSTIN")) {
+        (Some(_), Some(gstin))
+            if gstin_valid(gstin) && gstin_state(gstin) == Some(company_state) =>
+        {
+            None
+        }
+        (Some(_), Some(_)) => Some(InvoiceRegistrationCode::Differs),
+        _ => Some(InvoiceRegistrationCode::Missing),
+    }
+}
+
+/// DERIVED, not Tally's bytes: a read-back answer from before the request
+/// fetched the registration, with the two fields added once to each voucher
+/// (counted), valued as the lab's answer for `BP/26-27/0010` returned them on
+/// 10 Nov 2026 (row 2464-GN): the pilot lab's unit name, with `TYPE="String"`,
+/// and its GSTIN. They go last in the voucher. Where Tally writes them is not
+/// recorded here, since that answer holds a GSTIN and stayed on the lab PC; the
+/// read takes fields by tag.
+#[cfg(test)]
+pub(super) fn with_registration(xml: &str) -> String {
+    // By the whole tag: `<GSTREGISTRATIONTYPE>` begins with `<GSTREGISTRATION`.
+    for tag in ["GSTREGISTRATION", "CMPGSTIN"] {
+        for open in [format!("<{tag}>"), format!("<{tag} "), format!("<{tag}/")] {
+            assert!(!xml.contains(&open), "{open}");
+        }
+    }
+    // Each row closes at the first `</VOUCHER>` after its own opening tag. The
+    // answer's CMPINFO block, before the rows, holds a `<VOUCHER>` counter.
+    let added = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION><CMPGSTIN>08ZZZZZ0000Z1ZQ</CMPGSTIN></VOUCHER>";
+    let mut parts = xml.split("<VOUCHER ");
+    let mut out = parts.next().unwrap_or_default().to_string();
+    for part in parts {
+        assert!(part.contains("</VOUCHER>"), "a row with no close");
+        out.push_str("<VOUCHER ");
+        out.push_str(&part.replacen("</VOUCHER>", added, 1));
+    }
+    out
 }
 
 /// The read-back's legs on the ledgers the build classified as sales lines.

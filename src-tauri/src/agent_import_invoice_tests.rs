@@ -901,7 +901,8 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// renderer, so what is written and what is compared cannot drift apart. Its
 /// four GSTR-1 status elements are the lab's, copied as Tally wrote them for an
 /// invoice it lists as included (`included_status_elements`), and so are the
-/// five HSN/SAC elements each sales line carries (`resolved_hsn_elements`).
+/// five HSN/SAC elements each sales line carries (`resolved_hsn_elements`). The
+/// registration is `with_registration`'s.
 fn readback_xml(v: &ImportVoucher) -> String {
     let id = sentinel_uuid(0x1a);
     let mut rendered = render_sales_invoice_xml(
@@ -928,7 +929,7 @@ fn readback_xml(v: &ImportVoucher) -> String {
         .replace("<DATE>", &format!("<ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><GUID>g-1</GUID><ALTERID> 77</ALTERID>{}<DATE>", included_status_elements()))
         // The export also gives every leg an empty allocation container.
         .replace("</ISDEEMEDPOSITIVE>", "</ISDEEMEDPOSITIVE><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>");
-    format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{voucher}</COLLECTION></DATA></ENVELOPE>")
+    with_registration(&format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{voucher}</COLLECTION></DATA></ENVELOPE>"))
 }
 
 /// #2062: an invoice's cancel candidate is its native request with only its
@@ -973,6 +974,75 @@ fn differences(v: &ImportVoucher, xml: &str) -> Vec<String> {
         wire::Readback::One(read) => invoice_readback_differences(v, &read, "20260310"),
         other => panic!("one voucher expected, got {other:?}"),
     }
+}
+
+/// #2464: the read-back reads the registration Tally filed the invoice under,
+/// by its name and its GSTIN, from the structure of the lab's answer for
+/// `BP/26-27/0010` (row 2464-GN, not committed since it holds a GSTIN): the
+/// name carries `TYPE="String"`. Either field not back, or back empty, is
+/// missing. A GSTIN that is not a valid GSTIN of the company's recorded state
+/// differs. Either way the invoice is divergent, never verified.
+#[test]
+fn the_registration_tally_filed_the_invoice_under_is_read_back() {
+    let v = observed_voucher();
+    let xml = readback_xml(&v);
+    assert_eq!(differences(&v, &xml), Vec::<String>::new());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    assert_eq!(
+        (xml.matches(unit).count(), xml.matches(&gstin).count()),
+        (1, 1)
+    );
+    // The name is read by its text, with the attribute or without it.
+    let bare = xml.replace(
+        unit,
+        "<GSTREGISTRATION>Rajasthan Registration</GSTREGISTRATION>",
+    );
+    assert_eq!(differences(&v, &bare), Vec::<String>::new());
+    for missing in [
+        xml.replace(unit, ""),
+        xml.replace(&gstin, ""),
+        xml.replace(unit, "").replace(&gstin, ""),
+        xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>"),
+        xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"> </GSTREGISTRATION>"),
+        xml.replace(&gstin, "<CMPGSTIN/>"),
+    ] {
+        assert_eq!(
+            differences(&v, &missing),
+            vec!["invoice_registration_missing"]
+        );
+    }
+    for other in [GSTIN_MH, "08ZZZZZ0000Z1ZR", "08ZZZZZ0000Z1Z"] {
+        let differs = xml.replace(&gstin, &format!("<CMPGSTIN>{other}</CMPGSTIN>"));
+        assert_eq!(
+            differences(&v, &differs),
+            vec!["invoice_registration_differs"],
+            "{other}"
+        );
+    }
+    // The declared limit: a second registration in the company's recorded state
+    // is not told apart. A valid GSTIN of that state other than the company's
+    // own, under another unit name, reads with no difference.
+    let same_state = xml
+        .replace(&gstin, "<CMPGSTIN>08ZZZZZ0000Z2ZP</CMPGSTIN>")
+        .replace(
+            unit,
+            "<GSTREGISTRATION TYPE=\"String\">Second Unit</GSTREGISTRATION>",
+        );
+    assert_eq!(differences(&v, &same_state), Vec::<String>::new());
+    // Only the company's recorded state is the measure: the same answer for an
+    // invoice the build recorded under Maharashtra differs.
+    let mut maharashtra = v.clone();
+    maharashtra
+        .invoice
+        .as_mut()
+        .and_then(|detail| detail.observed.as_mut())
+        .unwrap()
+        .company_state = "Maharashtra".to_string();
+    assert!(differences(&maharashtra, &xml).contains(&"invoice_registration_differs".to_string()));
+    // A repeated field fails the whole read, as any repeated field does.
+    let twice = xml.replace(&gstin, &format!("{gstin}{gstin}"));
+    assert!(wire::parse_invoice_readback(&twice).is_err());
 }
 
 #[test]
@@ -1355,6 +1425,7 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">900.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 </VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
     );
+    let xml = with_registration(&xml);
     let v = observed_voucher();
     assert_eq!(differences(&v, &xml), Vec::<String>::new());
     // An allocation whose amount did not come back is a difference, not an absence.
@@ -1371,15 +1442,10 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 
 /// The pilot lab's captured read-back of the invoice its book took (the
 /// `pilot-lab` set; its PROVENANCE table is beside the fixtures), decoded and
-/// compared with `expected` as a post compares them.
+/// compared with `expected` as a post compares them. Each was answered before
+/// the request fetched the registration, so `with_registration` adds it.
 fn pilot_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<String> {
-    let xml = String::from_utf16(
-        &bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect::<Vec<_>>(),
-    )
-    .unwrap();
+    let xml = with_registration(&utf16le(bytes));
     match wire::parse_invoice_readback(&xml).unwrap() {
         wire::Readback::One(read) => invoice_readback_differences(expected, &read, date),
         other => panic!("one voucher expected, got {other:?}"),
@@ -3051,9 +3117,12 @@ fn pilot_0021() -> ImportVoucher {
 
 /// The differences and the sales-line evidence of a read-back answer, as a
 /// post reads them.
+/// Each answer it judges was answered before the request fetched the
+/// registration, so `with_registration` adds it.
 fn hsn_outcome(v: &ImportVoucher, xml: &str) -> (Vec<String>, Vec<serde_json::Value>) {
     let date = v.date.as_str().to_string();
-    let (differences, _, _, lines) = readback_outcome(wire::parse_invoice_readback(xml), v, &date);
+    let xml = with_registration(xml);
+    let (differences, _, _, lines) = readback_outcome(wire::parse_invoice_readback(&xml), v, &date);
     (differences, lines)
 }
 

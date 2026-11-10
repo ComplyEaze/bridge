@@ -501,7 +501,13 @@ pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<b
 /// (7 Oct 2026, §9.16): every field below came back. The four GSTR-1 status
 /// fields were added on 10 Oct 2026 and `ISPOSTDATED` after them on 3 Nov 2026,
 /// each time when the lab answered this request byte for byte (§9.16; the
-/// `pilot-lab-invoice-readback-post-dated` fixtures).
+/// `pilot-lab-invoice-readback-post-dated` fixtures). `GSTREGISTRATION` and
+/// `CMPGSTIN` came last, on 10 Nov 2026, when the lab answered this request for
+/// `BP/26-27/0010` with the two names Tally's own read of that voucher holds,
+/// and nothing else in the answer moved (row 2464-GN, `lab/2464-gn-answers`;
+/// that answer holds a GSTIN, so it is not committed). The fetched
+/// `GSTREGISTRATION` carries `TYPE="String"`, which `rows` does not keep, as
+/// it keeps no attribute of any fetched field.
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
     type_guid: &VoucherTypeGuid,
@@ -511,7 +517,7 @@ pub(in crate::agent) fn render_invoice_readback_request(
     let (type_guid, number) = (type_guid.as_str(), number.as_str());
     let (from, to) = (from.as_str(), to.as_str());
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN, ISPOSTDATED</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN, ISPOSTDATED, GSTREGISTRATION, CMPGSTIN</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     )
 }
@@ -671,6 +677,8 @@ pub(super) fn readback_fields(voucher: &Row) -> Result<BTreeMap<String, String>,
         "VCHGSTSTATUSISEXCLUDED",
         "ISGSTOVERRIDDEN",
         "ISPOSTDATED",
+        "GSTREGISTRATION",
+        "CMPGSTIN",
     ] {
         if let Some(value) = voucher.one(key)? {
             fields.insert(key.to_string(), value.to_string());

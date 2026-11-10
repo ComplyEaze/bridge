@@ -2604,7 +2604,7 @@ the pull requests it comes from, except where it names an issue.
 
 **Known limits of 0.3.0**
 
-- The package is unsigned. It is for evaluation, not production.
+- The package is unsigned.
 - Native Windows validation with Tally and Claude Desktop is outstanding
   (the Tauri desktop app's own Windows catalog flow is #293). The posting
   approval's decision also has no behavioural test on Windows (#702). Intel

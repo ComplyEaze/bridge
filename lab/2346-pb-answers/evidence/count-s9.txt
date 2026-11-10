@@ -1,0 +1,38 @@
+== a-s9-N-0099.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0101.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-R-0099.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s9-R-0101.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s9-R-CN1.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s9-R-CN2.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s9-R-CN3.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s9-R-CN4.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s9-B-bills.xml: 46 bytes
+  STATUS <absent>
+  BILLFIXED groups: 0
+  groups for 'BRIDGE Walk-in BC': 0
+== a-s9-B-payable.xml: 46 bytes
+  STATUS <absent>
+  BILLFIXED groups: 0
+  groups for 'BRIDGE Walk-in BC': 0
+== a-s9-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0

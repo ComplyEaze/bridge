@@ -1,0 +1,7 @@
+11:10:26	B-bills.xml	a-s4r-B-bills.xml	curl 0	970 bytes
+11:10:26	B-payable.xml	a-s4r-B-payable.xml	curl 0	46 bytes
+11:10:27	M-marks.xml	a-s4r-M-marks.xml	curl 0	3396 bytes
+11:10:27	N-0099.xml	a-s4r-N-0099.xml	curl 0	5608 bytes
+11:10:27	N-0101.xml	a-s4r-N-0101.xml	curl 0	5608 bytes
+11:10:27	R-0099.xml	a-s4r-R-0099.xml	curl 0	95834 bytes
+11:10:27	R-0101.xml	a-s4r-R-0101.xml	curl 0	95834 bytes

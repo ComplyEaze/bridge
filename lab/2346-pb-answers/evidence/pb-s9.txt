@@ -1,0 +1,4 @@
+a-s9-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  'BRIDGE Walk-in BC': no row
+exit 0

@@ -1,0 +1,4 @@
+== --diff a-s5r-R-0101.xml a-s6r-R-0101.xml
+   lists compared: 1
+   legs: 6 -> 6
+exit 0

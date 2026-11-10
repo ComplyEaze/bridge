@@ -283,6 +283,34 @@ fn setup_reports_duplicate_complete_tuple_separately() {
     assert_eq!(error.code, "company_identity_ambiguous");
 }
 
+/// The selection check trims before it measures, so these names pass it; the
+/// identity holds the name untrimmed and refuses it with its own code (#2397).
+#[test]
+fn setup_refuses_a_name_no_request_can_carry_with_its_own_code() {
+    for name in [format!("{} ", "A".repeat(255)), "Client Book\n".to_string()] {
+        let selected = SelectedCompanyIdentity {
+            display_name: name.clone(),
+            company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
+            company_number: "1".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+        };
+        let listed = TallyCompany {
+            name: name.clone(),
+            guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
+            company_number: Some("1".to_string()),
+            books_from: Some("20260401".to_string()),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, vec![listed])
+            .expect_err("a name no request can carry must not become an identity");
+
+        assert_eq!(error.code, "company_name_invalid", "{name:?}");
+        assert!(
+            !error.message.contains(name.trim()) && !error.remediation.contains(name.trim()),
+            "the refusal must not echo the name"
+        );
+    }
+}
+
 /// Regression for the destination-picker leak: `select_party_statement_
 /// destination` used to build the folder's IPC string with
 /// `to_string_lossy()`, which replaces invalid UTF-8 byte sequences with

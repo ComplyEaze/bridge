@@ -156,7 +156,10 @@ pub(super) fn not_read_back_next_step(code: &str) -> &'static str {
         | "company_identity_ambiguous"
         | "company_identity_incomplete"
         | "company_identity_mismatch"
-        | "company_number_invalid" => NEXT_LOAD_SAME_COMPANIES,
+        | "company_number_invalid"
+        // A name Bridge cannot send: renaming the company in Tally back to the
+        // name the create was recorded under is the remedy.
+        | "company_name_invalid" => NEXT_LOAD_SAME_COMPANIES,
         "master_batch_invalid" | "master_batch_too_large" | "master_intent_missing" => {
             NEXT_RECORD_NOT_READABLE
         }

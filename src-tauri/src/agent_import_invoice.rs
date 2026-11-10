@@ -2095,12 +2095,11 @@ impl InvoiceJudge<'_> {
                 admitted(super::super::invoice_company_registration_read(company))
             }
             Need::GroupHsn => admitted(super::super::invoice_group_hsn_read(company)),
-            Need::CompanyHsn => {
+            Need::CompanyHsn => Ok(
                 crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn(
                     self.identity,
-                )
-                .map_err(|error| Verdict::Failed(error.to_string()))
-            }
+                ),
+            ),
             Need::Rates => {
                 let scope = self.scope()?;
                 let window = self.year()?;

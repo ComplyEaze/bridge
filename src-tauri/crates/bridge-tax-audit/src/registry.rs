@@ -36,6 +36,13 @@ pub struct CallerData {
 }
 
 impl CallerData {
+    /// Whether the caller holds a GSTR-3B: named as loaded, or as the GSTR-3B turnover
+    /// `applicability_44ab` compares. `gst_ledgers_3b` refuses then (`gst_ledgers_3b::no_gstr3b`).
+    pub fn holds_gstr3b(&self) -> bool {
+        self.named_documents.contains(&CallerNamedDocument::Gstr3b)
+            || self.turnover_inputs.gstr3b.is_some()
+    }
+
     /// The documents loaded with the read, for `books_examined`, as the reference's pack lists them:
     /// each document whose file was loaded, rows or none, in the pack's order (#1281). Form 26AS, AIS
     /// and TIS when `traces` holds them, GSTR-1 when its comparison turnover is held (the pack takes
@@ -146,6 +153,12 @@ pub const PORTED: &[PortedTest] = &[
         // which is all a book shows when neither stock term is known.
         min_figures: 10,
         run_on: |e, b, r, c| crate::financial_statements_on(e, b, r, c.report_totals.as_ref()),
+    },
+    PortedTest {
+        id: "gst_ledgers_3b",
+        // 34 fixed figures and 11 a month with no tax or RCM ledger set: 45 for a one-month period.
+        min_figures: 45,
+        run_on: |e, b, r, c| crate::gst_ledgers_3b_on(e, b, r, c),
     },
     PortedTest {
         id: "high_value_register",

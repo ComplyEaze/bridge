@@ -1,0 +1,268 @@
+{
+ "comment": "gst_ledgers_3b, no GSTR-3B: a head of two ledgers, one with no Trial Balance row; nil tax lines (a Sales whose only tax line is nil, a Purchase beside a nil line on the ledger without a row); RCM unset; goods-carriage ledgers set but every payment on them carries a duties line (a configured tax ledger, or a nil line on an unconfigured Duties & Taxes ledger), so nothing is listed.",
+ "period": [
+  "2025-04-01",
+  "2025-05-31"
+ ],
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Export Sales": "Sales Accounts",
+  "Direct Incomes": null,
+  "Indirect Incomes": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-g3b_missing_tb-000"
+  },
+  {
+   "name": "CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_missing_tb-001"
+  },
+  {
+   "name": "CGST Old",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_missing_tb-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-g3b_missing_tb-003"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-g3b_missing_tb-004"
+  },
+  {
+   "name": "Freight Outward",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-g3b_missing_tb-005"
+  },
+  {
+   "name": "GST Paid",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_missing_tb-006"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-g3b_missing_tb-007"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-g3b_missing_tb-008"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_missing_tb-009"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1590,
+   "closing": -1590
+  },
+  {
+   "ledger": "CGST",
+   "opening": -700,
+   "debit": 180,
+   "credit": 0,
+   "closing": -520
+  },
+  {
+   "ledger": "Capital",
+   "opening": 700,
+   "debit": 0,
+   "credit": 0,
+   "closing": 700
+  },
+  {
+   "ledger": "Customer A",
+   "opening": 0,
+   "debit": 3000,
+   "credit": 0,
+   "closing": 3000
+  },
+  {
+   "ledger": "Freight Outward",
+   "opening": 0,
+   "debit": 1500,
+   "credit": 0,
+   "closing": 1500
+  },
+  {
+   "ledger": "GST Paid",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 1000,
+   "credit": 0,
+   "closing": 1000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3000,
+   "closing": -3000
+  },
+  {
+   "ledger": "Supplier B",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1090,
+   "closing": -1090
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "m01",
+   "date": "2025-04-03",
+   "base_type": "Sales",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Customer A",
+     3000
+    ],
+    [
+     "Sales",
+     -3000
+    ],
+    [
+     "CGST",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "m02",
+   "date": "2025-04-09",
+   "base_type": "Purchase",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Purchases",
+     1000
+    ],
+    [
+     "CGST",
+     90
+    ],
+    [
+     "CGST Old",
+     0
+    ],
+    [
+     "Supplier B",
+     -1090
+    ]
+   ]
+  },
+  {
+   "guid": "m03",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     1000
+    ],
+    [
+     "CGST",
+     90
+    ],
+    [
+     "Bank",
+     -1090
+    ]
+   ]
+  },
+  {
+   "guid": "m04",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     500
+    ],
+    [
+     "GST Paid",
+     0
+    ],
+    [
+     "Bank",
+     -500
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "gst_ledgers_3b"
+ ],
+ "gst_ledgers_3b": {
+  "tax_ledgers": {
+   "cgst": [
+    "CGST",
+    "CGST Old"
+   ]
+  },
+  "round_off_ledgers": [],
+  "goods_carriage_ledgers": [
+   "Freight Outward"
+  ]
+ }
+}

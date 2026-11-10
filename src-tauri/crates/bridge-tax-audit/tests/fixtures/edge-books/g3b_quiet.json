@@ -1,0 +1,124 @@
+{
+ "comment": "gst_ledgers_3b, no GSTR-3B: no tax, RCM or goods-carriage ledger configured: no per-head figure and no electronic-ledger finding; the monthly figures still read the Sales ledger's movement.",
+ "period": [
+  "2025-04-01",
+  "2025-05-31"
+ ],
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Export Sales": "Sales Accounts",
+  "Direct Incomes": null,
+  "Indirect Incomes": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-g3b_quiet-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-g3b_quiet-001"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-g3b_quiet-002"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-g3b_quiet-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 4000,
+   "credit": 0,
+   "closing": 4000
+  },
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Customer A",
+   "opening": 0,
+   "debit": 4000,
+   "credit": 4000,
+   "closing": 0
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4000,
+   "closing": -4000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "q01",
+   "date": "2025-04-10",
+   "base_type": "Sales",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Customer A",
+     4000
+    ],
+    [
+     "Sales",
+     -4000
+    ]
+   ]
+  },
+  {
+   "guid": "q02",
+   "date": "2025-05-10",
+   "base_type": "Receipt",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Bank",
+     4000
+    ],
+    [
+     "Customer A",
+     -4000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "gst_ledgers_3b"
+ ],
+ "gst_ledgers_3b": {}
+}

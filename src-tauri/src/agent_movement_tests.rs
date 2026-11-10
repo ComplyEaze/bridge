@@ -206,7 +206,7 @@ fn movement_snapshot_rejects_renames_even_when_the_selected_name_returns() {
             optional: false,
             ledger_entries: vec![MovementEntry {
                 ledger_name: name.into(),
-                amount: "-10".into(),
+                amount: MovementAmount::Plain("-10".into()),
                 is_deemed_positive: true,
             }],
         }]
@@ -322,6 +322,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
                     known_marks: Some(CompanyMarks::new(Some(3), 7)),
                 },
                 None,
+                MovementComposites::Refuse,
             )
             .await
             .unwrap()

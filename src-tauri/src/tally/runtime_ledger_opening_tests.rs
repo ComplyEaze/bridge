@@ -200,6 +200,7 @@ async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cach
                     &identity,
                     scoped.then(|| TallyDate::parse("20260815").unwrap()),
                     false,
+                    SeveralCurrencyOpening::Refused,
                     ReadRetryPolicy::transient_default(),
                 )
                 .await
@@ -640,4 +641,89 @@ async fn an_invalid_book_extent_stops_the_ledger_read_before_any_ledger_request(
             "unexpected error: {error:#}"
         );
     }
+}
+
+// -- #683: a several-currency book's opening, at its first day only (§8.2n) -------------------
+
+const FOREXGROUP_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+
+fn utf16(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The first-day admission exists for the book's first day and for no later date, so nothing
+/// that sets ledgers aside by currency can be reached for a later `from`.
+#[test]
+fn the_several_currency_admission_is_built_for_the_first_day_only() {
+    let base = bridge_tally_protocol::native_outstandings::parse_currency_master_list(&utf16(
+        include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml"
+        ),
+    ))
+    .unwrap()
+    .identify_base(Some(
+        bridge_tally_protocol::native_outstandings::parse_company_currency_name(
+            &utf16(include_bytes!(
+                "../../crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml"
+            )),
+            FOREXGROUP_GUID,
+        )
+        .unwrap()
+        .as_str(),
+    ))
+    .unwrap();
+    assert!(base.is_inr());
+    let books_from = TallyDate::parse("20250401").unwrap();
+    assert!(SeveralCurrencyFirstDay::at(&books_from, &books_from, &base).is_some());
+    for later in ["20250402", "20250430", "20260331"] {
+        assert!(
+            SeveralCurrencyFirstDay::at(&books_from, &TallyDate::parse(later).unwrap(), &base)
+                .is_none(),
+            "{later}"
+        );
+    }
+}
+
+/// Rule 3 on the captured first-day export: the ledger whose dollar opening was keyed on its
+/// master is set aside by its composite opening, and no other (row 683-OP's `x1`; its control
+/// `x0`, the book as found, gives none). The ordinary admission still refuses the same answer.
+#[test]
+fn rule_three_names_the_captured_composite_opening_and_no_other() {
+    let with_opening = utf16(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml"
+    ));
+    let ledgers = admit_native_ledger_opening_rows_as(
+        &with_opening,
+        FOREXGROUP_GUID,
+        SeveralCurrencyOpening::AtFirstDay,
+    )
+    .unwrap();
+    assert_eq!(ledgers.len(), 9);
+    assert_eq!(
+        composite_opening_names(&ledgers),
+        std::collections::BTreeSet::from(["BRIDGE USD Opening".to_string()])
+    );
+    assert!(admit_native_ledger_opening_rows(&with_opening, FOREXGROUP_GUID).is_err());
+
+    let as_found = utf16(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml"
+    ));
+    let ledgers = admit_native_ledger_opening_rows_as(
+        &as_found,
+        FOREXGROUP_GUID,
+        SeveralCurrencyOpening::AtFirstDay,
+    )
+    .unwrap();
+    assert_eq!(ledgers.len(), 8);
+    assert!(composite_opening_names(&ledgers).is_empty());
+    assert_eq!(
+        admit_native_ledger_opening_rows(&as_found, FOREXGROUP_GUID).unwrap(),
+        ledgers
+    );
 }

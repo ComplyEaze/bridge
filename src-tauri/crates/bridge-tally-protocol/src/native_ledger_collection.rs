@@ -258,6 +258,26 @@ pub fn parse_native_ledger_source_records_with_evidence(
     )
 }
 
+/// [`parse_native_ledger_source_records_with_evidence`], except that an
+/// `OPENINGBALANCE` that is a currency composite ([`crate::currency_composite::is_balance_composite`])
+/// is kept as text instead of refusing the response. Any other value that is
+/// not a decimal still refuses it. Only the several-currency movement read at
+/// a book's first day asks for this: there a composite opening sets its ledger
+/// aside by name, and no figure is read from it (TALLY_PROTOCOL_REFERENCE §8.2n).
+pub fn parse_native_ledger_source_records_keeping_composite_openings(
+    xml: &str,
+    expected_company_guid: &str,
+) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyLedger>>> {
+    parse_native_ledger_collection_with_evidence(
+        xml,
+        expected_company_guid,
+        NativeLedgerCollectionCompanyBinding::RowGuidPrefix,
+        |reader, element| {
+            native_ledger_collection_row(reader, element, OpeningAdmission::CompositeKept)
+        },
+    )
+}
+
 /// Parses the dedicated party/ledger master collection. This is deliberately
 /// distinct from ordinary ledger parsing because it retains the sensitive
 /// fields that only the workbook renderer consumes.
@@ -322,6 +342,9 @@ enum OpeningAdmission<'a> {
     Parsed,
     UnparsedFor(&'a std::collections::BTreeSet<String>),
     UnparsedForAll,
+    /// Every row's opening is parsed, except that a currency composite is kept
+    /// as text; any other non-decimal still refuses the response.
+    CompositeKept,
 }
 
 impl OpeningAdmission<'_> {
@@ -330,7 +353,12 @@ impl OpeningAdmission<'_> {
             Self::Parsed => true,
             Self::UnparsedFor(names) => !names.contains(ledger),
             Self::UnparsedForAll => false,
+            Self::CompositeKept => true,
         }
+    }
+
+    fn keeps_composite(self) -> bool {
+        matches!(self, Self::CompositeKept)
     }
 }
 
@@ -543,18 +571,21 @@ fn parse_native_ledger_collection_row(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<NativeLedgerCollectionRow<TallyLedger>> {
+    native_ledger_collection_row(reader, element, OpeningAdmission::Parsed)
+}
+
+fn native_ledger_collection_row(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    openings: OpeningAdmission<'_>,
+) -> anyhow::Result<NativeLedgerCollectionRow<TallyLedger>> {
     let ParsedNativeLedgerCollectionRow {
         ledger,
         identities,
         alter_id,
         response_company_guid,
         ..
-    } = parse_native_ledger_collection_row_with_master_fields(
-        reader,
-        element,
-        false,
-        OpeningAdmission::Parsed,
-    )?;
+    } = parse_native_ledger_collection_row_with_master_fields(reader, element, false, openings)?;
     Ok(NativeLedgerCollectionRow {
         record: ledger,
         identities,
@@ -700,7 +731,9 @@ fn parse_native_ledger_collection_row_with_master_fields(
                     // Every captured row carries this field. Its absence is
                     // unmeasured, so fail closed rather than silently turning
                     // a missing debtor/creditor balance into zero.
-                    if openings.parses(&ledger.name) {
+                    let kept_composite = openings.keeps_composite()
+                        && crate::currency_composite::is_balance_composite(&opening_balance);
+                    if openings.parses(&ledger.name) && !kept_composite {
                         bridge_tally_primitives::ExactDecimal::parse(opening_balance.clone())
                             .map_err(|error| {
                                 // Classified only to name the refusal: a composite

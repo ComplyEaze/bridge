@@ -1580,6 +1580,37 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
+### Ledger movement on a book with several Currency masters
+
+`ledger_movement` reads a book with several Currency masters only when `from` is
+the first day of the books (#683); a later `from` refuses with
+`company_several_currency_masters`. The reason is in protocol reference §8.2n:
+from the first day a currency composite marks every foreign balance, while from
+a later day a dollar party balance can read as a plain rupee figure that no test
+for a composite sees. Tally must identify an INR base among the masters
+(`company_base_currency_undetermined` or `company_base_currency_not_inr`
+otherwise).
+
+Three rules set a ledger aside, each by name and with no figure: the
+currency-scoped Trial Balance of the same window names it as kept in another
+currency or as showing a value in another currency (the sets `trial_balance`
+reports); its opening at the first day is a composite; or an entry on it in the
+window is a composite. The Trial Balance and the catalogue must name the same
+ledgers (`ledger_currency_scope_unmatched` otherwise), and the Trial Balance must
+see the same book extent (`ledger_snapshot_drifted`). The result is always
+partial, with `partial_reason` `base_currency_ledgers_only` (or
+`opening_balance_not_observed` when that also applies), and carries
+`trial_balance`'s fields: `ledgers_scope`, `foreign_currency_ledgers_excluded`,
+`base_currency_ledgers_mixed_excluded` (reason `mixed_currency_movement`),
+`scope_limitation` and `scope_label`. A `ledger` that is set aside refuses with
+`ledger_currency_set_aside`, naming the ledger and its `set_aside_reason`. The
+window answers each bill allocation amount-only (its fetch names no allocation
+field), a placeholder that is skipped; the `vouchers` capture of the same day holds
+those allocations typed. A typed allocation with a composite amount, which this
+read has not been seen to send, still refuses it (`bill_allocation_amount_invalid`). Measured on one synthetic
+book on TallyPrime 7.2 whose vouchers all sit on one day
+(`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`).
+
 A ledger name given to `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
 resolves only when it is spelled exactly as a ledger in the book, or when exactly one ledger differs
 from it only in ASCII case and ASCII spaces and no other ledger differs from that one only in case or
@@ -2130,7 +2161,7 @@ each other.
 - A debit is an entry with a negative amount and a credit one with a positive
   amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
   decides only a zero amount, which adds nothing to either side but still counts
-  its voucher. `ledger_movement` is expected to refuse the book of the live check (several Currency masters, #716; reasoned from the code, not run), so the live tie is to `trial_balance`; the two reads were not run side by side.
+  its voucher. `ledger_movement` is expected to refuse the book of the live check (several Currency masters, #716; reasoned from the code, not run; since #683 it reads such a book only from its first day), so the live tie is to `trial_balance`; the two reads were not run side by side.
 - A ledger bucket adds the entries on that ledger of the vouchers the window,
   selectors and search selected: with a `ledger`, a type or a search given, a
   counter-ledger's bucket holds only its entries on those vouchers, not that
@@ -2338,8 +2369,10 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 an
   Tally wrote them. Sums, summaries and an `amount` search use the rupee amount.
   When a window holds a composite, `vouchers` also reads the book's currencies.
   Measured on one book of each release, one currency. `ledger_movement` still
-  refuses such a window, so a `vouchers` summary holding these amounts cannot be
-  tied to it.
+  refuses such a window, except from the first day of a book with several
+  Currency masters, where it sets the composite entry's ledger aside by name
+  (#683); either way a `vouchers` summary holding these amounts cannot be tied to
+  it.
 - **It withholds a voucher it cannot read that way:** the book's base is not
   established as INR, the amount after `=` is not in that base, the foreign
   symbol is not one of the book's Currency masters, a composite has no rate or
@@ -4216,14 +4249,18 @@ Per tool:
   Its `catalogue_evidence_sha256` hashes parsed names, not a request.
 - `ledger_movement` (`src-tauri/src/agent_movement.rs`):
   1. the company read;
-  2. a runtime ledger read (currency masters, ledger export);
-  3. the opening window's marks and census;
-  4. its data parts, with the corroboration folded in when empty;
-  5. its closing marks (if divided);
-  6. the runtime ledger read again;
-  7. the replay window's data parts, with the corroboration folded in when
+  2. a runtime ledger read (currency masters, ledger export; on a book with
+     several Currency masters, the currency-name reads that find the base
+     before the export);
+  3. (on a book with several Currency masters) the currency-scoped Trial
+     Balance, read as `trial_balance` reads it;
+  4. the opening window's marks and census;
+  5. its data parts, with the corroboration folded in when empty;
+  6. its closing marks (if divided);
+  7. the runtime ledger read again;
+  8. the replay window's data parts, with the corroboration folded in when
      empty (no marks read: it reuses the first window's);
-  8. the replay window's closing marks (if divided).
+  9. the replay window's closing marks (if divided).
 
   The corroboration is sent after the closing marks but folded before them.
 - `trial_balance`:

@@ -68,6 +68,21 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The refusals `ledger_movement` adds for a book with several Currency masters, read from its
+    /// first day (#683).
+    pub(crate) enum MovementCurrencyCode {
+        /// The movement's dates did not form the Trial Balance's window.
+        InvalidDateRange = "invalid_date_range",
+        /// The book changed between the movement's reads.
+        SnapshotDrifted = "ledger_snapshot_drifted",
+        /// The currency-scoped Trial Balance and the movement's catalogue name different ledgers.
+        ScopeUnmatched = "ledger_currency_scope_unmatched",
+        /// The ledger asked for is set aside, so no figure is given for it.
+        SetAside = "ledger_currency_set_aside",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

@@ -59,6 +59,7 @@ use bridge_tally_protocol::{
     export_status, parse_companies_from_collection, parse_company_gateway_capability_observation,
     parse_import_evidence, parse_import_outcome, parse_import_result, parse_ledger_census_slice,
     parse_ledger_name_index, parse_native_group_source_records_with_evidence,
+    parse_native_ledger_source_records_keeping_composite_openings,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
@@ -1720,6 +1721,45 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683): the currency Trial Balance from the book's first
+    // day, as found and with a dollar opening keyed on one new ledger master
+    // (FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md; src/agent_movement_currency_tests.rs).
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
     // Built-in Cash Flow reports: src/native_cash_flow_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_cash_flow_probe_b_fy_live.utf16le.xml",
@@ -2661,6 +2701,43 @@ const ROWS: &[Row] = &[
         parser: "parse_native_ledger_source_records_with_evidence(Validation Lab)",
         parse: |_, text| ledger_sources(text, "c6afd306-00e1-4f51-802a-babe44daddd3"),
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683): the movement's opening export at the book's
+    // first day, as found and with a dollar opening on one master, which only the first-day parse
+    // keeps as text (src/native_ledger_collection_tests.rs).
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_with_evidence(FOREXGROUP)",
+        parse: |_, text| ledger_sources(text, FOREXGROUP_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_keeping_composite_openings(FOREXGROUP)",
+        parse: |_, text| {
+            untyped(parse_native_ledger_source_records_keeping_composite_openings(
+                text,
+                FOREXGROUP_GUID,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_with_evidence(FOREXGROUP)",
+        parse: |_, text| ledger_sources(text, FOREXGROUP_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_keeping_composite_openings(FOREXGROUP)",
+        parse: |_, text| {
+            untyped(parse_native_ledger_source_records_keeping_composite_openings(
+                text,
+                FOREXGROUP_GUID,
+            ))
+        },
+    },
     Row {
         fixture: "tests/fixtures/native/ledgers_native_master_fields_lab.utf8.xml",
         source: Source::Captured,
@@ -3544,6 +3621,9 @@ const APP_ALL_MARKS: &str = "recorded by the app crate's record (#1198 slice 2):
      parse_all_company_marks (a company ALTMSTID read of a book that holds no voucher)";
 const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
+const APP_MOVEMENT_FIRST_DAY: &str = "recorded by the app crate's record (#1198 slice 2): \
+     parse_agent_changed_rows and parse_agent_changed_rows_naming_composite_ledgers (a \
+     ledger_movement window of a several-currency book from its first day, #683)";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
 const APP_STOCK_LINE_ROWS: &str = "recorded by the app crate's record (#1198 slice 2): \
@@ -4705,6 +4785,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml",
         APP_FOREX_VOUCHERS,
+    ),
+    (
+        "tests/fixtures/agent/movement-forexgroup-book-20250401.utf16le.xml",
+        APP_MOVEMENT_FIRST_DAY,
+    ),
+    (
+        "tests/fixtures/agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+        APP_MOVEMENT_FIRST_DAY,
     ),
     // Voucher exports captured for the removed voucher-scan parser.
     (

@@ -51,13 +51,13 @@ test("the command line reads the two revisions and fails on a revision it cannot
     mkdirSync(join(dir, "src-tauri"));
     writeFileSync(join(dir, "src-tauri", "release-date.txt"), "2026-10-30\n");
     git("add", "-A");
-    git("commit", "-q", "-m", "base");
+    git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "base");
     const base = git("rev-parse", "HEAD");
     writeFileSync(join(dir, "src-tauri", "release-date.txt"), "2026-10-31\n");
-    git("commit", "-q", "-a", "-m", "moved");
+    git("-c", "commit.gpgsign=false", "commit", "-q", "-a", "-m", "moved");
     const moved = git("rev-parse", "HEAD");
     git("rm", "-q", "src-tauri/release-date.txt");
-    git("commit", "-q", "-m", "dropped");
+    git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "dropped");
     const dropped = git("rev-parse", "HEAD");
     const run = (...revs) => spawnSync(process.execPath, [script, ...revs], { cwd: dir, encoding: "utf8", env: { ...process.env } });
     const ok = run(base, moved);
@@ -69,6 +69,7 @@ test("the command line reads the two revisions and fails on a revision it cannot
     const unreadable = run(base, "no-such-revision");
     assert.equal(unreadable.status, 1);
     assert.doesNotMatch(unreadable.stderr, /is missing/, "an unreadable revision was reported as an absent file");
+    assert.match(unreadable.stderr, /::error file=src-tauri\/release-date\.txt::.*ls-tree/, "an unreadable revision must name the failed git read");
     assert.equal(run(base).status, 2);
   } finally {
     rmSync(dir, { recursive: true, force: true });

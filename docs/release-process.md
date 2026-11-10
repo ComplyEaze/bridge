@@ -803,8 +803,8 @@ between releases carries the last release's date, so its notice comes early. The
 refuses a date earlier than the last release tag's day (a clock running backward); a clock
 running forward cannot be detected by the script and would delay the notice. A release cut without
 `--apply` carries the old date, so its builds show the notice too soon. CI therefore refuses a
-version pull request whose `src-tauri/release-date.txt` is missing, is not a real day, is earlier
-than the base's, or still names the base's day on a later day (`scripts/check-version-release-date.mjs`,
+version pull request whose `src-tauri/release-date.txt` is missing, is not a real day, is later
+than today (UTC), is earlier than the base's, or still names the base's day on a later day (`scripts/check-version-release-date.mjs`,
 run by the scope job). A second version pull request on the same UTC day as the previous release
 keeps the same date and passes. To turn the check off, delete its line in `.github/workflows/ci.yml`.
 `scripts/check-license-metadata.mjs` checks the file's format.

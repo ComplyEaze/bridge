@@ -69,6 +69,14 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of `import_bank_statement` when it reads a proposals file.
+    pub(crate) enum BankStatementImportCode {
+        /// The proposals file does not hold what its parse would have written.
+        ProposalsFileInvalid = "proposals_file_invalid",
+    }
+}
+
+failure_codes! {
     /// Codes that several read tools write for the same failure, declared once.
     pub(crate) enum ReadCode {
         /// The window's `from` is after its `to`.

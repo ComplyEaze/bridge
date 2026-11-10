@@ -17,6 +17,11 @@ const GST_UNCERTAIN: &[(GstUncertainCode, &str)] = &[
     ),
 ];
 
+const BANK_STATEMENT_IMPORT: &[(BankStatementImportCode, &str)] = &[(
+    BankStatementImportCode::ProposalsFileInvalid,
+    "proposals_file_invalid",
+)];
+
 const READ: &[(ReadCode, &str)] = &[
     (ReadCode::InvalidDateRange, "invalid_date_range"),
     (ReadCode::ReadProtocolInvalid, "agent_read_protocol_invalid"),
@@ -75,6 +80,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     }
     [
         of(GST_UNCERTAIN),
+        of(BANK_STATEMENT_IMPORT),
         of(READ),
         of(GST_STATUS),
         of(GST_BY_LEDGER),
@@ -91,6 +97,7 @@ fn declared() -> Vec<FailureCode> {
     }
     [
         of(GstUncertainCode::ALL),
+        of(BankStatementImportCode::ALL),
         of(ReadCode::ALL),
         of(GstStatusCode::ALL),
         of(GstByLedgerCode::ALL),
@@ -108,6 +115,10 @@ fn every_variant_has_one_pinned_string() {
         pins.iter().map(|(code, _)| *code).collect()
     }
     assert_eq!(variants(GST_UNCERTAIN), GstUncertainCode::ALL);
+    assert_eq!(
+        variants(BANK_STATEMENT_IMPORT),
+        BankStatementImportCode::ALL
+    );
     assert_eq!(variants(READ), ReadCode::ALL);
     assert_eq!(variants(GST_STATUS), GstStatusCode::ALL);
     assert_eq!(variants(GST_BY_LEDGER), GstByLedgerCode::ALL);
@@ -138,6 +149,7 @@ where
 #[test]
 fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(GST_UNCERTAIN, GstUncertainCode::as_str);
+    check_pins(BANK_STATEMENT_IMPORT, BankStatementImportCode::as_str);
     check_pins(READ, ReadCode::as_str);
     check_pins(GST_STATUS, GstStatusCode::as_str);
     check_pins(GST_BY_LEDGER, GstByLedgerCode::as_str);
@@ -160,7 +172,7 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    assert_eq!(codes.len(), 21, "the declared codes");
+    assert_eq!(codes.len(), 22, "the declared codes");
     for code in codes {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");

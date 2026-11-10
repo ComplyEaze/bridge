@@ -4131,6 +4131,11 @@ Per tool:
   combination (`src-tauri/src/agent_company.rs`).
 - `tally_status`: the probe alone (`Server::status`,
   `src-tauri/src/agent_company.rs`).
+  Its `build_notice` string appears on the first status read of a session when the
+  build's release date (`src-tauri/release-date.txt`, compiled in by `build.rs`) is
+  more than 60 days before this computer's date; it states both dates and where
+  releases are listed, makes no request, and the server instructions tell the
+  assistant to relay it once (#2391).
 - `masters`:
   1. the company read;
   2. the extent check (if a later page);
@@ -4590,7 +4595,10 @@ its own cause, `native_bills_report_deadline_exceeded` (#2119); another request 
 same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
 repeat the call. Tally can go on building the report after the limit (a read sent straight after
 was refused for time too), so it also says to wait and let `tally_status` answer before the next
-read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
+read, that one party's open bills at the same `as_of` can still be read, after asking the user,
+with `party` and `detail` `open_bills` (that party's Ledger Outstandings beside the book's list of
+ledgers, not the Bills report, and no total for the book), and that an
+earlier `as_of` with fewer open bills answered on that book. Where the limit
 falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
 flight and sends nothing more (#778).
 

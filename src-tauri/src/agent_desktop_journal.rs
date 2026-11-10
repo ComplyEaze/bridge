@@ -314,10 +314,12 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(crate::agent::ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(crate::agent::VoucherPages::default())),
+            held_censuses: Arc::new(Mutex::new(crate::agent::HeldCensuses::default())),
             post_approvals,
             // The desktop app calls Bridge's operations directly and never dispatches an MCP
             // tool, so there is no MCP client to accept anything.
             terms: super::super::terms::TermsGate::NotRequired,
+            build_notice_sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
 }

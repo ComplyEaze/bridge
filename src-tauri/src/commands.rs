@@ -1965,6 +1965,15 @@ fn verify_observed_company_tuple_from_companies(
         &companies,
     )
     .map_err(|error| match error {
+        // Renaming in Tally is the remedy: probing again returns the same name.
+        VerifiedCompanyIdentityError::InvalidCompanyName => tally_command_error(
+            "company_name_invalid",
+            "Tally application",
+            "Tally reported a company name that ComplyEaze Bridge cannot send in a request, so it cannot select this company.",
+            "not_recommended",
+            false,
+            "Rename the company in Tally to at most 255 bytes with no control characters, then select it again.",
+        ),
         VerifiedCompanyIdentityError::InvalidCompanyNumber => tally_command_error(
             "company_selection_invalid",
             "Tally application",

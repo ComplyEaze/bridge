@@ -99,7 +99,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         ),
         (
             "native_trial_balance::render_native_trial_balance_request",
-            render_native_trial_balance_request(NAME, &period),
+            render_native_trial_balance_request(&company, &period),
         ),
         (
             "outstandings_shared::render_company_book_extent_v2",

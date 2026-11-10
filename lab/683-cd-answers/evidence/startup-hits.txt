@@ -1,0 +1,2 @@
+$ python -I (inline) the start-up check's hits in every file the stage reads, each with 12 characters either side (the number shown as <S>) ("inside the amount": the hit is part of $1000000.00)
+hits 0; not inside the amount: 0

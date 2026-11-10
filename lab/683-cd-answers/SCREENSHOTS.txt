@@ -1,0 +1,11 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/*.png are the Tally window (PrintWindow, its left part).
+shots/c10-no-company.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/c10-window.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/d1-box.png 47706 B 5520fb8be407a891960e197e78110c20eb74d7e4e2173b7d7a49df998bb4cc5e
+shots/d1-gateway.png 45505 B 5d4a618e786bafd023dd1aa1b5d9a2a1d8af7916aca4dac9a7071998ced1d6c2
+shots/d2-box.png 47824 B 97cca566cb5b219a9671d4a0cead86f7570706f0dd1dcf364d971fb85bcdce61
+shots/d2-gateway.png 45271 B 90f4e11aae10a255fbf5254f43f447c47916b7b929816636ac557283dce6f0d3
+shots/s0-gateway.png 45271 B 90f4e11aae10a255fbf5254f43f447c47916b7b929816636ac557283dce6f0d3
+shots/s0-select.png 37000 B 157ccbdb2c724e840be8e46ccc05844243498d8f392a7ae9780bb42456b1b802
+shots/s0-window.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/tb3d-after.png 45505 B 5d4a618e786bafd023dd1aa1b5d9a2a1d8af7916aca4dac9a7071998ced1d6c2

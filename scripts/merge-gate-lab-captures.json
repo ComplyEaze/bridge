@@ -5650,6 +5650,16 @@
       "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "bff19938fc345fadb76af9e2b1924309976837475e1d3777e875b5ccd6349443",
       "size": 23720
+    },
+    {
+      "blob": "b06d0283f9686677ba3789ad0eb21d507e6f50c8",
+      "capture_id": "native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-ld-answers at e38d2b82, file answers/a-tb3-T-tb3-20250401-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a12217b840ec71c5f68a6f646c10625f3f554bdd09c591d113c9667177b97705",
+      "size": 13528
     }
   ]
 }

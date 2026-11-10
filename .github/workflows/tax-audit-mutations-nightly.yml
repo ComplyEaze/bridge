@@ -69,7 +69,11 @@ jobs:
       # and held every crate pull request until someone re-ran the night (4 of the nightly's 6 failures
       # in the window read for the issue were fetch errors). A network failure is retried (3 attempts
       # at most, 30 s then 60 s apart); a failure that is not a network failure ends the step at once;
-      # a network failure that persists ends it after the third attempt. Either way the step fails
+      # a network failure that persists ends it after the third attempt. A crate the registry reports
+      # missing (cargo's own text for a 404 or 410 on a download, or no such package in the index: a
+      # permanent answer) ends it at once too, and each attempt is cut off after
+      # 15 minutes (a timeout is retried like a network failure), so a stalled download cannot hold a runner
+      # for the job's whole limit. Either way the step fails
       # with the named error below and a typed refusal in place of results, so the report says
       # "dependency fetch failed", not a mutation result. `cargo fetch` cannot be limited to one
       # package: it downloads the whole workspace's locked crates (about 560 registry packages against
@@ -81,25 +85,40 @@ jobs:
         run: |
           set +e
           attempts=3
+          fetch_timeout="${FETCH_TIMEOUT:-15m}"
           log="$RUNNER_TEMP/fetch.log"
           attempt=1
           while true; do
-            cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-unknown-linux-gnu 2>&1 | tee "$log"
+            timeout --kill-after=30s "$fetch_timeout" cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-unknown-linux-gnu 2>&1 | tee "$log"
             rc=${PIPESTATUS[0]}
             if [ "$rc" -eq 0 ]; then
               echo "dependency-fetch: attempt $attempt/$attempts outcome=ok"
               exit 0
             fi
-            if ! grep -Eq 'curl failed|spurious network error|download of .* failed|unable to update registry|failed to download|Could not resolve host|Couldn.t connect|Operation timed out|Connection (reset|refused)|SSL_ERROR|returned error: 5[0-9][0-9]' "$log"; then
+            kind=other
+            if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+              kind=timeout
+            elif grep -Eq 'successful HTTP response from .* got (404|410)([^0-9]|$)|no matching package named' "$log"; then
+              kind=missing
+            elif grep -Eq 'curl failed|spurious network error|download of .* failed|unable to update registry|failed to download|Could not resolve host|Couldn.t connect|Operation timed out|Connection (reset|refused)|SSL_ERROR|returned error: 5[0-9][0-9]' "$log"; then
+              kind=network
+            fi
+            if [ "$kind" = other ]; then
               echo "dependency-fetch: attempt $attempt/$attempts outcome=other-failure (not a network failure), not retrying"
               break
             fi
+            if [ "$kind" = missing ]; then
+              echo "dependency-fetch: attempt $attempt/$attempts outcome=missing-crate (the registry answered not found, a permanent answer), not retrying"
+              break
+            fi
+            label=network-failure
+            if [ "$kind" = timeout ]; then label="timeout after $fetch_timeout"; fi
             if [ "$attempt" -ge "$attempts" ]; then
-              echo "dependency-fetch: attempt $attempt/$attempts outcome=network-failure, no attempts left"
+              echo "dependency-fetch: attempt $attempt/$attempts outcome=$label, no attempts left"
               break
             fi
             pause=$((attempt * 30))
-            echo "dependency-fetch: attempt $attempt/$attempts outcome=network-failure, retrying in $pause s"
+            echo "dependency-fetch: attempt $attempt/$attempts outcome=$label, retrying in $pause s"
             sleep "$pause"
             attempt=$((attempt + 1))
           done

@@ -1,0 +1,7 @@
+Written 2026-11-10T16:25:57Z, before the restore of step 8 (C6).
+folder C:\lab\bk-683xa (holds this one file), file TDBK1800_<N>.001, 37618 B, sha256 9317cc079b9df3b183ea648288e8020eb0a0ccdee0bfb6d558156431b75c8792 (equal to evidence/bk.txt)
+company number <N>, BRIDGE FOREXGROUP LAB, GUID 1bb48be5-baba-45b2-90d8-7593244915a9
+Restore Data Path <Tally data folder>; source: Specify Path, the bk-683xa folder
+the Restore list must show BRIDGE FOREXGROUP LAB, its number, 10-Nov-26 (9:46 pm), the BK's time
+two prompts expected, the only ones answered: "Accept ?" = y; "Company data folder (<N>) already exists. Selecting Skip will cancel the Restore process for this company. Selecting Replace will overwrite the existing folder." = r (Replace)
+data folder listing before the restore: evidence/8-data-before-restore.txt (24 entries)

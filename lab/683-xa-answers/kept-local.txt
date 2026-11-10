@@ -1,0 +1,10 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+evidence/8-data-after-restore.txt 1257 B 3114705be9798e93456e5c5a283024f76964e5ea5e9113606572da0b524873e9 (Tally data folder or backup folder listing)
+evidence/8-data-before-restore.txt 1744 B 751f9cda3a67bbce274ee79e4161c74c2fb49e23eef4eb92774388c8a0e356c3 (Tally data folder or backup folder listing)
+evidence/bk-after-listing.txt 169 B faacd9c374db81433f08a98ef0657ad5f0f5e8a9b672f4381882087873ee15f1 (Tally data folder or backup folder listing)
+evidence/bk-before-listing.txt 95 B acb5aca22cc742c683a50b3d556025b19bc294e327633eca63ff6aaba4c5825c (Tally data folder or backup folder listing)
+evidence/c10-netstat.txt 36792 B 2064ccdfec18dbf60a7b63d843d83b327583bf7a9282dad11652ec61789a46e7 (process or port listing)
+evidence/c10-tasklist.txt 53 B 3484cf29dcbe9f13d10432bce5dd6f188e4c6c897a0999d75741e40588e519c4 (process or port listing)
+evidence/s0-netstat.txt 7619 B fc4210dceab5541edb7fbbb9759336ce8939b53acc8324bf7eb1d9655c127bc0 (process or port listing)
+evidence/s0-tasklist.txt 53 B 159b15d6ed317c8f8a7f03b9ce6d4f44988190d2aae642c15d7c94de35b6e69e (process or port listing)
+stage-683xa.py 12321 B 834864b99daed55025179ba3bbbd82a072c482dc12487d28d1363e3cf9ce5269 (this stage script: its patterns name the lab paths)

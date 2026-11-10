@@ -9,12 +9,13 @@ use bridge_tax_audit::counter_cheques_40a3::{check_invariants, TEST_ID};
 use bridge_tax_audit::error::AuditError;
 use bridge_tax_audit::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use bridge_tax_audit::{
-    counter_cheques_40a3_canonical, rules_for, trial_balance_canonical, Engagement,
+    counter_cheques_40a3_canonical, rules_for, trial_balance_canonical, DirectoryEngagement,
+    Engagement,
 };
 use serde_json::{json, Value as Json};
 
 /// The synthetic engagement with one `[roles]` line added.
-fn engagement_with(terms_line: &str) -> Engagement {
+fn engagement_with(terms_line: &str) -> DirectoryEngagement {
     let text = std::fs::read_to_string(common::fixtures().join("synthetic-engagement.toml"))
         .unwrap()
         .replacen(

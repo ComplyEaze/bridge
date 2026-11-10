@@ -10,7 +10,7 @@ use bridge_tax_audit::{
     applicability_44ab_canonical, cash_44ab_canonical, cash_book_integrity_canonical,
     cash_payments_40a3_canonical, depreciation_canonical, financial_statements_canonical,
     ledger_scrutiny_canonical, rules_for, stale_balances_41_1_canonical, trial_balance_canonical,
-    Engagement, Result,
+    DirectoryEngagement, Engagement, Result,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -71,7 +71,7 @@ pub fn synthetic_turnover_inputs() -> TurnoverInputs {
 }
 
 /// The synthetic engagement, pointed at `read_dir` instead of the committed read.
-pub fn engagement(read_dir: &Path, allow_unbracketed: bool) -> Engagement {
+pub fn engagement(read_dir: &Path, allow_unbracketed: bool) -> DirectoryEngagement {
     let text = std::fs::read_to_string(fixtures().join("synthetic-engagement.toml")).unwrap();
     let mut e = Engagement::from_toml(&text, &fixtures()).unwrap();
     e.read_dir = read_dir.to_path_buf();

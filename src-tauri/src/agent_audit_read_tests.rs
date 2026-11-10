@@ -413,7 +413,7 @@ async fn a_lab_build_writes_the_admitted_read_as_a_directory_that_loads_the_same
     opened
         .check(
             &audit.engagement.period,
-            audit.engagement.allow_unbracketed_read,
+            false,
             audit.engagement.company_pin.as_ref(),
         )
         .unwrap();

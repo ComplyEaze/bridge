@@ -9322,3 +9322,77 @@ async fn a_restore_the_post_cannot_record_refuses_it_with_nothing_sent() {
         .iter()
         .any(|record| record["record_type"] == "rollback_seen"));
 }
+
+/// The captured list with the saved batch's company renamed to a name no
+/// request can carry, as if renamed in Tally after the batch was built. Every
+/// company still lists; this one is marked (#2433).
+fn companies_with_the_batch_company_marked() -> String {
+    let list = companies();
+    assert_eq!(
+        list.matches("WR2 Unicode Lab").count(),
+        2,
+        "attribute and element"
+    );
+    list.replace("WR2 Unicode Lab", &"x".repeat(361))
+}
+
+/// #2433: a saved batch whose company is now marked is refused by the write
+/// tools with the declared code, at the company check: every request each
+/// sends is a status read or the company list that marked it, so none names the
+/// company, and nothing is journaled. Before, the list itself was refused, with
+/// `company_collection_invalid`, for every company in the book.
+#[tokio::test]
+async fn verify_and_post_refuse_a_marked_company_before_any_request_names_it() {
+    for tool in ["verify_import", "post_import"] {
+        let marked = companies_with_the_batch_company_marked();
+        let plans = vec![
+            status(),
+            xml(marked.clone()),
+            xml(marked.clone()),
+            status(),
+            xml(marked),
+            status(),
+        ];
+        let served = plans.len();
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (_line, args) = saved_batch(&server);
+        let before = journal(directory.path());
+        let refused = server.call_tool(tool, args).await;
+        let requests = sent(simulator);
+        assert_eq!(
+            refused["structuredContent"]["result"]["error"]["code"],
+            crate::agent::failure_code::CompanyReadCode::NameInvalid.as_str(),
+            "{tool}: {refused}"
+        );
+        let list = &requests
+            .iter()
+            .find(|request| !request.request_body.is_empty())
+            .expect("the company list was read")
+            .request_body;
+        let lists = requests
+            .iter()
+            .filter(|request| &request.request_body == list)
+            .count();
+        let statuses = requests
+            .iter()
+            .filter(|request| request.request_body.is_empty())
+            .count();
+        assert_eq!(
+            lists + statuses,
+            requests.len(),
+            "{tool}: every request is a status read or the company list"
+        );
+        assert!(
+            lists >= 1 && requests.len() <= served,
+            "{tool}: {}",
+            requests.len()
+        );
+        assert_eq!(
+            journal(directory.path()),
+            before,
+            "{tool}: nothing was recorded"
+        );
+    }
+}

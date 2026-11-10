@@ -1,0 +1,7 @@
+08:54:51	M-marks.xml	a-s8-M-marks.xml	curl 0	3394 bytes
+08:54:51	N-0099.xml	a-s8-N-0099.xml	curl 0	3022 bytes
+08:54:51	R-0099.xml	a-s8-R-0099.xml	curl 0	3022 bytes
+08:54:51	R-CN1.xml	a-s8-R-CN1.xml	curl 0	3022 bytes
+08:54:51	R-CN2.xml	a-s8-R-CN2.xml	curl 0	3022 bytes
+08:54:51	R-CN3.xml	a-s8-R-CN3.xml	curl 0	3022 bytes
+08:54:51	B-bills.xml	a-s8-B-bills.xml	curl 0	46 bytes

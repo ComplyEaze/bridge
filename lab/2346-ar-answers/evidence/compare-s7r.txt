@@ -1,0 +1,8 @@
+== --diff a-s6r-R-CN1.xml a-s7r-R-CN1.xml
+   lists compared: 1
+   legs: 6 -> 6
+exit 0
+== --diff a-s6r-R-0099.xml a-s7r-R-0099.xml
+   lists compared: 1
+   legs: 6 -> 6
+exit 0

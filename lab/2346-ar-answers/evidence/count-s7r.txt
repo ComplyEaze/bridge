@@ -1,0 +1,135 @@
+== a-s7r-B-bills.xml: 46 bytes
+  STATUS <absent>
+  BILLFIXED groups: 0
+  groups for 'BRIDGE Walk-in BC': 0
+== a-s7r-M-marks.xml: 3396 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '72' ALTMSTID '246'
+  GUID is the book's: yes
+  COMPANY rows: 1
+== a-s7r-R-0099.xml: 95834 bytes
+  STATUS '1'
+  VOUCHER rows: 1
+   DATE '20260801'
+   VOUCHERNUMBER 'BP/26-27/0099'
+   VOUCHERTYPENAME 'BRIDGE Sales'
+   REFERENCE 'BP/26-27/0099'
+   REFERENCEDATE '20260801'
+   PARTYLEDGERNAME 'BRIDGE Walk-in BC'
+   PARTYGSTIN ''
+   STATENAME 'Rajasthan'
+   PLACEOFSUPPLY 'Rajasthan'
+   GSTREGISTRATIONTYPE 'Unregistered/Consumer'
+   ISINVOICE 'Yes'
+   ISCANCELLED 'No'
+   ISOPTIONAL 'No'
+   GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d'
+   ALTERID '69'
+   VCHGSTSTATUSISINCLUDED 'Yes'
+   VCHGSTSTATUSISUNCERTAIN 'No'
+   VCHGSTSTATUSISEXCLUDED 'No'
+   ISGSTOVERRIDDEN 'No'
+   ISPOSTDATED 'No'
+   GSTREGISTRATION <absent>
+   CMPGSTIN <absent>
+   leg 'BRIDGE Walk-in BC' | 'Yes' | '-1051.00'
+   leg 'BRIDGE Svc 998313 5%' | 'No' | '600.40'
+   leg 'BRIDGE Svc 998314 5%' | 'No' | '400.40'
+   leg 'BRIDGE CGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE SGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE Round Off' | 'No' | '0.16'
+   bills on 'BRIDGE Walk-in BC': 1 with NAME, 0 whitespace-only, 1 lists
+      NAME 'BP/26-27/0099'; BILLTYPE 'New Ref'; AMOUNT '-1051.00'; BILLDATE '20260801'; BILLCREATIONDATE '20260801'; BILLID '2'
+   bills on 'BRIDGE Svc 998313 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Svc 998314 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE CGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE SGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Round Off': 0 with NAME, 1 whitespace-only, 1 lists
+   ALLINVENTORYENTRIES.LIST elements: 0
+   INVENTORYENTRIES.LIST elements: 0
+   LEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+   ALLLEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+== a-s7r-R-CN1.xml: 95834 bytes
+  STATUS '1'
+  VOUCHER rows: 1
+   DATE '20260801'
+   VOUCHERNUMBER '1'
+   VOUCHERTYPENAME 'Credit Note'
+   REFERENCE 'BP/26-27/0099'
+   REFERENCEDATE '20260801'
+   PARTYLEDGERNAME 'BRIDGE Walk-in BC'
+   PARTYGSTIN ''
+   STATENAME 'Rajasthan'
+   PLACEOFSUPPLY 'Rajasthan'
+   GSTREGISTRATIONTYPE 'Unregistered/Consumer'
+   ISINVOICE 'Yes'
+   ISCANCELLED 'No'
+   ISOPTIONAL 'No'
+   GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002e'
+   ALTERID '70'
+   VCHGSTSTATUSISINCLUDED 'Yes'
+   VCHGSTSTATUSISUNCERTAIN 'No'
+   VCHGSTSTATUSISEXCLUDED 'No'
+   ISGSTOVERRIDDEN 'No'
+   ISPOSTDATED 'No'
+   GSTREGISTRATION <absent>
+   CMPGSTIN <absent>
+   leg 'BRIDGE Walk-in BC' | 'No' | '1051.00'
+   leg 'BRIDGE Svc 998313 5%' | 'Yes' | '-600.40'
+   leg 'BRIDGE Svc 998314 5%' | 'Yes' | '-400.40'
+   leg 'BRIDGE CGST 2.5%' | 'Yes' | '-25.02'
+   leg 'BRIDGE SGST 2.5%' | 'Yes' | '-25.02'
+   leg 'BRIDGE Round Off' | 'Yes' | '-0.16'
+   bills on 'BRIDGE Walk-in BC': 1 with NAME, 0 whitespace-only, 1 lists
+      NAME 'BP/26-27/0099'; BILLTYPE 'Agst Ref'; AMOUNT '1051.00'; BILLDATE '20260801'; BILLCREATIONDATE '20260801'; BILLID '2'
+   bills on 'BRIDGE Svc 998313 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Svc 998314 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE CGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE SGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Round Off': 0 with NAME, 1 whitespace-only, 1 lists
+   ALLINVENTORYENTRIES.LIST elements: 0
+   INVENTORYENTRIES.LIST elements: 0
+   LEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+   ALLLEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+== a-s7r-R-CN3.xml: 95832 bytes
+  STATUS '1'
+  VOUCHER rows: 1
+   DATE '20260801'
+   VOUCHERNUMBER '3'
+   VOUCHERTYPENAME 'Credit Note'
+   REFERENCE 'BP/26-27/0099'
+   REFERENCEDATE '20260801'
+   PARTYLEDGERNAME 'BRIDGE Walk-in BC'
+   PARTYGSTIN ''
+   STATENAME 'Rajasthan'
+   PLACEOFSUPPLY 'Rajasthan'
+   GSTREGISTRATIONTYPE 'Unregistered/Consumer'
+   ISINVOICE 'Yes'
+   ISCANCELLED 'No'
+   ISOPTIONAL 'No'
+   GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000030'
+   ALTERID '72'
+   VCHGSTSTATUSISINCLUDED 'Yes'
+   VCHGSTSTATUSISUNCERTAIN 'No'
+   VCHGSTSTATUSISEXCLUDED 'No'
+   ISGSTOVERRIDDEN 'No'
+   ISPOSTDATED 'No'
+   GSTREGISTRATION <absent>
+   CMPGSTIN <absent>
+   leg 'BRIDGE Walk-in BC' | 'No' | '1051.00'
+   leg 'BRIDGE Svc 998313 5%' | 'Yes' | '-600.40'
+   leg 'BRIDGE Svc 998314 5%' | 'Yes' | '-400.40'
+   leg 'BRIDGE CGST 2.5%' | 'Yes' | '-25.02'
+   leg 'BRIDGE SGST 2.5%' | 'Yes' | '-25.02'
+   leg 'BRIDGE Round Off' | 'Yes' | '-0.16'
+   bills on 'BRIDGE Walk-in BC': 1 with NAME, 0 whitespace-only, 1 lists
+      NAME 'BP/26-27/0098'; BILLTYPE 'New Ref'; AMOUNT '1051.00'; BILLDATE '20260801'; BILLCREATIONDATE '20260801'; BILLID '3'
+   bills on 'BRIDGE Svc 998313 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Svc 998314 5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE CGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE SGST 2.5%': 0 with NAME, 1 whitespace-only, 1 lists
+   bills on 'BRIDGE Round Off': 0 with NAME, 1 whitespace-only, 1 lists
+   ALLINVENTORYENTRIES.LIST elements: 0
+   INVENTORYENTRIES.LIST elements: 0
+   LEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0
+   ALLLEDGERENTRIES.LIST INVENTORYALLOCATIONS.LIST elements: 0

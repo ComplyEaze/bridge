@@ -34,6 +34,15 @@ const PINNED: &[(&str, usize)] = &[
 /// The text of every string literal in `source`, in order. Comments are skipped; a backslash at
 /// the end of a line joins the next line as Rust does; raw strings are read to their closing quote.
 fn string_literals(source: &str) -> Vec<String> {
+    string_literal_spans(source)
+        .into_iter()
+        .map(|(_, _, text)| text)
+        .collect()
+}
+
+/// [`string_literals`] with where each literal sits: the byte index of its opening (the `r`, `br`
+/// or quote) and the byte index just past its closing quote.
+pub(crate) fn string_literal_spans(source: &str) -> Vec<(usize, usize, String)> {
     let bytes = source.as_bytes();
     let mut literals = Vec::new();
     let mut i = 0;
@@ -64,9 +73,11 @@ fn string_literals(source: &str) -> Vec<String> {
             let end = source[body_start..]
                 .find(&closing)
                 .map_or(bytes.len(), |at| body_start + at);
-            literals.push(source[body_start..end].to_string());
-            i = (end + closing.len()).min(bytes.len());
+            let close = (end + closing.len()).min(bytes.len());
+            literals.push((i, close, source[body_start..end].to_string()));
+            i = close;
         } else if bytes[i] == b'"' {
+            let open = i;
             let mut text = String::new();
             i += 1;
             while i < bytes.len() && bytes[i] != b'"' {
@@ -85,8 +96,8 @@ fn string_literals(source: &str) -> Vec<String> {
                 text.push(ch);
                 i += ch.len_utf8();
             }
-            literals.push(text);
             i += 1;
+            literals.push((open, i.min(bytes.len()), text));
         } else if bytes[i] == b'\'' {
             i += char_literal_len(rest);
         } else {
@@ -131,7 +142,7 @@ fn char_literal_len(rest: &str) -> usize {
 
 /// The part of `source` before an inline test module (`#[cfg(test)]`, then `mod name {`). A test
 /// module that is only declared (`mod tests;`, often with a `#[path]`) holds no text here.
-fn production_part(source: &str) -> &str {
+pub(crate) fn production_part(source: &str) -> &str {
     let mut offset = 0;
     let mut lines = source.lines().peekable();
     while let Some(line) = lines.next() {

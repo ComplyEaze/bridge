@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const expectedLicense = "Apache-2.0";
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-const [packageText, cargo, tauriText, license, notice, readme, frontendNotices, rustNotices, mcpbText, cargoLock] =
+const [packageText, cargo, tauriText, license, notice, readme, frontendNotices, rustNotices, mcpbText, cargoLock, releaseDate] =
   await Promise.all([
     read("package.json"),
     read("src-tauri/Cargo.toml"),
@@ -17,6 +17,7 @@ const [packageText, cargo, tauriText, license, notice, readme, frontendNotices, 
     read("THIRD_PARTY_LICENSES_RUST.txt"),
     read("packaging/mcpb/manifest.json"),
     read("src-tauri/Cargo.lock"),
+    read("src-tauri/release-date.txt"),
   ]);
 
 const packageJson = JSON.parse(packageText);
@@ -35,6 +36,12 @@ const lockVersion = cargoLock.match(/\[\[package\]\]\nname = "bridge"\nversion =
 const mcpbVersion = JSON.parse(mcpbText).version;
 if (!cargoVersion || [cargoVersion, tauri.version, mcpbVersion, lockVersion].some((version) => version !== packageJson.version)) {
   failures.push("manifest version consistency");
+}
+// src-tauri/release-date.txt is compiled into the program by build.rs and written with the version
+// by scripts/next-version.mjs; the build notice in tally_status reads it (#2391). One real UTC day.
+const releaseDay = releaseDate.replace(/\n$/, "");
+if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDay) || Number.isNaN(Date.parse(`${releaseDay}T00:00:00Z`)) || new Date(`${releaseDay}T00:00:00Z`).toISOString().slice(0, 10) !== releaseDay) {
+  failures.push("release date in src-tauri/release-date.txt");
 }
 if (packageJson.version === "0.1.0") failures.push("MIT v0.1.0 version boundary");
 

@@ -1,0 +1,5 @@
+a-m1-M-einv.xml: 3398 bytes, sha256 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+  GSTIN-shaped values: 0
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['3']; ALTMSTID ['215']
+a-m1-M-einv.xml: curl 0, HTTP 200, first byte 0.005639 s, curl total 0.006494 s, wall 0.04 s, 3398 bytes
+count exit 0

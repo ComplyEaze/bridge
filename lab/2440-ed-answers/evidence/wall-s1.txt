@@ -1,0 +1,3 @@
+request E1-einvoice-day.xml: sheet e0702cbb980e35f77e84cf48085824ef7d500d2f674e62d4c93d8d7257e95a71 1794; file e0702cbb980e35f77e84cf48085824ef7d500d2f674e62d4c93d8d7257e95a71 1794
+wall clock before the send 2026-11-10T19:49:38.883Z
+wall clock after the send 2026-11-10T19:49:39.366Z; timed.py exit 0

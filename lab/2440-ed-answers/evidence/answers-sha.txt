@@ -1,0 +1,9 @@
+$ size and sha256 of every answer as saved on the lab PC (Tally's answers, as timed.py wrote them)
+a-m1-M-einv.xml 3398 B 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+a-m2-M-einv.xml 3398 B 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+a-m3-M-dense.xml 3406 B fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+a-m4-M-dense.xml 3406 B fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+a-s1-E1-einvoice-day.xml 127966 B f03de5417d5ded4660f77f82f005abe602e972efabbd8554a1bd4fb4174248d0
+a-s2-E1-einvoice-day.xml 127966 B f03de5417d5ded4660f77f82f005abe602e972efabbd8554a1bd4fb4174248d0
+a-s3-E2-dense-day.xml 2809996 B c4f635c6b21df9730b4a06ad5fa6eeeb757b9668d010f159873029a2875c9c7f
+a-s4-E2-dense-day.xml 2809996 B c4f635c6b21df9730b4a06ad5fa6eeeb757b9668d010f159873029a2875c9c7f

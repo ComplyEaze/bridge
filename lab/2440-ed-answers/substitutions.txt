@@ -1,0 +1,6 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed (no captured byte is altered):
+scripts/step0.py: original 2842 B sha256 d91ff8cfe1545e085c28d1348008a72851dd09bc64689a9a518f7667c29f414d (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 542 B sha256 4764426dc19932c621cbad1cf2989c0b6ac4e297ea39b470a3d36f067dd9ec58 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/send.sh: original 963 B sha256 3e2b057b4831030e2ddd7b9fffb423a472872bfc920d5a8cbb28c427c9cd12df (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/fcount.py: original 1131 B sha256 0f161d2295847653e63860548206088700ea5252dd169f2965000c709b1c8570 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+scripts/mkresults-2440ed.py: original 3080 B sha256 21c963a516f226769978666ac809805f73a6900dbaa05ff7d23eb7762632f9b7 (kept on the lab PC); 1 x -> <LAB_DIR>

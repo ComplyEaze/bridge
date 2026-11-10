@@ -1,0 +1,87 @@
+a-m1-M-einv.xml: 3398 bytes, sha256 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+  GSTIN-shaped values: 0
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['3']; ALTMSTID ['215']
+a-m2-M-einv.xml: 3398 bytes, sha256 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+  GSTIN-shaped values: 0
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['3']; ALTMSTID ['215']
+a-m3-M-dense.xml: 3406 bytes, sha256 fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+  GSTIN-shaped values: 0
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['29900']; ALTMSTID ['328']
+a-s1-E1-einvoice-day.xml: 127966 bytes, sha256 f03de5417d5ded4660f77f82f005abe602e972efabbd8554a1bd4fb4174248d0
+  GSTIN-shaped values: 2
+  rows 3
+  row bytes: total 124904, the rest of the answer 3062; per row min 30484, max 47288, mean 41635
+  BRIDGEVCHISSALES: '<absent>' 3
+  VOUCHERTYPENAME: 'Sales' 2; 'Payment' 1
+  ISCANCELLED: 'No' 3
+  DATE: first 20250403, last 20250403, distinct 1
+  IRN: once in 3 rows, not empty in 1
+  IRNACKNO: once in 3 rows, not empty in 1
+  IRNACKDATE: once in 3 rows, not empty in 1
+  Sales-class rows 0: distinct numbers 0, distinct folded 0, rows whose folded number another Sales-class row also has 0
+  GUID: absent or empty in 0 rows; beginning with the book's GUID in 3 rows; distinct 3
+  ledger entry lists per row: min 2, max 3, total 8
+  row 1: 47288 bytes, 36 children, DATE='20250403' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x64 IRNACKNO:1x6 IRNACKDATE:1x8, IRNACKNO '112233', IRNACKDATE '20250403', GUID <book's>-00000001
+  row 2: 47132 bytes, 36 children, DATE='20250403' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000002
+  row 3: 30484 bytes, 35 children, DATE='20250403' VOUCHERNUMBER='1' VOUCHERTYPENAME='Payment' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000003
+a-s2-E1-einvoice-day.xml: 127966 bytes, sha256 f03de5417d5ded4660f77f82f005abe602e972efabbd8554a1bd4fb4174248d0
+  GSTIN-shaped values: 2
+  rows 3
+  row bytes: total 124904, the rest of the answer 3062; per row min 30484, max 47288, mean 41635
+  BRIDGEVCHISSALES: '<absent>' 3
+  VOUCHERTYPENAME: 'Sales' 2; 'Payment' 1
+  ISCANCELLED: 'No' 3
+  DATE: first 20250403, last 20250403, distinct 1
+  IRN: once in 3 rows, not empty in 1
+  IRNACKNO: once in 3 rows, not empty in 1
+  IRNACKDATE: once in 3 rows, not empty in 1
+  Sales-class rows 0: distinct numbers 0, distinct folded 0, rows whose folded number another Sales-class row also has 0
+  GUID: absent or empty in 0 rows; beginning with the book's GUID in 3 rows; distinct 3
+  ledger entry lists per row: min 2, max 3, total 8
+  row 1: 47288 bytes, 36 children, DATE='20250403' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x64 IRNACKNO:1x6 IRNACKDATE:1x8, IRNACKNO '112233', IRNACKDATE '20250403', GUID <book's>-00000001
+  row 2: 47132 bytes, 36 children, DATE='20250403' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000002
+  row 3: 30484 bytes, 35 children, DATE='20250403' VOUCHERNUMBER='1' VOUCHERTYPENAME='Payment' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000003
+a-s3-E2-dense-day.xml: 2809996 bytes, sha256 c4f635c6b21df9730b4a06ad5fa6eeeb757b9668d010f159873029a2875c9c7f
+  GSTIN-shaped values: 0
+  rows 82
+  row bytes: total 2805986, the rest of the answer 4010; per row min 34202, max 34222, mean 34219
+  BRIDGEVCHISSALES: '<absent>' 82
+  VOUCHERTYPENAME: 'Sales' 82
+  ISCANCELLED: 'No' 82
+  DATE: first 20250401, last 20250401, distinct 1
+  IRN: once in 82 rows, not empty in 0
+  IRNACKNO: once in 82 rows, not empty in 0
+  IRNACKDATE: once in 82 rows, not empty in 0
+  Sales-class rows 0: distinct numbers 0, distinct folded 0, rows whose folded number another Sales-class row also has 0
+  GUID: absent or empty in 0 rows; beginning with the book's GUID in 82 rows; distinct 82
+  ledger entry lists per row: min 2, max 2, total 164
+  row 1: 34202 bytes, 35 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000001
+  row 2: 34202 bytes, 35 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000002
+  row 3: 34202 bytes, 35 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000003
+a-s4-E2-dense-day.xml: 2809996 bytes, sha256 c4f635c6b21df9730b4a06ad5fa6eeeb757b9668d010f159873029a2875c9c7f
+  GSTIN-shaped values: 0
+  rows 82
+  row bytes: total 2805986, the rest of the answer 4010; per row min 34202, max 34222, mean 34219
+  BRIDGEVCHISSALES: '<absent>' 82
+  VOUCHERTYPENAME: 'Sales' 82
+  ISCANCELLED: 'No' 82
+  DATE: first 20250401, last 20250401, distinct 1
+  IRN: once in 82 rows, not empty in 0
+  IRNACKNO: once in 82 rows, not empty in 0
+  IRNACKDATE: once in 82 rows, not empty in 0
+  Sales-class rows 0: distinct numbers 0, distinct folded 0, rows whose folded number another Sales-class row also has 0
+  GUID: absent or empty in 0 rows; beginning with the book's GUID in 82 rows; distinct 82
+  ledger entry lists per row: min 2, max 2, total 164
+  row 1: 34202 bytes, 35 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000001
+  row 2: 34202 bytes, 35 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000002
+  row 3: 34202 bytes, 35 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES=<absent>, IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0, IRNACKNO '<0 chars>', IRNACKDATE '', GUID <book's>-00000003
+a-s1-E1-einvoice-day.xml against a-s2-E1-einvoice-day.xml: rows 3 and 3; element for element equal: yes
+a-s3-E2-dense-day.xml against a-s4-E2-dense-day.xml: rows 82 and 82; element for element equal: yes
+a-m1-M-einv.xml: curl 0, HTTP 200, first byte 0.005639 s, curl total 0.006494 s, wall 0.04 s, 3398 bytes
+a-m2-M-einv.xml: curl 0, HTTP 200, first byte 0.005257 s, curl total 0.006309 s, wall 0.05 s, 3398 bytes
+a-m3-M-dense.xml: curl 0, HTTP 200, first byte 0.009300 s, curl total 0.009987 s, wall 0.05 s, 3406 bytes
+a-s1-E1-einvoice-day.xml: curl 0, HTTP 200, first byte 0.089698 s, curl total 0.090888 s, wall 0.12 s, 127966 bytes
+a-s2-E1-einvoice-day.xml: curl 0, HTTP 200, first byte 0.089109 s, curl total 0.090276 s, wall 0.12 s, 127966 bytes
+a-s3-E2-dense-day.xml: curl 0, HTTP 200, first byte 0.476745 s, curl total 0.489827 s, wall 0.51 s, 2809996 bytes
+a-s4-E2-dense-day.xml: curl 0, HTTP 200, first byte 0.530902 s, curl total 0.561972 s, wall 0.59 s, 2809996 bytes
+count exit 0

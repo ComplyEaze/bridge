@@ -199,12 +199,12 @@ def report(path, ledger):
             for found in (c for c in row if c.tag == "GSTREGISTRATION"):  # GR
                 print("   GSTREGISTRATION attributes", dict(sorted(found.attrib.items())))
             for list_tag in ("LEDGERENTRIES.LIST", "ALLLEDGERENTRIES.LIST"):  # CD
-                legs = [c for c in row if c.tag == list_tag]
-                print(f"   {list_tag} elements: {len(legs)}")
-                for leg in legs[:LCAP]:
+                entries = [c for c in row if c.tag == list_tag]  # not "legs", which names the function R uses
+                print(f"   {list_tag} elements: {len(entries)}")
+                for leg in entries[:LCAP]:
                     print("    ", "; ".join(f"{t} {value(leg, t)}" for t in ("LEDGERNAME", "ISDEEMEDPOSITIVE", "AMOUNT")))
-                if len(legs) > LCAP:
-                    print(f"     ... {len(legs) - LCAP} more not printed")
+                if len(entries) > LCAP:
+                    print(f"     ... {len(entries) - LCAP} more not printed")
             print("   direct children:", len(row))
     elif kind == "K":
         found = rows(root, "LEDGER")

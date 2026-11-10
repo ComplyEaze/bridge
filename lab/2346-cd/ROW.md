@@ -52,6 +52,7 @@ Not for merge. For #2346 (0.9.0: sales-side Credit Notes and Debit Notes through
   - The V kind also prints `REFERENCE`, `REFERENCEDATE`, `GSTNATUREOFRETURN`, `VATPARTYTRANSRETURNNUMBER`, `VATPARTYTRANSRETURNDATE`, `ISINVOICE`, `VCHENTRYMODE` and `PERSISTEDVIEW`.
   - It also prints each `LEDGERENTRIES.LIST` and `ALLLEDGERENTRIES.LIST` (how many, then each one's ledger, side and amount).
   - Tried on `0010`'s voucher cut from the `pilot-lab-vouchers-after-post` fixture and re-encoded as UTF-16LE, it prints `REFERENCE` `BP/26-27/0010`, `GSTNATUREOFRETURN` empty, `ISINVOICE` Yes, `VCHENTRYMODE` `Accounting Invoice`, and six legs in each list, as the invoice has them.
+  - The first sheet's V kind named a local list `legs`, the name of the function the R kind calls, so every R answer failed (`UnboundLocalError`) before printing a row. The list is renamed. Tried since on a captured read-back answer (`lab/2162-bc-answers`, `answers/a-s2-R-0010.xml`), it prints one row and six legs.
 
 `SHA256.txt` lists every file with its size. Requests are UTF-16LE with a BOM, as sent.
 

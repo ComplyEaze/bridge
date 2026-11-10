@@ -26,15 +26,17 @@
 #   pb.py ANSWER...              the lines above for each answer (an L answer also needs its .headers file beside it).
 #   --same-row M0 M1             each holds exactly one COMPANY row, BOOK's, with equal ALTVCHID and ALTMSTID, else
 #                                MARKS DIFFER (exit 2); one row that is not BOOK's, or any other count, is STOP.
-#   --outcome LA LB S            the refusal or the read fetch_party_bills (tally/runtime_party_bills.rs) gives for the
-#                                report sent twice (LA, LB) and the snapshot S, in its order, as one last line
-#                                OUTCOME: <code> (<why>):
-#                                  response_content_type_unsupported   either answer has not exactly one Content-Type
+#   --outcome SA SB LA LB        the refusal or the read fetch_party_bills (tally/runtime_party_bills.rs) gives for the
+#                                snapshot sent twice (SA, SB), then the report sent twice (LA, LB), in its order, as one
+#                                last line OUTCOME: <code> (<why>) (PB: the snapshot's pair added):
+#                                  response_content_type_unsupported   any answer has not exactly one Content-Type
 #                                                                      header, or its value is not text/xml with at
 #                                                                      most one charset of utf-8 or utf-16
 #                                                                      (bridge-tally-transport lib.rs:1288-1295,
 #                                                                      text_encoding.rs:451): the transport refuses it;
 #                                  declared_encoding_mismatch          its charset is utf-8 where UTF-16 is asked for;
+#                                  native_ledger_collection_changed    SA and SB are not byte-equal (require_stable,
+#                                                                      runtime_party_bills.rs:89; PB);
 #                                  party_bills_drifted                 LA and LB are not byte-equal (require_stable,
 #                                                                      runtime_party_bills.rs:101);
 #                                  party_not_in_book                   no snapshot row is named PARTY (:116);
@@ -50,7 +52,6 @@
 #                                Codes are master's (party_bills.rs, runtime_party_bills.rs); the order is the runtime's.
 #                                Limits: master refuses the whole snapshot on any row it cannot read, before
 #                                party_not_in_book; this script reads PARTY's row, every row's GUID and nothing else.
-#                                The snapshot's own pair and Content-Type are not checked (it is sent once).
 # In an M or S answer a character XML forbids, raw or as a reference, is kept as U+FFFD, as master's sanitizer keeps it.
 # STOP, exit 1, never "0 rows", for an answer this script cannot read: an M or S answer that does not decode as UTF-16LE
 # or parse, carries a LINEERROR, has no BODY/DATA/COLLECTION, or (S) has two rows named PARTY, a row whose
@@ -58,8 +59,9 @@
 # or holds a character XML forbids; an L answer without its .headers file. An L answer that does not parse is ANSWER:
 # MALFORMED, as master refuses it.
 # Master's own parsers are run on the answers when they become fixtures, and that run is the one that counts.
-# Row 2346-PB: row 2377-NB's pb.py with PARTY alone changed (the line marked PB).
-# Example: python3 -I pb.py --outcome a-l1a-L-lo-rj-20260804.xml a-l1b-L-lo-rj-20260804.xml a-s1-S-snap-20260401-20260804.xml
+# Row 2346-PB: row 2377-NB's pb.py with PARTY changed and the snapshot's pair added to --outcome (the lines marked PB).
+# Example: python3 -I pb.py --outcome a-s1sa-S-snap-20260401-20260801.xml a-s1sb-S-snap-20260401-20260801.xml
+#            a-s1la-L-lo-bc-20260801.xml a-s1lb-L-lo-bc-20260801.xml
 import calendar, pathlib, re, sys
 from decimal import Decimal
 import xml.etree.ElementTree as ET
@@ -309,13 +311,20 @@ def answer(path, show=True):
         say(f"  sum of BILLCL: {sum((Decimal(row['BILLCL']) for row in rows), Decimal(0))}")
     return f"ROWS {len(rows)} ({on_account} On Account)", rows
 
-def outcome(la_path, lb_path, s_path):
+def outcome(sa_path, sb_path, la_path, lb_path):  # PB: the snapshot's pair, sent and checked first, as master does
+    def held(path):
+        return pathlib.Path(path).read_bytes() if pathlib.Path(path).exists() else b""
+    for path in (sa_path, sb_path):  # PB
+        refused = transport(path)  # PB
+        if refused:  # PB
+            return refused  # PB
+    if held(sa_path) != held(sb_path):  # PB
+        return "native_ledger_collection_changed (the two snapshot answers are not byte-equal)"  # PB
+    s_path = sa_path  # PB
     for path in (la_path, lb_path):
         refused = transport(path)
         if refused:
             return refused
-    def held(path):
-        return pathlib.Path(path).read_bytes() if pathlib.Path(path).exists() else b""
     if held(la_path) != held(lb_path):
         return "party_bills_drifted (the two answers are not byte-equal)"
     klass, rows = answer(la_path)
@@ -360,9 +369,9 @@ if args[0] == "--same-row":
         raise SystemExit(2)
     print("SAME MARKS")
 elif args[0] == "--outcome":
-    if len(args) != 4 or kind(args[1]) != "L" or kind(args[2]) != "L" or kind(args[3]) != "S":
-        stop("--outcome takes the two L answers, then an S answer")
-    print(f"OUTCOME: {outcome(args[1], args[2], args[3])}")
+    if len(args) != 5 or [kind(a) for a in args[1:]] != ["S", "S", "L", "L"]:  # PB
+        stop("--outcome takes the two S answers, then the two L answers")  # PB
+    print(f"OUTCOME: {outcome(args[1], args[2], args[3], args[4])}")  # PB
 else:
     for path in args:
         k = kind(path)

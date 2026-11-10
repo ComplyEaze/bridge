@@ -29,7 +29,13 @@ The states:
 - **Why one sitting:** each note's question is the state the notes before it left.
 - **Not asked here:** a Debit Note; a note against a bill from an earlier year or an opening bill; a part note whose rest is then settled; two part notes; a to-date at the period's end; a book with many bills (the read's cost).
 
-**The read is sent by curl, not by ComplyEaze Bridge.** Each request is one of master's builders' bytes, as row 2377-NB sent them: `render_ledger_outstandings_request` and `render_native_ledger_snapshot_request`, each with this row's party and to-date. This row does not run `fetch_party_bills` itself. It does not show its identity and book-extent brackets, or what the transport does with each answer. `pb.py --outcome` names the code master would give, from its own reading of master's code. Bridge's transport sending this read is #2473's domain, which is not on master.
+**The read is sent the way ComplyEaze Bridge sends it, with curl as the transport only.** On master ae38a75c, `fetch_party_bills` sends the ledger snapshot twice and requires the two answers to be byte-equal (`:89`). It then sends the party's `Ledger Outstandings` report twice under the same rule (`:101`). Each BR below sends those four requests in that order, after the step's write.
+- **The bytes are master's builders'.** `S-snap-20260401-20260801.xml` is `render_native_ledger_snapshot_request`'s format string, and `L-lo-bc-20260801.xml` is `render_ledger_outstandings_request`'s, each filled with this row's values. `B-bills.xml` and `B-payable.xml` are `render_native_bills_request`'s, one for each `NativeBillsReportKind`. Each was checked against master's format strings at ae38a75c before this sheet was sent.
+- **curl carries the bytes and keeps each answer's headers.** So the answers stand as Bridge-shaped evidence of what Tally returns to this read.
+- **What is not Bridge's:**
+  - The reads Bridge sends around the pairs are not sent: the read boundary, the company identity bracket before and after, and the book extent before and after. The step's M marks read stands in for part of the identity bracket (one COMPANY row, the book's GUID, its marks). Nothing stands in for the extent.
+  - `pb.py --outcome` names the code master would give, from its own reading of master's code. Master's parsers, run on the answers if they become fixtures, are the run that counts.
+- **An empty answer to the report** is row 2377-NB's case, which is #2473's domain.
 
 ## Book
 `BRIDGE PILOT LAB` (synthetic), loaded alone, in a sitting of its own. `LAB-COMMON.md` in this folder (v3, byte-equal to rows 2346-AR's and 2377-NB's) applies in full. Where it and this sheet differ, the stricter one holds.
@@ -64,7 +70,7 @@ The states:
 
   Nothing is re-sent on this row's own judgement. On this book the snapshot answered 25,518 B and the report under 6,000 B. A read-back that finds a voucher answers about 95,834 B.
 - **The stops.** `run.py`'s stops are failed requests, never "nothing found": a curl exit other than 0, an Unknown Request, an empty answer, or an answer above 2,000,000 B. So are `count20.py`'s and `pb.py`'s STOPs. Each stops the row there, with one exception.
-- **The one exception: an empty answer to an `L-` request.** It is row 2377-NB's exception, unchanged, and it needs the run coordinator's order for this row, as NB had one. Row 2377-NB found a bill-wise party with no bills answered with no bytes. Here the customer holds a bill at every read, but a settled bill may not count.
+- **The one exception: an empty answer to an `L-` request.** That case is #2473's domain. The exception is row 2377-NB's, unchanged, and it needs the run coordinator's order for this row, as NB had one. Row 2377-NB found a bill-wise party with no bills answered with no bytes. Here the customer holds a bill at every read, but a settled bill may not count.
   - It is recorded first as what it is: `run.py` printed "empty answer", so the request failed.
   - It is not a STOP, and its pair's second send is allowed, only if its headers file shows HTTP status 200 and `CONTENT-LENGTH: 0`. `run.py`'s printed "stop, do not resend" is then read as this exception.
   - Any other empty body (no headers file, no status line, another status or another length) ended without an answer. That is a STOP, and the request is never sent again. The rest of C3 holds.
@@ -80,18 +86,22 @@ The states:
 
 **Which script reads which answer**
 - **`count20.py`** (row 2346-AR's, unchanged) reads `a-*-M-marks.xml`, `a-*-N-*`, `a-*-R-*`, `a-*-B-*` (Bills Receivable and Bills Payable alike, by the flat grammar of reference §12a.1), and the import answers `a-*-I-*` and `a-*-L-ledger.xml`. Its B kind prints the customer's groups (`--ledger` defaults to `BRIDGE Walk-in BC`).
-- **`pb.py`** (row 2377-NB's with `PARTY` alone changed, marked PB) reads `a-*-S-snap-*` and `a-*-L-lo-*`. For each step it also prints `pb.py --outcome LA LB S`: the code master gives for the report sent twice and the snapshot.
+- **`pb.py`** (row 2377-NB's with two changes, marked PB) reads `a-*-S-snap-*` and `a-*-L-lo-*`. For each step it also prints `pb.py --outcome SA SB LA LB`: the code master gives for the snapshot sent twice and then the report sent twice, in master's order.
 - They share no answer file. Give each script only its own files.
 
-**A read of the bills** (named BR below) is three labels, in this order:
-1. `<step>r`: `S-snap-20260401-20260801.xml B-bills.xml B-payable.xml M-marks.xml`, plus the step's N or R reads;
-2. `<step>la`: `L-lo-bc-20260801.xml`;
-3. `<step>lb`: `L-lo-bc-20260801.xml`, the same request again, as master sends it twice.
+**A read of the bills** (named BR below) is five labels, in this order. The first four are `fetch_party_bills`'s sends, in its order:
+1. `<step>sa`: `S-snap-20260401-20260801.xml`;
+2. `<step>sb`: `S-snap-20260401-20260801.xml`, the same request again;
+3. `<step>la`: `L-lo-bc-20260801.xml`;
+4. `<step>lb`: `L-lo-bc-20260801.xml`, the same request again;
+5. `<step>r`: `B-bills.xml B-payable.xml M-marks.xml`, plus the step's N or R reads.
+
+If the two snapshot answers are not byte-equal, master sends nothing more. This row still sends 3 to 5, and records that master would not have.
 
 Then:
 - `count20.py` on the `r` label's M, N, R and B answers;
-- `pb.py` on its S answer and on both L answers;
-- `pb.py --outcome a-<step>la-L-lo-bc-20260801.xml a-<step>lb-L-lo-bc-20260801.xml a-<step>r-S-snap-20260401-20260801.xml`.
+- `pb.py` on both S answers and both L answers;
+- `pb.py --outcome a-<step>sa-S-snap-20260401-20260801.xml a-<step>sb-S-snap-20260401-20260801.xml a-<step>la-L-lo-bc-20260801.xml a-<step>lb-L-lo-bc-20260801.xml`.
 
 Record the window after `<step>la` (shot): the first read of this report for this party in each state.
 
@@ -106,7 +116,9 @@ Record the window after `<step>la` (shot): the first read of this report for thi
 - **Byte-equal to row 2377-NB's file** (`lab/2377-nb-sheet` at 03d7763a, folder `lab/2377-nb/`):
   - `run.py`;
   - `template-nb-L-lo-rj-20260804.xml` and `template-nb-S-snap-20260401-20260804.xml`, NB's `L-lo-rj-20260804.xml` and `S-snap-20260401-20260804.xml`, renamed.
-- **`pb.py`:** row 2377-NB's, with one line changed, marked PB: `PARTY` is `BRIDGE Walk-in BC`.
+- **`pb.py`:** row 2377-NB's, with each changed line marked PB:
+  - `PARTY` is `BRIDGE Walk-in BC`;
+  - `--outcome` takes the snapshot's two answers before the report's two, as master sends them (`runtime_party_bills.rs:89`, then `:101`). It checks the snapshot answers' headers as it checks the report's. A snapshot pair that is not byte-equal gives `native_ledger_collection_changed` (`src-tauri/src/tally/connection.rs:1270`).
 
 **`gen.py`** first asserts that row 2346-AR's own functions, with AR's values, give each AR file above byte for byte. It then writes each new request with only the change it names, each change asserted to occur exactly as often as expected:
 - **`I-0101.xml` (set-up):** `I-0099.xml` with the number `BP/26-27/0101` (twice, and as its New Ref's name) and the tail `000000000d14`.
@@ -129,7 +141,9 @@ Record the window after `<step>la` (shot): the first read of this report for thi
   - s1, where `BRIDGE Walk-in BC` has no row;
   - l1a, one row;
   - l2a, NO BYTES;
-  - `--outcome` l1a l1b s1: `party_not_in_book`, as the party is not in NB's book.
+  - `--outcome` s1 s1' l1a l1b, where s1' is s1's answer and headers file copied: `party_not_in_book`, as the party is not in NB's book. The script before the change gives the same for l1a l1b s1;
+  - `--outcome` s1 s2 l1a l1b: `native_ledger_collection_changed`;
+  - `--outcome` with the old order, l1a l1b s1: STOP, exit 1, as meant.
 - `pb.py` on master's capture `ledger-outstandings-p1-20260331.utf16le.xml` (with l1a's headers file beside it): ROWS 6 (1 On Account). The two credit bills read with a positive `BILLCL`, and the sum is -26000.00.
 - `count20.py`'s B kind on master's capture `native-outstandings-lab-bills-payable.utf16le.xml`: 3 groups, 0 for `BRIDGE Walk-in BC`.
 
@@ -233,11 +247,12 @@ Estimates, not predictions. Debit amounts are negative, as the report and the sn
 - **s9:** equal to s2 and s1.
 
 ## Decides
-Each is PARTIAL: one book, one release, one sitting, the read sent by curl.
+Each is PARTIAL: one book, one release, one sitting, the read sent in master's bytes and order by curl, without the reads around it.
 
 **For each state, the outcome `pb.py --outcome` names:**
 - **told:** master's one-party read reads this state. Its rows are what the note builder's refusals are judged on (the capture-6 comment's checks 1 to 3).
 - **`party_bills_untied`:** the report leaves out or misstates a bill that the closing holds. Record which bill, from Bills Receivable, Bills Payable and the read-backs. Master refuses every customer in that state, which is safe but stops notes to them. The coordinator decides whether the read needs a change.
+- **`native_ledger_collection_changed`:** the snapshot answered the same request differently, with nothing sent between. Record both answers whole. Nothing is sent again on this row's judgement.
 - **`response_content_type_unsupported` or NO BYTES:** row 2377-NB's empty answer, in a state with an open bill. #2473 is open for that case.
 - **Any other code:** record it whole.
 
@@ -257,10 +272,11 @@ Each is PARTIAL: one book, one release, one sitting, the read sent by curl.
 Lines are at master ae38a75c.
 - **The build has no note type.** `VoucherType` (`src-tauri/src/agent_import.rs:330`) has Payment, Receipt, Journal, Contra and Sales, so no build sends a note.
 - **The build refuses a bill-wise customer** before any write (`invoice_party_bill_wise_not_supported`, `src-tauri/src/agent_import_invoice.rs:883`). So no build reaches this row's set-up either.
-- **The bills read exists.** The `outstandings` tool's `open_bills` detail (`src-tauri/src/agent_outstandings.rs:13`) calls `TallyRuntime::fetch_party_bills` (`src-tauri/src/tally/runtime_party_bills.rs:57`). That reads the snapshot and then the report, each sent twice (`:89`, `:101`), and ties them (`PartyBillsAnswer::tie`, `src-tauri/crates/bridge-tally-protocol/src/native_outstandings/party_bills.rs:87`). This row sends the same two requests, with its own party and to-date.
+- **The bills read exists.** The `outstandings` tool's `open_bills` detail (`src-tauri/src/agent_outstandings.rs:13`) calls `TallyRuntime::fetch_party_bills` (`src-tauri/src/tally/runtime_party_bills.rs:57`). That reads the snapshot and then the report, each sent twice (`:89`, `:101`), and ties them (`PartyBillsAnswer::tie`, `src-tauri/crates/bridge-tally-protocol/src/native_outstandings/party_bills.rs:87`). This row sends the same two requests, each twice, in that order, with its own party and to-date.
 
 ## Not measured
-- The read sent by ComplyEaze Bridge, with its brackets and its transport (#2473's domain).
+- The reads ComplyEaze Bridge sends around the pairs: the read boundary, the identity bracket and the book extent.
+- Bridge's own transport and parsers on these answers. An empty report answer is #2473's domain.
 - A to-date at the period's end, or after a later-dated settlement.
 - A Debit Note, a purchase-side note, and a note against an opening bill or one from an earlier year.
 - A second part note, or the rest of a part-settled bill settled.

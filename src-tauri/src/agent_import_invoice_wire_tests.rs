@@ -1,6 +1,17 @@
 use super::*;
 use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
 
+/// How many Sales-class rows a window answer holds, as the control's miss
+/// reports them.
+fn sales_count(xml: &str) -> Result<usize, &'static str> {
+    control_miss(xml, None).map(|miss| miss.sales_rows)
+}
+
+/// Whether a Sales-class holder of `number` carries an IRN.
+fn holder_has_irn(xml: &str, number: &str) -> Result<bool, &'static str> {
+    number_holding(xml, number).map(|holding| holding == NumberHolding::Held { with_irn: true })
+}
+
 /// The shape of the lab's voucher-type collection (measured 6 Oct 2026): a
 /// CMPINFO counter named like the rows, then one VOUCHERTYPE per type with its
 /// reserved name as an attribute and the series-level numbering inside
@@ -160,16 +171,13 @@ fn an_answer_that_is_not_tallys_success_is_never_read_as_no_rows() {
         "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><VOUCHER/></DATA></BODY></ENVELOPE>",
     ] {
         assert_eq!(count_vouchers(no_collection), Err("invoice_read_collection_absent"), "{no_collection}");
-        assert_eq!(count_sales_vouchers(no_collection), Err("invoice_read_collection_absent"));
+        assert_eq!(sales_count(no_collection), Err("invoice_read_collection_absent"));
     }
     // A row written as an empty element is a row with no fields: it is never
     // "no rows", and the class count refuses it.
     let empty_row = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION><VOUCHER/></COLLECTION></DATA></ENVELOPE>";
     assert_eq!(count_vouchers(empty_row), Ok(1));
-    assert_eq!(
-        count_sales_vouchers(empty_row),
-        Err("invoice_number_class_unread")
-    );
+    assert_eq!(sales_count(empty_row), Err("invoice_number_class_unread"));
     // A collection written as an empty element is still a collection.
     let self_closed =
         "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION/></DATA></ENVELOPE>";
@@ -204,6 +212,134 @@ fn sent_sha256(request: &str) -> String {
         .chain(request.encode_utf16().flat_map(u16::to_le_bytes))
         .collect::<Vec<u8>>();
     crate::agent::sha256_hex(&sent)
+}
+
+/// The window read the code renders is, for each month of the dense book's
+/// year and for the pilot book's whole year, the request row 2162-S7 sent, by
+/// the SHA-256 of its file (`C-Y0-<month>.xml` and `A-Y0-year.xml` of
+/// `lab/2162-s7-sheet` at b63accd9, `SHA256.txt`).
+#[test]
+fn the_window_read_is_the_one_the_lab_sent_for_each_month_and_for_a_year() {
+    let months = calendar_months(&date("20250401"), &date("20260331")).unwrap();
+    let sent = [
+        "4ba0e96e06cb07b10e6d122b483ab87c01b4eed97b77b16fee681b8a922875df",
+        "566107572af15fa31b2ddd9014cd82ee7fe9164ecf40d66f85a520b8a9fd4ab5",
+        "b04114438fd616e1b4d0b2a68a2a13f5f1802a67ffa2dfa44fd9a843ec695735",
+        "1c8b0fa5760d0f2c535368c3bf4eec7c1992bf5237d8a4124e3a8dd5d4842dc5",
+        "3f1dd952bff9d12bc87b21b6d4b98e1916c4b0e5464e930269c6fdbe797b08f8",
+        "b834016d9d7a9ca9a90735240b4101a735680f7fa0db999908c84133e3af763b",
+        "cb57a5a2f8be2448bf6fa4f883cac380ee28e78717a0f61857e4f3240268df1f",
+        "779ccddef87de004dbc9d700cc7c01edc32bbd652483814205aaf7aaa052bbb7",
+        "abe28d18b2c481a13a23e9c79cb4f5fbc1c43a740e23935e8054920b148f9a30",
+        "0f9cc2edb641129abe727a44189c37d500b22b0e55fbb9591c758bedf2815c22",
+        "a2f6038bfe8830dd0b4a3e96269e864b6bf9001e9340481d05195a7a63e84ed7",
+        "7f23382ae309cdb1ef66526e090edddc504aec2f1aea0d00554e3bd959e85f98",
+    ];
+    assert_eq!(months.len(), sent.len());
+    for ((from, to), sha256) in months.iter().zip(sent) {
+        let rendered = render_invoice_window_numbers_request("BRIDGE CORPUS DENSE", (from, to));
+        assert_eq!(sent_sha256(&rendered), sha256, "{}", from.as_str());
+    }
+    let year = render_invoice_window_numbers_request(
+        "BRIDGE PILOT LAB",
+        (&date("20260401"), &date("20270331")),
+    );
+    assert_eq!(
+        sent_sha256(&year),
+        "4f2041761f5a0bab6a8cbbc27f0b8419eaf652d881f2585899189defc7d76ed1"
+    );
+}
+
+/// The month reads row 2162-M1 sends, on the two books the replay tests run
+/// on, are what the renderer writes for each month of their financial years,
+/// by the SHA-256 of each file (`A-Y0-<month>.xml` and `C-Y0-<month>.xml` of
+/// `lab/2162-m1-sheet`, `SHA256.txt`).
+#[test]
+fn the_m1_requests_are_the_ones_the_renderer_writes() {
+    let books = [
+        (
+            "BRIDGE PILOT LAB",
+            ("20260401", "20270331"),
+            [
+                "c247b44f63d3d3107f1a4eec8bb6e98f2ef163ddae0c9969d97b40fe59679ebc",
+                "a4afaa7bee760457d8c199c8a83bdd9a69f1bf73f246bf868ad89f095426d518",
+                "2ebf04a727ddfdc48d028b340fade10d88e18279069bbb2374645197af71ed5c",
+                "80f2ca5df0fd1035956d95df44a34ab790e8105b0ec69121de325f2f8a9e3e9d",
+                "b226ad52af00b919a62d9c29e2d2e6db0fe1ad4071fbe2a97da3a82852c23d26",
+                "9e6ff4c88df3af12f8c6be5d2b4abaf6d1cae133a0eea406b75c86af70990447",
+                "54e5fcb963d3d547c71d5aa61b242f39a5737120353a8832c5ca2e49ccc99853",
+                "84fb20ef3ed1065e7c4534113287143d2cb36846b391770d9aa6466d2bfa8381",
+                "e6df4cf0d2133d0d681ee074fce020391828ce4733614e2d3965c24035914dac",
+                "3ff8a263528b18baabdfdaa8ad0457d8ff1f236782c1bbd43e7bfe8cfd40cb10",
+                "a8fbb5f9cd443928bd430a481c4da1cf0040255f5c9e43901351b2a22d43d292",
+                "45d1541630cc938e63c1733f97d280e9eba94ee40fcb70ac48c5e2fccdddb4af",
+            ],
+        ),
+        (
+            "BRIDGE EINVOICE LAB",
+            ("20250401", "20260331"),
+            [
+                "62d8199bf164e22f29c04276b797e68a78e65de452c2db81ebe918dc7f4aed3d",
+                "a7158860f8c8e330e07108bd2228448e30d5ff39c881b5f19d738f2c0809604b",
+                "6fbabcd51e49cd6f670585a8d14148d16ff8a1fb0010ca31fed7b9dbae4f2800",
+                "0d6a7467e14ff043e2b783cab720add0a1e60ed11fc34101370962a1d6da67c8",
+                "20af351bb66ab62bde783699ed2e7a1aed0805aa94103c0dd887b5066473d6a5",
+                "b9b67fb65abcc882ab3a7ffa1df8bdeec8200a8d0efd3367eecc6e1ff03f369d",
+                "1a926b3105ea34fb1fe4e422b7220a4bc18b86c3d18a8425b25aeac43c37e7ce",
+                "295ecfe3127d0930ba60a3e4f748fbb43defab94295b1ce92cb4b64980db3ea3",
+                "eeadb3fb2f52cc7199e73a68eef4a36e3579e4965f1a6623efa3cb10562e06e6",
+                "bcb848eaa2121609c1f2b594a96249ea26850896a8ba55fdb29e0f5139243bc2",
+                "c2ac37a4b0db5424a5310e1d1b05506776c0a7872a4e5cf1ebb43041974ba962",
+                "585384e27a3a459fd6d1546cd3f4ba15e6ec015bf217da947575e233b31216f7",
+            ],
+        ),
+    ];
+    for (company, (from, to), sent) in books {
+        let months = calendar_months(&date(from), &date(to)).unwrap();
+        assert_eq!(months.len(), sent.len());
+        for ((from, to), sha256) in months.iter().zip(sent) {
+            let rendered = render_invoice_window_numbers_request(company, (from, to));
+            assert_eq!(
+                sent_sha256(&rendered),
+                sha256,
+                "{company} {}",
+                from.as_str()
+            );
+        }
+    }
+}
+
+/// The months of a span run from its first day to its last with no gap, each
+/// ending on its own last day (February of a leap year included); a span that
+/// does not start on a first or end on a month's last day has none.
+#[test]
+fn calendar_months_tile_a_span_of_whole_months_and_refuse_any_other() {
+    let months = calendar_months(&date("20271101"), &date("20280331")).unwrap();
+    let pairs = months
+        .iter()
+        .map(|(from, to)| format!("{}-{}", from.as_str(), to.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        pairs,
+        [
+            "20271101-20271130",
+            "20271201-20271231",
+            "20280101-20280131",
+            "20280201-20280229",
+            "20280301-20280331",
+        ]
+    );
+    assert_eq!(
+        calendar_months(&date("20260401"), &date("20260430")).map(|m| m.len()),
+        Some(1)
+    );
+    for (from, to) in [
+        ("20260402", "20270331"),
+        ("20260401", "20270330"),
+        ("20260501", "20260430"),
+    ] {
+        assert_eq!(calendar_months(&date(from), &date(to)), None, "{from} {to}");
+    }
 }
 
 /// The number read the code renders is, for the two numbers row 2162-IRN sent
@@ -324,26 +460,46 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
     let wrap = |rows: &str| {
         format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
     };
-    let row = |kind: &str, class: &str| {
-        format!("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><VOUCHERTYPENAME>{kind}</VOUCHERTYPENAME><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
+    let row_numbered = |number: &str, kind: &str, class: &str| {
+        format!("<VOUCHER><VOUCHERNUMBER>{number}</VOUCHERNUMBER><VOUCHERTYPENAME>{kind}</VOUCHERTYPENAME><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
     };
+    let row = |kind: &str, class: &str| row_numbered("9", kind, class);
+    // The year's month answers: the month given, then eleven empty ones.
+    let year = |month: String| {
+        let mut months = vec![month];
+        months.extend(std::iter::repeat_n(wrap(""), 11));
+        months
+    };
+    let judge =
+        |month: String, posted: Option<&str>| number_after_post_difference(&year(month), "9", posted);
     let posted = Some("BRIDGE Sales");
+    assert_eq!(judge(wrap(&row("BRIDGE Sales", "Yes")), posted), None);
+    // A month answer holds every number of the month: only the posted one counts.
     assert_eq!(
-        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes")), posted),
-        None
-    );
-    // A Purchase-class voucher holding the number is no clash after the post either.
-    assert_eq!(
-        number_after_post_difference(
-            &wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))),
+        judge(
+            wrap(&(row("BRIDGE Sales", "Yes") + &row_numbered("8", "Sales", "Yes"))),
             posted
         ),
         None
     );
-    // The read-back reads the posted type only; this read names each other type.
+    // The same number as the build counts it: letter case and the leading
+    // zeros of a run of digits ignored.
     assert_eq!(
-        number_after_post_difference(
-            &wrap(
+        judge(
+            wrap(&(row("BRIDGE Sales", "Yes") + &row_numbered("09", "Sales", "Yes"))),
+            posted
+        ),
+        Some("invoice_number_in_another_type: Sales".to_string())
+    );
+    // A Purchase-class voucher holding the number is no clash after the post either.
+    assert_eq!(
+        judge(wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))), posted),
+        None
+    );
+    // The read-back reads the posted type only; these reads name each other type.
+    assert_eq!(
+        judge(
+            wrap(
                 &(row("BRIDGE Sales", "Yes")
                     + &row("BRIDGE Sales Keyed", "Yes")
                     + &row("Sales", "Yes"))
@@ -353,47 +509,75 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         Some("invoice_number_in_another_type: BRIDGE Sales Keyed, Sales".to_string())
     );
     assert_eq!(
-        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes").repeat(2)), posted),
+        judge(wrap(&row("BRIDGE Sales", "Yes").repeat(2)), posted),
         Some("invoice_number_not_unique".to_string())
     );
-    // The read that misses the invoice the read-back found is never a pass.
+    // The year is judged whole: the number in two months is held twice.
+    let mut two_months = year(wrap(&row("BRIDGE Sales", "Yes")));
+    two_months[7] = wrap(&row("BRIDGE Sales", "Yes"));
     assert_eq!(
-        number_after_post_difference(&wrap(""), posted),
+        number_after_post_difference(&two_months, "9", posted),
+        Some("invoice_number_not_unique".to_string())
+    );
+    let mut elsewhere = year(wrap(&row("BRIDGE Sales", "Yes")));
+    elsewhere[11] = wrap(&row("Sales", "Yes"));
+    assert_eq!(
+        number_after_post_difference(&elsewhere, "9", posted),
+        Some("invoice_number_in_another_type: Sales".to_string())
+    );
+    // The reads that miss the invoice the read-back found are never a pass.
+    assert_eq!(
+        judge(wrap(""), posted),
         Some("invoice_number_read_missed_invoice".to_string())
     );
     assert_eq!(
-        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes")), None),
+        number_after_post_difference(&[], "9", posted),
+        Some("invoice_number_read_missed_invoice".to_string())
+    );
+    assert_eq!(
+        judge(wrap(&row("BRIDGE Sales", "Yes")), None),
         Some("invoice_number_type_unread".to_string())
     );
     assert_eq!(
-        number_after_post_difference(
-            &wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><BRIDGEVCHISSALES>Yes</BRIDGEVCHISSALES></VOUCHER>"),
+        judge(
+            wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><BRIDGEVCHISSALES>Yes</BRIDGEVCHISSALES></VOUCHER>"),
             posted,
         ),
         Some("invoice_number_type_unread".to_string())
     );
     assert_eq!(
-        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Maybe")), posted),
+        judge(wrap(&row("BRIDGE Sales", "Maybe")), posted),
         Some("invoice_number_class_unread".to_string())
     );
+    // One month that cannot be read spoils the year, wherever it stands.
+    let mut unread = year(wrap(&row("BRIDGE Sales", "Yes")));
+    unread[6] = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER></ENVELOPE>".to_string();
     assert_eq!(
-        number_after_post_difference(
-            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER></ENVELOPE>",
-            posted
-        ),
+        number_after_post_difference(&unread, "9", posted),
         Some("invoice_read_collection_absent".to_string())
     );
-    // Tally's answers for `BP/26-27/0010` (row 2162-ST): held once, on
-    // BRIDGE Sales; then also on a second Sales type, which took the number.
+    // Tally's answers to the build's class-wide number read for
+    // `BP/26-27/0010` (row 2162-ST), served here as one month's answer: their
+    // rows have the month reads' shape. Held once, on BRIDGE Sales; then also
+    // on a second Sales type, which took the number.
+    let number = "BP/26-27/0010";
     let held = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml"));
-    assert_eq!(number_after_post_difference(&held, posted), None);
+    assert_eq!(
+        number_after_post_difference(&year(held.clone()), number, posted),
+        None
+    );
+    // As the build counts it, `bp/26-27/10` is the same number.
+    assert_eq!(
+        number_after_post_difference(&year(held), "bp/26-27/10", posted),
+        None
+    );
     let two_types = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml"));
     for (posted, other) in [
         ("BRIDGE Sales", "BRIDGE Sales Keyed"),
         ("BRIDGE Sales Keyed", "BRIDGE Sales"),
     ] {
         assert_eq!(
-            number_after_post_difference(&two_types, Some(posted)),
+            number_after_post_difference(&year(two_types.clone()), number, Some(posted)),
             Some(format!("invoice_number_in_another_type: {other}")),
             "{posted}"
         );
@@ -403,7 +587,7 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
     ));
     assert_eq!(
-        number_after_post_difference(&beside_payment, Some("Sales")),
+        number_after_post_difference(&year(beside_payment), "1", Some("Sales")),
         None
     );
 }
@@ -416,26 +600,26 @@ fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
     let row = |class: &str| {
         format!("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
     };
-    assert_eq!(count_sales_vouchers(&wrap("")), Ok(0));
-    assert_eq!(count_sales_vouchers(&wrap(&row("Yes"))), Ok(1));
+    assert_eq!(sales_count(&wrap("")), Ok(0));
+    assert_eq!(sales_count(&wrap(&row("Yes"))), Ok(1));
     // The same number under a Purchase-class type is not an invoice number clash.
-    assert_eq!(count_sales_vouchers(&wrap(&row("No"))), Ok(0));
+    assert_eq!(sales_count(&wrap(&row("No"))), Ok(0));
     assert_eq!(
-        count_sales_vouchers(&wrap(&(row("Yes") + &row("Yes") + &row("No")))),
+        sales_count(&wrap(&(row("Yes") + &row("Yes") + &row("No")))),
         Ok(2)
     );
     // A row whose class did not come back is an error, never a No.
     assert_eq!(
-        count_sales_vouchers(&wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER></VOUCHER>")),
+        sales_count(&wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER></VOUCHER>")),
         Err("invoice_number_class_unread")
     );
     assert_eq!(
-        count_sales_vouchers(&wrap(&row("Maybe"))),
+        sales_count(&wrap(&row("Maybe"))),
         Err("invoice_number_class_unread")
     );
     // And an answer that is not Tally's success is never "no rows".
     assert_eq!(
-        count_sales_vouchers("<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><DATA><COLLECTION></COLLECTION></DATA></ENVELOPE>"),
+        sales_count("<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><DATA><COLLECTION></COLLECTION></DATA></ENVELOPE>"),
         Err("invoice_read_status_not_success")
     );
 }
@@ -452,10 +636,114 @@ fn the_captured_number_reads_say_whether_the_sales_holder_carries_an_irn() {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml"
     ));
     assert_eq!(count_vouchers(&with), Ok(2));
-    assert_eq!(count_sales_vouchers(&with), Ok(1));
-    assert_eq!(sales_holder_has_irn(&with), Ok(true));
-    assert_eq!(count_sales_vouchers(&without), Ok(1));
-    assert_eq!(sales_holder_has_irn(&without), Ok(false));
+    assert_eq!(sales_count(&with), Ok(1));
+    assert_eq!(holder_has_irn(&with, "1"), Ok(true));
+    assert_eq!(sales_count(&without), Ok(1));
+    assert_eq!(holder_has_irn(&without, "2"), Ok(false));
+}
+
+/// A window answer holds a number when a Sales-class row's number folds to
+/// it. On the captured answers: the book's first invoice `BP/26-27/0001` is
+/// held whatever its case and leading zeros, and a number that differs in a
+/// digit is not; on the e-invoice book number `1` is held by the Sales
+/// invoice with an IRN (the Payment of the same number is not Sales class),
+/// and `2` by one without; the empty answer holds nothing.
+#[test]
+fn a_window_answer_holds_a_number_its_sales_rows_fold_to() {
+    let in_use = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"
+    ));
+    let held = Ok(NumberHolding::Held { with_irn: false });
+    for number in [
+        "BP/26-27/0001",
+        "bp/26-27/1",
+        "BP/026-027/00001",
+        " BP/26-27/01 ",
+    ] {
+        assert_eq!(number_holding(&in_use, number), held, "{number}");
+    }
+    for number in [
+        "BP/26-27/0010",
+        "BP/26-27/00011",
+        "BP/26-28/0001",
+        "BP/26-27",
+        "",
+    ] {
+        assert_eq!(
+            number_holding(&in_use, number),
+            Ok(NumberHolding::Unheld),
+            "{number}"
+        );
+    }
+    let with = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
+    ));
+    let without = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml"
+    ));
+    assert_eq!(
+        number_holding(&with, "001"),
+        Ok(NumberHolding::Held { with_irn: true })
+    );
+    assert_eq!(number_holding(&without, "2"), held);
+    let empty = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"
+    ));
+    assert_eq!(number_holding(&empty, "1"), Ok(NumberHolding::Unheld));
+}
+
+/// The fold ignores case and the leading zeros of each digit run, keeps one
+/// zero of a run of zeros, keeps every other character (a space inside the
+/// number included), and has nothing to say of a blank number.
+#[test]
+fn the_number_fold_ignores_case_and_each_runs_leading_zeros() {
+    for (number, folded) in [
+        ("bp/26-27/0051", "BP/26-27/51"),
+        ("BP/026-027/051", "BP/26-27/51"),
+        ("  Z1/0001 ", "Z1/1"),
+        ("000", "0"),
+        ("A0B00C", "A0B0C"),
+        ("10", "10"),
+        ("100/0100", "100/100"),
+        ("A 01", "A 1"),
+    ] {
+        assert_eq!(folded_number(number).as_deref(), Some(folded), "{number}");
+    }
+    assert_ne!(folded_number("BP 1"), folded_number("BP1"));
+    assert_ne!(folded_number("1"), folded_number("10"));
+    assert_eq!(folded_number("   "), None);
+    assert_eq!(folded_number(""), None);
+}
+
+/// Of several holders, one with an IRN decides the verdict; a row of the
+/// other class never holds; a row whose class is unread is an error.
+#[test]
+fn any_holder_with_an_irn_decides_and_an_unread_class_is_an_error() {
+    let wrap = |rows: &str| {
+        format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
+    };
+    let row = |number: &str, class: &str, irn: &str| {
+        format!("<VOUCHER><VOUCHERNUMBER>{number}</VOUCHERNUMBER>{irn}<BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
+    };
+    let irn = "<IRN>abc</IRN>";
+    let both = row("A/07", "Yes", irn) + &row("a/7", "Yes", "") + &row("A/7", "No", irn);
+    assert_eq!(
+        number_holding(&wrap(&both), "A/0007"),
+        Ok(NumberHolding::Held { with_irn: true })
+    );
+    let reversed = row("a/7", "Yes", "") + &row("A/07", "Yes", irn);
+    assert_eq!(
+        number_holding(&wrap(&reversed), "A/7"),
+        Ok(NumberHolding::Held { with_irn: true })
+    );
+    assert_eq!(
+        number_holding(&wrap(&row("A/7", "No", irn)), "A/7"),
+        Ok(NumberHolding::Unheld)
+    );
+    assert_eq!(
+        number_holding(&wrap(&row("B/1", "Maybe", "")), "A/7"),
+        Err("invoice_number_class_unread")
+    );
 }
 
 /// The holder's IRN is said only when it came back with text; an empty or
@@ -470,20 +758,20 @@ fn only_a_sales_holder_with_an_irn_says_the_number_carries_one() {
     };
     let with = "<IRN TYPE=\"String\">ab12</IRN>";
     let empty = "<IRN TYPE=\"String\"></IRN>";
-    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", with))), Ok(true));
-    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", empty))), Ok(false));
-    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", ""))), Ok(false));
-    assert_eq!(sales_holder_has_irn(&wrap(&row("No", with))), Ok(false));
+    assert_eq!(holder_has_irn(&wrap(&row("Yes", with)), "1"), Ok(true));
+    assert_eq!(holder_has_irn(&wrap(&row("Yes", empty)), "1"), Ok(false));
+    assert_eq!(holder_has_irn(&wrap(&row("Yes", "")), "1"), Ok(false));
+    assert_eq!(holder_has_irn(&wrap(&row("No", with)), "1"), Ok(false));
     assert_eq!(
-        sales_holder_has_irn(&wrap(&(row("No", empty) + &row("Yes", with)))),
+        holder_has_irn(&wrap(&(row("No", empty) + &row("Yes", with))), "1"),
         Ok(true)
     );
     assert_eq!(
-        sales_holder_has_irn(&wrap(&row("Yes", &format!("{with}{with}")))),
+        holder_has_irn(&wrap(&row("Yes", &format!("{with}{with}"))), "1"),
         Err("invoice_read_field_repeated")
     );
     assert_eq!(
-        sales_holder_has_irn(&wrap(&row("Maybe", with))),
+        holder_has_irn(&wrap(&row("Maybe", with)), "1"),
         Err("invoice_number_class_unread")
     );
 }
@@ -858,8 +1146,64 @@ fn the_captured_number_answers_count_their_rows_not_their_header() {
         ),
     ] {
         assert_eq!(count_vouchers(&xml), Ok(vouchers), "{name}");
-        assert_eq!(count_sales_vouchers(&xml), Ok(sales), "{name}");
+        assert_eq!(sales_count(&xml), Ok(sales), "{name}");
     }
+}
+
+/// What a miss of the control reports, on Tally's own answers (#2162 item 13):
+/// the Sales rows the answer held, and the row carrying the control's voucher
+/// GUID as it reads, if any. The pilot lab's answer carries each voucher's
+/// GUID though the read's fetch list does not name it.
+#[test]
+fn a_control_miss_counts_the_sales_rows_and_finds_the_controls_guid() {
+    let known = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"));
+    let absent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"));
+    let guid = format!("{}-00000001", pilot_lab_guid());
+    assert_eq!(
+        control_miss(&known, Some(&guid.to_uppercase())),
+        Ok(ControlMiss {
+            sales_rows: 1,
+            guid: Some(GuidSeen::Seen {
+                number: Some("BP/26-27/0001".to_string()),
+                date: Some("20260801".to_string()),
+                voucher_type: Some("BRIDGE Sales".to_string()),
+            }),
+        })
+    );
+    let other = format!("{}-00000002", pilot_lab_guid());
+    assert_eq!(
+        control_miss(&known, Some(&other)),
+        Ok(ControlMiss {
+            sales_rows: 1,
+            guid: Some(GuidSeen::NotSeen),
+        })
+    );
+    assert_eq!(
+        control_miss(&absent, Some(&guid)),
+        Ok(ControlMiss {
+            sales_rows: 0,
+            guid: Some(GuidSeen::NotSeen),
+        })
+    );
+    // No GUID recorded for the control: the answer is still counted.
+    assert_eq!(
+        control_miss(&known, None),
+        Ok(ControlMiss {
+            sales_rows: 1,
+            guid: None,
+        })
+    );
+    // A row whose class cannot be read is an error, as for the read itself.
+    assert_eq!(
+        control_miss(
+            &known.replace(
+                "<BRIDGEVCHISSALES TYPE=\"Logical\">Yes</BRIDGEVCHISSALES>",
+                ""
+            ),
+            Some(&guid)
+        ),
+        Err("invoice_number_class_unread")
+    );
 }
 
 /// The control beside the number read, on Tally's own answers: it passes only

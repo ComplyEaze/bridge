@@ -173,17 +173,93 @@ const nightlyWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/
 if (jobBlock(nightlyWorkflow, "shard").match(/^ {6}max-parallel: .*$/gm)?.join("\n") !== "      max-parallel: 4") {
   failures.push("the mutation shards must run four at a time (strategy.max-parallel: 4 in tax-audit-mutations-nightly.yml)");
 }
+// The nightly shard fetches the locked crates in a step of its own, before the mutation run, so a failed download is
+// a named fetch failure (a typed refusal in place of results) and not a mutation result; the build of the unmutated copy
+// then finds the crates already downloaded. The step is pinned by its position (after the toolchain, before the run),
+// its locked fetch, and its bound of three attempts. The report job lists the outside inputs changed since the last
+// green night after judging and before the issue is written, so the issue can carry the list.
+function nightlySteps(block) {
+  const lines = block.split("\n");
+  const heads = [];
+  lines.forEach((line, index) => {
+    const named = /^ {6}- name: (.*)$/.exec(line);
+    if (named) heads.push({ name: named[1], index });
+    else if (/^ {6}- uses: /.test(line)) heads.push({ name: line.trim(), index });
+  });
+  return heads.map((head, i) => {
+    const stop = i + 1 < heads.length ? heads[i + 1].index : lines.length;
+    // A full-line comment at step indentation belongs to the step after it, not to this one.
+    let end = stop;
+    while (end > head.index + 1 && /^ {6}#/.test(lines[end - 1])) end -= 1;
+    return { name: head.name, text: lines.slice(head.index, end).join("\n") };
+  });
+}
+const FETCH_STEP = "Fetch the locked crates, retrying a network failure";
+const MUTATION_STEP = "Run this shard's mutations";
+const LISTING_STEP = "List the outside inputs changed since the last green night";
+const ISSUE_STEP = "Open, update or close the tracking issue";
+const shardSteps = nightlySteps(jobBlock(nightlyWorkflow, "shard"));
+const fetchAt = shardSteps.findIndex((step) => step.name === FETCH_STEP);
+if (shardSteps.filter((step) => step.name === FETCH_STEP).length !== 1
+  || fetchAt !== shardSteps.findIndex((step) => step.name === MUTATION_STEP) - 1
+  || !/dtolnay\/rust-toolchain@/.test(shardSteps[fetchAt - 1]?.name ?? "")) {
+  failures.push(`the mutation shard must fetch the locked crates in one step named "${FETCH_STEP}", directly after the toolchain step and directly before "${MUTATION_STEP}"`);
+} else {
+  const fetchText = shardSteps[fetchAt].text;
+  const fetchLines = fetchText.split("\n").map((line) => line.trim());
+  if (!fetchLines.includes("cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-unknown-linux-gnu 2>&1 | tee \"$log\"")
+    || fetchLines.filter((line) => line === "attempts=3").length !== 1
+    || fetchLines.filter((line) => /^attempts=/.test(line)).length !== 1
+    || !fetchLines.includes("if [ \"$attempt\" -ge \"$attempts\" ]; then")
+    || fetchLines.filter((line) => line === "attempt=1").length !== 1
+    || fetchLines.filter((line) => line === "break").length !== 2
+    || fetchLines.filter((line) => line === "attempt=$((attempt + 1))").length !== 1
+    || !fetchLines.some((line) => line.startsWith("node -e 'const fs = require(\"fs\");") && line.includes("fs.writeFileSync(process.argv[2], JSON.stringify({ refused: { shard: process.argv[3] + \"/8\""))
+    || fetchLines.at(-1) !== "exit 1"
+    || /^ {8}(if|shell|continue-on-error|working-directory):/m.test(fetchText)
+    || /^ {8}(if|continue-on-error):/m.test(shardSteps.find((step) => step.name === MUTATION_STEP)?.text ?? "")) {
+    failures.push(`the "${FETCH_STEP}" step must run "cargo fetch --locked" for the shard's target, start at attempt 1, make at most three attempts (attempts=3, the attempt-bound test and its two breaks), write the typed refusal, end in exit 1, and set none of if, shell, continue-on-error or working-directory; the "${MUTATION_STEP}" step must set neither if nor continue-on-error`);
+  }
+}
+const reportBlock = jobBlock(nightlyWorkflow, "report");
+const reportSteps = nightlySteps(reportBlock);
+const listingAt = reportSteps.findIndex((step) => step.name === LISTING_STEP);
+const judgeAt = reportSteps.findIndex((step) => step.name === "Merge the shards and judge the whole list");
+const issueAt = reportSteps.findIndex((step) => step.name === ISSUE_STEP);
+if (reportSteps.filter((step) => step.name === LISTING_STEP).length !== 1 || !(judgeAt !== -1 && judgeAt < listingAt && listingAt < issueAt)
+  || !reportSteps[listingAt]?.text.includes("node scripts/nightly-outside-inputs.mjs --base \"$base\" --head \"$HEAD_SHA\" --reason \"$reason\" > outside-inputs.md")
+  || !reportSteps[listingAt]?.text.includes("if: ${{ github.ref == 'refs/heads/master' && steps.judge.outputs.failed == 'true' }}")
+  || !reportSteps[listingAt]?.text.includes("if ! last=\"$(gh run list --repo \"$GITHUB_REPOSITORY\" --workflow tax-audit-mutations-nightly.yml --branch master --status success --limit 1 --json headSha --jq '.[0].headSha // \"\"')\"; then")
+  || !reportSteps[listingAt]?.text.includes("reason=\"could not read the run list (the gh command failed)\"")
+  || !reportSteps[listingAt]?.text.includes("reason=\"no earlier green run was found\"")
+  || !reportSteps[listingAt]?.text.includes("base=\"$last\"")
+  || !reportSteps[listingAt]?.text.includes("|| [ ! -s outside-inputs.md ]; then")
+  || !reportSteps[listingAt]?.text.includes("Could not be computed: the listing step failed. This is not the same as \"none changed\"")
+  || !reportSteps[issueAt]?.text.includes("cat outside-inputs.md")
+  || !/^ {10}fetch-depth: 0$/m.test(reportSteps.find((step) => step.name.startsWith("- uses: actions/checkout@"))?.text ?? "")
+  || !/^ {6}actions: read$/m.test(reportBlock)) {
+  failures.push(`the nightly report job must run "${LISTING_STEP}" once, after the judging step and before "${ISSUE_STEP}", on master failures only, with full history (fetch-depth: 0) and actions: read, and the issue step must append outside-inputs.md`);
+}
 // Line-based readers split on \n (and \r\n); a lone \r, U+0085, U+2028 or U+2029 is a line break to other
 // YAML readers but not to them, so neither workflow may contain one.
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
   if (/\r(?!\n)|[\u0085\u2028\u2029]/.test(source)) failures.push(`${name} must use only \\n or \\r\\n line breaks`);
+}
+// Cache entries are written by an explicit list of steps and by no other: Playwright's two (frontend), the package
+// compiler cache (bundle-smoke) and the PDFium archive's one (pdfium-cache). A save step added anywhere else, including
+// after a pinned step where a job digest cannot see it, must edit these counts and so carries an acknowledgement.
+{
+  const saves = (workflow.match(/uses: actions\/cache\/save@/g) ?? []).length;
+  if (saves !== 4) failures.push(`ci.yml has ${saves} actions/cache/save steps, expected 4 (frontend 2, bundle-smoke 1, pdfium-cache 1)`);
+  const pdfiumKeys = (workflow.match(/pdfium-archive-v1-/g) ?? []).length;
+  if (pdfiumKeys !== 4) failures.push(`ci.yml names the PDFium archive cache key ${pdfiumKeys} times, expected 4 (two restores, the writer's restore and save)`);
 }
 for (const [source, job, expected, digest] of [
   [workflow, "native", [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "b0320b1c8c35bc7c1210b1f070c73af39445ef9fe34af1c6c506b4a65686a131"],
+  ], "c3ec04049b655978d975ad4c5793f4a5c1fa5d85cd969199fdcc96a3e98c1f12"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -194,7 +270,17 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "3d84b5d1b3a818c0cf867ceee2bb4ba64a952443a4dc9d67ecc2d5609c4cc0c1"],
+  ], "4f8adc2f473e2f809406225526fd70ed8ce915aa6af9f02aa7f4809db577260a"],
+  // The one job that writes the archive cache: its steps, its events and its key are pinned, so a change that lets
+  // another event or job write what the build jobs restore must edit this pin and carry an acknowledgement.
+  [workflow, "pdfium-cache", [
+    "      - name: Save the PDFium archive",
+    "        if: ${{ steps.pdfium-cache.outputs.cache-hit != 'true' }}",
+    "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+    "        with:",
+    "          path: ${{ runner.temp }}/pdfium-archive",
+    "          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}",
+  ], "4aa2d1c9c76e8caca16e6902579732ebd0eb7af29b6a1074ffd545782e10ecd8"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -209,6 +295,8 @@ for (const [source, job, expected, digest] of [
   if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
   // The digest covers the job only up to the pinned step. A job-level key (container, env, services,
   // defaults, ...) written after the steps is outside it, so `steps:` must be the job's last key.
+  // pdfium-cache is pinned at its last step, so the digest covers all of it only if no step follows.
+  if (job === "pdfium-cache" && !jobBlock(source, job).trimEnd().endsWith(expected.join("\n"))) failures.push(`${job}: the pinned step must be the job's last step; a step after it is outside the pinned text`);
   const jobKeys = jobBlock(source, job).split("\n").filter((line) => /^ {4}[^ \t#-]/.test(line));
   if (jobKeys.at(-1)?.trimEnd() !== "    steps:") failures.push(`${job}: \`steps:\` must be the job's last key; a job-level key after the steps is outside its pinned text`);
 }
@@ -652,6 +740,10 @@ const expectedChanges = [
   "          }",
   "          release=false",
   "          if [[ -n \"$base\" && ! \"$base\" =~ ^0+$ && \"$(version_at \"$base\")\" != \"$(version_at \"$GITHUB_SHA\")\" ]]; then release=true; fi",
+  "          # A release pull request must also move src-tauri/release-date.txt (#2416): the script refuses a file that is missing,",
+  "          # not one real YYYY-MM-DD line, the same as the base's, or an earlier day. It exits 2 when git cannot be read, which",
+  "          # also fails this step: neither is a pass.",
+  "          if [[ \"$release\" == true ]]; then node scripts/check-release-date-changed.mjs \"$base\" \"$GITHUB_SHA\"; fi",
   "          if [[ \"$release\" == true ]]; then",
   "            echo \"native_os=$both\" >> \"$GITHUB_OUTPUT\"",
   "          else",
@@ -765,7 +857,8 @@ const expectedRequiredChecks = [
   "    # outside their paths and a reused master push set it 'false'): each must",
   "    # succeed then and be skipped otherwise, so a job that should have run and",
   "    # did not fails this job. compiler-cache-retention runs on master only and",
-  "    # may be skipped. A failure or cancellation fails every rule.",
+  "    # pdfium-cache on a push, a manual or a scheduled run only; either may be",
+  "    # skipped. A failure or cancellation fails every rule.",
   "    if: ${{ always() }}",
   `    needs: [${jobIds(workflow).filter((id) => id !== "required-checks").join(", ")}]`,
   "    runs-on: ubuntu-latest",
@@ -798,6 +891,7 @@ const expectedRequiredChecks = [
   "            ['seam-control', { kind: 'scope', output: 'bundle' }],",
   "            ['tax-audit-mutations', { kind: 'scope', output: 'tax_audit' }],",
   "            ['compiler-cache-retention', { kind: 'optional' }],",
+  "            ['pdfium-cache', { kind: 'optional' }],",
   "          ]);",
   "          const RESULTS = new Set(['success', 'failure', 'cancelled', 'skipped']);",
   "          const needs = JSON.parse(process.env.NEEDS_JSON);",

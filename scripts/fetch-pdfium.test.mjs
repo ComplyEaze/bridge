@@ -3,9 +3,12 @@
 // to. No network is used: archives are built here and passed with --archive, and the lock is a temporary copy.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, test } from "node:test";
 import { gzipSync } from "node:zlib";
 
@@ -364,4 +367,174 @@ test("the body of a failed answer is cancelled before the next attempt, so no so
   const { code } = await runDownload(scripted(failing, failing, ok(archive)));
   assert.equal(code, 0);
   assert.equal(cancelled, 2);
+});
+
+// --cache-dir: an archive kept by an earlier run saves the download, never the check.
+async function runCached(probe, extra = []) {
+  const logs = [];
+  const code = await main(["--platform", "test", "--dest", join(root, "out"), "--cache-dir", join(root, "cache"), ...extra], {
+    lockPath: lockPath(),
+    stdout: { write: () => {} },
+    fetchImpl: probe.fetchImpl,
+    sleep: async () => {},
+    log: (line) => logs.push(line),
+  });
+  return { code, logs };
+}
+
+test("a verified download is kept, and the next run uses it without a request", async () => {
+  const first = scripted(ok(archive));
+  const firstRun = await runCached(first);
+  assert.equal(firstRun.code, 0);
+  assert.ok(firstRun.logs.includes("pdfium cache: miss"));
+  assert.equal(first.calls.length, 1);
+  assert.deepEqual(readFileSync(join(root, "cache", "pdfium.tgz")), archive);
+  assert.deepEqual(readdirSync(join(root, "cache")), ["pdfium.tgz"], "no partial file is left behind");
+  const second = scripted(new Error("the network must not be used"));
+  const { code, logs } = await runCached(second);
+  assert.equal(code, 0);
+  assert.equal(second.calls.length, 0);
+  assert.ok(logs.some((line) => /pdfium cache: hit/.test(line)));
+  assert.equal(readFileSync(join(root, "out", "libpdfium.dylib"), "utf8"), "library bytes");
+});
+
+test("a cached archive with one changed byte is discarded and downloaded again", async () => {
+  mkdirSync(join(root, "cache"));
+  const bad = Buffer.from(archive);
+  bad[bad.length - 1] ^= 0xff;
+  writeFileSync(join(root, "cache", "pdfium.tgz"), bad);
+  const probe = scripted(ok(archive));
+  const { code, logs } = await runCached(probe);
+  assert.equal(code, 0);
+  assert.equal(probe.calls.length, 1);
+  assert.ok(logs.some((line) => /pdfium cache: bad/.test(line)));
+  assert.deepEqual(readFileSync(join(root, "cache", "pdfium.tgz")), archive, "the good download replaced the bad copy");
+});
+
+for (const [label, make] of [
+  ["a short file", () => writeFileSync(join(root, "cache", "pdfium.tgz"), archive.subarray(0, 10))],
+  ["an empty file", () => writeFileSync(join(root, "cache", "pdfium.tgz"), "")],
+  ["a longer file", () => writeFileSync(join(root, "cache", "pdfium.tgz"), Buffer.concat([archive, Buffer.from("x")]))],
+  ["a directory", () => mkdirSync(join(root, "cache", "pdfium.tgz"))],
+]) {
+  test(`${label} in the cache is not used`, async () => {
+    mkdirSync(join(root, "cache"));
+    make();
+    const probe = scripted(ok(archive));
+    assert.equal((await runCached(probe)).code, 0);
+    assert.equal(probe.calls.length, 1);
+    assert.deepEqual(readFileSync(join(root, "cache", "pdfium.tgz")), archive);
+  });
+}
+
+test("a download that does not match the pin is refused and is not kept", async () => {
+  const tampered = Buffer.from(archive);
+  tampered[tampered.length - 1] ^= 0xff;
+  await assert.rejects(runCached(scripted(ok(tampered))), (error) => error instanceof Refusal && /refusing/.test(error.message));
+  assert.equal(existsSync(join(root, "cache")), false, "nothing is kept for a refused download");
+});
+
+test("a cache directory that cannot be written costs the saving, not the run", async () => {
+  writeFileSync(join(root, "cache"), "a file where the directory should be");
+  const { code, logs } = await runCached(scripted(ok(archive)));
+  assert.equal(code, 0);
+  assert.ok(logs.some((line) => /could not keep pdfium\.tgz/.test(line)));
+});
+
+test("a local --archive is not read from or written to the cache", async () => {
+  const path = join(root, "given.tgz");
+  writeFileSync(path, archive);
+  const probe = scripted(new Error("the network must not be used"));
+  assert.equal((await runCached(probe, ["--archive", path])).code, 0);
+  assert.equal(existsSync(join(root, "cache")), false);
+});
+
+test("a pinned asset name that is a path is refused when a cache directory is given", async () => {
+  lock.platforms.test.asset = "../escape.tgz";
+  writeLock();
+  await assert.rejects(runCached(scripted(ok(archive))), (error) => error instanceof Refusal && /not a plain file name/.test(error.message));
+  assert.equal(existsSync(join(root, "escape.tgz")), false);
+});
+
+test("with --strict-cache a kept file of the pinned size and a wrong digest ends the run in failure, after replacing it", async () => {
+  mkdirSync(join(root, "cache"));
+  const bad = Buffer.from(archive);
+  bad[bad.length - 1] ^= 0xff;
+  writeFileSync(join(root, "cache", "pdfium.tgz"), bad);
+  const probe = scripted(ok(archive));
+  const { code, logs } = await runCached(probe, ["--strict-cache"]);
+  assert.equal(code, 1);
+  assert.ok(logs.some((line) => /^::error::.*pinned size but not the pinned digest/.test(line)));
+  assert.equal(probe.calls.length, 1);
+  assert.equal(readFileSync(join(root, "out", "libpdfium.dylib"), "utf8"), "library bytes", "the library is still written from the verified download");
+  assert.deepEqual(readFileSync(join(root, "cache", "pdfium.tgz")), archive);
+});
+
+test("with --strict-cache a short or empty kept file is only a warning", async () => {
+  mkdirSync(join(root, "cache"));
+  writeFileSync(join(root, "cache", "pdfium.tgz"), archive.subarray(0, 10));
+  const { code, logs } = await runCached(scripted(ok(archive)), ["--strict-cache"]);
+  assert.equal(code, 0);
+  assert.ok(!logs.some((line) => line.startsWith("::error::")));
+});
+
+test("with --strict-cache a good kept file and a plain miss both pass", async () => {
+  assert.equal((await runCached(scripted(ok(archive)), ["--strict-cache"])).code, 0);
+  assert.equal((await runCached(scripted(new Error("the network must not be used")), ["--strict-cache"])).code, 0);
+});
+
+test("with --strict-cache a kept copy that cannot be replaced by a saved one ends the run in failure", async () => {
+  writeFileSync(join(root, "cache"), "a file where the directory should be");
+  const { code, logs } = await runCached(scripted(ok(archive)), ["--strict-cache"]);
+  assert.equal(code, 1);
+  assert.ok(logs.some((line) => /^::error::.*could not be kept/.test(line)));
+});
+
+// The exit status of the command line is what a workflow step sees, and main()'s return value only reaches it if the
+// entry point passes it on. These run the script as a process, from a copy placed beside a temporary lock.
+async function runCommandLine(cacheFile) {
+  const here = dirname(fileURLToPath(import.meta.url));
+  mkdirSync(join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "packaging", "pdfium"), { recursive: true });
+  copyFileSync(join(here, "fetch-pdfium.mjs"), join(root, "scripts", "fetch-pdfium.mjs"));
+  const server = createServer((request, response) => { response.writeHead(200); response.end(archive); });
+  await new Promise((done) => server.listen(0, "127.0.0.1", done));
+  try {
+    const source = `http://127.0.0.1:${server.address().port}`;
+    // The notice names the source and release, so its pin is recomputed for the local server's.
+    const local = { ...lock, source, release: "r", platforms: { test: { ...lock.platforms.test } } };
+    const files = new Map(Object.entries(members).map(([name, data]) => [name, Buffer.from(data)]));
+    const notice = noticeBytes(local, local.platforms.test, files);
+    Object.assign(local.platforms.test, { notice_bytes: notice.length, notice_sha256: sha256(notice) });
+    writeFileSync(join(root, "packaging", "pdfium", "pdfium.lock.json"), JSON.stringify(local));
+    mkdirSync(join(root, "cache"), { recursive: true });
+    if (cacheFile) writeFileSync(join(root, "cache", "pdfium.tgz"), cacheFile);
+    const flags = ["--platform", "test", "--dest", join(root, "out"), "--cache-dir", join(root, "cache"), "--strict-cache"];
+    // Asynchronous, because the server above answers on this process's event loop.
+    return await new Promise((done) => {
+      const child = spawn(process.execPath, [join(root, "scripts", "fetch-pdfium.mjs"), ...flags]);
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk; });
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      child.on("close", (status) => done({ status, stdout, stderr }));
+    });
+  } finally {
+    server.close();
+  }
+}
+
+test("the command line exits 1 under --strict-cache for a kept copy of the pinned size and another digest", async () => {
+  const bad = Buffer.from(archive);
+  bad[bad.length - 1] ^= 0xff;
+  const child = await runCommandLine(bad);
+  assert.equal(child.status, 1, child.stdout + child.stderr);
+  assert.match(child.stderr, /::error::.*pinned size but not the pinned digest/);
+  assert.equal(readFileSync(join(root, "out", "libpdfium.dylib"), "utf8"), "library bytes");
+});
+
+test("the command line exits 0 under --strict-cache for a good kept copy", async () => {
+  const child = await runCommandLine(archive);
+  assert.equal(child.status, 0, child.stdout + child.stderr);
+  assert.match(child.stderr, /pdfium cache: hit/);
 });

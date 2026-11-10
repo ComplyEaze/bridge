@@ -132,9 +132,14 @@ const PILOT: &str = "BRIDGE PILOT LAB";
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
 /// listing, g groups, Q the listing with each ledger's GST rate and rounding,
 /// restricted to the ledgers the invoice names, by GUID (#1331; DERIVED),
-/// T voucher types, N the number read, C the company's tax units, O the company
+/// T voucher types, 1 to 9, x, y and z the number's month reads of the year
+/// (April to March, row 2162-M1's answers; 5, August, is DERIVED:
+/// `lab_numbers_august_without_0010`), C the company's tax units, O the company
 /// object (the HSN/SAC check, once the classification admits);
-/// U is the number read for a number the book uses.
+/// U is the captured August, which holds `BP/26-27/0010`, K the empty
+/// month's answer served for August (SYNTHETIC: a read that misses the rows),
+/// and S September's answer served for August (SYNTHETIC: a read that misses
+/// the control but holds one other Sales row).
 ///
 /// The marks read; the ledger listing (its currency read inside two extents,
 /// then its masters inside two more); then the three reads an invoice adds.
@@ -146,18 +151,25 @@ const ADMISSION_ORDER: &str = concat!(
     "ese",
     "eQsQse",
     "eTsTse",
-    "eNsNse",
+    "e1s1se",
+    "e2s2se",
+    "e3s3se",
+    "e4s4se",
+    "e5s5se",
+    "e6s6se",
+    "e7s7se",
+    "e8s8se",
+    "e9s9se",
+    "exsxse",
+    "eysyse",
+    "ezszse",
     "eCsCse",
     "eOsOse"
 );
 
-/// The requests the tests pin a read to, by sha256: the number read for
-/// `BP/26-27/0010` and the same read for `BP/26-27/0001`, each the lab's
-/// request file with the e-invoice words added (DERIVED, see
-/// `LAB_NUMBER_NEW_INVOICE_SHA256`), and the company's tax units
-/// (`r16-tax-units.xml`, the request the code sends).
-const R09_WITH_IRN_SHA256: &str = super::LAB_NUMBER_NEW_INVOICE_SHA256;
-const R10_WITH_IRN_SHA256: &str = super::LAB_NUMBER_CONTROL_SHA256;
+/// The requests the tests pin a read to, by sha256: the company's tax units
+/// (`r16-tax-units.xml`, the request the code sends). The month reads are
+/// pinned in `lab_number_months`.
 const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
 /// The rates read restricted to the lab invoice's ledgers by GUID (#1331): the
 /// request the code renders, never sent to the lab with these six GUIDs. The
@@ -176,6 +188,40 @@ fn sent_as<'a>(
         .zip(requests)
         .filter(|(sent, _)| *sent == letter)
         .map(|(_, request)| request.request_body_sha256.as_str())
+        .collect()
+}
+
+/// The month of the year a month read's letter stands for, from 0 for April.
+fn month_index(letter: char) -> usize {
+    "123456789xyz".find(letter).expect("a month letter")
+}
+
+/// The sha256 of the month reads the lab sent, April to March.
+fn month_shas() -> Vec<&'static str> {
+    super::lab_number_months()
+        .iter()
+        .map(|month| month.2)
+        .collect()
+}
+
+/// The sha256 of each month read sent where `order` has a month letter, in order.
+fn months_sent<'a>(
+    order: &str,
+    requests: &'a [tally_protocol_simulator::ObservedRequest],
+) -> Vec<&'a str> {
+    order
+        .chars()
+        .zip(requests)
+        .filter(|(sent, _)| "123456789xyzUKS".contains(*sent))
+        .map(|(_, request)| request.request_body_sha256.as_str())
+        .collect()
+}
+
+/// Each month's sha256 twice, as a paired read sends it.
+fn month_shas_paired() -> Vec<&'static str> {
+    month_shas()
+        .into_iter()
+        .flat_map(|sha| [sha, sha])
         .collect()
 }
 
@@ -198,13 +244,16 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'Q' => super::lab_invoice_rates_hsn(),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
-        'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
+        // DERIVED: see `lab_numbers_august_without_0010`.
+        '5' => super::lab_numbers_august_without_0010(),
+        month @ ('1'..='9' | 'x' | 'y' | 'z') => super::lab_number_months()[month_index(month)].3,
+        'K' => super::lab_number_months()[0].3,
+        'S' => super::lab_number_months()[5].3,
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
         'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
         'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"),
         'A' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml"),
-        'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
-        'H' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml"),
+        'U' => super::lab_number_months()[4].3,
         other => panic!("unknown kind {other}"),
     };
     answer(utf16(bytes))
@@ -419,6 +468,7 @@ async fn admit_on(
                         invoice::RefusalDetail::Nothing => String::new(),
                         invoice::RefusalDetail::Ledger(name) => name,
                         invoice::RefusalDetail::Value(value) => value,
+                        invoice::RefusalDetail::ControlMissing(missing) => missing.batch_id,
                     },
                 )
             })
@@ -586,9 +636,9 @@ fn pilot_observed() -> serde_json::Value {
 }
 
 /// The whole of one admission: 6 requests for the marks, 40 for the ledger
-/// listing, and 6 each for the voucher types, the number read, the
-/// company's tax units and (once the classification admits) the company object,
-/// in that order. Each case stops where its answer decides
+/// listing, 6 each for the voucher types and the twelve month reads of the
+/// invoice number, then 6 each for the company's tax units and (once the
+/// classification admits) the company object, in that order. Each case stops where its answer decides
 /// it, which the request count shows. The invoice the pilot lab's book took,
 /// to its walk-in customer under `BRIDGE Sales`, is admitted after every read
 /// and records what it observed; a ledger of the book that is no customer,
@@ -598,7 +648,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
     let walk_in = "BRIDGE Walk-in";
     let goods = "BRIDGE Goods 18%";
     for (party, filed, outcome, requests) in [
-        (walk_in, "BRIDGE Sales", Ok(()), 76),
+        (walk_in, "BRIDGE Sales", Ok(()), 142),
         (
             goods,
             "BRIDGE Sales",
@@ -606,7 +656,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
                 ("invoice_sales_must_be_credit", goods),
                 ("invoice_party_missing", ""),
             ]),
-            70,
+            136,
         ),
         // A type whose series is not Manual, and a type the book does not
         // have, stop before the number is read.
@@ -666,12 +716,8 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
                 pilot_observed()
             );
             // Both sends of the tax-unit read are the request the lab
-            // sent, byte for byte, and both of the number read are the
-            // lab's with the e-invoice words added (DERIVED).
-            assert_eq!(
-                sent_as(ADMISSION_ORDER, &received, 'N'),
-                [R09_WITH_IRN_SHA256; 2]
-            );
+            // sent, byte for byte, and so are both of each month read.
+            assert_eq!(months_sent(ADMISSION_ORDER, &received), month_shas_paired());
             assert_eq!(
                 sent_as(ADMISSION_ORDER, &received, 'C'),
                 [LAB_R16_SHA256; 2]
@@ -686,7 +732,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
 /// The company's registration is the admission's last read: a registration
 /// the build cannot issue under is a refusal under its own code, and an answer
 /// with no tax unit at all is a failed read, never "no registration". Both
-/// come after every other read (70 requests) and record no observation. The
+/// come after every other read (136 requests) and record no observation. The
 /// answers are the pilot lab's capture with one stated edit each.
 #[tokio::test]
 async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_unread_one_fails() {
@@ -716,13 +762,99 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
         )
         .await;
         assert_eq!(seen, Err(vec![(outcome.0, outcome.1.to_string())]));
-        assert_eq!(requests.len(), 70);
+        assert_eq!(requests.len(), 136);
         assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
     }
 }
 
+/// Row 2162-GY's company object answers (`pilot-lab-gy`, copies with the
+/// company number replaced; see its PROVENANCE.md), served in place of the
+/// pilot lab's: the one taken with the company's GST turned off refuses the
+/// invoice under its own code once the object is read (142 requests, the whole
+/// admission), with no observation, and the one taken before the change, on
+/// the same book, admits it. An `ISGSTON` emptied or removed, which no answer
+/// carried, is refused under the other code (marked as edits of the answer
+/// before the change).
+#[tokio::test]
+async fn a_company_whose_gst_is_off_or_unstated_is_refused_by_name() {
+    let before = utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml"));
+    let off = utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"));
+    let element = "<ISGSTON TYPE=\"Logical\">Yes</ISGSTON>";
+    assert_eq!(before.matches(element).count(), 1);
+    assert_eq!(
+        off.matches("<ISGSTON TYPE=\"Logical\">No</ISGSTON>")
+            .count(),
+        1
+    );
+    for (object, outcome) in [
+        (before.clone(), Ok(())),
+        (off, Err(vec![("invoice_company_gst_off", String::new())])),
+        // Edits: no answer carried these.
+        (
+            before.replace(element, "<ISGSTON TYPE=\"Logical\"></ISGSTON>"),
+            Err(vec![("invoice_company_gst_unstated", String::new())]),
+        ),
+        (
+            before.replace(element, ""),
+            Err(vec![("invoice_company_gst_unstated", String::new())]),
+        ),
+    ] {
+        let (seen, voucher, requests) = admit_on(
+            pilot_lab_replacing('O', object),
+            pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+        )
+        .await;
+        assert_eq!(seen, outcome);
+        assert_eq!(requests.len(), 142, "{outcome:?}");
+        let observed = voucher.invoice.as_ref().unwrap().observed.as_ref();
+        assert_eq!(observed.is_some(), outcome.is_ok(), "{outcome:?}");
+    }
+    assert!(crate::agent::refusal_remediation("invoice_company_gst_off")
+        .is_some_and(|step| step.contains("GST is turned off for this company")));
+    assert!(
+        crate::agent::refusal_remediation("invoice_company_gst_unstated")
+            .is_some_and(|step| step.contains("did not say whether GST is on"))
+    );
+}
+
+/// The GST setting is judged first, by itself: with the company's minimum
+/// HSN/SAC code length edited to 8 (marked as an edit; the answers read 4), the
+/// answer before the change refuses every sales line as not measured, and the
+/// answer with GST off, under the same edit, refuses the invoice under the GST
+/// code alone, with no line refusal beside it.
+#[tokio::test]
+async fn the_gst_setting_refuses_by_itself_before_any_sales_line_is_judged() {
+    let length = "<HSNCODELENGTH TYPE=\"Number\"> 4</HSNCODELENGTH>";
+    let longer = "<HSNCODELENGTH TYPE=\"Number\"> 8</HSNCODELENGTH>";
+    let edited = |bytes: &[u8]| {
+        let text = utf16(bytes);
+        assert_eq!(text.matches(length).count(), 1);
+        text.replace(length, longer)
+    };
+    let before = edited(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml"));
+    let off = edited(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"));
+    let (seen, _, _) = admit_on(
+        pilot_lab_replacing('O', before),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    let lines = seen.expect_err("every sales line refused");
+    assert!(!lines.is_empty());
+    assert!(lines.iter().all(|(code, ledger)| *code
+        == "invoice_sales_ledger_hsn_source_not_measured"
+        && !ledger.is_empty()));
+    let (seen, voucher, requests) = admit_on(
+        pilot_lab_replacing('O', off),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    assert_eq!(seen, Err(vec![("invoice_company_gst_off", String::new())]));
+    assert_eq!(requests.len(), 142);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+}
+
 /// A Regular customer whose GSTIN in force is the company's own is refused
-/// once the registration is read (70 requests), with no observation: Tally
+/// once the registration is read (136 requests), with no observation: Tally
 /// listed such an invoice as uncertain (section 9.16). The same customer under
 /// another registration of the company's PAN, which Tally listed as included,
 /// is admitted. The pair is the one the lab measured; the listing is the
@@ -740,9 +872,9 @@ async fn a_customer_holding_the_companys_own_gstin_is_refused_and_another_regist
                 "invoice_party_gstin_is_company_own",
                 walk_in.to_string(),
             )]),
-            70,
+            136,
         ),
-        ("08ZZZZZ0000Z3ZO", Ok(()), 76),
+        ("08ZZZZZ0000Z3ZO", Ok(()), 142),
     ] {
         let (seen, voucher, sent) = admit_on(
             pilot_lab_replacing('L', super::lab_invoice_listing_with_walk_in_gstin(gstin)),
@@ -801,7 +933,7 @@ async fn the_registrations_state_is_the_supplier_state_the_place_of_supply_is_ch
     assert!(refusals
         .iter()
         .any(|(code, _)| *code == "invoice_place_of_supply_not_company_state"));
-    assert_eq!(requests.len(), 70);
+    assert_eq!(requests.len(), 136);
 }
 
 /// The same registration read as Composition at the re-read a post makes
@@ -828,7 +960,7 @@ async fn a_re_read_that_finds_the_registration_composition_is_refused_as_not_reg
         result.err().map(|failure| failure.code),
         Some("invoice_company_registration_not_regular".to_string())
     );
-    assert_eq!(sent(lab.simulator), 70);
+    assert_eq!(sent(lab.simulator), 136);
 }
 
 /// A number the book already uses, on Tally's own answer: the number read for
@@ -839,7 +971,8 @@ async fn a_re_read_that_finds_the_registration_composition_is_refused_as_not_reg
 /// answer, captured without them, names no IRN, so the refusal claims none.
 #[tokio::test]
 async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
-    let order = ADMISSION_ORDER.replace('N', "U");
+    // The book's first invoice is in the August answer.
+    let order = ADMISSION_ORDER.to_string();
     let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
     voucher.voucher_number = Some("BP/26-27/0001".to_string());
     let (seen, voucher, requests) = admit_on(pilot_lab_over(&order), voucher).await;
@@ -850,48 +983,86 @@ async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
             "BP/26-27/0001".to_string()
         )])
     );
-    assert_eq!(requests.len(), 64);
-    assert_eq!(sent_as(&order, &requests, 'U'), [R10_WITH_IRN_SHA256; 2]);
+    // Refused at August's answer: no later month is read.
+    assert_eq!(requests.len(), order.find("e5s5se").unwrap() + 6);
+    assert_eq!(months_sent(&order, &requests), month_shas_paired()[..10]);
     assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
 }
 
 /// A number held by a Sales voucher with an IRN is refused under its own code.
-/// DERIVED: the pilot lab answering as captured except the number read, which
-/// gets the e-invoice lab's answer for its number `1` (`einvoice-lab`), whose
-/// Sales holder carries an IRN; the judge reads the rows, not their number.
+/// DERIVED: the pilot lab answering as captured except August's month read,
+/// which gets the e-invoice lab's answer for its number `1` (`einvoice-lab`),
+/// whose Sales holder carries an IRN; the invoice is numbered `1`.
 #[tokio::test]
 async fn a_number_held_by_an_invoice_with_an_irn_is_refused_saying_so() {
-    let order = ADMISSION_ORDER.replace('N', "U");
+    let order = ADMISSION_ORDER.to_string();
     let held = utf16(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
     ));
     let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
-    voucher.voucher_number = Some("BP/26-27/0001".to_string());
+    voucher.voucher_number = Some("1".to_string());
     let (seen, _, requests) =
-        admit_on(pilot_lab_over_replacing(&order, &[('U', held)]), voucher).await;
+        admit_on(pilot_lab_over_replacing(&order, &[('5', held)]), voucher).await;
     assert_eq!(
         seen,
         Err(vec![(
             "invoice_number_already_used_with_irn",
-            "BP/26-27/0001".to_string()
+            "1".to_string()
         )])
     );
-    assert_eq!(requests.len(), 64);
+    assert_eq!(requests.len(), order.find("e5s5se").unwrap() + 6);
+}
+
+/// Every month of the year is judged, not only the two the lab found rows in.
+/// SYNTHETIC placement: August's captured answer (`U`), which holds the book's
+/// first invoice `BP/26-27/0001`, is served at each month in turn, and the
+/// empty month (`K`) at August when August is not the month under test. The
+/// invoice is numbered `bp/26-27/01`, which folds to the same number, so it is
+/// refused at that month's answer and no later month is read.
+#[tokio::test]
+async fn a_number_held_in_any_month_of_the_year_is_refused_at_that_month() {
+    for (index, letter) in "123456789xyz".chars().enumerate() {
+        let mut order = ADMISSION_ORDER.replace("e5s5se", "eKsKse");
+        let slot = if letter == '5' { 'K' } else { letter };
+        order = order.replace(&format!("e{slot}s{slot}se"), "eUsUse");
+        assert_eq!(order.matches("eUsUse").count(), 1, "{letter}");
+        let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+        voucher.voucher_number = Some("bp/26-27/01".to_string());
+        let (seen, voucher, requests) = admit_on(pilot_lab_over(&order), voucher).await;
+        assert_eq!(
+            seen,
+            Err(vec![(
+                "invoice_number_already_used",
+                "bp/26-27/01".to_string()
+            )]),
+            "month {letter}"
+        );
+        assert_eq!(
+            requests.len(),
+            order.find("eUsUse").unwrap() + 6,
+            "month {letter}"
+        );
+        assert_eq!(
+            months_sent(&order, &requests),
+            month_shas_paired()[..2 * (index + 1)],
+            "month {letter}"
+        );
+        assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+    }
 }
 
 /// The re-read a post makes before its approval window, and again after it,
-/// is a whole admission (70 requests when it reaches the company's tax units, 76
+/// is a whole admission (136 requests when it reaches the company's tax units, 142
 /// once the company object is read, which the admitted invoice does).
 /// The invoice the build admitted, saved with what it observed, passes; saved
 /// with an observation the re-read does not make (another type's GUID), it is
 /// "a master changed"; and what refuses it comes back under its own code (a
 /// type whose series is not Manual, 58 requests; a number the book uses by
-/// the re-read, 64 requests), never as "a master changed".
+/// the re-read, refused at its month, 88 requests), never as "a master changed".
 #[tokio::test]
 async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
     let mut other_type = pilot_observed();
     other_type["voucher_type_guid"] = json!(format!("{}-0000002c", pilot_lab_guid()));
-    let in_use = ADMISSION_ORDER.replace('N', "U");
     for (filed, number, order, observed, outcome, requests) in [
         (
             "BRIDGE Sales",
@@ -899,7 +1070,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             ADMISSION_ORDER,
             pilot_observed(),
             None,
-            76,
+            142,
         ),
         (
             "BRIDGE Sales",
@@ -907,7 +1078,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             ADMISSION_ORDER,
             other_type,
             Some("import_invoice_masters_changed"),
-            76,
+            142,
         ),
         (
             "Sales",
@@ -920,10 +1091,10 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
         (
             "BRIDGE Sales",
             "BP/26-27/0001",
-            in_use.as_str(),
+            ADMISSION_ORDER,
             pilot_observed(),
             Some("invoice_number_already_used"),
-            64,
+            88,
         ),
     ] {
         let lab = pilot_lab_over(order);
@@ -950,10 +1121,14 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
 /// read-back of `BP/26-27/0010` after the post; before it, m is the marks and A
 /// the same read-back (a complete envelope with no voucher).
 const READBACK_ORDER: &str = "eMsMseeRsRse";
-/// A clean read-back, then the number read sent again (6): H answers it, the
-/// lab's answer for `BP/26-27/0010` on the book that holds it once, on
-/// BRIDGE Sales (row 2162-ST's s2).
-const READBACK_THEN_NUMBER_ORDER: &str = "eMsMseeRsRseeHsHse";
+/// A clean read-back, then the number's twelve month reads sent again (72):
+/// the months row 2162-M1 captured, with August answered by `U`, the captured
+/// month that holds `BP/26-27/0010` once, on BRIDGE Sales.
+const READBACK_THEN_NUMBER_ORDER: &str = concat!(
+    "eMsMseeRsRse",
+    "e1s1see2s2see3s3see4s4seeUsUsee6s6see7s7see8s8se",
+    "e9s9seexsxseeysyseezszse"
+);
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
 /// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
 /// line's HSN/SAC and `ISPOSTDATED` (`R-0010.xml` of the 2162-S1 sheet, the
@@ -1042,9 +1217,9 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
         assert_eq!(requests.len(), order.len(), "{number}");
         if number == "BP/26-27/0010" {
             assert_eq!(sent_as(order, &requests, 'R'), [LAB_R12_SHA256; 2]);
-            // The number read after the post is the build's request for this
-            // number, byte for byte.
-            assert_eq!(sent_as(order, &requests, 'H'), [R09_WITH_IRN_SHA256; 2]);
+            // The month reads after the post are the build's month reads,
+            // byte for byte, April to March.
+            assert_eq!(months_sent(order, &requests), month_shas_paired());
         }
     }
 }
@@ -1069,6 +1244,17 @@ async fn admission_after_a_sent_invoice(
     Result<(), Vec<(&'static str, String)>>,
     Vec<tally_protocol_simulator::ObservedRequest>,
 ) {
+    let (outcome, _, requests) = admit_on(
+        lab_after_a_sent_invoice(then, order),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    (outcome, requests)
+}
+
+/// The pilot lab answering `order`, with the journal of
+/// `admission_after_a_sent_invoice`.
+fn lab_after_a_sent_invoice(then: Then, order: &str) -> Lab {
     let lab = pilot_lab_over(order);
     let mut first = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
     first.bridge_txn_id = "t0".to_string();
@@ -1113,19 +1299,16 @@ async fn admission_after_a_sent_invoice(
                 .unwrap();
         }
     }
-    let (outcome, _, requests) =
-        admit_on(lab, pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales")).await;
-    (outcome, requests)
+    lab
 }
 
 /// A company with an invoice sent and not verified posted is refused before
 /// any read of Tally, naming the batch. Once that batch reads verified, the
-/// admission makes every read as before and one more: the verified invoice
-/// is the number control, so after the number read the same read is sent for
-/// it (the lab's `r10-number-control-k0.xml`, answered with the book's first
-/// invoice), and the invoice is admitted. Once a person released it instead,
-/// no invoice of the company stands as sent: the admission makes every read
-/// as before, sends no control read, and the invoice is admitted.
+/// admission makes every read as before and no more: the verified invoice is
+/// the number control, dated in August, so it is found in August's answer (the
+/// book's first invoice), and the invoice is admitted. Once a person released
+/// it instead, no invoice of the company stands as sent: the admission makes
+/// the same reads, and the invoice is admitted.
 #[tokio::test]
 async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
     let stopped = Err(vec![("invoice_company_stopped", sentinel_batch_id(1))]);
@@ -1137,39 +1320,34 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
     let (outcome, requests) = admission_after_a_sent_invoice(Then::Released, ADMISSION_ORDER).await;
     assert_eq!(outcome, Ok(()));
     assert_eq!(requests.len(), ADMISSION_ORDER.len());
-    // No control read: the number read is followed by the company's tax units.
-    assert_eq!(
-        sent_as(ADMISSION_ORDER, &requests, 'N'),
-        [R09_WITH_IRN_SHA256; 2]
-    );
+    // The twelve month reads are followed by the company's tax units.
+    assert_eq!(months_sent(ADMISSION_ORDER, &requests), month_shas_paired());
     assert_eq!(
         sent_as(ADMISSION_ORDER, &requests, 'C'),
         [LAB_R16_SHA256; 2]
     );
-    let controlled = ADMISSION_ORDER.replace("eNsNse", "eNsNseeUsUse");
     let (outcome, requests) =
-        admission_after_a_sent_invoice(Then::Status("posted_verified"), &controlled).await;
+        admission_after_a_sent_invoice(Then::Status("posted_verified"), ADMISSION_ORDER).await;
     assert_eq!(outcome, Ok(()));
-    assert_eq!(requests.len(), controlled.len());
+    assert_eq!(requests.len(), ADMISSION_ORDER.len());
+    assert_eq!(months_sent(ADMISSION_ORDER, &requests), month_shas_paired());
     assert_eq!(
-        sent_as(&controlled, &requests, 'N'),
-        [R09_WITH_IRN_SHA256; 2]
+        sent_as(ADMISSION_ORDER, &requests, 'C'),
+        [LAB_R16_SHA256; 2]
     );
-    assert_eq!(
-        sent_as(&controlled, &requests, 'U'),
-        [R10_WITH_IRN_SHA256; 2]
-    );
-    assert_eq!(sent_as(&controlled, &requests, 'C'), [LAB_R16_SHA256; 2]);
 }
 
-/// The control read (`r10-number-control-k0.xml`) answered with no voucher:
-/// the pilot lab's empty collection, which reads the same whatever the request
-/// (`pilot-lab/PROVENANCE.md`). The build is refused before the company's
-/// tax units are read, and the refusal names the verified batch that holds the
-/// control invoice, the batch `verify_import` is to be run on.
+/// August's month read, which holds the control, answered with no voucher
+/// (SYNTHETIC pairing: the lab's empty month answer in August's place). The
+/// build is refused once the twelve months are read, before the company's tax
+/// units are read; the refusal names the verified batch that holds the
+/// control invoice, and its data says what the answer held: no Sales row,
+/// and no record of the control's GUID to look for (the batch's verdict bound
+/// none). Served September's answer instead (SYNTHETIC), the count is that
+/// answer's one Sales row: it is August's slot that is judged.
 #[tokio::test]
 async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
-    let missing = ADMISSION_ORDER.replace("eNsNse", "eNsNseeNsNse");
+    let missing = ADMISSION_ORDER.replace("e5s5se", "eKsKse");
     let (outcome, requests) =
         admission_after_a_sent_invoice(Then::Status("posted_verified"), &missing).await;
     assert_eq!(
@@ -1179,16 +1357,34 @@ async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
             sentinel_batch_id(1)
         )])
     );
-    assert_eq!(
-        sent_as(&missing, &requests, 'N'),
-        [
-            R09_WITH_IRN_SHA256,
-            R09_WITH_IRN_SHA256,
-            R10_WITH_IRN_SHA256,
-            R10_WITH_IRN_SHA256
-        ]
-    );
+    assert_eq!(requests.len(), missing.find("eCsCse").unwrap());
+    assert_eq!(months_sent(&missing, &requests), month_shas_paired());
     assert!(sent_as(&missing, &requests, 'C').is_empty());
+    for (august, sales_rows) in [("eKsKse", 0), ("eSsSse", 1)] {
+        let order = ADMISSION_ORDER.replace("e5s5se", august);
+        let lab = lab_after_a_sent_invoice(Then::Status("posted_verified"), &order);
+        let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+        let Err(invoice::InvoiceAdmission::Refused(refusals)) = lab
+            .server
+            .admit_sales_invoice(
+                &lab.identity,
+                &lab.company,
+                &mut voucher,
+                &pilot_catalogue(),
+            )
+            .await
+        else {
+            panic!("{august}: not refused");
+        };
+        let refusals: Vec<_> = refusals.iter().map(|refusal| refusal.to_json()).collect();
+        assert_eq!(refusals.len(), 1, "{august}: {refusals:?}");
+        assert_eq!(
+            refusals[0]["control"],
+            json!({"voucher_number": "BP/26-27/0001", "date": "20260801",
+                   "sales_rows_in_answer": sales_rows, "guid_in_answer": "not_recorded"}),
+            "{august}"
+        );
+    }
 }
 
 // ---- #1331: the rate read is restricted to the invoice's ledgers ----
@@ -1284,6 +1480,18 @@ fn known_control() -> ledger::NumberControl {
         batch_id: "bridge-00000000-0000-4000-8000-000000000001".to_string(),
         number: "BP/26-27/0009".to_string(),
         date: "20260801".to_string(),
+        guid: None,
+    }
+}
+
+/// A control dated in the financial year before the invoice's, which has a
+/// read of its own month.
+fn prior_year_control() -> ledger::NumberControl {
+    ledger::NumberControl::Known {
+        batch_id: "bridge-00000000-0000-4000-8000-000000000001".to_string(),
+        number: "BP/25-26/0009".to_string(),
+        date: "20260315".to_string(),
+        guid: None,
     }
 }
 
@@ -1296,20 +1504,27 @@ fn a_plan_that_is_not_the_invoices_does_not_fit_it() {
     let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
     let plan = plan_of(&voucher, &ledger::NumberControl::NoneStanding);
     assert_eq!(invoice::fit_plan(&plan, &plan), Ok(()));
-    // Another number and another financial year are each another invoice's
-    // plan; the voucher type is judged, not requested.
+    // The number's reads are its year's months and name no number, so another
+    // number of the same year makes the same plan (the judge compares the
+    // invoice's own number with their answers); another financial year is
+    // another invoice's plan. The voucher type is judged, not requested.
     let mut other_number = voucher.clone();
     other_number.voucher_number = Some("BP/26-27/0011".to_string());
+    assert_eq!(
+        invoice::fit_plan(
+            &plan,
+            &plan_of(&other_number, &ledger::NumberControl::NoneStanding)
+        ),
+        Ok(())
+    );
     let mut other_year = voucher.clone();
     other_year.date = bridge_tally_core::TallyDate::parse("20270510".to_string()).unwrap();
-    for other in [other_number, other_year] {
-        let carried = plan_of(&other, &ledger::NumberControl::NoneStanding);
-        assert_eq!(
-            invoice::fit_plan(&plan, &carried),
-            Err(AdmissionInconsistent),
-            "{other:?}"
-        );
-    }
+    let carried = plan_of(&other_year, &ledger::NumberControl::NoneStanding);
+    assert_eq!(
+        invoice::fit_plan(&plan, &carried),
+        Err(AdmissionInconsistent),
+        "{other_year:?}"
+    );
     // The company is held to the invoice too.
     let mut other_company = plan.clone();
     other_company.company_name = "ANOTHER LAB".to_string();
@@ -1338,7 +1553,11 @@ fn a_plan_that_is_not_the_invoices_does_not_fit_it() {
 fn a_number_control_that_moved_since_the_plan_is_a_change_not_a_fault() {
     use crate::tally::approved_import::ApprovedImportAdmissionError::InvoiceMastersChanged;
     let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
-    let with_control = plan_of(&voucher, &known_control());
+    // A control dated in the invoice's year is looked for in that month's
+    // answer, so it adds no read; one dated in the year before has a read of
+    // its own month.
+    assert!(plan_of(&voucher, &known_control()).number_control.is_none());
+    let with_control = plan_of(&voucher, &prior_year_control());
     let without = plan_of(&voucher, &ledger::NumberControl::NoneStanding);
     assert!(with_control.number_control.is_some() && without.number_control.is_none());
     for (wanted, carried) in [(&with_control, &without), (&without, &with_control)] {
@@ -1572,7 +1791,8 @@ fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
     };
     let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
     let never = ledger::NumberControl::NoneStanding;
-    let known = known_control();
+    // A control with a read of its own: one dated in the year changes no read.
+    let known = prior_year_control();
     let admit = |carried: &InvoiceReadPlan, control: &ledger::NumberControl| {
         invoice::admit_queued_invoice(
             &voucher,
@@ -1593,9 +1813,10 @@ fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
             code: "invoice_book_too_many_vouchers".to_string()
         })
     );
-    // Another invoice's plan is a wiring fault, whatever the answers say.
+    // Another invoice's plan (another financial year's reads) is a wiring
+    // fault, whatever the answers say.
     let mut other = voucher.clone();
-    other.voucher_number = Some("BP/26-27/0011".to_string());
+    other.date = bridge_tally_core::TallyDate::parse("20270510".to_string()).unwrap();
     assert_eq!(
         admit(&plan_of(&other, &never), &never),
         Err(AdmissionInconsistent)
@@ -1763,7 +1984,16 @@ async fn pilot_queue_answers(rates: String) -> InvoiceAnswers {
         listing: Some(pilot_listing().await),
         rates: Some(rates),
         voucher_types: Some(pilot_text(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"))),
-        number: Some(pilot_text(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"))),
+        // The twelve month answers, August DERIVED without the invoice (as
+        // `pilot_plan`'s '5').
+        number: super::lab_number_months()
+            .iter()
+            .enumerate()
+            .map(|(index, month)| match index {
+                4 => pilot_text(super::lab_numbers_august_without_0010()),
+                _ => pilot_text(month.3),
+            })
+            .collect(),
         registration: Some(pilot_tax_units()),
         company_hsn: Some(pilot_text(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"))),
         ..InvoiceAnswers::default()
@@ -1859,7 +2089,7 @@ fn a_number_the_literal_cannot_hold_is_refused_before_either_number_read() {
         catalogue: &catalogue,
         control: &none,
     };
-    match judge.request(invoice::Need::Number) {
+    match judge.request(invoice::Need::Number(0)) {
         Err(invoice::Verdict::Refused(refusals)) => {
             assert_eq!(refusals.len(), 1);
             assert_eq!(refusals[0].code, "invoice_number_invalid");
@@ -1873,6 +2103,7 @@ fn a_number_the_literal_cannot_hold_is_refused_before_either_number_read() {
         batch_id,
         number: "A\"B".to_string(),
         date,
+        guid: None,
     };
     let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
     let judge = InvoiceJudge {

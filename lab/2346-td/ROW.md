@@ -288,4 +288,4 @@ Lines are at master ae38a75c.
 - ComplyEaze Bridge's own transport, or any Bridge build (above);
 - a voucher dated after the notes;
 - another to-date, another book or release;
-- a customer whose name the type refuses: that is the alphabet's own lab run (`ledger_scope.rs:20` to `:22`).
+- a customer whose name the type refuses: that is #2480, the alphabet's own lab run (`ledger_scope.rs:20` to `:22`).

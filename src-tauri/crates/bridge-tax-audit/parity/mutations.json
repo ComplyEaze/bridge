@@ -11768,6 +11768,22 @@
   "to": "        let unchecked_debit = if false {"
  },
  {
+  "id": "L1875-TDS-20",
+  "by": "author",
+  "what": "loans_interest: the not-computed finding does not say where a listed voucher's TDS debit is",
+  "file": "src/loans_interest.rs",
+  "from": "            let listed_tds = if debited.iter().any(|&(at, _)| rows.listed.contains(&at)) {",
+  "to": "            let listed_tds = if false {"
+ },
+ {
+  "id": "L1875-TDS-21",
+  "by": "author",
+  "what": "loans_interest: a split voucher counted as a TDS debit is read as a split deduction",
+  "file": "src/loans_interest.rs",
+  "from": "                x > 0\n                    && pop[at]\n",
+  "to": "                x != 0\n                    && pop[at]\n"
+ },
+ {
   "id": "P1243-DEP-01",
   "by": "author",
   "what": "depreciation: a voucher is a depreciation journal when any voucher holding its GUID carries a depreciation-expense line (by GUID again), so a sale sharing the journal's GUID is book depreciation",

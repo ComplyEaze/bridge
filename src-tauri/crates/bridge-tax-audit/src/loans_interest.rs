@@ -5147,6 +5147,70 @@ this interest."
         );
     }
 
+    /// The not-computed s.194A finding says where a listed voucher's TDS is: where the voucher's
+    /// TDS nets to a debit, the limit names `tds_debited_on_loan_<tag>` for it (a declared
+    /// difference, rule 4); with a deduction on it, the reference's wording stays.
+    #[test]
+    fn the_not_computed_finding_says_where_a_listed_vouchers_tds_debit_is() {
+        let limit = |tds: i64| {
+            // One voucher credits and debits Loan A (listed), with TDS Payable and Bank A.
+            let listed = journal(
+                "c1",
+                &[
+                    ("Loan A", -500_000),
+                    ("Loan A", 300_000),
+                    ("TDS Payable", tds),
+                    ("Bank A", 200_000 - tds),
+                ],
+            );
+            let interest = journal("i1", &[("Interest A", 8_502_000), ("Loan A", -8_502_000)]);
+            let (b, r, _) = two_loans_run(vec![interest, listed]);
+            let h = stable_ledger_tag(&b, "Loan A").unwrap();
+            let f = r
+                .findings
+                .iter()
+                .find(|f| f.id == format!("{TEST_ID}/not_computed/s194a_{h}"))
+                .unwrap_or_else(|| panic!("no not-computed finding: {:?}", r.findings));
+            (h, f.limits.join(" "))
+        };
+        let (h, debit) = limit(100_000);
+        assert!(
+            debit.contains(&format!(
+                "any TDS deducted on them is in the TDS seen on the loan and any TDS debit in \
+tds_debited_on_loan_{h}"
+            )),
+            "{debit}"
+        );
+        let (_, credit) = limit(-100_000);
+        assert!(
+            credit.contains("any TDS on them is in the TDS seen on the loan")
+                && !credit.contains("tds_debited_on_loan"),
+            "{credit}"
+        );
+    }
+
+    /// A voucher on two loans on one side whose TDS is a debit is a debit on each loan, never a
+    /// split deduction: with interest over the threshold, Loan A's coverage reads "none", not
+    /// "not checked" (a split deduction), because nothing was deducted.
+    #[test]
+    fn a_split_voucher_that_is_a_debit_is_not_a_split_deduction() {
+        let (b, r, _) = two_loans_run(vec![
+            journal("i1", &[("Interest A", 8_502_000), ("Loan A", -8_502_000)]),
+            journal(
+                "t2",
+                &[
+                    ("Loan A", -70_000),
+                    ("Loan B", -30_000),
+                    ("TDS Payable", 100_000),
+                ],
+            ),
+        ]);
+        assert_eq!(
+            loan_figure(&b, &r, "s194a_tds_coverage", "Loan A").map(|f| f.value.clone()),
+            Some(Value::Text("none".to_string()))
+        );
+    }
+
     /// With no debit on the loan, a deduction within a rupee of the s.194A rate reads "covered".
     #[test]
     fn a_deduction_within_a_rupee_of_the_rate_reads_covered() {

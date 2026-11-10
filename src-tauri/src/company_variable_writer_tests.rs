@@ -25,9 +25,10 @@ const SEAM: &str = "static_variables_for_unvalidated_company";
 /// The most production uses of the seam there may be. It may only fall: each builder moved to
 /// `&ValidatedCompanyName` lowers it. At zero the seam and this test are deleted together (#2397).
 /// It rose once, from 27 to 28, when the invoice window read (#2423) added a builder that takes
-/// `&str` and was moved onto the seam rather than left writing the block itself. It fell by one
-/// when the built-in report envelope took `&ValidatedCompanyName`.
-const SEAM_CEILING: usize = 27;
+/// `&str` and was moved onto the seam rather than left writing the block itself. It fell to 27
+/// when the trial balance builders took `&ValidatedCompanyName`, and to 26 when the built-in
+/// report envelope did.
+const SEAM_CEILING: usize = 26;
 
 /// Production files whose string literals name the variable without writing a request, with
 /// the most such literals each may hold and why.

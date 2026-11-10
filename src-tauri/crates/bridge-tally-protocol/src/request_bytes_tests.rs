@@ -721,11 +721,11 @@ fn built_requests() -> Vec<(String, String)> {
 
     row(
         "render_native_trial_balance_request".into(),
-        render_native_trial_balance_request(COMPANY, &snapshot),
+        render_native_trial_balance_request(&company, &snapshot),
     );
     row(
         "render_native_trial_balance_request_with_currency".into(),
-        render_native_trial_balance_request_with_currency(COMPANY, &snapshot),
+        render_native_trial_balance_request_with_currency(&company, &snapshot),
     );
 
     for kind in every!(NativeBillsReportKind: Receivable, Payable) {

@@ -140,6 +140,76 @@ impl fmt::Debug for ValidatedCompanyName {
     }
 }
 
+/// A company name as a person is shown it, and why it cannot be sent if it
+/// cannot: the one rule for every surface that shows a company name, the agent
+/// and the desktop client alike (#2433, #2449). What is stored and sent stays
+/// the name as Tally reported it; only this text is drawn.
+///
+/// Each control or invisible format character (Default_Ignorable_Code_Point or
+/// General_Category Cf) is written as `\u{..}`, so a name holding one never
+/// draws like the same name without it, no text is hidden in it and none
+/// reorders the text around it. A sendable name keeps the zero-width joiner
+/// and non-joiner, anywhere: they are part of how Indic and Persian names are
+/// written. Two limits follow and hold wherever the text is shown:
+/// - a sendable name made of joiners alone draws as nothing;
+/// - a backslash is not escaped, so a name that spells a `\u{..}` code out as
+///   text draws like one holding the character.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShownCompanyName {
+    text: String,
+    refusal: Option<CompanyNameRefusal>,
+}
+
+impl ShownCompanyName {
+    pub fn of(name: &str) -> Self {
+        let refusal = ValidatedCompanyName::refusal(name);
+        let text = name
+            .chars()
+            .map(|character| {
+                let escape = match refusal {
+                    Some(_) => character.is_control() || is_invisible_format(character),
+                    None => {
+                        !matches!(character, '\u{200c}' | '\u{200d}')
+                            && is_invisible_format(character)
+                    }
+                };
+                if escape {
+                    format!("\\u{{{:04x}}}", u32::from(character))
+                } else {
+                    character.to_string()
+                }
+            })
+            .collect();
+        Self { text, refusal }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn into_text(self) -> String {
+        self.text
+    }
+
+    pub fn refusal(&self) -> Option<CompanyNameRefusal> {
+        self.refusal
+    }
+}
+
+/// Characters that draw nothing but can change how the text around them reads:
+/// Unicode General_Category Cf and Default_Ignorable_Code_Point (the same rule
+/// the native approval screen applies to the names it shows), so U+061C, the
+/// tag characters and every future format character are covered without a
+/// list. The agent's headline filters names by the same test.
+pub fn is_invisible_format(character: char) -> bool {
+    use icu_properties::{
+        props::{DefaultIgnorableCodePoint, GeneralCategory},
+        CodePointMapData, CodePointSetData,
+    };
+    CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(character)
+        || CodePointMapData::<GeneralCategory>::new().get(character) == GeneralCategory::Format
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedDateRange {
     from: TallyDate,

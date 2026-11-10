@@ -529,7 +529,8 @@ pub(super) struct ReadLeg {
 }
 
 impl ReadLeg {
-    /// The HSN/SAC Tally used for the line: on an item line it is the item's,
+    /// The HSN/SAC Tally used for the line: on an item line it is the one Tally
+    /// filled on the item's allocation (from the ledger, on the measured book),
     /// and the leg's own elements are empty (row 1379-IT, 10 Nov 2026).
     pub(super) fn line_hsn(&self) -> &LegHsn {
         match &self.items {
@@ -543,8 +544,11 @@ impl ReadLeg {
 /// 10 Nov 2026, one amount-only item line on a book with one godown and no
 /// batches) found the line read back as its ledger's entry, with the item in
 /// one `INVENTORYALLOCATIONS.LIST` under it and no inventory list on the
-/// voucher. The answer gives the elements of several items under one entry
-/// no grouping this parse can rely on, so several are only counted.
+/// voucher. How Tally answers with two items under one entry is not measured
+/// (unverified): this parse groups an item's elements by their list, and it
+/// does not rely on that grouping for more than one, so several are only
+/// counted, and refused. The test of several is built from the one measured
+/// item, repeated.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum LegItems {
     None,

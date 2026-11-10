@@ -1,0 +1,15 @@
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['26720']
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['26720']
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['3720']
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['3720']
+  BILLREF 'BP/26-27/0099' BILLDATE '1-Aug-26' BILLCL '1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0101' BILLDATE '1-Aug-26' BILLCL '-525.50' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0098' BILLDATE '1-Aug-26' BILLCL '1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: 1576.50
+ANSWER: ROWS 3 (0 On Account)
+a-c1sa-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 19
+  'BRIDGE Walkin BC': PARENT 'Sundry Debtors'; CURRENCYNAME '₹'; ISBILLWISEON 'Yes'; OPENINGBALANCE '0.00'; CLOSINGBALANCE '1576.50'; BRIDGECOMPANYGUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85'
+    CLOSINGBALANCE reads 1576.50
+OUTCOME: told (ROWS 3 (0 On Account), sum of BILLCL 1576.50 equals closing 1576.50)
+exit 0

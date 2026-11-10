@@ -1,0 +1,6 @@
+a-s4b-I-0101.xml: 540 B sha256 32e7a29b201c773547aa47bc95bd3eda8af83aeb6e35090303b9b27bcd34eec5
+pb-answers/a-s4b-I-0101.xml: 540 B sha256 32e7a29b201c773547aa47bc95bd3eda8af83aeb6e35090303b9b27bcd34eec5
+bytes as they are: equal
+name mapped: 0 place(s) in pb-answers/a-s4b-I-0101.xml
+EQUAL
+exit 0

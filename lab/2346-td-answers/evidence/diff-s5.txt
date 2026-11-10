@@ -1,0 +1,6 @@
+a-s5-I-CN-1.xml: 540 B sha256 f8384a874e1d8a6be92c2969f94e2887fb700768f6e111b6b3f649cd13ffdc7e
+pb-answers/a-s5-I-CN-1.xml: 540 B sha256 f8384a874e1d8a6be92c2969f94e2887fb700768f6e111b6b3f649cd13ffdc7e
+bytes as they are: equal
+name mapped: 0 place(s) in pb-answers/a-s5-I-CN-1.xml
+EQUAL
+exit 0

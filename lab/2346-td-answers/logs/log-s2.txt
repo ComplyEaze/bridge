@@ -1,0 +1,13 @@
+12:34:05	N-0099.xml	a-s2-N-0099.xml	curl 0	3022 bytes
+12:34:06	N-0101.xml	a-s2-N-0101.xml	curl 0	3022 bytes
+12:34:06	R-0099.xml	a-s2-R-0099.xml	curl 0	3022 bytes
+12:34:06	R-0101.xml	a-s2-R-0101.xml	curl 0	3022 bytes
+12:34:06	R-CN1.xml	a-s2-R-CN1.xml	curl 0	3022 bytes
+12:34:06	R-CN2.xml	a-s2-R-CN2.xml	curl 0	3022 bytes
+12:34:06	R-CN3.xml	a-s2-R-CN3.xml	curl 0	3022 bytes
+12:34:07	R-CN4.xml	a-s2-R-CN4.xml	curl 0	3022 bytes
+12:34:07	B-bills.xml	a-s2-B-bills.xml	curl 0	46 bytes
+12:34:07	B-payable.xml	a-s2-B-payable.xml	curl 0	46 bytes
+12:34:07	S-snap-20260401-20260801.xml	a-s2-S-snap-20260401-20260801.xml	curl 0	25480 bytes
+12:34:07	S-snap-20260401-20270331.xml	a-s2-S-snap-20260401-20270331.xml	curl 0	25518 bytes
+12:34:07	M-marks.xml	a-s2-M-marks.xml	curl 0	3394 bytes

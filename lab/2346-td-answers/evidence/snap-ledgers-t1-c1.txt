@@ -1,0 +1,17 @@
+$ the LEDGER rows of c1sa (to 20260801) and t1sa (to 20270331): each ledger whose CLOSINGBALANCE differs, and the customer's row
+rows: c1sa=19, t1sa=19; same names: True
+differs: BRIDGE CGST 2.5%: 227.66 -> 317.81
+differs: BRIDGE Purchase Svc 5%: 0.00 -> -2000.00
+differs: BRIDGE SGST 2.5%: 227.64 -> 317.77
+differs: BRIDGE Supplier RJ: 0.00 -> 2100.00
+differs: BRIDGE Svc 4D 5%: 0.00 -> 100.00
+differs: BRIDGE Svc 998313 5%: 8505.80 -> 12509.60
+differs: BRIDGE Svc 998314 5%: 599.80 -> 1101.00
+differs: BRIDGE Svc 998315 5%: 0.00 -> 100.10
+differs: BRIDGE Svc INH 5%: 0.00 -> 500.00
+differs: BRIDGE Svc INH2 5%: 0.00 -> 400.00
+differs: BRIDGE Walk-in: -11963.32 -> -17148.70
+differs: Cash: 0.00 -> -700.00
+differs: Profit &amp; Loss A/c: 9805.52 -> 13410.62
+BRIDGE Walkin BC: 1576.50 -> 1576.50 (same)
+differing: 13

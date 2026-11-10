@@ -1,0 +1,6 @@
+a-s7-I-CN-2.xml: 540 B sha256 93e331323bb1235565ab31f2ddbbaf7afaa752ce6770d0ae7ae145d7b3244234
+pb-answers/a-s7-I-CN-2.xml: 540 B sha256 93e331323bb1235565ab31f2ddbbaf7afaa752ce6770d0ae7ae145d7b3244234
+bytes as they are: equal
+name mapped: 0 place(s) in pb-answers/a-s7-I-CN-2.xml
+EQUAL
+exit 0

@@ -1,0 +1,14 @@
+$ td-diff.py --map a-c1sa-S-snap-20260401-20260801.xml pb-answers/a-s8sa-S-snap-20260401-20260801.xml
+a-c1sa-S-snap-20260401-20260801.xml: 26720 B sha256 fcc1efc205c6a7018762f5988bd53f43ab5ff9c1c1073bd91eb73e34c0b5feff
+pb-answers/a-s8sa-S-snap-20260401-20260801.xml: 26724 B sha256 a20c20f0e8bfc8e0180b844f29f73fcc01659b5b12850875fe0ddcea16b3a07e
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s8sa-S-snap-20260401-20260801.xml
+EQUAL
+exit 0
+$ td-diff.py --map a-c1la-L-lo-wk-20260801.xml pb-answers/a-s8la-L-lo-bc-20260801.xml
+a-c1la-L-lo-wk-20260801.xml: 3720 B sha256 113fe494a6034279763f1e2d5fc14dd0e1a31465db206f6f4963993ea8938a13
+pb-answers/a-s8la-L-lo-bc-20260801.xml: 3720 B sha256 113fe494a6034279763f1e2d5fc14dd0e1a31465db206f6f4963993ea8938a13
+bytes as they are: equal
+name mapped: 0 place(s) in pb-answers/a-s8la-L-lo-bc-20260801.xml
+EQUAL
+exit 0

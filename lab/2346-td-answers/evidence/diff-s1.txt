@@ -1,0 +1,6 @@
+a-s1-M-marks.xml: 3394 B sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+pb-answers/a-s1-M-marks.xml: 3394 B sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+bytes as they are: equal
+name mapped: 0 place(s) in pb-answers/a-s1-M-marks.xml
+EQUAL
+exit 0

@@ -1,0 +1,9 @@
+12:36:49	R-CN4.xml	a-s8r-R-CN4.xml	curl 0	95832 bytes
+12:36:49	R-CN1.xml	a-s8r-R-CN1.xml	curl 0	95832 bytes
+12:36:50	R-CN2.xml	a-s8r-R-CN2.xml	curl 0	95828 bytes
+12:36:50	R-CN3.xml	a-s8r-R-CN3.xml	curl 0	95832 bytes
+12:36:50	R-0099.xml	a-s8r-R-0099.xml	curl 0	95832 bytes
+12:36:50	R-0101.xml	a-s8r-R-0101.xml	curl 0	95832 bytes
+12:36:50	B-bills.xml	a-s8r-B-bills.xml	curl 0	506 bytes
+12:36:51	B-payable.xml	a-s8r-B-payable.xml	curl 0	962 bytes
+12:36:51	M-marks.xml	a-s8r-M-marks.xml	curl 0	3398 bytes

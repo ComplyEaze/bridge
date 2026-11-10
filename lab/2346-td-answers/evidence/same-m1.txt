@@ -1,0 +1,3 @@
+== a-m1-M-marks.xml against a-s8r-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'246'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'246'")
+  equal
+exit 0

@@ -1,0 +1,111 @@
+$ td-diff.py --map a-s8r-R-CN4.xml pb-answers/a-s8r-R-CN4.xml
+a-s8r-R-CN4.xml: 95832 B sha256 90b932dc8003ab78509567410dbb41031d30de28272704028cfca705ce36a264
+pb-answers/a-s8r-R-CN4.xml: 95836 B sha256 8704315d4ea8dadc4e412cd1cbc320a0b43d82e792fdab6944dae3731dbb42bb
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s8r-R-CN4.xml
+EQUAL
+exit 0
+$ td-diff.py --map a-s8r-R-CN1.xml pb-answers/a-s8r-R-CN1.xml
+a-s8r-R-CN1.xml: 95832 B sha256 1ddb030cd305b29106759c8dd41ff9433445eb6996de99537598387e720aa3b1
+pb-answers/a-s8r-R-CN1.xml: 95836 B sha256 6e5de6d41f4d687fed631808c6a8369f4300504e9d8fcd7fef13d2994bd6e26e
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s8r-R-CN1.xml
+EQUAL
+exit 0
+$ td-diff.py --map a-s8r-R-0099.xml pb-answers/a-s8r-R-0099.xml
+a-s8r-R-0099.xml: 95832 B sha256 b5af11b23955c6cf9142d97afa3283b89fc1e9a963a9374b71b0fafa98a13ca4
+pb-answers/a-s8r-R-0099.xml: 95836 B sha256 70844f32ad54d3eaac4042d701c12ae6c730f70bf3289c3c146e82468557bf5c
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s8r-R-0099.xml
+EQUAL
+exit 0
+$ td-diff.py --map a-s8r-B-bills.xml pb-answers/a-s8r-B-bills.xml
+a-s8r-B-bills.xml: 506 B sha256 a43ee72c3ffb4a03fea640e6ba4284f8c8197e13de2fd1513f834305b95fd5af
+pb-answers/a-s8r-B-bills.xml: 508 B sha256 5503268c3303f4b75cdc949d3a68768e141de143eadaf98a42b4469c4e7fa823
+bytes as they are: not equal
+name mapped: 1 place(s) in pb-answers/a-s8r-B-bills.xml
+EQUAL
+exit 0
+$ td-diff.py --map a-s8r-B-payable.xml pb-answers/a-s8r-B-payable.xml
+a-s8r-B-payable.xml: 962 B sha256 96b5e3c7c5fc8c9d75443684cad5ad44dd419041795c59c622085780a70de90e
+pb-answers/a-s8r-B-payable.xml: 966 B sha256 1e6171e57aafef610bc0f193be89b80b7eb7a2316d38a5c07c15f282123b1bf3
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s8r-B-payable.xml
+EQUAL
+exit 0
+$ td-diff.py --map a-s8r-M-marks.xml pb-answers/a-s8r-M-marks.xml
+a-s8r-M-marks.xml: 3398 B sha256 24c915d10371ba90319bb238ece00778da068326191e81b4c04d6ac59c5379a6
+pb-answers/a-s8r-M-marks.xml: 3398 B sha256 24c915d10371ba90319bb238ece00778da068326191e81b4c04d6ac59c5379a6
+bytes as they are: equal
+name mapped: 0 place(s) in pb-answers/a-s8r-M-marks.xml
+EQUAL
+exit 0
+$ td-diff.py --map a-s8r-R-CN2.xml pb-answers/a-s6r-R-CN2.xml
+a-s8r-R-CN2.xml: 95828 B sha256 ddb49e859853107e464637b3805ad278227747e6682b156ce5c2ac5df5e60905
+pb-answers/a-s6r-R-CN2.xml: 95830 B sha256 eb470e67de44a4aa5afd63fa5bbf3e236c2c150ce7ffb9bf66f7a554259a2ae0
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s6r-R-CN2.xml
+DIFFER: 10 line(s) differ
+  --- pb-answers/a-s6r-R-CN2.xml
+  +++ a-s8r-R-CN2.xml
+  @@ -11 +11 @@
+  -    <LEDGER>45</LEDGER>
+  +    <LEDGER>67</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>4</CURRENCY>
+  +    <CURRENCY>6</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>4</TAXUNIT>
+  +    <TAXUNIT>6</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>4</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>8</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>6</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>12</VOUCHER>
+exit 0
+$ td-diff.py --map a-s8r-R-CN3.xml pb-answers/a-s7r-R-CN3.xml
+a-s8r-R-CN3.xml: 95832 B sha256 f9b8fa25c51edbfffb4339cf0d28ede368ef4ddeb6d46b0778e8f9be3277fa73
+pb-answers/a-s7r-R-CN3.xml: 95836 B sha256 547e5dc8e82bee41b85142b00d4e66a0ea070732d1cdc6d2a498a1a6d8bdd8c5
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s7r-R-CN3.xml
+DIFFER: 10 line(s) differ
+  --- pb-answers/a-s7r-R-CN3.xml
+  +++ a-s8r-R-CN3.xml
+  @@ -11 +11 @@
+  -    <LEDGER>56</LEDGER>
+  +    <LEDGER>67</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>5</CURRENCY>
+  +    <CURRENCY>6</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>5</TAXUNIT>
+  +    <TAXUNIT>6</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>5</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>10</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>6</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>12</VOUCHER>
+exit 0
+$ td-diff.py --map a-s8r-R-0101.xml pb-answers/a-s6r-R-0101.xml
+a-s8r-R-0101.xml: 95832 B sha256 9b99928875580b3f6f89ca359c65c5e225b1efd01cc67430adee2cf49d4d1c8d
+pb-answers/a-s6r-R-0101.xml: 95834 B sha256 6b044785bf191d462b5c15f6131cc238c49e80a90289aac260b00ec992625b05
+bytes as they are: not equal
+name mapped: 2 place(s) in pb-answers/a-s6r-R-0101.xml
+DIFFER: 10 line(s) differ
+  --- pb-answers/a-s6r-R-0101.xml
+  +++ a-s8r-R-0101.xml
+  @@ -11 +11 @@
+  -    <LEDGER>45</LEDGER>
+  +    <LEDGER>67</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>4</CURRENCY>
+  +    <CURRENCY>6</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>4</TAXUNIT>
+  +    <TAXUNIT>6</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>4</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>8</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>6</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>12</VOUCHER>
+exit 0

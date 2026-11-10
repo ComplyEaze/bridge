@@ -1,0 +1,6 @@
+a-s6-I-CN-P.xml: 540 B sha256 e6540f6534095f5608f3c59f802c1f40a3ae13529a7e9041847b460f03c32fec
+pb-answers/a-s6-I-CN-P.xml: 540 B sha256 e6540f6534095f5608f3c59f802c1f40a3ae13529a7e9041847b460f03c32fec
+bytes as they are: equal
+name mapped: 0 place(s) in pb-answers/a-s6-I-CN-P.xml
+EQUAL
+exit 0

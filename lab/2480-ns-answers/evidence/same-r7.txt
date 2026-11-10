@@ -1,0 +1,4 @@
+  a-r7a-L-lo-rp-20260801.xml: 896 bytes, sha256 6b1e1ad206f91b0e9a2dd37e812f79ceeb30b8bdac90ea4f2d33c36d773bfa84
+  a-r7b-L-lo-rp-20260801.xml: 896 bytes, sha256 6b1e1ad206f91b0e9a2dd37e812f79ceeb30b8bdac90ea4f2d33c36d773bfa84
+SAME: EQUAL
+exit 0

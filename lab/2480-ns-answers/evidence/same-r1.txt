@@ -1,0 +1,4 @@
+  a-r1a-L-lo-pl-20260801.xml: 896 bytes, sha256 45f34d9819048484aa555bbfd17b4c74cdcd1f10a51ee24f9e3a344747fbb877
+  a-r1b-L-lo-pl-20260801.xml: 896 bytes, sha256 45f34d9819048484aa555bbfd17b4c74cdcd1f10a51ee24f9e3a344747fbb877
+SAME: EQUAL
+exit 0

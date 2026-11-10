@@ -1,0 +1,14 @@
+a-s6sa-S-snap-20260401-20260801.xml: LEDGER rows 29
+  pl 'BRIDGE Ns Plain': names ['BRIDGE Ns Plain']
+  hy 'BRIDGE Ns Hk-Hm': names ['BRIDGE Ns Hk-Hm']
+  dt 'BRIDGE Ns Dk.Dm': names ['BRIDGE Ns Dk.Dm']
+  am 'BRIDGE Ns Ak&Am': names ['BRIDGE Ns Ak&Am']
+  sl 'BRIDGE Ns Sk/Sm': names ['BRIDGE Ns Sk/Sm']
+  lp 'BRIDGE Ns Lk(Lm': names ['BRIDGE Ns Lk(Lm']
+  rp 'BRIDGE Ns Rk)Rm': names ['BRIDGE Ns Rk)Rm']
+  ap "BRIDGE Ns Pk'Pm": names ["BRIDGE Ns Pk'Pm"]
+  op 'BRIDGE Ns Ok and Om': names ['BRIDGE Ns Ok and Om']
+  dd 'BRIDGE Ns 2023-24': names ['BRIDGE Ns 2023-24']
+  sc 'BRIDGE Ns उदाहरण': names ['BRIDGE Ns उदाहरण']
+NAMES: EQUAL
+exit 0

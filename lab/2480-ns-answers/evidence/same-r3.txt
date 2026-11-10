@@ -1,0 +1,4 @@
+  a-r3a-L-lo-dt-20260801.xml: 896 bytes, sha256 81c33e352aaa4a406041e112373a6b91a3d52a25da0a811939adb07dae63da34
+  a-r3b-L-lo-dt-20260801.xml: 896 bytes, sha256 81c33e352aaa4a406041e112373a6b91a3d52a25da0a811939adb07dae63da34
+SAME: EQUAL
+exit 0

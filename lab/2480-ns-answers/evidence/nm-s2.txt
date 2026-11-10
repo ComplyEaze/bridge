@@ -1,0 +1,29 @@
+== a-s2-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Ns Plain': 0 groups
+  hy 'BRIDGE Ns Hk-Hm': 0 groups
+  dt 'BRIDGE Ns Dk.Dm': 0 groups
+  am 'BRIDGE Ns Ak&Am': 0 groups
+  sl 'BRIDGE Ns Sk/Sm': 0 groups
+  lp 'BRIDGE Ns Lk(Lm': 0 groups
+  rp 'BRIDGE Ns Rk)Rm': 0 groups
+  ap "BRIDGE Ns Pk'Pm": 0 groups
+  op 'BRIDGE Ns Ok and Om': 0 groups
+  dd 'BRIDGE Ns 2023-24': 0 groups
+  sc 'BRIDGE Ns उदाहरण': 0 groups
+  groups of any other party: 0
+== a-s2-S-snap-20260401-20260801.xml
+a-s2-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Ns Plain': no row
+  hy 'BRIDGE Ns Hk-Hm': no row
+  dt 'BRIDGE Ns Dk.Dm': no row
+  am 'BRIDGE Ns Ak&Am': no row
+  sl 'BRIDGE Ns Sk/Sm': no row
+  lp 'BRIDGE Ns Lk(Lm': no row
+  rp 'BRIDGE Ns Rk)Rm': no row
+  ap "BRIDGE Ns Pk'Pm": no row
+  op 'BRIDGE Ns Ok and Om': no row
+  dd 'BRIDGE Ns 2023-24': no row
+  sc 'BRIDGE Ns उदाहरण': no row
+exit 0

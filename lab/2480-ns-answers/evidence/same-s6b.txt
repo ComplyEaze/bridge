@@ -1,0 +1,4 @@
+  a-s6ba-B-bills.xml: 5098 bytes, sha256 b3103d4cc08d62071c2d267806362c9fea2d6ebf3d6352c41c7a52814d7107ef
+  a-s6bb-B-bills.xml: 5098 bytes, sha256 b3103d4cc08d62071c2d267806362c9fea2d6ebf3d6352c41c7a52814d7107ef
+SAME: EQUAL
+exit 0

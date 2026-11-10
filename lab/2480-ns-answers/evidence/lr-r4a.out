@@ -1,0 +1,10 @@
+L-lo-am-20260801.xml: 896 bytes
+printwindow True saved <LAB_DIR>/shots/r4a-after.png
+2026-11-10T20:19:06.926Z
+== a-r4a-L-lo-am-20260801.xml
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['896']
+  BILLREF 'BP/26-27/0224' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: -1051.00
+ANSWER: ROWS 1 (0 On Account)
+exit 0
+r4a: answered with bytes; record with nm.py --against

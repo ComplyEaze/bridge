@@ -1,0 +1,4 @@
+  a-r2a-L-lo-hy-20260801.xml: 896 bytes, sha256 9106fcd53bad280111db32938332c7da1f1a8831ac5371cc4e78523bf29ef1b4
+  a-r2b-L-lo-hy-20260801.xml: 896 bytes, sha256 9106fcd53bad280111db32938332c7da1f1a8831ac5371cc4e78523bf29ef1b4
+SAME: EQUAL
+exit 0

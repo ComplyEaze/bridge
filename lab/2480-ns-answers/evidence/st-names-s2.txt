@@ -1,0 +1,13 @@
+a-s2-S-snap-20260401-20260801.xml: LEDGER rows 18
+  pl 'BRIDGE Ns Plain': no row
+  hy 'BRIDGE Ns Hk-Hm': no row
+  dt 'BRIDGE Ns Dk.Dm': no row
+  am 'BRIDGE Ns Ak&Am': no row
+  sl 'BRIDGE Ns Sk/Sm': no row
+  lp 'BRIDGE Ns Lk(Lm': no row
+  rp 'BRIDGE Ns Rk)Rm': no row
+  ap "BRIDGE Ns Pk'Pm": no row
+  op 'BRIDGE Ns Ok and Om': no row
+  dd 'BRIDGE Ns 2023-24': no row
+  sc 'BRIDGE Ns उदाहरण': no row
+NAMES: EQUAL

@@ -1200,6 +1200,21 @@ fn forex_leg(letter: char) -> (Option<&'static str>, &'static str) {
             Some("agent/forex-register/forex-register-marks"),
             "5b447d03d63414bb46753503faee9b105347e13c28cac548bfd51d6fdb9fb4b7",
         ),
+        // `ledger_movement` from the book's first day: its opening export at 1 April, the
+        // currency Trial Balance of 1 April and the window of 1 April, each answer the lab's
+        // (`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`) and each request the one the lab sent.
+        'X' => (
+            Some("native/ledgers_native_forexgroup_first_day"),
+            "de2c64d48e9538ab15bc4eefd8ab7e823e1f1cf031d9d62602e9fc21a3ffbac1",
+        ),
+        'T' => (
+            Some("native/trial_balance_currency_forexgroup_first_day"),
+            "1853d0dfbbe92bece1cef034ed4e91b13ff604ec4537e77ef9a2cf80bdd0ad1a",
+        ),
+        'V' => (
+            Some("agent/movement-forexgroup-book-20250401"),
+            "294ee078e9ae3cdbf7f406f5c0c236b15f05d630ec8995b7032a869d1431e70c",
+        ),
         other => panic!("unknown leg {other}"),
     }
 }
@@ -1405,4 +1420,101 @@ fn the_class_entry_window_refused_at_a_bill_allocation_and_now_reads_each_at_its
         );
         assert_eq!(allocation["foreign"]["currency"], "$", "{allocation}");
     }
+}
+
+/// The order `ledger_movement` sends for the day on that book from its first day, in
+/// [`forex_leg`]'s letters: identity, the opening read with the base Tally identifies among the
+/// masters, the currency Trial Balance (rule 1), the window after its marks, the opening read
+/// again, and the window again.
+const FOREX_MOVEMENT: &str = "esesseebsbscscsCsCsksksXsXsbsbseseseebsbscscsCsCsksksTsTsbsbseseemsmseeVsVseseebsbscscsCsCsksksXsXsbsbseseeVsVse";
+
+/// The letter of each request, by its fingerprint: `?` for one no leg names.
+fn forex_letters(observed: &[tally_protocol_simulator::ObservedRequest]) -> String {
+    const LETTERS: &str = "sebcCkLBgnwmXTV";
+    observed
+        .iter()
+        .map(|request| {
+            LETTERS
+                .chars()
+                .find(|letter| forex_leg(*letter).1 == request.request_body_sha256)
+                .unwrap_or('?')
+        })
+        .collect()
+}
+
+/// #683: `ledger_movement` on this book from its first day, through the handler, on the book's
+/// own answers. The six ledgers the currency Trial Balance sets aside are named with no figure,
+/// the two plain rupee ledgers are returned with the movement Tally's own Trial Balance shows for
+/// them (`Cash` and `BRIDGE INR Customer` each close at 3,000.00 Dr from a zero opening), and the
+/// result is partial. Every request is the one the lab sent.
+#[tokio::test]
+async fn a_first_day_movement_on_a_book_with_several_currencies_returns_the_plain_ledgers_partial()
+{
+    let simulator =
+        SequenceSimulator::spawn(FOREX_MOVEMENT.chars().map(forex_plan).collect()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({"company_guid": FOREX_GUID, "from": "20250401", "to": "20250401"}),
+        )
+        .await;
+    simulator.cancel();
+    let sent: Vec<_> = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.cancelled)
+        .collect();
+    assert_eq!(forex_letters(&sent), FOREX_MOVEMENT, "{response}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{response}");
+    assert_eq!(result["partial_reason"], "base_currency_ledgers_only");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
+    assert_eq!(result["voucher_rows_observed"], 11, "{response}");
+    assert_eq!(result["ledgers_scope"], "base_currency_ledgers_only");
+    assert_eq!(result["foreign_currency_ledgers_excluded"]["count"], 0);
+    let mixed = &result["base_currency_ledgers_mixed_excluded"];
+    assert_eq!(mixed["count"], 6, "{mixed}");
+    assert_eq!(mixed["reason"], "mixed_currency_movement");
+    assert_eq!(
+        mixed["ledgers"],
+        json!([
+            "BRIDGE Export Sales",
+            "BRIDGE Import Purchases",
+            "BRIDGE Lab Bank",
+            "BRIDGE USD Customer",
+            "BRIDGE USD Supplier",
+            "Profit & Loss A/c"
+        ])
+    );
+    // The Trial Balance closes each of the two at -3000.00 from a zero opening.
+    let rows: Vec<Value> = result["ledgers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            json!([
+                row["ledger"],
+                row["opening"],
+                row["debit"],
+                row["credit"],
+                row["closing"],
+                row["vouchers_touching"]
+            ])
+        })
+        .collect();
+    assert_eq!(
+        rows,
+        vec![
+            json!(["BRIDGE INR Customer", "0.00", "-5000", "2000", "-3000", 2]),
+            json!(["Cash", "0.00", "-3000", "0", "-3000", 2]),
+        ],
+        "{response}"
+    );
 }

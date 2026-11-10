@@ -3,16 +3,17 @@
 Not for merge. Part of #683. **Reads only:** no voucher or master is keyed, so there is no BK and no restore. The one thing changed is Tally's current date, by F2 at the Gateway, and it is set back before the close. Lines are at master ae38a75c.
 
 ## Question
-Row 683-TW sent the Trial Balance from 1 April 2025 to 1 April 2025 (`tb3`, request sha256 `1853d0df…1ad1a`) on this book. It answered 14,140 B, byte-equal to its Trial Balance to 30 April, with six ledgers MIXED (each reading the dollar composite). Row 683-LD sent the same request after two vouchers dated 30 April 2025 were saved. It answered 13,528 B, with every ledger PLAIN: each of the six read its rupee figure alone, and every rupee figure was the same as before (`lab/683-ld-answers` e38d2b82, `RESULTS.md`). Two things differed between those sittings:
+Row 683-TW sent the Trial Balance from 1 April 2025 to 1 April 2025 (`tb3`, request sha256 `1853d0df…0ad1a`) on this book. It answered 14,140 B, byte-equal to its Trial Balance to 30 April, with six ledgers MIXED (each reading the dollar composite). Row 683-LD sent the same request after two vouchers dated 30 April 2025 were saved. It answered 13,528 B, with every ledger PLAIN: each of the six read its rupee figure alone, and every rupee figure was the same as before (`lab/683-ld-answers` e38d2b82, `RESULTS.md`). Three things differed between those sittings:
 - the two vouchers dated 30 April, which row 683-LD then restored away;
+- the Gateway's date of last entry: 1-Apr-25 in row 683-TW's sitting, 30-Apr-25 in row 683-LD's. It follows the vouchers, and cannot be moved without one;
 - Tally's current date: 1-Apr-2025 in row 683-TW's sitting, 30-Apr-2025 in row 683-LD's (moved by K1's voucher date).
 
-Row 683-LD does not say which of the two changed the answer. This row changes the second alone (P6). The book is as row 683-TW read it (row 683-LD's restore returned it to 11/214 and its book-scoped window to the bytes found). The request is the same file. Only Tally's current date moves, from 1-Apr-2025 to 30-Apr-2025, and then back to 1-Apr-2025.
+Row 683-LD does not say which of them changed the answer. This row changes the current date alone (P6), and leaves the vouchers and the date of last entry as row 683-TW had them. The book is as row 683-TW read it (row 683-LD's restore returned it to 11/214 and its book-scoped window to the bytes found). The request is the same file. Only Tally's current date moves, from 1-Apr-2025 to 30-Apr-2025, and then back to 1-Apr-2025.
 
 **Q1:** with the book as found and the current date at 30-Apr-2025, does `tb3` answer as row 683-TW's did (six MIXED) or as row 683-LD's did (all PLAIN)? `tb.py --sets` answers it in one line against each.
 
 **The controls:**
-- **`tb3a`,** the same request at the current date row 683-TW had (1-Apr-2025), before the date is touched. EXPECT byte-equal to row 683-TW's `tb3` answer. Then a difference in `tb3d` is about the date, not the book, the sitting or the script.
+- **`tb3a`,** the same request at the current date row 683-TW had (1-Apr-2025), before the date is touched. EXPECT byte-equal to row 683-TW's `tb3` answer. Then a difference in `tb3d` is about the date, not the book or the script. One thing of the sitting differs: row 683-TW sent its `tb3` about 8 seconds after its Trial Balance to 30 April, and here `tb3a` is the sitting's first Trial Balance. A `tb3a` byte-equal to row 683-TW's shows that order did not change this answer.
 - **`tb3r`,** the same request again after the date is set back to 1-Apr-2025. A `tb3r` that differs from `tb3a` means the date's return did not return the answer, and `tb3d` then decides nothing until that is explained (P5: an anomaly is repeated before it is believed).
 
 Sending master's own builder raw is shape discovery on a lab book, which the owner allows. The request is not a new shape: it is the file rows 683-TW and 683-LD sent, byte for byte.
@@ -22,7 +23,7 @@ Sending master's own builder raw is shape discovery on a lab book, which the own
 - **Synthetic:** it is in master's registry, `scripts/merge-gate-synthetic-uuids.json` line 201 ("created in the lab on 28 October 2026 with invented masters and vouchers keyed by hand").
 - **Not an excluded book:** its GUID is not the register lab book's (`REGISTER_LAB_GUID`, `captured_parse_record.rs:302`), and not the one the private exclusion list names.
 - **Pinned by GUID.** The `BOOK` of `lm.py` and `tb.py` is this GUID. m0 must print one COMPANY row, `the book's: yes`, or the row STOPs before any other send.
-- **Its last state** (row 683-LD, `RESULTS.md`): restored from its backup, then m2 byte-equal to m0 (V 11, M 214), and the book-scoped window byte-equal to the one found. At its step 9 the Gateway showed current date Tuesday, 1-Apr-2025, period 1-Apr-25 to 31-Mar-26, last entry 1-Apr-25. No row has written to it since. `a-ldm2-M-marks.xml` here is that m2.
+- **Its last state** (row 683-LD, `RESULTS.md`): restored from its backup, then m2 byte-equal to m0 (V 11, M 214), and the book-scoped window byte-equal to the one found. After its restore the Gateway showed current date Tuesday, 1-Apr-2025, period 1-Apr-25 to 31-Mar-26, last entry 1-Apr-25, and its step 9 read the date and period as at step 0. m0 checks that nothing has written to it since. `a-ldm2-M-marks.xml` here is that m2.
 - **The period:** do not change it.
 
 ## The current date, and why changing it writes nothing
@@ -45,10 +46,10 @@ Check every file against `SHA256.txt` first, and check each send's request file 
 | file | what, and where its bytes come from |
 |---|---|
 | `M-marks.xml` | The marks request (GUID, ALTVCHID, ALTMSTID). Byte-equal to rows 683-TW's and 683-LD's. |
-| `T-tb3-20250401-20250401.xml` | Row 683-TW's `tb3` request, byte-equal (sha256 `1853d0df…1ad1a`): `render_native_trial_balance_request_with_currency` (`native_trial_balance/mod.rs:170`), from 20250401 to 20250401. Row 683-LD sent the same file. All three sends of this row use it. |
+| `T-tb3-20250401-20250401.xml` | Row 683-TW's `tb3` request, byte-equal (sha256 `1853d0df…0ad1a`): `render_native_trial_balance_request_with_currency` (`native_trial_balance/mod.rs:170`), from 20250401 to 20250401. Row 683-LD sent the same file. All three sends of this row use it. |
 | `a-twtb3-T-tb3-20250401-20250401.xml` | Not sent. Row 683-TW's `tb3` answer (`lab/683-tw-answers` 4f31b925, sha256 `1c4638e8…b7b7`, 14,140 B; six MIXED). |
 | `a-ldtb3-T-tb3-20250401-20250401.xml` | Not sent. Row 683-LD's `tb3` answer (`lab/683-ld-answers` e38d2b82, sha256 `a12217b8…7705`, 13,528 B; all PLAIN). |
-| `a-ldm2-M-marks.xml` | Not sent. Row 683-LD's m2, the book's marks after its restore (sha256 `3d75dd1a…afb7`, 3,404 B; byte-equal to row 683-TW's m0). |
+| `a-ldm2-M-marks.xml` | Not sent. Row 683-LD's m2, the book's marks after its restore (sha256 `3d75dd1a…dafba`, 3,404 B; byte-equal to row 683-TW's m0). |
 | `run.py`, `LAB-COMMON.md`, `.gitattributes`, `lm.py`, `tb.py` | Rows 683-TW's and 683-LD's, byte-equal. |
 
 ## Screens and prompts
@@ -91,7 +92,7 @@ Run each send as `python3 -I run.py http://127.0.0.1:9001 <label> <file>`, and w
 3. **The date to 30 April:** by the path above, F2, `30-4-2025`, Enter. Record the box's offered date and the Gateway after it (two screenshots). Then **`m1`:** `M-marks.xml`, and `python3 -I lm.py --same-row a-m0-M-marks.xml a-m1-M-marks.xml`. EXPECT SAME MARKS. On MARKS DIFFER:
    - send `M-marks.xml` once more as `m1r` (P5, C8) and record it;
    - send nothing else, and STOP. The date is left as it is until the run coordinator's word.
-4. **`tb3d`** (at 30-Apr-2025): `T-tb3-20250401-20250401.xml`. Then, at once, screenshot the whole Tally window: this is the first Trial Balance on this book sent with the current date after every voucher. A dialog = Stop. Record whether the answer is byte-equal to `a-tb3a-…`, and whether it is byte-equal to `a-ldtb3-…`. Then:
+4. **`tb3d`** (at 30-Apr-2025): `T-tb3-20250401-20250401.xml`. Then, at once, screenshot the whole Tally window: this is the first Trial Balance on this book sent with the current date later than its date of last entry. A dialog = Stop. Record whether the answer is byte-equal to `a-tb3a-…`, and whether it is byte-equal to `a-ldtb3-…`. Then:
    - `python3 -I tb.py a-tb3d-T-tb3-20250401-20250401.xml`, recorded whole;
    - `python3 -I tb.py --sets a-tb3a-T-tb3-20250401-20250401.xml a-tb3d-T-tb3-20250401-20250401.xml`, recorded whole;
    - `python3 -I tb.py --sets a-ldtb3-T-tb3-20250401-20250401.xml a-tb3d-T-tb3-20250401-20250401.xml`, recorded whole.
@@ -136,8 +137,8 @@ Nothing is keyed, so there is never anything to restore. If a STOP leaves the cu
 - m0, m1 and m2 byte-equal.
 
 ## Decides
-- **`tb3a` as row 683-TW's, `tb3d` all PLAIN (SETS DIFFER against `tb3a`, the six MIXED to PLAIN), `tb3r` as `tb3a`:** Tally's current date alone changes what the Trial Balance to 1 April reads for the dollar ledgers, with the book unchanged, on this book and release: PARTIAL. Row 683-LD's PLAIN figures then came from the current date. Record whether `tb3d` is byte-equal to `a-ldtb3`; where it is not, record which fields differ, since row 683-LD's book had two more vouchers.
-- **`tb3a` and `tb3r` as row 683-TW's, `tb3d` SETS SAME against `tb3a`:** the current date alone does not change this answer. Row 683-LD's change then came with the vouchers dated 30 April, alone or together with the date. Separating those two needs the vouchers and a current date of 1 April in one sitting, which is a write behind a backup. That is another row, drafted only on the run coordinator's word.
+- **`tb3a` as row 683-TW's, `tb3d` all PLAIN (SETS DIFFER against `tb3a`, the six MIXED to PLAIN), `tb3r` as `tb3a`:** Tally's current date alone changes what the Trial Balance to 1 April reads for the dollar ledgers, with the vouchers and the date of last entry unchanged, on this book and release: PARTIAL. Row 683-LD's PLAIN figures could then come from its current date; that row's vouchers and last entry date are not ruled out, only shown not to be needed. Record whether `tb3d` is byte-equal to `a-ldtb3`; where it is not, record which fields differ, since row 683-LD's book had two more vouchers.
+- **`tb3a` and `tb3r` as row 683-TW's, `tb3d` SETS SAME against `tb3a`:** the current date alone does not change this answer. Row 683-LD's change then came with the vouchers dated 30 April (and the date of last entry they move), alone or together with the current date. Separating those two needs the vouchers and a current date of 1 April in one sitting, which is a write behind a backup. That is another row, drafted only on the run coordinator's word.
 - **`tb3d` neither:** some ledgers MIXED and some PLAIN, other text, or any UNREAD. Record it whole; it decides nothing until the run coordinator has read it.
 - **`tb3r` not as `tb3a`:** setting the date back did not return the answer. `tb3d` decides nothing until that is explained.
 - **`tb3a` not as row 683-TW's:** the book or the sitting reads differently from row 683-TW's at the same date. `tb3d` and `tb3r` are recorded, but they decide nothing until that is explained.

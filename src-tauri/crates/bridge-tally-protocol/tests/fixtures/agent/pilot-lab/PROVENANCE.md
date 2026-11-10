@@ -146,7 +146,7 @@ Answers of the Windows lab (the same synthetic company, TallyPrime 7.1 Silver, l
 
 ## The customer made SEZ on screen (2026-11-09)
 
-Row 2162-S9b's answer to the build's ledger compliance read (`C-compliance.xml`, byte-equal to `r05-ledgers-compliance.xml`), sent raw by the Windows lab on BRIDGE PILOT LAB loaded alone (TallyPrime 7.2 Silver) after `Regular - SEZ` was chosen for `BRIDGE Customer RJ` on Tally's Ledger Alteration screen and saved. The fixture is the answer byte for byte as captured, published on `lab/2162-s9b-answers` (commit `6c80eb43`, `answers/a-s5r-C-compliance.xml`). Its GSTINs are synthetic, as the book's setup seeded them: the customer's (twice) and the company's own registration, each passing the build's check digit. No BOM, as Tally sent it.
+Row 2162-S9b's answer to the build's ledger compliance read (`C-compliance.xml`, byte-equal to `r05-ledgers-compliance.xml`), sent raw by the Windows lab on BRIDGE PILOT LAB loaded alone (TallyPrime 7.2, single-user edition) after `Regular - SEZ` was chosen for `BRIDGE Customer RJ` on Tally's Ledger Alteration screen and saved. The fixture is the answer byte for byte as captured, published on `lab/2162-s9b-answers` (commit `6c80eb43`, `answers/a-s5r-C-compliance.xml`). Its GSTINs are synthetic, as the book's setup seeded them: the customer's (twice) and the company's own registration, each passing the build's check digit. No BOM, as Tally sent it.
 
 | Fixture | Bytes | SHA-256 | Published as | Request | What it is |
 | --- | ---: | --- | --- | --- | --- |
@@ -154,7 +154,7 @@ Row 2162-S9b's answer to the build's ledger compliance read (`C-compliance.xml`,
 
 ## An invoice saved again, unchanged, on Tally's screen (2026-11-09)
 
-Row 2162-RS's answers to the build's invoice read-back (`R-0057.xml`, `R-0010.xml` with the number changed), sent raw by the Windows lab on BRIDGE PILOT LAB loaded alone (TallyPrime Silver, `tally.exe` file version 1.1.7.2) for `BP/26-27/0057`, which the build's request had created on that book (GUID `...-0000002d`). The first is the read with no key pressed since the write; the second is the read after the voucher was opened from the Day Book and saved with no change (Ctrl+A, no prompt). Each fixture is the answer byte for byte as captured, published on `lab/2162-rs-answers` (commit `8c24fe17`). No BOM, as Tally sent it.
+Row 2162-RS's answers to the build's invoice read-back (`R-0057.xml`, `R-0010.xml` with the number changed), sent raw by the Windows lab on BRIDGE PILOT LAB loaded alone (TallyPrime, single-user edition, `tally.exe` file version 1.1.7.2) for `BP/26-27/0057`, which the build's request had created on that book (GUID `...-0000002d`). The first is the read with no key pressed since the write; the second is the read after the voucher was opened from the Day Book and saved with no change (Ctrl+A, no prompt). Each fixture is the answer byte for byte as captured, published on `lab/2162-rs-answers` (commit `8c24fe17`). No BOM, as Tally sent it.
 
 | Fixture | Bytes | SHA-256 | Published as | Request | What it is |
 | --- | ---: | --- | --- | --- | --- |

@@ -283,11 +283,17 @@ fn setup_reports_duplicate_complete_tuple_separately() {
     assert_eq!(error.code, "company_identity_ambiguous");
 }
 
-/// The selection check trims before it measures, so these names pass it; the
-/// identity holds the name untrimmed and refuses it with its own code (#2397).
+/// A name no request can carry is refused at selection with its own code and
+/// the rename remedy in the one wording of the rule, for each way a name can
+/// fail it: too long, a control character, blank (#2397, #2433).
 #[test]
 fn setup_refuses_a_name_no_request_can_carry_with_its_own_code() {
-    for name in [format!("{} ", "A".repeat(255)), "Client Book\n".to_string()] {
+    let limit = bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES;
+    for name in [
+        "A".repeat(limit + 1),
+        "Client Book\n".to_string(),
+        "   ".to_string(),
+    ] {
         let selected = SelectedCompanyIdentity {
             display_name: name.clone(),
             company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
@@ -304,9 +310,42 @@ fn setup_refuses_a_name_no_request_can_carry_with_its_own_code() {
             .expect_err("a name no request can carry must not become an identity");
 
         assert_eq!(error.code, "company_name_invalid", "{name:?}");
+        assert_eq!(
+            error.remediation,
+            format!(
+                "Rename the company in Tally to {}, then select it again.",
+                crate::tally::validators::company_name_rule!()
+            )
+        );
+        let echoed = name.trim();
         assert!(
-            !error.message.contains(name.trim()) && !error.remediation.contains(name.trim()),
+            echoed.is_empty()
+                || (!error.message.contains(echoed) && !error.remediation.contains(echoed)),
             "the refusal must not echo the name"
+        );
+    }
+}
+
+/// With nothing selected, the name is blank too. That is answered as a
+/// selection to make again, not as a company to rename: the name is judged
+/// only after the GUID, number and date of the selection (#2433).
+#[test]
+fn an_empty_selection_with_a_blank_name_is_a_selection_error_not_a_rename() {
+    for name in ["", "   "] {
+        let selected = SelectedCompanyIdentity {
+            display_name: name.to_string(),
+            company_guid: String::new(),
+            company_number: String::new(),
+            books_from_yyyymmdd: String::new(),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, Vec::new())
+            .expect_err("an empty selection must not become an identity");
+
+        assert_eq!(error.code, "company_selection_invalid", "{name:?}");
+        assert!(
+            !error.remediation.contains("Rename"),
+            "{name:?}: {}",
+            error.remediation
         );
     }
 }

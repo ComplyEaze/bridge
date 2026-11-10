@@ -4433,6 +4433,21 @@ Observed company numbers must contain 1–16 ASCII digits, using the same rule a
 desktop selection. Discovery labels malformed values `invalid_company_number`;
 scoped access refuses them before any company report is read.
 
+`list_companies` lists every company Tally reports, with its name exactly as Tally reported it,
+never trimmed. A company whose name a read cannot carry also has `name_refusal`, one of
+`company_name_blank`, `company_name_control_character` or `company_name_length_not_established`
+(over 360 UTF-8 bytes). Its name is shown whole, with each control and invisible format character
+written as its `\u{..}` code, and every read naming it refuses as `company_name_invalid`. No other
+company has the key. Any other company's name is shown with each invisible format character
+written as its code too, so a name holding one never draws like the same name without it, no text
+is hidden in a name and none reorders the text around it. Other scripts' format characters, such
+as Mongolian or Khmer ones, are shown as codes too. The one exception is the zero-width joiner and
+non-joiner (U+200D, U+200C), shown as they are wherever they stand, because Indic and Persian names
+are written with them; so a name of joiners alone draws as nothing. A backslash is shown as it is,
+so a name that spells a `\u{..}` code out as text draws like one holding that character. The
+escape applies to `list_companies`; a record a read writes holds the name as Tally reported it
+(#2433).
+
 Port zero and ports above 65535 are rejected at startup.
 Unknown arguments, wrong selector types, and invalid enums are rejected before
 any Tally request, and so is a missing required argument (`<name>_required`, for

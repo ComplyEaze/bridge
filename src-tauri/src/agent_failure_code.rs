@@ -69,6 +69,14 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of a read for a listed company, before any request names it.
+    pub(crate) enum CompanyReadCode {
+        /// The company's name, as Tally reported it, is one a request cannot carry (#2433).
+        NameInvalid = "company_name_invalid",
+    }
+}
+
+failure_codes! {
     /// The refusal of a `vouchers` read that took a held census (#2399).
     pub(crate) enum CensusReuseCode {
         /// The read used a census counted by an earlier call, and a part it read

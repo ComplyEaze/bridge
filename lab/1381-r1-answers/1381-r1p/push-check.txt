@@ -1,0 +1,9 @@
+Row 1381-R1P: row 1381-R1's kept-local answers checked before a push (check-push.py)
+a-a1.xml: PUSH; 8270 B, sha256 92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4; registered identifier 2; GSTIN outside the family 0, COMPANYNUMBER with text 0, other GUID 0, drive path 0, Users folder 0, email shape 0, 10+ digit run 0
+a-a1b1.xml: PUSH; 10758 B, sha256 2ae12ef647f24b9645231b868f733f978b09d3a8508aab5bf6dfa2564ccbffbd; registered identifier 4; GSTIN outside the family 0, COMPANYNUMBER with text 0, other GUID 0, drive path 0, Users folder 0, email shape 0, 10+ digit run 0
+a-a1b2.xml: PUSH; 15922 B, sha256 f58ab8debba4d819c53e3d58df3d84b1bbfb050e35b78a9d506ee1cd74fc2ba3; registered identifier 6; GSTIN outside the family 0, COMPANYNUMBER with text 0, other GUID 0, drive path 0, Users folder 0, email shape 0, 10+ digit run 0
+a-a1c.xml: PUSH; 15998 B, sha256 3bdb313e443c8de87fa6f9c593611307833f93e29dc2f348133e76f00c5b800c; registered identifier 6; GSTIN outside the family 0, COMPANYNUMBER with text 0, other GUID 0, drive path 0, Users folder 0, email shape 0, 10+ digit run 0
+a-g1.xml: PUSH; 4170 B, sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a; registered identifier 2; GSTIN outside the family 0, COMPANYNUMBER with text 0, other GUID 0, drive path 0, Users folder 0, email shape 0, 10+ digit run 0
+a-u1.xml: PUSH; 4040 B, sha256 cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39; registered identifier 2; GSTIN outside the family 0, COMPANYNUMBER with text 0, other GUID 0, drive path 0, Users folder 0, email shape 0, 10+ digit run 0
+a-m0.xml: PUSH; 3318 B, sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1; registered identifier 1; GSTIN outside the family 0, COMPANYNUMBER with text 0, other GUID 0, drive path 0, Users folder 0, email shape 0, 10+ digit run 0
+PUSH 7 of 7

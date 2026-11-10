@@ -5,6 +5,7 @@ use crate::text_encoding::{
 use bridge_tally_primitives::TallyDate;
 
 use crate::outstandings_shared::DateBoundaryProfile;
+use crate::xml_text::escape_text as xml_escape;
 
 const BS_FY: &[u8] =
     include_bytes!("../tests/fixtures/statement_balance_sheet_fy_live.utf16le.xml");

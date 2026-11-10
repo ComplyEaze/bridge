@@ -20,7 +20,7 @@ For each of the ten names master's party type refuses, one name a ledger:
 2. **Once it exists with one bill, does the report answer with that ledger's own bill?** Master's own request, with only the name changed, sent twice.
 3. **Does that answer agree with the other two reads of the book?** The ledger snapshot's closing for the ledger (the tie master makes), and the book-wide Bills Receivable group for it.
 
-**The one variable** in each ledger's answers is its name's mark. The ledgers are alike but for the name: the same parent group, the same bill-wise setting, one invoice of the same amount on the same day, a bill named by the invoice's number. The control ledger, whose name the type admits, is read the same way.
+**The one variable** in each ledger's answers is its name's mark, in names of one pattern (letters, the mark, letters) except `op`, `dd` and `sc`, whose shape is their point. The ledgers are alike but for the name: the same parent group, the same bill-wise setting, one invoice of the same amount on the same day, a bill named by the invoice's number. The control ledger, whose name the type admits, is read the same way.
 
 ## Book
 `BRIDGE PILOT LAB` (synthetic), loaded alone, in a sitting of its own. `LAB-COMMON.md` in this folder (byte-equal to NM's) applies in full. Where it and this sheet differ, the stricter one holds.
@@ -58,16 +58,18 @@ The names are invented. Each mark sits between two letters, one mark a name. Eac
 
 ## The sends and the wedge rule
 `run.py` is NM's, byte for byte: one request at a time, each answer's headers kept by curl -D in `a-<label>-<file>.headers`, and it never abandons a request.
-- **The wedge rule.** If any send has not answered **5 minutes** after it began: press nothing, do not end curl, send nothing more (not even `GET /status`), screenshot the whole Tally window, and report to the run coordinator (C9). Nothing is re-sent on this row's own judgement. On this book NM's reads each answered within about 4.2 s.
+- **The wedge rule.** If any send has not answered **5 minutes** after it began (NM's bound, kept on purpose though it is tighter than LAB-COMMON's): press nothing, do not end curl, send nothing more (not even `GET /status`), screenshot the whole Tally window, and report to the run coordinator (C9). Nothing is re-sent on this row's own judgement. On this book NM's reads each answered within about 4.2 s.
 - **The stops.** `run.py`'s stops are failed requests, never "nothing found": a curl exit other than 0, an Unknown Request, an empty answer, or an answer above 2,000,000 B. So are the STOPs of `count20.py`, `nm.py` and `st.py`. Each stops the row there, with one exception.
-- **The one exception: an empty answer to an `L-lo-` request.** It needs the run coordinator's word when the row is queued, as NM's did.
+- **The one exception: an empty answer to an `L-lo-` request.** It is looser than C3, which makes every empty body a STOP, so it holds only with the run coordinator's word given when the row is queued, as NM's was. Without that word, an empty `L-lo-` answer is a STOP like any other.
   - A name that matches no ledger is answered with no bytes (row 2377-L). At step 3 that is the expected answer for every name.
   - It is recorded first as what it is: `run.py` printed "empty answer", so the request failed.
   - It is not a STOP, and the step goes on, only if its headers file shows HTTP status 200 and `CONTENT-LENGTH: 0`. `run.py`'s "stop, do not resend" is then read as this exception.
   - Any other empty body (no headers file, no status line, another status or another length) ended without an answer: a STOP, and the request is never sent again.
   - Then, in this order: keep the headers file and the log line, and screenshot the whole Tally window; if a dialog is up: STOP; send `GET /status` once (C2c's command), recording its status and bytes, and if it is not 200: STOP; run `nm.py` on that answer, and go on with the step.
+  - Each `GET /status` this sends is a request of the row: it is logged with the rest, and there may be up to 22 of them (11 at step 3, 11 at step 6).
+  - At step 6, an empty `r<n>a` under this exception is followed by its `r<n>b`, as for any other answer.
   - An empty answer to any other request, an `LM-` or `I-` import included, is a STOP, as `run.py` says.
-- Check each file's sha256 against `SHA256.txt` before its send.
+- Check each file's sha256 against `SHA256.txt` before its send. No file in `nm/` or `pb/` is ever an argument to `run.py`: they are sources for `gen-ns.py`, and `pb/L-ledger.xml` is a ledger create.
 - Close no Bridge process, and call no Bridge tool.
 
 **Which script reads which answer**
@@ -100,17 +102,19 @@ The names are invented. Each mark sits between two letters, one mark a name. Eac
 - **Not tried:** any send to Tally.
 
 ## Steps
-Run each label as `python3 -I run.py <gateway URL> <label> <files>`. (Row 2480-NM's PC has no `python3` command; there, `python -I` with Python 3 is the same command.) The prompt rule, the wait rule and the path rule are NM's.
+Run each label as `python3 -I run.py http://127.0.0.1:9001 <label> <files>`, the Gateway on 9001 as C2 finds it (written `URL` below). (Row 2480-NM's PC has no `python3` command; there, `python -I` with Python 3 is the same command.) The prompt rule, the wait rule and the path rule are NM's.
+
+**Labels are not step numbers.** Step 1 sends `s1`, step 2 `s2`, step 3 `p1` to `p12`, step 4 `s4<id>` and `s5<id>` (with `m` after each for its marks read), step 5 `s6…`, step 6 `r<n>a` and `r<n>b`, step 7 `m1`, step 8 `s9`.
 
 **The prompt rule, at every step.** The only prompts answered are C5's and C6's, each with the key named. For any other prompt, message or dialog: copy it word for word and screenshot it first; then answer No, or Esc if it offers no No; press nothing more and send nothing. That prompt is this row's result, and C8 holds: the restore waits for the run coordinator's word.
 
-**Each write, the same way, by hand, one label a command.**
-1. `run.py URL <label>m M-marks.xml`, then `python3 -I count20.py --before-write a-s1-M-marks.xml a-<label>m-M-marks.xml`.
-2. Only if that passes, and no key was pressed in Tally since: `run.py URL <label> <file>`, the import alone.
-3. Screenshot the whole window before the next request (C3).
-4. `python3 -I st.py --import a-<label>-<file>`, recorded whole. **Only on exit 0 is the next request of the row sent.** On any other exit: the STOP of step 4.
+**Each write, the same way, by hand, one label a command** (the write recipe, used only in step 4):
+- (a) `run.py URL <label>m M-marks.xml`, then `python3 -I count20.py --before-write a-s1-M-marks.xml a-<label>m-M-marks.xml`.
+- (b) Only if that passes, and no key was pressed in Tally since: `run.py URL <label> <file>`, the import alone.
+- (c) Screenshot the whole window before the next request (C3).
+- (d) `python3 -I st.py --import a-<label>-<file>`, recorded whole. **Only on exit 0 is the next request of the row sent.** On any other exit of `st.py`, or any exit other than 0 of `run.py` in (b): the STOP of the set-up (step 4).
 
-Step 4 is not run as a loop. If a script sends any of it, the script ends at the first `st.py` exit other than 0 and sends nothing after it. Nothing else decides whether an import answer is as expected.
+The set-up (step 4) is not run as a loop. If a script sends any of it, the script ends at the first exit other than 0 of `run.py` or `st.py` and sends nothing after it. Nothing else decides whether an import answer is as expected.
 
 1. **Load, check and back up.**
    - Step 0 of C2, with no company loaded. Load BRIDGE PILOT LAB alone from Select Company (C1). Any prompt: stop, press nothing, and ask.
@@ -127,7 +131,7 @@ Step 4 is not run as a loop. If a script sends any of it, the script ends at the
    - **An answer with bytes** is that name's result, the most important kind this row can give: record it whole, with `nm.py --against <id> a-p<n>-L-lo-<id>-20260801.xml a-s2-B-bills.xml a-s2-S-snap-20260401-20260801.xml`. That id's ledger and invoice are never sent; step 4 skips it. The row goes on.
    - Then `p12`: `M-marks.xml`, and `count20.py --same-row a-s1-M-marks.xml a-p12-M-marks.xml`. EXPECT SAME MARKS. On MARKS DIFFER: send `M-marks.xml` once more as `p12r` and record it; send nothing else, and STOP.
 4. **The set-up,** one ledger at a time in the order of the table, each id's ledger and then its invoice, each write as above. The labels are `s4<id>` for `LM-<id>.xml` and `s5<id>` for `I-<id>.xml`, with `s4<id>m` and `s5<id>m` for the marks reads before them.
-   - **The STOP of this step.** The first `st.py --import` exit other than 0, on any answer, a ledger's or an invoice's, the control's or a mark's: send nothing more, not even the invoice of that id; screenshot the whole window; record the answer whole; and report to the run coordinator. C8 holds. The book then holds each ledger and invoice created before it, and possibly a ledger that answer altered: say which in the report.
+   - **The STOP of the set-up.** The first `st.py --import` exit other than 0, on any answer, a ledger's or an invoice's, the control's or a mark's; or an exit other than 0 of `run.py` on an `LM-` or `I-` file (a curl failure, an empty answer, Unknown Request or an answer above the bound), after which what the import did is not known and the file is never sent again: send nothing more, not even the invoice of that id; screenshot the whole window; record the answer whole; and report to the run coordinator. C8 holds. The book then holds each ledger and invoice created before it, and possibly a ledger that answer altered: say which in the report.
    - This is the point at which row 2480-NM went on. Nothing in this row goes on after it.
 5. **The book-wide reads and the state.** `s6m`: `M-marks.xml`. Then `s6sa`, `s6sb`: `S-snap-20260401-20260801.xml`, the same file twice; and `s6ba`, `s6bb`: `B-bills.xml`, the same file twice. Neither request is a new shape (NM's files, byte for byte); a dialog at any time is still the prompt rule.
    - `nm.py` on `a-s6sa-S-snap-20260401-20260801.xml` and `a-s6ba-B-bills.xml`, each recorded whole.
@@ -135,7 +139,7 @@ Step 4 is not run as a loop. If a script sends any of it, the script ends at the
    - `st.py --names a-s6sa-S-snap-20260401-20260801.xml`, recorded whole. EXPECT `NAMES: EQUAL`, each created ledger's name list its own name. A ledger whose name list is not its NAME attribute is a set-up result, recorded whole. Step 6 still runs: it only reads.
    - **It is the intended state** if S holds a row for each created ledger, `ISBILLWISEON` Yes, `CLOSINGBALANCE` -1051.00, and B one group for each, `BP/26-27/<its number>`, -1051.00. If not, step 6 is still sent for the ledgers that exist, and the report says the state is not the intended one.
    - If the two snapshot answers are not byte-equal, master would send nothing more for any ledger; this row still sends step 6, and records that master would not have.
-6. **The ledger reads.** For each id in the order of the table that has a ledger and a bill, LR with the labels below. The request is `L-lo-<id>-20260801.xml`, the file step 3 sent.
+6. **The ledger reads.** For each id in the order of the table that has a ledger and a bill, LR with the labels below. An id has a ledger and a bill when `st.py --import` gave exit 0 on both its files at step 4 and `nm.py` on `a-s6sa-…` shows a row for its name. Any other id is not read here, and the report says why. The request is `L-lo-<id>-20260801.xml`, the file step 3 sent.
 
    | n | id | labels | n | id | labels |
    | --- | --- | --- | --- | --- | --- |
@@ -186,7 +190,7 @@ Each is PARTIAL: one book, one release, one sitting, master's request template s
 **For each of the ten names,** one of these. The control is the baseline: if it is not `told` with `AGAINST: EQUAL`, no other name is judged until it is explained.
 - **Step 3 answered with bytes:** Tally reads that name, before its ledger exists, as some other ledger. That mark is not admitted, whatever else is measured, and the coordinator decides what it means for the alphabet.
 - **`told`, `AGAINST: EQUAL`, the one bill the ledger's own, the two sends equal, and NO BYTES at step 3:** on this book and release, Tally reads that name in the `LedgerName` static variable as that ledger and as no other. This is the evidence #2480 asks for, for that one mark. It says nothing about the formula read (`CHILDOF`).
-- **NO BYTES at step 6:** Tally matched no ledger for that name; the build keeps refusing it. The row cannot tell whether the mark or its escape is the cause.
+- **NO BYTES at step 6,** for an id with a ledger and a bill as step 6 defines it: Tally matched no ledger for that name; the build keeps refusing it. The row cannot tell whether the mark or its escape is the cause.
 - **Rows that are another ledger's at step 6:** as step 3's, the most important result.
 - **`party_bills_untied`, `party_bills_answer_malformed`, `party_bills_tally_failure` or another code:** master's parse would refuse that read for that name, so widening the alphabet would not make it work as it is.
 - **`SAME: DIFFER`:** record both; master would refuse as `party_bills_drifted`.

@@ -1,0 +1,35 @@
+2026-11-10T23:43:59.907Z start bash r9.sh pl,cm,us,dq,ps,at,hs,cl,pc,st,ex
+== cr.sh r1a C-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r1b C-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+r1 pl: SAME: EQUAL (5382 B sha256 f2e3cd800df1812e; 5382 B sha256 f2e3cd800df1812e) | OWN: YES
+== cr.sh r2a C-v-cm.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r2b C-v-cm.xml exit 3: ANSWER: VOUCHERS 1
+r2 cm: SAME: EQUAL (5382 B sha256 d745e4da92d96f7f; 5382 B sha256 d745e4da92d96f7f) | OWN: YES
+== cr.sh r3a C-v-us.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r3b C-v-us.xml exit 3: ANSWER: VOUCHERS 1
+r3 us: SAME: EQUAL (5382 B sha256 31027690c4ce4b08; 5382 B sha256 31027690c4ce4b08) | OWN: YES
+== cr.sh r4a C-v-dq.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r4b C-v-dq.xml exit 3: ANSWER: VOUCHERS 1
+r4 dq: SAME: EQUAL (5382 B sha256 53856447d8d2902f; 5382 B sha256 53856447d8d2902f) | OWN: YES
+== cr.sh r5a C-v-ps.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r5b C-v-ps.xml exit 3: ANSWER: VOUCHERS 1
+r5 ps: SAME: EQUAL (5382 B sha256 aa3dab1e972f4a5d; 5382 B sha256 aa3dab1e972f4a5d) | OWN: YES
+== cr.sh r6a C-v-at.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r6b C-v-at.xml exit 3: ANSWER: VOUCHERS 1
+r6 at: SAME: EQUAL (5382 B sha256 e1ac739dc4172e05; 5382 B sha256 e1ac739dc4172e05) | OWN: YES
+== cr.sh r7a C-v-hs.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r7b C-v-hs.xml exit 3: ANSWER: VOUCHERS 1
+r7 hs: SAME: EQUAL (5382 B sha256 7eec71e6f7099c5b; 5382 B sha256 7eec71e6f7099c5b) | OWN: YES
+== cr.sh r8a C-v-cl.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r8b C-v-cl.xml exit 3: ANSWER: VOUCHERS 1
+r8 cl: SAME: EQUAL (5382 B sha256 922557ec17316c03; 5382 B sha256 922557ec17316c03) | OWN: YES
+== cr.sh r9a C-v-pc.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r9b C-v-pc.xml exit 3: ANSWER: VOUCHERS 1
+r9 pc: SAME: EQUAL (5382 B sha256 0a1d2fed097934e6; 5382 B sha256 0a1d2fed097934e6) | OWN: YES
+== cr.sh r10a C-v-st.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r10b C-v-st.xml exit 3: ANSWER: VOUCHERS 1
+r10 st: SAME: EQUAL (5382 B sha256 b8a333ab98ed0e72; 5382 B sha256 b8a333ab98ed0e72) | OWN: YES
+== cr.sh r11a C-v-ex.xml exit 3: ANSWER: VOUCHERS 1
+== cr.sh r11b C-v-ex.xml exit 3: ANSWER: VOUCHERS 1
+r11 ex: SAME: EQUAL (5382 B sha256 e2c4e2121b987ea3; 5382 B sha256 e2c4e2121b987ea3) | OWN: YES
+2026-11-10T23:46:20.025Z end, exit 0

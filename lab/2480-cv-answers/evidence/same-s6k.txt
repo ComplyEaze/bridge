@@ -1,0 +1,2 @@
+SAME: EQUAL (56666 B sha256 56c12dca993fa7e5; 56666 B sha256 56c12dca993fa7e5)
+exit 0

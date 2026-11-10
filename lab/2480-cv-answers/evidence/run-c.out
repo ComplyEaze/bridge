@@ -1,0 +1,37 @@
+2026-11-10T23:36:54.222Z start bash c.sh
+== send.sh c0 M-marks.xml exit 0: 
+== send.sh c1 C-u-pl.xml exit 0: a-c1-C-u-pl.xml: ANSWER: VOUCHERS 1
+== send.sh c2 C-uv-pl.xml exit 0: a-c2-C-uv-pl.xml: ANSWER: VOUCHERS 1
+== send.sh c3 C-v-pl.xml exit 0: a-c3-C-v-pl.xml: ANSWER: VOUCHERS 1
+== send.sh c4 C-book.xml exit 0: a-c4-C-book.xml: ANSWER: VOUCHERS 12
+== send.sh c5 M-marks.xml exit 0: 
+-- cv-c1
+a-c1-C-u-pl.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d ALTERID 69 DATE 20260801
+exit 0
+-- cv-c2
+a-c2-C-uv-pl.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d ALTERID 69 DATE 20260801
+exit 0
+-- cv-c3
+a-c3-C-v-pl.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d ALTERID 69 DATE 20260801
+exit 0
+-- same-c1c3
+SAME: EQUAL (5372 B sha256 d3bbd37cf6e472dd; 5372 B sha256 d3bbd37cf6e472dd)
+exit 0
+-- same-c1c2
+SAME: EQUAL (5372 B sha256 d3bbd37cf6e472dd; 5372 B sha256 d3bbd37cf6e472dd)
+exit 0
+-- own-c1
+a-c1-C-u-pl.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d ALTERID 69 DATE 20260801
+pl's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d ALTERID 69 DATE 20260801 (new vouchers 1)
+  observation: its GUID is not I-pl.xml's REMOTEID
+OWN: YES
+exit 0
+-- same-c5
+== a-c5-M-marks.xml against a-c0-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'246'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'246'")
+  equal
+exit 0
+2026-11-10T23:37:43.335Z end, exit 0

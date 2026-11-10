@@ -1,0 +1,20 @@
+2026-11-10T23:43:05.782Z start bash s8.sh
+== send.sh s6m M-marks.xml exit 0
+== send.sh s6sa S-snap-20260401-20260801.xml exit 0
+== send.sh s6sb S-snap-20260401-20260801.xml exit 0
+== send.sh s6ba B-bills.xml exit 0
+== send.sh s6bb B-bills.xml exit 0
+== send.sh s6ka C-book.xml exit 0
+== send.sh s6kb C-book.xml exit 0
+count-s6m: exit 0
+nm-s6sa: exit 0
+nm-s6sb: exit 0
+nm-s6ba: exit 0
+nm-s6bb: exit 0
+cv-s6ka: exit 0
+cv-s6kb: exit 0
+same-s6s: exit 0
+same-s6b: exit 0
+st-names-s6: exit 0
+same-s6k: exit 0
+2026-11-10T23:43:23.021Z end, exit 0

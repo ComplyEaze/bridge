@@ -1,0 +1,6 @@
+a-r5a-C-v-ps.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031 ALTERID 73 DATE 20260801
+ps's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031 ALTERID 73 DATE 20260801 (new vouchers 11)
+  observation: its GUID is not I-ps.xml's REMOTEID
+OWN: YES
+exit 0

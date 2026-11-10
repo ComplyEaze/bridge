@@ -1,0 +1,25 @@
+2026-11-10T23:37:57.709Z start bash p6.sh
+== cr.sh p4 C-v-cm.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p5 C-v-us.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p6 C-v-dq.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p7 C-v-ps.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p8 C-v-at.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p9 C-v-hs.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p10 C-v-cl.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p11 C-v-pc.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p12 C-v-st.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== cr.sh p13 C-v-ex.xml exit 3: ANSWER: VOUCHERS 0
+SAME: DIFFER (2926 B sha256 52f69354f7d87de7; 2928 B sha256 eadc547c5ef27e09)
+== a-p14-M-marks.xml against a-c5-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'246'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'246'")
+  equal
+exit 0
+2026-11-10T23:38:50.340Z end, exit 0

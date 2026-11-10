@@ -1,0 +1,9 @@
+2026-11-10T23:35:00.559Z start bash p3.sh
+== cr.sh p1 C-u-pl.xml exit 3: 
+== cr.sh p2 C-v-pl.xml exit 3: 
+SAME: EQUAL (2926 B sha256 52f69354f7d87de7; 2926 B sha256 52f69354f7d87de7)
+exit 0
+== a-p3-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  equal
+exit 0
+2026-11-10T23:35:21.424Z end, exit 0

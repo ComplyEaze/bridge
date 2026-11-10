@@ -1,0 +1,12 @@
+2026-11-10T23:46:50.161Z start bash -c bash send.sh m1 M-marks.xml && python -I -X utf8 count20.py --same-row a-s6m-M-marks.xml a-m1-M-marks.xml > evidence/same-m1.txt 2>&1; echo "exit $?" >> evidence/same-m1.txt; cat evidence/same-m1.txt
+M-marks.xml: 3406 bytes
+== a-m1-M-marks.xml: 3406 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '79' ALTMSTID '256'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0
+== a-m1-M-marks.xml against a-s6m-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'79'", "'256'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'79'", "'256'")
+  equal
+exit 0
+2026-11-10T23:46:51.895Z end, exit 0

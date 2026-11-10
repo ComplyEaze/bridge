@@ -1,0 +1,6 @@
+a-r9a-C-v-pc.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000035 ALTERID 77 DATE 20260801
+pc's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000035 ALTERID 77 DATE 20260801 (new vouchers 11)
+  observation: its GUID is not I-pc.xml's REMOTEID
+OWN: YES
+exit 0

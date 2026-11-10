@@ -1,0 +1,6 @@
+a-r11a-C-v-ex.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000037 ALTERID 79 DATE 20260801
+ex's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000037 ALTERID 79 DATE 20260801 (new vouchers 11)
+  observation: its GUID is not I-ex.xml's REMOTEID
+OWN: YES
+exit 0

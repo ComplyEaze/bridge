@@ -1,0 +1,6 @@
+a-r10a-C-v-st.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000036 ALTERID 78 DATE 20260801
+st's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000036 ALTERID 78 DATE 20260801 (new vouchers 11)
+  observation: its GUID is not I-st.xml's REMOTEID
+OWN: YES
+exit 0

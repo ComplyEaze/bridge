@@ -1,0 +1,6 @@
+a-r1a-C-v-pl.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d ALTERID 69 DATE 20260801
+pl's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d ALTERID 69 DATE 20260801 (new vouchers 11)
+  observation: its GUID is not I-pl.xml's REMOTEID
+OWN: YES
+exit 0

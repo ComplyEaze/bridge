@@ -1865,9 +1865,13 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// on master merged with the schema change (#2418), the lists measured 214,075,
 /// 240,243, 242,752 and 248,129, over the budgets by 1,175, 1,343, 1,352 and
 /// 1,229. Each budget went up by 1,500, leaving margins of 325, 157, 148 and 271.
+/// On 10 Nov 2026, merged with master at cbad081f, whose `tally_status` build
+/// notice (c974cd2d) adds 224 bytes to each list, they measured 214,299,
+/// 240,467, 242,976 and 248,353: the second and third over their budgets by 67
+/// and 76. Each budget went up by 500, leaving margins of 601, 433, 424 and 547.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [214_400, 240_400, 242_900, 248_400];
+const TOOL_LIST_BUDGETS: [usize; 4] = [214_900, 240_900, 243_400, 248_900];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

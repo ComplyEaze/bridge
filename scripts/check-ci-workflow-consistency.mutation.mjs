@@ -123,6 +123,21 @@ for (const [job, name, change] of PDFIUM_CACHE_CASES) {
   });
 }
 
+// The Windows bundle step retries only a bundler download 5xx, three attempts at most. bundle-smoke is pinned at a step after
+// it, so any edit of the step is a changed job: a broader retry, more attempts, other pauses or a plain unretried command is refused.
+const RETRY_STEP_CASES = [
+  ["the retry matches any failure", (text) => replaceFirst(text, "grep -aEo 'http status: 50[0-9]\\b'", "grep -aEo 'http status: [0-9]+'")],
+  ["a fourth attempt", (text) => replaceFirst(text, "pauses=(30 90)\n          for attempt in 1 2 3; do", "pauses=(30 90)\n          for attempt in 1 2 3 4; do")],
+  ["longer pauses", (text) => replaceFirst(text, "pauses=(30 90)", "pauses=(300 900)")],
+  ["the step back to a single unretried command", (text) => replaceFirst(text, "      - name: Build the Windows bundles, retrying only a bundler download 5xx\n", "      - name: Build the Windows bundles\n")],
+  ["the half-written bundle folder kept between attempts", (text) => replaceFirst(text, "            rm -rf src-tauri/target/release/bundle || true\n", "")],
+];
+for (const [name, change] of RETRY_STEP_CASES) {
+  test(`bundle-smoke: Windows bundle retry: ${name} is refused`, () => {
+    refused(withChange(CI_FILE, change), "bundle-smoke changed before");
+  });
+}
+
 // The digest of a pinned job covers it only up to the pinned step, so a job-level key written after the
 // steps would be outside the pinned text: `steps:` must be the job's last key.
 for (const [file, job] of PINNED) {

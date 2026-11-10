@@ -3560,6 +3560,11 @@ const PILOT_LAB_READBACK: &str =
      row here: the app crate's invoice tests (src/agent_import_invoice_tests.rs, and the replay in \
      src/agent_import_post_e2e_tests.rs) parse it with the read-back's own parser and pin what it \
      returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_NUMBER_MONTHS: &str = "a month answer of the invoice number's read of the pilot \
+     lab's financial year 2026-27 (row 2162-M1, 9 Nov 2026), with no row here: the app crate's \
+     replays (src/agent_import_post_e2e_tests.rs, src/agent_import_invoice_admission_tests.rs) \
+     feed it through the number check and pin what it decides, and src/agent_import_tests.rs \
+     pins each month's request and August's rows; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oct 2026), with no \
      row here: the app crate's replay (src/agent_import_post_e2e_tests.rs, and for the tax units \
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
@@ -4015,6 +4020,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml",
         PILOT_LAB_NUMBERING,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-08.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-09.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-empty-month.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",

@@ -4372,6 +4372,16 @@
       "size": 538
     },
     {
+      "blob": "0008bfeeaf5aeb36e43a2e16a46aebedff2efa70",
+      "capture_id": "pilot-lab-invoice-readback-item-line.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/1379-it-answers at a5b9d603, file lab/1379-it-answers/answers/a-s4r-R-0093.xml, equal to its line in that folder's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#1379 row IT)",
+      "sha256": "dff8c724dd8c70811e99340e38fe003331a2c8a8569ed01d30a9d1d04aa4de0a",
+      "size": 90662
+    },
+    {
       "blob": "51acf6f00227a80e1677a73f88daaaea3ed04156",
       "capture_id": "forex-register-extent.utf16le.xml",
       "company": "BRIDGE FOREXGROUP LAB",

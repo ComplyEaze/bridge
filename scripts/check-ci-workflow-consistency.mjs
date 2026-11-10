@@ -178,12 +178,21 @@ if (jobBlock(nightlyWorkflow, "shard").match(/^ {6}max-parallel: .*$/gm)?.join("
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
   if (/\r(?!\n)|[\u0085\u2028\u2029]/.test(source)) failures.push(`${name} must use only \\n or \\r\\n line breaks`);
 }
+// Cache entries are written by an explicit list of steps and by no other: Playwright's two (frontend), the package
+// compiler cache (bundle-smoke) and the PDFium archive's one (pdfium-cache). A save step added anywhere else, including
+// after a pinned step where a job digest cannot see it, must edit these counts and so carries an acknowledgement.
+{
+  const saves = (workflow.match(/uses: actions\/cache\/save@/g) ?? []).length;
+  if (saves !== 4) failures.push(`ci.yml has ${saves} actions/cache/save steps, expected 4 (frontend 2, bundle-smoke 1, pdfium-cache 1)`);
+  const pdfiumKeys = (workflow.match(/pdfium-archive-v1-/g) ?? []).length;
+  if (pdfiumKeys !== 4) failures.push(`ci.yml names the PDFium archive cache key ${pdfiumKeys} times, expected 4 (two restores, the writer's restore and save)`);
+}
 for (const [source, job, expected, digest] of [
   [workflow, "native", [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "b0320b1c8c35bc7c1210b1f070c73af39445ef9fe34af1c6c506b4a65686a131"],
+  ], "c3ec04049b655978d975ad4c5793f4a5c1fa5d85cd969199fdcc96a3e98c1f12"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -194,7 +203,17 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "3d84b5d1b3a818c0cf867ceee2bb4ba64a952443a4dc9d67ecc2d5609c4cc0c1"],
+  ], "4cda3f7a75013b25c3192c46ad1be1984858d3d58b32cdd042139ac542bd19db"],
+  // The one job that writes the archive cache: its steps, its events and its key are pinned, so a change that lets
+  // another event or job write what the build jobs restore must edit this pin and carry an acknowledgement.
+  [workflow, "pdfium-cache", [
+    "      - name: Save the PDFium archive",
+    "        if: ${{ steps.pdfium-cache.outputs.cache-hit != 'true' }}",
+    "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+    "        with:",
+    "          path: ${{ runner.temp }}/pdfium-archive",
+    "          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}",
+  ], "4aa2d1c9c76e8caca16e6902579732ebd0eb7af29b6a1074ffd545782e10ecd8"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -209,6 +228,8 @@ for (const [source, job, expected, digest] of [
   if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
   // The digest covers the job only up to the pinned step. A job-level key (container, env, services,
   // defaults, ...) written after the steps is outside it, so `steps:` must be the job's last key.
+  // pdfium-cache is pinned at its last step, so the digest covers all of it only if no step follows.
+  if (job === "pdfium-cache" && !jobBlock(source, job).trimEnd().endsWith(expected.join("\n"))) failures.push(`${job}: the pinned step must be the job's last step; a step after it is outside the pinned text`);
   const jobKeys = jobBlock(source, job).split("\n").filter((line) => /^ {4}[^ \t#-]/.test(line));
   if (jobKeys.at(-1)?.trimEnd() !== "    steps:") failures.push(`${job}: \`steps:\` must be the job's last key; a job-level key after the steps is outside its pinned text`);
 }
@@ -769,7 +790,8 @@ const expectedRequiredChecks = [
   "    # outside their paths and a reused master push set it 'false'): each must",
   "    # succeed then and be skipped otherwise, so a job that should have run and",
   "    # did not fails this job. compiler-cache-retention runs on master only and",
-  "    # may be skipped. A failure or cancellation fails every rule.",
+  "    # pdfium-cache on a push, a manual or a scheduled run only; either may be",
+  "    # skipped. A failure or cancellation fails every rule.",
   "    if: ${{ always() }}",
   `    needs: [${jobIds(workflow).filter((id) => id !== "required-checks").join(", ")}]`,
   "    runs-on: ubuntu-latest",
@@ -802,6 +824,7 @@ const expectedRequiredChecks = [
   "            ['seam-control', { kind: 'scope', output: 'bundle' }],",
   "            ['tax-audit-mutations', { kind: 'scope', output: 'tax_audit' }],",
   "            ['compiler-cache-retention', { kind: 'optional' }],",
+  "            ['pdfium-cache', { kind: 'optional' }],",
   "          ]);",
   "          const RESULTS = new Set(['success', 'failure', 'cancelled', 'skipped']);",
   "          const needs = JSON.parse(process.env.NEEDS_JSON);",

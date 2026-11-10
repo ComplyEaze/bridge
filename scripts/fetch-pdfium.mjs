@@ -16,7 +16,14 @@
 // pdfium.txt drops the `//` comment prefix the macOS build keeps.
 //
 // Usage:
-//   node scripts/fetch-pdfium.mjs --platform macos-arm64 --dest DIR [--github-env FILE]
+//   node scripts/fetch-pdfium.mjs --platform macos-arm64 --dest DIR [--github-env FILE] [--cache-dir DIR] [--strict-cache]
+//
+// With --cache-dir, a copy of the archive kept there by an earlier run is used instead of a download, but only
+// after it passes the same byte-count and SHA-256 check a download gets; a copy that fails it is deleted and the
+// archive is downloaded. A downloaded archive that passed is written there. The directory is untrusted storage:
+// it can make a run skip the network, not accept a byte the lock does not name, and this check is its only
+// protection. A kept file of the pinned size whose bytes differ is more than damage in transit, so with
+// --strict-cache the run still completes from the download but then exits 1 with an error annotation.
 //
 // Prints the absolute library path. With --github-env, also appends
 // BRIDGE_PDFIUM_LIBRARY=<path> to that file (a GitHub Actions environment file).
@@ -24,7 +31,7 @@
 // native job runs this without actions/setup-node.
 
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -232,6 +239,53 @@ async function download(url, limit, { fetchImpl = fetch, sleep = pause, log = (l
   throw new Refusal(`${last.message} (tried ${DOWNLOAD_ATTEMPTS} times)`);
 }
 
+/** The archive kept in `cacheDir` by an earlier run: `data` is the verified bytes, or undefined when there is none
+ * or it is not the pinned one (in which case it is deleted, so that the next run does not meet it again).
+ * `altered` is true when the file had the pinned size but not the pinned digest. */
+function cachedArchive(cacheDir, pin, log) {
+  const file = join(cacheDir, pin.asset);
+  if (!existsSync(file)) {
+    log("pdfium cache: miss");
+    return { data: undefined, altered: false };
+  }
+  let altered = false;
+  try {
+    if (!statSync(file).isFile() || statSync(file).size !== pin.bytes) throw new Refusal(`${file}: not a file of ${pin.bytes} bytes; refusing it`);
+    const data = readFileSync(file);
+    try {
+      verify(pin.asset, data, pin.bytes, pin.sha256);
+    } catch (error) {
+      altered = true;
+      throw error;
+    }
+    log("pdfium cache: hit");
+    return { data, altered };
+  } catch (error) {
+    log(`::warning::pdfium cache: bad (${error.message}); downloading it`);
+    try {
+      rmSync(file, { force: true, recursive: true });
+    } catch (removal) {
+      log(`could not delete it either (${removal.message}); the download will replace it if it can`);
+    }
+    return { data: undefined, altered };
+  }
+}
+
+/** Keep a verified archive for the next run; false when it could not be kept. A cache that cannot be written is a
+ * missed saving, not a failure, except under --strict-cache, whose writer must not save a directory holding no archive. */
+function keepArchive(cacheDir, pin, archive, log) {
+  try {
+    mkdirSync(cacheDir, { recursive: true });
+    const temporary = join(cacheDir, `${pin.asset}.${process.pid}.part`);
+    writeFileSync(temporary, archive);
+    renameSync(temporary, join(cacheDir, pin.asset));
+    return true;
+  } catch (error) {
+    log(`could not keep ${pin.asset} for the next run: ${error.message}`);
+    return false;
+  }
+}
+
 export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdout = process.stdout, fetchImpl = fetch, sleep = pause, log } = {}) {
   let values;
   try {
@@ -242,20 +296,32 @@ export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdo
       dest: { type: "string" },
       "github-env": { type: "string" },
       archive: { type: "string" }, // a local copy, for tests
+      "cache-dir": { type: "string" },
+      "strict-cache": { type: "boolean" },
     },
     strict: true,
     }));
   } catch (error) {
-    throw new Refusal(`${error.message}; usage: fetch-pdfium.mjs --platform P --dest DIR [--github-env FILE]`);
+    throw new Refusal(`${error.message}; usage: fetch-pdfium.mjs --platform P --dest DIR [--github-env FILE] [--cache-dir DIR] [--strict-cache]`);
   }
-  if (!values.platform || !values.dest) throw new Refusal("usage: fetch-pdfium.mjs --platform P --dest DIR [--github-env FILE]");
+  if (!values.platform || !values.dest) throw new Refusal("usage: fetch-pdfium.mjs --platform P --dest DIR [--github-env FILE] [--cache-dir DIR] [--strict-cache]");
   const lock = JSON.parse(readFileSync(lockPath, "utf8"));
   const pin = Object.hasOwn(lock.platforms, values.platform) ? lock.platforms[values.platform] : undefined;
   if (pin === undefined) throw new Refusal(`no pinned PDFium for platform '${values.platform}'`);
-  const archive = values.archive
-    ? readFileSync(values.archive)
-    : await download(`${lock.source}/releases/download/${lock.release}/${pin.asset}`, pin.bytes + 1, { fetchImpl, sleep, log });
+  if (values["cache-dir"] && basename(pin.asset) !== pin.asset) throw new Refusal(`the pinned asset name '${pin.asset}' is not a plain file name; refusing to use a cache directory with it`);
+  const say = log ?? ((line) => process.stderr.write(`${line}\n`));
+  const cacheDir = values.archive || !values["cache-dir"] ? undefined : resolve(values["cache-dir"]);
+  let archive;
+  let fromCache = false;
+  let altered = false;
+  if (values.archive) archive = readFileSync(values.archive);
+  else if (cacheDir) {
+    ({ data: archive, altered } = cachedArchive(cacheDir, pin, say));
+    fromCache = archive !== undefined;
+  }
+  archive ??= await download(`${lock.source}/releases/download/${lock.release}/${pin.asset}`, pin.bytes + 1, { fetchImpl, sleep, log });
   verify(pin.asset, archive, pin.bytes, pin.sha256);
+  const kept = cacheDir && !fromCache ? keepArchive(cacheDir, pin, archive, say) : true;
 
   const files = new Map();
   for (const [name, data] of tarFiles(gunzipSync(archive))) {
@@ -275,12 +341,25 @@ export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdo
   writeFileSync(join(dest, NOTICE), notice);
   stdout.write(`${library}\n`);
   if (values["github-env"]) appendFileSync(values["github-env"], `BRIDGE_PDFIUM_LIBRARY=${library}\n`, "utf8");
+  if (!kept && values["strict-cache"]) {
+    say(`::error::the verified ${pin.asset} could not be kept in ${cacheDir}, so there is nothing to save`);
+    return 1;
+  }
+  if (altered && values["strict-cache"]) {
+    say(`::error::the kept ${pin.asset} had the pinned size but not the pinned digest; it was replaced from the download. Delete the cache entry (gh cache delete) or bump the key suffix`);
+    return 1;
+  }
   return 0;
 }
 
 if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
-  main().catch((error) => {
-    process.stderr.write(`${error instanceof Refusal ? error.message : error.stack}\n`);
-    process.exitCode = 1;
-  });
+  main().then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (error) => {
+      process.stderr.write(`${error instanceof Refusal ? error.message : error.stack}\n`);
+      process.exitCode = 1;
+    },
+  );
 }

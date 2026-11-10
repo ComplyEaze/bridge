@@ -64,6 +64,7 @@ const PROBES = [
   { script: "retain-macos-test-binaries.mjs", status: 2, pattern: /--crash-json, --target and --output are required/ },
   { script: "mcp-sleep-server.mjs", args: ["--bogus"], status: 2, pattern: /usage: node scripts\/mcp-sleep-server\.mjs/ },
   { script: "check-ai-attribution.mjs", status: 2, pattern: /check-ai-attribution: the input is not the expected JSON object/ },
+  { script: "check-version-release-date.mjs", status: 2, pattern: /usage: node scripts\/check-version-release-date\.mjs BASE_REV HEAD_REV/ },
 ];
 
 function environment(extra = {}) {

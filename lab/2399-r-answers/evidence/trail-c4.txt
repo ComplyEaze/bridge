@@ -1,0 +1,4 @@
+line 9	2026-11-10T14:30:08.636Z	vouchers	11b8969b-74c7-4a3a-b5c3-f080e8a14027	sent 22	omitted 0	failed 0	listed 22 (post 14, status 8)	listed request bytes 28664	listed response bytes 1904752
+records printed 1
+lines read 10; records by type {'response_prepared': 5, 'stdio_write_completed': 5}
+exit 0

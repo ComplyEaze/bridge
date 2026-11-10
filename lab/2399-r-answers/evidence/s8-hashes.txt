@@ -1,0 +1,10 @@
+Step 8 answer hashes: each s8 answer against the same request's earlier answers
+a-s8-M-marks.xml 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | a-s1-M-marks.xml 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | EQUAL
+a-s8-M-marks.xml 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | a-s2-M-marks.xml 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | EQUAL
+a-s8-M-marks.xml 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | a-s4m-M-marks.xml 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | EQUAL
+a-s8-N-0399.xml 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974 | a-s2-N-0399.xml 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974 | EQUAL
+a-s8-D-empty.xml 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974 | a-se-D-empty.xml 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974 | EQUAL
+
+Egress files, kept whole:
+42518 B, lines=22, sha256 a0f248194eb562dd4ce3e0ce9a3ee06ea205c757b565cb62ac6fcee299f02cac  /c/lab/2399-r/data/agent-egress.jsonl
+4253 B, lines=2, sha256 e31da245abc5891eda7867aac014b595dcbdfd57f65334bea43f903c53b85c1e  /c/lab/2399-r/data-2/agent-egress.jsonl

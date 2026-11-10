@@ -1,0 +1,16 @@
+2026-11-10T14:17:04Z exe sha256 9d93302281841ca7829ff95fe58c0fe9c8c767c46fd64f3752fb6379a9a2dc04 ok; launch-env.json sha256 7d8676a616827dc7bdbeb6e1213612f01a6df4b3da57dfa2556a546f214f10df; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: False
+2026-11-10T14:17:04Z launched pid 2668; stderr to server-stderr-20261110T141704Z.log
+2026-11-10T14:17:04Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-10T14:17:22Z 000-tools.json tool=list secs=0.023 isError=None error=None saved_sha256=23b5bd98223bfa9f46908f44aac4960093af203215454ed9782a36279e70e7fc
+2026-11-10T14:17:35Z 001-c0.json tool=list_companies secs=1.888 isError=False error=None saved_sha256=80b5cfa5813a568b1c517c51414a1e428ae5edc3adcffbf332ce52f883833619
+2026-11-10T14:17:49Z 002-c1.json tool=vouchers secs=2.278 isError=False error=None saved_sha256=3ff12687df4b4c00f5e90ba9ff3fc253b44dbc71db9bece0e9f7ae438b46efe0
+2026-11-10T14:18:27Z 003-c2.json tool=vouchers secs=1.522 isError=False error=None saved_sha256=ce4182145ae5399223765dbc189a151490fdf6a68404a5e104e321486faaecd7
+2026-11-10T14:29:12Z 004-c3.json tool=vouchers secs=1.952 isError=False error=None saved_sha256=8373419226b56ce606311e976fc950b0100e1286257c7e31a588160e2d10cf98
+2026-11-10T14:30:08Z 005-c4.json tool=vouchers secs=2.080 isError=False error=None saved_sha256=86f16f95904dea0aa71c6a92486f1347c34b1cb7d564d69a4c28a88bca7817ab
+2026-11-10T14:30:12Z 006-c4b.json tool=vouchers secs=1.461 isError=False error=None saved_sha256=d191edcc60e175dfcb0eecb8e977b00e8950c65a276cbfefa6c0bb2756f5e6e7
+2026-11-10T14:30:45Z 007-c5.json tool=vouchers secs=2.222 isError=False error=None saved_sha256=27bc6c03c09db9ef05461e39d7854749c1d854850a8bb9fcc2010b7cdcf0b5f1
+2026-11-10T14:31:01Z 008-c6.json tool=vouchers secs=2.852 isError=False error=None saved_sha256=1214e202432bc403c5c1e1e77a2e2a7eff6d4fed4c8915b43f341a5581f3721b
+2026-11-10T14:31:06Z 009-c7.json tool=vouchers secs=2.229 isError=False error=None saved_sha256=05254172f0e3c20786602903b05e2deec08b3b85e4f041debb22529cae43003c
+2026-11-10T14:31:21Z 010-c5b.json tool=vouchers secs=1.527 isError=False error=None saved_sha256=258d5b8320f9486436e4274d632556ec8f97b40ec238e13cf6b47816aa81abb3
+2026-11-10T14:34:27Z 011-c8a.json tool=vouchers secs=2.160 isError=False error=None saved_sha256=260fdcd6397437f4a4f2d4b2f4e341d1f898eece2e6c0b754bc89b4a61f6cef4
+2026-11-10T14:34:37Z session ended; server pid 2668 exit code 0

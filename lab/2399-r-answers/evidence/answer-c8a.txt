@@ -1,0 +1,9 @@
+rpc/011-c8a.json: 21079 bytes, sha256 37efd12810006b19868677fc7fb2d56cbeb56e570f4ab6b8e80a0b9101fc2196
+census.requests 1	census.ms 632
+census_reused absent
+window parts 1
+items 11: BP/26-27/0001, BP/26-27/0002, BP/26-27/0003, BP/26-27/0004, BP/26-27/0005, BP/26-27/0006, BP/26-27/0007, BP/26-27/0008, BP/26-27/0009, BP/26-27/0011, BP/26-27/0010
+exit 0
+$ answer.py --same-items rpc/002-c1.json rpc/011-c8a.json
+items equal: True (11 and 11 items)
+exit 0

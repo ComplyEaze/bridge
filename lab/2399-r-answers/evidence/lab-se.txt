@@ -1,0 +1,3 @@
+$ lab.py rows a-se-D-empty.xml
+rows 0
+exit 0

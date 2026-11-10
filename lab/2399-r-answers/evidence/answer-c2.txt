@@ -1,0 +1,9 @@
+rpc/003-c2.json: 21193 bytes, sha256 d1634c696bfe8b84c40b8ba4fefb9849a273045280a75d711c3700784758f92d
+census.requests 0	census.ms 0
+census_reused {"read_at": "2026-11-10T14:17:49.501Z"}
+window parts 1
+items 11: BP/26-27/0001, BP/26-27/0002, BP/26-27/0003, BP/26-27/0004, BP/26-27/0005, BP/26-27/0006, BP/26-27/0007, BP/26-27/0008, BP/26-27/0009, BP/26-27/0011, BP/26-27/0010
+exit 0
+$ answer.py --same-items rpc/002-c1.json rpc/003-c2.json
+items equal: True (11 and 11 items)
+exit 0

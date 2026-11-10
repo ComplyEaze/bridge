@@ -1,0 +1,4 @@
+$ the exe the clients launched, hashed again after C10 (both clients ended)
+bridge_mcp.exe 35650560 B sha256 9d93302281841ca7829ff95fe58c0fe9c8c767c46fd64f3752fb6379a9a2dc04 at 2026-11-10T14:42:33Z
+before the run (evidence/build.txt, mcpb-smoke.json): 9d93302281841ca7829ff95fe58c0fe9c8c767c46fd64f3752fb6379a9a2dc04; each client checked it at launch (run/client-log.txt, run2/client-log.txt): ok
+after equal to before: EQUAL

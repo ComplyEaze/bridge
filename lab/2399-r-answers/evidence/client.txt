@@ -1,0 +1,22 @@
+$ the row's client: run/client.py, a copy of 852c1/runA/client.py whose only change is the wait after stdin closes (the run lead's decision, 10 Nov)
+852c1/runA/client.py sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63
+run/client.py sha256 1e6b490f10d2534a14d3c14d913815a6ba127bdb79da712a2be8d9d25186e324
+$ diff -u 852c1/runA/client.py run/client.py
+--- client.py	2026-11-03 14:36:40.898306900 +0530
++++ client.py	2026-11-10 19:42:14.052679500 +0530
+@@ -103,10 +103,9 @@
+     log(f'{fn} tool={req["tool"]} secs={secs:.3f} isError={r.get("isError")} error={res.get("error")} saved_sha256={sha_of(out)}')
+ p.stdin.close()
+ try:
+-    p.wait(timeout=30)
+-except subprocess.TimeoutExpired:
+-    log('server did not exit within 30 s of stdin close; killed')
+-    p.kill()
+-    p.wait()
++    p.wait(timeout=60)
++except subprocess.TimeoutExpired:  # row 2399-R step 8: never ended by the lab; the operator stops and reports
++    log('stop: server did not exit within 60 s of stdin close; left running, not ended')
++    sys.exit(3)
+ stderr_file.close()
+ log(f'session ended; server pid {p.pid} exit code {p.returncode}')
+hunks: 1

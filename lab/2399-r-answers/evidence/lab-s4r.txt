@@ -1,0 +1,7 @@
+$ lab.py marks a-s4r-M-marks.xml --guid 6b43e498-430c-4d5c-bfef-d32e2ab93c85
+COMPANY 6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID 69 ALTMSTID 245
+exit 0
+$ lab.py rows a-s4r-N-0399.xml
+rows 1
+VOUCHER {'VOUCHERNUMBER': 'BP/26-27/0399', 'DATE': '20260801'}
+exit 0

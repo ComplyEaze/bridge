@@ -1,0 +1,4 @@
+line 17	2026-11-10T14:31:06.273Z	vouchers	b2dd9018-fff1-4095-b456-384f269385fa	sent 28	omitted 0	failed 0	listed 28 (post 18, status 10)	listed request bytes 35664	listed response bytes 66210
+records printed 1
+lines read 18; records by type {'response_prepared': 9, 'stdio_write_completed': 9}
+exit 0

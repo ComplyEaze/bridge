@@ -1,0 +1,6 @@
+$ trail.py <egress> --expect list_companies 4
+line 1	2026-11-10T14:17:35.740Z	list_companies	36833f58-c35e-49fa-9dc4-1692321f323b	sent 4	omitted 0	failed 0	listed 4 (post 2, status 2)	listed request bytes 5048	listed response bytes 8102
+records printed 1
+lines read 2; records by type {'response_prepared': 1, 'stdio_write_completed': 1}
+calibration ok: the last list_companies record has sent 4
+exit 0

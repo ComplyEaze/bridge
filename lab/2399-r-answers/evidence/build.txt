@@ -1,0 +1,13 @@
+$ step 0, the build (UTC 2026-11-10T14:11:29Z)
+artifact 13750966183 unsigned-bundle-smoke-windows-latest, downloaded 2026-11-10T14:08:05Z to 14:08:30Z by gh api .../actions/artifacts/13750966183/zip, on the owner's word in the lab session
+zip 60279141 B sha256 7309fad953762ccba515297492cd8e7c92225dd04c87e6c9d1d546f8833cfa3f; GitHub digest sha256:7309fad953762ccba515297492cd8e7c92225dd04c87e6c9d1d546f8833cfa3f: EQUAL
+zip entries: bridge-tally.mcpb, mcpb-smoke.json, msi/Bridge_0.7.0_x64_en-US.msi, nsis/Bridge_0.7.0_x64-setup.exe
+bridge-tally.mcpb sha256 f62420a55db22ed426ac90f575199568fccd7bcb23d24d598eaf915ef4315aef; mcpb-smoke.json archive_sha256 f62420a55db22ed426ac90f575199568fccd7bcb23d24d598eaf915ef4315aef
+bridge_mcp.exe 35650560 B sha256 9d93302281841ca7829ff95fe58c0fe9c8c767c46fd64f3752fb6379a9a2dc04; mcpb-smoke.json binary_sha256 9d93302281841ca7829ff95fe58c0fe9c8c767c46fd64f3752fb6379a9a2dc04
+pdfium.dll sha256 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118; mcpb-smoke.json pdfium_library_sha256 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118
+manifest.json version 0.7.0; it names no commit. The exe holds no 40-hex commit of this repository as text (its one frequent 40-hex string is the Rust toolchain's, in /rustc/<hash>/ paths).
+the artifact's workflow_run (API): head_sha d40c42041f0383487fee4e851ab11f4e44f0df65, head_branch fix/2399-reuse-vouchers-census; run 42787114741: workflow_dispatch, completed, success
+The commit, by the run lead's decision (10 Nov): the bundle and the exe carry no commit of their own. The commit comes from the artifact's API record, tied by the digest, in three links:
+  1. the zip's sha256 7309fad953762ccba515297492cd8e7c92225dd04c87e6c9d1d546f8833cfa3f equals GitHub's digest of artifact 13750966183: EQUAL;
+  2. artifact 13750966183 belongs to run 42787114741 (its workflow_run.id): EQUAL;
+  3. run 42787114741's head_sha d40c42041f0383487fee4e851ab11f4e44f0df65 is the Build line's commit: EQUAL.

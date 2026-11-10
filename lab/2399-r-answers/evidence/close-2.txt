@@ -1,0 +1,2 @@
+stop file written 2026-11-10T14:36:57.776Z
+pid 22472 gone by 2026-11-10T14:36:59.178Z

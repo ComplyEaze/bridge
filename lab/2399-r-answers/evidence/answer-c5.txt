@@ -1,0 +1,9 @@
+rpc/007-c5.json: 23147 bytes, sha256 360a2fe3c44e27f932b1fc57278b8fa421c209e37fc10823ea1545a75e73e8ca
+census.requests 1	census.ms 677
+census_reused absent
+window parts 1
+items 12: BP/26-27/0001, BP/26-27/0002, BP/26-27/0003, BP/26-27/0004, BP/26-27/0005, BP/26-27/0006, BP/26-27/0007, BP/26-27/0008, BP/26-27/0009, BP/26-27/0011, BP/26-27/0010, BP/26-27/0399
+exit 0
+$ answer.py --same-items rpc/005-c4.json rpc/007-c5.json
+items equal: True (12 and 12 items)
+exit 0

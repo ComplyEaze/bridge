@@ -1,0 +1,4 @@
+$ lab.py marks a-s1-M-marks.xml --guid 6b43e498-430c-4d5c-bfef-d32e2ab93c85 --expect <ALTVCHID 68> <ALTMSTID 245>
+COMPANY 6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID 68 ALTMSTID 245
+marks equal
+exit 0

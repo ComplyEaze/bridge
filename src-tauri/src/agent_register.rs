@@ -13,6 +13,7 @@ use bridge_tally_protocol::group_ancestry::{AncestryChain, AncestryGap, GroupInd
 use bridge_tally_protocol::{GstDutyHeadObservation, PartyLedgerMasterRecord};
 use std::collections::BTreeMap;
 
+use super::failure_code::{FailureCode, ReadCode, RegisterCode};
 use super::voucher_parse::WITHHELD_MARKER;
 use super::vouchers::{listed_withheld, VoucherComposites};
 use super::*;
@@ -151,7 +152,7 @@ impl MasterIndex {
     pub(super) fn build<'a>(
         records: impl IntoIterator<Item = &'a PartyLedgerMasterRecord>,
         groups: &GroupIndex,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, FailureCode> {
         let mut by_name = BTreeMap::new();
         for record in records {
             let parent = record.ledger.parent.returned_text().map(str::to_string);
@@ -164,7 +165,7 @@ impl MasterIndex {
                 head: record.fields.gst_duty_head.clone(),
             };
             if by_name.insert(record.ledger.name.clone(), ledger).is_some() {
-                return Err("ledger_snapshot_drifted".to_string());
+                return Err(ReadCode::LedgerSnapshotDrifted.into());
             }
         }
         Ok(Self {
@@ -302,7 +303,7 @@ pub(super) fn classify_register(
     kind: RegisterKind,
     index: &MasterIndex,
     rows: &[Value],
-) -> Result<RegisterPage, String> {
+) -> Result<RegisterPage, FailureCode> {
     let mut page = RegisterPage {
         rows: Vec::new(),
         other_voucher_types: Vec::new(),
@@ -316,7 +317,7 @@ pub(super) fn classify_register(
         let entries = row
             .get("amounts")
             .and_then(Value::as_array)
-            .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+            .ok_or(ReadCode::ReadProtocolInvalid)?;
         let party = row.get("party").and_then(Value::as_str);
         let mut tax = Vec::new();
         let mut without_head = Vec::new();
@@ -331,11 +332,11 @@ pub(super) fn classify_register(
             let name = entry
                 .get("ledger")
                 .and_then(Value::as_str)
-                .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+                .ok_or(ReadCode::ReadProtocolInvalid)?;
             let ledger = index
                 .by_name
                 .get(name)
-                .ok_or_else(|| "ledger_snapshot_drifted".to_string())?;
+                .ok_or(ReadCode::LedgerSnapshotDrifted)?;
             match ledger.group {
                 LedgerGroup::DutiesAndTaxes => {
                     touched.push(json!(name));
@@ -611,7 +612,7 @@ pub(super) fn register_result(
     (from, to): (&str, &str),
     (offset, limit): (usize, usize),
     redaction: Redaction,
-) -> Result<RegisterResult, String> {
+) -> Result<RegisterResult, ToolFailure> {
     // An undivided window read is admitted by its caller against the window: rows dated
     // outside it would otherwise be returned as register rows. A withheld voucher is checked
     // with the rest, before it is set aside (#674).
@@ -702,7 +703,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         if from > to {
-            return Err("invalid_date_range".to_string().into());
+            return Err(ReadCode::InvalidDateRange.into());
         }
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
@@ -852,7 +853,7 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
     ) -> Result<RegisterMasters, ToolFailure> {
         let today = bridge_tally_core::TallyDate::parse(tally_host_today())
-            .map_err(|_| ToolFailure::from("current_date_invalid".to_string()))?;
+            .map_err(|_| ToolFailure::from(ReadCode::CurrentDateInvalid))?;
         let listing = self
             .runtime
             .fetch_agent_party_ledger_masters_with_evidence(
@@ -872,7 +873,7 @@ impl Server {
                 .extent
                 .master_alter_id_high_water()
                 .map(|mark| mark.get())
-                .ok_or_else(|| ToolFailure::from("register_master_mark_unavailable".to_string()))?,
+                .ok_or_else(|| ToolFailure::from(RegisterCode::MasterMarkUnavailable))?,
         );
         let groups = GroupIndex::build(listing.groups);
         // A ledger set aside for its currency is classified by its master like any other

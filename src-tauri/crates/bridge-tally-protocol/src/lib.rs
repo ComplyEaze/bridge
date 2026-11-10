@@ -74,10 +74,10 @@ pub mod xml_read_profiles;
 pub mod xml_text;
 
 pub use import_outcome::{
-    parse_import_evidence, parse_import_outcome, parse_import_result, ParsedImportEvidence,
-    TallyImportApplicationStatus, TallyImportCounterPresence, TallyImportOutcome,
-    TallyImportResult, TallyLineError, MAX_TALLY_LINE_ERRORS, MAX_TALLY_LINE_ERROR_BYTES,
-    MAX_TALLY_LINE_ERROR_CHARS,
+    parse_import_evidence, parse_import_outcome, parse_import_result, ImportCounters,
+    ParsedImportEvidence, TallyImportApplicationStatus, TallyImportCounterPresence,
+    TallyImportOutcome, TallyImportResult, TallyLineError, MAX_TALLY_LINE_ERRORS,
+    MAX_TALLY_LINE_ERROR_BYTES, MAX_TALLY_LINE_ERROR_CHARS,
 };
 pub use native_ledger_collection::{
     parse_native_ledger_source_records_with_evidence,
@@ -2498,3 +2498,8 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 #[path = "company_name_escaping_tests.rs"]
 mod company_name_escaping_tests;
+
+/// The request bytes of every builder, pinned by hash (#2397).
+#[cfg(test)]
+#[path = "request_bytes_tests.rs"]
+mod request_bytes_tests;

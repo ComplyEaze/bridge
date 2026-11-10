@@ -427,6 +427,9 @@ impl RuntimeTallyConnector {
             companies,
         )
         .map_err(|error| match error {
+            VerifiedCompanyIdentityError::InvalidCompanyName => {
+                protocol_error("company_name_invalid")
+            }
             VerifiedCompanyIdentityError::InvalidCompanyNumber => {
                 protocol_error("company_number_invalid")
             }

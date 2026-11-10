@@ -37,6 +37,7 @@ fn timings(
             requests: census_reads,
             ms: census_ms,
         },
+        census_reused: None,
         parts,
         failed: None,
     }

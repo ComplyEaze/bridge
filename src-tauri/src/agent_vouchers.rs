@@ -731,7 +731,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             gst: VoucherGstFields::following(shown.2),
         });
         let read = server
-            .read_entry_window_rows(
+            .read_entry_window_rows_reusing_census(
                 &identity,
                 &company.name,
                 &from,
@@ -989,6 +989,10 @@ impl Server {
     /// server does before it returns (see `drop_listing_snapshots`).
     pub(super) fn drop_voucher_pages(&self, company_guid: &str) {
         self.voucher_pages
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .drop_company(company_guid);
+        self.held_censuses
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .drop_company(company_guid);
@@ -1333,6 +1337,36 @@ impl Server {
             shape,
             composites,
             gst,
+            WindowPlanSource::Estimate { known_marks: None },
+        )
+        .await
+    }
+
+    /// [`Self::read_entry_window_rows`] for the `vouchers` tool's first page: the
+    /// census may be taken from an earlier call while the company's marks, read
+    /// afresh here, are unchanged (#2399). No other window reader is given the store; the
+    /// desktop screen builds a server per call, so what it leaves is dropped with it.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn read_entry_window_rows_reusing_census(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        from: &TallyDate,
+        to: &TallyDate,
+        shape: VoucherReadShape,
+        composites: VoucherComposites,
+        gst: GstDetailsShown,
+    ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
+        read_entry_window_rows_reading_gst(
+            &AgentReader(self),
+            identity,
+            company,
+            from,
+            to,
+            shape,
+            composites,
+            gst,
+            WindowPlanSource::EstimateReusing(Arc::clone(&self.held_censuses)),
         )
         .await
     }
@@ -1442,6 +1476,7 @@ pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
         shape,
         composites,
         GstDetailsShown::Withheld,
+        WindowPlanSource::Estimate { known_marks: None },
     )
     .await
 }
@@ -1458,6 +1493,7 @@ async fn read_entry_window_rows_reading_gst<R: WindowReader>(
     shape: VoucherReadShape,
     composites: VoucherComposites,
     gst: GstDetailsShown,
+    source: WindowPlanSource,
 ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
     read_voucher_window_with(
         reader,
@@ -1466,7 +1502,7 @@ async fn read_entry_window_rows_reading_gst<R: WindowReader>(
         from,
         to,
         shape,
-        WindowPlanSource::Estimate { known_marks: None },
+        source,
         WindowReadLimits::for_shape(shape).counting_small_books(),
         |xml| match composites {
             VoucherComposites::Withhold => parse_agent_rows_withholding_reading_gst(

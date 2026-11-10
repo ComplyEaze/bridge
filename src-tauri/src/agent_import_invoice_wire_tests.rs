@@ -383,13 +383,21 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         ),
         Some("invoice_read_collection_absent".to_string())
     );
-    // Tally's own answer for a number one invoice holds, on BRIDGE Sales.
-    let held = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"));
+    // Tally's answers for `BP/26-27/0010` (row 2162-ST): held once, on
+    // BRIDGE Sales; then also on a second Sales type, which took the number.
+    let held = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml"));
     assert_eq!(number_after_post_difference(&held, posted), None);
-    assert_eq!(
-        number_after_post_difference(&held, Some("BRIDGE Sales Keyed")),
-        Some("invoice_number_in_another_type: BRIDGE Sales".to_string())
-    );
+    let two_types = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml"));
+    for (posted, other) in [
+        ("BRIDGE Sales", "BRIDGE Sales Keyed"),
+        ("BRIDGE Sales Keyed", "BRIDGE Sales"),
+    ] {
+        assert_eq!(
+            number_after_post_difference(&two_types, Some(posted)),
+            Some(format!("invoice_number_in_another_type: {other}")),
+            "{posted}"
+        );
+    }
     // And one where a Payment holds the number beside the Sales invoice.
     let beside_payment = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"

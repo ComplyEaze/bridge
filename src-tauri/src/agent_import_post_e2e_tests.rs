@@ -7639,11 +7639,9 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
-        // STAND-IN: the answer to the number read after the post has not been
-        // captured. U's capture (one row, BRIDGE Sales, Sales class, for
-        // BP/26-27/0001) stands for it; that read takes each row's type and
-        // class, never its number.
-        'V' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
+        // The number read after the post: the lab's answer for BP/26-27/0010
+        // on the book that holds it once, on BRIDGE Sales (row 2162-ST's s2).
+        'V' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml"),
         'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"),
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),

@@ -204,6 +204,7 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"),
         'A' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml"),
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
+        'H' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml"),
         other => panic!("unknown kind {other}"),
     };
     answer(utf16(bytes))
@@ -949,11 +950,10 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
 /// read-back of `BP/26-27/0010` after the post; before it, m is the marks and A
 /// the same read-back (a complete envelope with no voucher).
 const READBACK_ORDER: &str = "eMsMseeRsRse";
-/// A clean read-back, then the number read sent again (6): U answers it, the
-/// captured one-row answer for `BP/26-27/0001` (BRIDGE Sales, Sales class),
-/// standing in for the answer after `BP/26-27/0010`'s post, which has not been
-/// captured. The read takes the row's type and class only, never its number.
-const READBACK_THEN_NUMBER_ORDER: &str = "eMsMseeRsRseeUsUse";
+/// A clean read-back, then the number read sent again (6): H answers it, the
+/// lab's answer for `BP/26-27/0010` on the book that holds it once, on
+/// BRIDGE Sales (row 2162-ST's s2).
+const READBACK_THEN_NUMBER_ORDER: &str = "eMsMseeRsRseeHsHse";
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
 /// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
 /// line's HSN/SAC and `ISPOSTDATED` (`R-0010.xml` of the 2162-S1 sheet, the
@@ -1044,7 +1044,7 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
             assert_eq!(sent_as(order, &requests, 'R'), [LAB_R12_SHA256; 2]);
             // The number read after the post is the build's request for this
             // number, byte for byte.
-            assert_eq!(sent_as(order, &requests, 'U'), [R09_WITH_IRN_SHA256; 2]);
+            assert_eq!(sent_as(order, &requests, 'H'), [R09_WITH_IRN_SHA256; 2]);
         }
     }
 }

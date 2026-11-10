@@ -34,6 +34,9 @@ const AS_FOUND_TRIAL_BALANCE: &[u8] = include_bytes!(
 const DOLLAR_OPENING_TRIAL_BALANCE: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml"
 );
+const ALL_PLAIN_TRIAL_BALANCE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml"
+);
 const BOOK_WINDOW: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/movement-forexgroup-book-20250401.utf16le.xml"
 );
@@ -118,6 +121,15 @@ fn set_aside_names(set_aside: &CurrencySetAside, catalogue: &[TallyLedger]) -> B
         .collect()
 }
 
+/// The ledger an inconclusive refusal names and where it found the composite.
+fn inconclusive(failure: ToolFailure) -> (String, &'static str) {
+    assert_eq!(failure.code, "ledger_currency_scope_inconclusive");
+    failure
+        .read_detail
+        .and_then(|detail| detail.set_aside)
+        .expect("the refusal names the ledger")
+}
+
 /// The book as found, from its first day. The six ledgers `trial_balance` sets aside are
 /// set aside; the two it reads are kept, and their movement over the captured window ties to
 /// Tally's own Trial Balance for them.
@@ -125,10 +137,10 @@ fn set_aside_names(set_aside: &CurrencySetAside, catalogue: &[TallyLedger]) -> B
 fn the_book_as_found_sets_aside_the_six_and_keeps_the_two_that_tie() {
     let catalogue = catalogue(AS_FOUND_EXPORT);
     let (scope, kept) = trial_balance(AS_FOUND_TRIAL_BALANCE);
-    let mut set_aside =
+    let set_aside =
         CurrencySetAside::before_window(&first_day(&[]), &scope, &kept, &catalogue).unwrap();
     let vouchers = window(BOOK_WINDOW);
-    set_aside.add_composite_entries(&vouchers);
+    assert!(set_aside.check_composite_entries(&vouchers).is_ok());
     assert_eq!(
         set_aside_names(&set_aside, &catalogue),
         SET_ASIDE_AS_FOUND.map(String::from).into()
@@ -137,7 +149,7 @@ fn the_book_as_found_sets_aside_the_six_and_keeps_the_two_that_tie() {
         assert_eq!(
             set_aside.rule_of(ledger),
             Some(SetAsideRule::MixedCurrencyMovement),
-            "{ledger}: rule 1 names it first"
+            "{ledger}"
         );
     }
     // Each kept ledger moved 3000.00 to the debit on the day; Tally's Trial Balance closes each
@@ -187,41 +199,115 @@ fn the_book_as_found_sets_aside_the_six_and_keeps_the_two_that_tie() {
         .contains("BRIDGE"));
 }
 
-/// Rule 2 alone, on the captured window: every ledger with a composite entry, which is every
-/// ledger rule 1 names except Profit & Loss A/c (it has no entry in the window).
+/// The captured window's composite entries are on five of the six ledgers the Trial Balance sets
+/// aside (`Profit & Loss A/c` has no entry), so the as-found Trial Balance (row 683-TW's answer to
+/// the same request, byte-equal to it) passes. Row 683-LD's
+/// Trial Balance of the same window, read after two vouchers dated 30 April were saved and Tally's
+/// current date had moved to 30 April, reads all eight ledgers as plain. It sets nothing aside, so
+/// `Profit & Loss A/c` would be read; the window's composites show what it missed, and the read is
+/// refused. The book's own window is used for both, as row 683-LD's year window answered the
+/// eleven 1 April vouchers entry by entry as before.
 #[test]
-fn rule_two_names_every_ledger_with_a_composite_entry_in_the_captured_window() {
-    let mut rule_two_alone = CurrencySetAside {
-        foreign: Vec::new(),
-        mixed: BTreeMap::new(),
-    };
-    rule_two_alone.add_composite_entries(&window(BOOK_WINDOW));
+fn a_trial_balance_that_reads_a_ledger_with_a_composite_entry_as_plain_is_not_conclusive() {
+    let vouchers = window(BOOK_WINDOW);
+    let with_composite_entry = vouchers
+        .iter()
+        .flat_map(|voucher| &voucher.ledger_entries)
+        .filter(|entry| entry.amount == MovementAmount::Composite)
+        .map(|entry| entry.ledger_name.as_str())
+        .collect::<BTreeSet<_>>();
     assert_eq!(
-        rule_two_alone.mixed,
-        SET_ASIDE_AS_FOUND[..5]
-            .iter()
-            .map(|name| (name.to_string(), SetAsideRule::CompositeEntryInWindow))
-            .collect::<BTreeMap<_, _>>()
+        with_composite_entry,
+        SET_ASIDE_AS_FOUND[..5].iter().copied().collect()
     );
+    let catalogue = catalogue(AS_FOUND_EXPORT);
+    let (scope, kept) = trial_balance(AS_FOUND_TRIAL_BALANCE);
+    let as_found =
+        CurrencySetAside::before_window(&first_day(&[]), &scope, &kept, &catalogue).unwrap();
+    assert!(as_found.check_composite_entries(&vouchers).is_ok());
+
+    let (scope, kept) = trial_balance(ALL_PLAIN_TRIAL_BALANCE);
+    let TrialBalanceLedgerScope::BaseCurrencyLedgersOnly { foreign, mixed, .. } = &scope else {
+        panic!("not the several-currency scope");
+    };
+    assert!(foreign.is_empty() && mixed.is_empty());
+    assert_eq!(kept.rows.len(), 8);
+    let all_plain =
+        CurrencySetAside::before_window(&first_day(&[]), &scope, &kept, &catalogue).unwrap();
+    assert_eq!(all_plain.rule_of("Profit & Loss A/c"), None);
+    let first_composite = vouchers
+        .iter()
+        .flat_map(|voucher| &voucher.ledger_entries)
+        .find(|entry| entry.amount == MovementAmount::Composite)
+        .unwrap()
+        .ledger_name
+        .clone();
+    assert_eq!(
+        inconclusive(all_plain.check_composite_entries(&vouchers).unwrap_err()),
+        (first_composite, "composite_entry_in_window")
+    );
+
     let scoped = window(USD_CUSTOMER_WINDOW);
     assert_eq!(scoped.len(), 4);
     assert!(scoped
         .iter()
         .flat_map(|voucher| &voucher.ledger_entries)
         .all(|entry| entry.amount == MovementAmount::Composite));
+    assert_eq!(
+        inconclusive(all_plain.check_composite_entries(&scoped).unwrap_err()),
+        (
+            "BRIDGE USD Customer".to_string(),
+            "composite_entry_in_window"
+        )
+    );
 }
 
-/// A dollar opening keyed on a ledger master (row 683-OP's `x1` and `t1`). Rule 1 sets the
-/// ledger aside from the Trial Balance without rule 3, and with both it is named once, by rule 1.
-/// Rule 3 alone is pinned on the same export in the runtime's tests.
+/// `Profit & Loss A/c` has no entry in the window and a plain opening at the first day, so only the
+/// Trial Balance can set it aside. The conclusive Trial Balance does, and its figure is never read;
+/// with row 683-LD's Trial Balance it would be kept, so that read refuses before any figure.
+#[test]
+fn profit_and_loss_is_set_aside_only_by_a_conclusive_trial_balance() {
+    const PROFIT_AND_LOSS: &str = "Profit & Loss A/c";
+    let vouchers = window(BOOK_WINDOW);
+    assert!(!vouchers
+        .iter()
+        .flat_map(|voucher| &voucher.ledger_entries)
+        .any(|entry| entry.ledger_name == PROFIT_AND_LOSS));
+    let catalogue = catalogue(AS_FOUND_EXPORT);
+    assert!(catalogue
+        .iter()
+        .any(|ledger| ledger.name == PROFIT_AND_LOSS));
+
+    let (scope, kept) = trial_balance(AS_FOUND_TRIAL_BALANCE);
+    let conclusive =
+        CurrencySetAside::before_window(&first_day(&[]), &scope, &kept, &catalogue).unwrap();
+    assert_eq!(
+        conclusive.rule_of(PROFIT_AND_LOSS),
+        Some(SetAsideRule::MixedCurrencyMovement)
+    );
+    assert!(conclusive.check_composite_entries(&vouchers).is_ok());
+
+    let (scope, kept) = trial_balance(ALL_PLAIN_TRIAL_BALANCE);
+    assert!(kept.rows.iter().any(|row| row.name == PROFIT_AND_LOSS));
+    let inconclusive_trial_balance =
+        CurrencySetAside::before_window(&first_day(&[]), &scope, &kept, &catalogue).unwrap();
+    assert_eq!(inconclusive_trial_balance.rule_of(PROFIT_AND_LOSS), None);
+    assert!(inconclusive_trial_balance
+        .check_composite_entries(&vouchers)
+        .is_err());
+}
+
+/// A dollar opening keyed on a ledger master (row 683-OP's `x1` and `t1`). The Trial Balance sets
+/// the ledger aside, so its composite opening passes the check and it is named once. The
+/// composite opening alone is pinned on the same export in the runtime's tests.
 #[test]
 fn a_dollar_opening_on_a_master_is_set_aside_and_named_once() {
     let catalogue = catalogue(DOLLAR_OPENING_EXPORT);
     let (scope, kept) = trial_balance(DOLLAR_OPENING_TRIAL_BALANCE);
-    let rule_one_alone =
+    let trial_balance_alone =
         CurrencySetAside::before_window(&first_day(&[]), &scope, &kept, &catalogue).unwrap();
     assert_eq!(
-        rule_one_alone.rule_of("BRIDGE USD Opening"),
+        trial_balance_alone.rule_of("BRIDGE USD Opening"),
         Some(SetAsideRule::MixedCurrencyMovement)
     );
     let both = CurrencySetAside::before_window(
@@ -237,19 +323,27 @@ fn a_dollar_opening_on_a_master_is_set_aside_and_named_once() {
     assert_eq!(result["base_currency_ledgers_mixed_excluded"]["count"], 7);
 }
 
-/// Rule 3 names what the Trial Balance does not: on the as-found Trial Balance with a composite
-/// opening admitted for one of its ledgers, that ledger is set aside by its opening.
+/// A composite opening on a ledger the Trial Balance reads as plain: the Trial Balance missed a
+/// value in another currency, so the read is refused. The admission is made for the test; the
+/// captured composite opening is on a ledger the Trial Balance sets aside (the test above).
 #[test]
-fn rule_three_sets_aside_a_ledger_rule_one_keeps() {
+fn a_composite_opening_on_a_ledger_the_trial_balance_reads_as_plain_is_not_conclusive() {
     let catalogue = catalogue(AS_FOUND_EXPORT);
     let (scope, kept) = trial_balance(AS_FOUND_TRIAL_BALANCE);
-    let set_aside =
-        CurrencySetAside::before_window(&first_day(&["Cash"]), &scope, &kept, &catalogue).unwrap();
     assert_eq!(
-        set_aside.rule_of("Cash"),
-        Some(SetAsideRule::CompositeOpening)
+        inconclusive(
+            CurrencySetAside::before_window(&first_day(&["Cash"]), &scope, &kept, &catalogue)
+                .unwrap_err()
+        ),
+        ("Cash".to_string(), "composite_opening")
     );
-    assert_eq!(set_aside.rule_of("BRIDGE INR Customer"), None);
+    assert!(CurrencySetAside::before_window(
+        &first_day(&["BRIDGE USD Customer"]),
+        &scope,
+        &kept,
+        &catalogue
+    )
+    .is_ok());
 }
 
 /// The two reports must name the same ledgers. Both pairs are captured answers of the same
@@ -265,8 +359,9 @@ fn a_trial_balance_and_catalogue_that_name_different_ledgers_refuse() {
             &as_found_kept,
             &catalogue(DOLLAR_OPENING_EXPORT),
         )
-        .unwrap_err(),
-        MovementCurrencyCode::ScopeUnmatched
+        .unwrap_err()
+        .code,
+        MovementCurrencyCode::ScopeUnmatched.as_str()
     );
     // A set-aside name the catalogue does not hold.
     let (opening_scope, opening_kept) = trial_balance(DOLLAR_OPENING_TRIAL_BALANCE);
@@ -277,8 +372,9 @@ fn a_trial_balance_and_catalogue_that_name_different_ledgers_refuse() {
             &opening_kept,
             &catalogue(AS_FOUND_EXPORT),
         )
-        .unwrap_err(),
-        MovementCurrencyCode::ScopeUnmatched
+        .unwrap_err()
+        .code,
+        MovementCurrencyCode::ScopeUnmatched.as_str()
     );
     // A Trial Balance read under the one-master admission means the book changed between reads.
     assert_eq!(
@@ -288,8 +384,9 @@ fn a_trial_balance_and_catalogue_that_name_different_ledgers_refuse() {
             &as_found_kept,
             &catalogue(AS_FOUND_EXPORT),
         )
-        .unwrap_err(),
-        MovementCurrencyCode::SnapshotDrifted
+        .unwrap_err()
+        .code,
+        MovementCurrencyCode::SnapshotDrifted.as_str()
     );
 }
 

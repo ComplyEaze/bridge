@@ -1424,23 +1424,9 @@ fn the_class_entry_window_refused_at_a_bill_allocation_and_now_reads_each_at_its
 
 /// The order `ledger_movement` sends for the day on that book from its first day, in
 /// [`forex_leg`]'s letters: identity, the opening read with the base Tally identifies among the
-/// masters, the currency Trial Balance (rule 1), the window after its marks, the opening read
+/// masters, the currency Trial Balance, the window after its marks, the opening read
 /// again, and the window again.
 const FOREX_MOVEMENT: &str = "esesseebsbscscsCsCsksksXsXsbsbseseseebsbscscsCsCsksksTsTsbsbseseemsmseeVsVseseebsbscscsCsCsksksXsXsbsbseseeVsVse";
-
-/// The letter of each request, by its fingerprint: `?` for one no leg names.
-fn forex_letters(observed: &[tally_protocol_simulator::ObservedRequest]) -> String {
-    const LETTERS: &str = "sebcCkLBgnwmXTV";
-    observed
-        .iter()
-        .map(|request| {
-            LETTERS
-                .chars()
-                .find(|letter| forex_leg(*letter).1 == request.request_body_sha256)
-                .unwrap_or('?')
-        })
-        .collect()
-}
 
 /// #683: `ledger_movement` on this book from its first day, through the handler, on the book's
 /// own answers. The six ledgers the currency Trial Balance sets aside are named with no figure,
@@ -1450,24 +1436,12 @@ fn forex_letters(observed: &[tally_protocol_simulator::ObservedRequest]) -> Stri
 #[tokio::test]
 async fn a_first_day_movement_on_a_book_with_several_currencies_returns_the_plain_ledgers_partial()
 {
-    let simulator =
-        SequenceSimulator::spawn(FOREX_MOVEMENT.chars().map(forex_plan).collect()).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let server = server_for(&simulator, directory.path(), Redaction::None);
-    let response = server
-        .call_tool(
-            "ledger_movement",
-            json!({"company_guid": FOREX_GUID, "from": "20250401", "to": "20250401"}),
-        )
-        .await;
-    simulator.cancel();
-    let sent: Vec<_> = simulator
-        .finish()
-        .unwrap()
-        .into_iter()
-        .filter(|request| !request.cancelled)
-        .collect();
-    assert_eq!(forex_letters(&sent), FOREX_MOVEMENT, "{response}");
+    let response = replay_forex(
+        "ledger_movement",
+        FOREX_MOVEMENT,
+        FOREX_MOVEMENT.chars().map(forex_plan).collect(),
+    )
+    .await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{response}");
@@ -1517,4 +1491,60 @@ async fn a_first_day_movement_on_a_book_with_several_currencies_returns_the_plai
         ],
         "{response}"
     );
+}
+
+/// The Trial Balance row 683-LD read with the same request, after two vouchers dated 30 April were
+/// saved and Tally's current date had moved to 30 April: every ledger plain
+/// (`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`).
+const FOREX_ALL_PLAIN_TRIAL_BALANCE: &str =
+    "native/trial_balance_currency_forexgroup_first_day_all_plain";
+
+/// #683: the same call with that Trial Balance in place of the first. It sets nothing aside, so
+/// `Profit & Loss A/c`, which only the Trial Balance can set aside, would be read; the window's
+/// composite entries show the Trial Balance missed five ledgers, and the read refuses with no
+/// figure. Every request is the one the lab sent.
+#[tokio::test]
+async fn a_first_day_movement_refuses_when_the_trial_balance_reads_a_ledger_with_a_composite_entry_as_plain(
+) {
+    let plans = FOREX_MOVEMENT
+        .chars()
+        .map(|letter| match letter {
+            'T' => plan(
+                Kind::Window,
+                utf16(&recorded_file(
+                    FIXTURES,
+                    &format!("{FOREX_ALL_PLAIN_TRIAL_BALANCE}.utf16le.xml"),
+                )),
+            ),
+            other => forex_plan(other),
+        })
+        .collect();
+    let response = replay_forex("ledger_movement", FOREX_MOVEMENT, plans).await;
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "ledger_currency_scope_inconclusive",
+        "{response}"
+    );
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(
+        error["set_aside_reason"], "composite_entry_in_window",
+        "{error}"
+    );
+    assert!(
+        [
+            "BRIDGE Export Sales",
+            "BRIDGE Import Purchases",
+            "BRIDGE Lab Bank",
+            "BRIDGE USD Customer",
+            "BRIDGE USD Supplier"
+        ]
+        .contains(&error["ledger"].as_str().unwrap()),
+        "{error}"
+    );
+    assert!(
+        response["structuredContent"]["result"]["ledgers"].is_null(),
+        "{response}"
+    );
+    assert!(!response.to_string().contains("-3000"), "{response}");
 }

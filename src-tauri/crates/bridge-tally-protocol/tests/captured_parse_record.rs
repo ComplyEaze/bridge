@@ -1760,6 +1760,26 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // The same request after two vouchers dated 30 April were saved and Tally's current date had
+    // moved to 30 April (row 683-LD): every ledger plain.
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
     // Built-in Cash Flow reports: src/native_cash_flow_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_cash_flow_probe_b_fy_live.utf16le.xml",

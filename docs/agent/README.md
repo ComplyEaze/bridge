@@ -1591,11 +1591,17 @@ for a composite sees. Tally must identify an INR base among the masters
 (`company_base_currency_undetermined` or `company_base_currency_not_inr`
 otherwise).
 
-Three rules set a ledger aside, each by name and with no figure: the
-currency-scoped Trial Balance of the same window names it as kept in another
-currency or as showing a value in another currency (the sets `trial_balance`
-reports); its opening at the first day is a composite; or an entry on it in the
-window is a composite. The Trial Balance and the catalogue must name the same
+The currency-scoped Trial Balance of the same window sets a ledger aside, by name
+and with no figure, when it names it as kept in another currency or as showing a
+value in another currency (the sets `trial_balance` reports). The movement's own
+reads check it: a composite opening at the first day, or a composite entry in the
+window, on a ledger the Trial Balance reads as plain refuses the read with
+`ledger_currency_scope_inconclusive`, naming that ledger and, in
+`set_aside_reason`, which of the two found it (`composite_opening` or
+`composite_entry_in_window`), since the Trial Balance then cannot be relied on to
+name every such ledger. That was seen once on the same book, for a Trial
+Balance ending on the first day read after later vouchers were saved and Tally's
+current date had moved. The Trial Balance and the catalogue must name the same
 ledgers (`ledger_currency_scope_unmatched` otherwise), and the Trial Balance must
 see the same book extent (`ledger_snapshot_drifted`). The result is always
 partial, with `partial_reason` `base_currency_ledgers_only` (or

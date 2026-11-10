@@ -6,6 +6,14 @@
 //! (TALLY_PROTOCOL_REFERENCE §8.2n). So this path is reachable only through a
 //! [`SeveralCurrencyFirstDay`], which the runtime builds for no other date, and every rule here is
 //! measured on one book: its result is always partial.
+//!
+//! The currency-scoped Trial Balance alone names the ledgers set aside. The movement's own reads
+//! check it: an opening at the first day that is a composite, or an entry in the window that is
+//! one, must be on a ledger the Trial Balance set aside. On the same book a Trial Balance ending
+//! on the first day was seen to read every dollar value as its rupee figure alone, once later
+//! vouchers were saved and Tally's current date had moved
+//! (`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`); a ledger only the Trial Balance can show, such
+//! as `Profit & Loss A/c`, would then be read. So a check that fails refuses the whole read.
 
 use super::super::failure_code::MovementCurrencyCode;
 use super::*;
@@ -17,17 +25,32 @@ use bridge_tally_protocol::native_trial_balance::NativeTrialBalance;
 /// speaks of totals, and the movement returns none.
 pub(super) const BASE_CURRENCY_LEDGERS_MOVEMENT_LIMITATION: &str = "Only this book's plain base-currency ledgers are read. Ledgers kept in another currency, and base-currency ledgers with a value Tally shows in another currency, are left out and named, with no figure.";
 
-/// Why a ledger is set aside. A code from a closed set.
+/// Why the Trial Balance set a ledger aside. A code from a closed set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum SetAsideRule {
-    /// Rule 1: the Trial Balance names the ledger as kept in another currency.
+    /// The Trial Balance names the ledger as kept in another currency.
     ForeignCurrencyLedger,
-    /// Rule 1: a base-currency ledger the Trial Balance shows with a value in another currency.
+    /// A base-currency ledger the Trial Balance shows with a value in another currency.
     MixedCurrencyMovement,
-    /// Rule 3: the ledger's opening at the first day is a composite.
-    CompositeOpening,
-    /// Rule 2: an entry on the ledger in the window is a composite.
-    CompositeEntryInWindow,
+}
+
+/// Where a movement read found a composite on a ledger the Trial Balance reads as plain. A code
+/// from a closed set, given as the refusal's `set_aside_reason`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CompositeFoundIn {
+    /// The ledger's opening at the first day.
+    Opening,
+    /// An entry on the ledger in the window.
+    WindowEntry,
+}
+
+impl CompositeFoundIn {
+    pub(super) fn code(self) -> &'static str {
+        match self {
+            Self::Opening => "composite_opening",
+            Self::WindowEntry => "composite_entry_in_window",
+        }
+    }
 }
 
 impl SetAsideRule {
@@ -35,26 +58,25 @@ impl SetAsideRule {
         match self {
             Self::ForeignCurrencyLedger => "foreign_currency_ledger",
             Self::MixedCurrencyMovement => "mixed_currency_movement",
-            Self::CompositeOpening => "composite_opening",
-            Self::CompositeEntryInWindow => "composite_entry_in_window",
         }
     }
 }
 
-/// The ledgers a several-currency movement sets aside, each named once, by the first rule that
-/// found it. Built only from a [`SeveralCurrencyFirstDay`].
+/// The ledgers a several-currency movement sets aside, as the Trial Balance names them. Built
+/// only from a [`SeveralCurrencyFirstDay`].
 #[derive(Debug)]
 pub(super) struct CurrencySetAside {
-    /// Rule 1's ledgers kept in another currency, with their `CURRENCYNAME`, in read order.
+    /// The ledgers kept in another currency, with their `CURRENCYNAME`, in read order.
     foreign: Vec<ForeignCurrencyLedger>,
-    /// Every other set-aside ledger and the rule that named it.
-    mixed: BTreeMap<String, SetAsideRule>,
+    /// The base-currency ledgers with a value in another currency.
+    mixed: std::collections::BTreeSet<String>,
 }
 
 impl CurrencySetAside {
-    /// Rules 1 and 3, before any voucher is read. `scope` and `kept` are the currency-scoped Trial
-    /// Balance of the same window (its set-aside names and its plain rows); `catalogue` is the
-    /// movement's own opening export at the first day.
+    /// Before any voucher is read. `scope` and `kept` are the currency-scoped Trial Balance of the
+    /// same window (its set-aside names and its plain rows); `catalogue` is the movement's own
+    /// opening export at the first day, whose composite openings are checked
+    /// (`check_composite_openings`).
     ///
     /// Every name the Trial Balance sets aside must be in the catalogue, and every catalogue
     /// ledger must be in the Trial Balance: a spelling or listing difference between the two
@@ -64,11 +86,11 @@ impl CurrencySetAside {
         scope: &TrialBalanceLedgerScope,
         kept: &NativeTrialBalance,
         catalogue: &[TallyLedger],
-    ) -> Result<Self, MovementCurrencyCode> {
+    ) -> Result<Self, ToolFailure> {
         let TrialBalanceLedgerScope::BaseCurrencyLedgersOnly { foreign, mixed, .. } = scope else {
             // The Trial Balance found one Currency master where the opening read found several:
             // the book changed between the two reads.
-            return Err(MovementCurrencyCode::SnapshotDrifted);
+            return Err(MovementCurrencyCode::SnapshotDrifted.into());
         };
         let catalogue_names = catalogue
             .iter()
@@ -90,42 +112,67 @@ impl CurrencySetAside {
                 .iter()
                 .any(|name| !trial_balance_names.contains(name))
         {
-            return Err(MovementCurrencyCode::ScopeUnmatched);
+            return Err(MovementCurrencyCode::ScopeUnmatched.into());
         }
-        let mut set_aside = Self {
+        let set_aside = Self {
             foreign: foreign.clone(),
-            mixed: BTreeMap::new(),
+            mixed: mixed.iter().cloned().collect(),
         };
-        for name in mixed {
-            set_aside.add(name, SetAsideRule::MixedCurrencyMovement);
-        }
-        for name in first_day.composite_openings() {
-            set_aside.add(name, SetAsideRule::CompositeOpening);
-        }
+        set_aside.check_composite_openings(first_day)?;
         Ok(set_aside)
     }
 
-    /// Rule 2: every ledger with a composite entry in the window's vouchers.
-    pub(super) fn add_composite_entries(&mut self, vouchers: &[MovementVoucher]) {
-        for entry in vouchers.iter().flat_map(|voucher| &voucher.ledger_entries) {
-            if entry.amount == MovementAmount::Composite {
-                self.add(&entry.ledger_name, SetAsideRule::CompositeEntryInWindow);
-            }
+    /// Every composite opening at the first day must be on a ledger the Trial Balance set aside.
+    fn check_composite_openings(
+        &self,
+        first_day: &SeveralCurrencyFirstDay,
+    ) -> Result<(), ToolFailure> {
+        self.require_set_aside(
+            first_day.composite_openings().iter().map(String::as_str),
+            CompositeFoundIn::Opening,
+        )
+    }
+
+    /// After the window is read: every ledger with a composite entry in it must be one the Trial
+    /// Balance set aside.
+    pub(super) fn check_composite_entries(
+        &self,
+        vouchers: &[MovementVoucher],
+    ) -> Result<(), ToolFailure> {
+        self.require_set_aside(
+            vouchers
+                .iter()
+                .flat_map(|voucher| &voucher.ledger_entries)
+                .filter(|entry| entry.amount == MovementAmount::Composite)
+                .map(|entry| entry.ledger_name.as_str()),
+            CompositeFoundIn::WindowEntry,
+        )
+    }
+
+    /// A composite on a ledger the Trial Balance reads as plain means the Trial Balance did not
+    /// show every value in another currency, so it cannot be trusted to name every ledger to leave
+    /// out: refused (`ledger_currency_scope_inconclusive`), naming the first such ledger and where
+    /// its composite was, with no figure.
+    fn require_set_aside<'a>(
+        &self,
+        mut ledgers: impl Iterator<Item = &'a str>,
+        found_in: CompositeFoundIn,
+    ) -> Result<(), ToolFailure> {
+        match ledgers.find(|ledger| self.rule_of(ledger).is_none()) {
+            Some(ledger) => Err(ToolFailure::from(MovementCurrencyCode::ScopeInconclusive)
+                .with_set_aside(ledger, found_in.code())),
+            None => Ok(()),
         }
     }
 
-    fn add(&mut self, ledger: &str, rule: SetAsideRule) {
-        if self.rule_of(ledger).is_none() {
-            self.mixed.insert(ledger.to_string(), rule);
-        }
-    }
-
-    /// The rule that set `ledger` aside, if one did.
+    /// Why the Trial Balance set `ledger` aside, if it did.
     pub(super) fn rule_of(&self, ledger: &str) -> Option<SetAsideRule> {
         if self.foreign.iter().any(|found| found.ledger == ledger) {
             return Some(SetAsideRule::ForeignCurrencyLedger);
         }
-        self.mixed.get(ledger).copied()
+        self.mixed
+            .contains(ledger)
+            .then_some(SetAsideRule::MixedCurrencyMovement)
     }
 
     /// A named ledger that is set aside refuses, naming it and the rule, with no figure (P7: an
@@ -158,7 +205,7 @@ impl CurrencySetAside {
             "reason": "mixed_currency_movement",
             "ledgers": self
                 .mixed
-                .keys()
+                .iter()
                 .take(named)
                 .map(|ledger| party_name(ledger.clone()))
                 .collect::<Vec<_>>(),

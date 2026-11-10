@@ -194,9 +194,10 @@ impl Server {
                 None => None,
             };
             // A book with several Currency masters reaches here only at its first day (#683,
-            // §8.2n). Rules 1 and 3 set ledgers aside before any voucher is read, and a named
-            // ledger that is set aside refuses before the window is read.
-            let mut set_aside = match several_currency.as_ref() {
+            // §8.2n). The Trial Balance sets ledgers aside before any voucher is read, checked
+            // against the composite openings, and a named ledger that is set aside refuses before
+            // the window is read.
+            let set_aside = match several_currency.as_ref() {
                 Some(first_day) => {
                     let period = crate::tally::runtime::TrialBalancePeriod::new(from.clone(), to.clone())
                         .map_err(|_| ToolFailure::from(MovementCurrencyCode::InvalidDateRange))?;
@@ -336,11 +337,10 @@ impl Server {
                 return Err("voucher_snapshot_drifted".to_string().into());
             }
             validate_movement_snapshot(&ledgers, &corroborating_ledgers, &vouchers)?;
-            // Rule 2, from the window both reads agreed on; then a named ledger it set aside
-            // refuses too.
-            if let Some(set_aside) = set_aside.as_mut() {
-                set_aside.add_composite_entries(&vouchers);
-                set_aside.refuse_named(selected.as_ref().map(|found| found.name()))?;
+            // The window both reads agreed on checks the Trial Balance: a composite entry on a
+            // ledger it reads as plain refuses the read.
+            if let Some(set_aside) = set_aside.as_ref() {
+                set_aside.check_composite_entries(&vouchers)?;
             }
             let mut movement =
                 BTreeMap::<String, (Option<String>, Option<String>, String, String, usize)>::new();

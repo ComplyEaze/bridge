@@ -1524,9 +1524,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "ledger_currency_set_aside" => Some(
             "The ledger named is one this several-currency book keeps in another currency, or a \
              base-currency ledger with a value Tally shows in another currency (set_aside_reason \
-             names the rule that found it), so ComplyEaze Bridge gives no figure for it. \
+             says which), so ComplyEaze Bridge gives no figure for it. \
              ledger_movement without a ledger returns the base-currency ledgers and names the \
              ones it leaves out. Retrying this read refuses again.",
+        ),
+        "ledger_currency_scope_inconclusive" => Some(
+            "On this several-currency book the ledger named has an opening or an entry in the \
+             window with a value in another currency (set_aside_reason says which), but the Trial \
+             Balance for the same window read it as a plain figure. The Trial Balance could then miss a ledger that only it shows in \
+             another currency, so ComplyEaze Bridge returned no movement. This has been seen after \
+             vouchers dated later than the window were saved and Tally's current date moved past \
+             it; repeating the same read is expected to refuse again.",
         ),
         "ledger_currency_scope_unmatched" => Some(
             "On this several-currency book the Trial Balance and the ledger list did not name the \

@@ -72,6 +72,10 @@ const MOVEMENT_CURRENCY: &[(MovementCurrencyCode, &str)] = &[
         MovementCurrencyCode::ScopeUnmatched,
         "ledger_currency_scope_unmatched",
     ),
+    (
+        MovementCurrencyCode::ScopeInconclusive,
+        "ledger_currency_scope_inconclusive",
+    ),
     (MovementCurrencyCode::SetAside, "ledger_currency_set_aside"),
 ];
 

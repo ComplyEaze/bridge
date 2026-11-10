@@ -78,6 +78,8 @@ failure_codes! {
         SnapshotDrifted = "ledger_snapshot_drifted",
         /// The currency-scoped Trial Balance and the movement's catalogue name different ledgers.
         ScopeUnmatched = "ledger_currency_scope_unmatched",
+        /// A composite opening or window entry is on a ledger the Trial Balance reads as plain.
+        ScopeInconclusive = "ledger_currency_scope_inconclusive",
         /// The ledger asked for is set aside, so no figure is given for it.
         SetAside = "ledger_currency_set_aside",
     }

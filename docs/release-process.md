@@ -795,10 +795,19 @@ patch for a fix-only release:
 
 `--apply` writes the version to `package.json`, `packaging/mcpb/manifest.json`,
 `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, the `bridge` entry in
-`src-tauri/Cargo.lock`, and the README sentence naming the current version.
+`src-tauri/Cargo.lock`, and the README sentence naming the current version. It also
+writes today's date (UTC, `YYYY-MM-DD`) to `src-tauri/release-date.txt`, which `build.rs`
+compiles into the program: `tally_status` adds a build notice, once per session, when that
+date is more than 60 days before the computer's date. No request is made. A build made
+between releases carries the last release's date, so its notice comes early. The script
+refuses a date earlier than the last release tag's day (a clock running backward); a clock
+running forward cannot be detected by the script and would delay the notice. A release cut without
+`--apply` carries the old date, so its builds show the notice too soon; nothing in CI yet
+requires the file to change in the version pull request, so use `--apply`.
+`scripts/check-license-metadata.mjs` checks the file's format.
 It checks every file first and writes none if one fails. Then:
 
-1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
+1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because some of those files are pinned, `src-tauri/src/agent.rs` among them (see "Compatibility-surface reseal").
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`, and move the
    unreleased entries into the new section (see "At cut time" under `CHANGELOG.md` below).
 

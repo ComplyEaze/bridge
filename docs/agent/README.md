@@ -1955,7 +1955,7 @@ question replaces it.
 - `window.census.requests` is 0 on such a call, so `read_cost` (shown only for a slow or large census) counts
   no census reads for it; `census_reused` says why.
 - Not established: how often a real user repeats the same window (the lab's own repeats were counted; no real
-  request trail was read), whether a Tally Gold remote user's save or a restored copy of the company moves the
+  request trail was read), whether a save by a user of the multi-user edition on another computer or a restored copy of the company moves the
   marks at once (as for held windows above), and the saving on a real book.
 
 ### What a `vouchers` read cost (`window.read_cost`)

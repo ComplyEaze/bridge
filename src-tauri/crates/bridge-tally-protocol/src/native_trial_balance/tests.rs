@@ -16,7 +16,10 @@ fn request_binds_both_admitted_snapshot_boundaries_and_escapes_company() {
         TallyDate::parse("20260731").unwrap(),
     )
     .unwrap();
-    let request = render_native_trial_balance_request("A & B <Co>", &period);
+    let request = render_native_trial_balance_request(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &period,
+    );
     assert!(request.contains("<SVCURRENTCOMPANY>A &amp; B &lt;Co&gt;</SVCURRENTCOMPANY>"));
     assert!(request.contains("<SVFROMDATE TYPE=\"Date\">20260601</SVFROMDATE>"));
     assert!(request.contains("<SVTODATE TYPE=\"Date\">20260731</SVTODATE>"));
@@ -35,12 +38,18 @@ fn the_currency_variant_differs_from_the_unchanged_request_only_by_currencyname(
         TallyDate::parse("20260731").unwrap(),
     )
     .unwrap();
-    let plain = render_native_trial_balance_request("A & B <Co>", &period);
+    let plain = render_native_trial_balance_request(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &period,
+    );
     assert_eq!(
         plain,
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>A &amp; B &lt;Co&gt;</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">20260601</SVFROMDATE><SVTODATE TYPE="Date">20260731</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>NAME, GUID, PARENT, TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#
     );
-    let with_currency = render_native_trial_balance_request_with_currency("A & B <Co>", &period);
+    let with_currency = render_native_trial_balance_request_with_currency(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &period,
+    );
     assert_eq!(
         with_currency,
         plain.replace("TBALCLOSING</FETCH>", "TBALCLOSING, CURRENCYNAME</FETCH>")

@@ -501,7 +501,7 @@ async fn collect_parts(
         .map_err(|_| refused("audit_part_window_unsupported_in_education"))?;
     let trial_balance =
         bridge_tally_protocol::native_trial_balance::render_native_trial_balance_request(
-            name, &snapshot,
+            &company, &snapshot,
         );
     let trial_balance = fetch_xml(runtime, config, identity, trial_balance).await?;
     let window = Some((period.0.clone(), period.1.clone()));

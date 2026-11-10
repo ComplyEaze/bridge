@@ -1882,6 +1882,21 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **Not measured:** two or more cash ledgers in one batch, a span over a year end (a March deposit keyed in April reads a Trial Balance across two years, and the tie refuses if it differs), and any of this on a book of real size.
 - **What Bridge does with it.** A deposit from the cash box builds only if the ledger's opening and vouchers reach Tally's own closing, so the vouchers read must be the ones Tally counts. The window runs from the first deposit to the 31 March on or after the later of the last deposit and the last entry.
 
+### 12a.27 Ledger Outstandings answers a bill-wise party with no entry by its date as it answers a name no ledger carries: HTTP 200, a zero length, no type, no body (PARTIAL)
+
+**Measured:** two synthetic books on TallyPrime 7.2 (`tally.exe` file version 1.1.7.2), each loaded alone, in two sittings whose Gateway showed a licensed edition. Reads only: each request a fixed file the lab sent one at a time (not Bridge's transport), each answer written to a file as received. The request is the one `crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/PROVENANCE.md` records: `<ID>Ledger Outstandings</ID>` with `LedgerName` and `SVTODATE`, and no fetch list.
+
+- `BRIDGE BILLTRAIL LAB`, 8 November 2026: a `LedgerName` no ledger carries, sent twice (`ledger-outstandings-unknown-party.*` in that fixture folder; `lab/2377-l-answers` at a2be6d96).
+- `BRIDGE PILOT LAB`, 10 November 2026: its bill-wise payable party `BRIDGE Supplier RJ`, sent twice to 31 July 2026, before the party's first entry, and twice to 4 August 2026, the day of its two entries, as the control (`lab/2377-nb-answers` at 61a5c1bf). The book's marks read before and after were byte-equal.
+
+Findings:
+
+- **The answer (verified, four sends).** HTTP 200, the header lines `RESPSTATUS: 1`, `CONNECTION: KEEP-ALIVE` and `CONTENT-LENGTH: 0`, no `Content-Type`, and no body. The headers file kept from the unknown name and both of PILOT's are byte-equal, 77 bytes each. `GET /status` answered 200 between the two sends of each pair, and on PILOT after the second as well; on PILOT no dialog was on screen after either send.
+- **The control ties (verified, one party).** To 4 August the same request answered 1,232 bytes, `text/xml; charset=utf-16`, byte-equal twice: one bill, whose closing equals the party's closing in the `List of Ledgers` snapshot to the same date (2100.00). For this payable party the bill's closing and the ledger's carry the same sign.
+- **Only the snapshot tells the two apart (verified).** The answers are the same bytes. The `List of Ledgers` snapshot to the same date names `BRIDGE Supplier RJ`, bill-wise, with `CLOSINGBALANCE` empty, not `0.00`, at 31 July; a name no ledger carries is in no snapshot.
+- **What Bridge does with it.** Bridge's transport refuses an answer with no `Content-Type` before it reads a body, as `response_content_type_unsupported`. The paired read stops at that first send, so `party_bills` refuses both cases as `party_bills_read_failed` without making the second send, and before the snapshot it has already read is used (#2377).
+- **Not measured:** a receivable party; a party whose bills settle to a written zero, or whose zero is an open bill against an on-account advance; a book of real size; other releases; why Tally sends no `Content-Type`; and Bridge's own transport sending this request.
+
 ## 13. Open questions
 
 | Question | Why it matters |

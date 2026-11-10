@@ -1869,6 +1869,10 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// notice (c974cd2d) adds 224 bytes to each list, they measured 214,299,
 /// 240,467, 242,976 and 248,353: the second and third over their budgets by 67
 /// and 76. Each budget went up by 500, leaving margins of 601, 433, 424 and 547.
+/// So Sales raised each budget by 2,000 in all: 1,500 for the switch, then 500.
+/// On 11 Nov 2026, merged with master at d69b2ea8, after #2407 and #2447 (170
+/// bytes to each list), they measured 214,469, 240,637, 243,146 and 248,523,
+/// leaving margins of 431, 263, 254 and 377.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [214_900, 240_900, 243_400, 248_900];

@@ -720,6 +720,92 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
     }
 }
 
+/// Row 2162-GY's company object answers (`pilot-lab-gy`, copies with the
+/// company number replaced; see its PROVENANCE.md), served in place of the
+/// pilot lab's: the one taken with the company's GST turned off refuses the
+/// invoice under its own code once the object is read (76 requests, the whole
+/// admission), with no observation, and the one taken before the change, on
+/// the same book, admits it. An `ISGSTON` emptied or removed, which no answer
+/// carried, is refused under the other code (marked as edits of the answer
+/// before the change).
+#[tokio::test]
+async fn a_company_whose_gst_is_off_or_unstated_is_refused_by_name() {
+    let before = utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml"));
+    let off = utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"));
+    let element = "<ISGSTON TYPE=\"Logical\">Yes</ISGSTON>";
+    assert_eq!(before.matches(element).count(), 1);
+    assert_eq!(
+        off.matches("<ISGSTON TYPE=\"Logical\">No</ISGSTON>")
+            .count(),
+        1
+    );
+    for (object, outcome) in [
+        (before.clone(), Ok(())),
+        (off, Err(vec![("invoice_company_gst_off", String::new())])),
+        // Edits: no answer carried these.
+        (
+            before.replace(element, "<ISGSTON TYPE=\"Logical\"></ISGSTON>"),
+            Err(vec![("invoice_company_gst_unstated", String::new())]),
+        ),
+        (
+            before.replace(element, ""),
+            Err(vec![("invoice_company_gst_unstated", String::new())]),
+        ),
+    ] {
+        let (seen, voucher, requests) = admit_on(
+            pilot_lab_replacing('O', object),
+            pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+        )
+        .await;
+        assert_eq!(seen, outcome);
+        assert_eq!(requests.len(), 76, "{outcome:?}");
+        let observed = voucher.invoice.as_ref().unwrap().observed.as_ref();
+        assert_eq!(observed.is_some(), outcome.is_ok(), "{outcome:?}");
+    }
+    assert!(crate::agent::refusal_remediation("invoice_company_gst_off")
+        .is_some_and(|step| step.contains("GST is turned off for this company")));
+    assert!(
+        crate::agent::refusal_remediation("invoice_company_gst_unstated")
+            .is_some_and(|step| step.contains("did not say whether GST is on"))
+    );
+}
+
+/// The GST setting is judged first, by itself: with the company's minimum
+/// HSN/SAC code length edited to 8 (marked as an edit; the answers read 4), the
+/// answer before the change refuses every sales line as not measured, and the
+/// answer with GST off, under the same edit, refuses the invoice under the GST
+/// code alone, with no line refusal beside it.
+#[tokio::test]
+async fn the_gst_setting_refuses_by_itself_before_any_sales_line_is_judged() {
+    let length = "<HSNCODELENGTH TYPE=\"Number\"> 4</HSNCODELENGTH>";
+    let longer = "<HSNCODELENGTH TYPE=\"Number\"> 8</HSNCODELENGTH>";
+    let edited = |bytes: &[u8]| {
+        let text = utf16(bytes);
+        assert_eq!(text.matches(length).count(), 1);
+        text.replace(length, longer)
+    };
+    let before = edited(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml"));
+    let off = edited(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"));
+    let (seen, _, _) = admit_on(
+        pilot_lab_replacing('O', before),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    let lines = seen.expect_err("every sales line refused");
+    assert!(!lines.is_empty());
+    assert!(lines.iter().all(|(code, ledger)| *code
+        == "invoice_sales_ledger_hsn_source_not_measured"
+        && !ledger.is_empty()));
+    let (seen, voucher, requests) = admit_on(
+        pilot_lab_replacing('O', off),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    assert_eq!(seen, Err(vec![("invoice_company_gst_off", String::new())]));
+    assert_eq!(requests.len(), 76);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+}
+
 /// A Regular customer whose GSTIN in force is the company's own is refused
 /// once the registration is read (70 requests), with no observation: Tally
 /// listed such an invoice as uncertain (section 9.16). The same customer under

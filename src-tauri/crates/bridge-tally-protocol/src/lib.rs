@@ -2508,3 +2508,8 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 #[path = "company_name_escaping_tests.rs"]
 mod company_name_escaping_tests;
+
+/// The request bytes of every builder, pinned by hash (#2397).
+#[cfg(test)]
+#[path = "request_bytes_tests.rs"]
+mod request_bytes_tests;

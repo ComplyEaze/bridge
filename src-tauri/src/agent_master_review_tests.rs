@@ -127,13 +127,13 @@ fn the_preview_quotes_every_name_it_shows() {
 #[test]
 fn unsafe_text_is_refused_with_its_typed_error() {
     let plain = item("Plain", AdmittedLedgerKind::Suspense);
+    // A company name with a control character (newline, carriage return,
+    // tab, NUL) can no longer be held by an identity at all (#2397); the
+    // separators below are not control characters, so the review still
+    // refuses them itself.
     for (case, name) in [
-        ("a newline in the company", "Lab\nX"),
-        ("a carriage return", "Lab\rX"),
-        ("a tab", "Lab\tX"),
         ("a line separator", "Lab\u{2028}X"),
         ("a paragraph separator", "Lab\u{2029}X"),
-        ("a NUL", "Lab\0X"),
     ] {
         assert_eq!(
             master_review_text(&plain, &company(name), ORIGIN),

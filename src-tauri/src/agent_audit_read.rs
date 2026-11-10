@@ -463,8 +463,7 @@ async fn collect_parts(
         opening,
     ));
 
-    let company_object =
-        AgentReadRequest::company_object(identity).map_err(|error| refused(&error.to_string()))?;
+    let company_object = AgentReadRequest::company_object(identity);
     let company_part = fetch(runtime, config, identity, company_object).await?;
     bridge_tally_protocol::audit_company_part::admit_audit_company_part(
         &company_part.body,

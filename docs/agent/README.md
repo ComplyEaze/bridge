@@ -3421,8 +3421,8 @@ its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 
 One native-approved Journal and restart reconciliation have been observed on
-macOS against a synthetic Silver 7.1 instance. This remains a preview: Windows
-interactive approval and native posting on Education have not been established.
+macOS against a synthetic Silver 7.1 instance. Windows interactive approval and
+native posting on Education have not been established.
 Native posts on licensed 7.1 Gold were captured once, in one session on a
 development build and one client book, with the approval step not recorded
 ([reference](../tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)). Also
@@ -3640,7 +3640,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
 Keep the selected company free of other imports and ledger changes while posting,
 and leave Tally's product/licence mode unchanged. Bridge serializes its own writers;
 its separate checks cannot lock out Tally UI edits or other importers. Concurrent
-external changes are outside this preview's validated posting workflow.
+external changes are outside the validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
 approval. (The tool call itself returns "approval pending" after about 40 seconds
@@ -4131,6 +4131,11 @@ Per tool:
   combination (`src-tauri/src/agent_company.rs`).
 - `tally_status`: the probe alone (`Server::status`,
   `src-tauri/src/agent_company.rs`).
+  Its `build_notice` string appears on the first status read of a session when the
+  build's release date (`src-tauri/release-date.txt`, compiled in by `build.rs`) is
+  more than 60 days before this computer's date; it states both dates and where
+  releases are listed, makes no request, and the server instructions tell the
+  assistant to relay it once (#2391).
 - `masters`:
   1. the company read;
   2. the extent check (if a later page);
@@ -4605,7 +4610,10 @@ its own cause, `native_bills_report_deadline_exceeded` (#2119); another request 
 same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
 repeat the call. Tally can go on building the report after the limit (a read sent straight after
 was refused for time too), so it also says to wait and let `tally_status` answer before the next
-read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
+read, that one party's open bills at the same `as_of` can still be read, after asking the user,
+with `party` and `detail` `open_bills` (that party's Ledger Outstandings beside the book's list of
+ledgers, not the Bills report, and no total for the book), and that an
+earlier `as_of` with fewer open bills answered on that book. Where the limit
 falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
 flight and sends nothing more (#778).
 

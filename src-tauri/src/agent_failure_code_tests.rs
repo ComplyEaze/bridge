@@ -206,7 +206,7 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    assert_eq!(codes.len(), 22, "the declared codes");
+    assert_eq!(codes.len(), 27, "the declared codes");
     for code in codes {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");

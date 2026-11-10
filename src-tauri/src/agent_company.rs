@@ -158,10 +158,10 @@ impl Server {
                 )
                 .map_err(|error| {
                     match error {
-                        // No test reaches this arm: `normalized_standard_value`, in
-                        // the company-list parser, refuses such a name first.
+                        // The name check above refuses such a name first; this arm
+                        // gives the same declared code if that order ever changes.
                         crate::tally::VerifiedCompanyIdentityError::InvalidCompanyName => {
-                            "company_name_invalid"
+                            super::failure_code::CompanyReadCode::NameInvalid.as_str()
                         }
                         crate::tally::VerifiedCompanyIdentityError::InvalidCompanyNumber => {
                             "company_number_invalid"

@@ -1353,7 +1353,7 @@ fn snapshot_identity_refuses_a_matching_company_whose_guid_is_not_strict_shaped(
 fn snapshot_identity_refuses_a_matching_company_whose_name_cannot_be_sent() {
     let lineage = "tally_xml_http:http://127.0.0.1:9000";
     let guid = "4c42a771-abcd-4def-8abc-001122aabbcc";
-    let name = "A".repeat(256);
+    let name = "A".repeat(bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES + 1);
     let company = CompanyRef {
         identity: company_source_identity(lineage, guid, "100001", &name, "20260401"),
         display_name: name.clone(),

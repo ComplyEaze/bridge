@@ -113,6 +113,23 @@ fn every_company_lists_and_only_the_unsendable_one_is_marked() {
             None,
             "\\u{3164}".to_string(),
         ),
+        // The rule's two limits, pinned so that changing either is a visible
+        // decision. A name of joiners alone is sendable and unmarked, and draws
+        // as nothing.
+        (
+            "&#x200d;&#x200c;",
+            "\u{200d}\u{200c}".to_string(),
+            None,
+            "\u{200d}\u{200c}".to_string(),
+        ),
+        // A backslash is shown as it is, so a name that spells a code out as
+        // text draws like one holding that character.
+        (
+            "Acme\\u{200b} Lab",
+            "Acme\\u{200b} Lab".to_string(),
+            None,
+            "Acme\\u{200b} Lab".to_string(),
+        ),
     ] {
         let xml = with_name(name_xml);
         let companies = bridge_tally_protocol::parse_companies_from_collection(&xml).unwrap();
@@ -185,7 +202,9 @@ async fn only_the_marked_company_refuses_its_reads() {
     let xml = with_name(&"x".repeat(361));
     assert_eq!(
         verified(&xml, MARKED_GUID).await,
-        Err("company_name_invalid".to_string())
+        Err(crate::agent::failure_code::CompanyReadCode::NameInvalid
+            .as_str()
+            .to_string())
     );
     assert_eq!(
         verified(&xml, OTHER_GUID).await,
@@ -196,5 +215,33 @@ async fn only_the_marked_company_refuses_its_reads() {
         verified(&edge, MARKED_GUID).await,
         Ok("  Edge Lab  ".to_string()),
         "a name with edge spaces is read under its own spelling"
+    );
+}
+
+/// The capture with the marked row's company number left out, which the list
+/// parser reads as missing (an empty one refuses the whole list).
+fn without_number(xml: &str) -> String {
+    let at = xml.find(MARKED_GUID).unwrap();
+    let start = at + xml[at..].find("<COMPANYNUMBER").unwrap();
+    let close = "</COMPANYNUMBER>";
+    let end = start + xml[start..].find(close).unwrap() + close.len();
+    format!("{}{}", &xml[..start], &xml[end..])
+}
+
+/// The name check runs ahead of the identity checks, so a marked company that
+/// also lacks its number is refused for its name, the remedy that applies
+/// first (#2433).
+#[tokio::test]
+async fn a_marked_name_is_refused_ahead_of_an_incomplete_identity() {
+    assert_eq!(
+        verified(&without_number(&with_name(&"x".repeat(361))), MARKED_GUID).await,
+        Err(crate::agent::failure_code::CompanyReadCode::NameInvalid
+            .as_str()
+            .to_string())
+    );
+    assert_eq!(
+        verified(&without_number(&with_name("Number Lab")), MARKED_GUID).await,
+        Err("company_identity_incomplete".to_string()),
+        "the same row with a sendable name is refused for the missing number"
     );
 }

@@ -24,3 +24,18 @@ fn validates_tally_date_ranges() {
     assert!(validate_date_range("20260430", "20260401").is_err());
     assert!(validate_date_range("2026-04-01", "20260430").is_err());
 }
+
+/// The one wording of the name rule states the limit the type enforces, and the
+/// blank case (#2433).
+#[test]
+fn the_name_rule_wording_states_the_limit() {
+    let rule = super::company_name_rule!();
+    let limit = bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES;
+    assert!(rule.contains(&format!("at most {limit} bytes")), "{rule}");
+    assert!(rule.contains("not blank"), "{rule}");
+    assert!(rule.contains("no control characters"), "{rule}");
+    assert_eq!(
+        validate_company_name(&"x".repeat(limit + 1)).unwrap_err(),
+        format!("The Tally company needs {rule}.")
+    );
+}

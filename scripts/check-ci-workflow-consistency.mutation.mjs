@@ -363,6 +363,17 @@ for (const [name, replacement] of [
   });
 }
 
+// A version pull request must move src-tauri/release-date.txt (#2416): the scope job runs the check on every pull request or
+// queue entry it recognises as one. Deleting the line, or making it unable to fail, would let a stale date through.
+for (const [name, change] of [
+  ["deleted", (text) => text.replace(/^ +node scripts\/check-version-release-date\.mjs "\$base" "\$GITHUB_SHA"\n/m, "")],
+  ["made unable to fail", (text) => text.replace('node scripts/check-version-release-date.mjs "$base" "$GITHUB_SHA"', 'node scripts/check-version-release-date.mjs "$base" "$GITHUB_SHA" || true')],
+]) {
+  test(`release date: the version pull request check ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", change), "changes changed shape; review its scope rules and update expectedChanges");
+  });
+}
+
 // A draft-scoped run must post a name no ruleset requires. If it posted `Required checks`, its green (heavy jobs skipped on
 // purpose) would satisfy the ruleset on a head whose ready run has not started its own gate yet.
 for (const [name, replacement] of [

@@ -178,6 +178,9 @@ jobs:
           release=false
           if [[ -n "$base" && ! "$base" =~ ^0+$ && "$(version_at "$base")" != "$(version_at "$GITHUB_SHA")" ]]; then release=true; fi
           if [[ "$release" == true ]]; then
+            # A version pull request also moves src-tauri/release-date.txt (#2416): a stale date makes a fresh build
+            # show the build notice too soon. To turn this off, delete this line.
+            node scripts/check-version-release-date.mjs "$base" "$GITHUB_SHA"
             echo "native_os=$both" >> "$GITHUB_OUTPUT"
           else
             echo "native_os=$windows" >> "$GITHUB_OUTPUT"

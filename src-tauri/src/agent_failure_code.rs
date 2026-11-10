@@ -69,6 +69,16 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusal of a `vouchers` read that took a held census (#2399).
+    pub(crate) enum CensusReuseCode {
+        /// The read used a census counted by an earlier call, and a part it read
+        /// was not the vouchers that census described. The census is dropped; the
+        /// next call counts afresh. `cause` says how the part differed.
+        Mismatch = "census_reused_mismatch",
+    }
+}
+
+failure_codes! {
     /// The refusals of `import_bank_statement` when it reads a proposals file.
     pub(crate) enum BankStatementImportCode {
         /// The proposals file does not hold what its parse would have written.

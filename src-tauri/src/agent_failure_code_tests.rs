@@ -184,3 +184,23 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
         assert!(seen.insert(text), "{text} is declared twice");
     }
 }
+
+/// The census-reuse refusal (#2399), pinned the same way as the codes above: written out here, so
+/// a changed string fails a test.
+const CENSUS_REUSE: &[(CensusReuseCode, &str)] =
+    &[(CensusReuseCode::Mismatch, "census_reused_mismatch")];
+
+#[test]
+fn the_census_reuse_code_is_pinned_once_and_is_the_string_a_caller_sees() {
+    let pinned: Vec<CensusReuseCode> = CENSUS_REUSE.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, CensusReuseCode::ALL);
+    for (code, string) in CENSUS_REUSE {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()));
+        assert!(string
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'));
+    }
+}

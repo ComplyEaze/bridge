@@ -805,6 +805,9 @@ struct Server {
     /// `vouchers` windows read once and served page by page (#485). In memory
     /// only; see `agent_vouchers.rs`.
     voucher_pages: Arc<Mutex<VoucherPages>>,
+    /// Censuses of finished `vouchers` window reads, reused while the company's
+    /// marks are unchanged (#2399). In memory only; see `agent_voucher_window.rs`.
+    held_censuses: Arc<Mutex<HeldCensuses>>,
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
@@ -2005,6 +2008,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              did not honour the read's filter, or a fault in ComplyEaze Bridge; read this window in Tally \
              itself.",
         ),
+        // The code of a `vouchers` read that took a census counted by an earlier call
+        // (#2399) and found its part was not the vouchers that census described.
+        "census_reused_mismatch" => Some(
+            "ComplyEaze Bridge reused the count of this window's vouchers from an earlier call, \
+             because Tally's change marks had not moved, and the read returned different vouchers \
+             from the ones that count described, so it released nothing. It has discarded that \
+             count: call the same tool again with the same arguments, once, and it counts the \
+             window afresh. If the refusal comes back on a book nobody is changing, tell the user \
+             and read the window in Tally itself.",
+        ),
         // A product limit of the bounded window read (protocol reference §11c):
         // the census walks the book's AlterIDs whatever the window, so the
         // obvious retry — a shorter window — cannot succeed, and saying so is
@@ -2846,6 +2859,7 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
+            held_censuses: Arc::new(Mutex::new(HeldCensuses::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
         }

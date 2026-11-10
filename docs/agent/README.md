@@ -1726,7 +1726,8 @@ or vouchers.
   `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
   every voucher read was checked against a separate count of the window (a census,
   which ComplyEaze Bridge sends for every book that has held a voucher, however
-  few), and an empty window only when its corroboration read confirmed it: the
+  few, unless a repeat of the same question takes the census of the call before it,
+  see "A repeated `vouchers` read reuses its census" below), and an empty window only when its corroboration read confirmed it: the
   read widened by a day on each side was also empty and the company has no
   vouchers. Otherwise it is `partial` with `reason`
   `nonempty_window_unqualified`, or, for an empty window, the corroboration's own
@@ -1933,6 +1934,30 @@ is the mark Tally sent.
   sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
   requests. Before this change each later page repeated the whole read.
 
+### A repeated `vouchers` read reuses its census (`window.census_reused`)
+
+The first page of a `vouchers` call counts the window's vouchers before it reads them. A call that asks the
+same question again, for the same company, the same dates exactly as sent and the same book, takes that count
+from the call before it instead of counting again, when the company's two change marks, which this call reads
+afresh, equal the marks the count was taken at. The count is kept for 10 minutes, in memory, and is dropped when
+a mark differs, when a write through this server touches the company, or when a newer count of the same
+question replaces it.
+
+- The window of that call shows it: `window.census.requests` is 0 and `window.census_reused.read_at` says when
+  the count was taken. A call that counted its own census has no `census_reused`.
+- The reused count only plans the read. Every part read is still compared with it, voucher by voucher, so a count
+  that no longer describes the book refuses the call as `census_reused_mismatch` (the `cause` says how the part
+  differed), the count is dropped, and the next call counts afresh. It never lets a call answer from a count the
+  vouchers read do not match.
+- A window with no voucher is still checked by a count of its own, a day wider on each side, which is never
+  reused. A read that gives the marks itself, an import's read-back and the audit's sealed read take no held
+  count and leave none. A reused count never earns a `BracketedCount`, which no `vouchers` call uses.
+- `window.census.requests` is 0 on such a call, so `read_cost` (shown only for a slow or large census) counts
+  no census reads for it; `census_reused` says why.
+- Not established: how often a real user repeats the same window (the lab's own repeats were counted; no real
+  request trail was read), whether a Tally Gold remote user's save or a restored copy of the company moves the
+  marks at once (as for held windows above), and the saving on a real book.
+
 ### What a `vouchers` read cost (`window.read_cost`)
 
 The census a window read pays follows the book's voucher mark, not the window:
@@ -2025,8 +2050,9 @@ ends).
   voucher_window_book_too_large` and `limit_census_reads` (a mark above 2,097,152, the refusal the read
   itself makes, from the same function; no floor is given for a read that sends no census).
 - `census_reads` is **derived** from the mark and the read's own rules (`census_read_count`, which the
-  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so it sends at
-  least one census read on any book that has held a voucher; `ledger_movement` and `verify_import` send
+  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so a call that
+  counts sends at least one census read on any book that has held a voucher (a repeat of the same
+  `vouchers` question within ten minutes on unchanged marks may send none, #2399); `ledger_movement` and `verify_import` send
   none while the mark times their default voucher size fits one request (a mark of 170 or less). A
   book that has never held a voucher (no mark) sends none, and only then is the count 0.
 - `floor_seconds` is **derived from the gate's rule**, as `read_cost.floor_seconds` is, and from the

@@ -257,26 +257,26 @@ sorted position still conflict in the pin list itself. Resolve it by keeping bot
 entries (see "When the surface conflicts in a merge"); the cap is no longer part of
 it.
 
-#### What the coverage report shows
+#### What no check sees when code moves
 
-`scripts/surface_coverage_report.py` prints a surface coverage report. Run it by
-hand before opening a pull request that moves code. It never fails. Against the
-merge-base with `origin/master` (override with `--base`) it lists two things the
-gate cannot see: a pin that was dropped, and a module declared directly by a
-pinned module and newly left unpinned. Modules left unpinned before the branch
-are not reprinted, test-only modules are only counted, and feature-gated ones are
-labelled.
+A dropped pin is refused: `scripts/check-surface-ack.mjs` fails a pull request that
+removes a pin without a `removed-pin:` line, or that loses a pin one of its own
+commits added (see "What checks it"). Nothing checks that code leaving a pinned
+file stays pinned. Before opening a pull request that moves code, look for each of
+these yourself:
 
-**A clean report is not evidence that nothing left the pinned surface.** It does
-not see code moved between files that already existed; a new module declared by
-an *unpinned* module, even one carved out of a pinned file (a new file under an
-unpinned `db/mod.rs`, say); deeper descendants of a pinned module; a pinned
-file that stops being compiled; a test-only or feature-gated module becoming
-production; or a new crate root. The script's docstring keeps the full list.
+- a new module declared by a pinned module and left unpinned;
+- a new module declared by an *unpinned* module, even one carved out of a pinned
+  file (a new file under an unpinned `db/mod.rs`, say);
+- a deeper descendant of a pinned module;
+- code moved between files that already existed;
+- a pinned file that stops being compiled;
+- a test-only or feature-gated module becoming production;
+- a new crate root.
 
-Read it, then pin each listed file that decides what Bridge posts or lets leave
-the machine, and leave the rest; see the module documentation of
-`compatibility_surface_stays_whole` for the rule and bridge#416 for the reasoning.
+Pin each such file that decides what Bridge posts or lets leave the machine, and
+leave the rest; see the module documentation of `compatibility_surface_stays_whole`
+for the rule and bridge#416 for the reasoning.
 
 #### When the surface conflicts in a merge or rebase
 
@@ -745,7 +745,12 @@ every note for them first, and for maintainers second.
   both hosts. The macOS native tests run only on a master push, the daily
   scheduled run, a manual run and the version pull request (the release pull
   request, which changes the version in `src-tauri/tauri.conf.json`), never on
-  another pull request or in the merge queue. A master
+  another pull request or in the merge queue. The scope step of the same run also
+  refuses a version pull request that leaves `src-tauri/release-date.txt` as the
+  base had it, dates it before the base's day, or breaks its one-line format
+  (`scripts/check-release-date-changed.mjs`); a second release on the base's own
+  UTC day is refused too, so wait for the next day, and so is a revert of a version
+  pull request (it needs a fresh, later date). A master
   push leaves the Windows native, bundle and seam jobs out of its matrix when the merge
   queue ran them on that same commit; its job summary names the queue run. The
   macOS bundle and seam jobs run in the queue and on a push only when a
@@ -831,7 +836,9 @@ It checks every file first and writes none if one fails. Then:
    spans that name the newest published build (`managed:current-release` in
    `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
    for `managed:`), and check that the install page and the repository
-   description name the same build.
+   description name the same build. Move the `version` of `registry/server.json` in the same
+   pull request; `scripts/release-text-agreement.test.mjs` fails until the two spans and the
+   registry file name one version.
    Also update the sentences that say a tool is "in source but not in the
    0.3.0 release" in `docs/agent/README.md` (name the build that now has it),
    and the `README.md` lines that describe the published package, so no line
@@ -939,6 +946,14 @@ disagree.
   fails until each stamp names the version in `packaging/mcpb/manifest.json` and the page
   names the tools the catalog serves, so a version bump cannot merge with answers nobody
   has reread.
+  In the same pull request, move the `README.md` sentences that name the build in source:
+  "At a glance, release X.", "release X installs" and "current development source is version"
+  (the last is written by `next-version.mjs --apply`). `scripts/release-text-agreement.test.mjs`
+  fails until all three name the manifest's version. The same test holds the post-release
+  pull request to its half: the `managed:current-release` span in `README.md`, the
+  `managed:latest-preview` span in `SECURITY.md` and the `version` of `registry/server.json`
+  must name one version, the two spans must carry one date, and none may be ahead of the manifest.
+  They stay on the previous published build in the version pull request, which the test allows.
 - The install page shows this file's headings, paragraphs and bullets, so a
   claim added here is a claim on the public site. Fenced code is left out, and
   tables and quotes show as plain text. Escape nothing by hand: the renderer

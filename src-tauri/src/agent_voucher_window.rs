@@ -15,6 +15,7 @@
 //! Every estimate here is a planning figure, not a bound (§12a.8). The transport
 //! cap stays the final safeguard; this only stops Bridge from *asking* for a
 //! response it already expects to be too large.
+use super::failure_code::CensusReuseCode;
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::{DateSpan, TallyDate};
@@ -511,6 +512,213 @@ pub(super) struct WindowWitness {
     pub(super) census: Option<WindowCensus>,
 }
 
+/// How many bytes of censuses a server holds at once (#2399). A census row is a
+/// date, an AlterID and a GUID; a census above this is not held, and the read
+/// that counted it is unaffected.
+const HELD_CENSUS_MAX_BYTES: usize = 32 * 1024 * 1024;
+
+/// Memory counted for each voucher of a held census: its date entry, AlterID,
+/// GUID text and the map nodes holding them. An estimate, not a measurement.
+const HELD_CENSUS_BYTES_PER_VOUCHER: usize = 128;
+
+/// What a held census answers for (#2399): all five must equal the question.
+/// The window is exactly as sent, not a wider window narrowed, because nothing
+/// has measured Tally's date narrowing to agree between two windows.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CensusKey {
+    company_guid: String,
+    from: TallyDate,
+    to: TallyDate,
+    /// The ledger whose vouchers were counted, or `None` for the whole book.
+    ledger: Option<String>,
+    /// The census capacity, which fixes the spans a census is sent in.
+    capacity: u64,
+}
+
+impl CensusKey {
+    fn of(
+        identity: &VerifiedCompanyIdentity,
+        scope: WindowScope<'_>,
+        (from, to): (&TallyDate, &TallyDate),
+        limits: WindowReadLimits,
+    ) -> Self {
+        Self {
+            company_guid: identity.company_guid().to_ascii_lowercase(),
+            from: from.clone(),
+            to: to.clone(),
+            ledger: match scope {
+                WindowScope::Book => None,
+                WindowScope::Ledger(ledger) => Some(ledger.as_str().to_string()),
+            },
+            capacity: limits.census_capacity(),
+        }
+    }
+}
+
+/// The company marks a window read took itself, in this call (#2399). The only
+/// lookup of a held census takes one, so a census is never found by marks from
+/// an earlier call or from a caller: the field is private, the type is neither
+/// `Clone` nor stored, and [`FreshMarks::read`] is its only constructor.
+struct FreshMarks(CompanyMarks);
+
+impl FreshMarks {
+    async fn read<R: WindowReader>(
+        reader: &R,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        evidence: &mut Option<Evidence>,
+        boundary: &mut Option<DateBoundaryProfile>,
+    ) -> Result<Self, ToolFailure> {
+        read_marks(reader, identity, company, evidence, boundary)
+            .await
+            .map(Self)
+    }
+}
+
+/// A census a finished window read may leave for the next one (#2399). The
+/// only store of it takes nothing else. It is made at one place, the end of a
+/// read that counted its census in that call and then stood: every part
+/// admitted against the census by AlterID and GUID, the union admitted, and a
+/// divided read closed on its opening marks. So a partial, refused or moved
+/// census cannot be held.
+struct AdmittedCensus {
+    key: CensusKey,
+    marks: CompanyMarks,
+    census: WindowCensus,
+}
+
+impl AdmittedCensus {
+    /// `None` for a census that does not name every voucher's GUID: such a
+    /// census admits on AlterIDs alone, which a substituted voucher can pass.
+    fn of(key: CensusKey, marks: CompanyMarks, census: &WindowCensus) -> Option<Self> {
+        census.names_every_guid().then(|| Self {
+            key,
+            marks,
+            census: census.clone(),
+        })
+    }
+}
+
+struct HeldCensus {
+    key: CensusKey,
+    marks: CompanyMarks,
+    census: WindowCensus,
+    read_at: String,
+    taken: std::time::Instant,
+    bytes: usize,
+}
+
+/// The censuses of finished window reads, held for the next read of the same
+/// question while the company's two marks are unchanged (#2399). In memory
+/// only. Same lifetime as the held `vouchers` windows: dropped after the TTL,
+/// when a later census of the same key replaces it, when a mark differs at a
+/// lookup, when a read that used it was refused, when a write through this
+/// server touches the company, or when the byte cap evicts the oldest.
+pub(super) struct HeldCensuses {
+    held: Vec<HeldCensus>,
+    ttl: std::time::Duration,
+    max_bytes: usize,
+}
+
+impl Default for HeldCensuses {
+    fn default() -> Self {
+        Self {
+            held: Vec::new(),
+            ttl: super::ledgers::LISTING_SNAPSHOT_TTL,
+            max_bytes: HELD_CENSUS_MAX_BYTES,
+        }
+    }
+}
+
+impl HeldCensuses {
+    fn purge_expired(&mut self) {
+        let ttl = self.ttl;
+        self.held.retain(|held| held.taken.elapsed() < ttl);
+    }
+
+    /// The census held for `key`, when the marks `fresh` read equal the marks
+    /// it was counted at, with when it was read. A held census whose marks
+    /// differ is dropped: marks only move forward.
+    fn find(&mut self, fresh: &FreshMarks, key: &CensusKey) -> Option<(WindowCensus, String)> {
+        self.purge_expired();
+        let position = self.held.iter().position(|held| held.key == *key)?;
+        if self.held[position].marks != fresh.0 {
+            self.held.remove(position);
+            return None;
+        }
+        let held = &self.held[position];
+        Some((held.census.clone(), held.read_at.clone()))
+    }
+
+    /// Whether the census was kept: one above the byte cap is not.
+    fn hold(&mut self, admitted: AdmittedCensus) -> bool {
+        self.drop_key(&admitted.key);
+        let bytes = admitted
+            .census
+            .total()
+            .saturating_mul(HELD_CENSUS_BYTES_PER_VOUCHER as u64);
+        let bytes = usize::try_from(bytes).unwrap_or(usize::MAX);
+        if bytes > self.max_bytes {
+            return false;
+        }
+        while self.held.iter().map(|held| held.bytes).sum::<usize>() + bytes > self.max_bytes {
+            let oldest = self
+                .held
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, held)| held.taken)
+                .map(|(index, _)| index)
+                .expect("a held census while over the cap");
+            self.held.remove(oldest);
+        }
+        self.held.push(HeldCensus {
+            key: admitted.key,
+            marks: admitted.marks,
+            census: admitted.census,
+            read_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+            taken: std::time::Instant::now(),
+            bytes,
+        });
+        true
+    }
+
+    fn drop_key(&mut self, key: &CensusKey) {
+        self.purge_expired();
+        self.held.retain(|held| held.key != *key);
+    }
+
+    /// Drops every census of a company, as a write through this server does
+    /// before it returns. The marks move on a write anyway; this is the belt.
+    pub(super) fn drop_company(&mut self, company_guid: &str) {
+        self.held
+            .retain(|held| !held.key.company_guid.eq_ignore_ascii_case(company_guid));
+    }
+
+    #[cfg(test)]
+    pub(super) fn limits_for_test(&mut self, ttl: std::time::Duration, max_bytes: usize) {
+        self.ttl = ttl;
+        self.max_bytes = max_bytes;
+    }
+
+    #[cfg(test)]
+    pub(super) fn held_count(&self) -> usize {
+        self.held.len()
+    }
+}
+
+/// A census store and the question a read asks it (#2399).
+struct CensusReuse<'a> {
+    store: &'a std::sync::Mutex<HeldCensuses>,
+    key: &'a CensusKey,
+}
+
+/// When the read that counted the census a read reused finished. The read's `timings` carry it,
+/// so a reader of the answer is never told a count was taken when it was not.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub(super) struct CensusReused {
+    pub(super) read_at: String,
+}
+
 /// Proof that a window read made a corroborating second read of itself
 /// redundant (#1241): it was divided, every part was admitted against a census
 /// that names every voucher's GUID (so each part held exactly the counted
@@ -705,7 +913,9 @@ impl WindowCensus {
     }
 
     /// Every counted day falls inside `[from, to]`. A count describing days
-    /// outside the window is not a count of this window.
+    /// outside the window is not a count of this window. Used only by the
+    /// test-only [`WindowPlanSource::Counted`].
+    #[cfg(test)]
     fn within(&self, from: NaiveDate, to: NaiveDate) -> bool {
         self.days.keys().all(|day| *day >= from && *day <= to)
     }
@@ -1077,13 +1287,18 @@ pub(super) enum WindowPlanSource {
     /// marks the caller has just read itself, which saves reading them again;
     /// they open the bracket exactly as a mark read here would.
     Estimate { known_marks: Option<CompanyMarks> },
-    /// Plan from a count the caller already holds for exactly this window, and
+    /// Test-only: plan from a count the test holds for exactly this window, and
     /// send no census. See [`WindowCensus`]. No high-water mark is read, so a
     /// divided read is not bracketed: the caller answers for the count being
-    /// current. No production caller holds such a count yet; this is the
-    /// interface one would use, proven by the tests.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// current. A shipped build has no such form (#2399): a census is reused
+    /// only through [`Self::EstimateReusing`], which reads the marks itself.
+    #[cfg(test)]
     Counted(WindowCensus),
+    /// [`Self::Estimate`] with no marks given, which may take its census from
+    /// `store` when the marks it reads equal the marks the census was counted
+    /// at (#2399), and leaves the census it counts there when it stands. Refused
+    /// for a reader that seals its reads.
+    EstimateReusing(Arc<std::sync::Mutex<HeldCensuses>>),
     /// Read exactly these parts again, as a corroborating second read of a
     /// window already planned and read once. A replay of a divided read must
     /// carry that read's [`WindowWitness`]: its parts are admitted against the
@@ -1398,6 +1613,10 @@ pub(super) struct WindowReadTimings {
     pub(super) to: TallyDate,
     pub(super) marks: RequestTally,
     pub(super) census: RequestTally,
+    /// Set when the read took its census from the store instead of counting it
+    /// (#2399): `census.requests` is then 0 and this says when it was counted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) census_reused: Option<CensusReused>,
     pub(super) parts: Vec<PartTiming>,
     /// On a failed read only: the last request sent, when it failed — a
     /// deadline, a transport refusal. `None` on a read that stands, and on a
@@ -1415,6 +1634,7 @@ impl WindowReadTimings {
             to,
             marks: RequestTally::default(),
             census: RequestTally::default(),
+            census_reused: None,
             parts: Vec::new(),
             failed: None,
         }
@@ -2123,6 +2343,14 @@ where
     {
         return Err(AUDIT_WINDOW_NEEDS_ITS_OWN_MARKS.to_string().into());
     }
+    // The store and the question this read asks of it (#2399).
+    let held = match &source {
+        WindowPlanSource::EstimateReusing(store) => Some((
+            Arc::clone(store),
+            CensusKey::of(identity, scope, (from, to), limits),
+        )),
+        _ => None,
+    };
     let timed = TimedReader::new(reader, from, to);
     let read = read_voucher_window_timed(
         &timed, identity, scope, company, from, to, shape, source, limits, parse,
@@ -2131,6 +2359,23 @@ where
     let timings = timed.into_timings();
     match read {
         Ok(mut outcome) => {
+            // The one place a census is left for the next read: this read
+            // counted it itself, and it stood (every part admitted against it,
+            // the union admitted, a divided read closed on its opening marks).
+            if let (Some((store, key)), None, Some(witness)) =
+                (&held, &timings.census_reused, &outcome.witness)
+            {
+                if let Some(admitted) = witness
+                    .census
+                    .as_ref()
+                    .and_then(|census| AdmittedCensus::of(key.clone(), witness.marks, census))
+                {
+                    store
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .hold(admitted);
+                }
+            }
             // `failed` is already `None`: a read that stands ended on a request
             // that succeeded, a part or the closing marks. A part Tally could
             // not serve and the read divided is in `parts`, not in `failed`.
@@ -2138,6 +2383,22 @@ where
             Ok(outcome)
         }
         Err(mut failure) => {
+            // A read that took a held census and was refused leaves none
+            // behind. One refused for a part the census did not describe says
+            // so: the census was not current, and the next call counts afresh.
+            if let (Some((store, key)), Some(_)) = (&held, &timings.census_reused) {
+                store
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .drop_key(key);
+                // Only the census disagreement is relabelled; a row outside its
+                // part or a repeated row says Tally did not honour a filter, and
+                // keeps saying so.
+                if failure.code == PART_NOT_ADMITTED && failure.cause == Some(PART_CENSUS_MISMATCH)
+                {
+                    failure.code = CensusReuseCode::Mismatch.as_str().to_string();
+                }
+            }
             failure.window_timings = Some(Box::new(timings));
             Err(failure)
         }
@@ -2173,6 +2434,8 @@ where
     // Observed by every read this window makes, at no request of its own.
     let mut boundary: Option<DateBoundaryProfile> = None;
     let mut census = None;
+    // When the census was counted, if this read took it from the store (#2399).
+    let mut reused: Option<String> = None;
     let mut ceiling = 0;
     // How many parts may be sent before one is measured ([`first_plan`]).
     let mut unmeasured = limits.max_reads;
@@ -2213,6 +2476,7 @@ where
         }
         source => {
             let estimate = match source {
+                #[cfg(test)]
                 WindowPlanSource::Counted(counted) => {
                     if !counted.within(first, last) {
                         return Err("window_not_honoured".to_string().into());
@@ -2228,12 +2492,45 @@ where
                     (first, last),
                     known_marks,
                     limits,
+                    None,
                     &mut preflight,
                     &mut opening,
                     &mut boundary,
                 )
                 .await
                 .map_err(|failure| with_prior(failure, &preflight, &None))?,
+                WindowPlanSource::EstimateReusing(store) => {
+                    let key = CensusKey::of(identity, scope, (from, to), limits);
+                    let estimated = estimate_window_volume(
+                        reader,
+                        identity,
+                        scope,
+                        company,
+                        (from, to),
+                        (first, last),
+                        None,
+                        limits,
+                        Some((
+                            CensusReuse {
+                                store: &store,
+                                key: &key,
+                            },
+                            &mut reused,
+                        )),
+                        &mut preflight,
+                        &mut opening,
+                        &mut boundary,
+                    )
+                    .await;
+                    // Recorded before anything can refuse the plan, so a refusal
+                    // of a read that took a held census drops it and says so.
+                    if let Some(read_at) = &reused {
+                        reader.timings().census_reused = Some(CensusReused {
+                            read_at: read_at.clone(),
+                        });
+                    }
+                    estimated.map_err(|failure| with_prior(failure, &preflight, &None))?
+                }
                 WindowPlanSource::Replay { .. } => unreachable!("handled above"),
             };
             match estimate {
@@ -2465,7 +2762,11 @@ where
     // The only place a `BracketedCount` is made (#1241). A replay never earns
     // one: it is itself the second read. A reader that does not seal closes
     // only a divided read, so closing the marks is what says the read was divided.
+    // A read that took its census from the store earns none: its census was not
+    // counted by this read, so the agreement the proof rests on is not two
+    // observations of this read (#2399).
     let bracketed = (!replaying
+        && reused.is_none()
         && matches!(scope, WindowScope::Book)
         && !reader.seals_its_reads()
         && closed_on_opening_marks
@@ -2574,6 +2875,9 @@ pub(super) async fn count_window_only<R: WindowReader>(
         days,
         known_marks,
         limits,
+        // A count-only read, and so the empty-window corroboration, is given no
+        // store: a census that corroborated itself would undercount twice (#2399).
+        None,
         &mut preflight,
         &mut opening,
         &mut boundary,
@@ -2674,13 +2978,19 @@ async fn estimate_window_volume<R: WindowReader>(
     days: (NaiveDate, NaiveDate),
     known_marks: Option<CompanyMarks>,
     limits: WindowReadLimits,
+    reuse: Option<(CensusReuse<'_>, &mut Option<String>)>,
     preflight: &mut Option<Evidence>,
     observed_marks: &mut Option<CompanyMarks>,
     boundary: &mut Option<DateBoundaryProfile>,
 ) -> Result<Preflight, ToolFailure> {
-    let marks = match known_marks {
-        Some(marks) => marks,
-        None => read_marks(reader, identity, company, preflight, boundary).await?,
+    // Marks the caller gave are no `FreshMarks`, so a read given marks never
+    // finds a held census (#2399).
+    let (marks, fresh) = match known_marks {
+        Some(marks) => (marks, None),
+        None => {
+            let fresh = FreshMarks::read(reader, identity, company, preflight, boundary).await?;
+            (fresh.0, Some(fresh))
+        }
     };
     *observed_marks = Some(marks);
     let high_water = marks.vouchers();
@@ -2697,12 +3007,28 @@ async fn estimate_window_volume<R: WindowReader>(
             marks: None,
         });
     }
-    let rows = census_window(
-        reader, identity, scope, company, window, days, high_water, limits, preflight, boundary,
-    )
-    .await?;
-    let census = WindowCensus::from_census_rows(rows)
-        .ok_or_else(|| ToolFailure::from(VOLUME_UNESTIMATED.to_string()))?;
+    let held = match (reuse, &fresh) {
+        (Some((reuse, reused)), Some(fresh)) => reuse
+            .store
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .find(fresh, reuse.key)
+            .inspect(|(_, read_at)| *reused = Some(read_at.clone()))
+            .map(|(census, _)| census),
+        _ => None,
+    };
+    let census = match held {
+        Some(census) => census,
+        None => {
+            let rows = census_window(
+                reader, identity, scope, company, window, days, high_water, limits, preflight,
+                boundary,
+            )
+            .await?;
+            WindowCensus::from_census_rows(rows)
+                .ok_or_else(|| ToolFailure::from(VOLUME_UNESTIMATED.to_string()))?
+        }
+    };
     // A sealed record admits its data against the census it seals beside it,
     // even when the whole window would fit one request.
     if reader.seals_its_reads() {

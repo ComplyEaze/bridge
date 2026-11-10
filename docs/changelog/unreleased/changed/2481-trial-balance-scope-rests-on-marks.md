@@ -1,0 +1,1 @@
+- On a book with several currency masters, `trial_balance` no longer says that no ledger was left out: its headline now says that which ledgers count as base-currency rests on what Tally marked in that answer, which is not checked against the ledgers' vouchers (part of #2481).

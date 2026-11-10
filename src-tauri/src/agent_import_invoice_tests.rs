@@ -1581,6 +1581,73 @@ fn an_invoice_number_refusal_names_rule_46b_and_what_it_allows() {
     );
 }
 
+/// A control the read misses is refused naming its batch, and the refusal
+/// says what the answer held (#2162 item 13): the control's number and date as
+/// the journal stores them, the Sales rows of the answer, and whether its GUID
+/// was looked for and where it was seen. Its next step is the code's own.
+#[test]
+fn a_missing_control_refusal_says_what_the_answer_held() {
+    let refusal = |guid| {
+        InvoiceRefusal {
+            code: "invoice_number_control_missing",
+            detail: RefusalDetail::ControlMissing(Box::new(ControlMissing {
+                batch_id: "b1".to_string(),
+                number: "BP/26-27/0001".to_string(),
+                date: "20260801".to_string(),
+                miss: wire::ControlMiss {
+                    sales_rows: 3,
+                    guid,
+                },
+            })),
+        }
+        .to_json()
+    };
+    let not_recorded = refusal(None);
+    assert_eq!(not_recorded["code"], "invoice_number_control_missing");
+    assert_eq!(not_recorded["detail"], "b1");
+    assert_eq!(
+        not_recorded["control"],
+        json!({"voucher_number": "BP/26-27/0001", "date": "20260801",
+               "sales_rows_in_answer": 3, "guid_in_answer": "not_recorded"})
+    );
+    assert_eq!(
+        not_recorded["remediation"].as_str(),
+        crate::agent::refusal_remediation("invoice_number_control_missing")
+    );
+    assert!(not_recorded["remediation"].is_string());
+    assert_eq!(
+        refusal(Some(wire::GuidSeen::NotSeen))["control"]["guid_in_answer"],
+        "not_seen"
+    );
+    let seen = refusal(Some(wire::GuidSeen::Seen {
+        number: Some("BP/26-27/1".to_string()),
+        date: Some("20260801".to_string()),
+        voucher_type: Some("BRIDGE Sales".to_string()),
+    }));
+    assert_eq!(
+        seen["control"]["guid_in_answer"],
+        json!({"seen_as": {"voucher_number": "BP/26-27/1", "date": "20260801",
+                           "voucher_type": "BRIDGE Sales"}})
+    );
+}
+
+/// A date is placed in its month from the month's first day to its last, both
+/// included, for every month of a financial year; a date outside the year is
+/// in none. A control dated on a month's last day is looked for in that month.
+#[test]
+fn every_month_holds_its_first_and_last_day() {
+    let date = |text: &str| bridge_tally_core::TallyDate::parse(text).expect("a YYYYMMDD date");
+    let months = wire::calendar_months(&date("20260401"), &date("20270331")).expect("a year");
+    assert_eq!(months.len(), 12);
+    for (index, (first, last)) in months.iter().enumerate() {
+        assert_eq!(month_holding(&months, first.as_str()), Some(index));
+        assert_eq!(month_holding(&months, last.as_str()), Some(index));
+    }
+    assert_eq!(months[10].1.as_str(), "20270228");
+    assert_eq!(month_holding(&months, "20260331"), None);
+    assert_eq!(month_holding(&months, "20270401"), None);
+}
+
 #[test]
 fn the_book_size_guard_admits_at_each_bound_and_refuses_one_past_it() {
     assert_eq!(voucher_mark_refusal(Some(25_000)), None);

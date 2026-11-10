@@ -3574,6 +3574,11 @@ const PILOT_LAB_RESAVE_READBACK: &str =
      saved the invoice again unchanged, with no row here: the app crate's invoice tests \
      (src/agent_import_invoice_tests.rs) parse it with the read-back's own parser and pin what it \
      returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_NUMBER_MONTHS: &str = "a month answer of the invoice number's read of the pilot \
+     lab's financial year 2026-27 (row 2162-M1, 9 Nov 2026), with no row here: the app crate's \
+     replays (src/agent_import_post_e2e_tests.rs, src/agent_import_invoice_admission_tests.rs) \
+     feed it through the number check and pin what it decides, and src/agent_import_tests.rs \
+     pins each month's request and August's rows; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oct 2026), with no \
      row here: the app crate's replay (src/agent_import_post_e2e_tests.rs, and for the tax units \
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
@@ -3583,6 +3588,12 @@ const PILOT_LAB_W18_REPLAY: &str = "an answer of the pilot lab's W18, W18b and W
      with no row here: the app crate's HSN/SAC warning replay (src/agent_import_w18_replay_tests.rs) \
      feeds it through the build, the post and the verification and pins what each parse returns; \
      pilot-lab-w18/PROVENANCE.md says what it is";
+const PILOT_LAB_GY_COMPANY_GST: &str = "a company object answer of the pilot lab's row 2162-GY \
+     (9 Nov 2026), before and after the company's GST was turned off, a copy with the company number \
+     replaced, with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs) parses \
+     it, and its tests (src/agent_import_invoice_hsn_tests.rs and \
+     src/agent_import_invoice_admission_tests.rs) pin what each parse returns; \
+     pilot-lab-gy/PROVENANCE.md says what it is";
 const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on the Windows lab \
      (12 Oct 2026), with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs \
      and src/agent_import_invoice_wire.rs) parses it, and its tests \
@@ -4033,6 +4044,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_NUMBERING,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-08.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-09.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-empty-month.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",
         PILOT_LAB_EVIDENCE,
     ),
@@ -4055,6 +4078,15 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-vouchers-after-post.utf8.xml",
         PILOT_LAB_EVIDENCE,
+    ),
+    // Row 2162-GY's company object answers, before and after the company's GST was turned off.
+    (
+        "tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml",
+        PILOT_LAB_GY_COMPANY_GST,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml",
+        PILOT_LAB_GY_COMPANY_GST,
     ),
     // The W18 replay answers (the build's reads on the book with the four-digit ledger).
     (

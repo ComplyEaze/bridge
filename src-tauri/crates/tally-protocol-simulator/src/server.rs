@@ -34,8 +34,11 @@ const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// admissions reads the company object for the HSN/SAC check, the post reads
 /// the book again, and the endpoint queue reads the invoice's masters, the
 /// company object and the groups once more under its lock; a replay that then
-/// starts a second build runs to about 510.
-pub const MAX_SEQUENCE_REQUESTS: usize = 576;
+/// starts a second build runs to about 510. Since the invoice number is read a
+/// month at a time (twelve paired reads where there was one, bridge#2162), each
+/// of those four number reads is 66 legs longer: about 760, and 772 with the
+/// second build.
+pub const MAX_SEQUENCE_REQUESTS: usize = 1024;
 
 /// The payload of the `TimedOut` error returned when no request reached a plan
 /// within the accept deadline: `plan` is its zero-based place in a sequence of

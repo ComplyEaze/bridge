@@ -1,0 +1,1 @@
+- The `outstandings` tool's `detail` parameter text now names `open_bills` beside `bill_trail` and `unadjusted`, and says only the latter two read the company's vouchers (part of #2377).

@@ -452,6 +452,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bridge-mcpb-check"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "zip",
+]
+
+[[package]]
 name = "bridge-tally-core"
 version = "0.1.0"
 dependencies = [

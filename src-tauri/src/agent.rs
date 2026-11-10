@@ -48,6 +48,8 @@ use company::*;
 mod cash_flow;
 #[path = "agent_company_features.rs"]
 mod company_features;
+#[path = "agent_failure_code.rs"]
+mod failure_code;
 #[path = "agent_gst_status.rs"]
 mod gst_status;
 #[path = "agent_gst_uncertain.rs"]
@@ -174,6 +176,13 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufRea
 
 const SERVER_NAME: &str = "bridge-tally";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The date (YYYY-MM-DD) of the release this build belongs to, from `release-date.txt` through
+/// `build.rs`. `scripts/next-version.mjs --apply` writes it with the version. A build made between
+/// releases carries the last release's date, so its notice comes early; a computer clock running
+/// forward when `--apply` ran would delay it (#2391).
+const RELEASE_DATE: &str = env!("BRIDGE_RELEASE_DATE");
+/// A build whose date is more than this many days before the computer's date gets the notice.
+const BUILD_NOTICE_AFTER_DAYS: i64 = 60;
 const MAX_EVIDENCE_RECORDS: usize = 256;
 const SUPPORTED_PROTOCOL_VERSIONS: [&str; 2] = ["2025-06-18", "2024-11-05"];
 const PARTY_NAME_MARKER: &str = "$bridge_agent_party_name";
@@ -810,6 +819,8 @@ struct Server {
     /// answers an MCP client is built by [`Server::for_mcp`], which closes it until the user has
     /// accepted the Terms (see `agent_terms.rs`).
     terms: terms::TermsGate,
+    /// Whether this session has already been given `tally_status`'s build notice (#2391).
+    build_notice_sent: std::sync::atomic::AtomicBool,
 }
 
 struct ToolOutcome {
@@ -1230,6 +1241,12 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
 struct RowCounts {
     returned: u64,
     counted: u64,
+}
+
+impl From<failure_code::FailureCode> for ToolFailure {
+    fn from(code: failure_code::FailureCode) -> Self {
+        Self::from(code.as_str().to_string())
+    }
 }
 
 impl From<String> for ToolFailure {
@@ -2281,6 +2298,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              details in Tally, and the date they apply from, then build again. Do not change \
              the invoice's date or figures to get past this.",
         ),
+        "invoice_company_gst_off" => Some(
+            "GST is turned off for this company in Tally, and ComplyEaze Bridge does not \
+             post a sale into a company with GST off. Nothing was written to Tally. Tell \
+             the user, and ask them to confirm that this is the right company. Whether GST \
+             should be on for it is the user's decision, made in Tally, not yours. Do not \
+             record the sale another way to get past this.",
+        ),
+        "invoice_company_gst_unstated" => Some(
+            "Tally's answer about the company did not say whether GST is on for it, so \
+             ComplyEaze Bridge cannot issue a tax invoice in it. Nothing was written to Tally. \
+             Check that the company is still open in Tally, then build again; if it repeats, \
+             report it rather than retrying.",
+        ),
         "invoice_company_registration_unread" | "invoice_tax_unit_without_guid" => Some(
             "Tally's answer about the company's GST registrations could not be read: it \
              listed no tax unit at all, or a unit without its identifier. Nothing was \
@@ -2573,7 +2603,13 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
              did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
              and on that book a read sent straight after was refused for time as well. Do not \
              repeat the same call, and do not send another read of this company straight away: \
-             tell the user, wait, then call `tally_status` once, and go on only when it answers. On \
+             tell the user, wait, then call `tally_status` once, and go on only when it answers. If the user needs one party's \
+             outstanding at this date, ask them, and once it answers call `outstandings` with \
+             that `party`, the same `as_of` and `detail` `open_bills`: that reads the party's \
+             bills through Tally's Ledger Outstandings report, not this one, beside the book's \
+             list of ledgers, and gives no total for the whole book (on that book, sent directly \
+             and not through ComplyEaze Bridge, that report answered for each of its three \
+             largest parties in about a second). On \
              that book an earlier `as_of`, with fewer bills open, answered; whether one does here \
              depends on how many bills were open then, and choosing it is the user's call.",
         ),
@@ -2844,6 +2880,7 @@ impl Server {
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
+            build_notice_sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

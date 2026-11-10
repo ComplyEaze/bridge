@@ -89,11 +89,11 @@ jobs:
           # Packaging paths: src-tauri/tauri.conf.json, src-tauri/icons/, src-tauri/build.rs (it copies the bundled legal
           # files), LICENSE, NOTICE, THIRD_PARTY_LICENSES.txt, THIRD_PARTY_LICENSES_RUST.txt, packaging/ (the MCPB manifest
           # and the PDFium lock), package.json (the Tauri CLI and its build script), this workflow, and the scripts the
-          # bundle job runs: fetch-pdfium, capture-package-log, check-mcpb-bundle, package-mcpb, check-license-metadata,
+          # bundle job runs: fetch-pdfium, capture-package-log, package-mcpb, check-license-metadata,
           # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests. Also what
           # pins the bundler and the build: pnpm-lock.yaml, .node-version, rust-toolchain.toml, .cargo/ and
-          # src-tauri/Cargo.lock, Cargo.toml and .cargo/, and the Rust port of check-mcpb-bundle in src-tauri/examples/.
-          packaging_paths='^(\.github/workflows/ci\.yml$|packaging/|package\.json$|pnpm-lock\.yaml$|\.node-version$|rust-toolchain\.toml$|\.cargo/|src-tauri/(tauri\.conf\.json$|icons/|build\.rs$|Cargo\.(lock|toml)$|\.cargo/|examples/check_mcpb_bundle\.rs$)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$)'
+          # src-tauri/Cargo.lock, Cargo.toml and .cargo/, and the MCPB bundle check in src-tauri/crates/bridge-mcpb-check/.
+          packaging_paths='^(\.github/workflows/ci\.yml$|packaging/|package\.json$|pnpm-lock\.yaml$|\.node-version$|rust-toolchain\.toml$|\.cargo/|src-tauri/(tauri\.conf\.json$|icons/|build\.rs$|Cargo\.(lock|toml)$|\.cargo/|crates/bridge-mcpb-check/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$)'
 
           # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready
           # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this
@@ -177,6 +177,10 @@ jobs:
           }
           release=false
           if [[ -n "$base" && ! "$base" =~ ^0+$ && "$(version_at "$base")" != "$(version_at "$GITHUB_SHA")" ]]; then release=true; fi
+          # A release pull request must also move src-tauri/release-date.txt (#2416): the script refuses a file that is missing,
+          # not one real YYYY-MM-DD line, the same as the base's, or an earlier day. It exits 2 when git cannot be read, which
+          # also fails this step: neither is a pass.
+          if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"; fi
           if [[ "$release" == true ]]; then
             echo "native_os=$both" >> "$GITHUB_OUTPUT"
           else
@@ -204,7 +208,7 @@ jobs:
             echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
-          if [[ "$draft" == false ]] && grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|examples/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
+          if [[ "$draft" == false ]] && grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|examples/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
@@ -436,7 +440,9 @@ jobs:
       - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
       - run: node --test scripts/fetch-pdfium.test.mjs
       - run: node --test scripts/check-ai-attribution.test.mjs
-      # merge-gate.test.py takes about 6.5 of this job's 7.5 minutes and tests the merge gate and what it reads. A
+      # merge-gate.test.py tests the merge gate and what it reads. In one process it took about 475 s of this job's 550 s,
+      # so shard-unittest.py runs it in four processes side by side (a public repository's Linux runner has four cores).
+      # It fails unless each process ran exactly the tests assigned to it, none skipped, so every test still runs once. A
       # pull request that changes nothing under scripts/, .github/ or docs/tally/compatibility/ (or the Node version
       # and attributes files) skips it; the merge queue, a push to master, the nightly run and a manual
       # run always run it, so a break the filter missed is caught before it lands. A diff that cannot be read fails
@@ -454,8 +460,7 @@ jobs:
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - if: steps.merge-gate-scope.outputs.run == 'true'
-        run: python3 scripts/merge-gate.test.py
-      - run: python3 scripts/surface_coverage_report.test.py
+        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4
 
   tally-portable:
     name: Tally portable core
@@ -637,6 +642,18 @@ jobs:
       # passes; here the pinned build is fetched, verified against the SHA-256
       # in packaging/pdfium/pdfium.lock.json before extraction, and the ignored
       # tests are run on their own. Without the variable they fail, not skip.
+      # The archive is restored from a cache that only the pdfium-cache job writes, so once an entry exists a release-host
+      # outage does not fail this job (a run before the first save, or after a new pin, still downloads). The cache is
+      # untrusted storage and the digest check is the whole protection: fetch-pdfium.mjs checks a kept copy's byte count
+      # and SHA-256 against the lock like a download and downloads again when it differs. On a master push a copy of the
+      # pinned size with another digest also fails the step (--strict-cache), because that is not damage in transit.
+      # The key has no fallback prefix and holds the platform and the lock's hash; to drop a bad entry, delete it
+      # (gh cache delete) or raise the -v1 in the key.
+      - name: Restore the PDFium archive
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
       - name: Fetch pinned PDFium
         if: matrix.shard == 1
         shell: bash
@@ -644,6 +661,7 @@ jobs:
           node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/pdfium" --github-env "$GITHUB_ENV"
+          --cache-dir "$RUNNER_TEMP/pdfium-archive" ${{ github.event_name == 'push' && '--strict-cache' || '' }}
       # Nine tests, selected on the workspace build above and run on both systems: in
       # bridge-bank-statement's pdf_tests, a_union_bank_statement_reads_one_row_per_line,
       # an_owner_password_only_statement_opens_with_its_owner_password,
@@ -843,12 +861,18 @@ jobs:
       # parse_bank_statement loads PDFium from beside bridge_mcp, so the bundle
       # carries the pinned build. fetch-pdfium.mjs verifies the archive, the
       # library and the licence notice it writes against the lock before use.
+      - name: Restore the PDFium archive
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
       - name: Fetch pinned PDFium for the MCPB
         shell: bash
         run: >-
           node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/mcpb-pdfium"
+          --cache-dir "$RUNNER_TEMP/pdfium-archive" ${{ github.event_name == 'push' && '--strict-cache' || '' }}
       # tauri build uses --bins, including the auto-discovered bridge_mcp.
       # Stage that fresh release binary instead of rebuilding without Tauri's
       # custom-protocol feature and native build environment.
@@ -879,22 +903,11 @@ jobs:
       - name: Exercise the packaged MCPB stdio server
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            python_command=python
-          else
-            python_command=python3
-          fi
-          "$python_command" scripts/check-mcpb-bundle.test.py
-          "$python_command" scripts/check-mcpb-bundle.py src-tauri/target/release/bundle/bridge-tally.mcpb --output src-tauri/target/release/bundle/mcpb-smoke.json
-          # bridge#1810: the Rust port runs the same checks on the same bundle, and its report must equal the
-          # Python's byte for byte before the Python is retired. It is written outside the uploaded folder.
-          # Built, then started directly, so the server it starts sees no environment cargo would add.
-          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --example check_mcpb_bundle
-          "src-tauri/target/release/examples/check_mcpb_bundle${{ runner.os == 'Windows' && '.exe' || '' }}" src-tauri/target/release/bundle/bridge-tally.mcpb --output "$RUNNER_TEMP/mcpb-smoke-rust.json"
-          if ! cmp src-tauri/target/release/bundle/mcpb-smoke.json "$RUNNER_TEMP/mcpb-smoke-rust.json"; then
-            diff src-tauri/target/release/bundle/mcpb-smoke.json "$RUNNER_TEMP/mcpb-smoke-rust.json" || true
-            exit 1
-          fi
+          # The check is a cargo example in its own package; src-tauri/crates/bridge-mcpb-check/tests/ tests it in
+          # the native job. Built after the bundle is packed, then started directly, so the server it starts sees
+          # no environment cargo would add.
+          cargo build --locked --release --manifest-path src-tauri/Cargo.toml -p bridge-mcpb-check --example check_mcpb_bundle
+          "src-tauri/target/release/examples/check_mcpb_bundle${{ runner.os == 'Windows' && '.exe' || '' }}" src-tauri/target/release/bundle/bridge-tally.mcpb --output src-tauri/target/release/bundle/mcpb-smoke.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: unsigned-bundle-smoke-${{ matrix.os }}
@@ -1064,6 +1077,46 @@ jobs:
           node src-tauri/crates/bridge-tax-audit/parity/mutations.mjs --verify
           --changed-since "$BASE_SHA" --nightly-issues "$RUNNER_TEMP/nightly-issues.txt"
 
+  pdfium-cache:
+    name: Keep the PDFium archive (${{ matrix.os }})
+    # The only job that writes the archive cache: a small job that builds nothing and runs no dependency's script, so
+    # nothing can alter the file between its check and its save, and one writer means no two jobs race on a key. Only
+    # a push to master, a manual run or the nightly run writes (a pull-request or merge-queue run restores only). It
+    # is skipped for a pull request and in the merge queue, where required-checks accepts that, so it cannot hold a
+    # merge; a failure here (a kept copy with the pinned size and another digest, or an archive that could not be kept)
+    # turns the master run's Required checks red for whoever watches it.
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Restore the PDFium archive
+        id: pdfium-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
+      - name: Fetch pinned PDFium into the cache directory
+        shell: bash
+        run: >-
+          node scripts/fetch-pdfium.mjs
+          --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
+          --dest "$RUNNER_TEMP/pdfium" --cache-dir "$RUNNER_TEMP/pdfium-archive" --strict-cache
+      - name: Save the PDFium archive
+        if: ${{ steps.pdfium-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/pdfium-archive
+          key: pdfium-archive-v1-${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}-${{ hashFiles('packaging/pdfium/pdfium.lock.json') }}
+
   required-checks:
     # A draft-scoped run posts `Required checks (draft)`, which no ruleset requires, never `Required checks`: its
     # green means the heavy jobs were skipped on purpose, and must not stand in for the ready run's gate on the same
@@ -1078,9 +1131,10 @@ jobs:
     # outside their paths and a reused master push set it 'false'): each must
     # succeed then and be skipped otherwise, so a job that should have run and
     # did not fails this job. compiler-cache-retention runs on master only and
-    # may be skipped. A failure or cancellation fails every rule.
+    # pdfium-cache on a push, a manual or a scheduled run only; either may be
+    # skipped. A failure or cancellation fails every rule.
     if: ${{ always() }}
-    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
+    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations, pdfium-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -1111,6 +1165,7 @@ jobs:
             ['seam-control', { kind: 'scope', output: 'bundle' }],
             ['tax-audit-mutations', { kind: 'scope', output: 'tax_audit' }],
             ['compiler-cache-retention', { kind: 'optional' }],
+            ['pdfium-cache', { kind: 'optional' }],
           ]);
           const RESULTS = new Set(['success', 'failure', 'cancelled', 'skipped']);
           const needs = JSON.parse(process.env.NEEDS_JSON);

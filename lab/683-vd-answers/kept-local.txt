@@ -1,0 +1,11 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+evidence/8-data-after-restore.txt 1257 B afa745528205c98c4ffa18ff858fbb4aa0495da75f4dd1d24d5c374c2d42b067 (Tally data folder or backup folder listing)
+evidence/8-data-before-restore.txt 1744 B 04f6103978a1841c40cb3ec68c7942324e46a974e59b26b0b200c3f2b28a2644 (Tally data folder or backup folder listing)
+evidence/bk-before-listing.txt 109 B f36de46d2f60ff52e1254c1c64913d4ddc5e4fce3ff37bdc5d76a94d27c6d612 (Tally data folder or backup folder listing)
+evidence/c10-netstat.txt 34879 B 14de6c06540e6599702718a78d8582128125f3eb4a417ddeddaa0bf185a62c1f (process or port listing)
+evidence/c10-tasklist.txt 53 B db140abc143bcac010e963fd591378dca0ced8f6e65c8a853651a62589ff0eda (process or port listing)
+evidence/s0-netstat.txt 8364 B 3fb4d4a3457deefd5ded7c4458cc03d262f75af24817729c93848481e961e294 (process or port listing)
+evidence/s0-tasklist.txt 53 B efdd6dc66e12ffd0c094dbddc2c31d981bf186bad86c7e381fe61bfb74776d68 (process or port listing)
+restore-plan-8.txt 861 B 0e4d99bd71ea9d5916233e49463c8fe9c2e8cbb152ea09443c90ea1410227e9f (a restore plan, written before the shut; it names the company number; restore-plan.txt is equal to restore-plan-8.txt)
+restore-plan.txt 861 B 0e4d99bd71ea9d5916233e49463c8fe9c2e8cbb152ea09443c90ea1410227e9f (a restore plan, written before the shut; it names the company number; restore-plan.txt is equal to restore-plan-8.txt)
+stage-683vd.py 12513 B 45f948a816f2136b7fbaf756bd90e813bf8d2bafb3b3c24417f47e38e0dd14dc (this stage script: its patterns name the lab paths)

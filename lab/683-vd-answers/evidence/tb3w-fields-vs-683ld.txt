@@ -1,0 +1,10 @@
+$ python -I tb.py on a-ldtb3 (row 683-LD's tb3, tb-ldtb3.txt) and this row's tb3w (tb-tb3w.txt); each line: (ledger, field) row 683-LD's value and class -> tb3w's
+('BRIDGE Import Purchases', 'CREDITTOTALS') ('0.00', 'PLAIN') -> ('', 'EMPTY')
+('BRIDGE Import Purchases', 'DEBITTOTALS') ('-17400.00', 'PLAIN') -> ('-$200.00 @ ₹ 86/$ = -₹ 17400.00', 'COMPOSITE')
+('BRIDGE Import Purchases', 'TBALCLOSING') ('-17400.00', 'PLAIN') -> ('-$200.00 @ ₹ 86/$ = -₹ 17400.00', 'COMPOSITE')
+('BRIDGE Import Purchases', 'class') PLAIN -> MIXED
+('BRIDGE Lab Bank', 'CREDITTOTALS') ('17500.00', 'PLAIN') -> ('$200.00 @ ₹ 87/$ = ₹ 17500.00', 'COMPOSITE')
+('BRIDGE Lab Bank', 'DEBITTOTALS') ('-96700.00', 'PLAIN') -> ('-$1100.00 @ ₹ 87/$ = -₹ 96700.00', 'COMPOSITE')
+('BRIDGE Lab Bank', 'TBALCLOSING') ('-79200.00', 'PLAIN') -> ('-$900.00 @ ₹ 88/$ = -₹ 79200.00', 'COMPOSITE')
+('BRIDGE Lab Bank', 'class') PLAIN -> MIXED
+fields differing: 8 of 40

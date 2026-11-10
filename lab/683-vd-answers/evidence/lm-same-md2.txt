@@ -1,0 +1,8 @@
+a-m1-M-marks.xml: HEADER/STATUS 1
+  COMPANY rows: 1
+  GUID 1bb48be5-baba-45b2-90d8-7593244915a9 (the book's: yes) ALTVCHID 13 ALTMSTID 214
+a-md2-M-marks.xml: HEADER/STATUS 1
+  COMPANY rows: 1
+  GUID 1bb48be5-baba-45b2-90d8-7593244915a9 (the book's: yes) ALTVCHID 13 ALTMSTID 214
+SAME MARKS
+exit 0

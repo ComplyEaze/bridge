@@ -19,9 +19,9 @@
 //! headline: the headline types hold counts, dates and enums, and one
 //! [`CompanyName`].
 use super::*;
+use crate::reports::statements::{Established, NotEstablishedReason};
 // Characters that draw nothing but can change how the text around them reads: the same test
 // company names are shown by (#2449).
-use crate::reports::statements::{Established, NotEstablishedReason};
 use bridge_tally_protocol::xml_read_profiles::is_invisible_format;
 use serde::Deserialize;
 

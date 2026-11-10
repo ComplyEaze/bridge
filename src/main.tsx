@@ -59,7 +59,6 @@ import {
 } from "./tally-mirror-contract";
 import "./styles.css";
 
-
 type TallyProbeResult = {
   review_id: string;
   canonical_origin: string;

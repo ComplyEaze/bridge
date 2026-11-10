@@ -1,4 +1,6 @@
 package.json
+scripts/tally-setup-safety.test.mjs
+scripts/ux1-shell.test.mjs
 src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
 src-tauri/src/agent_company.rs
 src-tauri/src/agent_headline.rs

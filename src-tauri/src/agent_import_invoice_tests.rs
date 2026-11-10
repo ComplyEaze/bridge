@@ -1020,6 +1020,16 @@ fn the_registration_tally_filed_the_invoice_under_is_read_back() {
             "{other}"
         );
     }
+    // The declared limit: a second registration in the company's recorded state
+    // is not told apart. A valid GSTIN of that state other than the company's
+    // own, under another unit name, reads with no difference.
+    let same_state = xml
+        .replace(&gstin, "<CMPGSTIN>08ZZZZZ0000Z2ZP</CMPGSTIN>")
+        .replace(
+            unit,
+            "<GSTREGISTRATION TYPE=\"String\">Second Unit</GSTREGISTRATION>",
+        );
+    assert_eq!(differences(&v, &same_state), Vec::<String>::new());
     // Only the company's recorded state is the measure: the same answer for an
     // invoice the build recorded under Maharashtra differs.
     let mut maharashtra = v.clone();

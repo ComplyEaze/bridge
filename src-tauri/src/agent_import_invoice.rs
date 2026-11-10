@@ -12,6 +12,7 @@
 //! (never from a ledger's name: duty heads, reserved groups), the arithmetic,
 //! and the rendering. The reads that fill `LedgerFacts` belong to the build.
 
+use super::super::failure_code::InvoiceItemLineCode;
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
 use crate::tally::approved_import::{
     ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheckInput, InvoiceReadPlan,
@@ -1499,15 +1500,75 @@ fn invoice_readback_differences(
     }
     // Each sales line names the HSN/SAC Tally used and the kind of master it
     // took it from (§9.16); the code itself is not judged here.
-    if sales_legs(observed, read).any(|leg| !leg.hsn.resolved()) {
+    if sales_legs(observed, read).any(|leg| !leg.line_hsn().resolved()) {
         diffs.push("invoice_line_hsn_unresolved".to_string());
     }
+    diffs.extend(
+        item_line_differences(read)
+            .into_iter()
+            .map(|code| code.as_str().to_string()),
+    );
     diffs.extend(
         gst_status_differences(&read.fields)
             .into_iter()
             .map(|difference| difference.code().to_string()),
     );
     diffs
+}
+
+/// What differs about the stock items Tally holds under the invoice's legs,
+/// each code once, in a fixed order. The build sends no item line yet
+/// (#1379), so any item is stored other than sent. Each item is also held to
+/// the one form row 1379-IT measured: an amount-only line, whose side and
+/// amount are its leg's, with no rate or quantity, and one batch allocation
+/// naming a godown and a batch for its amount (on that book, its one godown
+/// and `Primary Batch`, which Tally added). The item's name and godown are not
+/// compared: nothing the build sends names them yet.
+fn item_line_differences(read: &wire::ReadInvoice) -> Vec<InvoiceItemLineCode> {
+    let text = |value: &wire::EntryText| match value {
+        wire::EntryText::Text(text) => Some(text.clone()),
+        wire::EntryText::Absent | wire::EntryText::Empty => None,
+    };
+    let mut found = Vec::new();
+    for leg in &read.legs {
+        let item = match &leg.items {
+            wire::LegItems::None => continue,
+            wire::LegItems::Several => {
+                found.push(InvoiceItemLineCode::NotSent);
+                found.push(InvoiceItemLineCode::Several);
+                continue;
+            }
+            wire::LegItems::One(item) => item,
+        };
+        found.push(InvoiceItemLineCode::NotSent);
+        let amount = text(&item.amount).and_then(|amount| signed_paise(&amount));
+        let quantified = [&item.rate, &item.actual_qty, &item.billed_qty]
+            .iter()
+            .any(|value| text(value).is_some());
+        if amount.is_none()
+            || amount != signed_paise(&leg.amount)
+            || text(&item.deemed_positive) != leg.deemed_positive
+            || quantified
+        {
+            found.push(InvoiceItemLineCode::Differs);
+        }
+        let batch_ok = matches!(
+            item.batches.as_slice(),
+            [(Some(_), Some(_), batch)] if amount.is_some() && signed_paise(batch) == amount
+        );
+        if !batch_ok {
+            found.push(InvoiceItemLineCode::Batch);
+        }
+    }
+    [
+        InvoiceItemLineCode::NotSent,
+        InvoiceItemLineCode::Several,
+        InvoiceItemLineCode::Differs,
+        InvoiceItemLineCode::Batch,
+    ]
+    .into_iter()
+    .filter(|code| found.contains(code))
+    .collect()
 }
 
 /// The read-back's legs on the ledgers the build classified as sales lines.
@@ -1545,11 +1606,11 @@ fn sales_line_evidence(
         .map(|leg| {
             serde_json::json!({
                 "ledger": super::super::party_name(leg.ledger.as_str()),
-                "hsn_code": text(&leg.hsn.code),
-                "hsn_source_type": text(&leg.hsn.source_type),
-                "hsn_ledger_source": name(&leg.hsn.ledger_source),
-                "hsn_group_source": name(&leg.hsn.group_source),
-                "hsn_resolved": leg.hsn.resolved(),
+                "hsn_code": text(&leg.line_hsn().code),
+                "hsn_source_type": text(&leg.line_hsn().source_type),
+                "hsn_ledger_source": name(&leg.line_hsn().ledger_source),
+                "hsn_group_source": name(&leg.line_hsn().group_source),
+                "hsn_resolved": leg.line_hsn().resolved(),
             })
         })
         .collect()

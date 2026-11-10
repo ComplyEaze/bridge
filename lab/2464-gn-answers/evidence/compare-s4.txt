@@ -1,0 +1,10 @@
+== count19.py --type "BRIDGE Sales" --type-diff a-46bs4-T-types.xml a-s4-T-types.xml
+== --type-diff a-46bs4-T-types.xml a-s4-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 0 leaves differ
+exit 0
+== count19.py --unit-diff a-46bs4-U-taxunits.xml a-s4-U-taxunits.xml
+== --unit-diff a-46bs4-U-taxunits.xml a-s4-U-taxunits.xml: TAXUNIT names ['Default Tax Unit', 'Maharashtra Registration', 'Rajasthan Registration'] -> ['Default Tax Unit', 'Maharashtra Registration', 'Rajasthan Registration']
+   unit 'Default Tax Unit': 0 leaves differ
+   unit 'Maharashtra Registration': 0 leaves differ
+   unit 'Rajasthan Registration': 0 leaves differ
+exit 0

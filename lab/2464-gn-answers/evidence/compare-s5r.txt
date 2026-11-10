@@ -1,0 +1,14 @@
+== count19.py --diff a-s5r-R-0095.xml a-s5r-RC-0095.xml
+--diff needs one VOUCHER row in each: 0, 0
+exit 1
+== count19.py --diff a-s2-V-0010.xml a-s5r-V-0010.xml
+== --diff a-s2-V-0010.xml a-s5r-V-0010.xml
+   lists compared: 2
+   legs: 0 -> 0
+exit 0
+--- the DESC/CMPINFO counters of a-s2-V-0010.xml against a-s5r-V-0010.xml (every line that differs; 788 lines each)
+line 11 <LEDGER>0</LEDGER> -> <LEDGER>7</LEDGER>
+line 18 <VOUCHERTYPE>0</VOUCHERTYPE> -> <VOUCHERTYPE>1</VOUCHERTYPE>
+line 39 <TAXUNIT>0</TAXUNIT> -> <TAXUNIT>2</TAXUNIT>
+line 42 <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES> -> <VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>
+46b's a-s5r-V-0010.xml and a-s5r-V-0091.xml (after its import) read LEDGER 7, VOUCHERTYPE 1, TAXUNIT 1, VOUCHERNUMBERSERIES 1; its s2 and s6 read 0 in each.

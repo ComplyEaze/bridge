@@ -1,0 +1,16 @@
+== count19.py --diff a-s7r-R-0097.xml a-s7r-RC-0097.xml
+--diff needs one VOUCHER row in each: 0, 0
+exit 1
+== count19.py --diff a-s5r-V-0095.xml a-s7r-V-0095.xml
+--diff needs one VOUCHER row in each: 0, 0
+exit 1
+== count19.py --diff a-s2-V-0010.xml a-s7r-V-0010.xml
+== --diff a-s2-V-0010.xml a-s7r-V-0010.xml
+   lists compared: 2
+   legs: 0 -> 0
+exit 0
+s5r-V-0010 against s7r-V-0010: lines a=788, b=788; the lines that differ (line number, a, b): [(11, '<LEDGER>7</LEDGER>', '<LEDGER>14</LEDGER>'), (39, '<TAXUNIT>2</TAXUNIT>', '<TAXUNIT>3</TAXUNIT>'), (42, '<VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>', '<VOUCHERNUMBERSERIES>2</VOUCHERNUMBERSERIES>')]
+s5r-V-0095 against s7r-V-0095: lines a=50, b=50; the lines that differ (line number, a, b): [(11, '<LEDGER>7</LEDGER>', '<LEDGER>14</LEDGER>'), (39, '<TAXUNIT>2</TAXUNIT>', '<TAXUNIT>3</TAXUNIT>'), (42, '<VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>', '<VOUCHERNUMBERSERIES>2</VOUCHERNUMBERSERIES>')]
+s5r-M-marks against s7r-M-marks: lines a=56, b=56; the lines that differ (line number, a, b): [(11, '<LEDGER>7</LEDGER>', '<LEDGER>14</LEDGER>'), (39, '<TAXUNIT>2</TAXUNIT>', '<TAXUNIT>3</TAXUNIT>'), (42, '<VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>', '<VOUCHERNUMBERSERIES>2</VOUCHERNUMBERSERIES>')]
+s2-V-0010 against s7r-V-0010: lines a=788, b=788; the lines that differ (line number, a, b): [(11, '<LEDGER>0</LEDGER>', '<LEDGER>14</LEDGER>'), (18, '<VOUCHERTYPE>0</VOUCHERTYPE>', '<VOUCHERTYPE>1</VOUCHERTYPE>'), (39, '<TAXUNIT>0</TAXUNIT>', '<TAXUNIT>3</TAXUNIT>'), (42, '<VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>', '<VOUCHERNUMBERSERIES>2</VOUCHERNUMBERSERIES>')]
+(the lines above, from a line-by-line compare: every line that differs, all in DESC/CMPINFO)

@@ -1,0 +1,2 @@
+BRIDGE PILOT LAB: folder <N>, GUID hits 2, excluded GUID hits 0
+folders named so: 1

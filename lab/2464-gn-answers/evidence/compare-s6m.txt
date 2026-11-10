@@ -1,0 +1,13 @@
+== count19.py --type-diff a-s4-T-types.xml a-s6m-T-types.xml
+== --type-diff a-s4-T-types.xml a-s6m-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 0 leaves differ
+exit 0
+== count19.py --unit-diff a-s4-U-taxunits.xml a-s6m-U-taxunits.xml
+== --unit-diff a-s4-U-taxunits.xml a-s6m-U-taxunits.xml: TAXUNIT names ['Default Tax Unit', 'Maharashtra Registration', 'Rajasthan Registration'] -> ['Default Tax Unit', 'Maharashtra Registration', 'Rajasthan Registration']
+   unit 'Default Tax Unit': 0 leaves differ
+   unit 'Maharashtra Registration': 0 leaves differ
+   unit 'Rajasthan Registration': 0 leaves differ
+exit 0
+T-types: lines a=4445, b=4445; the lines that differ (line number, a, b): [(11, '<LEDGER>0</LEDGER>', '<LEDGER>7</LEDGER>'), (39, '<TAXUNIT>1</TAXUNIT>', '<TAXUNIT>2</TAXUNIT>'), (42, '<VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>', '<VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>')]
+U-taxunits: lines a=447, b=447; the lines that differ (line number, a, b): [(11, '<LEDGER>0</LEDGER>', '<LEDGER>7</LEDGER>'), (39, '<TAXUNIT>1</TAXUNIT>', '<TAXUNIT>2</TAXUNIT>'), (42, '<VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>', '<VOUCHERNUMBERSERIES>1</VOUCHERNUMBERSERIES>')]
+(the lines above, from a line-by-line compare: every line that differs between a-s4 and a-s6m, all in DESC/CMPINFO)

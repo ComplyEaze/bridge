@@ -1,0 +1,6 @@
+08:25:35	N-0095.xml	a-s5r-N-0095.xml	curl 0	3022 bytes
+08:25:35	R-0095.xml	a-s5r-R-0095.xml	curl 0	3022 bytes
+08:25:36	RC-0095.xml	a-s5r-RC-0095.xml	curl 0	3022 bytes
+08:25:36	V-0095.xml	a-s5r-V-0095.xml	curl 0	3022 bytes
+08:25:36	V-0010.xml	a-s5r-V-0010.xml	curl 0	52784 bytes
+08:25:36	M-marks.xml	a-s5r-M-marks.xml	curl 0	3394 bytes

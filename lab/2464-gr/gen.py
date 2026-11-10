@@ -2,13 +2,13 @@
 # gen.py: writes the requests of row 2464-GR beside this file, UTF-16LE with a BOM, as sent. It starts from files
 # beside it that are byte-equal to earlier rows' (ROW.md says which), and changes only what each line below names.
 # Every change is asserted to occur exactly as often as expected, and each template's sha256 is checked first.
-#   I-0041.xml   template-import-0010.utf16le.xml (the build's request that created BP/26-27/0010) with the number
-#                BP/26-27/0041 (VOUCHERNUMBER and REFERENCE) and the REMOTEID tail 0941. An edit of a captured
+#   I-0091.xml   template-import-0010.utf16le.xml (the build's request that created BP/26-27/0010) with the number
+#                BP/26-27/0091 (VOUCHERNUMBER and REFERENCE) and the REMOTEID tail 0991. An edit of a captured
 #                request, as row 2162-HS's I-0072.xml was; it names no registration, as the build's never does.
-#   N-0041.xml   the number read (template-n-0001.utf16le.xml) with the number BP/26-27/0041.
-#   R-0041.xml   the build's read-back (R-0010.xml) with the number BP/26-27/0041.
+#   N-0091.xml   the number read (template-n-0001.utf16le.xml) with the number BP/26-27/0091.
+#   R-0091.xml   the build's read-back (R-0010.xml) with the number BP/26-27/0091.
 #   V-0010.xml   template-full-0057.utf16le.xml (row 2162-RS's V-0057.xml: every native field of the one voucher
-#   V-0041.xml   holding the number) with the number BP/26-27/0010, and with BP/26-27/0041.
+#   V-0091.xml   holding the number) with the number BP/26-27/0010, and with BP/26-27/0091.
 # Example: python3 -I gen.py
 import hashlib
 import pathlib
@@ -33,18 +33,18 @@ def swap(text, old, new, count):
     return text.replace(old, new)
 
 invoice = load("template-import-0010.utf16le.xml")
-invoice = swap(invoice, ">BP/26-27/0010<", ">BP/26-27/0041<", 2)
-invoice = swap(invoice, "00000000-0000-4000-8000-000000000777", "00000000-0000-4000-8000-000000000941", 1)
+invoice = swap(invoice, ">BP/26-27/0010<", ">BP/26-27/0091<", 2)
+invoice = swap(invoice, "00000000-0000-4000-8000-000000000777", "00000000-0000-4000-8000-000000000991", 1)
 for word in ("GSTREGISTRATION>", "CMPGSTIN", "CMPGSTSTATE"):
     assert word not in invoice, f"the import names {word}"
-save("I-0041.xml", invoice)
+save("I-0091.xml", invoice)
 
 number = load("template-n-0001.utf16le.xml")
-save("N-0041.xml", swap(number, '"BP/26-27/0001"', '"BP/26-27/0041"', 1))
+save("N-0091.xml", swap(number, '"BP/26-27/0001"', '"BP/26-27/0091"', 1))
 
 readback = load("R-0010.xml")
-save("R-0041.xml", swap(readback, '"BP/26-27/0010"', '"BP/26-27/0041"', 1))
+save("R-0091.xml", swap(readback, '"BP/26-27/0010"', '"BP/26-27/0091"', 1))
 
 full = load("template-full-0057.utf16le.xml")
 save("V-0010.xml", swap(full, '"BP/26-27/0057"', '"BP/26-27/0010"', 1))
-save("V-0041.xml", swap(full, '"BP/26-27/0057"', '"BP/26-27/0041"', 1))
+save("V-0091.xml", swap(full, '"BP/26-27/0057"', '"BP/26-27/0091"', 1))

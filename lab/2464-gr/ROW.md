@@ -1,6 +1,6 @@
 # Row 2464-GR: in a book with two GST registrations, which registration does Tally give an imported Sales invoice that names none, when its voucher type is bound to one?
 
-Not for merge. For #2464 (0.9.0: issue a Sales invoice under the registration the voucher type is bound to), related to #2162 (ADR 0004, slice 1, the "Not changed" bullet) and #2467. Written 10 Nov 2026. Two master changes on Tally's screen and one import, then a restore from the row's own backup. Confidence of everything here until the row runs: unverified.
+Not for merge. For #2464 (0.9.0: issue a Sales invoice under the registration the voucher type is bound to), related to #2162 (ADR 0004, slice 1, the "Not changed" bullet) and #2467. Written 10 Nov 2026; revised the same day after the first sitting stopped at step 2 on the number (now `0091`), with nothing written. Two master changes on Tally's screen and one import, then a restore from the row's own backup. Confidence of everything here until the row runs: unverified.
 
 ## Question
 The build's invoice names no registration: no `GSTREGISTRATION`, no `CMPGSTIN` (`render_sales_invoice_xml`, `src-tauri/src/agent_import_invoice.rs:2664` at master ae38a75c). On this book, with one registration, Tally filled them itself. The native read of the book after the 9 Oct import (the `pilot-lab-vouchers-after-post` fixture) gives the imported `BP/26-27/0010` (REMOTEID tail `0777`) `GSTREGISTRATION` `Rajasthan Registration`, `CMPGSTIN` `08ZZZZZ0000Z1ZQ`, `CMPGSTSTATE` `Rajasthan` and `CMPGSTREGISTRATIONTYPE` `Regular`, the same as the ten keyed invoices.
@@ -20,10 +20,19 @@ The build's invoice names no registration: no `GSTREGISTRATION`, no `CMPGSTIN` (
   - `--before-write` and `--same-row` STOP on any other GUID, whatever the company is called.
   - STOP before anything is keyed unless s1's COMPANY row is the book's.
 - **Its state,** from the lab's last notes on it: rows queued before this one each end with a restore, which leaves the marks at ALTVCHID 68 and ALTMSTID 245.
+- **The number, `BP/26-27/0091`, is chosen from the captured answers, cancelled vouchers included.**
+  - Row 2162-S5's year read (`lab/2162-s5-answers` at ab3d2e77, `answers/a-s2-Y-all.xml`, 117,992 bytes, sha256 beginning `f8ccb3ca`) returns every voucher of 1 Apr 2026 to 31 Mar 2027, of every type, with `ISCANCELLED`: 41 rows, at the book's restored state (marks 68 and 245).
+    - The `BP/26-27/` numbers held are 0001 to 0016, 0019, 0020, 0021 and 0041 to 0044.
+    - `0041` is the one cancelled (20260820, `BRIDGE Sales`). This row's first sitting stopped at step 2 on it, as the step's STOP is meant to.
+  - Row 2162-KC's August read at s2 (`lab/2162-kc-answers` at e3c2bd1f, RESULTS.md, `a-s2-W-2026-08.xml`, 40 rows) lists the same numbers for that month, `0041` among them.
+  - Every voucher number in every committed answer on the `lab/*-answers` branches (322 branches, UTF-16 decoded) was counted: no answer holds `BP/26-27/0091`. That includes numbers that rows created and then restored away, up to `0072`.
+  - No file on any `lab/` branch names `BP/26-27/0091`, or the REMOTEID tail `000000000991`, and nor does master.
+  - `0081` was passed over: row 2360's queued sheet sends it in its run A (`lab/2360-declined-sheet` at 5e73c1db).
+  - Step 2's N read stays a STOP, in case this check is wrong.
 - **BK is this row's way back.** It is taken at step 1, before anything is keyed, and restored at step 6 by C6. The restore runs after step 3 in every case, including a stop. After it, every read is compared whole with the reads before the change; any part of that compare that is not equal stops the row.
 - Write down the release shown on Tally's screen. Rows 2162-RU, 2162-SC, 2162-GY and 2467-GS read TallyPrime with tally.exe 1.1.7.2.
 
-**No Bridge build.** Raw requests, one at a time, through `run.py`. The two changes are made on Tally's screen, by hand. The one write is `I-0041.xml`, sent once.
+**No Bridge build.** Raw requests, one at a time, through `run.py`. The two changes are made on Tally's screen, by hand. The one write is `I-0091.xml`, sent once.
 
 **The sends** are row 2162-RP's, unchanged.
 - Each of these stops the run and is reported as "the request failed", never as "nothing found":
@@ -38,9 +47,9 @@ The build's invoice names no registration: no `GSTREGISTRATION`, no `CMPGSTIN` (
 - **Byte-equal to row 2162-GY's file of the same name** (`lab/2162-gy-sheet` at 0b8f09d8): `U-taxunits.xml` (the build's company registration read, sha256 `c763f19d`) and `T-types.xml` (the build's voucher-type read, sha256 `c351d6c6`), as rows 2162-RU and 2162-GY sent them.
 - **`template-full-0057.utf16le.xml`:** row 2162-RS's `V-0057.xml` (`lab/2162-rs-sheet`, folder `lab/2162-rs/`), byte for byte: every native field of the one voucher holding a number, over 1 Apr 2026 to 31 Mar 2027. Its ROW.md records that with the number set back it is row 2162-BC's `V-0055.xml`. It is not a new shape.
 - **`gen.py`** writes, each with only the change it names asserted, and each template's sha256 checked first:
-  - `I-0041.xml`: the template import with the number `BP/26-27/0041` (twice) and the REMOTEID tail `0941`. It names no registration, as the build's request never does (`gen.py` asserts it). An edit of a captured request, as row 2162-HS's import was.
-  - `N-0041.xml`, `R-0041.xml`: the number read and the read-back for `BP/26-27/0041`.
-  - `V-0010.xml`, `V-0041.xml`: the native read for `BP/26-27/0010` and for `BP/26-27/0041`.
+  - `I-0091.xml`: the template import with the number `BP/26-27/0091` (twice) and the REMOTEID tail `0991`. It names no registration, as the build's request never does (`gen.py` asserts it). An edit of a captured request, as row 2162-HS's import was.
+  - `N-0091.xml`, `R-0091.xml`: the number read and the read-back for `BP/26-27/0091`.
+  - `V-0010.xml`, `V-0091.xml`: the native read for `BP/26-27/0010` and for `BP/26-27/0091`.
 - **`count16.py`:** row 2162-GY's `count15.py` with one change, marked GR: the V kind also prints `GSTREGISTRATION` (its text, and any attribute it carries), `CMPGSTIN`, `CMPGSTSTATE`, `CMPGSTREGISTRATIONTYPE`, `PLACEOFSUPPLY` and `STATENAME`, each counted as an element (`<absent>`, or `<N times>` if repeated). Tried on `0010`'s voucher cut from the `pilot-lab-vouchers-after-post` fixture and re-encoded as UTF-16LE, it prints `Rajasthan Registration`, `08ZZZZZ0000Z1ZQ`, `Rajasthan`, `Regular`, `Rajasthan`, `Rajasthan`, and no attributes.
 
 `SHA256.txt` lists every file with its size. Requests are UTF-16LE with a BOM, as sent.
@@ -58,11 +67,11 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
    - Step 0 of C2, with no company loaded. Load BRIDGE PILOT LAB alone from Select Company (C1). Any prompt: stop, press nothing, and ask.
    - Read the Gateway's current date and period, and write them down.
    - `s1`: `M-marks.xml`. EXPECT one COMPANY row, the book's GUID. Record ALTVCHID and ALTMSTID (68 and 245 expected) and go on.
-   - **Take BK** by C5, to the new empty folder `C:\lab\2464-gr\backup-1`. Row 2162-GY's step 1 is the path. Record the file's name, size and sha256, and the time the Restore list will show.
-2. **The book before.** `s2`: `U-taxunits.xml T-types.xml N-0041.xml R-0010.xml V-0010.xml M-marks.xml`.
+   - **Take BK** by C5, to the new empty folder `C:\lab\2464-gr\backup-2` (the first sitting took `backup-1`; leave it as it is). Row 2162-GY's step 1 is the path. Record the file's name, size and sha256, and the time the Restore list will show.
+2. **The book before.** `s2`: `U-taxunits.xml T-types.xml N-0091.xml R-0010.xml V-0010.xml M-marks.xml`.
    - EXPECT U byte-equal to row 2162-RU's s2 answer (`answers/a-s2-U-taxunits.xml` at c7b14084: 22,636 bytes, sha256 beginning `e40ef83c`): two units, `Rajasthan Registration` the one GST unit.
-   - EXPECT T: `BRIDGE Sales` with `DEFAULTGSTREGISTRATION` empty, as row 2162-RU's s2 and sC2 answers read. Record its `LASTGSTTAXUNIT`.
-   - EXPECT N-0041 0 rows: no voucher holds the number. One row or more: stop before step 3.
+   - EXPECT T: `BRIDGE Sales` with `DEFAULTGSTREGISTRATION` empty (count16 prints no unit leaf for it), `LASTGSTTAXUNIT` `Rajasthan Registration` and `TAXUNITNAME` `Any`. These are as row 2162-RU's s2 and sC2 answers read, and as this row's first sitting read on 10 Nov 2026.
+   - EXPECT N-0091 0 rows: no voucher holds the number, cancelled or not (the Book's number bullet says why). One row or more: stop before step 3, with each row recorded whole.
    - EXPECT R-0010 one row: `BRIDGE Walk-in`, included Yes, every other status flag No, 6 legs.
    - EXPECT V-0010 one VOUCHER: `GSTREGISTRATION` `Rajasthan Registration`, `CMPGSTIN` `08ZZZZZ0000Z1ZQ`, `CMPGSTSTATE` `Rajasthan`, `CMPGSTREGISTRATIONTYPE` `Regular`, as the fixture reads. Anything else: record it whole and stop before step 3. It would mean the book does not hold what the 9 Oct read recorded.
 3. **Change 1: a second GST registration (row 2162-RU's part C2).** Before it, `s3m`: `M-marks.xml`, then `count16.py --before-write a-s1-M-marks.xml a-s3m-M-marks.xml`. It must pass. Then no key is pressed in Tally but those below.
@@ -85,19 +94,19 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
      - `count16.py --type "BRIDGE Sales" --type-diff a-s3-T-types.xml a-s4-T-types.xml`. Record the whole output. EXPECT `DEFAULTGSTREGISTRATION` `Maharashtra Registration` on `BRIDGE Sales`, and record `LASTGSTTAXUNIT`, `LASTGSTTAXUNITBYSERIES` and `TAXUNITNAME` as they now read.
      - `count16.py --unit-diff a-s3-U-taxunits.xml a-s4-U-taxunits.xml`: EXPECT 0 leaves differ in every unit.
 5. **The import.** `s5m`: `M-marks.xml`, then `count16.py --before-write a-s1-M-marks.xml a-s5m-M-marks.xml`. It must pass. Then no key is pressed in Tally before the send.
-   - `s5`: `I-0041.xml`, sent once. Then the wait rule. Record every counter and any LINEERROR, word for word. The window after it (shot): the Gateway, no dialog. A dialog: the prompt rule.
-   - `s5r`: `N-0041.xml R-0041.xml V-0041.xml V-0010.xml M-marks.xml`.
-     - Record N-0041's rows, each with its GUID.
-     - Record R-0041's rows: ledger, the three status flags and the legs.
-     - **The row's answer: V-0041's `GSTREGISTRATION` (and any attribute), `CMPGSTIN`, `CMPGSTSTATE`, `CMPGSTREGISTRATIONTYPE`, `PLACEOFSUPPLY` and `STATENAME`, as count16.py prints them.** Record them whole, beside V-0010's.
+   - `s5`: `I-0091.xml`, sent once. Then the wait rule. Record every counter and any LINEERROR, word for word. The window after it (shot): the Gateway, no dialog. A dialog: the prompt rule.
+   - `s5r`: `N-0091.xml R-0091.xml V-0091.xml V-0010.xml M-marks.xml`.
+     - Record N-0091's rows, each with its GUID.
+     - Record R-0091's rows: ledger, the three status flags and the legs.
+     - **The row's answer: V-0091's `GSTREGISTRATION` (and any attribute), `CMPGSTIN`, `CMPGSTSTATE`, `CMPGSTREGISTRATIONTYPE`, `PLACEOFSUPPLY` and `STATENAME`, as count16.py prints them.** Record them whole, beside V-0010's.
      - `count16.py --diff a-s2-V-0010.xml a-s5r-V-0010.xml`. Record the whole output: whether the existing invoice's registration fields moved.
      - Record ALTVCHID and ALTMSTID against s5m's.
-   - Any answer at s5 is a result, created or not. Record it and go on to step 6. Never send `I-0041.xml` again (C3).
-6. **Restore** BK by C6, with `restore-plan.txt` written first. Row 2162-GY's step 5 is the path, with its two prompts ("Accept ?" y; the folder-exists question, R Replace). Then `s6`: `M-marks.xml U-taxunits.xml T-types.xml N-0041.xml R-0010.xml V-0010.xml`, and compare whole:
+   - Any answer at s5 is a result, created or not. Record it and go on to step 6. Never send `I-0091.xml` again (C3).
+6. **Restore** BK by C6, with `restore-plan.txt` written first. Row 2162-GY's step 5 is the path, with its two prompts ("Accept ?" y; the folder-exists question, R Replace). Then `s6`: `M-marks.xml U-taxunits.xml T-types.xml N-0091.xml R-0010.xml V-0010.xml`, and compare whole:
    - `count16.py --same-row a-s1-M-marks.xml a-s6-M-marks.xml`: EXPECT it passes.
    - `count16.py --unit-diff a-s2-U-taxunits.xml a-s6-U-taxunits.xml`: EXPECT the two units and 0 leaves differ in each.
    - `count16.py --type "BRIDGE Sales" --type-diff a-s2-T-types.xml a-s6-T-types.xml`: EXPECT no type differs.
-   - N-0041 0 rows. `count16.py --diff a-s2-R-0010.xml a-s6-R-0010.xml`: EXPECT only `lists compared` and `legs: 6 -> 6`.
+   - N-0091 0 rows. `count16.py --diff a-s2-R-0010.xml a-s6-R-0010.xml`: EXPECT only `lists compared` and `legs: 6 -> 6`.
    - Record each answer's sha256 against s2's; EXPECT each equal. **Any of these not equal stops the row:** send nothing more, and report before the close. The book is then not as it was, and the coordinator decides.
 7. **Close** by C10. One tally.exe owns 9001.
 
@@ -116,21 +125,21 @@ Estimates, not predictions.
 - **s2:** as the Book and step 2 say.
 - **Step 3:** as row 2162-RU's part C2: the three named prompts, then a third unit in force from 20260401.
 - **Step 4:** as row 2162-RU's part C3 with the other line: `DEFAULTGSTREGISTRATION` `Maharashtra Registration`, `TAXUNITNAME` `Any`, the units unchanged.
-- **Step 5:** created (`0041` is not in use and `I-0041.xml` is row 2162-HS's shape with another number). Which registration it gets is not estimated: that is the row's question.
+- **Step 5:** created (no captured answer shows `0091` in use, and `I-0091.xml` is row 2162-HS's shape with another number). Which registration it gets is not estimated: that is the row's question.
 - **s6:** equal to s2 and s1.
 
 ## Decides
 Each is PARTIAL: one import, one sitting, one book, one release.
-- **V-0041 reads `Maharashtra Registration`, `27ZZZZZ0000Z1ZQ`, Maharashtra:** Tally gives an imported invoice that names no registration its type's bound registration. #2464's design holds as written: judging the bound unit is judging the registration Tally issues under, with no registration field added to the request. The slice 1 "Not changed" bullet of ADR 0004 can then say so for a bound type.
-- **V-0041 reads `Rajasthan Registration`, `08ZZZZZ0000Z1ZQ`:** Tally ignores the binding on an import and uses the first unit or the type's last one (`LASTGSTTAXUNIT`). #2464 as written would judge Maharashtra while Tally issues under Rajasthan. Before #2464 is built, the build must either name the registration in the request (a new request shape, measured first) or refuse a book with two registrations as it does today. Record which unit `LASTGSTTAXUNIT` named.
-- **V-0041 holds no registration (`GSTREGISTRATION` and `CMPGSTIN` absent or empty):** with two registrations, Tally gives such an import none. The build must name the registration itself before any two-registration book is invoiced.
-- **V-0041's fields disagree** (for example `GSTREGISTRATION` one unit and `CMPGSTIN` the other's GSTIN): record all six whole. Neither field can be relied on alone; the coordinator decides.
+- **V-0091 reads `Maharashtra Registration`, `27ZZZZZ0000Z1ZQ`, Maharashtra:** Tally gives an imported invoice that names no registration its type's bound registration. #2464's design holds as written: judging the bound unit is judging the registration Tally issues under, with no registration field added to the request. The slice 1 "Not changed" bullet of ADR 0004 can then say so for a bound type.
+- **V-0091 reads `Rajasthan Registration`, `08ZZZZZ0000Z1ZQ`:** Tally ignores the binding on an import and uses the first unit or the type's last one (`LASTGSTTAXUNIT`). #2464 as written would judge Maharashtra while Tally issues under Rajasthan. Before #2464 is built, the build must either name the registration in the request (a new request shape, measured first) or refuse a book with two registrations as it does today. Record which unit `LASTGSTTAXUNIT` named.
+- **V-0091 holds no registration (`GSTREGISTRATION` and `CMPGSTIN` absent or empty):** with two registrations, Tally gives such an import none. The build must name the registration itself before any two-registration book is invoiced.
+- **V-0091's fields disagree** (for example `GSTREGISTRATION` one unit and `CMPGSTIN` the other's GSTIN): record all six whole. Neither field can be relied on alone; the coordinator decides.
 - **The import is refused** (`CREATED` 0, an error or a LINEERROR): record the words. A bound type, or two registrations with no common numbering series, then changes what an import needs on this release; that is its own question.
 - **V-0010's registration fields moved at s5r:** the second registration or the binding reached an existing invoice. Record which field, and report before the restore.
 
 ## Code admits the trigger
 Lines are at master ae38a75c.
-- **The build writes no registration.** `render_sales_invoice_xml` (`src-tauri/src/agent_import_invoice.rs:2664`, its template at `:2708`) writes `GSTREGISTRATIONTYPE` (the customer's) and no `GSTREGISTRATION`, `CMPGSTIN` or `CMPGSTSTATE`. `I-0041.xml` is that shape, and `gen.py` asserts it names none of the three.
+- **The build writes no registration.** `render_sales_invoice_xml` (`src-tauri/src/agent_import_invoice.rs:2664`, its template at `:2708`) writes `GSTREGISTRATIONTYPE` (the customer's) and no `GSTREGISTRATION`, `CMPGSTIN` or `CMPGSTSTATE`. `I-0091.xml` is that shape, and `gen.py` asserts it names none of the three.
 - **Today the build refuses this book.** With two GST units in force, `parse_company_registration` refuses as `invoice_company_registration_ambiguous` (`src-tauri/src/agent_import_invoice_wire.rs:804`), and `parse_voucher_types` (`:274`) does not read `DEFAULTGSTREGISTRATION`. So no build reaches step 5's state; the row measures what #2464 would rely on, before it is built.
 
 ## Not measured

@@ -398,6 +398,24 @@ test("merge gate scope: a base SHA taken from the pull request's head is refused
     "the merge-gate-scope step must read the event name and the pull request's base SHA");
 });
 
+// A release pull request must move src-tauri/release-date.txt (#2416): the scope step's pinned text runs the date check
+// under the version test, on the base and the merge commit, with no `|| true`. These cases prove the pinned text is exact;
+// scripts/check-release-date-changed.test.mjs proves what the script decides.
+const RELEASE_DATE_CALL = 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"; fi';
+for (const [name, replacement] of [
+  ["the call removed", ""],
+  ["the call run for every pull request", 'node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"'],
+  ["the call run only when it is not a release pull request", 'if [[ "$release" != true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA"; fi'],
+  ["its failure swallowed", 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base" "$GITHUB_SHA" || true; fi'],
+  ["the base and head swapped", 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$GITHUB_SHA" "$base"; fi'],
+  ["the head left out", 'if [[ "$release" == true ]]; then node scripts/check-release-date-changed.mjs "$base"; fi'],
+  ["another script run in its place", 'if [[ "$release" == true ]]; then node scripts/next-version.mjs; fi'],
+]) {
+  test(`release date check: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", (text) => text.replace(RELEASE_DATE_CALL, replacement)), "changes changed shape");
+  });
+}
+
 // The driver that splits the merge gate's test across processes is pinned by its bytes: any edit to it, even a comment
 // or a count, is refused until the pin and its acknowledgement move with it.
 test("the sharding driver: any change to its bytes is refused", () => {

@@ -1,0 +1,25 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/bk.txt: original 173 B sha256 c80bc2143a34c3f7cac7e06ab1559d566c169e613bf38f7309a97ea1771c2b68 (kept on the lab PC); the company number replaced in 1 place(s)
+evidence/notes.txt: original 11342 B sha256 2fc5fd6545ba8d924734693a2171b43c2c7170e854db4589c85e2f7f5770ed64 (kept on the lab PC); 3 x -> stop; 1 x -> DEVIATION, whole (; 2 x -> "status=200, bytes=51"
+evidence/wr-s3am.txt: original 801 B sha256 16982a5b57e0754720ed64bd44f8eb49026caa09c2911039232f7dd0d5be935a (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3ap.txt: original 801 B sha256 38d8311ad25b7bd436636f5880f80a79ee5584aa0d617c01d26cf03180bdb1ea (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3dd.txt: original 801 B sha256 9f9bebde1336c324e6697d22d013d1dc5ab44a9f6629fc0869741bb775e93759 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3dt.txt: original 801 B sha256 c815449d67f43b4de6b7999bd904aa8f6f0dc923d1eec18e1d3983db57ff9d90 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3hy.txt: original 801 B sha256 2e883b6253e87fe66936c0705cad8995b316887f7fce4012b741fe7b3a96e8b2 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3lp.txt: original 801 B sha256 45bdb08f116bde83a2751919f5e24c042652863e1f6fc9f43516d38402069763 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3op.txt: original 801 B sha256 ad8b5100f16682db35ab77ea27ed1ca428c3ece24fda9aff2b1bdeeefced3861 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3rp.txt: original 801 B sha256 da766157274772e0b1eb75be42fa5034b46667f4299d003fa1b205cc244f2696 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3sc.txt: original 801 B sha256 fee21c4386d8a4fdff314281566d051e26b7f7090ab2761f07cbaf1c4093b592 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s3sl.txt: original 801 B sha256 c9f6246dfcbee46c2cb3709b217885beeeafcbb13a03d28aa944564dc0817906 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s4ap.txt: original 800 B sha256 44ada2b0b452da3e1dcd8e2c17ab07b843184bf22c6de9d1594ef5d8ac4d79c7 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s4dd.txt: original 800 B sha256 1ec99949916d10fb30841fb18d51665895e59abb9ce972ea539c01e6742e30e1 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s4hy.txt: original 800 B sha256 a5085905c2b33de09f359b6e02ce0c1588d1b42ecdc95138f53faffa5b9ea61d (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s4op.txt: original 800 B sha256 66fca453232acf4d3a1b10a4e3b17fa71a590cdd41e16816b2b58a96e102e938 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/wr-s4sc.txt: original 800 B sha256 c52f8588825ffbfb903751277cf5691d039393e26764c5ebba50b409287a80e5 (kept on the lab PC); 1 x -> <LAB_DIR>
+RESULTS.md: original 82491 B sha256 104f13ecd87c94d03a83056e421659ce8e0f1272d2371fbc4f8caaba412911f5 (kept on the lab PC); 15 x -> <LAB_DIR>
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 383 B sha256 608043b65e7f1e7930dca75b9724f3a6065d554cbcee1a231ddd65243b65f2eb (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/send.sh: original 1674 B sha256 f872139cc1d33eff30c932adcf8dd7e2c3907835406db93e648fbd6fbd5a3449 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/wr.sh: original 1097 B sha256 56c5e7b18578c164db63c3acb8fc9aac0946cd60b35a57e385a1a6b7b304766c (kept on the lab PC); 2 x -> <the before-write option>; 1 x -> <LAB_DIR>
+scripts/step3.sh: original 2234 B sha256 08c2116ef1dbb9bdb39739c68ce58acecfc392c957533df59cd8ef1ef21c920b (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/prep-c6.sh: original 2196 B sha256 90500ec61a08547c0897e1e0b5ec5382b23c1b40a9dd6d3a30a36232224cd04c (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> <Tally data folder>

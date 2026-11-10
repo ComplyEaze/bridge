@@ -1,0 +1,10 @@
+== a-c8s-S-snap-20260401-20260801.xml
+  NAME attribute 'BRIDGE Nm 2024-25'; name list ['BRIDGE Nm 2024-25']; the same
+  NAME attribute "BRIDGE Nm Ax'Bx"; name list ["BRIDGE Nm Ax'Bx"]; the same
+  NAME attribute 'BRIDGE Nm Ax and Bx'; name list ['BRIDGE Nm Ax and Bx']; the same
+  NAME attribute 'BRIDGE Nm Ax-Bx'; name list ['BRIDGE Nm Ax)Bx']; DIFFERS
+  NAME attribute 'BRIDGE Nm Plain'; name list ['BRIDGE Nm Plain']; the same
+  NAME attribute 'BRIDGE Nm नमूना'; name list ['BRIDGE Nm नमूना']; the same
+  rows with "BRIDGE Nm ": 6
+== a-s2-S-snap-20260401-20260801.xml
+  rows with "BRIDGE Nm ": 0

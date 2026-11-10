@@ -1,0 +1,81 @@
+$ each send's time to answer and the gap from the previous send's answer to its start, seconds, from evidence/sends-utc.txt
+s1: started 09:47:00.632Z
+s1: answered in 0.6 s
+s2: started 09:48:46.435Z; gap after s1 answered: 105.2 s
+s2: answered in 2.0 s
+s3plm: started 09:49:05.355Z; gap after s2 answered: 17.0 s
+s3plm: answered in 0.4 s
+s3pl: started 09:49:06.950Z; gap after s3plm answered: 1.2 s
+s3pl: answered in 3.6 s
+s4plm: started 09:49:22.182Z; gap after s3pl answered: 11.7 s
+s4plm: answered in 0.4 s
+s4pl: started 09:49:23.764Z; gap after s4plm answered: 1.2 s
+s4pl: answered in 4.1 s
+s3hym: started 09:50:02.520Z; gap after s4pl answered: 34.6 s
+s3hym: answered in 0.5 s
+s3hy: started 09:50:04.505Z; gap after s3hym answered: 1.5 s
+s3hy: answered in 3.4 s
+s4hym: started 09:50:09.614Z; gap after s3hy answered: 1.7 s
+s4hym: answered in 0.5 s
+s4hy: started 09:50:11.674Z; gap after s4hym answered: 1.5 s
+s4hy: answered in 3.7 s
+s3dtm: started 09:50:17.304Z; gap after s4hy answered: 1.9 s
+s3dtm: answered in 0.5 s
+s3dt: started 09:50:19.144Z; gap after s3dtm answered: 1.4 s
+s3dt: answered in 3.5 s
+s3amm: started 09:50:24.281Z; gap after s3dt answered: 1.6 s
+s3amm: answered in 0.5 s
+s3am: started 09:50:26.201Z; gap after s3amm answered: 1.5 s
+s3am: answered in 3.5 s
+s3slm: started 09:50:31.311Z; gap after s3am answered: 1.6 s
+s3slm: answered in 0.5 s
+s3sl: started 09:50:33.142Z; gap after s3slm answered: 1.4 s
+s3sl: answered in 3.5 s
+s3lpm: started 09:50:38.223Z; gap after s3sl answered: 1.6 s
+s3lpm: answered in 0.5 s
+s3lp: started 09:50:40.141Z; gap after s3lpm answered: 1.4 s
+s3lp: answered in 3.4 s
+s3rpm: started 09:50:45.195Z; gap after s3lp answered: 1.7 s
+s3rpm: answered in 0.5 s
+s3rp: started 09:50:47.090Z; gap after s3rpm answered: 1.4 s
+s3rp: answered in 3.6 s
+s3apm: started 09:50:52.342Z; gap after s3rp answered: 1.6 s
+s3apm: answered in 0.5 s
+s3ap: started 09:50:54.265Z; gap after s3apm answered: 1.4 s
+s3ap: answered in 3.5 s
+s4apm: started 09:50:59.421Z; gap after s3ap answered: 1.6 s
+s4apm: answered in 0.5 s
+s4ap: started 09:51:01.409Z; gap after s4apm answered: 1.5 s
+s4ap: answered in 3.9 s
+s3opm: started 09:51:07.168Z; gap after s4ap answered: 1.8 s
+s3opm: answered in 0.5 s
+s3op: started 09:51:09.131Z; gap after s3opm answered: 1.4 s
+s3op: answered in 3.5 s
+s4opm: started 09:51:14.264Z; gap after s3op answered: 1.6 s
+s4opm: answered in 0.5 s
+s4op: started 09:51:16.187Z; gap after s4opm answered: 1.4 s
+s4op: answered in 3.9 s
+s3ddm: started 09:51:21.989Z; gap after s4op answered: 1.9 s
+s3ddm: answered in 0.5 s
+s3dd: started 09:51:23.858Z; gap after s3ddm answered: 1.4 s
+s3dd: answered in 3.4 s
+s4ddm: started 09:51:28.928Z; gap after s3dd answered: 1.6 s
+s4ddm: answered in 0.5 s
+s4dd: started 09:51:30.733Z; gap after s4ddm answered: 1.3 s
+s4dd: answered in 3.7 s
+s3scm: started 09:51:36.230Z; gap after s4dd answered: 1.8 s
+s3scm: answered in 0.5 s
+s3sc: started 09:51:38.685Z; gap after s3scm answered: 1.9 s
+s3sc: answered in 4.1 s
+s4scm: started 09:51:44.391Z; gap after s3sc answered: 1.6 s
+s4scm: answered in 0.5 s
+s4sc: started 09:51:46.335Z; gap after s4scm answered: 1.4 s
+s4sc: answered in 3.7 s
+c8m: started 09:53:24.058Z; gap after s4sc answered: 94.0 s
+c8m: answered in 0.5 s
+c8s: started 09:53:30.397Z; gap after c8m answered: 5.9 s
+c8s: answered in 0.4 s
+c8b: started 09:53:37.597Z; gap after c8s answered: 6.8 s
+c8b: answered in 0.4 s
+s9: started 09:56:53.552Z; gap after c8b answered: 195.6 s
+s9: answered in 2.0 s

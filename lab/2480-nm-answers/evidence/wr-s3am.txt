@@ -1,0 +1,26 @@
+M-marks.xml: 3396 bytes
+== a-s3amm-M-marks.xml: 3396 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '70' ALTMSTID '248'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0
+== a-s3amm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'70'", "'248'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+LM-am.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s3am-after.png
+2026-11-10T09:50:29.621Z
+== a-s3am-LM-am.xml: 538 bytes
+  root RESPONSE
+  CREATED '0'
+  ALTERED '1'
+  DELETED '0'
+  LASTVCHID '0'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'
+exit 0

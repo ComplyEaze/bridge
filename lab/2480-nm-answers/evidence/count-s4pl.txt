@@ -1,0 +1,13 @@
+== a-s4pl-I-pl.xml: 540 bytes
+  root RESPONSE
+  CREATED '1'
+  ALTERED '0'
+  DELETED '0'
+  LASTVCHID '45'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'
+exit 0

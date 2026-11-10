@@ -1,0 +1,13 @@
+== a-s3op-LM-op.xml: 538 bytes
+  root RESPONSE
+  CREATED '1'
+  ALTERED '0'
+  DELETED '0'
+  LASTVCHID '0'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'
+exit 0

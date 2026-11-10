@@ -1,0 +1,82 @@
+N-0201.xml: 3022 bytes
+N-0202.xml: 3022 bytes
+N-0203.xml: 3022 bytes
+N-0204.xml: 3022 bytes
+N-0205.xml: 3022 bytes
+N-0206.xml: 3022 bytes
+N-0207.xml: 3022 bytes
+N-0208.xml: 3022 bytes
+N-0209.xml: 3022 bytes
+N-0210.xml: 3022 bytes
+N-0211.xml: 3022 bytes
+B-bills.xml: 46 bytes
+S-snap-20260401-20260801.xml: 25480 bytes
+M-marks.xml: 3394 bytes
+== a-s9-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Nm Plain': 0 groups
+  hy 'BRIDGE Nm Ax-Bx': 0 groups
+  dt 'BRIDGE Nm Ax.Bx': 0 groups
+  am 'BRIDGE Nm Ax&Bx': 0 groups
+  sl 'BRIDGE Nm Ax/Bx': 0 groups
+  lp 'BRIDGE Nm Ax(Bx': 0 groups
+  rp 'BRIDGE Nm Ax)Bx': 0 groups
+  ap "BRIDGE Nm Ax'Bx": 0 groups
+  op 'BRIDGE Nm Ax and Bx': 0 groups
+  dd 'BRIDGE Nm 2024-25': 0 groups
+  sc 'BRIDGE Nm नमूना': 0 groups
+  groups of any other party: 0
+== a-s9-S-snap-20260401-20260801.xml
+a-s9-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Nm Plain': no row
+  hy 'BRIDGE Nm Ax-Bx': no row
+  dt 'BRIDGE Nm Ax.Bx': no row
+  am 'BRIDGE Nm Ax&Bx': no row
+  sl 'BRIDGE Nm Ax/Bx': no row
+  lp 'BRIDGE Nm Ax(Bx': no row
+  rp 'BRIDGE Nm Ax)Bx': no row
+  ap "BRIDGE Nm Ax'Bx": no row
+  op 'BRIDGE Nm Ax and Bx': no row
+  dd 'BRIDGE Nm 2024-25': no row
+  sc 'BRIDGE Nm नमूना': no row
+exit 0
+== a-s9-N-0201.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0202.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0203.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0204.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0205.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0206.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0207.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0208.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0209.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0210.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0211.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0

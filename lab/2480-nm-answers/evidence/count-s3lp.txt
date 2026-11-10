@@ -1,0 +1,13 @@
+== a-s3lp-LM-lp.xml: 538 bytes
+  root RESPONSE
+  CREATED '0'
+  ALTERED '1'
+  DELETED '0'
+  LASTVCHID '0'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'
+exit 0

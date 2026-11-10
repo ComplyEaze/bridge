@@ -1,0 +1,21 @@
+== a-c8b-B-bills.xml
+  BILLFIXED groups: 6
+  pl 'BRIDGE Nm Plain': 1 groups
+    BILLREF 'BP/26-27/0201'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  hy 'BRIDGE Nm Ax-Bx': 1 groups
+    BILLREF 'BP/26-27/0202'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  dt 'BRIDGE Nm Ax.Bx': 0 groups
+  am 'BRIDGE Nm Ax&Bx': 0 groups
+  sl 'BRIDGE Nm Ax/Bx': 0 groups
+  lp 'BRIDGE Nm Ax(Bx': 0 groups
+  rp 'BRIDGE Nm Ax)Bx': 0 groups
+  ap "BRIDGE Nm Ax'Bx": 1 groups
+    BILLREF 'BP/26-27/0208'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  op 'BRIDGE Nm Ax and Bx': 1 groups
+    BILLREF 'BP/26-27/0209'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  dd 'BRIDGE Nm 2024-25': 1 groups
+    BILLREF 'BP/26-27/0210'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  sc 'BRIDGE Nm नमूना': 1 groups
+    BILLREF 'BP/26-27/0211'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  groups of any other party: 0
+exit 0

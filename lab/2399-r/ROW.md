@@ -39,7 +39,7 @@ How a request count is read is fixed below: it comes from Bridge's egress receip
 ## Build
 The Windows bundle of a CI run started by hand on `fix/2399-reuse-vouchers-census` (a draft pull request builds no bundle). The artifact is `unsigned-bundle-smoke-windows-latest`. The build is of the exact head of #2482 on the day it is made.
 
-**Build line, to fill before the sitting:** CI run `to fill`, commit `to fill` (it must equal #2482's head at the run's start), artifact id `to fill`, GitHub digest `to fill`, expiry `to fill`.
+**Build line:** CI run 42787114741 (started by hand, `workflow_dispatch`, all jobs succeeded), commit `d40c42041f0383487fee4e851ab11f4e44f0df65` (#2482's head at the run's start), artifact id 13750966183 (`unsigned-bundle-smoke-windows-latest`), GitHub digest `sha256:7309fad953762ccba515297492cd8e7c92225dd04c87e6c9d1d546f8833cfa3f`, expiry 2026-11-17T09:14:10Z. Inside it, `bridge-tally.mcpb` has sha256 `f62420a55db22ed426ac90f575199568fccd7bcb23d24d598eaf915ef4315aef` and `bridge_mcp.exe` (`bin/x86_64-pc-windows-msvc/`) has sha256 `9d93302281841ca7829ff95fe58c0fe9c8c767c46fd64f3752fb6379a9a2dc04`; `mcpb-smoke.json` records both, and both were read from the download. If the artifact has expired by the sitting, STOP: the build is not remade here.
 
 At step 0, before the first call:
 - Check the zip's sha256 against the digest, and `bridge_mcp.exe` against `mcpb-smoke.json`. Either differing is a STOP.

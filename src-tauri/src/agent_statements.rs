@@ -33,8 +33,8 @@ impl Server {
         let period = crate::tally::runtime::TrialBalancePeriod::new(from, to)
             .map_err(|_| "invalid_date_range".to_string())?;
         let (company, identity, prior) = self.verified_company(guid).await?;
-        let today =
-            TallyDate::parse(tally_host_today()).map_err(|_| "current_date_invalid".to_string())?;
+        let today = TallyDate::parse(tally_host_today())
+            .map_err(|_| super::failure_code::ReadCode::CurrentDateInvalid)?;
         let read = self
             .runtime
             .fetch_statements(self.tally_config(), &identity, period, kind, today)

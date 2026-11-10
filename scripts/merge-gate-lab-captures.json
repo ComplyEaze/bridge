@@ -5590,6 +5590,66 @@
       "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
       "sha256": "b2d0519cc1d25b5eac8a0ddc15318d58818fa9aaba97e4bf3ac81a87785f533f",
       "size": 13532
+    },
+    {
+      "blob": "e164f1d5b0c329b6d579738f92c1ac758fca458d",
+      "capture_id": "native/ledgers_native_forexgroup_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-lm-answers at f832eb17, file answers/a-lx1-X-lx1-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "898ad76bf159ec8676deaefe4cf2a01672e297de5945bab4c924365705ccace3",
+      "size": 11556
+    },
+    {
+      "blob": "b94d8bba94b810104671a200428e2ca2d06ba83f",
+      "capture_id": "native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-op-answers at fb7125ad, file answers/a-x1-X-lx1-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "fc69af7076469b26ad111eac385e7ab875951c6527ff1bbc9102a6d12e2d8962",
+      "size": 12678
+    },
+    {
+      "blob": "084bee8d377925eebca98c51fa304c3872d4f0c5",
+      "capture_id": "native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-tb-answers at 154a0ca3, file answers/a-tb1-T-tb1-20250401-20250430.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1c4638e8df640575eff3e4955bed2d9783026fe7817ad73e63e05f19277fb7b7",
+      "size": 14140
+    },
+    {
+      "blob": "ff99da39188f0e2d3d0d27006f94c28da89d5f11",
+      "capture_id": "native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-op-answers at fb7125ad, file answers/a-t1-T-tb1-20250401-20250430.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "13ae13a58f8867e80070a3a5aa43eeabce8fc25cf1c2d225c66620de8617c283",
+      "size": 15526
+    },
+    {
+      "blob": "f0ff5990f67c1a5b4b5c01e3853cf60125f4431e",
+      "capture_id": "agent/movement-forexgroup-book-20250401.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-lm-answers at f832eb17, file answers/a-mv-V-mv-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/movement-forexgroup-book-20250401.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "56554b6a655a92afc74f28527484647098f8cf43e774142d8caa5eb7736f4df7",
+      "size": 59524
+    },
+    {
+      "blob": "5c0281b767d6b7a898c0e1e5a93a9e21d74a229c",
+      "capture_id": "agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "lab branch lab/683-lm-answers at f832eb17, file answers/a-mvl-V-mvl-usd-customer-20250401.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+      "seed_basis": "synthetic lab book; see FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "bff19938fc345fadb76af9e2b1924309976837475e1d3777e875b5ccd6349443",
+      "size": 23720
     }
   ]
 }

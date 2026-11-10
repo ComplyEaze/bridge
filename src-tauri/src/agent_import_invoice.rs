@@ -1522,7 +1522,11 @@ fn invoice_readback_differences(
 /// empty, so it cannot tell the two apart. A GSTIN that is not a valid GSTIN of
 /// the company's state the build recorded differs. The name is not compared,
 /// since the build records no unit's name, and a second registration in the
-/// same state is not told apart by the GSTIN's state.
+/// same state is not told apart by the GSTIN's state. The registration's state
+/// and type (`CMPGSTSTATE`, `CMPGSTREGISTRATIONTYPE`) are not fetched, so an
+/// invoice that stored its name and GSTIN with those two empty reads no
+/// difference here (row 2464-RB, `BP/26-27/0107`); its GSTR-1 status and its
+/// lines' HSN/SAC are judged on their own.
 fn registration_difference(
     fields: &BTreeMap<String, String>,
     company_state: &str,

@@ -319,6 +319,7 @@ impl Server {
             // The desktop app calls Bridge's operations directly and never dispatches an MCP
             // tool, so there is no MCP client to accept anything.
             terms: super::super::terms::TermsGate::NotRequired,
+            build_notice_sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
 }

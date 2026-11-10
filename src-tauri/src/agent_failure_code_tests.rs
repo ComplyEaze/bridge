@@ -17,12 +17,35 @@ const GST_UNCERTAIN: &[(GstUncertainCode, &str)] = &[
     ),
 ];
 
+const BANK_STATEMENT_IMPORT: &[(BankStatementImportCode, &str)] = &[(
+    BankStatementImportCode::ProposalsFileInvalid,
+    "proposals_file_invalid",
+)];
+
+/// Every declared code with its pinned string, across the enums.
+fn all_pinned() -> Vec<(FailureCode, &'static str)> {
+    GST_UNCERTAIN
+        .iter()
+        .map(|(code, string)| (FailureCode::from(*code), *string))
+        .chain(
+            BANK_STATEMENT_IMPORT
+                .iter()
+                .map(|(code, string)| (FailureCode::from(*code), *string)),
+        )
+        .collect()
+}
+
 /// The pins cover every variant, once each and in declaration order, so a variant added without a
 /// pin fails here.
 #[test]
 fn every_variant_has_one_pinned_string() {
     let pinned: Vec<GstUncertainCode> = GST_UNCERTAIN.iter().map(|(code, _)| *code).collect();
     assert_eq!(pinned, GstUncertainCode::ALL);
+    let pinned: Vec<BankStatementImportCode> = BANK_STATEMENT_IMPORT
+        .iter()
+        .map(|(code, _)| *code)
+        .collect();
+    assert_eq!(pinned, BankStatementImportCode::ALL);
 }
 
 /// Each declared code is the string its site wrote, byte for byte, as a variant and as the
@@ -31,15 +54,20 @@ fn every_variant_has_one_pinned_string() {
 fn each_declared_code_is_the_string_its_site_wrote() {
     for (code, string) in GST_UNCERTAIN {
         assert_eq!(code.as_str(), *string);
-        assert_eq!(FailureCode::from(*code).as_str(), *string);
+    }
+    for (code, string) in BANK_STATEMENT_IMPORT {
+        assert_eq!(code.as_str(), *string);
+    }
+    for (code, string) in all_pinned() {
+        assert_eq!(code.as_str(), string);
     }
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
 #[test]
 fn a_tool_failure_from_a_declared_code_carries_its_string() {
-    for (code, string) in GST_UNCERTAIN {
-        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+    for (code, string) in all_pinned() {
+        assert_eq!(super::super::ToolFailure::from(code).code, string);
     }
 }
 
@@ -49,7 +77,7 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 #[test]
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
-    for code in GstUncertainCode::ALL {
+    for (code, _) in all_pinned() {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");
         assert!(

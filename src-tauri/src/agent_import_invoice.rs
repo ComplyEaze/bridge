@@ -2368,8 +2368,9 @@ impl InvoiceJudge<'_> {
         // far: a code is fixed in Tally and the rest by the caller, and an
         // invoice refused above costs these reads nothing. The company object
         // is read for every admitted invoice, because its settings decide
-        // whether the measured order holds at any level; the groups only when
-        // a sales ledger's own row defers.
+        // whether the measured order holds at any level, and it alone says
+        // whether the company's GST is on; the groups only when a sales
+        // ledger's own row defers.
         let (hsn_refusals, hsn_warnings) =
             self.sales_hsn_refusals(&sales_ledgers, &facts, &as_of, answers)?;
         if !hsn_refusals.is_empty() {
@@ -2388,7 +2389,8 @@ impl InvoiceJudge<'_> {
     /// One refusal per sales ledger (the classification's sales lines) whose
     /// HSN/SAC does not resolve on the invoice date, and the warnings on the
     /// codes that do, in ledger-name order; or the next answer the check
-    /// needs.
+    /// needs. A company object whose GST setting is not on refuses the
+    /// invoice first, by itself.
     fn sales_hsn_refusals(
         &self,
         sales_ledgers: &[String],
@@ -2407,6 +2409,15 @@ impl InvoiceJudge<'_> {
         };
         let company = wire::parse_company_hsn(company_body, self.identity.company_guid())
             .map_err(|code| Verdict::Failed(code.to_string()))?;
+        // A tax invoice needs the company's GST on. Off, or not stated, the
+        // invoice is refused whatever its lines resolve to.
+        match company.gst {
+            wire::CompanyGst::On => {}
+            wire::CompanyGst::Off => return Err(refusing(refuse("invoice_company_gst_off"))),
+            wire::CompanyGst::Unstated => {
+                return Err(refusing(refuse("invoice_company_gst_unstated")))
+            }
+        }
         // The build reads the groups only when a sales ledger's own row defers
         // to them. The queue's `read_invoice_plan` always reads them, and an
         // answer that is present is always parsed here, needed or not: a groups

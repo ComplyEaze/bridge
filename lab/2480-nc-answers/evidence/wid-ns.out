@@ -1,0 +1,22 @@
+== a-s4nsm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'251'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+exit 0
+== w.sh m s4ns exit 0
+LM-ns.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4ns-after.png
+2026-11-10T21:27:26.464Z
+capture equal to p1-after
+a-s4ns-LM-ns.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4ns LM-ns.xml exit 0
+== a-s5nsm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'252'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+exit 0
+== w.sh m s5ns exit 0
+I-ns.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5ns-after.png
+2026-11-10T21:27:33.556Z
+capture equal to p1-after
+a-s5ns-I-ns.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 51, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5ns I-ns.xml exit 0

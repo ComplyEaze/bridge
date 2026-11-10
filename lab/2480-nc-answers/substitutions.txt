@@ -1,0 +1,54 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/bk.txt: original 173 B sha256 1d504828311759b45c17ba7cec2f8daf79bfeb4060b7b3de1ae16da6177eb39c (kept on the lab PC); the company number replaced in 1 place(s)
+evidence/lr-p1.out: original 663 B sha256 1f814c79fbbcf60aaa832b599109abed248460f6ae542488d468c82aa42a6b22 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p10.out: original 669 B sha256 0621a063b33f6641cd2c632b4f433bd327f37079e8b1e42f5cfd7086d630a775 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p11.out: original 669 B sha256 4d56de1b77c35c8590c994195e5ca5d9096f372107b265a4055c14b513c65969 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p2.out: original 663 B sha256 0a7503d867959c753c84d0e7f2647db008488a1b5668b149b7cc79d4cae69e05 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p3.out: original 663 B sha256 a5be1353917b081905a8f720e615e22ed191e633dc704b9d6e0a57f7a5f72781 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p4.out: original 663 B sha256 a942470ebddc3e8d2dd002e4c32f3f021bd372963cb1f7f3dc0f4db00f40b046 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p5.out: original 663 B sha256 5eb268e32805419f88311fc3f520b5f7b2176bbd68d22b4261803f83b52b0fb5 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p6.out: original 663 B sha256 801dc64e70e7517b05753584b5a050cd20f76410b9b3fd14cbf587c2966041e6 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p7.out: original 663 B sha256 561163b29e35c1af5397aaa56e08968a5d3350fd942982f8315735e8c4e4236b (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p8.out: original 663 B sha256 a19474e47aa63fdad5df2326b922a04f330cc60c713682d1dcd302eba1d82977 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-p9.out: original 663 B sha256 42235bb8bc87bef069aaf774761651b25c269f3e1d347f9669236456341aeabb (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r10a.out: original 474 B sha256 22e0e557c33f942898c2b327a8d8b8b3a4eab0445c034d85bb7439585336cded (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r10b.out: original 474 B sha256 89512d22659cd21e501c7f106c3736f1a12e34aa81135ae3be7c8c1f6ce62529 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r11a.out: original 474 B sha256 ae419ec0c0ba1a0f8f717cbbc3264a7f5353c71abcde68f6becb82e0bb3c4f73 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r11b.out: original 474 B sha256 022f001f64df3e6532d3bbbc97e3d1a945a1e340524b9305c020430f9d7af214 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r1a.out: original 471 B sha256 883f3a1a40115312ba5fffa5ae2e65f8475912919bb8a9a325d92550d450ead3 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r1b.out: original 471 B sha256 ae8d772242a10625a7b240cd7f509e1614c4d7f8b0507913dc507c048d69f966 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r2a.out: original 471 B sha256 8f0dba63178acf9e2dba2e67fec651731e8e1a612d37c0697b42994970751938 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r2b.out: original 471 B sha256 a85d64ddd51e052caf6d46a92978c3785c5430f2500f7507cab498b11b53ec18 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r3a.out: original 471 B sha256 eaea6012097ea4921202b4af4c063c86af557fbb633ca1bb7ee2203168c030e5 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r3b.out: original 471 B sha256 164b86c29a448f13c3f0b450a30cd43aed5091d171e05e2f977cd03554fc0cff (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r4a.out: original 471 B sha256 aca9d99bd52cfeac0e12af5b5414b10efb3a20a25ee9c6814561acba1a70ecb3 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r4b.out: original 471 B sha256 037819aea695be11ed29a3c072a4b2cf9d1236552941f93999d1fe2685ca613b (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r5a.out: original 471 B sha256 a96e90bd283cb2d27dc3d44ea00467b1a38ce38371e80412eb88c335a48632ba (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r5b.out: original 471 B sha256 3425f73b4366634901f038b450b4684c51711d9c79b47c5ec28e8f3d3b3f4d9d (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r6a.out: original 471 B sha256 76fe90fa9b8748a47bf91a093b5527f0d7081858028e4b5be29f168dedee778a (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r6b.out: original 471 B sha256 6a02f1405bbee4666c569e2bf582cb74f7e947a00ac9f67d71b17df1fbbaa377 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r7a.out: original 471 B sha256 a4fae8d10174ec4280b972d889929f008bc5e8f181837ffdb9cfabc66c5b1c8e (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r7b.out: original 471 B sha256 978afa6a7282a99c996b561baf407b7e4eb0fb9b36bec081c930c22000481e59 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r8a.out: original 471 B sha256 26e2c4a9c080527089d20a2ced3db0489bbc92f50a94338cea35b8e0b03c2cb7 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r8b.out: original 471 B sha256 94fa6e9d7df2ee9a06b55fed6034eed5f015dce576c0dd4d4b9602e9d331c4a4 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r9a.out: original 471 B sha256 0b33dc2fd406bc89fdc8904184bf1f7bcd71ad0c87597e75bb51d805a7646f57 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/lr-r9b.out: original 471 B sha256 44f7ed513a572a5feadb28fc20926f1414b2162906ee8a37bfa7ae8f710b4bb1 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/notes.txt: original 7422 B sha256 dbd28fcd92c12b3d526ad3b5d6027a87aeeed5c4fb3d1603a1bfe7aed4fe287f (kept on the lab PC); 1 x -> <the before-write option>; 1 x -> <the before option>; 1 x -> stop
+evidence/wid-ad.out: original 1148 B sha256 8e78f493fa8e2d64025978e08620ae4f626aeb84822acf8e35b23a37e5ffc7d8 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-al.out: original 1148 B sha256 75d15dac04972eacff8e68d5a505e06aa44554f65b3fdec0fd0bc9756883f915 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-bd.out: original 1148 B sha256 0940a1be89197fe4b5c2b89a2b9ec9d03a5b3a7006d226ee80478c325bcc324a (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-ns.out: original 1148 B sha256 5101b1b6eb2e97a7aa4481cb70a0aeb4e48739f7d641b816e265c759291e3525 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-ob.out: original 1148 B sha256 7fffb28320899fad946243cc6f6a7b973fda027baebdecf70d8368b0378cca7f (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-qa.out: original 1148 B sha256 a3c3f38e086d1b3dc93857e6fdc281f0f3037f54483f7af28bc4bb32e90fbb51 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-rs.out: original 1148 B sha256 6e3c203cd5327b4198bc60bb4bcfec05bbabb3b08bd4cb118d6cc414304ddbc2 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-sh.out: original 1148 B sha256 c3abb9f93a9c1e80a21cd2396b10986944a406f32b56d3ead2980b44e13e7e48 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-sm.out: original 1148 B sha256 17f2764ec791cb777fb005fabc664510d19d6d47a708544eedb1b84b92e2700d (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/wid-wd.out: original 1148 B sha256 040fc59a48bbe5390330783e2ce11d8822f257f7e103186743e2602ec95f65af (kept on the lab PC); 2 x -> <LAB_DIR>
+RESULTS.md: original 66209 B sha256 eddbb9405f35f3066c8678e43a7539897d06127aa564ddd5aae735a4f004994a (kept on the lab PC); 1 x -> <the before-write option>; 2 x -> <the before option>
+scripts/step0.py: original 2880 B sha256 0e15d8e5ddcb24f6607e992430b5cfcf0ba7adcc2636934abd8b83fd2893f909 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 419 B sha256 d0bb8c026b7aad2c1b9fd49f4ba0e566581a4cba233aa9bcce984409f7fd817d (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/send.sh: original 1778 B sha256 cd0cc385aa1b415fa75f3b7f19cbe0ff0af10f63e167d5aecdc41a5d9a90420c (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/lr.sh: original 2294 B sha256 b33c97f0e0ae94cc2c5044f4dbbe06566722caec10c3493e807a376dfc6decd8 (kept on the lab PC); 1 x -> <LAB_DIR>; 3 x -> stop
+scripts/w.sh: original 1246 B sha256 390b3b87d510c978ef32c0f92902f5e79b0cb60e4193c989884d725302927ff5 (kept on the lab PC); 2 x -> <the before-write option>; 1 x -> <LAB_DIR>; 2 x -> stop
+scripts/wid.sh: original 646 B sha256 57e7786940aa9f50690f5312246726b0306fa2b81fc47db7f71559f0d3f9d045 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/prep-c6.sh: original 2232 B sha256 4a861c16048495c8cd7eec3b77d07aef2fb2a49a794685d1c62ca4fc7b00c846 (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> <Tally data folder>

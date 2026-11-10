@@ -1,0 +1,82 @@
+N-0241.xml: 3022 bytes
+N-0242.xml: 3022 bytes
+N-0243.xml: 3022 bytes
+N-0244.xml: 3022 bytes
+N-0245.xml: 3022 bytes
+N-0246.xml: 3022 bytes
+N-0247.xml: 3022 bytes
+N-0248.xml: 3022 bytes
+N-0249.xml: 3022 bytes
+N-0250.xml: 3022 bytes
+N-0251.xml: 3022 bytes
+B-bills.xml: 46 bytes
+S-snap-20260401-20260801.xml: 25480 bytes
+M-marks.xml: 3394 bytes
+== a-s9-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Nc Plain': 0 groups
+  ad 'BRIDGE Nc Ak & Am Pvt. Ltd.': 0 groups
+  sh 'BRIDGE Nc M/s Bk-Bm': 0 groups
+  bd 'BRIDGE Nc Ck (Cm) Cn.': 0 groups
+  qa "BRIDGE Nc Dk's & Dm": 0 groups
+  wd 'BRIDGE Nc Ek and Em 2023-24': 0 groups
+  ns 'BRIDGE Nc Fk.Fm/Fn-Fp': 0 groups
+  sm 'BRIDGE Nc उदाहरण & Gk.': 0 groups
+  ob 'BRIDGE Nc (Hk) Hm': 0 groups
+  al "BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24": 0 groups
+  rs 'BRIDGE Nc Kk & Sons (India) Pvt. Ltd.': 0 groups
+  groups of any other party: 0
+== a-s9-S-snap-20260401-20260801.xml
+a-s9-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Nc Plain': no row
+  ad 'BRIDGE Nc Ak & Am Pvt. Ltd.': no row
+  sh 'BRIDGE Nc M/s Bk-Bm': no row
+  bd 'BRIDGE Nc Ck (Cm) Cn.': no row
+  qa "BRIDGE Nc Dk's & Dm": no row
+  wd 'BRIDGE Nc Ek and Em 2023-24': no row
+  ns 'BRIDGE Nc Fk.Fm/Fn-Fp': no row
+  sm 'BRIDGE Nc उदाहरण & Gk.': no row
+  ob 'BRIDGE Nc (Hk) Hm': no row
+  al "BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24": no row
+  rs 'BRIDGE Nc Kk & Sons (India) Pvt. Ltd.': no row
+exit 0
+== a-s9-N-0241.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0242.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0243.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0244.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0245.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0246.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0247.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0248.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0249.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0250.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0251.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0

@@ -1,0 +1,4 @@
+  a-r10a-L-lo-al-20260801.xml: 896 bytes, sha256 ade384af03dad64a8c69fecc00e1aa54f29683575f18756546d6149fbfbb20a7
+  a-r10b-L-lo-al-20260801.xml: 896 bytes, sha256 ade384af03dad64a8c69fecc00e1aa54f29683575f18756546d6149fbfbb20a7
+SAME: EQUAL
+exit 0

@@ -1,0 +1,10 @@
+p8 L-lo-sm-20260801.xml: run.py stopped (log-p8.txt: curl 0	0 bytes)
+answer file 0 bytes
+headers file:
+  HTTP/1.1 200 OK
+  RESPSTATUS: 1
+  CONNECTION: KEEP-ALIVE
+  CONTENT-LENGTH: 0
+  
+EXCEPTION HOLDS: HTTP 200, CONTENT-LENGTH: 0, 0 bytes
+2026-11-10T21:23:58.213Z GET /status after p8: curl 0 "status=200, bytes=51"

@@ -1,0 +1,26 @@
+== a-s6bb-B-bills.xml
+  BILLFIXED groups: 11
+  pl 'BRIDGE Nc Plain': 1 groups
+    BILLREF 'BP/26-27/0241'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ad 'BRIDGE Nc Ak & Am Pvt. Ltd.': 1 groups
+    BILLREF 'BP/26-27/0242'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  sh 'BRIDGE Nc M/s Bk-Bm': 1 groups
+    BILLREF 'BP/26-27/0243'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  bd 'BRIDGE Nc Ck (Cm) Cn.': 1 groups
+    BILLREF 'BP/26-27/0244'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  qa "BRIDGE Nc Dk's & Dm": 1 groups
+    BILLREF 'BP/26-27/0245'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  wd 'BRIDGE Nc Ek and Em 2023-24': 1 groups
+    BILLREF 'BP/26-27/0246'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ns 'BRIDGE Nc Fk.Fm/Fn-Fp': 1 groups
+    BILLREF 'BP/26-27/0247'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  sm 'BRIDGE Nc उदाहरण & Gk.': 1 groups
+    BILLREF 'BP/26-27/0248'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ob 'BRIDGE Nc (Hk) Hm': 1 groups
+    BILLREF 'BP/26-27/0249'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  al "BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24": 1 groups
+    BILLREF 'BP/26-27/0250'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  rs 'BRIDGE Nc Kk & Sons (India) Pvt. Ltd.': 1 groups
+    BILLREF 'BP/26-27/0251'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  groups of any other party: 0
+exit 0

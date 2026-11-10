@@ -1,0 +1,14 @@
+a-s6sa-S-snap-20260401-20260801.xml: LEDGER rows 29
+  pl 'BRIDGE Nc Plain': names ['BRIDGE Nc Plain']
+  ad 'BRIDGE Nc Ak & Am Pvt. Ltd.': names ['BRIDGE Nc Ak & Am Pvt. Ltd.']
+  sh 'BRIDGE Nc M/s Bk-Bm': names ['BRIDGE Nc M/s Bk-Bm']
+  bd 'BRIDGE Nc Ck (Cm) Cn.': names ['BRIDGE Nc Ck (Cm) Cn.']
+  qa "BRIDGE Nc Dk's & Dm": names ["BRIDGE Nc Dk's & Dm"]
+  wd 'BRIDGE Nc Ek and Em 2023-24': names ['BRIDGE Nc Ek and Em 2023-24']
+  ns 'BRIDGE Nc Fk.Fm/Fn-Fp': names ['BRIDGE Nc Fk.Fm/Fn-Fp']
+  sm 'BRIDGE Nc उदाहरण & Gk.': names ['BRIDGE Nc उदाहरण & Gk.']
+  ob 'BRIDGE Nc (Hk) Hm': names ['BRIDGE Nc (Hk) Hm']
+  al "BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24": names ["BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24"]
+  rs 'BRIDGE Nc Kk & Sons (India) Pvt. Ltd.': names ['BRIDGE Nc Kk & Sons (India) Pvt. Ltd.']
+NAMES: EQUAL
+exit 0

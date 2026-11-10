@@ -1,0 +1,14 @@
+a-s2-S-snap-20260401-20260801.xml: LEDGER rows 18
+  pl 'BRIDGE Nc Plain': no row
+  ad 'BRIDGE Nc Ak & Am Pvt. Ltd.': no row
+  sh 'BRIDGE Nc M/s Bk-Bm': no row
+  bd 'BRIDGE Nc Ck (Cm) Cn.': no row
+  qa "BRIDGE Nc Dk's & Dm": no row
+  wd 'BRIDGE Nc Ek and Em 2023-24': no row
+  ns 'BRIDGE Nc Fk.Fm/Fn-Fp': no row
+  sm 'BRIDGE Nc उदाहरण & Gk.': no row
+  ob 'BRIDGE Nc (Hk) Hm': no row
+  al "BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24": no row
+  rs 'BRIDGE Nc Kk & Sons (India) Pvt. Ltd.': no row
+NAMES: EQUAL
+exit 0

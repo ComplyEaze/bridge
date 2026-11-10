@@ -1,0 +1,22 @@
+== a-s4alm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'77'", "'254'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+exit 0
+== w.sh m s4al exit 0
+LM-al.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4al-after.png
+2026-11-10T21:28:10.574Z
+capture equal to p1-after
+a-s4al-LM-al.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4al LM-al.xml exit 0
+== a-s5alm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'77'", "'255'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+exit 0
+== w.sh m s5al exit 0
+I-al.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5al-after.png
+2026-11-10T21:28:18.076Z
+capture equal to p1-after
+a-s5al-I-al.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 54, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5al I-al.xml exit 0

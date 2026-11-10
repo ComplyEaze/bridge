@@ -1,0 +1,29 @@
+== a-s9-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Nc Plain': 0 groups
+  ad 'BRIDGE Nc Ak & Am Pvt. Ltd.': 0 groups
+  sh 'BRIDGE Nc M/s Bk-Bm': 0 groups
+  bd 'BRIDGE Nc Ck (Cm) Cn.': 0 groups
+  qa "BRIDGE Nc Dk's & Dm": 0 groups
+  wd 'BRIDGE Nc Ek and Em 2023-24': 0 groups
+  ns 'BRIDGE Nc Fk.Fm/Fn-Fp': 0 groups
+  sm 'BRIDGE Nc उदाहरण & Gk.': 0 groups
+  ob 'BRIDGE Nc (Hk) Hm': 0 groups
+  al "BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24": 0 groups
+  rs 'BRIDGE Nc Kk & Sons (India) Pvt. Ltd.': 0 groups
+  groups of any other party: 0
+== a-s9-S-snap-20260401-20260801.xml
+a-s9-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Nc Plain': no row
+  ad 'BRIDGE Nc Ak & Am Pvt. Ltd.': no row
+  sh 'BRIDGE Nc M/s Bk-Bm': no row
+  bd 'BRIDGE Nc Ck (Cm) Cn.': no row
+  qa "BRIDGE Nc Dk's & Dm": no row
+  wd 'BRIDGE Nc Ek and Em 2023-24': no row
+  ns 'BRIDGE Nc Fk.Fm/Fn-Fp': no row
+  sm 'BRIDGE Nc उदाहरण & Gk.': no row
+  ob 'BRIDGE Nc (Hk) Hm': no row
+  al "BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24": no row
+  rs 'BRIDGE Nc Kk & Sons (India) Pvt. Ltd.': no row
+exit 0

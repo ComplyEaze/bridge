@@ -1,0 +1,4 @@
+  a-r9a-L-lo-ob-20260801.xml: 896 bytes, sha256 3ae1ae3765e0ee2b581abdf27c6087fab9a73efd750e50293eb136650afa6e74
+  a-r9b-L-lo-ob-20260801.xml: 896 bytes, sha256 3ae1ae3765e0ee2b581abdf27c6087fab9a73efd750e50293eb136650afa6e74
+SAME: EQUAL
+exit 0

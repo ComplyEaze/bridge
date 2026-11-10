@@ -1,0 +1,22 @@
+== a-s4obm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'76'", "'253'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+exit 0
+== w.sh m s4ob exit 0
+LM-ob.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4ob-after.png
+2026-11-10T21:27:53.836Z
+capture equal to p1-after
+a-s4ob-LM-ob.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4ob LM-ob.xml exit 0
+== a-s5obm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'76'", "'254'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+exit 0
+== w.sh m s5ob exit 0
+I-ob.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5ob-after.png
+2026-11-10T21:28:01.921Z
+capture equal to p1-after
+a-s5ob-I-ob.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 53, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5ob I-ob.xml exit 0

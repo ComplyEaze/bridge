@@ -6,3 +6,4 @@ scripts/shot.sh: original 427 B sha256 6714e89d4adffd647938d0b65e3628db3cd7f5f0c
 scripts/send.sh: original 899 B sha256 f49f5303451aa27f6917cf10a959a33364253a09fec49778f33938641ca66637 (kept on the lab PC); 1 x -> <LAB_DIR>
 scripts/step2.sh: original 1678 B sha256 6595a5e87038280d98ce019d250234c82fa0179c539a747588ea7423f062452e (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop
 scripts/step6.sh: original 2619 B sha256 4c13abf2eace010a7a13ba1b484ae6b9b93dad60231a15b2b6bba97341016d22 (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop
+fix-forward on fc1bdff2, the tier word: RESULTS.md (lines 3 and 49) and evidence/notes.txt (line 4, two places) name the Tally edition as TallyPrime single-user edition; the copies at fc1bdff2 were RESULTS.md 58989 B sha256 20618b38f8f0b3886e0d2e0dcd0298573526069c3fbffbe33ff2b32bb8c162fa and evidence/notes.txt 14380 B sha256 c4ec7e8307a9794c948be8a1dcbbb9676bb61d0138fe8ac81c5901f21961407c; no answer held the word

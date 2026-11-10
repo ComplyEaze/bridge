@@ -4621,6 +4621,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml",
         APP_STOCK_LINE_ROWS,
     ),

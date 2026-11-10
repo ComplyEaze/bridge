@@ -1,0 +1,7 @@
+08:02:28	M-marks.xml	a-s5-M-marks.xml	curl 0	3394 bytes
+08:02:28	W-2026-08.xml	a-s5-W-2026-08.xml	curl 0	115168 bytes
+08:02:28	V-0093.xml	a-s5-V-0093.xml	curl 0	3022 bytes
+08:02:28	R-0093.xml	a-s5-R-0093.xml	curl 0	3022 bytes
+08:02:28	R-0010.xml	a-s5-R-0010.xml	curl 0	94474 bytes
+08:02:28	S-items.xml	a-s5-S-items.xml	curl 0	2998 bytes
+08:02:28	G-godowns.xml	a-s5-G-godowns.xml	curl 0	4146 bytes

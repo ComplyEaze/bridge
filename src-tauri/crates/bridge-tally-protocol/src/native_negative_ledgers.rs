@@ -22,6 +22,7 @@
 //! amount that is not a plain decimal each have their own error; an entry with both
 //! columns empty, with both columns filled, with a zero or with a sign that is not
 //! the one measured is the one `BalanceUnexpected`.
+use crate::xml_read_profiles::ValidatedCompanyName;
 use bridge_tally_primitives::ExactDecimal;
 use quick_xml::{
     events::{BytesStart, Event},
@@ -42,7 +43,7 @@ use crate::{
 /// Renders the only supported request: Tally's own Negative Ledgers by name over
 /// the period, for the named company. No TDL.
 pub fn render_native_negative_ledgers_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_built_in_report_request(BuiltInReport::NegativeLedgers, company, period)

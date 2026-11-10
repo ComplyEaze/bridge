@@ -243,9 +243,27 @@ async fn the_three_requests_on_the_wire_are_this_companys_and_periods_each_read_
     )
     .unwrap();
     for request in [
-        render_native_godown_summary_request("Bridge Ageing Lab", &period),
-        render_native_stock_summary_request("Bridge Ageing Lab", &period),
-        render_native_stock_summary_exploded_request("Bridge Ageing Lab", &period),
+        render_native_godown_summary_request(
+            &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+                "Bridge Ageing Lab",
+            )
+            .unwrap(),
+            &period,
+        ),
+        render_native_stock_summary_request(
+            &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+                "Bridge Ageing Lab",
+            )
+            .unwrap(),
+            &period,
+        ),
+        render_native_stock_summary_exploded_request(
+            &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+                "Bridge Ageing Lab",
+            )
+            .unwrap(),
+            &period,
+        ),
     ] {
         let mut body = vec![0xFF, 0xFE];
         body.extend(request.encode_utf16().flat_map(u16::to_le_bytes));

@@ -77,7 +77,10 @@ fn the_request_is_byte_equal_to_its_committed_capture() {
     )
     .unwrap();
     assert_eq!(
-        render_native_negative_ledgers_request(COMPANY, &period),
+        render_native_negative_ledgers_request(
+            &ValidatedCompanyName::new(COMPANY).unwrap(),
+            &period
+        ),
         decode_xml_bytes(REQUEST).unwrap()
     );
 }
@@ -91,7 +94,10 @@ fn the_second_requests_bytes_are_those_of_the_committed_capture() {
     )
     .unwrap();
     assert_eq!(
-        render_native_negative_ledgers_request("BRIDGE SHAPE LAB", &period),
+        render_native_negative_ledgers_request(
+            &ValidatedCompanyName::new("BRIDGE SHAPE LAB").unwrap(),
+            &period
+        ),
         decode_xml_bytes(SHAPE_LAB_REQUEST).unwrap()
     );
 }

@@ -18,6 +18,7 @@
 //! cash (observed live; the trial balance side is not committed and is UNVERIFIED
 //! here); which groups Tally counts as working capital was not measured. Nothing
 //! here applies that reading, and nothing ties the figures to anything.
+use crate::xml_read_profiles::ValidatedCompanyName;
 use serde::Serialize;
 use std::fmt;
 
@@ -32,7 +33,10 @@ use crate::{
 
 /// Renders the only supported request: Tally's own Funds Flow by name over the
 /// window, for the named company. No TDL.
-pub fn render_native_funds_flow_request(company: &str, window: &WholeMonthWindow) -> String {
+pub fn render_native_funds_flow_request(
+    company: &ValidatedCompanyName,
+    window: &WholeMonthWindow,
+) -> String {
     render_built_in_report_request(BuiltInReport::FundsFlow, company, window.period())
 }
 

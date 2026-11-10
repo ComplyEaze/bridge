@@ -543,7 +543,7 @@ impl TallyRuntime {
                     .await?;
 
                     let request =
-                        render_native_stock_summary_request(identity.display_name(), &period);
+                        render_native_stock_summary_request(identity.company_name(), &period);
                     let (xml, bytes, hash) = client
                         .fetch_native_report_paired(request.clone())
                         .await?

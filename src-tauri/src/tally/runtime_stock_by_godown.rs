@@ -152,7 +152,7 @@ impl TallyRuntime {
                         .ok_or(OutstandingsError::MasterWitnessAbsent)?
                         .get();
                     let estimate = admit_stock_summary_size(mark).map_err(own)?;
-                    let company = identity.display_name();
+                    let company = identity.company_name();
 
                     let mut answers = Vec::with_capacity(3);
                     for (request, drift) in [

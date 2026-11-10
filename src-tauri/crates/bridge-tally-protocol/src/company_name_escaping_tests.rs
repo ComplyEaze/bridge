@@ -81,7 +81,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         ),
         (
             "native_statement_reports::render_native_statement_request",
-            render_native_statement_request(NativeStatementKind::BalanceSheet, NAME, &period),
+            render_native_statement_request(NativeStatementKind::BalanceSheet, &company, &period),
         ),
         (
             "native_stock_summary::render_company_inventory_flags_request",
@@ -95,7 +95,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         ),
         (
             "native_stock_summary::render_native_stock_summary_request",
-            render_native_stock_summary_request(NAME, &period),
+            render_native_stock_summary_request(&company, &period),
         ),
         (
             "native_trial_balance::render_native_trial_balance_request",

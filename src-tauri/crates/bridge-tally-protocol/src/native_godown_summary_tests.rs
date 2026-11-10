@@ -110,7 +110,10 @@ fn outcome_of(exploded: &str, item: &str) -> NativeItemByGodown {
 #[test]
 fn the_request_is_text_equal_to_its_committed_capture() {
     assert_eq!(
-        render_native_godown_summary_request("BRIDGE SHAPE LAB", &year_end()),
+        render_native_godown_summary_request(
+            &ValidatedCompanyName::new("BRIDGE SHAPE LAB").unwrap(),
+            &year_end()
+        ),
         decode_xml_bytes(REQUEST).unwrap()
     );
 }
@@ -118,7 +121,10 @@ fn the_request_is_text_equal_to_its_committed_capture() {
 #[test]
 fn the_exploded_request_is_text_equal_to_its_committed_capture() {
     assert_eq!(
-        render_native_stock_summary_exploded_request("BRIDGE SHAPE LAB", &year_end()),
+        render_native_stock_summary_exploded_request(
+            &ValidatedCompanyName::new("BRIDGE SHAPE LAB").unwrap(),
+            &year_end()
+        ),
         decode_xml_bytes(EXPLODED_REQUEST).unwrap()
     );
 }

@@ -4342,6 +4342,26 @@
       "size": 3024
     },
     {
+      "blob": "0ef93c693aec99920ecd78b20e2f5cef597c34e6",
+      "capture_id": "pilot-lab-number-0010-held-once.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-st-answers at dd3d85a2, file lab/2162-st-answers/answers/a-s2-N-0010s.xml, equal to its line in that folder's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row ST)",
+      "sha256": "850c2b166e02c2666a9e5c9807646ff2b9d2e8cdc68f7ff2af21b71bc45b1e85",
+      "size": 5604
+    },
+    {
+      "blob": "d62568f3cb87da72479524892dc5de0ba5d8819d",
+      "capture_id": "pilot-lab-number-0010-two-sales-types.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-st-answers at dd3d85a2, file lab/2162-st-answers/answers/a-s4r-N-0010s.xml, equal to its line in that folder's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row ST)",
+      "sha256": "01086f928399b4ed0bc316c453dd4e08f393e123a201967d557076707ba5100d",
+      "size": 8206
+    },
+    {
       "blob": "618661e6a514b5d123984f50d10ee803f9008cfd",
       "capture_id": "pilot-lab-invoice-post-duplicate-declined.utf16le.xml",
       "company": "BRIDGE PILOT LAB",

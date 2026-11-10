@@ -823,3 +823,80 @@ fn the_company_name_limit_is_360_utf8_bytes_for_every_script() {
         not_established
     );
 }
+
+/// #2449: the one display rule for a company name, as the agent and the
+/// desktop client both show it. Each row is (name, shown text, refusal).
+#[test]
+fn a_company_name_is_shown_by_one_rule_and_marked_when_it_cannot_be_sent() {
+    let ascii_300 = "S".repeat(300);
+    let ascii_361 = "S".repeat(MAX_COMPANY_NAME_BYTES + 1);
+    let rows: Vec<(String, String, Option<CompanyNameRefusal>)> = vec![
+        // Edge spaces are part of the name: kept, shown and sendable.
+        (
+            "  Synthetic Traders  ".into(),
+            "  Synthetic Traders  ".into(),
+            None,
+        ),
+        // A zero-width space and a right-to-left override are shown as codes.
+        (
+            "Synthetic\u{200b}Tra\u{202e}ders".into(),
+            "Synthetic\\u{200b}Tra\\u{202e}ders".into(),
+            None,
+        ),
+        // A Devanagari name with a joiner is shown as is.
+        (
+            "\u{915}\u{94d}\u{200d}\u{937}".into(),
+            "\u{915}\u{94d}\u{200d}\u{937}".into(),
+            None,
+        ),
+        // Limit: a name of joiners alone is sendable and draws as nothing.
+        ("\u{200d}\u{200c}".into(), "\u{200d}\u{200c}".into(), None),
+        // Limit: a backslash is not escaped, so spelt-out text shows as is.
+        (
+            "Synthetic\\u{200b}".into(),
+            "Synthetic\\u{200b}".into(),
+            None,
+        ),
+        // Over 255 bytes and within the limit: sendable, shown whole.
+        (ascii_300.clone(), ascii_300, None),
+        // A control character marks the name, and every control and format
+        // character in it is shown as a code, the joiner included.
+        (
+            "Synthetic\u{7}Tra\u{200d}ders".into(),
+            "Synthetic\\u{0007}Tra\\u{200d}ders".into(),
+            Some(CompanyNameRefusal::ControlCharacter),
+        ),
+        // An edge control character marks the name too.
+        (
+            "Synthetic Traders\n".into(),
+            "Synthetic Traders\\u{000a}".into(),
+            Some(CompanyNameRefusal::ControlCharacter),
+        ),
+        // Over the limit: marked, never cut.
+        (
+            ascii_361.clone(),
+            ascii_361,
+            Some(CompanyNameRefusal::LengthNotEstablished),
+        ),
+        ("   ".into(), "   ".into(), Some(CompanyNameRefusal::Blank)),
+    ];
+    for (name, text, refusal) in rows {
+        let shown = ShownCompanyName::of(&name);
+        assert_eq!(shown.text(), text, "{name:?}");
+        assert_eq!(shown.refusal(), refusal, "{name:?}");
+        assert_eq!(
+            shown.refusal(),
+            ValidatedCompanyName::refusal(&name),
+            "{name:?}"
+        );
+    }
+    assert_eq!(CompanyNameRefusal::Blank.code(), "company_name_blank");
+    assert_eq!(
+        CompanyNameRefusal::ControlCharacter.code(),
+        "company_name_control_character"
+    );
+    assert_eq!(
+        CompanyNameRefusal::LengthNotEstablished.code(),
+        "company_name_length_not_established"
+    );
+}

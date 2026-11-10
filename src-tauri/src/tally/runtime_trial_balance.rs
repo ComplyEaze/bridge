@@ -464,11 +464,11 @@ impl TallyRuntime {
 
                     let request = match &base {
                         Some(_) => render_native_trial_balance_request_with_currency(
-                            identity.display_name(),
+                            identity.company_name(),
                             &period,
                         ),
                         None => {
-                            render_native_trial_balance_request(identity.display_name(), &period)
+                            render_native_trial_balance_request(identity.company_name(), &period)
                         }
                     };
                     let (xml, bytes, hash) = client

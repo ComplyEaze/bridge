@@ -50,6 +50,7 @@ use bridge_tally_core::{
     ReadWindow, RequestContext, TallyConnector, TallyDate, TransportId,
     CORE_ACCOUNTING_SCHEMA_VERSION,
 };
+use bridge_tally_protocol::xml_read_profiles::ShownCompanyName;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::State;
@@ -1785,18 +1786,36 @@ pub async fn fetch_tally_companies(
     runtime
         .fetch_companies(config)
         .await
-        .map(|companies| {
-            companies
-                .into_iter()
-                .map(|company| UntrustedCompanyCandidate { name: company.name })
-                .collect()
-        })
+        .map(untrusted_company_candidates)
         .map_err(tally_runtime_command_error)
 }
 
+/// A company the picker offers before it is verified. `name` is exactly as
+/// Tally reported it, and is what the webview sends back to verify; the picker
+/// draws `shown_name`, by the agent's own rule (#2449).
 #[derive(Debug, Serialize)]
 pub struct UntrustedCompanyCandidate {
     pub name: String,
+    pub shown_name: String,
+    /// Why a request cannot carry this name; only a marked company has it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_refusal: Option<&'static str>,
+}
+
+pub(crate) fn untrusted_company_candidates(
+    companies: Vec<TallyCompany>,
+) -> Vec<UntrustedCompanyCandidate> {
+    companies
+        .into_iter()
+        .map(|company| {
+            let shown = ShownCompanyName::of(&company.name);
+            UntrustedCompanyCandidate {
+                name_refusal: shown.refusal().map(|refusal| refusal.code()),
+                shown_name: shown.into_text(),
+                name: company.name,
+            }
+        })
+        .collect()
 }
 
 #[derive(Debug, Deserialize)]

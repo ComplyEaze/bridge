@@ -1,0 +1,5 @@
+$ each send's time to answer and the gap from the previous send's answer to its start, seconds, from evidence/sends-utc.txt
+m0: started 07:58:19.804Z
+m0: answered in 0.4 s
+tb3a: started 07:58:28.582Z; gap after m0 answered: 8.4 s
+tb3a: answered in 0.5 s

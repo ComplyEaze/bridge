@@ -1,0 +1,85 @@
+$ python -I (difflib, inline) unified line diff of row 683-TW's tb3 answer (a-twtb3) against tb3a, both decoded UTF-16LE, 3 lines of context
+--- a-twtb3-T-tb3-20250401-20250401.xml
++++ a-tb3a-T-tb3-20250401-20250401.xml
+@@ -51,8 +51,8 @@
+      <PARENT TYPE="String">Sales Accounts</PARENT>
+      <DEBITTOTALS TYPE="Amount"></DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount">$1000100.00 @ ₹ 86/$ = ₹ 86014641.25</CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">$1000100.00 @ ₹ 86/$ = ₹ 86014641.25</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>BRIDGE Export Sales</NAME>
+@@ -66,8 +66,8 @@
+      <PARENT TYPE="String">Purchase Accounts</PARENT>
+      <DEBITTOTALS TYPE="Amount">-$200.00 @ ₹ 86/$ = -₹ 17400.00</DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount"></CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">-$200.00 @ ₹ 86/$ = -₹ 17400.00</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>BRIDGE Import Purchases</NAME>
+@@ -81,8 +81,8 @@
+      <PARENT TYPE="String">Sundry Debtors</PARENT>
+      <DEBITTOTALS TYPE="Amount">-5000.00</DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount">2000.00</CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">-3000.00</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>BRIDGE INR Customer</NAME>
+@@ -96,8 +96,8 @@
+      <PARENT TYPE="String">Bank Accounts</PARENT>
+      <DEBITTOTALS TYPE="Amount">-$1100.00 @ ₹ 87/$ = -₹ 96700.00</DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount">$200.00 @ ₹ 87/$ = ₹ 17500.00</CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">-$900.00 @ ₹ 88/$ = -₹ 79200.00</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>BRIDGE Lab Bank</NAME>
+@@ -111,8 +111,8 @@
+      <PARENT TYPE="String">Sundry Debtors</PARENT>
+      <DEBITTOTALS TYPE="Amount">-$1000100.00 @ ₹ 87.9999/$ = -₹ 88008700.00</DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount">$1100.00 @ ₹ 87/$ = ₹ 96700.00</CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">-$999000.00 @ ₹ 88/$ = -₹ 87912000.00</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>BRIDGE USD Customer</NAME>
+@@ -126,8 +126,8 @@
+      <PARENT TYPE="String">Sundry Creditors</PARENT>
+      <DEBITTOTALS TYPE="Amount">-$200.00 @ ₹ 87/$ = -₹ 17500.00</DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount">$200.00 @ ₹ 87.50/$ = ₹ 17500.00</CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">$0.00 @ ₹ /$ = ₹ 0.00</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>BRIDGE USD Supplier</NAME>
+@@ -141,8 +141,8 @@
+      <PARENT TYPE="String">Cash-in-Hand</PARENT>
+      <DEBITTOTALS TYPE="Amount">-3000.00</DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount"></CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">-3000.00</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>Cash</NAME>
+@@ -156,8 +156,8 @@
+      <PARENT TYPE="String">&#4; Primary</PARENT>
+      <DEBITTOTALS TYPE="Amount"></DEBITTOTALS>
+      <CREDITTOTALS TYPE="Amount"></CREDITTOTALS>
++     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <TBALCLOSING TYPE="Amount">$0.00 @ ₹ /$ = ₹ 0.00</TBALCLOSING>
+-     <TBALOPENING TYPE="Amount">0.00</TBALOPENING>
+      <LANGUAGENAME.LIST>
+       <NAME.LIST TYPE="String">
+        <NAME>Profit &amp; Loss A/c</NAME>
+lines removed: 8; lines added: 8; every one is <TBALOPENING TYPE="Amount">0.00</TBALOPENING>, moved from after TBALCLOSING to before it
+the two answers as sorted lists of lines: EQUAL

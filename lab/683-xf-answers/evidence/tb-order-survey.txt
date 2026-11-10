@@ -1,0 +1,11 @@
+$ python -I (inline) every Trial Balance answer file (a-*-T-*.xml holding both TBALOPENING and TBALCLOSING) in the lab row folders, counted by row and by which of the two elements comes first; copies of earlier rows' answers count in the row that holds them
+683-cd: TBALCLOSING first=5
+683-ld: TBALCLOSING first=5
+683-op: TBALCLOSING first=2
+683-ro: TBALCLOSING first=6
+683-tb: TBALCLOSING first=2
+683-tw: TBALCLOSING first=3
+683-vd: TBALCLOSING first=6
+683-xf: TBALCLOSING first=3; TBALOPENING first=1
+in all: TBALCLOSING first=32; TBALOPENING first=1
+the one with TBALOPENING first is a-tb3a in row 683-XF

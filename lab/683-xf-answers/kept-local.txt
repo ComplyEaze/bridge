@@ -1,0 +1,6 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+evidence/c10-netstat.txt 7768 B a5cb4759560169220e29de2b90df0f673a02f8de08563648c4734ef925021551 (process or port listing)
+evidence/c10-tasklist.txt 54 B c93b66784ba2faf6145d7af8b178e5afbaa7a54fbbe024b627454bdfb940d84d (process or port listing)
+evidence/s0-netstat.txt 7768 B 3df7d9ee8306c1c3b369de6ec88b1cc7c0afc86f10efc7bb8cd796a1048c6064 (process or port listing)
+evidence/s0-tasklist.txt 54 B e22029f829b0e36e3c68cea8b9f1e18c1c24e52686a0427661730bbccd5ba0b7 (process or port listing)
+stage-683xf.py 12331 B a9eb95a6e871776e18cbcd6db4eac72ad2f488233f1fb02ae4d9686bcb773faf (this stage script: its patterns name the lab paths)

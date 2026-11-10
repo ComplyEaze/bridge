@@ -7423,6 +7423,18 @@ macro_rules! pilot_number_months {
     };
 }
 
+/// The number's month reads sent again after a clean read-back (#2162): the
+/// same twelve reads, with August answered by the captured month `U`, which
+/// holds the posted `BP/26-27/0010` once, on BRIDGE Sales.
+macro_rules! pilot_number_months_after_post {
+    () => {
+        concat!(
+            "e1s1se", "e2s2se", "e3s3se", "e4s4se", "eUsUse", "e6s6se", "e7s7se", "e8s8se",
+            "e9s9se", "exsxse", "eysyse", "ezszse"
+        )
+    };
+}
+
 /// The invoice's masters, read again in the endpoint queue after the approval
 /// (#1337): the build's own reads from its currency read to the tax units, in
 /// the same order and without the marks (the queue's binding marks are the
@@ -7473,7 +7485,9 @@ macro_rules! pilot_queue_block {
 // their series-level numbering (both read at the build and again before the
 // approval, 16 Oct 2026),
 // R invoice read-back (the request with the GSTR-1 status fields, answered on
-// 10 Oct 2026 for the voucher unchanged since the post: AlterID 17), Z Tally's
+// 10 Oct 2026 for the voucher unchanged since the post: AlterID 17), U the
+// captured August, holding the posted number, in the month reads sent again
+// after the read-back (`pilot_number_months_after_post!`), Z Tally's
 // answer to the import. The queue re-reads the invoice's masters (the block in
 // `pilot_queue_block!`) before its closing profile and the aim marks (#1337).
 const PILOT_ORDER: &str = concat!(
@@ -7492,7 +7506,13 @@ const PILOT_ORDER: &str = concat!(
     // The invoice's masters, read again in the queue after the approval (#1337).
     pilot_queue_block!(),
     "seeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
+    // The number's month reads sent again after the clean read-back (#2162).
+    pilot_number_months_after_post!(),
 );
+
+/// The tail of `PILOT_ORDER` that only a clean read-back is followed by: the
+/// number's month reads sent again (#2162).
+const PILOT_NUMBER_READ_AFTER_POST: &str = pilot_number_months_after_post!();
 
 const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 /// The request Tally accepted on 9 Oct 2026 (CREATED 1): its SHA-256.
@@ -8109,7 +8129,13 @@ async fn pilot_post_changed(changes: &[Changed]) -> PilotRun {
 
 /// As [`pilot_post_changed`], over another order of requests.
 async fn pilot_post_changed_in(order: &str, changes: &[Changed]) -> PilotRun {
-    let (simulator, server, directory) = pilot_lab_changed(order, changes);
+    pilot_post_on(pilot_lab_changed(order, changes)).await
+}
+
+/// The build and the post of the pilot lab's invoice, over a replay.
+async fn pilot_post_on(
+    (simulator, server, directory): (SequenceSimulator, Server, tempfile::TempDir),
+) -> PilotRun {
     let remote_id = Uuid::parse_str("00000000-0000-4000-8000-000000000777").unwrap();
     let (response, journal_after_build) = TEST_QUALIFIED_VOUCHER_TYPES
         .scope(PILOT_QUALIFIED, async {
@@ -8790,6 +8816,62 @@ fn pilot_readback_uncertain() -> String {
     answer
 }
 
+/// A month read after a clean read-back that fails is a difference, never a
+/// pass (#2162): the month reads end there, and the invoice ends
+/// `posted_divergent` with `invoice_number_read_failed` alone. March's first
+/// send, the last month read, fails both ways the transport can: Tally
+/// answering with an HTTP error, and the connection reset before the answer.
+#[tokio::test]
+async fn a_month_read_that_fails_after_a_clean_read_back_ends_the_invoice_divergent() {
+    let after_post = PILOT_ORDER.len() - PILOT_NUMBER_READ_AFTER_POST.len();
+    let failing = after_post + PILOT_NUMBER_READ_AFTER_POST.find('z').unwrap();
+    for (how, plan) in [
+        (
+            "an HTTP error",
+            ScenarioPlan::new(Fixture::SyntheticXml("<ENVELOPE/>".into())).with_http_status(500),
+        ),
+        (
+            "a reset",
+            pilot_plan('z').with_delivery(tally_protocol_simulator::Delivery::ResetBeforeBody),
+        ),
+    ] {
+        let mut plans: Vec<ScenarioPlan> = PILOT_ORDER[..failing].chars().map(pilot_plan).collect();
+        plans.push(plan);
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let run = pilot_post_on((simulator, server, directory)).await;
+        let result = &run.response["structuredContent"]["result"];
+        let voucher = &result["vouchers"][0];
+        assert_eq!(
+            voucher["status"], "posted_divergent",
+            "{how}: {}",
+            run.response
+        );
+        assert_eq!(
+            voucher["diffs"],
+            json!([{"invoice_fields": ["invoice_number_read_failed"]}]),
+            "{how}"
+        );
+        assert_eq!(result["counts"]["posted_divergent"], 1, "{how}");
+        assert_eq!(result["counts"]["posted_verified"], 0, "{how}");
+        // The month reads before March were each the build's own request;
+        // nothing was sent after the failed one.
+        assert_eq!(run.observed.len(), failing + 1, "{how}");
+        for (position, request) in run.observed.iter().enumerate().skip(after_post) {
+            let letter = PILOT_ORDER.as_bytes()[position] as char;
+            if !"123456789xyzU".contains(letter) {
+                continue;
+            }
+            assert_eq!(
+                request.request_body_sha256,
+                pilot_request_sha256(letter),
+                "{how} at {position}"
+            );
+        }
+    }
+}
+
 /// #691: an invoice posted on the pilot lab's answers whose read-back Tally's
 /// GSTR-1 lists as uncertain ends `posted_divergent` with that code alone, and
 /// stops the company: the next invoice build is refused, naming the batch,
@@ -8797,11 +8879,16 @@ fn pilot_readback_uncertain() -> String {
 #[tokio::test]
 async fn an_invoice_the_gstr_1_lists_as_uncertain_ends_divergent_and_stops_the_next_invoice() {
     let readback = pilot_readback_uncertain();
-    // The post as on the verified replay, then the reads a second build makes
-    // before its admission, as many as the build refused on the walk-in
-    // ledger's earlier spelling makes: the admission itself reads nothing.
+    // The post as on the verified replay, up to its read-back: that read-back
+    // differs, so the number read after it is not sent. Then the reads a
+    // second build makes before its admission, as many as the build refused
+    // on the walk-in ledger's earlier spelling makes: the admission itself
+    // reads nothing.
     let order = format!(
-        "{PILOT_ORDER}{}",
+        "{}{}",
+        PILOT_ORDER
+            .strip_suffix(PILOT_NUMBER_READ_AFTER_POST)
+            .unwrap(),
         &PILOT_ORDER[..PILOT_ORDER.find('k').unwrap() + 5]
     );
     let simulator = SequenceSimulator::spawn(with_sentinel(

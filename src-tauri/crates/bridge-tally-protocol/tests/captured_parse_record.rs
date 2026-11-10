@@ -3968,6 +3968,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_REPLAY,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-duplicate-declined.utf16le.xml",
         PILOT_LAB_REPLAY,
     ),

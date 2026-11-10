@@ -69,6 +69,30 @@ const OUTSTANDINGS: &[(OutstandingsCode, &str)] = &[
     ),
 ];
 
+/// The codes of the invoice number read after the post (#2162).
+const INVOICE_NUMBER_AFTER_POST: &[(InvoiceNumberAfterPostCode, &str)] = &[
+    (
+        InvoiceNumberAfterPostCode::ReadFailed,
+        "invoice_number_read_failed",
+    ),
+    (
+        InvoiceNumberAfterPostCode::TypeUnread,
+        "invoice_number_type_unread",
+    ),
+    (
+        InvoiceNumberAfterPostCode::InAnotherType,
+        "invoice_number_in_another_type",
+    ),
+    (
+        InvoiceNumberAfterPostCode::ReadMissedInvoice,
+        "invoice_number_read_missed_invoice",
+    ),
+    (
+        InvoiceNumberAfterPostCode::NotUnique,
+        "invoice_number_not_unique",
+    ),
+];
+
 /// Every pin of every enum, as the failure code its variant makes, beside the pinned string.
 fn pinned() -> Vec<(FailureCode, &'static str)> {
     fn of<C: Copy + Into<FailureCode>>(
@@ -86,6 +110,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(GST_BY_LEDGER),
         of(REGISTER),
         of(OUTSTANDINGS),
+        of(INVOICE_NUMBER_AFTER_POST),
     ]
     .concat()
 }
@@ -103,6 +128,7 @@ fn declared() -> Vec<FailureCode> {
         of(GstByLedgerCode::ALL),
         of(RegisterCode::ALL),
         of(OutstandingsCode::ALL),
+        of(InvoiceNumberAfterPostCode::ALL),
     ]
     .concat()
 }
@@ -124,6 +150,10 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(GST_BY_LEDGER), GstByLedgerCode::ALL);
     assert_eq!(variants(REGISTER), RegisterCode::ALL);
     assert_eq!(variants(OUTSTANDINGS), OutstandingsCode::ALL);
+    assert_eq!(
+        variants(INVOICE_NUMBER_AFTER_POST),
+        InvoiceNumberAfterPostCode::ALL
+    );
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -155,6 +185,10 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(GST_BY_LEDGER, GstByLedgerCode::as_str);
     check_pins(REGISTER, RegisterCode::as_str);
     check_pins(OUTSTANDINGS, OutstandingsCode::as_str);
+    check_pins(
+        INVOICE_NUMBER_AFTER_POST,
+        InvoiceNumberAfterPostCode::as_str,
+    );
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -172,7 +206,7 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    assert_eq!(codes.len(), 22, "the declared codes");
+    assert_eq!(codes.len(), 27, "the declared codes");
     for code in codes {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");

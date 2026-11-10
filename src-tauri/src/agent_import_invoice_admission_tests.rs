@@ -1121,6 +1121,14 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
 /// read-back of `BP/26-27/0010` after the post; before it, m is the marks and A
 /// the same read-back (a complete envelope with no voucher).
 const READBACK_ORDER: &str = "eMsMseeRsRse";
+/// A clean read-back, then the number's twelve month reads sent again (72):
+/// the months row 2162-M1 captured, with August answered by `U`, the captured
+/// month that holds `BP/26-27/0010` once, on BRIDGE Sales.
+const READBACK_THEN_NUMBER_ORDER: &str = concat!(
+    "eMsMseeRsRse",
+    "e1s1see2s2see3s3see4s4seeUsUsee6s6see7s7see8s8se",
+    "e9s9seexsxseeysyseezszse"
+);
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
 /// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
 /// line's HSN/SAC and `ISPOSTDATED` (`R-0010.xml` of the 2162-S1 sheet, the
@@ -1180,17 +1188,27 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
 /// reference the number gives.
 #[tokio::test]
 async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_answer() {
-    for (number, expected) in [
-        ("BP/26-27/0010", Vec::<&str>::new()),
-        ("BP/26-27/0040", vec!["VOUCHERNUMBER", "REFERENCE"]),
+    let mut read_bytes = Vec::new();
+    for (number, expected, order) in [
+        (
+            "BP/26-27/0010",
+            Vec::<&str>::new(),
+            READBACK_THEN_NUMBER_ORDER,
+        ),
+        (
+            "BP/26-27/0040",
+            vec!["VOUCHERNUMBER", "REFERENCE"],
+            READBACK_ORDER,
+        ),
     ] {
-        let lab = pilot_lab_over(READBACK_ORDER);
-        let (differences, alter_id, guid, _, _) = lab
+        let lab = pilot_lab_over(order);
+        let (differences, alter_id, guid, _, evidence) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &pilot_saved(number, true))
             .await
             .expect("a read-back after a post is never an error");
         assert_eq!(differences, expected, "{number}");
+        read_bytes.push(evidence.bytes);
         assert_eq!(alter_id.as_deref(), Some("17"), "{number}");
         assert_eq!(
             guid,
@@ -1198,11 +1216,23 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
             "{number}"
         );
         let requests = received(lab.simulator);
-        assert_eq!(requests.len(), 12, "{number}");
+        assert_eq!(requests.len(), order.len(), "{number}");
         if number == "BP/26-27/0010" {
-            assert_eq!(sent_as(READBACK_ORDER, &requests, 'R'), [LAB_R12_SHA256; 2]);
+            assert_eq!(sent_as(order, &requests, 'R'), [LAB_R12_SHA256; 2]);
+            // The month reads after the post are the build's month reads,
+            // byte for byte, April to March.
+            assert_eq!(months_sent(order, &requests), month_shas_paired());
         }
     }
+    // The read-back's evidence counts the month reads after it: the two cases
+    // share the marks and the read-back's answer, so they differ by exactly
+    // the twelve month answers, each read twice.
+    // August's answer `U` is the captured August.
+    let months: usize = super::lab_number_months()
+        .iter()
+        .map(|month| month.3.len())
+        .sum();
+    assert_eq!(read_bytes[0] - read_bytes[1], months * 2);
 }
 
 // ---- BRIDGE PILOT LAB: the Sales stop ----

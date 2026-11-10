@@ -1,0 +1,49 @@
+a-twtb3-T-tb3-20250401-20250401.xml: 14140 B sha256 1c4638e8df640575eff3e4955bed2d9783026fe7817ad73e63e05f19277fb7b7
+  rows: 8
+a-tb3p-T-tb3-20250401-20250401.xml: 13528 B sha256 a12217b840ec71c5f68a6f646c10625f3f554bdd09c591d113c9667177b97705
+  rows: 8
+ROW 'BRIDGE Export Sales': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '86014641.25'
+  A only: /DEBITTOTALS {'TYPE': 'Amount'} ''
+  B only: /DEBITTOTALS {'TYPE': 'Amount'} '0.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '86014641.25'
+ROW 'BRIDGE Import Purchases': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} ''
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '0.00'
+  A only: /DEBITTOTALS {'TYPE': 'Amount'} '-$200.00 @ ₹ 86/$ = -₹ 17400.00'
+  B only: /DEBITTOTALS {'TYPE': 'Amount'} '-17400.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '-$200.00 @ ₹ 86/$ = -₹ 17400.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '-17400.00'
+ROW 'BRIDGE Lab Bank': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} '$200.00 @ ₹ 87/$ = ₹ 17500.00'
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '17500.00'
+  A only: /DEBITTOTALS {'TYPE': 'Amount'} '-$1100.00 @ ₹ 87/$ = -₹ 96700.00'
+  B only: /DEBITTOTALS {'TYPE': 'Amount'} '-96700.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '-$900.00 @ ₹ 88/$ = -₹ 79200.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '-79200.00'
+ROW 'BRIDGE USD Customer': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} '$1100.00 @ ₹ 87/$ = ₹ 96700.00'
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '96700.00'
+  A only: /DEBITTOTALS {'TYPE': 'Amount'} '-$1000100.00 @ ₹ 87.9999/$ = -₹ 88008700.00'
+  B only: /DEBITTOTALS {'TYPE': 'Amount'} '-88008700.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '-$999000.00 @ ₹ 88/$ = -₹ 87912000.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '-87912000.00'
+ROW 'BRIDGE USD Supplier': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} '$200.00 @ ₹ 87.50/$ = ₹ 17500.00'
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '17500.00'
+  A only: /DEBITTOTALS {'TYPE': 'Amount'} '-$200.00 @ ₹ 87/$ = -₹ 17500.00'
+  B only: /DEBITTOTALS {'TYPE': 'Amount'} '-17500.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '$0.00 @ ₹ /$ = ₹ 0.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '0.00'
+ROW 'Cash': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} ''
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '0.00'
+ROW 'Profit & Loss A/c': content differs
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '$0.00 @ ₹ /$ = ₹ 0.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '0.00'
+CONTENT DIFFER
+ROW ORDER SAME
+ELEMENT ORDER SAME
+exit 2

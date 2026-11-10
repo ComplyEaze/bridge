@@ -20,6 +20,8 @@ use crate::reports::schedule_iii::{
 };
 
 const MAX_TEXT: usize = 2_000;
+/// The longest declared person's name. A company name is not held to this: it is checked by
+/// `ValidatedCompanyName`, the one rule every read applies (#2433).
 const MAX_NAME: usize = 256;
 
 /// The person who records an event, as they declare it: Bridge has no user
@@ -409,10 +411,12 @@ impl TallyMirrorRepository {
         if events.is_empty() {
             return Err(GroupingStoreError::Refused("grouping_events_empty"));
         }
-        let display_name = context.company_display_name.trim();
-        if display_name.is_empty() || display_name.len() > MAX_NAME {
-            return Err(GroupingStoreError::Refused("grouping_company_display_name"));
-        }
+        // The name as the company list reported it and the reads sent it: checked by the one
+        // company-name rule and stored as given, never trimmed or held to a limit of its own (#2433).
+        let display_name = bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+            context.company_display_name.as_str(),
+        )
+        .map_err(|_| GroupingStoreError::Refused("grouping_company_display_name"))?;
         if context.recorded_at_unix_ms <= 0 {
             return Err(GroupingStoreError::Refused("grouping_recorded_at"));
         }
@@ -489,7 +493,7 @@ impl TallyMirrorRepository {
             .bind(context.book.company_guid())
             .bind(context.book.company_number())
             .bind(context.book.books_from_yyyymmdd())
-            .bind(display_name)
+            .bind(display_name.as_str())
             .bind(i64::from(context.year.first_year()))
             .bind(kind.code())
             .bind(ledger)

@@ -5338,10 +5338,10 @@
  {
   "id": "E3A-13",
   "by": "author",
-  "what": "the period credit is added to the books closing",
-  "file": "src/stock.rs",
-  "from": "let mv = sub(add(t.opening_paise, t.debit_paise)?, t.credit_paise)?;",
-  "to": "let mv = add(add(t.opening_paise, t.debit_paise)?, t.credit_paise)?;"
+  "what": "the period credit is added to the books closing (TbRow::closing_by_movements_paise)",
+  "file": "src/book.rs",
+  "from": ".checked_sub(self.credit_paise)",
+  "to": ".checked_add(self.credit_paise)"
  },
  {
   "id": "E3A-14",
@@ -15478,6 +15478,102 @@
   "file": "src/loans_interest.rs",
   "from": "                    .any(|l| paired.contains(l.ledger.as_str()) && l.amount_paise != 0)",
   "to": "                    .any(|l| paired.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "TBM-01",
+  "by": "author",
+  "what": "book: the movements add the debit column as a credit",
+  "file": "src/book.rs",
+  "from": ".checked_add(self.debit_paise)?",
+  "to": ".checked_sub(self.debit_paise)?"
+ },
+ {
+  "id": "TBM-02",
+  "by": "author",
+  "what": "book: an overflow in the movements reads as zero, not as unknown",
+  "file": "src/book.rs",
+  "from": ".checked_add(self.debit_paise)?",
+  "to": ".checked_add(self.debit_paise).unwrap_or(0)"
+ },
+ {
+  "id": "TBM-03",
+  "by": "author",
+  "what": "book: the gap is the movements less the closing",
+  "file": "src/book.rs",
+  "from": ".checked_sub(self.closing_by_movements_paise()?)?",
+  "to": ".checked_add(self.closing_by_movements_paise()?)?"
+ },
+ {
+  "id": "TBM-04",
+  "by": "author",
+  "what": "book: a row ties when its closing is not the movements",
+  "file": "src/book.rs",
+  "from": "if by_paise == 0 {",
+  "to": "if by_paise != 0 {"
+ },
+ {
+  "id": "TBM-05",
+  "by": "author",
+  "what": "book: the gap is dropped from a row that does not tie",
+  "file": "src/book.rs",
+  "from": "TbMovements::Differ { by_paise }",
+  "to": "TbMovements::Differ { by_paise: 0 }"
+ },
+ {
+  "id": "TBM-06",
+  "by": "author",
+  "what": "stock: the books closing is taken from the Trial Balance field",
+  "file": "src/stock.rs",
+  "from": "t.closing_by_movements_paise().ok_or_else(overflow)?;",
+  "to": "t.closing_paise;"
+ },
+ {
+  "id": "TBM-07",
+  "by": "author",
+  "what": "tb: the gap figure has the wrong sign",
+  "file": "src/trial_balance.rs",
+  "from": "Value::Int(by_paise),",
+  "to": "Value::Int(-by_paise),"
+ },
+ {
+  "id": "TBM-08",
+  "by": "author",
+  "what": "tb: no gap figure is stated",
+  "file": "src/trial_balance.rs",
+  "from": "if let TbMovements::Differ { by_paise } = t.movements().ok_or_else(overflow)? {",
+  "to": "if let TbMovements::Differ { by_paise } = TbMovements::Tie {"
+ },
+ {
+  "id": "TB3-01",
+  "by": "author",
+  "what": "TB-3: a row that ties is expected to carry the figure",
+  "file": "src/trial_balance.rs",
+  "from": "TbMovements::Tie => None,",
+  "to": "TbMovements::Tie => gap,"
+ },
+ {
+  "id": "TB3-03",
+  "by": "author",
+  "what": "TB-3: a figure that is not the gap is not reported",
+  "file": "src/trial_balance.rs",
+  "from": "if gap != want {",
+  "to": "if gap == want {"
+ },
+ {
+  "id": "TB3-04",
+  "by": "author",
+  "what": "TB-3: only a row with no listed closing is checked",
+  "file": "src/trial_balance.rs",
+  "from": "if closing.is_some() {",
+  "to": "if closing.is_none() {"
+ },
+ {
+  "id": "TB3-05",
+  "by": "author",
+  "what": "TB-3: the expected gap has the wrong sign",
+  "file": "src/trial_balance.rs",
+  "from": "TbMovements::Differ { by_paise } => Some(by_paise),",
+  "to": "TbMovements::Differ { by_paise } => Some(-by_paise),"
  },
  {
   "id": "RY-1",

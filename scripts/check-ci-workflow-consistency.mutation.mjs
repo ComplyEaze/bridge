@@ -419,6 +419,28 @@ for (const [name, replacement] of [
   });
 }
 
+// A pull request runs the Windows bundle and seam jobs only for a packaging path or a release; the queue runs them for the whole list.
+// A scope step that drops the narrowing, widens it to the queue, loses the release exemption or forgets to use it changes what a
+// pull request run or a queue run proves.
+const BUNDLE_SCOPED = '          bundle_scoped=true\n          if [[ "$EVENT_NAME" == "pull_request" && "$release" != true ]] && ! grep -Eq "$packaging_paths|$windows_pr_paths" <<< "$changed_files"; then\n            bundle_scoped=false\n          fi\n';
+for (const [name, change] of [
+  ["the narrowing deleted", (text) => text.replace(BUNDLE_SCOPED, "          bundle_scoped=true\n")],
+  ["the narrowing turned off", (text) => text.replace("            bundle_scoped=false\n", "            bundle_scoped=true\n")],
+  ["the narrowing applied to the queue", (text) => text.replace('[[ "$EVENT_NAME" == "pull_request" && "$release" != true ]] && ! grep', '[[ "$EVENT_NAME" != "push" && "$release" != true ]] && ! grep')],
+  ["the release exemption dropped", (text) => text.replace('[[ "$EVENT_NAME" == "pull_request" && "$release" != true ]] && ! grep', '[[ "$EVENT_NAME" == "pull_request" ]] && ! grep')],
+  ["the narrowing never read", (text) => text.replace('[[ "$draft" == false && "$bundle_scoped" == true ]] && grep', '[[ "$draft" == false ]] && grep')],
+  ["the narrowing read inverted", (text) => text.replace('"$bundle_scoped" == true ]] && grep', '"$bundle_scoped" == false ]] && grep')],
+  ["the Windows paths dropped from the pull-request list", (text) => text.replace('! grep -Eq "$packaging_paths|$windows_pr_paths" <<< "$changed_files"; then\n            bundle_scoped=false', '! grep -Eq "$packaging_paths" <<< "$changed_files"; then\n            bundle_scoped=false')],
+  ["the Windows resource script dropped from its list", (text) => text.replace('|scripts/check-windows-bundle-resources\\.ps1$', '')],
+  ["the crate manifests dropped from the Windows list", (text) => text.replace('|src-tauri/.*/Cargo\\.toml$)\'\n          bundle_scoped', ')\'\n          bundle_scoped')],
+  ["the setup action dropped from the Windows list", (text) => text.replace("windows_pr_paths='^(\\.github/actions/setup-windows-native/|", "windows_pr_paths='^(")],
+  ["the packaging list swapped for a source path", (text) => text.replace('! grep -Eq "$packaging_paths|$windows_pr_paths" <<< "$changed_files"; then\n            bundle_scoped=false', '! grep -Eq "^src/" <<< "$changed_files"; then\n            bundle_scoped=false')],
+]) {
+  test(`pull-request bundle scope: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", change), "changes changed shape; review its scope rules and update expectedChanges");
+  });
+}
+
 // The merge gate's test is wired to the merge-gate-scope step's output. A step that runs it always, never, or twice, or that
 // loses the scope step, changes what a merge-queue run proves.
 for (const [name, change] of [

@@ -112,6 +112,88 @@ fn tb1_fires_when_a_listed_closing_differs_from_the_trial_balance() {
     assert!(v.iter().any(|m| m.starts_with("TB-2")), "{v:?}");
 }
 
+/// TB-3: the closing-not-movements figure is there exactly when a listed row does not tie, and is
+/// the gap.
+#[test]
+fn tb3_fires_when_the_gap_figure_is_missing_wrong_or_on_a_row_that_ties() {
+    let b = book(
+        vec![
+            ledger("Keyed Stock", &["Stock-in-Hand"]),
+            ledger("Stores", &["Indirect Expenses"]),
+        ],
+        vec![
+            ("Keyed Stock", tb(100_000, 40_000, 0, 100_000)),
+            ("Stores", tb(0, 500, 0, 500)),
+            ("Cash", tb(0, 0, 500, -500)),
+        ],
+        Vec::new(),
+    );
+    let tag = |n: &str| bridge_tax_audit::ledger_ids::stable_ledger_tag(&b, n).unwrap();
+    let (stock, stores) = (tag("Keyed Stock"), tag("Stores"));
+    let gap_id = |t: &str| format!("tb_closing_not_movements_{t}");
+    let run = || trial_balance::run(&b, &rules()).unwrap();
+    let tb3 = |r: &bridge_tax_audit::findings::TestResult| {
+        trial_balance::check_invariants(&b, r)
+            .unwrap()
+            .into_iter()
+            .filter(|m| m.starts_with("TB-3"))
+            .collect::<Vec<_>>()
+    };
+
+    // As the test reports it: the gap on the row that does not tie, none on the rows that do.
+    let r = run();
+    assert_eq!(
+        r.figures
+            .iter()
+            .find(|f| f.id.ends_with(&gap_id(&stock)))
+            .map(|f| f.value.clone()),
+        Some(Value::Int(-40_000))
+    );
+    assert!(!r.figures.iter().any(|f| f.id.ends_with(&gap_id(&stores))));
+    assert!(tb3(&r).is_empty());
+
+    // A wrong gap.
+    let mut r = run();
+    set_int(&mut r, &gap_id(&stock), -39_999);
+    assert_eq!(tb3(&r).len(), 1, "{:?}", tb3(&r));
+
+    // A gap figure missing from the row that does not tie.
+    let mut r = run();
+    r.figures.retain(|f| !f.id.ends_with(&gap_id(&stock)));
+    assert_eq!(tb3(&r).len(), 1, "{:?}", tb3(&r));
+
+    // A gap figure on a row that ties.
+    let mut r = run();
+    let mut extra = r
+        .figures
+        .iter()
+        .find(|f| f.id.ends_with(&gap_id(&stock)))
+        .unwrap()
+        .clone();
+    extra.id = format!("trial_balance.{}", gap_id(&stores));
+    r.figures.push(extra);
+    assert_eq!(tb3(&r).len(), 1, "{:?}", tb3(&r));
+}
+
+/// A row whose opening, debit and credit do not fit `i64` paise has no known gap: the test and
+/// its invariants refuse the read rather than list the row as tying.
+#[test]
+fn a_row_whose_movements_overflow_is_refused_not_listed_as_tying() {
+    let b = book(
+        vec![ledger("Huge", &["Indirect Expenses"])],
+        vec![("Huge", tb(i64::MAX, 1, 0, 0))],
+        Vec::new(),
+    );
+    assert!(trial_balance::run(&b, &rules()).is_err());
+    let ok = book(
+        vec![ledger("Huge", &["Indirect Expenses"])],
+        vec![("Huge", tb(5, 0, 0, 5))],
+        Vec::new(),
+    );
+    let r = trial_balance::run(&ok, &rules()).unwrap();
+    assert!(trial_balance::check_invariants(&b, &r).is_err());
+}
+
 #[test]
 fn stl1_fires_when_a_stale_ledger_has_a_population_line() {
     // The TB says no movement, but a regular voucher posts to the debtor: contradictory books.

@@ -1,0 +1,7 @@
+package.json
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/src/agent_company.rs
+src-tauri/src/agent_headline.rs
+src-tauri/src/commands.rs
+src/main.tsx
+reviewer: lamemustafa

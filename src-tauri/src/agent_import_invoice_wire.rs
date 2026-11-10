@@ -462,6 +462,42 @@ pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
     sales_rows(xml).map(|sales| sales.len())
 }
 
+/// The number read sent after a post (#2162): the posted invoice, found by the
+/// read-back in `posted_type`, must be the only Sales-class voucher of the year
+/// holding its number. The read-back filters on the posted type's GUID, so a
+/// Sales voucher of another type holding the number is seen only here. Its
+/// difference names each other type that holds it, as Tally answered it;
+/// none when exactly one Sales-class row came back, in the posted type. A read
+/// that cannot be told is a difference, never a pass (P3).
+pub(super) fn number_after_post_difference(xml: &str, posted_type: Option<&str>) -> Option<String> {
+    let sales = match sales_rows(xml) {
+        Ok(sales) => sales,
+        Err(code) => return Some(code.to_string()),
+    };
+    let Some(posted_type) = posted_type else {
+        return Some("invoice_number_type_unread".to_string());
+    };
+    let mut types = Vec::with_capacity(sales.len());
+    for row in &sales {
+        match row.one("VOUCHERTYPENAME") {
+            Ok(Some(name)) => types.push(name),
+            Ok(None) => return Some("invoice_number_type_unread".to_string()),
+            Err(code) => return Some(code.to_string()),
+        }
+    }
+    let others: std::collections::BTreeSet<&str> =
+        types.iter().copied().filter(|name| *name != posted_type).collect();
+    if !others.is_empty() {
+        let named: Vec<&str> = others.into_iter().collect();
+        return Some(format!("invoice_number_in_another_type: {}", named.join(", ")));
+    }
+    match types.len() {
+        1 => None,
+        0 => Some("invoice_number_read_missed_invoice".to_string()),
+        _ => Some("invoice_number_not_unique".to_string()),
+    }
+}
+
 /// Whether a Sales-class voucher holding the number carries an IRN: an `IRN`
 /// with text. One that came back empty or did not come back says nothing (the
 /// row reader keeps no empty field, so the two are not told apart), and never

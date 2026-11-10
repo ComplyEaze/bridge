@@ -1756,9 +1756,29 @@ impl super::super::Server {
         let Ok((xml, evidence)) = self.post_read(identity, request).await else {
             return only("invoice_readback_failed", mark_evidence);
         };
-        let evidence = super::super::combine_evidence(mark_evidence, evidence);
-        let (differences, alter_id, guid, lines) =
-            readback_outcome(wire::parse_invoice_readback(&xml), voucher, date);
+        let mut evidence = super::super::combine_evidence(mark_evidence, evidence);
+        let parsed = wire::parse_invoice_readback(&xml);
+        let posted_type = match &parsed {
+            Ok(wire::Readback::One(read)) => read.fields.get("VOUCHERTYPENAME").cloned(),
+            _ => None,
+        };
+        let (mut differences, alter_id, guid, lines) = readback_outcome(parsed, voucher, date);
+        // The read-back finds the invoice in its own type only, so a Sales
+        // voucher of another type holding the number is seen only by the
+        // class-wide number read the build sends, sent again here (#2162).
+        if differences.is_empty() {
+            let request = super::super::invoice_number_read(&company.name, &number, (&year.0, &year.1));
+            match self.post_read(identity, request).await {
+                Ok((number_xml, number_evidence)) => {
+                    evidence = super::super::combine_evidence(evidence, number_evidence);
+                    differences.extend(wire::number_after_post_difference(
+                        &number_xml,
+                        posted_type.as_deref(),
+                    ));
+                }
+                Err(_) => differences.push("invoice_number_read_failed".to_string()),
+            }
+        }
         Ok((differences, alter_id, guid, lines, evidence))
     }
 }
@@ -2010,11 +2030,11 @@ fn admitted(
 /// mark. A voucher mark Tally did not give never admits.
 fn size_gate(marks: &str, company_guid: &str) -> Result<super::PreImportMark, Verdict> {
     let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
-    // The duplicate-number read and the read-back each walk the book's
-    // vouchers (a formula decides the rows, so Tally evaluates every
-    // voucher): at the build, at both re-reads (a redeemed approval repeats
-    // them), in the endpoint queue, after the post and at every later
-    // verification. The voucher mark
+    // The duplicate-number read walks the book's vouchers (a formula decides
+    // the rows, so Tally evaluates every voucher) at the build, at both
+    // re-reads (a redeemed approval repeats them) and in the endpoint queue;
+    // after the post and at every later verification the read-back walks
+    // them, and so does the number read again when the read-back is clean. The voucher mark
     // bounds that walk.
     if let Some(refusal) = voucher_mark_refusal(mark.value) {
         return Err(refusing(refusal));
@@ -2280,7 +2300,7 @@ impl InvoiceJudge<'_> {
         let resolved = wire::resolve_voucher_type(&types, &type_name, "Sales")
             .map_err(|code| refusing(refuse_value(code, &type_name)))?;
 
-        // 3b. The number must not already be in use in this type and year.
+        // 3b. The number must not already be in use in any Sales type this year.
         let number = voucher.voucher_number.clone().unwrap_or_default();
         let Some(number_body) = answers.number.as_deref() else {
             return Err(Verdict::Need(Need::Number));

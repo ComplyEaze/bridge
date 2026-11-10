@@ -320,6 +320,71 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
 }
 
 #[test]
+fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_only() {
+    let wrap = |rows: &str| {
+        format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
+    };
+    let row = |kind: &str, class: &str| {
+        format!("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><VOUCHERTYPENAME>{kind}</VOUCHERTYPENAME><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
+    };
+    let posted = Some("BRIDGE Sales");
+    assert_eq!(number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes")), posted), None);
+    // A Purchase-class voucher holding the number is no clash after the post either.
+    assert_eq!(
+        number_after_post_difference(&wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))), posted),
+        None
+    );
+    // The read-back reads the posted type only; this read names each other type.
+    assert_eq!(
+        number_after_post_difference(
+            &wrap(&(row("BRIDGE Sales", "Yes") + &row("BRIDGE Sales Keyed", "Yes") + &row("Sales", "Yes"))),
+            posted,
+        ),
+        Some("invoice_number_in_another_type: BRIDGE Sales Keyed, Sales".to_string())
+    );
+    assert_eq!(
+        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes").repeat(2)), posted),
+        Some("invoice_number_not_unique".to_string())
+    );
+    // The read that misses the invoice the read-back found is never a pass.
+    assert_eq!(
+        number_after_post_difference(&wrap(""), posted),
+        Some("invoice_number_read_missed_invoice".to_string())
+    );
+    assert_eq!(
+        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes")), None),
+        Some("invoice_number_type_unread".to_string())
+    );
+    assert_eq!(
+        number_after_post_difference(
+            &wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><BRIDGEVCHISSALES>Yes</BRIDGEVCHISSALES></VOUCHER>"),
+            posted,
+        ),
+        Some("invoice_number_type_unread".to_string())
+    );
+    assert_eq!(
+        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Maybe")), posted),
+        Some("invoice_number_class_unread".to_string())
+    );
+    assert_eq!(
+        number_after_post_difference("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER></ENVELOPE>", posted),
+        Some("invoice_read_collection_absent".to_string())
+    );
+    // Tally's own answer for a number one invoice holds, on BRIDGE Sales.
+    let held = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"));
+    assert_eq!(number_after_post_difference(&held, posted), None);
+    assert_eq!(
+        number_after_post_difference(&held, Some("BRIDGE Sales Keyed")),
+        Some("invoice_number_in_another_type: BRIDGE Sales".to_string())
+    );
+    // And one where a Payment holds the number beside the Sales invoice.
+    let beside_payment = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
+    ));
+    assert_eq!(number_after_post_difference(&beside_payment, Some("Sales")), None);
+}
+
+#[test]
 fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
     let wrap = |rows: &str| {
         format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")

@@ -9,14 +9,14 @@ mod common;
 
 use bridge_bank_statement::bank::Bank;
 use bridge_bank_statement::cash::{
-    CashAnswer, CashAnswerRow, CashAnswers, CashMovement, CASH_DEPOSIT, CASH_WITHDRAWAL,
-    PURPOSE_NOT_CONFIRMED,
+    CashAnswer, CashAnswerRow, CashAnswers, CashMovement, CASH_DEPOSIT, CASH_LIMIT_FLAG,
+    CASH_WITHDRAWAL, PURPOSE_NOT_CONFIRMED,
 };
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
 use bridge_bank_statement::proposals::{
-    build, selfcheck, suspense_tagged, Build, BuildOptions, Disposition, Side, VoucherType,
-    SUSPENSE_TAGS, UNIDENTIFIED,
+    build, is_statement_txn_id, selfcheck, suspense_tagged, Build, BuildOptions, Disposition, Side,
+    VoucherType, CASH_PAYMENT_ID_SUFFIX, SUSPENSE_TAGS, UNIDENTIFIED,
 };
 use common::*;
 
@@ -60,8 +60,29 @@ fn answers(
                 bridge_txn_id: id.to_string(),
                 answer: answer.to_string(),
                 ledger: ledger.map(str::to_string),
+                cash_ledger: None,
             }),
     )
+}
+
+/// Answers with a cash ledger: (id, answer, ledger, cash_ledger).
+fn answers_through_cash(
+    rows: &[(&str, &str, Option<&str>, Option<&str>)],
+) -> Result<CashAnswers, bridge_bank_statement::Refusal> {
+    CashAnswers::from_rows(rows.iter().enumerate().map(
+        |(index, (id, answer, ledger, cash_ledger))| CashAnswerRow {
+            origin: format!("cash_answers[{index}]"),
+            bridge_txn_id: id.to_string(),
+            answer: answer.to_string(),
+            ledger: ledger.map(str::to_string),
+            cash_ledger: cash_ledger.map(str::to_string),
+        },
+    ))
+}
+
+/// `paid_to_someone` for one row: the payee and the cash ledger.
+fn paid(id: &str, payee: &str, cash: &str) -> CashAnswers {
+    answers_through_cash(&[(id, "paid_to_someone", Some(payee), Some(cash))]).unwrap()
 }
 
 /// An SBI row; SBI names parties from the spaced narration and reference.
@@ -415,21 +436,214 @@ fn dont_know_posts_to_suspense_tagged_for_the_ca() {
 
 #[test]
 fn an_answer_bridge_cannot_build_yet_is_refused_with_the_way_forward() {
-    let withdrawal = withdrawal_statement();
-    let id = first_id(&withdrawal, Bank::Sbi);
-    let given = answers(&[(&id, "paid_to_someone", None)]).unwrap();
-    let refusal = refuses(
-        build(&withdrawal, Bank::Sbi, &no_mapping(), &options(&given)),
-        "cash_answer_not_built",
-    );
-    assert!(refusal.message.contains("dont_know"), "{refusal}");
     let deposit = deposit_statement();
     let id = first_id(&deposit, Bank::Ubi);
     let given = answers(&[(&id, "unbooked_cash_sales", None)]).unwrap();
-    refuses(
+    let refusal = refuses(
         build(&deposit, Bank::Ubi, &no_mapping(), &options(&given)),
         "cash_answer_not_built",
     );
+    assert!(refusal.message.contains("dont_know"), "{refusal}");
+}
+
+/// Cash paid straight to someone passes through the cash book: the row's
+/// Contra fills the named cash ledger from the bank, and a cash Payment on the
+/// same day empties it to the payee. The Contra keeps the row's id, as every
+/// voucher with the bank leg does; the Payment's id is the row's and a suffix,
+/// which is not a statement row id, so it is never read as half of a transfer.
+#[test]
+fn cash_paid_to_someone_is_a_contra_into_cash_then_a_cash_payment() {
+    let withdrawal = withdrawal_statement();
+    let id = first_id(&withdrawal, Bank::Sbi);
+    let given = paid(&id, "Synthetic Wages", "Cash");
+    let built = build(&withdrawal, Bank::Sbi, &no_mapping(), &options(&given)).unwrap();
+    let contra = &built.proposals[0];
+    assert_eq!(contra.bridge_txn_id, id);
+    assert_eq!(contra.voucher_type, VoucherType::Contra);
+    assert_eq!(legs(&built), (("Cash", Side::Dr), ("Bank", Side::Cr)));
+    let payment = &built.proposals[1];
+    assert_eq!(
+        payment.bridge_txn_id,
+        format!("{id}{CASH_PAYMENT_ID_SUFFIX}")
+    );
+    assert!(!is_statement_txn_id(&payment.bridge_txn_id));
+    assert_eq!(payment.voucher_type, VoucherType::Payment);
+    assert_eq!(payment.date, contra.date);
+    let payment_legs: Vec<_> = payment
+        .entries
+        .iter()
+        .map(|entry| (entry.ledger.as_str(), entry.amount.as_str(), entry.side))
+        .collect();
+    assert_eq!(
+        payment_legs,
+        [
+            ("Synthetic Wages", "500.00", Side::Dr),
+            ("Cash", "500.00", Side::Cr)
+        ]
+    );
+    assert!(
+        payment
+            .narration
+            .starts_with("Cash paid to Synthetic Wages from Cash | "),
+        "{}",
+        payment.narration
+    );
+    assert!(!payment.narration.contains(CASH_LIMIT_FLAG));
+    // One record for the row: its Contra, and the Payment it adds.
+    let record = &built.records[0];
+    assert_eq!(
+        record.disposition,
+        Disposition::Voucher(VoucherType::Contra)
+    );
+    assert_eq!(record.ledger, "Cash");
+    assert_eq!(record.cash_answer, Some(CashAnswer::PaidToSomeone));
+    assert!(!record.suspense);
+    let paid_to = record.paid_to.as_ref().unwrap();
+    assert_eq!(paid_to.ledger, "Synthetic Wages");
+    assert_eq!(paid_to.bridge_txn_id, payment.bridge_txn_id);
+    assert!(!paid_to.over_cash_limit);
+    assert!(built.records[1].paid_to.is_none());
+    // The receipt row is the third voucher; only the Contra moves the bank.
+    let check = selfcheck(&built, "Bank").unwrap();
+    assert_eq!(check.vouchers, 3);
+    assert_eq!(check.bank_out.as_str(), "500");
+    // A record without its Payment is a miscount.
+    let mut short = built.clone();
+    short.proposals.remove(1);
+    refuses(selfcheck(&short, "Bank"), "manifest_count_mismatch");
+}
+
+#[test]
+fn cash_paid_to_someone_needs_both_ledgers_and_no_other_answer_takes_a_cash_ledger() {
+    refuses(
+        answers_through_cash(&[("st-x", "paid_to_someone", Some("Payee"), None)]),
+        "cash_answer_without_cash_ledger",
+    );
+    refuses(
+        answers_through_cash(&[("st-x", "paid_to_someone", Some("Payee"), Some("  "))]),
+        "cash_answer_without_cash_ledger",
+    );
+    refuses(
+        answers_through_cash(&[("st-x", "paid_to_someone", None, Some("Cash"))]),
+        "cash_answer_without_ledger",
+    );
+    for answer in [
+        "business_cash",
+        "owner_use",
+        "own_cash_box",
+        "customer_paid_in",
+    ] {
+        refuses(
+            answers_through_cash(&[("st-x", answer, Some("Cash"), Some("Cash"))]),
+            "cash_ledger_not_used",
+        );
+    }
+    refuses(
+        answers_through_cash(&[("st-x", "dont_know", None, Some("Cash"))]),
+        "cash_ledger_not_used",
+    );
+    assert!(CashAnswer::PaidToSomeone.ledger_prompt().is_some());
+}
+
+#[test]
+fn cash_paid_to_someone_refuses_a_payee_that_is_the_cash_the_bank_or_suspense() {
+    let withdrawal = withdrawal_statement();
+    let id = first_id(&withdrawal, Bank::Sbi);
+    let run = |payee: &str, cash: &str| {
+        build(
+            &withdrawal,
+            Bank::Sbi,
+            &no_mapping(),
+            &options(&paid(&id, payee, cash)),
+        )
+    };
+    refuses(run("cash", "Cash"), "self_cancelling_voucher");
+    refuses(run("Bank", "Cash"), "cash_payment_to_statement_bank");
+    refuses(run("Suspense", "Cash"), "cash_answer_names_suspense");
+    refuses(
+        run("Synthetic Wages", "suspense"),
+        "cash_answer_names_suspense",
+    );
+    refuses(run("Synthetic Wages", "Bank"), "self_cancelling_voucher");
+}
+
+/// SBI cash withdrawals, one per (date, amount), each with its own balance.
+fn withdrawals(amounts: &[(&str, &str)]) -> Vec<Row> {
+    // The running balance in paise, so no float touches an amount.
+    let mut balance: i64 = 10_000_000;
+    amounts
+        .iter()
+        .map(|(date, amount)| {
+            balance -= amount.replace('.', "").parse::<i64>().unwrap();
+            sbi(
+                date,
+                "ATM WDL ATM CASH 1234 SYNTHETIC BRANCH",
+                amount,
+                "",
+                &format!("{}.{:02}", balance / 100, balance % 100),
+            )
+        })
+        .collect()
+}
+
+/// Every withdrawal of `rows` paid to the payee its index picks.
+fn flags(rows: &[Row], payees: &[&str]) -> Vec<bool> {
+    let ids: Vec<String> = build(
+        rows,
+        Bank::Sbi,
+        &no_mapping(),
+        &options(CashAnswers::none()),
+    )
+    .unwrap()
+    .records
+    .iter()
+    .map(|record| record.bridge_txn_id.clone())
+    .collect();
+    let given = answers_through_cash(
+        &ids.iter()
+            .zip(payees)
+            .map(|(id, payee)| (id.as_str(), "paid_to_someone", Some(*payee), Some("Cash")))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let built = build(rows, Bank::Sbi, &no_mapping(), &options(&given)).unwrap();
+    built
+        .records
+        .iter()
+        .map(|record| {
+            let paid_to = record.paid_to.as_ref().unwrap();
+            let payment = built
+                .proposals
+                .iter()
+                .find(|proposal| proposal.bridge_txn_id == paid_to.bridge_txn_id)
+                .unwrap();
+            assert_eq!(
+                payment
+                    .narration
+                    .ends_with(&format!(" | {CASH_LIMIT_FLAG}")),
+                paid_to.over_cash_limit,
+                "{}",
+                payment.narration
+            );
+            paid_to.over_cash_limit
+        })
+        .collect()
+}
+
+/// s.40A(3) counts the cash paid to one person in a day. The flag sums this
+/// file's cash Payments by payee and day, and marks every Payment of a
+/// payee-day over the limit; one exactly at the limit is not over it.
+#[test]
+fn cash_paid_to_one_payee_in_a_day_over_the_limit_is_flagged_for_the_ca() {
+    let one_day = withdrawals(&[("01Aug2026", "6000.00"), ("01Aug2026", "5000.00")]);
+    assert_eq!(flags(&one_day, &["Payee A", "payee  a"]), [true, true]);
+    assert_eq!(flags(&one_day, &["Payee A", "Payee B"]), [false, false]);
+    let two_days = withdrawals(&[("01Aug2026", "6000.00"), ("02Aug2026", "5000.00")]);
+    assert_eq!(flags(&two_days, &["Payee A", "Payee A"]), [false, false]);
+    let at_limit = withdrawals(&[("01Aug2026", "4000.00"), ("01Aug2026", "6000.00")]);
+    assert_eq!(flags(&at_limit, &["Payee A", "Payee A"]), [false, false]);
+    let one_over = withdrawals(&[("01Aug2026", "10000.01")]);
+    assert_eq!(flags(&one_over, &["Payee A"]), [true]);
 }
 
 #[test]
@@ -602,16 +816,12 @@ fn each_question_offers_every_answer_of_its_direction_and_none_other() {
     assert_eq!(given.last(), Some(&CashAnswer::DontKnow));
 }
 
-/// The three answers ComplyEaze Bridge cannot build yet, each with its whole
-/// reason, which reaches the assistant beside the answer and in the
+/// The answer ComplyEaze Bridge cannot build yet, with its whole reason, which reaches the assistant beside the answer and in the
 /// `cash_answer_not_built` refusal (#962). Every reason any answer of either
 /// movement gives names the product in full, never by its bare short name.
 #[test]
 fn every_not_built_reason_names_the_product_in_full() {
-    assert_eq!(
-        CashAnswer::PaidToSomeone.not_built(),
-        Some("cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
-    );
+    assert_eq!(CashAnswer::PaidToSomeone.not_built(), None);
     assert_eq!(CashAnswer::OwnCashBox.not_built(), None);
     assert_eq!(
         CashAnswer::UnbookedCashSales.not_built(),

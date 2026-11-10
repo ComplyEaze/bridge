@@ -176,6 +176,13 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufRea
 
 const SERVER_NAME: &str = "bridge-tally";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The date (YYYY-MM-DD) of the release this build belongs to, from `release-date.txt` through
+/// `build.rs`. `scripts/next-version.mjs --apply` writes it with the version. A build made between
+/// releases carries the last release's date, so its notice comes early; a computer clock running
+/// forward when `--apply` ran would delay it (#2391).
+const RELEASE_DATE: &str = env!("BRIDGE_RELEASE_DATE");
+/// A build whose date is more than this many days before the computer's date gets the notice.
+const BUILD_NOTICE_AFTER_DAYS: i64 = 60;
 const MAX_EVIDENCE_RECORDS: usize = 256;
 const SUPPORTED_PROTOCOL_VERSIONS: [&str; 2] = ["2025-06-18", "2024-11-05"];
 const PARTY_NAME_MARKER: &str = "$bridge_agent_party_name";
@@ -805,6 +812,9 @@ struct Server {
     /// `vouchers` windows read once and served page by page (#485). In memory
     /// only; see `agent_vouchers.rs`.
     voucher_pages: Arc<Mutex<VoucherPages>>,
+    /// Censuses of finished `vouchers` window reads, reused while the company's
+    /// marks are unchanged (#2399). In memory only; see `agent_voucher_window.rs`.
+    held_censuses: Arc<Mutex<HeldCensuses>>,
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
@@ -812,6 +822,8 @@ struct Server {
     /// answers an MCP client is built by [`Server::for_mcp`], which closes it until the user has
     /// accepted the Terms (see `agent_terms.rs`).
     terms: terms::TermsGate,
+    /// Whether this session has already been given `tally_status`'s build notice (#2391).
+    build_notice_sent: std::sync::atomic::AtomicBool,
 }
 
 struct ToolOutcome {
@@ -2005,6 +2017,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              did not honour the read's filter, or a fault in ComplyEaze Bridge; read this window in Tally \
              itself.",
         ),
+        // The code of a `vouchers` read that took a census counted by an earlier call
+        // (#2399) and found its part was not the vouchers that census described.
+        "census_reused_mismatch" => Some(
+            "ComplyEaze Bridge reused the count of this window's vouchers from an earlier call, \
+             because Tally's change marks had not moved, and the read returned different vouchers \
+             from the ones that count described, so it released nothing. It has discarded that \
+             count: call the same tool again with the same arguments, once, and it counts the \
+             window afresh. If the refusal comes back on a book nobody is changing, tell the user \
+             and read the window in Tally itself.",
+        ),
         // A product limit of the bounded window read (protocol reference §11c):
         // the census walks the book's AlterIDs whatever the window, so the
         // obvious retry — a shorter window — cannot succeed, and saying so is
@@ -2141,16 +2163,20 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // The control beside the number read (`NumberAbsence`): a read that
         // matches nothing must never pass as a number not in use.
         "invoice_number_control_missing" => Some(
-            "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
-             earlier invoice it posted in this company and verified, and Tally did not return \
-             it, so the read cannot be trusted here and the build is refused. The detail names \
-             the batch that posted that invoice. Run verify_import on it. If it no longer reads \
-             verified, it no longer checks new numbers, and a batch ComplyEaze Bridge sent then \
-             stops the company's invoices until the user releases it (invoice_company_stopped \
-             says how). If it still reads \
-             posted and verified, Tally holds the invoice and the number check does not work on \
-             this book: stop, tell the user, and do not post this invoice through ComplyEaze \
-             Bridge.",
+            "Before trusting that this invoice number is not in use, ComplyEaze Bridge read the \
+             month holding an earlier invoice it posted in this company and verified, and that \
+             month's answer did not show it, so the read cannot be trusted here and the build is \
+             refused. The detail names the batch that posted that invoice; control gives its \
+             number and date, how many Sales vouchers the answer held, and whether the answer \
+             held that invoice's GUID under another number, date or type. Run verify_import on \
+             that batch. If it no longer reads verified, it no longer checks new numbers, and a \
+             batch ComplyEaze Bridge sent then stops the company's invoices until the user \
+             releases it (invoice_company_stopped says how). If it still reads posted and \
+             verified, tell the user that ComplyEaze Bridge cannot check invoice numbers on this \
+             company at present and that repeating the build does not clear this; an update of \
+             ComplyEaze Bridge can. Until then the user enters this company's invoices in Tally, \
+             where Tally's own duplicate-number check is the only one. Do not suggest editing or \
+             deleting that invoice to get past this.",
         ),
         "invoice_company_stopped" => Some(
             "An earlier invoice of this company was sent to Tally and is not verified posted, so \
@@ -2284,6 +2310,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Nothing was sent to Tally. Ask the user to check the company's GST registration \
              details in Tally, and the date they apply from, then build again. Do not change \
              the invoice's date or figures to get past this.",
+        ),
+        "invoice_company_gst_off" => Some(
+            "GST is turned off for this company in Tally, and ComplyEaze Bridge does not \
+             post a sale into a company with GST off. Nothing was written to Tally. Tell \
+             the user, and ask them to confirm that this is the right company. Whether GST \
+             should be on for it is the user's decision, made in Tally, not yours. Do not \
+             record the sale another way to get past this.",
+        ),
+        "invoice_company_gst_unstated" => Some(
+            "Tally's answer about the company did not say whether GST is on for it, so \
+             ComplyEaze Bridge cannot issue a tax invoice in it. Nothing was written to Tally. \
+             Check that the company is still open in Tally, then build again; if it repeats, \
+             report it rather than retrying.",
         ),
         "invoice_company_registration_unread" | "invoice_tax_unit_without_guid" => Some(
             "Tally's answer about the company's GST registrations could not be read: it \
@@ -2577,7 +2616,13 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
              did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
              and on that book a read sent straight after was refused for time as well. Do not \
              repeat the same call, and do not send another read of this company straight away: \
-             tell the user, wait, then call `tally_status` once, and go on only when it answers. On \
+             tell the user, wait, then call `tally_status` once, and go on only when it answers. If the user needs one party's \
+             outstanding at this date, ask them, and once it answers call `outstandings` with \
+             that `party`, the same `as_of` and `detail` `open_bills`: that reads the party's \
+             bills through Tally's Ledger Outstandings report, not this one, beside the book's \
+             list of ledgers, and gives no total for the whole book (on that book, sent directly \
+             and not through ComplyEaze Bridge, that report answered for each of its three \
+             largest parties in about a second). On \
              that book an earlier `as_of`, with fewer bills open, answered; whether one does here \
              depends on how many bills were open then, and choosing it is the user's call.",
         ),
@@ -2846,8 +2891,10 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
+            held_censuses: Arc::new(Mutex::new(HeldCensuses::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
+            build_notice_sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

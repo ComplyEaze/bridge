@@ -66,12 +66,13 @@ async fn initialize_carries_the_server_instructions() {
         "Put anything partial, withheld, not established or not checked in that first line, before the figures.",
         "Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user.",
         "Never get around a refusal by another route.",
+        "If tally_status carries build_notice, tell the person once, in your own words, what it says about this build's date and where releases are listed.",
         "Ask before a read that scans vouchers over more than one month (for example vouchers, a register, ledger_movement or voucher_presence), saying the window you would read, unless the user already gave the dates or the financial year;",
     ] {
             assert!(instructions.contains(needle), "missing: {needle}");
         }
         assert!(
-            instructions.len() < 1_800,
+            instructions.len() < 2_000,
             "kept short: {}",
             instructions.len()
         );

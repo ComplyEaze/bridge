@@ -4131,6 +4131,11 @@ Per tool:
   combination (`src-tauri/src/agent_company.rs`).
 - `tally_status`: the probe alone (`Server::status`,
   `src-tauri/src/agent_company.rs`).
+  Its `build_notice` string appears on the first status read of a session when the
+  build's release date (`src-tauri/release-date.txt`, compiled in by `build.rs`) is
+  more than 60 days before this computer's date; it states both dates and where
+  releases are listed, makes no request, and the server instructions tell the
+  assistant to relay it once (#2391).
 - `masters`:
   1. the company read;
   2. the extent check (if a later page);

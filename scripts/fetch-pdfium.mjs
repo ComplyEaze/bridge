@@ -171,8 +171,14 @@ function paxRecords(data, offset) {
 // job). Nothing else is retried: any other HTTP status, a malformed answer, and above all a digest mismatch are
 // refusals on the first sight, because verify() runs on the bytes AFTER the download returns and is not inside
 // this loop, so a retry can never be used to fetch until the pinned digest happens to match.
-export const DOWNLOAD_ATTEMPTS = 3;
-export const RETRY_PAUSES_MS = [1_000, 3_000]; // before the second and before the third attempt
+//
+// The pauses are longer than a blip because the outages seen were: on 8 and 9 Nov 2026 four Windows native
+// jobs failed here with a 503 or 504 on all three attempts, whose pauses added up to 4 s, and a rerun a couple of
+// minutes after one of them failed the same way. Five attempts with pauses of 5, 15, 45 and 90 s wait up to 155 s
+// in all; a passing job spends nothing, a failing one spends that long longer (up to about 12 minutes if every
+// attempt also runs to its 120 s limit).
+export const RETRY_PAUSES_MS = [5_000, 15_000, 45_000, 90_000]; // before the second, third, fourth and fifth attempt
+export const DOWNLOAD_ATTEMPTS = RETRY_PAUSES_MS.length + 1;
 
 /** A failure worth another try; once the attempts are spent it is reported as the refusal it is. */
 class Transient extends Refusal {}

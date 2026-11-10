@@ -4,7 +4,7 @@
 # the window block's `census.requests` and `census.ms`, `census_reused` (its `read_at` and every other field) or
 # `census_reused absent`, the number of window parts, the number of items, and the items' voucher numbers in the
 # order given. With `--same-items A B` it prints whether the two answers' `items` arrays are equal as JSON
-# (parsed, not text). It records and never decides.
+# (parsed, not text), and STOPs if either is an error answer or holds no `items` list. It records and never decides.
 # STOPs (exit 1): the file is empty or above 4,000,000 bytes, does not parse, or holds no structuredContent object.
 # An error answer is a result (exit 0, printed in full below `ERROR`), not a failure of this script.
 import hashlib, json, pathlib, sys
@@ -24,9 +24,17 @@ def load(path):
         raise SystemExit(f"STOP: {path} holds no structuredContent object")
     return raw, body, structured
 if sys.argv[1] == "--same-items":
-    a, b = load(sys.argv[2])[2], load(sys.argv[3])[2]
-    ia, ib = a.get("result", {}).get("items"), b.get("result", {}).get("items")
-    print(f"items equal: {ia == ib} ({len(ia or [])} and {len(ib or [])} items)")
+    compared = []
+    for path in sys.argv[2:4]:
+        _, body, structured = load(path)
+        result = structured.get("result", {})
+        if body.get("isError") is True or result.get("error") or structured.get("error"):
+            raise SystemExit(f"STOP: {path} is an error answer, so its items cannot be compared")
+        if not isinstance(result.get("items"), list):
+            raise SystemExit(f"STOP: {path} holds no items list, so its items cannot be compared")
+        compared.append(result["items"])
+    ia, ib = compared
+    print(f"items equal: {ia == ib} ({len(ia)} and {len(ib)} items)")
     raise SystemExit(0)
 raw, body, structured = load(sys.argv[1])
 print(f"{sys.argv[1]}: {len(raw)} bytes, sha256 {hashlib.sha256(raw).hexdigest()}")

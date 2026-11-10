@@ -1767,7 +1767,8 @@ impl super::super::Server {
         // voucher of another type holding the number is seen only by the
         // class-wide number read the build sends, sent again here (#2162).
         if differences.is_empty() {
-            let request = super::super::invoice_number_read(&company.name, &number, (&year.0, &year.1));
+            let request =
+                super::super::invoice_number_read(&company.name, &number, (&year.0, &year.1));
             match self.post_read(identity, request).await {
                 Ok((number_xml, number_evidence)) => {
                     evidence = super::super::combine_evidence(evidence, number_evidence);
@@ -1776,7 +1777,11 @@ impl super::super::Server {
                         posted_type.as_deref(),
                     ));
                 }
-                Err(_) => differences.push("invoice_number_read_failed".to_string()),
+                Err(_) => differences.push(
+                    crate::agent::failure_code::InvoiceNumberAfterPostCode::ReadFailed
+                        .as_str()
+                        .to_owned(),
+                ),
             }
         }
         Ok((differences, alter_id, guid, lines, evidence))

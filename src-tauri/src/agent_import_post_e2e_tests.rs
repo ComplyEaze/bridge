@@ -7469,7 +7469,13 @@ const PILOT_ORDER: &str = concat!(
     // The invoice's masters, read again in the queue after the approval (#1337).
     pilot_queue_block!(),
     "seeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
+    // The number read sent again after the clean read-back (#2162).
+    "eVsVse",
 );
+
+/// The tail of `PILOT_ORDER` that only a clean read-back is followed by: the
+/// number read sent again (#2162).
+const PILOT_NUMBER_READ_AFTER_POST: &str = "eVsVse";
 
 const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 /// The request Tally accepted on 9 Oct 2026 (CREATED 1): its SHA-256.
@@ -7510,6 +7516,8 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         // r09-number-new-invoice.xml with the e-invoice words added (DERIVED,
         // `LAB_NUMBER_NEW_INVOICE_SHA256`).
         'N' => super::super::tests::LAB_NUMBER_NEW_INVOICE_SHA256,
+        // The number read sent again after the post: N's request, byte for byte.
+        'V' => super::super::tests::LAB_NUMBER_NEW_INVOICE_SHA256,
         'k' => "28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0", // r13-ledger-catalogue-v2.xml
         'w' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'W' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
@@ -7631,6 +7639,11 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
+        // STAND-IN: the answer to the number read after the post has not been
+        // captured. U's capture (one row, BRIDGE Sales, Sales class, for
+        // BP/26-27/0001) stands for it; that read takes each row's type and
+        // class, never its number.
+        'V' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
         'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"),
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
@@ -8733,11 +8746,16 @@ fn pilot_readback_uncertain() -> String {
 #[tokio::test]
 async fn an_invoice_the_gstr_1_lists_as_uncertain_ends_divergent_and_stops_the_next_invoice() {
     let readback = pilot_readback_uncertain();
-    // The post as on the verified replay, then the reads a second build makes
-    // before its admission, as many as the build refused on the walk-in
-    // ledger's earlier spelling makes: the admission itself reads nothing.
+    // The post as on the verified replay, up to its read-back: that read-back
+    // differs, so the number read after it is not sent. Then the reads a
+    // second build makes before its admission, as many as the build refused
+    // on the walk-in ledger's earlier spelling makes: the admission itself
+    // reads nothing.
     let order = format!(
-        "{PILOT_ORDER}{}",
+        "{}{}",
+        PILOT_ORDER
+            .strip_suffix(PILOT_NUMBER_READ_AFTER_POST)
+            .unwrap(),
         &PILOT_ORDER[..PILOT_ORDER.find('k').unwrap() + 5]
     );
     let simulator = SequenceSimulator::spawn(with_sentinel(

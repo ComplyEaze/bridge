@@ -470,31 +470,40 @@ pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
 /// none when exactly one Sales-class row came back, in the posted type. A read
 /// that cannot be told is a difference, never a pass (P3).
 pub(super) fn number_after_post_difference(xml: &str, posted_type: Option<&str>) -> Option<String> {
+    use crate::agent::failure_code::InvoiceNumberAfterPostCode as Code;
+    let code = |code: Code| Some(code.as_str().to_owned());
     let sales = match sales_rows(xml) {
         Ok(sales) => sales,
-        Err(code) => return Some(code.to_string()),
+        Err(unread) => return Some(unread.to_owned()),
     };
     let Some(posted_type) = posted_type else {
-        return Some("invoice_number_type_unread".to_string());
+        return code(Code::TypeUnread);
     };
     let mut types = Vec::with_capacity(sales.len());
     for row in &sales {
         match row.one("VOUCHERTYPENAME") {
             Ok(Some(name)) => types.push(name),
-            Ok(None) => return Some("invoice_number_type_unread".to_string()),
-            Err(code) => return Some(code.to_string()),
+            Ok(None) => return code(Code::TypeUnread),
+            Err(unread) => return Some(unread.to_owned()),
         }
     }
-    let others: std::collections::BTreeSet<&str> =
-        types.iter().copied().filter(|name| *name != posted_type).collect();
+    let others: std::collections::BTreeSet<&str> = types
+        .iter()
+        .copied()
+        .filter(|name| *name != posted_type)
+        .collect();
     if !others.is_empty() {
         let named: Vec<&str> = others.into_iter().collect();
-        return Some(format!("invoice_number_in_another_type: {}", named.join(", ")));
+        return Some(format!(
+            "{}: {}",
+            Code::InAnotherType.as_str(),
+            named.join(", ")
+        ));
     }
     match types.len() {
         1 => None,
-        0 => Some("invoice_number_read_missed_invoice".to_string()),
-        _ => Some("invoice_number_not_unique".to_string()),
+        0 => code(Code::ReadMissedInvoice),
+        _ => code(Code::NotUnique),
     }
 }
 

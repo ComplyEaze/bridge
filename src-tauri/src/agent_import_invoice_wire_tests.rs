@@ -328,16 +328,26 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         format!("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><VOUCHERTYPENAME>{kind}</VOUCHERTYPENAME><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
     };
     let posted = Some("BRIDGE Sales");
-    assert_eq!(number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes")), posted), None);
+    assert_eq!(
+        number_after_post_difference(&wrap(&row("BRIDGE Sales", "Yes")), posted),
+        None
+    );
     // A Purchase-class voucher holding the number is no clash after the post either.
     assert_eq!(
-        number_after_post_difference(&wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))), posted),
+        number_after_post_difference(
+            &wrap(&(row("BRIDGE Sales", "Yes") + &row("Purchase", "No"))),
+            posted
+        ),
         None
     );
     // The read-back reads the posted type only; this read names each other type.
     assert_eq!(
         number_after_post_difference(
-            &wrap(&(row("BRIDGE Sales", "Yes") + &row("BRIDGE Sales Keyed", "Yes") + &row("Sales", "Yes"))),
+            &wrap(
+                &(row("BRIDGE Sales", "Yes")
+                    + &row("BRIDGE Sales Keyed", "Yes")
+                    + &row("Sales", "Yes"))
+            ),
             posted,
         ),
         Some("invoice_number_in_another_type: BRIDGE Sales Keyed, Sales".to_string())
@@ -367,7 +377,10 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         Some("invoice_number_class_unread".to_string())
     );
     assert_eq!(
-        number_after_post_difference("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER></ENVELOPE>", posted),
+        number_after_post_difference(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER></ENVELOPE>",
+            posted
+        ),
         Some("invoice_read_collection_absent".to_string())
     );
     // Tally's own answer for a number one invoice holds, on BRIDGE Sales.
@@ -381,7 +394,10 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
     let beside_payment = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
     ));
-    assert_eq!(number_after_post_difference(&beside_payment, Some("Sales")), None);
+    assert_eq!(
+        number_after_post_difference(&beside_payment, Some("Sales")),
+        None
+    );
 }
 
 #[test]

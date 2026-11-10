@@ -949,6 +949,11 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
 /// read-back of `BP/26-27/0010` after the post; before it, m is the marks and A
 /// the same read-back (a complete envelope with no voucher).
 const READBACK_ORDER: &str = "eMsMseeRsRse";
+/// A clean read-back, then the number read sent again (6): U answers it, the
+/// captured one-row answer for `BP/26-27/0001` (BRIDGE Sales, Sales class),
+/// standing in for the answer after `BP/26-27/0010`'s post, which has not been
+/// captured. The read takes the row's type and class only, never its number.
+const READBACK_THEN_NUMBER_ORDER: &str = "eMsMseeRsRseeUsUse";
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
 /// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
 /// line's HSN/SAC and `ISPOSTDATED` (`R-0010.xml` of the 2162-S1 sheet, the
@@ -1008,11 +1013,19 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
 /// reference the number gives.
 #[tokio::test]
 async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_answer() {
-    for (number, expected) in [
-        ("BP/26-27/0010", Vec::<&str>::new()),
-        ("BP/26-27/0040", vec!["VOUCHERNUMBER", "REFERENCE"]),
+    for (number, expected, order) in [
+        (
+            "BP/26-27/0010",
+            Vec::<&str>::new(),
+            READBACK_THEN_NUMBER_ORDER,
+        ),
+        (
+            "BP/26-27/0040",
+            vec!["VOUCHERNUMBER", "REFERENCE"],
+            READBACK_ORDER,
+        ),
     ] {
-        let lab = pilot_lab_over(READBACK_ORDER);
+        let lab = pilot_lab_over(order);
         let (differences, alter_id, guid, _, _) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &pilot_saved(number, true))
@@ -1026,9 +1039,12 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
             "{number}"
         );
         let requests = received(lab.simulator);
-        assert_eq!(requests.len(), 12, "{number}");
+        assert_eq!(requests.len(), order.len(), "{number}");
         if number == "BP/26-27/0010" {
-            assert_eq!(sent_as(READBACK_ORDER, &requests, 'R'), [LAB_R12_SHA256; 2]);
+            assert_eq!(sent_as(order, &requests, 'R'), [LAB_R12_SHA256; 2]);
+            // The number read after the post is the build's request for this
+            // number, byte for byte.
+            assert_eq!(sent_as(order, &requests, 'U'), [R09_WITH_IRN_SHA256; 2]);
         }
     }
 }

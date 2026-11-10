@@ -1247,8 +1247,8 @@ pub(in crate::agent::agent_import) use hsn::HsnWarning;
 #[cfg(test)]
 pub(super) use hsn::HsnWarningCode;
 pub(super) use hsn::{
-    hsn_warnings, parse_company_hsn, parse_group_hsn, resolve_hsn, HsnLevel, HsnRows, HsnStep,
-    SupplyType, NOT_MEASURED as HSN_NOT_MEASURED,
+    hsn_warnings, parse_company_hsn, parse_group_hsn, resolve_hsn, CompanyGst, HsnLevel, HsnRows,
+    HsnStep, SupplyType, NOT_MEASURED as HSN_NOT_MEASURED,
 };
 
 /// The group listing the build's compliance read already sends (the

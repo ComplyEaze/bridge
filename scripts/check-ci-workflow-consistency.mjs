@@ -260,13 +260,20 @@ const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repos
 if (reuseScriptDigest !== "fed907ab68fe52ebd7eb227a377f546a51127303eef48d6cee560fa6e2560c6a") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
-// The merge gate's test (about 6.5 of the Workflow consistency job's 7.5 minutes) runs on a pull request only when the diff
+// The driver that splits the merge gate's test across processes is pinned by its bytes, like the reuse lookup above: it
+// decides which tests run, so a change to it is a change to what the queue proves and needs this file edited (and
+// acknowledged) with it. It lists the file's tests, gives each to exactly one process and fails unless each process reports exactly its assigned tests, all run, none skipped.
+const shardDriverDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/shard-unittest.py"))).digest("hex");
+if (shardDriverDigest !== "619a8d16e33789172ec160fa4b94fe4172323e7276f1b80e3aa4a76740a05426") {
+  failures.push(`scripts/shard-unittest.py changed; its digest is now ${shardDriverDigest}`);
+}
+// The merge gate's test (about 475 s in one process, split four ways by the driver above) runs on a pull request only when the diff
 // touches what it reads, which the merge-gate-scope step decides; the test step must stay wired to that output and nothing
 // else, or the test silently stops running on every event, the merge queue included. The step's two env lines are pinned
 // too: a base taken from anywhere but the pull request's base (its head, say) gives an empty diff and skips the test.
 {
   const consistencyJob = jobBlock(workflow, "workflow-consistency");
-  const wiring = "      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py\n";
+  const wiring = "      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4\n";
   if ((consistencyJob + "\n").split(wiring).length !== 2 || (consistencyJob.match(/^ *(?:- )?run: .*merge-gate\.test\.py/gm) ?? []).length !== 1 || (consistencyJob.match(/^      - id: merge-gate-scope$/gm) ?? []).length !== 1) {
     failures.push("the merge gate's test must run once, exactly when the merge-gate-scope step says so");
   }
@@ -578,11 +585,11 @@ const expectedChanges = [
   "          # Packaging paths: src-tauri/tauri.conf.json, src-tauri/icons/, src-tauri/build.rs (it copies the bundled legal",
   "          # files), LICENSE, NOTICE, THIRD_PARTY_LICENSES.txt, THIRD_PARTY_LICENSES_RUST.txt, packaging/ (the MCPB manifest",
   "          # and the PDFium lock), package.json (the Tauri CLI and its build script), this workflow, and the scripts the",
-  "          # bundle job runs: fetch-pdfium, capture-package-log, check-mcpb-bundle, package-mcpb, check-license-metadata,",
+  "          # bundle job runs: fetch-pdfium, capture-package-log, package-mcpb, check-license-metadata,",
   "          # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests. Also what",
   "          # pins the bundler and the build: pnpm-lock.yaml, .node-version, rust-toolchain.toml, .cargo/ and",
-  "          # src-tauri/Cargo.lock, Cargo.toml and .cargo/, and the Rust port of check-mcpb-bundle in src-tauri/examples/.",
-  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|pnpm-lock\\.yaml$|\\.node-version$|rust-toolchain\\.toml$|\\.cargo/|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$|Cargo\\.(lock|toml)$|\\.cargo/|examples/check_mcpb_bundle\\.rs$)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$)'",
+  "          # src-tauri/Cargo.lock, Cargo.toml and .cargo/, and the MCPB bundle check in src-tauri/crates/bridge-mcpb-check/.",
+  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|pnpm-lock\\.yaml$|\\.node-version$|rust-toolchain\\.toml$|\\.cargo/|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$|Cargo\\.(lock|toml)$|\\.cargo/|crates/bridge-mcpb-check/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$)'",
   "",
   "          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready",
   "          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this",
@@ -666,6 +673,10 @@ const expectedChanges = [
   "          }",
   "          release=false",
   "          if [[ -n \"$base\" && ! \"$base\" =~ ^0+$ && \"$(version_at \"$base\")\" != \"$(version_at \"$GITHUB_SHA\")\" ]]; then release=true; fi",
+  "          # A release pull request must also move src-tauri/release-date.txt (#2416): the script refuses a file that is missing,",
+  "          # not one real YYYY-MM-DD line, the same as the base's, or an earlier day. It exits 2 when git cannot be read, which",
+  "          # also fails this step: neither is a pass.",
+  "          if [[ \"$release\" == true ]]; then node scripts/check-release-date-changed.mjs \"$base\" \"$GITHUB_SHA\"; fi",
   "          if [[ \"$release\" == true ]]; then",
   "            echo \"native_os=$both\" >> \"$GITHUB_OUTPUT\"",
   "          else",
@@ -693,7 +704,7 @@ const expectedChanges = [
   "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
-  "          if [[ \"$draft\" == false ]] && grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|examples/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
+  "          if [[ \"$draft\" == false ]] && grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|examples/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",

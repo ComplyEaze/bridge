@@ -196,8 +196,9 @@ pub(crate) enum MailingReadDecision {
     /// reference §8.4, lab row 2214).
     ContinueOnceDrained,
     /// The read ran out of time, or past the cap without Tally declaring it, so
-    /// Tally may still be working on it, and no such cut of a mailing read has
-    /// been seen live: the export fails, and nothing is sent again.
+    /// Tally may still be working on it: the export fails, and nothing is sent
+    /// again. A mailing read cut at the time limit has been seen live, owing
+    /// the drain (protocol reference §8.4).
     Refuse,
 }
 

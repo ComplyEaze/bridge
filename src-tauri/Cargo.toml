@@ -30,6 +30,7 @@ members = [
   ".",
   "crates/bridge-approval-standin",
   "crates/bridge-bank-statement",
+  "crates/bridge-mcpb-check",
   "crates/bridge-tally-core",
   "crates/bridge-tally-primitives",
   "crates/bridge-tally-protocol",

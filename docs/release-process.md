@@ -745,7 +745,12 @@ every note for them first, and for maintainers second.
   both hosts. The macOS native tests run only on a master push, the daily
   scheduled run, a manual run and the version pull request (the release pull
   request, which changes the version in `src-tauri/tauri.conf.json`), never on
-  another pull request or in the merge queue. A master
+  another pull request or in the merge queue. The scope step of the same run also
+  refuses a version pull request that leaves `src-tauri/release-date.txt` as the
+  base had it, dates it before the base's day, or breaks its one-line format
+  (`scripts/check-release-date-changed.mjs`); a second release on the base's own
+  UTC day is refused too, so wait for the next day, and so is a revert of a version
+  pull request (it needs a fresh, later date). A master
   push leaves the Windows native, bundle and seam jobs out of its matrix when the merge
   queue ran them on that same commit; its job summary names the queue run. The
   macOS bundle and seam jobs run in the queue and on a push only when a
@@ -795,12 +800,34 @@ patch for a fix-only release:
 
 `--apply` writes the version to `package.json`, `packaging/mcpb/manifest.json`,
 `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, the `bridge` entry in
-`src-tauri/Cargo.lock`, and the README sentence naming the current version.
+`src-tauri/Cargo.lock`, and the README sentence naming the current version. It also
+writes today's date (UTC, `YYYY-MM-DD`) to `src-tauri/release-date.txt`, which `build.rs`
+compiles into the program: `tally_status` adds a build notice, once per session, when that
+date is more than 60 days before the computer's date. No request is made. A build made
+between releases carries the last release's date, so its notice comes early. The script
+refuses a date earlier than the last release tag's day (a clock running backward); a clock
+running forward cannot be detected by the script and would delay the notice. A release cut without
+`--apply` carries the old date, so its builds show the notice too soon; nothing in CI yet
+requires the file to change in the version pull request, so use `--apply`.
+`scripts/check-license-metadata.mjs` checks the file's format.
 It checks every file first and writes none if one fails. Then:
 
-1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
+1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because some of those files are pinned, `src-tauri/src/agent.rs` among them (see "Compatibility-surface reseal").
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`, and move the
    unreleased entries into the new section (see "At cut time" under `CHANGELOG.md` below).
+
+**Also in the version pull request, between steps 2 and 3,** check the two things a reader meets first:
+
+- the new `CHANGELOG.md` section opens with "In plain words" and its "Should I upgrade?" block
+  (see below). When the section is missing or unreadable the release run only warns, and the
+  release page then has no plain-words opening;
+- the static lines of `site/download.html` that name a release (`At a glance, release`,
+  `Not in release`, and the sentence about the file a run used) name the new build, and the
+  "If you already have an older release" list says, for the previous release installed
+  over, whether it was measured or "has not been measured". The buttons follow the newest
+  release by themselves, so a page edited later offers the new build under the old
+  description until it is deployed.
+
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
 5. After the release is published, if the release run warned that unreleased entries were

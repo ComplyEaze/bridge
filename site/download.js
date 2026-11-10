@@ -5,12 +5,15 @@ var PLATFORMS = {
   "windows-x64": {
     name: "Windows&nbsp;x64",
     label: "Windows",
-    note: "Windows x64.", // "Windows 10 or 11" is not a verified fact
+    // "Windows 10 or 11" is not a verified fact. Windows on ARM is not named in the install guide; "other platforms are not qualified" (INSTALL.md, Platforms) covers it.
+    note: "Windows x64 only. Windows on ARM is not qualified for this release. You also need Microsoft&rsquo;s Visual C++ Redistributable (x64): the <a href=\"https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md#before-you-start\">installation guide</a> has its download link.",
   },
   "macos-arm64": {
     name: "Mac (Apple&nbsp;Silicon)",
     label: "Mac",
-    note: "Apple&nbsp;Silicon only. Intel Macs are not qualified for this release.", // the release text's own words: "not qualified"
+    // "Intel Macs are not qualified for this release" is the release text's own words. TallyPrime is a Windows program, so the
+    // Mac note says where it must run before a person downloads (install guide, Step 0).
+    note: "Apple&nbsp;Silicon only: in the Apple menu choose About This Mac, and the chip should read Apple M1 or newer. Intel Macs are not qualified for this release. TallyPrime runs only on Windows, so on a Mac it must run in a Windows virtual machine on that same Mac with its port forwarded: do <a href=\"https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md#step-0-mac-only-let-the-mac-reach-tally\">Step 0 of the installation guide</a> first.",
   },
 };
 

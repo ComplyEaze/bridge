@@ -1,0 +1,32 @@
+== --diff a-s5b-R-0105.xml a-s6-R-0105.xml
+   ALTERID: '69' -> '70'
+   VCHGSTSTATUSISINCLUDED: 'No' -> 'Yes'
+   VCHGSTSTATUSISUNCERTAIN: 'Yes' -> 'No'
+   list ALLLEDGERENTRIES.LIST: 6 -> 6, 5 differ
+   lists compared: 1
+   legs: 6 -> 6
+diff R-0105 exit 0
+== --diff a-s5b-RC-0105.xml a-s6-RC-0105.xml
+   ALTERID: '69' -> '70'
+   CMPGSTIN: '' -> '08ZZZZZ0000Z1ZQ'
+   VCHGSTSTATUSISINCLUDED: 'No' -> 'Yes'
+   VCHGSTSTATUSISUNCERTAIN: 'Yes' -> 'No'
+   list ALLLEDGERENTRIES.LIST: 6 -> 6, 5 differ
+   lists compared: 1
+   legs: 6 -> 6
+diff RC-0105 exit 0
+== --diff a-s5b-V-0105.xml a-s6-V-0105.xml
+   ALTERID: '69' -> '70'
+   CMPGSTIN: '' -> '08ZZZZZ0000Z1ZQ'
+   CMPGSTREGISTRATIONTYPE: '' -> 'Regular'
+   CMPGSTSTATE: '' -> 'Rajasthan'
+   REMOTEALTGUID: '' -> '6b43e498-430c-4d5c-bfef-d32e2ab93c85'
+   VCHGSTSTATUSISINCLUDED: 'No' -> 'Yes'
+   VCHGSTSTATUSISUNCERTAIN: 'Yes' -> 'No'
+   lists compared: 2
+   legs: 0 -> 0
+diff V-0105 exit 0
+== --diff a-s2-V-0010.xml a-s6-V-0010.xml
+   lists compared: 2
+   legs: 0 -> 0
+diff V-0010 s2-s6 exit 0

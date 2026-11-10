@@ -1,0 +1,15 @@
+== --diff a-s5r-R-0105.xml a-s5b-R-0105.xml
+   lists compared: 1
+   legs: 6 -> 6
+diff R-0105 exit 0
+== --diff a-s5r-RC-0105.xml a-s5b-RC-0105.xml
+   lists compared: 1
+   legs: 6 -> 6
+diff RC-0105 exit 0
+== --diff a-s5r-V-0105.xml a-s5b-V-0105.xml
+   lists compared: 2
+   legs: 0 -> 0
+diff V-0105 exit 0
+== a-s5b-M-marks.xml against a-s5r-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'248'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'248'")
+  equal
+same-row M exit 0

@@ -1,0 +1,4 @@
+13:08:25	R-0105.xml	a-s5b-R-0105.xml	curl 0	87968 bytes
+13:08:25	RC-0105.xml	a-s5b-RC-0105.xml	curl 0	88208 bytes
+13:08:25	V-0105.xml	a-s5b-V-0105.xml	curl 0	52630 bytes
+13:08:25	M-marks.xml	a-s5b-M-marks.xml	curl 0	3394 bytes

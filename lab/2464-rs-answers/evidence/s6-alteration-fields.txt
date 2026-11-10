@@ -1,0 +1,18 @@
+Voucher screen opened by Enter on the Day Book line BP/26-27/0105, as shown before Ctrl+A (nothing changed):
+Title bar: Accounting Voucher Alteration (Secondary) | BRIDGE PILOT LAB
+GST Registration: Rajasthan Registration (a line above the voucher type, centred; row 2162-RS's screen on the one-registration book had no such line; recorded, not touched)
+Voucher type: BRIDGE Sales
+No.: BP/26-27/0105 (cursor on the No. field)
+Date: 1-Aug-26, Saturday
+Party A/c name: BRIDGE Walk-in
+Current balance: 18,199.70 Dr
+Particulars | Rate | per | Amount
+BRIDGE Svc 998313 5% | | | 600.40
+BRIDGE Svc 998314 5% | | | 400.40
+BRIDGE CGST 2.5% | 2.50 | % | 25.02
+BRIDGE SGST 2.5% | 2.50 | % | 25.02
+BRIDGE Round Off | | | 0.16
+Narration: (empty)
+Total: 1,051.00
+No tax, HSN/SAC or other GST line is shown on the screen beyond the GST Registration line above.
+Button bar: Q: Quit, A: Accept, D: Delete, X: Cancel Vch, F12: Configure; right panel F2: Date, F3: Company/Tax Registration (row 2162-RS's read F3: Company), F4: Contra, F5: Payment, F6: Receipt, F7: Journal, F8: Sales, F9: Purchase, F10: Other Vouchers, H: Change Mode, I: More Details, O: Related Reports, L: Optional, T: Post-Dated (F: Autofill greyed)

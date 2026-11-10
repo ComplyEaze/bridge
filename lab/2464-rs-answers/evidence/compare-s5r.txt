@@ -1,0 +1,6 @@
+s5r N-0105 byte-equal to RB's s5r
+s5r R-0105 byte-equal to RB's s5r
+s5r RC-0105 byte-equal to RB's s5r
+s5r V-0105 byte-equal to RB's s5r
+s5r V-0010 byte-equal to RB's s5r
+s5r M-marks byte-equal to RB's s5r

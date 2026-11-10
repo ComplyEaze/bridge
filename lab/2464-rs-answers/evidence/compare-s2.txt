@@ -1,0 +1,7 @@
+s2 U-taxunits byte-equal to RB's s2
+s2 T-types byte-equal to RB's s2
+s2 N-0105 byte-equal to RB's s2
+s2 R-0010 byte-equal to RB's s2
+s2 RC-0010 byte-equal to RB's s2
+s2 V-0010 byte-equal to RB's s2
+s2 M-marks byte-equal to RB's s2

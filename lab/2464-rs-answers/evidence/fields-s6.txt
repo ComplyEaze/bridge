@@ -1,0 +1,4 @@
+a-s6-R-0105.xml: VCHGSTSTATUSISINCLUDED 'Yes' (attr TYPE="Logical"); VCHGSTSTATUSISUNCERTAIN 'No' (attr TYPE="Logical"); VCHGSTSTATUSISEXCLUDED 'No' (attr TYPE="Logical"); ISGSTOVERRIDDEN 'No' (attr TYPE="Logical"); ALTERID ' 70' (attr TYPE="Number"); MASTERID ' 45' (attr TYPE="Number")
+a-s6-RC-0105.xml: GSTREGISTRATION 'Rajasthan Registration' (attr TYPE="String"); CMPGSTIN '08ZZZZZ0000Z1ZQ' (attr TYPE="String")
+a-s6-V-0105.xml: GSTREGISTRATION 'Rajasthan Registration'; CMPGSTIN '08ZZZZZ0000Z1ZQ'; CMPGSTSTATE 'Rajasthan'; CMPGSTREGISTRATIONTYPE 'Regular'; PLACEOFSUPPLY 'Rajasthan'; STATENAME 'Rajasthan'; ALTERID ' 70'; MASTERID ' 45'
+a-s6-M-marks.xml: ALTVCHID ' 70' (attr TYPE="Number"); ALTMSTID ' 248' (attr TYPE="Number")

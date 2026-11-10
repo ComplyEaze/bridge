@@ -1,0 +1,4 @@
+a-s5r-R-0105.xml: VCHGSTSTATUSISINCLUDED 'No' (attr TYPE="Logical"); VCHGSTSTATUSISUNCERTAIN 'Yes' (attr TYPE="Logical"); VCHGSTSTATUSISEXCLUDED 'No' (attr TYPE="Logical"); ISGSTOVERRIDDEN 'No' (attr TYPE="Logical"); ALTERID ' 69' (attr TYPE="Number"); MASTERID ' 45' (attr TYPE="Number")
+a-s5r-RC-0105.xml: GSTREGISTRATION 'Rajasthan Registration' (attr TYPE="String"); CMPGSTIN '' (attr TYPE="String")
+a-s5r-V-0105.xml: GSTREGISTRATION 'Rajasthan Registration'; CMPGSTIN empty element; CMPGSTSTATE empty element; CMPGSTREGISTRATIONTYPE empty element; PLACEOFSUPPLY 'Rajasthan'; STATENAME 'Rajasthan'; ALTERID ' 69'; MASTERID ' 45'
+a-s5r-M-marks.xml: ALTVCHID ' 69' (attr TYPE="Number"); ALTMSTID ' 248' (attr TYPE="Number")

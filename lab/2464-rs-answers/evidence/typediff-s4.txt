@@ -1,0 +1,2 @@
+== --type-diff a-rb-a-s4-T-types.xml a-s4-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 0 leaves differ

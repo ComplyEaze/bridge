@@ -629,6 +629,62 @@ class MergeGateControls(unittest.TestCase):
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
+    def test_dependabots_signoff_line_in_a_well_formed_commit_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer")
+
+    def test_dependabots_signoff_line_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer-crlf")
+
+    def test_dependabots_signoff_line_without_a_final_newline_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-trailer-no-final-newline")
+
+    def test_dependabots_signoff_line_beside_the_public_agent_trailer_is_identity_metadata(self):
+        self.assert_pass("bot-signoff-with-agent-trailer")
+
+    def test_dependabots_signoff_line_outside_a_commit_trailer_still_blocks(self):
+        for scenario in (
+            "bot-signoff-in-pr-body",
+            "bot-signoff-in-source-payload",
+            "bot-signoff-nonfooter",
+            "bot-signoff-before-another-paragraph",
+            "bot-signoff-with-malformed-line",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_dependabots_signoff_line_with_another_key_name_or_spelling_still_blocks(self):
+        for scenario in (
+            "bot-signoff-other-key",
+            "bot-signoff-coauthor-key",
+            "bot-signoff-lowercase-key",
+            "bot-signoff-prefixed-key",
+            "bot-signoff-other-name",
+            "bot-signoff-name-case",
+            "bot-signoff-name-with-address",
+            "bot-signoff-double-space",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_dependabots_signoff_line_with_anything_after_the_bracket_or_no_bracket_still_blocks(self):
+        for scenario in (
+            "bot-signoff-extra-payload",
+            "bot-signoff-unclosed",
+            "bot-signoff-trailing-space",
+            "bot-signoff-second-address",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "customer email shape")
+
+    def test_another_address_under_dependabots_signoff_line_still_blocks(self):
+        self.assert_blocked("bot-signoff-other-address", "customer email shape")
+
+    def test_mixed_line_endings_around_dependabots_signoff_line_still_block(self):
+        self.assert_blocked("bot-signoff-mixed-line-endings", "customer email shape")
+
+    def test_a_customer_trailer_beside_dependabots_signoff_line_still_blocks(self):
+        self.assert_blocked("bot-signoff-with-customer-trailer", "customer email shape")
+
     # -- AI attribution is a note, never a block (owner practice of 25 Oct 2026) ------------
 
     def assert_noted(self, scenario, text):
@@ -2130,6 +2186,17 @@ class PrivacyLocationAndCommentBlockTests(unittest.TestCase):
         self.assertTrue(self.redacted(message).endswith("\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"), "the block is returned unchanged")
         crlf = message.replace("\n", "\r\n")
         self.assertEqual(self.emails(crlf), 0)
+
+    def test_dependabots_signoff_before_a_git_conflict_comment_block_is_still_the_terminal_trailer(self):
+        support = "support" + "@" + "github.com"
+        bot = "Signed-off-by: dependabot[bot] <" + support + ">"
+        message = "Merge master\n\n" + bot + "\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"
+        self.assertEqual(self.emails(message), 0)
+        self.assertTrue(self.redacted(message).endswith("\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"), "the block is returned unchanged")
+        self.assertEqual(self.emails(message.replace("\n", "\r\n")), 0)
+        self.assertEqual(self.emails("Merge\n\n" + bot + "\n\n# Conflicts:\n# " + self.CUSTOMER), 1, "an address in the block still counts")
+        self.assertEqual(self.emails("Merge\n\n# Conflicts:\n#\ta\n\n" + bot), 0, "a terminal sign-off after the block is unchanged behaviour")
+        self.assertEqual(self.emails("Merge\n\nnote: see <" + support + ">\n\n# Conflicts:\n#\ta"), 1, "the address outside a sign-off line still counts")
 
     def test_an_address_inside_or_after_the_comment_block_is_still_counted(self):
         inside = "Merge\n\nCo-Authored-By: Claude <" + self.AGENT + ">\n\n# Conflicts:\n# " + self.CUSTOMER

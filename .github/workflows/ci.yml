@@ -231,7 +231,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -379,7 +379,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
@@ -405,7 +405,7 @@ jobs:
           # base to enforce never-renumber; a shallow clone has no base to read,
           # and the check says so and skips rather than passing quietly.
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
@@ -471,7 +471,7 @@ jobs:
         with:
           toolchain: 1.96.0
           components: clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: |
             src-tauri -> target
@@ -545,7 +545,7 @@ jobs:
           toolchain: 1.96.0
           components: clippy
       - name: Install pinned nextest
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
           tool: cargo-nextest@0.9.143
           fallback: none
@@ -555,7 +555,7 @@ jobs:
         uses: ./.github/actions/setup-windows-native
         with:
           save-cache: ${{ matrix.shard == 1 }}
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         id: native-cache
         with:
           workspaces: |
@@ -593,7 +593,7 @@ jobs:
       - name: Retain macOS per-test timings
         if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-test-timings-macos-shard-${{ matrix.shard }}
           path: src-tauri/target/nextest/default/junit.xml
@@ -609,7 +609,7 @@ jobs:
       - name: Retain minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-crash-stacks-macos-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/bridge-native-crashes.json
@@ -626,7 +626,7 @@ jobs:
           --output "$RUNNER_TEMP/bridge-native-binaries"
       - name: Retain failed macOS executable evidence
         if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'failure' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-crash-binaries-macos-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/bridge-native-binaries
@@ -697,7 +697,7 @@ jobs:
       - name: Retain native compiler timings
         if: ${{ always() }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}
           path: src-tauri/target/cargo-timings/*.html
@@ -737,7 +737,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -757,7 +757,7 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_ENV, `MACOSX_DEPLOYMENT_TARGET=${target}\n`);
           JS
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri -> target
           # Tauri sets this inside its process; include it before cache lookup so
@@ -778,7 +778,7 @@ jobs:
       - run: corepack pnpm run license:all
       - name: Install pinned package compiler cache
         id: package-sccache
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
           tool: sccache@0.17.0
           fallback: none
@@ -822,7 +822,7 @@ jobs:
       - name: Retain macOS package diagnostics
         if: ${{ always() && runner.os == 'macOS' && (steps.macos-bundle.outcome == 'success' || steps.macos-bundle.outcome == 'failure') }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-package-diagnostics
           path: |
@@ -895,7 +895,7 @@ jobs:
             diff src-tauri/target/release/bundle/mcpb-smoke.json "$RUNNER_TEMP/mcpb-smoke-rust.json" || true
             exit 1
           fi
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unsigned-bundle-smoke-${{ matrix.os }}
           path: src-tauri/target/release/bundle/**
@@ -919,7 +919,7 @@ jobs:
       - name: Upload package compiler cache statistics
         if: ${{ always() && steps.package-sccache-start.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-compiler-cache-${{ matrix.os }}
           path: package-compiler-cache.json
@@ -953,7 +953,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
@@ -974,7 +974,7 @@ jobs:
           JS
       # Restores bundle-smoke's release dependencies (same key) and never saves:
       # a second cache family would only compete for the repository's quota.
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri -> target
           shared-key: bundle-smoke
@@ -1009,7 +1009,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
       # Package sccache: two newest per OS. Rust caches: newest per job/OS family.
@@ -1037,7 +1037,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version-file: .node-version
       - name: Test the mutation runner

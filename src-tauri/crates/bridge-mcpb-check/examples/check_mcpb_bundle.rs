@@ -4,7 +4,7 @@
 //! The Rust port of `scripts/check-mcpb-bundle.py` (#1810 step 6). Every check is the same, in the same
 //! order, with the same diagnostic codes, and the report has the same fields in the same order, so CI can
 //! run both on one bundle and compare the two reports byte for byte before the Python is retired. It reads
-//! the archive with the `zip` crate the `bridge` package already depends on.
+//! the archive with the `zip` crate. It lives in its own package so that building it never compiles `bridge`.
 //!
 //! Usage: `check_mcpb_bundle <archive> [--output <file>]`. The report goes to stdout (and the file); a
 //! failure prints `MCPB smoke failed: <code>` on stderr and exits 1.
@@ -1216,10 +1216,11 @@ pub fn report_text(report: &Report) -> Checked<String> {
     Ok(text)
 }
 
-/// The repository this example was built from: `src-tauri/..`.
+/// The repository this example was built from: `src-tauri/crates/bridge-mcpb-check/../../..`.
 fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
+        .ancestors()
+        .nth(3)
         .map_or_else(|| PathBuf::from("."), Path::to_path_buf)
 }
 

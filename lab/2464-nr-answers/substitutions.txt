@@ -1,0 +1,10 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/bk.txt: original 173 B sha256 43baa23c9ba3de0ef207a0b94d64526b4f743a72e3ad2960044400c75c088710 (kept on the lab PC); the company number replaced in 1 place(s)
+evidence/diff-s3r-r0010-r0085.txt: original 447 B sha256 d63288e22ab8611420f874f4fe444fee8bdf108e4d5d495f8d50946a50b19907 (kept on the lab PC); the voucher keys of 1 VOUCHERKEY diff line(s) -> <15-digit voucher key> (the values are in the answers)
+evidence/diff-s3r-v0010-v0085.txt: original 538 B sha256 4f42e1573711b7b1ac98b62e1e625c5912a73dc97cec5c6a9bace40fba65336d (kept on the lab PC); the voucher keys of 1 VOUCHERKEY diff line(s) -> <15-digit voucher key> (the values are in the answers); the values of 1 REMOTEGUID diff line(s) -> <REMOTEGUID, the sheet value> (the values are in the sheet requests)
+evidence/notes.txt: original 6637 B sha256 ce3542c9b069ceefe72350672a4c3e62df9ed812c8388f1632d3b08cb9d32a55 (kept on the lab PC); 1 x -> <the before-write option>; 1 x -> <Tally data folder>
+RESULTS.md: original 46912 B sha256 ddbe7d3d3013df41b8e8a83766b89649a3d188417d724443d872b794fad9629e (kept on the lab PC); the voucher keys of 2 VOUCHERKEY diff line(s) -> <15-digit voucher key> (the values are in the answers); the values of 1 REMOTEGUID diff line(s) -> <REMOTEGUID, the sheet value> (the values are in the sheet requests); 1 x -> <the before-write option>; 1 x -> <Tally data folder>
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 383 B sha256 b9722b09d3d1204a0d6af6a0e7161e60793cab81ca83eac573519517439650a5 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/send.sh: original 720 B sha256 f61d7e3c11da7df08a9b7f1c2e45d85b92a94c93fe689e20b3aea3fda8c13bb3 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/prep-c6.sh: original 2196 B sha256 ba2a424a84a5fc2d9933384b7fc467f71fd9b293615227b675ef5a9e734013ad (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> <Tally data folder>

@@ -1,0 +1,9 @@
+$ step 5: each s5 answer against s2's of the same name, by size, sha256 and bytes
+a-s5-M-marks.xml 3394 B sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | s2 3394 B | byte-equal: yes
+a-s5-U-taxunits.xml 22636 B sha256 e40ef83cc01ffc18ee38a48745dd712d2f0f89f282cd2fe1e716a7ff71835989 | s2 22636 B | byte-equal: yes
+a-s5-T-types.xml 306946 B sha256 cfd362721f9dd1f39dd7033d90a839999341a85df6c3ac0ac109384d236197ed | s2 306946 B | byte-equal: yes
+a-s5-N-0085.xml 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974 | s2 3022 B | byte-equal: yes
+a-s5-N-0087.xml 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974 | s2 3022 B | byte-equal: yes
+a-s5-R-0010.xml 94474 B sha256 b32ec79cf0ee63c3635e94196ab2b81670f2d13e5542673753906c2bb3c2ede5 | s2 94474 B | byte-equal: yes
+a-s5-RC-0010.xml 94744 B sha256 5805c4173cce5e6fb0be6cf2990575e81cbf9c39b6aa9a3616c10254e5574399 | s2 94744 B | byte-equal: yes
+a-s5-V-0010.xml 52784 B sha256 4bf8b111c33edc1378933a2583021ce677d8ae4641972f88b8dc6343cfc60456 | s2 52784 B | byte-equal: yes

@@ -1,0 +1,6 @@
+09:53:26	N-0085.xml	a-s3r-N-0085.xml	curl 0	5608 bytes
+09:53:26	R-0085.xml	a-s3r-R-0085.xml	curl 0	94478 bytes
+09:53:26	RC-0085.xml	a-s3r-RC-0085.xml	curl 0	94748 bytes
+09:53:27	V-0085.xml	a-s3r-V-0085.xml	curl 0	52788 bytes
+09:53:27	V-0010.xml	a-s3r-V-0010.xml	curl 0	52786 bytes
+09:53:27	M-marks.xml	a-s3r-M-marks.xml	curl 0	3396 bytes

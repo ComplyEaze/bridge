@@ -1,0 +1,8 @@
+GN a-s2-U-taxunits.xml 22636 B sha256 equal to the sheet table
+GN a-s2-RC-0010.xml 94744 B sha256 equal to the sheet table
+GN a-s2-V-0010.xml 52784 B sha256 equal to the sheet table
+GN a-s2-T-types.xml 306946 B sha256 equal to the sheet table
+GN a-s2-R-0010.xml 94474 B sha256 equal to the sheet table
+GN a-s2-M-marks.xml 3394 B sha256 equal to the sheet table
+GN a-s2-N-0095.xml 3022 B sha256 equal to the sheet table
+GN a-s2-N-0097.xml 3022 B sha256 equal to the sheet table

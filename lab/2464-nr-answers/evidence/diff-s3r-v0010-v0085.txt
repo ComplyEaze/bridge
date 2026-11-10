@@ -1,0 +1,11 @@
+== --diff a-s3r-V-0010.xml a-s3r-V-0085.xml
+   ALTERID: '17' -> '69'
+   GUID: '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b' -> '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d'
+   MASTERID: '11' -> '45'
+   REFERENCE: 'BP/26-27/0010' -> 'BP/26-27/0085'
+   REMOTEGUID: '<REMOTEGUID, the sheet value>' -> '<REMOTEGUID, the sheet value>'
+   VOUCHERKEY: '<15-digit voucher key>' -> '<15-digit voucher key>'
+   VOUCHERNUMBER: 'BP/26-27/0010' -> 'BP/26-27/0085'
+   VOUCHERRETAINKEY: '41' -> '129'
+   lists compared: 2
+   legs: 0 -> 0

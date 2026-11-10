@@ -1,0 +1,3 @@
+== --type-diff a-s2-T-types.xml a-s4m-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 1 leaves differ
+     /LASTNUMBER[1]: 'BP/26-27/0044' -> 'BP/26-27/0085'

@@ -1,0 +1,10 @@
+$ fields-vd.py evidence/tb-vdtb3w.txt evidence/tb-tb3p.txt (the tb.py fields that differ, row by row: row 683-VD's tb3w -> tb3p)
+('BRIDGE Import Purchases', 'CREDITTOTALS') ('', 'EMPTY') -> ('0.00', 'PLAIN')
+('BRIDGE Import Purchases', 'DEBITTOTALS') ('-$200.00 @ ₹ 86/$ = -₹ 17400.00', 'COMPOSITE') -> ('-17400.00', 'PLAIN')
+('BRIDGE Import Purchases', 'TBALCLOSING') ('-$200.00 @ ₹ 86/$ = -₹ 17400.00', 'COMPOSITE') -> ('-17400.00', 'PLAIN')
+('BRIDGE Import Purchases', 'class') MIXED -> PLAIN
+('BRIDGE Lab Bank', 'CREDITTOTALS') ('$200.00 @ ₹ 87/$ = ₹ 17500.00', 'COMPOSITE') -> ('17500.00', 'PLAIN')
+('BRIDGE Lab Bank', 'DEBITTOTALS') ('-$1100.00 @ ₹ 87/$ = -₹ 96700.00', 'COMPOSITE') -> ('-96700.00', 'PLAIN')
+('BRIDGE Lab Bank', 'TBALCLOSING') ('-$900.00 @ ₹ 88/$ = -₹ 79200.00', 'COMPOSITE') -> ('-79200.00', 'PLAIN')
+('BRIDGE Lab Bank', 'class') MIXED -> PLAIN
+fields differing: 8 of 40

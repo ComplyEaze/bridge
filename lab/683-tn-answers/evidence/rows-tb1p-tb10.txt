@@ -1,0 +1,28 @@
+a-tb10-T-tb1-20250401-20250430.xml: 14140 B sha256 1c4638e8df640575eff3e4955bed2d9783026fe7817ad73e63e05f19277fb7b7
+  rows: 8
+a-tb1p-T-tb1-20250401-20250430.xml: 14140 B sha256 47916021905a5bdedf18fcead25b2d0a0abee3682beffbc4d019e213d3dd237f
+  rows: 8
+ROW 'BRIDGE Export Sales': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '$1000200.00 @ ₹ 86/$ = ₹ 86023441.25'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '$1000200.00 @ ₹ 86/$ = ₹ 86023441.25'
+ROW 'BRIDGE INR Customer': content differs
+  A only: /CREDITTOTALS {'TYPE': 'Amount'} '2000.00'
+  B only: /CREDITTOTALS {'TYPE': 'Amount'} '4000.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '-1000.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '-3000.00'
+ROW 'BRIDGE USD Customer': content differs
+  A only: /DEBITTOTALS {'TYPE': 'Amount'} '-$1000100.00 @ ₹ 87.9999/$ = -₹ 88008700.00'
+  B only: /DEBITTOTALS {'TYPE': 'Amount'} '-$1000200.00 @ ₹ 87.9999/$ = -₹ 88017500.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '-$999000.00 @ ₹ 88/$ = -₹ 87912000.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '-$999100.00 @ ₹ 88/$ = -₹ 87920800.00'
+ROW 'Cash': content differs
+  A only: /DEBITTOTALS {'TYPE': 'Amount'} '-3000.00'
+  B only: /DEBITTOTALS {'TYPE': 'Amount'} '-5000.00'
+  A only: /TBALCLOSING {'TYPE': 'Amount'} '-3000.00'
+  B only: /TBALCLOSING {'TYPE': 'Amount'} '-5000.00'
+CONTENT DIFFER
+ROW ORDER SAME
+ELEMENT ORDER SAME
+exit 2

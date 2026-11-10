@@ -1,0 +1,10 @@
+$ fields-vd.py evidence/tb-tb10.txt evidence/tb-tb1p.txt (the tb.py fields that differ, row by row: this row's tb10, before the write -> tb1p, after it)
+('BRIDGE Export Sales', 'CREDITTOTALS') ('$1000100.00 @ ₹ 86/$ = ₹ 86014641.25', 'COMPOSITE') -> ('$1000200.00 @ ₹ 86/$ = ₹ 86023441.25', 'COMPOSITE')
+('BRIDGE Export Sales', 'TBALCLOSING') ('$1000100.00 @ ₹ 86/$ = ₹ 86014641.25', 'COMPOSITE') -> ('$1000200.00 @ ₹ 86/$ = ₹ 86023441.25', 'COMPOSITE')
+('BRIDGE INR Customer', 'CREDITTOTALS') ('2000.00', 'PLAIN') -> ('4000.00', 'PLAIN')
+('BRIDGE INR Customer', 'TBALCLOSING') ('-3000.00', 'PLAIN') -> ('-1000.00', 'PLAIN')
+('BRIDGE USD Customer', 'DEBITTOTALS') ('-$1000100.00 @ ₹ 87.9999/$ = -₹ 88008700.00', 'COMPOSITE') -> ('-$1000200.00 @ ₹ 87.9999/$ = -₹ 88017500.00', 'COMPOSITE')
+('BRIDGE USD Customer', 'TBALCLOSING') ('-$999000.00 @ ₹ 88/$ = -₹ 87912000.00', 'COMPOSITE') -> ('-$999100.00 @ ₹ 88/$ = -₹ 87920800.00', 'COMPOSITE')
+('Cash', 'DEBITTOTALS') ('-3000.00', 'PLAIN') -> ('-5000.00', 'PLAIN')
+('Cash', 'TBALCLOSING') ('-3000.00', 'PLAIN') -> ('-5000.00', 'PLAIN')
+fields differing: 8 of 40

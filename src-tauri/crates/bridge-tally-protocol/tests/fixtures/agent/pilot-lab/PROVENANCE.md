@@ -144,6 +144,23 @@ Answers of the Windows lab (the same synthetic company, TallyPrime 7.1 Silver, l
 | `pilot-lab-ledger-rates-hsn.request.utf16le.xml` | 1,974 | `03de8fa7e3e3477a527e2a1ecf4c0c69a2bf2d190fa76b5c8def9e595eb94c5e` | `workorder/w16-ledger-rates-hsn.xml` in `lab/1342-capture-requests` (commit `b426aeb76`) | the code renders it: `w7-ledgers-rates.xml` with `HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE` added | the request that was answered, with a byte order mark |
 | `pilot-lab-groups-hsn.request.utf16le.xml` | 1,100 | `237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02` | `workorder/w16-groups-hsn.xml` in `lab/1342-capture-requests` (commit `b426aeb76`) | the code renders it: `r07-groups.xml` with `HSNDETAILS.LIST` added | the request that was answered, with a byte order mark |
 
+## The customer made SEZ on screen (2026-11-09)
+
+Row 2162-S9b's answer to the build's ledger compliance read (`C-compliance.xml`, byte-equal to `r05-ledgers-compliance.xml`), sent raw by the Windows lab on BRIDGE PILOT LAB loaded alone (TallyPrime 7.2, single-user edition) after `Regular - SEZ` was chosen for `BRIDGE Customer RJ` on Tally's Ledger Alteration screen and saved. The fixture is the answer byte for byte as captured, published on `lab/2162-s9b-answers` (commit `6c80eb43`, `answers/a-s5r-C-compliance.xml`). Its GSTINs are synthetic, as the book's setup seeded them: the customer's (twice) and the company's own registration, each passing the build's check digit. No BOM, as Tally sent it.
+
+| Fixture | Bytes | SHA-256 | Published as | Request | What it is |
+| --- | ---: | --- | --- | --- | --- |
+| `pilot-lab-s9b-customer-sez-compliance.utf16le.xml` | 41,284 | `176fa6421ed99f55c5982a45b579706923b6c4fff4485b12d8147f0bf0a297f4` | `answers/a-s5r-C-compliance.xml (commit 6c80eb43)` | `r05-ledgers-compliance.xml` (`c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386`) | the 19 ledgers, `BRIDGE Customer RJ` with two dated registration entries: 20260401 `Regular` and 20260915 `Regular - SEZ`, the date Tally gave the save |
+
+## An invoice saved again, unchanged, on Tally's screen (2026-11-09)
+
+Row 2162-RS's answers to the build's invoice read-back (`R-0057.xml`, `R-0010.xml` with the number changed), sent raw by the Windows lab on BRIDGE PILOT LAB loaded alone (TallyPrime, single-user edition, `tally.exe` file version 1.1.7.2) for `BP/26-27/0057`, which the build's request had created on that book (GUID `...-0000002d`). The first is the read with no key pressed since the write; the second is the read after the voucher was opened from the Day Book and saved with no change (Ctrl+A, no prompt). Each fixture is the answer byte for byte as captured, published on `lab/2162-rs-answers` (commit `8c24fe17`). No BOM, as Tally sent it.
+
+| Fixture | Bytes | SHA-256 | Published as | Request | What it is |
+| --- | ---: | --- | --- | --- | --- |
+| `pilot-lab-invoice-readback-resave-before.utf16le.xml` | 94,478 | `fcb385ecc5840075bb3f4b2865a516fc7f01f78b8613a925306de48625704bac` | `answers/a-s4-R-0057.xml (commit 8c24fe17)` | `R-0057.xml` (`b8108f2c36be8a9fb02fcc22f8461e9db44c00963b6e94e5d9e97bb5de2011a4`) | `BP/26-27/0057` as the build's request stored it: ALTERID 69, included Yes, uncertain No, excluded No, six legs |
+| `pilot-lab-invoice-readback-resave-after.utf16le.xml` | 95,182 | `c039be9fd5c33ab174d50e3673be4204dcf6139bad6974f19b6ff9f6cd04c3d9` | `answers/a-s6-R-0057.xml (commit 8c24fe17)` | `R-0057.xml` (`b8108f2c36be8a9fb02fcc22f8461e9db44c00963b6e94e5d9e97bb5de2011a4`) | the same voucher after the unchanged save: the same GUID, ALTERID 70, `VATEXPAMOUNT` filled on the five legs other than the party's, `RATEOFINVOICETAX.LIST` (2.50) added on the two tax legs, both fetched by the read-back and not compared; every field the read-back compares is unchanged |
+
 ## The invoice number's month reads (2026-11-09)
 
 Answers of the Windows lab (the same synthetic company, TallyPrime 7.2 Silver, Gateway on 9001) to row 2162-M1, part A, reads only, on 9 Nov 2026: the sheet `lab/2162-m1-sheet` (eaf2a4fc) sent the window read with no number term (`render_invoice_window_numbers_request`) for each calendar month of the financial year 2026-27, twice. Every month's two answers were byte-equal, and the book's marks were byte-equal before and after (V 68, M 245). The answers are published on `lab/2162-m1-answers` at 1f250b86, under `lab/2162-m1-answers/answers/`.

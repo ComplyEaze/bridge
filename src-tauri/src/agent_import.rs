@@ -407,19 +407,26 @@ impl VoucherType {
 // Every variant here carries live import/readback evidence for the exact file
 // shape this module renders for it: Journal in
 // docs/agent/ASSESSMENT-2026-09-06.md, and Payment/Receipt/Contra in
-// docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.13. Adding a `VoucherType` variant
-// does not qualify it; the build refuses any type absent from this list before
-// its first request, and a post refuses a saved one, so evidence has to arrive
-// before the file can.
+// docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.13. Sales carries PARTIAL evidence
+// only (§9.16); ADR 0004's amendment of 2026-11-09 lists what it still owes.
+// Adding a `VoucherType` variant does not qualify it; the build refuses any
+// type absent from this list before its first request, and a post refuses a
+// saved one, so evidence has to arrive before the file can.
 //
-// Sales is NOT here. One lab rehearsal (7 Oct 2026, §9.16) showed the
-// duplicate-number read finding a known invoice, Tally taking two of the
-// element sets, every read-back field coming back, and the company's
-// STATENAME equal to the GST registration state of a keyed invoice. It joins
-// this list when what that rehearsal left owed is done (ADR 0004). The check
-// before a post now recognises an invoice by its number; that has not run
-// against Tally.
+// Once a Sales batch is saved, a release older than `mcp-v0.7.0` refuses this
+// computer's import journal; the release notes name the recovery.
 const LIVE_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
+    VoucherType::Journal,
+    VoucherType::Payment,
+    VoucherType::Receipt,
+    VoucherType::Contra,
+    VoucherType::Sales,
+];
+
+/// Test-only: the list as it stood before Sales qualified. The tests that hold
+/// the gate on a declared type missing from the list run against it.
+#[cfg(test)]
+const PRE_SALES_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
     VoucherType::Journal,
     VoucherType::Payment,
     VoucherType::Receipt,
@@ -1293,8 +1300,9 @@ impl Server {
         Ok(ToolOutcome {
             payload: json!({"result": {"schema": schema, "rules": [
                 "bridge_txn_id is client-supplied, unique within this batch, 1-64 ASCII characters from [A-Za-z0-9_-]",
-                "new files accept Journal, Payment, Receipt and Contra, the voucher types with recorded live import/readback evidence",
+                "new files accept Journal, Payment, Receipt and Contra, the voucher types with recorded live import/readback evidence, and Sales, whose live evidence is PARTIAL (synthetic books, one TallyPrime release)",
                 "a Journal takes any balanced set of entries and may carry a voucher_number",
+                "a Sales voucher is a GST invoice: it carries invoice and voucher_number, is built only while posting is on (invoice_post_not_enabled), is the only voucher of its batch (invoice_one_per_batch beside another invoice, voucher_type_shapes_mixed beside another type), and must be posted only through post_import, never by importing its file in Tally",
                 "Payment, Receipt and Contra take two or more entries with at least one debit and one credit, no ledger on both sides (for more than two entries, one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified; no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), and neither voucher_number nor reference: neither element's fate on these types has been observed, and the bank's own reference belongs in the narration, which survives",
                 "a Payment credits, and a Receipt debits, a ledger whose live group ancestry reaches Bank Accounts or Cash-in-Hand; both Contra legs must name one, and a leg that cannot be established is refused",
                 "the other leg of a Payment or Receipt must be established as holding no money: a ledger under any money group is refused there, because money on both sides is a Contra whatever the type says, and so is one whose group ancestry cannot be resolved at all",
@@ -1303,7 +1311,7 @@ impl Server {
                 "dates must be within the selected company's BOOKSFROM through today",
                 "ledger names must exactly match the live catalogue; validate_masters before build_import_xml",
                 "a batch may contain at most 100 distinct ledger names of at most 1024 characters each"
-            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt and Contra are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import, and so is a batch of 2 to 50 such vouchers: an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post."}}}),
+            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt, Contra and Sales are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that Sales rests on PARTIAL evidence, invoices built by ComplyEaze Bridge, imported over the gateway and read back on synthetic lab books on one release, and that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import, and so is a batch of 2 to 50 such vouchers: an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post. A Sales invoice is posted one per batch."}}}),
             evidence: local_evidence("voucher_schema"),
             company_guid: None,
             truncated: false,
@@ -4327,7 +4335,7 @@ fn native_post_refusal_reason(code: &str) -> String {
     let voucher_limit = ledger::MAX_BATCH_POST_VOUCHERS;
     match code {
         "import_post_requires_one_voucher" => format!(
-            "native posting takes 1 to {voucher_limit} vouchers, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
+            "native posting takes one Sales invoice, or 1 to {voucher_limit} vouchers, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
         ),
         "import_post_batch_too_large" => format!(
             "this batch has more vouchers than native posting takes at once ({voucher_limit})"

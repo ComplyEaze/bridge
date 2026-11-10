@@ -378,10 +378,14 @@ async fn verification_refuses_a_voucher_type_that_is_not_qualified_before_any_re
     )
     .unwrap();
     let before = journal(directory.path());
-    let response = server
-        .call_tool(
-            "verify_import",
-            json!({"company_guid":GUID,"batch_id":line.batch_id}),
+    // Against the list before Sales qualified, Sales is declared and not on it.
+    let response = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(
+            super::super::PRE_SALES_QUALIFIED_VOUCHER_TYPES,
+            server.call_tool(
+                "verify_import",
+                json!({"company_guid":GUID,"batch_id":line.batch_id}),
+            ),
         )
         .await;
     assert_eq!(

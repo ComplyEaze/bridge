@@ -36,7 +36,7 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
   assert.doesNotMatch(app, /function configuredTallyEndpoint/);
   assert.match(app, /if \(view !== "companies" && view !== "clients"\) return;/);
   assert.match(app, /<OutstandingsScreen\s+key=\{selectedCompany \|\| "unselected"\}/);
-  assert.match(app, /setOpenCompanyNames\(\[\]\);\s*setUntrustedDiscoveredCompanies\(\[\]\);/);
+  assert.match(app, /setOpenCompanies\(\[\]\);\s*setUntrustedDiscoveredCompanies\(\[\]\);/);
   assert.match(app, /correlation_key: company\.correlation_key/);
   assert.match(app, /onOpen=\{\(\) => void refreshPersistedCompanyProfiles\(\)\}/);
   assert.match(app, /import \{ usePersistedCompanyProfiles \} from "\.\/persisted-company-profiles";/);

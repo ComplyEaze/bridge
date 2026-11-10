@@ -94,11 +94,11 @@ use super::{
     party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
     reviewed_probe_commitment_sha256, sweep_failure_naming_identity, tally_command_error,
-    tally_runtime_command_error, verify_observed_company_tuple_from_companies,
-    write_unique_download, CompanySweepFailure, OutstandingsRequest, PartyLedgerMasterExport,
-    PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
-    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED, MIRROR_KEY_INVALID_MESSAGE,
-    MIRROR_KEY_MISSING_MESSAGE, PARTY_LEDGER_MASTER_EXPORT_READ,
+    tally_runtime_command_error, untrusted_company_candidates,
+    verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
+    OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
+    SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    MIRROR_KEY_INVALID_MESSAGE, MIRROR_KEY_MISSING_MESSAGE, PARTY_LEDGER_MASTER_EXPORT_READ,
 };
 use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
@@ -1478,4 +1478,39 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
         );
         assert_eq!(held.remediation, HELD_REMEDIATION, "{error:?}");
     }
+}
+
+/// #2449: the picker's list marks only the company whose name a request cannot
+/// carry, with its code, and every candidate keeps the name byte for byte as
+/// Tally reported it, which is what the webview sends back to verify.
+#[test]
+fn the_picker_marks_only_a_company_whose_name_cannot_be_sent() {
+    let company = |name: &str| TallyCompany {
+        name: name.to_string(),
+        guid: None,
+        company_number: None,
+        books_from: None,
+    };
+    let marked = "Synthetic\u{7}Traders";
+    let ordinary = "Synthetic Traders";
+    let candidates = untrusted_company_candidates(vec![company(marked), company(ordinary)]);
+
+    assert_eq!(candidates.len(), 2);
+    assert_eq!(candidates[0].name, marked);
+    assert_eq!(candidates[0].shown_name, "Synthetic\\u{0007}Traders");
+    assert_eq!(
+        candidates[0].name_refusal,
+        Some("company_name_control_character")
+    );
+    assert_eq!(candidates[1].name, ordinary);
+    assert_eq!(candidates[1].shown_name, ordinary);
+    assert_eq!(candidates[1].name_refusal, None);
+
+    let rows = serde_json::to_value(&candidates).expect("candidates serialize");
+    assert_eq!(rows[0]["name_refusal"], "company_name_control_character");
+    assert!(
+        rows[1].get("name_refusal").is_none(),
+        "an ordinary company carries no mark: {}",
+        rows[1]
+    );
 }

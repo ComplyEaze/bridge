@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-//! The checks of `examples/check_mcpb_bundle.rs`, the Rust port of `scripts/check-mcpb-bundle.py`
-//! (#1810). Every archive here is built by the test itself with the `zip` crate's writer; a case the
-//! writer refuses to make (a duplicate name, a local header naming another file) is made by patching the
-//! bytes it wrote.
+//! The checks of `examples/check_mcpb_bundle.rs`, the MCPB bundle check (#1810). Every archive here is
+//! built by the test itself with the `zip` crate's writer; a case the writer refuses to make (a duplicate
+//! name, a local header naming another file) is made by patching the bytes it wrote. The checks inside the
+//! server runs are tested against an in-process stand-in server.
 
 #[allow(dead_code)] // the example's `main` and argument handling are not called from here
 #[path = "../examples/check_mcpb_bundle.rs"]
@@ -21,8 +21,9 @@ use checker::{Failure, Limits, LIMITS};
 
 fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("src-tauri has a parent")
+        .ancestors()
+        .nth(3)
+        .expect("src-tauri/crates/bridge-mcpb-check is three levels below the repository")
         .to_path_buf()
 }
 
@@ -1001,4 +1002,507 @@ fn the_scratch_folder_is_removed_when_the_run_ends() {
         scratch.0.clone()
     };
     assert!(!path.exists());
+}
+
+/// What the stand-in server gets wrong: one fault a test, each a check inside the smoke's server runs.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Fault {
+    None,
+    RefusedRunServesTheCall,
+    RefusedRunHidesTheTools,
+    RefusedRunRecordsAcceptance,
+    OldProtocol,
+    /// The last reply of the start with this index (0 refused, 1 accepted, 2 posting opt-in, 3 tax-audit
+    /// opt-in, 4 statement) is never written.
+    DropsLastReply(usize),
+    NotJsonRpc2,
+    RefusalNotMarkedAnError,
+    AcceptanceFromAnotherSource,
+    SchemaReplyIsAnError,
+    SchemaIsNotAnObject,
+    PasswordInTheReply,
+    PostingListedByDefault,
+    OptInMissesAPostingTool,
+    AuditSwitchAddsAnotherTool,
+    SchemaTextDiffers,
+    NoCompletionReceipt,
+    AcceptanceRecordedEachRun,
+    StatementVouchersShort,
+    StatementRefused,
+    PasswordEchoed,
+}
+
+const STAND_IN_VERSION: &str = "9.9.9-stand-in";
+
+/// One start of the server as the smoke made it.
+struct Start {
+    command: Vec<String>,
+    environment: Map<String, Value>,
+    timeout: Duration,
+}
+
+/// An in-process stand-in for the bundle's server: it answers each request line as Bridge's server does,
+/// from the environment it is started with, and writes the egress receipts and the Terms record into the
+/// data folder that environment names.
+struct StandIn {
+    fault: Fault,
+    starts: Vec<Start>,
+}
+
+impl StandIn {
+    fn serve(
+        &mut self,
+        command: &[String],
+        payload: &[u8],
+        environment: &Map<String, Value>,
+        timeout: Duration,
+    ) -> Result<(Vec<u8>, Vec<u8>), Failure> {
+        let start = self.starts.len();
+        self.starts.push(Start {
+            command: command.to_vec(),
+            environment: environment.clone(),
+            timeout,
+        });
+        let fault = self.fault;
+        let flag = |name: &str| environment.get(name).and_then(Value::as_str) == Some("true");
+        let accepted = flag("BRIDGE_TERMS_ACCEPTED");
+        let writes = flag("BRIDGE_AGENT_ENABLE_WRITES");
+        let audit = flag("BRIDGE_AGENT_ENABLE_TAX_AUDIT");
+        let data = PathBuf::from(environment["BRIDGE_AGENT_DATA_DIR"].as_str().unwrap());
+        fs::create_dir_all(&data).unwrap();
+        let acceptance = data.join("terms-acceptance.jsonl");
+        let record_acceptance = (accepted
+            && (!acceptance.exists() || fault == Fault::AcceptanceRecordedEachRun))
+            || (!accepted && fault == Fault::RefusedRunRecordsAcceptance);
+        if record_acceptance {
+            let mut file = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&acceptance)
+                .unwrap();
+            let source = if fault == Fault::AcceptanceFromAnotherSource {
+                "prompt"
+            } else {
+                "setting"
+            };
+            file.write_all(format!("{{\"source\":\"{source}\"}}\n").as_bytes())
+                .unwrap();
+        }
+        let (mut output, mut diagnostics) = (Vec::new(), Vec::new());
+        let mut last_reply = 0;
+        for line in payload
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+        {
+            let request: Value = serde_json::from_slice(line).unwrap();
+            let Some(id) = request.get("id").cloned() else {
+                continue;
+            };
+            let method = request["method"].as_str().unwrap();
+            let tool = request["params"]["name"].as_str().unwrap_or_default();
+            let refused =
+                method == "tools/call" && !accepted && fault != Fault::RefusedRunServesTheCall;
+            let result = match method {
+                "initialize" => json!({
+                    "protocolVersion": if fault == Fault::OldProtocol { "2024-11-05" } else { "2025-06-18" },
+                    "serverInfo": {"name": "bridge-mcp", "version": STAND_IN_VERSION},
+                }),
+                "tools/list" => {
+                    let mut names = checker::expected_tools(environment);
+                    let extra = checker::POSTING_TOOLS[0].to_string();
+                    match fault {
+                        Fault::RefusedRunHidesTheTools if !accepted => names.clear(),
+                        Fault::PostingListedByDefault if !writes => {
+                            names.insert(extra);
+                        }
+                        Fault::OptInMissesAPostingTool if writes => {
+                            names.remove(&extra);
+                        }
+                        Fault::AuditSwitchAddsAnotherTool if audit => {
+                            names.insert(extra);
+                        }
+                        _ => {}
+                    }
+                    let tools: Vec<Value> =
+                        names.iter().map(|name| json!({"name": name})).collect();
+                    json!({ "tools": tools })
+                }
+                "tools/call" if refused => json!({
+                    "isError": fault != Fault::RefusalNotMarkedAnError,
+                    "structuredContent": {"result": {"error": {"code": "terms_not_accepted"}}},
+                    "content": [{"type": "text", "text": "the Terms of Use are not accepted"}],
+                }),
+                "tools/call" if tool == "voucher_schema" => {
+                    let kind = if fault == Fault::SchemaIsNotAnObject {
+                        "array"
+                    } else {
+                        "object"
+                    };
+                    let structured = json!({"result": {"schema": {"type": kind}}});
+                    let shown = if fault == Fault::SchemaTextDiffers {
+                        json!({"result": {"schema": {"type": "array"}}})
+                    } else {
+                        structured.clone()
+                    };
+                    json!({
+                        "isError": fault == Fault::SchemaReplyIsAnError,
+                        "structuredContent": structured,
+                        "content": [{"type": "text", "text": shown.to_string()}],
+                    })
+                }
+                "tools/call" if tool == "parse_bank_statement" => {
+                    let password_file = request["params"]["arguments"]["password_file"]
+                        .as_str()
+                        .unwrap();
+                    assert_eq!(
+                        fs::read_to_string(password_file).unwrap(),
+                        format!("{}\n", checker::STATEMENT_PASSWORD)
+                    );
+                    assert!(Path::new(
+                        request["params"]["arguments"]["statement_path"]
+                            .as_str()
+                            .unwrap()
+                    )
+                    .is_file());
+                    if fault == Fault::PasswordEchoed {
+                        diagnostics.extend_from_slice(checker::STATEMENT_PASSWORD.as_bytes());
+                    }
+                    if fault == Fault::StatementRefused {
+                        json!({"isError": true, "structuredContent": {"result": {"error": {"code": "pdfium_unavailable"}}}})
+                    } else {
+                        let vouchers = if fault == Fault::StatementVouchersShort {
+                            5
+                        } else {
+                            6
+                        };
+                        let mut parsed = json!({
+                            "isError": false,
+                            "structuredContent": {"result": {"statement_rows": 6, "vouchers": vouchers, "proposals_id": "stand-in"}},
+                        });
+                        if fault == Fault::PasswordInTheReply {
+                            parsed["content"] =
+                                json!([{"type": "text", "text": checker::STATEMENT_PASSWORD}]);
+                        }
+                        parsed
+                    }
+                }
+                other => {
+                    panic!("the smoke sent a request the stand-in does not answer: {other} {tool}")
+                }
+            };
+            let version = if fault == Fault::NotJsonRpc2 && start == 1 {
+                "1.0"
+            } else {
+                "2.0"
+            };
+            let mut reply =
+                serde_json::to_vec(&json!({"jsonrpc": version, "id": id, "result": result}))
+                    .unwrap();
+            reply.push(b'\n');
+            if tool == "voucher_schema" && !refused {
+                let digest = hex_sha256(&reply);
+                let mut receipts = vec![json!({
+                    "record_type": "response_prepared", "tool": "voucher_schema", "receipt_id": "r-1",
+                    "bytes_prepared": reply.len(), "response_sha256": digest,
+                })];
+                if fault != Fault::NoCompletionReceipt {
+                    receipts.push(json!({
+                        "record_type": "stdio_write_completed", "receipt_id": "r-1",
+                        "bytes_written": reply.len(), "response_sha256": digest,
+                    }));
+                }
+                let mut file = fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(data.join("agent-egress.jsonl"))
+                    .unwrap();
+                for receipt in receipts {
+                    file.write_all(format!("{receipt}\n").as_bytes()).unwrap();
+                }
+            }
+            last_reply = output.len();
+            output.extend(reply);
+        }
+        if fault == Fault::DropsLastReply(start) {
+            output.truncate(last_reply);
+        }
+        Ok((output, diagnostics))
+    }
+}
+
+/// A bundle that passes `unpack_bundle` and carries the committed manifest's settings, mappings and a
+/// version, so the smoke reaches its server runs; its repository holds the synthetic statement.
+fn serving_bundle(root: &Path) -> (PathBuf, PathBuf) {
+    let mut bundle = Bundle::valid();
+    let committed = committed_manifest();
+    bundle.manifest["version"] = json!(STAND_IN_VERSION);
+    bundle.manifest["user_config"] = committed["user_config"].clone();
+    bundle.manifest["server"]["mcp_config"]["env"] =
+        committed["server"]["mcp_config"]["env"].clone();
+    let (archive, repository) = bundle.write(root);
+    let statement = repository.join(checker::STATEMENT_FIXTURE);
+    fs::create_dir_all(statement.parent().unwrap()).unwrap();
+    fs::copy(
+        self::repository().join(checker::STATEMENT_FIXTURE),
+        statement,
+    )
+    .unwrap();
+    (archive, repository)
+}
+
+fn smoke_against(fault: Fault) -> (Result<checker::Report, Failure>, StandIn) {
+    let root = tempfile::tempdir().unwrap();
+    let (archive, repository) = serving_bundle(root.path());
+    let mut stand_in = StandIn {
+        fault,
+        starts: Vec::new(),
+    };
+    let result = checker::smoke_with(
+        &archive,
+        &repository,
+        &mut |command, payload, environment, timeout| {
+            stand_in.serve(command, payload, environment, timeout)
+        },
+    );
+    (result, stand_in)
+}
+
+fn smoke_failure(fault: Fault) -> Failure {
+    match smoke_against(fault).0 {
+        Ok(_) => panic!("{fault:?}: the smoke passed"),
+        Err(failure) => failure,
+    }
+}
+
+#[test]
+fn a_server_that_answers_as_bridge_passes_the_smoke_with_each_run_set_up_as_released() {
+    if !host_bundles_pdfium() {
+        return;
+    }
+    let (result, stand_in) = smoke_against(Fault::None);
+    let report = match result {
+        Ok(report) => report,
+        Err(failure) => panic!("the stand-in failed the smoke: {failure:?}"),
+    };
+    assert_eq!(report.server_version, STAND_IN_VERSION);
+    assert_eq!(report.response_ids, [json!(1), json!(2), json!(3)]);
+    assert_eq!(report.statement_vouchers, json!(6));
+    assert_eq!(report.egress_receipts, 2);
+    let starts = &stand_in.starts;
+    assert_eq!(
+        starts.len(),
+        5,
+        "refused, accepted, posting opt-in, tax-audit opt-in, statement"
+    );
+    let defaults = checker::expected_tools(&starts[1].environment);
+    assert_eq!(report.default_tool_count, defaults.len());
+    assert_eq!(
+        report.opt_in_tool_count,
+        defaults.len() + checker::POSTING_TOOLS.len()
+    );
+    let binary = Path::new(&starts[0].command[0]);
+    assert!(
+        binary.ends_with(Path::new("bundle").join(ENTRY)),
+        "{}",
+        binary.display()
+    );
+    assert!(
+        !binary.exists(),
+        "the scratch folder is removed once the run ends"
+    );
+    let value = |start: &Start, name: &str| {
+        start
+            .environment
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    };
+    let data = |start: &Start| PathBuf::from(value(start, "BRIDGE_AGENT_DATA_DIR").unwrap());
+    for (index, start) in starts.iter().enumerate() {
+        assert_eq!(start.command, starts[0].command, "start {index}");
+        assert_eq!(
+            value(start, "BRIDGE_TALLY_HOST").as_deref(),
+            Some("127.0.0.1"),
+            "start {index}"
+        );
+        assert_eq!(
+            value(start, "BRIDGE_TALLY_PORT").as_deref(),
+            Some("9"),
+            "start {index}"
+        );
+        assert_eq!(
+            value(start, "BRIDGE_AGENT_ENABLE_IMPORT").as_deref(),
+            Some("true"),
+            "start {index}"
+        );
+        let terms = if index == 0 { "false" } else { "true" };
+        assert_eq!(
+            value(start, "BRIDGE_TERMS_ACCEPTED").as_deref(),
+            Some(terms),
+            "start {index}"
+        );
+        let writes = if index == 2 { "true" } else { "false" };
+        assert_eq!(
+            value(start, "BRIDGE_AGENT_ENABLE_WRITES").as_deref(),
+            Some(writes),
+            "start {index}"
+        );
+        let audit = if index == 3 { "true" } else { "false" };
+        assert_eq!(
+            value(start, "BRIDGE_AGENT_ENABLE_TAX_AUDIT").as_deref(),
+            Some(audit),
+            "start {index}"
+        );
+        let timeout = if index == 4 { 60 } else { 15 };
+        assert_eq!(start.timeout, Duration::from_secs(timeout), "start {index}");
+    }
+    assert!(data(&starts[0]).ends_with("data-refused"));
+    assert!(data(&starts[1]).ends_with("data"));
+    assert_eq!(data(&starts[2]), data(&starts[1]));
+    assert_eq!(data(&starts[3]), data(&starts[1]));
+    assert!(data(&starts[4]).ends_with(Path::new("statement").join("data")));
+}
+
+#[test]
+fn the_terms_refusal_is_checked_on_the_run_with_the_default_settings() {
+    if !host_bundles_pdfium() {
+        return;
+    }
+    for (fault, code) in [
+        (Fault::DropsLastReply(0), "terms_refusal_response_ids"),
+        (Fault::RefusedRunServesTheCall, "terms_refusal_missing"),
+        (Fault::RefusalNotMarkedAnError, "terms_refusal_missing"),
+        (
+            Fault::RefusedRunHidesTheTools,
+            "terms_refusal_hid_the_tool_list",
+        ),
+        (
+            Fault::RefusedRunRecordsAcceptance,
+            "terms_recorded_without_acceptance",
+        ),
+        (
+            Fault::AcceptanceRecordedEachRun,
+            "terms_acceptance_not_recorded",
+        ),
+        (
+            Fault::AcceptanceFromAnotherSource,
+            "terms_acceptance_not_recorded",
+        ),
+    ] {
+        assert_eq!(smoke_failure(fault), failure(code), "{fault:?}");
+    }
+}
+
+#[test]
+fn the_tool_lists_must_match_each_setting() {
+    if !host_bundles_pdfium() {
+        return;
+    }
+    for (fault, code) in [
+        (Fault::OldProtocol, "protocol_mismatch"),
+        (Fault::DropsLastReply(1), "unexpected_response_ids"),
+        (Fault::NotJsonRpc2, "invalid_jsonrpc_response"),
+        (Fault::DropsLastReply(2), "opt_in_response_ids"),
+        (Fault::DropsLastReply(3), "audit_opt_in_response_ids"),
+        (Fault::PostingListedByDefault, "default_tools_mismatch"),
+        (Fault::OptInMissesAPostingTool, "opt_in_tools_mismatch"),
+        (
+            Fault::AuditSwitchAddsAnotherTool,
+            "audit_opt_in_tools_mismatch",
+        ),
+    ] {
+        assert_eq!(smoke_failure(fault), failure(code), "{fault:?}");
+    }
+}
+
+#[test]
+fn the_schema_reply_must_agree_with_itself_and_its_receipts() {
+    if !host_bundles_pdfium() {
+        return;
+    }
+    for (fault, code) in [
+        (Fault::SchemaTextDiffers, "voucher_schema_response_invalid"),
+        (
+            Fault::SchemaReplyIsAnError,
+            "voucher_schema_response_invalid",
+        ),
+        (
+            Fault::SchemaIsNotAnObject,
+            "voucher_schema_response_invalid",
+        ),
+        (
+            Fault::NoCompletionReceipt,
+            "schema_egress_completion_missing",
+        ),
+    ] {
+        assert_eq!(smoke_failure(fault), failure(code), "{fault:?}");
+    }
+}
+
+#[test]
+fn the_statement_parse_must_build_its_vouchers_without_echoing_the_password() {
+    if !host_bundles_pdfium() {
+        return;
+    }
+    for (fault, code) in [
+        (
+            Fault::StatementVouchersShort,
+            "statement_parse_failed:no_result",
+        ),
+        (
+            Fault::StatementRefused,
+            "statement_parse_failed:pdfium_unavailable",
+        ),
+        (Fault::PasswordEchoed, "statement_password_echoed"),
+        (Fault::PasswordInTheReply, "statement_password_echoed"),
+        (Fault::DropsLastReply(4), "statement_response_ids"),
+    ] {
+        assert_eq!(smoke_failure(fault), failure(code), "{fault:?}");
+    }
+}
+
+/// NOTICE is copied into every archive, and the smoke compares the archive's copy to it, so this is what a
+/// user of the package reads about the icon: not Apache-2.0, all rights reserved.
+#[test]
+fn the_shipped_notice_reserves_the_rights_in_the_icon() {
+    let notice = fs::read_to_string(repository().join("NOTICE")).unwrap();
+    let text = notice.split_whitespace().collect::<Vec<_>>().join(" ");
+    for phrase in [
+        "packaging/mcpb/icon.png",
+        "are not licensed under Apache-2.0: all rights in them are reserved",
+        "A fork or modified build must replace them",
+    ] {
+        assert!(text.contains(phrase), "{phrase}");
+    }
+}
+
+/// A file held open without delete sharing locks its folder's removal on Windows: the removal waits, once,
+/// for the lock to clear, against the real operating system.
+#[cfg(windows)]
+#[test]
+fn a_file_held_open_is_waited_for_against_the_real_operating_system() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join("scratch");
+    fs::create_dir(&folder).unwrap();
+    let mut held = Some(
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .share_mode(0)
+            .open(folder.join("server.exe"))
+            .unwrap(),
+    );
+    let mut pauses = 0;
+    let message = checker::remove_with_retries(
+        &folder,
+        |path| fs::remove_dir_all(path),
+        |_| {
+            pauses += 1;
+            drop(held.take());
+        },
+    );
+    assert_eq!(message, None);
+    assert_eq!(pauses, 1);
+    assert!(!folder.exists());
 }

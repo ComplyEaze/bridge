@@ -203,6 +203,41 @@ impl TbRow {
     pub fn movement_paise(&self) -> i64 {
         self.closing_paise - self.opening_paise
     }
+
+    /// The closing the row's own movements give: opening plus debit less credit (Dr positive).
+    /// `None` when the sum overflows `i64`. Tally's `closing_paise` is a separate field and can
+    /// differ from it (see [`TbMovements`]).
+    pub fn closing_by_movements_paise(&self) -> Option<i64> {
+        self.opening_paise
+            .checked_add(self.debit_paise)?
+            .checked_sub(self.credit_paise)
+    }
+
+    /// Whether Tally's closing field is the row's opening plus debit less credit. `None` when
+    /// the arithmetic overflows `i64`, never a guess in either direction.
+    pub fn movements(&self) -> Option<TbMovements> {
+        let by_paise = self
+            .closing_paise
+            .checked_sub(self.closing_by_movements_paise()?)?;
+        Some(if by_paise == 0 {
+            TbMovements::Tie
+        } else {
+            TbMovements::Differ { by_paise }
+        })
+    }
+}
+
+/// Whether a Trial Balance row's closing field is its opening plus debit less credit. On a
+/// Closing Stock ledger whose closing was keyed on Tally's screen the field keeps the opening and
+/// the keyed change shows only as its debit, so the row does not tie and the closing field is not
+/// the closing stock Tally's statements use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TbMovements {
+    Tie,
+    /// The closing field less (opening + debit - credit), Dr positive.
+    Differ {
+        by_paise: i64,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -2253,5 +2288,193 @@ mod tests {
             opening_stock(Some(true), Some(&broken), Some(&from), Some(&from)),
             OpeningStock::Unknown(OpeningStockUnknown::Unreadable)
         );
+    }
+    fn row(opening: i64, debit: i64, credit: i64, closing: i64) -> TbRow {
+        TbRow {
+            opening_paise: opening,
+            debit_paise: debit,
+            credit_paise: credit,
+            closing_paise: closing,
+        }
+    }
+
+    #[test]
+    fn a_row_ties_when_its_closing_is_opening_plus_debit_less_credit() {
+        assert_eq!(
+            row(100, 40, 10, 130).closing_by_movements_paise(),
+            Some(130)
+        );
+        assert_eq!(row(100, 40, 10, 130).movements(), Some(TbMovements::Tie));
+        assert_eq!(row(0, 0, 0, 0).movements(), Some(TbMovements::Tie));
+        // A closing-only row carries a closing nothing in its columns gives.
+        assert_eq!(
+            row(0, 0, 0, -500).movements(),
+            Some(TbMovements::Differ { by_paise: -500 })
+        );
+    }
+
+    #[test]
+    fn the_gap_is_the_closing_less_the_movements_in_dr_positive_paise() {
+        assert_eq!(
+            row(100, 40, 0, 100).movements(),
+            Some(TbMovements::Differ { by_paise: -40 })
+        );
+        assert_eq!(
+            row(0, 365_050, 0, 365_550).movements(),
+            Some(TbMovements::Differ { by_paise: 500 })
+        );
+        // The credit column lowers the movements' closing, so a closing above it shows a gap.
+        assert_eq!(
+            row(100, 0, 30, 100).movements(),
+            Some(TbMovements::Differ { by_paise: 30 })
+        );
+    }
+
+    #[test]
+    fn overflow_is_none_never_a_tie_or_a_gap() {
+        assert_eq!(row(i64::MAX, 1, 0, 0).closing_by_movements_paise(), None);
+        assert_eq!(row(i64::MAX, 1, 0, 0).movements(), None);
+        assert_eq!(row(i64::MIN, 0, 1, 0).closing_by_movements_paise(), None);
+        // The movements fit but the gap does not.
+        assert_eq!(row(0, 1, 0, i64::MIN).movements(), None);
+    }
+
+    const NONINT_CAPTURE: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml"
+    );
+    const INTEGRATED_CAPTURE: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml"
+    );
+
+    /// A book of a captured Trial Balance answer (a real read of an invented lab company, see
+    /// `bridge-tally-protocol`'s native fixture provenance): its rows through `load_tb`, and each
+    /// ledger under its own parent group only.
+    fn captured_book(content: &[u8]) -> Book {
+        let root = crate::xml::read(content, "captured trial balance").unwrap();
+        let tb = load_tb(&root, "captured trial balance").unwrap();
+        let ledgers = root
+            .descendants_named("LEDGER")
+            .into_iter()
+            .filter_map(|l| {
+                let name = l.attr("NAME").filter(|n| !n.is_empty())?.to_string();
+                let parent = l.child_text("PARENT").to_string();
+                Some((
+                    name.clone(),
+                    Ledger {
+                        name,
+                        parent: parent.clone(),
+                        chain: vec![parent],
+                        chain_complete: true,
+                        master_opening_paise: 0,
+                        guid: String::new(),
+                        masterid: None,
+                        pan: String::new(),
+                        gstin: String::new(),
+                    },
+                ))
+            })
+            .collect();
+        Book {
+            tb,
+            ledgers,
+            ..Default::default()
+        }
+    }
+
+    /// On both captured books a Closing Stock ledger was opened at 1,000.00 and keyed to a closing
+    /// of 1,400.00: Tally's closing field kept the opening and the keyed 400.00 shows only as its
+    /// debit. It is the only one of the eight rows that does not tie.
+    #[test]
+    fn the_keyed_closing_stock_row_is_the_only_one_that_does_not_tie_on_both_captures() {
+        for content in [NONINT_CAPTURE, INTEGRATED_CAPTURE] {
+            let book = captured_book(content);
+            let stock = &book.tb["Closing Stock"];
+            assert_eq!(
+                (
+                    stock.opening_paise,
+                    stock.debit_paise,
+                    stock.credit_paise,
+                    stock.closing_paise
+                ),
+                (100_000, 40_000, 0, 100_000)
+            );
+            assert_eq!(stock.closing_by_movements_paise(), Some(140_000));
+            assert_eq!(
+                stock.movements(),
+                Some(TbMovements::Differ { by_paise: -40_000 })
+            );
+            let differing: Vec<&str> = book
+                .tb
+                .iter()
+                .filter(|(_, t)| t.movements() != Some(TbMovements::Tie))
+                .map(|(n, _)| n.as_str())
+                .collect();
+            assert_eq!(differing, ["Closing Stock"]);
+        }
+    }
+
+    /// The Trial Balance test states the gap beside the unchanged closing field, once.
+    #[test]
+    fn trial_balance_states_the_gap_beside_the_closing_field_on_both_captures() {
+        let rules = crate::rules::Rules::vendored().unwrap();
+        for content in [NONINT_CAPTURE, INTEGRATED_CAPTURE] {
+            let book = captured_book(content);
+            let r = crate::trial_balance::run(&book, &rules).unwrap();
+            let tag = crate::ledger_ids::stable_ledger_tag(&book, "Closing Stock").unwrap();
+            let int = |id: String| {
+                r.figures
+                    .iter()
+                    .find(|f| f.id == format!("trial_balance.{id}"))
+                    .map(|f| f.value.clone())
+            };
+            assert_eq!(
+                int(format!("tb_closing_{tag}")),
+                Some(crate::findings::Value::Int(100_000))
+            );
+            assert_eq!(
+                int(format!("tb_closing_not_movements_{tag}")),
+                Some(crate::findings::Value::Int(-40_000))
+            );
+            let gaps = r
+                .figures
+                .iter()
+                .filter(|f| f.id.starts_with("trial_balance.tb_closing_not_movements_"))
+                .count();
+            assert_eq!(gaps, 1);
+            let violations = crate::trial_balance::check_invariants(&book, &r).unwrap();
+            assert!(
+                !violations.iter().any(|m| m.starts_with("TB-3")),
+                "{violations:?}"
+            );
+        }
+    }
+
+    /// `financial_statements` takes the closing stock from the movements, so a closing field that
+    /// kept the opening does not understate it. Not integrated: Tally's own Profit and Loss on that
+    /// book used 1,400.00. Integrated: Tally valued the stock from the item, so the ledger beside
+    /// it leaves the profit unknown rather than choosing a figure.
+    #[test]
+    fn financial_statements_use_the_movements_on_both_captures() {
+        let none = BTreeSet::new();
+        let book = captured_book(NONINT_CAPTURE);
+        let (s, _) = crate::financial_statements::compute(&book, &none).unwrap();
+        assert_eq!(
+            s.stock_basis,
+            crate::financial_statements::StockBasis::Ledgers
+        );
+        assert_eq!(s.closing_stock, Some(140_000));
+        assert_eq!(s.closing_stock_tb_field, 100_000);
+
+        let mut book = captured_book(INTEGRATED_CAPTURE);
+        book.opening_stock = OpeningStock::Valued(100_000);
+        book.closing_stock = ClosingStock::Valued(120_000);
+        let (s, _) = crate::financial_statements::compute(&book, &none).unwrap();
+        assert!(matches!(
+            &s.stock_basis,
+            crate::financial_statements::StockBasis::Unknown { why, .. }
+                if why == &[crate::financial_statements::StockUnknown::LedgerAlso]
+        ));
+        assert_eq!(s.gross_profit, None);
+        assert_eq!(s.net_profit, None);
     }
 }

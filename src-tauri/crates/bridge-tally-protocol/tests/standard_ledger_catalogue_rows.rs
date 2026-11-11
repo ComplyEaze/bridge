@@ -687,3 +687,53 @@ fn the_name_index_holds_each_alias_after_its_ledgers_own_name() {
         assert_eq!(&row.names[1..], aliases, "{owner}");
     }
 }
+
+/// The shape lab capture with the company name every row echoes replaced by
+/// `name`: an in-memory change to a live capture, nothing else altered.
+fn shape_lab_named(name: &str) -> String {
+    let echo =
+        |name: &str| format!(r#"<BRIDGECOMPANYNAME TYPE="String">{name}</BRIDGECOMPANYNAME>"#);
+    let xml = decoded_shape_lab_catalogue();
+    assert_eq!(xml.matches(&echo(SHAPE_LAB_COMPANY_NAME)).count(), 43);
+    xml.replace(&echo(SHAPE_LAB_COMPANY_NAME), &echo(name))
+}
+
+/// Both parsers compare the company name a read was sent for with the name
+/// each row echoes exactly as given, as the company list reads it: neither side
+/// is trimmed, and a name is admitted up to the one limit `ValidatedCompanyName`
+/// holds (#2433). Trimming one side could refuse, or bind the wrong company
+/// for, a name whose spaces were kept.
+#[test]
+fn the_company_name_is_compared_as_given_by_both_parsers() {
+    let catalogue = |xml: &str, name: &str| {
+        parse_standard_ledger_catalog_with_identities(xml, name, SHAPE_LAB_COMPANY_GUID)
+            .map(|catalogue| catalogue.names().count())
+    };
+    let identity = |xml: &str, name: &str| {
+        parse_standard_ledger_identity_observation(xml, name).map(|observed| observed.ledger_count)
+    };
+    let mismatch = Err(StandardLedgerCatalogError::CompanyIdentityMismatch);
+    let spaced = "  BRIDGE SHAPE LAB  ";
+    let spaced_xml = shape_lab_named(spaced);
+    assert_eq!(catalogue(&spaced_xml, spaced), Ok(43));
+    assert_eq!(identity(&spaced_xml, spaced).unwrap(), 43);
+    assert_eq!(catalogue(&spaced_xml, SHAPE_LAB_COMPANY_NAME), mismatch);
+    assert!(identity(&spaced_xml, SHAPE_LAB_COMPANY_NAME).is_err());
+    let unchanged = decoded_shape_lab_catalogue();
+    assert_eq!(catalogue(&unchanged, spaced), mismatch);
+    assert!(identity(&unchanged, spaced).is_err());
+    // 360 bytes is admitted on both sides, past the 255 these parsers once
+    // capped; 361 is not established, so no read is bound through it.
+    let at_limit = "A".repeat(360);
+    assert_eq!(catalogue(&shape_lab_named(&at_limit), &at_limit), Ok(43));
+    assert_eq!(
+        identity(&shape_lab_named(&at_limit), &at_limit).unwrap(),
+        43
+    );
+    let over = "A".repeat(361);
+    assert_eq!(
+        catalogue(&shape_lab_named(&over), &over),
+        Err(StandardLedgerCatalogError::BoundsViolation)
+    );
+    assert!(identity(&shape_lab_named(&over), &over).is_err());
+}

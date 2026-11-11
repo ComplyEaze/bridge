@@ -1347,6 +1347,58 @@ fn snapshot_identity_refuses_a_matching_company_whose_guid_is_not_strict_shaped(
     );
 }
 
+/// A matching company whose name no request can carry is refused with the
+/// name's own code, not as a missing or ambiguous company (#2397).
+#[test]
+fn snapshot_identity_refuses_a_matching_company_whose_name_cannot_be_sent() {
+    let lineage = "tally_xml_http:http://127.0.0.1:9000";
+    let guid = "4c42a771-abcd-4def-8abc-001122aabbcc";
+    let name = "A".repeat(bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES + 1);
+    let company = CompanyRef {
+        identity: company_source_identity(lineage, guid, "100001", &name, "20260401"),
+        display_name: name.clone(),
+    };
+    let context = RequestContext {
+        run_id: "run-unsendable-company-name".to_string(),
+        company: company.clone(),
+        pack: CapabilityPackId::CoreAccounting,
+        schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
+        window: ReadWindow {
+            from_yyyymmdd: "20260701".to_string(),
+            to_yyyymmdd: "20260701".to_string(),
+        },
+        query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
+        filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
+    };
+    let connector = RuntimeTallyConnector::new(
+        TallyRuntime::default(),
+        TallyConfig {
+            host: "127.0.0.1".to_string(),
+            port: 9000,
+        },
+        company,
+        context,
+    )
+    .unwrap();
+    let companies = [TallyCompany {
+        name,
+        guid: Some(guid.to_string()),
+        company_number: Some("100001".to_string()),
+        books_from: Some("20260401".to_string()),
+    }];
+
+    let error = connector
+        .verify_snapshot_identity_from_companies(&companies)
+        .expect_err("a name no request can carry must not become a verified identity");
+    assert!(
+        matches!(
+            &error,
+            TallyError::Protocol { code } if code == "company_name_invalid"
+        ),
+        "unexpected error: {error:?}"
+    );
+}
+
 #[tokio::test]
 async fn direct_company_snapshot_probe_rejects_identity_without_company_collection_tuple() {
     let _simulator_guard = simulator_test_lock().lock().await;

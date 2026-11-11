@@ -94,11 +94,11 @@ use super::{
     party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
     reviewed_probe_commitment_sha256, sweep_failure_naming_identity, tally_command_error,
-    tally_runtime_command_error, verify_observed_company_tuple_from_companies,
-    write_unique_download, CompanySweepFailure, OutstandingsRequest, PartyLedgerMasterExport,
-    PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
-    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED, MIRROR_KEY_INVALID_MESSAGE,
-    MIRROR_KEY_MISSING_MESSAGE, PARTY_LEDGER_MASTER_EXPORT_READ,
+    tally_runtime_command_error, untrusted_company_candidates,
+    verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
+    OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
+    SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    MIRROR_KEY_INVALID_MESSAGE, MIRROR_KEY_MISSING_MESSAGE, PARTY_LEDGER_MASTER_EXPORT_READ,
 };
 use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
@@ -281,6 +281,73 @@ fn setup_reports_duplicate_complete_tuple_separately() {
             .expect_err("a duplicate complete tuple must not be saved or enrolled");
 
     assert_eq!(error.code, "company_identity_ambiguous");
+}
+
+/// A name no request can carry is refused at selection with its own code and
+/// the rename remedy in the one wording of the rule, for each way a name can
+/// fail it: too long, a control character, blank (#2397, #2433).
+#[test]
+fn setup_refuses_a_name_no_request_can_carry_with_its_own_code() {
+    let limit = bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES;
+    for name in [
+        "A".repeat(limit + 1),
+        "Client Book\n".to_string(),
+        "   ".to_string(),
+    ] {
+        let selected = SelectedCompanyIdentity {
+            display_name: name.clone(),
+            company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
+            company_number: "1".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+        };
+        let listed = TallyCompany {
+            name: name.clone(),
+            guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
+            company_number: Some("1".to_string()),
+            books_from: Some("20260401".to_string()),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, vec![listed])
+            .expect_err("a name no request can carry must not become an identity");
+
+        assert_eq!(error.code, "company_name_invalid", "{name:?}");
+        assert_eq!(
+            error.remediation,
+            format!(
+                "Rename the company in Tally to {}, then select it again.",
+                crate::tally::validators::company_name_rule!()
+            )
+        );
+        let echoed = name.trim();
+        assert!(
+            echoed.is_empty()
+                || (!error.message.contains(echoed) && !error.remediation.contains(echoed)),
+            "the refusal must not echo the name"
+        );
+    }
+}
+
+/// With nothing selected, the name is blank too. That is answered as a
+/// selection to make again, not as a company to rename: the name is judged
+/// only after the GUID, number and date of the selection (#2433).
+#[test]
+fn an_empty_selection_with_a_blank_name_is_a_selection_error_not_a_rename() {
+    for name in ["", "   "] {
+        let selected = SelectedCompanyIdentity {
+            display_name: name.to_string(),
+            company_guid: String::new(),
+            company_number: String::new(),
+            books_from_yyyymmdd: String::new(),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, Vec::new())
+            .expect_err("an empty selection must not become an identity");
+
+        assert_eq!(error.code, "company_selection_invalid", "{name:?}");
+        assert!(
+            !error.remediation.contains("Rename"),
+            "{name:?}: {}",
+            error.remediation
+        );
+    }
 }
 
 /// Regression for the destination-picker leak: `select_party_statement_
@@ -1411,4 +1478,39 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
         );
         assert_eq!(held.remediation, HELD_REMEDIATION, "{error:?}");
     }
+}
+
+/// #2449: the picker's list marks only the company whose name a request cannot
+/// carry, with its code, and every candidate keeps the name byte for byte as
+/// Tally reported it, which is what the webview sends back to verify.
+#[test]
+fn the_picker_marks_only_a_company_whose_name_cannot_be_sent() {
+    let company = |name: &str| TallyCompany {
+        name: name.to_string(),
+        guid: None,
+        company_number: None,
+        books_from: None,
+    };
+    let marked = "Synthetic\u{7}Traders";
+    let ordinary = "Synthetic Traders";
+    let candidates = untrusted_company_candidates(vec![company(marked), company(ordinary)]);
+
+    assert_eq!(candidates.len(), 2);
+    assert_eq!(candidates[0].name, marked);
+    assert_eq!(candidates[0].shown_name, "Synthetic\\u{0007}Traders");
+    assert_eq!(
+        candidates[0].name_refusal,
+        Some("company_name_control_character")
+    );
+    assert_eq!(candidates[1].name, ordinary);
+    assert_eq!(candidates[1].shown_name, ordinary);
+    assert_eq!(candidates[1].name_refusal, None);
+
+    let rows = serde_json::to_value(&candidates).expect("candidates serialize");
+    assert_eq!(rows[0]["name_refusal"], "company_name_control_character");
+    assert!(
+        rows[1].get("name_refusal").is_none(),
+        "an ordinary company carries no mark: {}",
+        rows[1]
+    );
 }

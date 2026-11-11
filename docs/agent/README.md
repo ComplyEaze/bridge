@@ -8,8 +8,8 @@ The developer configuration below remains for supported client integrations.
 `bridge_mcp` is Bridge's newline-delimited JSON-RPC 2.0 MCP server. It uses
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
-parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra, or
-a saved batch of 2 to 50) is off by default because of the limits under
+parsing by default. Voucher posting (one Journal, Payment, Receipt, Contra or Sales
+invoice, or a saved batch of 2 to 50 with no invoice) is off by default because of the limits under
 *Approved voucher posting* below; the **Allow voucher posting, one voucher or a
 batch of up to 50** setting adds it, with separate native approval for each new
 attempt. Command-line installations
@@ -1726,7 +1726,8 @@ or vouchers.
   `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
   every voucher read was checked against a separate count of the window (a census,
   which ComplyEaze Bridge sends for every book that has held a voucher, however
-  few), and an empty window only when its corroboration read confirmed it: the
+  few, unless a repeat of the same question takes the census of the call before it,
+  see "A repeated `vouchers` read reuses its census" below), and an empty window only when its corroboration read confirmed it: the
   read widened by a day on each side was also empty and the company has no
   vouchers. Otherwise it is `partial` with `reason`
   `nonempty_window_unqualified`, or, for an empty window, the corroboration's own
@@ -1933,6 +1934,30 @@ is the mark Tally sent.
   sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
   requests. Before this change each later page repeated the whole read.
 
+### A repeated `vouchers` read reuses its census (`window.census_reused`)
+
+The first page of a `vouchers` call counts the window's vouchers before it reads them. A call that asks the
+same question again, for the same company, the same dates exactly as sent and the same book, takes that count
+from the call before it instead of counting again, when the company's two change marks, which this call reads
+afresh, equal the marks the count was taken at. The count is kept for 10 minutes, in memory, and is dropped when
+a mark differs, when a write through this server touches the company, or when a newer count of the same
+question replaces it.
+
+- The window of that call shows it: `window.census.requests` is 0 and `window.census_reused.read_at` says when
+  the count was taken. A call that counted its own census has no `census_reused`.
+- The reused count only plans the read. Every part read is still compared with it, voucher by voucher, so a count
+  that no longer describes the book refuses the call as `census_reused_mismatch` (the `cause` says how the part
+  differed), the count is dropped, and the next call counts afresh. It never lets a call answer from a count the
+  vouchers read do not match.
+- A window with no voucher is still checked by a count of its own, a day wider on each side, which is never
+  reused. A read that gives the marks itself, an import's read-back and the audit's sealed read take no held
+  count and leave none. A reused count never earns a `BracketedCount`, which no `vouchers` call uses.
+- `window.census.requests` is 0 on such a call, so `read_cost` (shown only for a slow or large census) counts
+  no census reads for it; `census_reused` says why.
+- Not established: how often a real user repeats the same window (the lab's own repeats were counted; no real
+  request trail was read), whether a save by a user of the multi-user edition on another computer or a restored copy of the company moves the
+  marks at once (as for held windows above), and the saving on a real book.
+
 ### What a `vouchers` read cost (`window.read_cost`)
 
 The census a window read pays follows the book's voucher mark, not the window:
@@ -2025,8 +2050,9 @@ ends).
   voucher_window_book_too_large` and `limit_census_reads` (a mark above 2,097,152, the refusal the read
   itself makes, from the same function; no floor is given for a read that sends no census).
 - `census_reads` is **derived** from the mark and the read's own rules (`census_read_count`, which the
-  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so it sends at
-  least one census read on any book that has held a voucher; `ledger_movement` and `verify_import` send
+  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so a call that
+  counts sends at least one census read on any book that has held a voucher (a repeat of the same
+  `vouchers` question within ten minutes on unchanged marks may send none, #2399); `ledger_movement` and `verify_import` send
   none while the mark times their default voucher size fits one request (a mark of 170 or less). A
   book that has never held a voucher (no mark) sends none, and only then is the count 0.
 - `floor_seconds` is **derived from the gate's rule**, as `read_cost.floor_seconds` is, and from the
@@ -2557,7 +2583,8 @@ reads Tally, saves local proof files and writes nothing to Tally), and
 `build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
-Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
+Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, and
+`Sales` while posting is on, each
 with freshly observed supported TallyPrime product and licence mode before and
 after the build reads. Release and licence tier are returned as observed facts;
 they do not independently refuse a file. `tally_status` reports the observed
@@ -2597,7 +2624,8 @@ Historical batch records remain readable. None of this qualifies every host,
 licence mode, or manually imported file. An unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
 per approval (a voucher that carries a voucher number is refused), and a saved
-batch of 2 to 50 posts in one import after one approval of its summary. One
+batch of 2 to 50 posts in one import after one approval of its summary. A Sales
+invoice carries its number and is posted alone, one per approval. One
 posting setting covers both, in the MCPB extension and on the command line (#1090).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
@@ -2967,7 +2995,7 @@ Positive historical readback remains available on an unqualified profile.
 A failed profile probe remains a read failure.
 
 Safety boundary: local loopback only, bounded responses, verified company tuple
-selection, append-only receipts, and separately approved Journal, Payment, Receipt or Contra
+selection, append-only receipts, and separately approved Journal, Payment, Receipt, Contra or Sales
 dispatch. Unsupported:
 Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,
@@ -3421,8 +3449,8 @@ its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 
 One native-approved Journal and restart reconciliation have been observed on
-macOS against a synthetic Silver 7.1 instance. This remains a preview: Windows
-interactive approval and native posting on Education have not been established.
+macOS against a synthetic Silver 7.1 instance. Windows interactive approval and
+native posting on Education have not been established.
 Native posts on licensed 7.1 Gold were captured once, in one session on a
 development build and one client book, with the approval step not recorded
 ([reference](../tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)). Also
@@ -3640,7 +3668,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
 Keep the selected company free of other imports and ledger changes while posting,
 and leave Tally's product/licence mode unchanged. Bridge serializes its own writers;
 its separate checks cannot lock out Tally UI edits or other importers. Concurrent
-external changes are outside this preview's validated posting workflow.
+external changes are outside the validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
 approval. (The tool call itself returns "approval pending" after about 40 seconds
@@ -4131,6 +4159,11 @@ Per tool:
   combination (`src-tauri/src/agent_company.rs`).
 - `tally_status`: the probe alone (`Server::status`,
   `src-tauri/src/agent_company.rs`).
+  Its `build_notice` string appears on the first status read of a session when the
+  build's release date (`src-tauri/release-date.txt`, compiled in by `build.rs`) is
+  more than 60 days before this computer's date; it states both dates and where
+  releases are listed, makes no request, and the server instructions tell the
+  assistant to relay it once (#2391).
 - `masters`:
   1. the company read;
   2. the extent check (if a later page);
@@ -4402,6 +4435,21 @@ Observed company numbers must contain 1–16 ASCII digits, using the same rule a
 desktop selection. Discovery labels malformed values `invalid_company_number`;
 scoped access refuses them before any company report is read.
 
+`list_companies` lists every company Tally reports, with its name exactly as Tally reported it,
+never trimmed. A company whose name a read cannot carry also has `name_refusal`, one of
+`company_name_blank`, `company_name_control_character` or `company_name_length_not_established`
+(over 360 UTF-8 bytes). Its name is shown whole, with each control and invisible format character
+written as its `\u{..}` code, and every read naming it refuses as `company_name_invalid`. No other
+company has the key. Any other company's name is shown with each invisible format character
+written as its code too, so a name holding one never draws like the same name without it, no text
+is hidden in a name and none reorders the text around it. Other scripts' format characters, such
+as Mongolian or Khmer ones, are shown as codes too. The one exception is the zero-width joiner and
+non-joiner (U+200D, U+200C), shown as they are wherever they stand, because Indic and Persian names
+are written with them; so a name of joiners alone draws as nothing. A backslash is shown as it is,
+so a name that spells a `\u{..}` code out as text draws like one holding that character. The
+escape applies to `list_companies`; a record a read writes holds the name as Tally reported it
+(#2433).
+
 Port zero and ports above 65535 are rejected at startup.
 Unknown arguments, wrong selector types, and invalid enums are rejected before
 any Tally request, and so is a missing required argument (`<name>_required`, for
@@ -4590,7 +4638,10 @@ its own cause, `native_bills_report_deadline_exceeded` (#2119); another request 
 same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
 repeat the call. Tally can go on building the report after the limit (a read sent straight after
 was refused for time too), so it also says to wait and let `tally_status` answer before the next
-read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
+read, that one party's open bills at the same `as_of` can still be read, after asking the user,
+with `party` and `detail` `open_bills` (that party's Ledger Outstandings beside the book's list of
+ledgers, not the Bills report, and no total for the book), and that an
+earlier `as_of` with fewer open bills answered on that book. Where the limit
 falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
 flight and sends nothing more (#778).
 

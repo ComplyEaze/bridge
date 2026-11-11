@@ -50,6 +50,7 @@ use bridge_tally_core::{
     ReadWindow, RequestContext, TallyConnector, TallyDate, TransportId,
     CORE_ACCOUNTING_SCHEMA_VERSION,
 };
+use bridge_tally_protocol::xml_read_profiles::ShownCompanyName;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::State;
@@ -1785,18 +1786,36 @@ pub async fn fetch_tally_companies(
     runtime
         .fetch_companies(config)
         .await
-        .map(|companies| {
-            companies
-                .into_iter()
-                .map(|company| UntrustedCompanyCandidate { name: company.name })
-                .collect()
-        })
+        .map(untrusted_company_candidates)
         .map_err(tally_runtime_command_error)
 }
 
+/// A company the picker offers before it is verified. `name` is exactly as
+/// Tally reported it, and is what the webview sends back to verify; the picker
+/// draws `shown_name`, by the agent's own rule (#2449).
 #[derive(Debug, Serialize)]
 pub struct UntrustedCompanyCandidate {
     pub name: String,
+    pub shown_name: String,
+    /// Why a request cannot carry this name; only a marked company has it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_refusal: Option<&'static str>,
+}
+
+pub(crate) fn untrusted_company_candidates(
+    companies: Vec<TallyCompany>,
+) -> Vec<UntrustedCompanyCandidate> {
+    companies
+        .into_iter()
+        .map(|company| {
+            let shown = ShownCompanyName::of(&company.name);
+            UntrustedCompanyCandidate {
+                name_refusal: shown.refusal().map(|refusal| refusal.code()),
+                shown_name: shown.into_text(),
+                name: company.name,
+            }
+        })
+        .collect()
 }
 
 #[derive(Debug, Deserialize)]
@@ -1908,20 +1927,29 @@ pub(crate) async fn verify_observed_company_tuple(
     verify_observed_company_tuple_from_companies(selected, companies)
 }
 
+/// A selected company whose name no request can carry, refused by the name
+/// check ahead of the identity or by the identity itself, with one code and
+/// one wording. Renaming in Tally is the remedy: probing again returns the same
+/// name (#2397, #2433).
+fn company_name_invalid() -> TallyCommandError {
+    tally_command_error(
+        "company_name_invalid",
+        "Tally application",
+        "Tally reported a company name that ComplyEaze Bridge cannot send in a request, so it cannot select this company.",
+        "not_recommended",
+        false,
+        concat!(
+            "Rename the company in Tally to ",
+            crate::tally::validators::company_name_rule!(),
+            ", then select it again."
+        ),
+    )
+}
+
 fn verify_observed_company_tuple_from_companies(
     selected: &SelectedCompanyIdentity,
     companies: Vec<TallyCompany>,
 ) -> Result<VerifiedCompanyIdentity, TallyCommandError> {
-    validate_company_name(&selected.display_name).map_err(|message| {
-        tally_command_error(
-            "company_selection_invalid",
-            "Tally application",
-            message,
-            "after_change",
-            false,
-            "Select a company with an observed name, number, GUID, and book opening date.",
-        )
-    })?;
     let selected_guid = normalize_company_guid(&selected.company_guid).map_err(|_| {
         tally_command_error(
             "company_selection_invalid",
@@ -1957,6 +1985,9 @@ fn verify_observed_company_tuple_from_companies(
                 "Do not use this company here. Write to contact@complyeaze.com with this company's name.",
             )
         })?;
+    // The name is judged after the selection itself, so an empty selection is
+    // answered as one, not as a company to rename.
+    validate_company_name(&selected.display_name).map_err(|_| company_name_invalid())?;
     VerifiedCompanyIdentity::from_observed_companies(
         selected.display_name.clone(),
         selected_guid,
@@ -1965,6 +1996,7 @@ fn verify_observed_company_tuple_from_companies(
         &companies,
     )
     .map_err(|error| match error {
+        VerifiedCompanyIdentityError::InvalidCompanyName => company_name_invalid(),
         VerifiedCompanyIdentityError::InvalidCompanyNumber => tally_command_error(
             "company_selection_invalid",
             "Tally application",

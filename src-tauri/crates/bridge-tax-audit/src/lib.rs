@@ -9,7 +9,7 @@
 //! a vendored rules excerpt ([`rules`]), and serialise the result canonically ([`canonical`]) so
 //! [`compare`] can diff it against the reference engine's dump under the same rules the
 //! reference's own comparer applies. A module with its own invariant (`depreciation`'s DEP-1/DEP-2,
-//! `financial_statements`' FS-1/FS-2, `trial_balance`'s TB-1/TB-2, `stale_balances_41_1`'s STL-1,
+//! `financial_statements`' FS-1/FS-2, `trial_balance`'s TB-1/TB-2/TB-3, `stale_balances_41_1`'s STL-1,
 //! `ledger_scrutiny`'s LSC-1, `cash_book_integrity`'s CBI-1/CBI-2) threads it through
 //! [`canonical::canonical_test_result`]'s `module_check` parameter.
 //!
@@ -489,8 +489,8 @@ pub struct DepreciationConfig {
     pub opening_wdv_paise: BTreeMap<String, i64>,
     pub dep_expense_ledgers: BTreeSet<String>,
     /// `[depreciation.put_to_use_by_voucher]`, guid -> date; optional, empty when absent (no
-    /// client TOML configures this key today -- the reference engine's own `pack.py` never
-    /// passes it either -- but `depreciation.py`'s `run()` signature carries it, so this port
+    /// client TOML configures this key today -- the reference engine's own pack never
+    /// passes it either -- but the depreciation test's `run()` signature carries it, so this port
     /// does too).
     pub put_to_use_by_voucher: BTreeMap<String, TallyDate>,
 }
@@ -1136,15 +1136,35 @@ pub fn trade_creditors(engagement: &Engagement, book: &book::Book) -> Result<BTr
     }
 }
 
-/// The vendored rules, for the one assessment year this slice carries.
+/// The vendored rules, for the one assessment year this slice carries. The year and the
+/// financial year they judge are the rules' own `[meta]`: an engagement for another year is
+/// refused (`CFG-rules-year`), and so is a period that is not inside that financial year
+/// (`CFG-period-outside-rules`), which would otherwise be judged by this year's thresholds.
 pub fn rules_for(engagement: &Engagement) -> Result<Rules> {
-    if engagement.assessment_year != "2026-27" {
-        return Err(AuditError::Config(format!(
-            "no vendored rules for AY {}",
-            engagement.assessment_year
-        )));
+    let rules = Rules::vendored()?;
+    if engagement.assessment_year != rules.assessment_year {
+        return Err(AuditError::refused(
+            "CFG-rules-year",
+            format!(
+                "no rules for assessment year {}; the rules held are for {}",
+                engagement.assessment_year, rules.assessment_year
+            ),
+        ));
     }
-    Rules::vendored()
+    let (start, end) = &rules.previous_year;
+    if engagement.period.from < *start || engagement.period.to > *end {
+        return Err(AuditError::refused(
+            "CFG-period-outside-rules",
+            format!(
+                "the period {} to {} is not inside {} to {}, the year the rules are for",
+                engagement.period.from.as_str(),
+                engagement.period.to.as_str(),
+                start.as_str(),
+                end.as_str()
+            ),
+        ));
+    }
+    Ok(rules)
 }
 
 /// Read and verify the engagement's read, and build its book (C1-C10).
@@ -1409,7 +1429,7 @@ pub fn statutory_dues_43b_on(
 }
 
 /// Run `trial_balance` on a book and return its canonical parity dump, with the module's own
-/// TB-1/TB-2 check. Reads no engagement configuration beyond binding.
+/// TB-1/TB-2/TB-3 check. Reads no engagement configuration beyond binding.
 pub fn trial_balance_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -2296,6 +2316,59 @@ mod py_int_tests {
             py_int_value(&Value::Float(f64::INFINITY)),
             Err(PyIntError::Invalid)
         );
+    }
+}
+
+#[cfg(test)]
+mod rules_for_tests {
+    use super::*;
+
+    fn engagement(year: &str, start: &str, end: &str) -> Engagement {
+        Engagement::from_toml_for_read(&format!(
+            "[client]\nlabel = \"T\"\nassessment_year = \"{year}\"\n\n[period]\n\
+             start = \"{start}\"\nend = \"{end}\"\n\n[roles]\ncash_groups = []\n\
+             bank_groups = []\n"
+        ))
+        .unwrap()
+    }
+
+    fn refusal(e: &Engagement) -> &'static str {
+        match rules_for(e).unwrap_err() {
+            AuditError::Refused { code, .. } => code,
+            other => panic!("not a refusal: {other}"),
+        }
+    }
+
+    /// The year and the financial year come from the rules' own `[meta]`.
+    #[test]
+    fn the_rules_name_their_year_and_the_financial_year_they_judge() {
+        let rules = Rules::vendored().unwrap();
+        assert_eq!(rules.assessment_year, "2026-27");
+        assert_eq!(rules.previous_year.0.as_str(), "20250401");
+        assert_eq!(rules.previous_year.1.as_str(), "20260331");
+    }
+
+    /// The whole year and a part of it are judged; another year's label, a period that starts
+    /// before the year or ends after it is refused by code, never judged by these thresholds.
+    #[test]
+    fn a_period_outside_the_rules_year_is_refused() {
+        assert!(rules_for(&engagement("2026-27", "2025-04-01", "2026-03-31")).is_ok());
+        assert!(rules_for(&engagement("2026-27", "2025-10-01", "2025-12-31")).is_ok());
+        assert_eq!(
+            refusal(&engagement("2027-28", "2025-04-01", "2026-03-31")),
+            "CFG-rules-year"
+        );
+        for (start, end) in [
+            ("2025-03-31", "2026-03-31"),
+            ("2025-04-01", "2026-04-01"),
+            ("2026-04-01", "2027-03-31"),
+        ] {
+            assert_eq!(
+                refusal(&engagement("2026-27", start, end)),
+                "CFG-period-outside-rules",
+                "{start} to {end}"
+            );
+        }
     }
 }
 

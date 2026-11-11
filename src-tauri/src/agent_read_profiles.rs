@@ -2,6 +2,7 @@
 use super::*;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+use bridge_tally_protocol::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 
 /// The FETCH list for reads that RETURN bill allocations.
 ///
@@ -304,9 +305,14 @@ fn render_voucher_census(
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company.as_str())
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     ))
 }
 
@@ -392,9 +398,14 @@ fn render_scoped_vouchers(
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company.as_str())
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     ))
 }
 
@@ -546,9 +557,14 @@ fn render_status_window(
         .map_err(|_| "company_name_invalid".to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN{fetch_tail}</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company.as_str()),
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN{fetch_tail}</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(type_name.as_str())
     ))
 }
@@ -572,9 +588,13 @@ pub(super) fn gst_status_read(
 }
 
 pub(super) fn render_agent_company_high_water(company: &str) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        "",
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Company High Water</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Agent Company High Water\" ISMODIFY=\"No\"><TYPE>Company</TYPE><FETCH>GUID,ALTVCHID,ALTMSTID</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company)
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Company High Water</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Agent Company High Water\" ISMODIFY=\"No\"><TYPE>Company</TYPE><FETCH>GUID,ALTVCHID,ALTMSTID</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -675,16 +695,14 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_voucher_types_request(company))
 }
 
-/// The vouchers carrying one invoice number in one financial year, with the
-/// measured per-row Sales-class compute, for the duplicate-number check.
-pub(super) fn invoice_number_read(
+/// Every voucher of one window (a calendar month of an invoice's financial
+/// year), with the measured per-row Sales-class compute, for the
+/// duplicate-number check: the program compares the numbers (#2162 item 11).
+pub(super) fn invoice_window_numbers_read(
     company: &str,
-    number: &agent_import::invoice::InvoiceNumber,
     window: (&TallyDate, &TallyDate),
 ) -> ReadRequest {
-    ReadRequest(agent_import::invoice::render_invoice_number_request(
-        company, number, window,
-    ))
+    ReadRequest(agent_import::invoice::render_invoice_window_numbers_request(company, window))
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.

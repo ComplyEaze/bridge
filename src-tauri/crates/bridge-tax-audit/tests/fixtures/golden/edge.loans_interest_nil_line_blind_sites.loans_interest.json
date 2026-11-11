@@ -7,6 +7,14 @@
   "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger lines are its configured interest ledger or ledgers (the client's list of loans) and any ledger the client configures as TDS payable; every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name -- except one that both credits and debits the loan ledger, which is listed as the books hold it, not divided into entries.",
   "figures": [
     {
+      "id": "loans_interest.clause31_expense_entry_count_258bf70b",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "b28dabe6d702dae6",
+      "definition_text": "Entries on loan ledger (tag 258bf70b) whose other lines are expense ledgers only, besides any TDS: each is read as a loan taken or repaid, not as interest. Clause 31 lists it, asking whether it is the lender's charge (or its reversal), where the lender and the running balance, or its own amount, make it reportable; an entry whose reportability is not computed is listed as not computed instead, without that question.",
+      "evidence": []
+    },
+    {
       "id": "loans_interest.clause31_repaid_reportable_total",
       "value": 0,
       "unit": "paise",
@@ -99,6 +107,20 @@
       "definition_sha256_16": "a02e7d371de92a27",
       "definition_text": "Whether the assessee must deduct TDS under s.194A for the year -- the same rule and figure as 'TDS on payments made': firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF.",
       "evidence": []
+    },
+    {
+      "id": "loans_interest.expense_credits_258bf70b",
+      "value": 300000,
+      "unit": "paise",
+      "definition_sha256_16": "7bd386e19f70cc9b",
+      "definition_text": "Credits to loan ledger (tag 258bf70b) on entries whose other lines are expense ledgers only, besides any TDS: the loan's own side of each, so net of any TDS on it. The lender's charge or a loan taken, not judged; not added into the interest total, and a reversal to an expense ledger is not netted against them.",
+      "evidence": [
+        {
+          "id": "c01",
+          "kind": "voucher",
+          "label": "Journal c01 on 2025-06-10"
+        }
+      ]
     },
     {
       "id": "loans_interest.interest_ledger_258bf70b",
@@ -319,18 +341,20 @@
           "label": "Journal c01 on 2025-06-10"
         }
       ],
-      "title_sha256_16": "70dbdecd7831c97f",
-      "title_text": "Loan taken against Invented K Lender (journal mode, code J) -- at or over the s.269SS/269T running-balance limit",
-      "limits_sha256_16": "495d9d717c510aad",
+      "title_sha256_16": "5f3f6d5d7f0d80da",
+      "title_text": "Loan taken against Invented K Lender (journal mode, code J): credited from an expense ledger -- the lender's charge, or a loan taken?",
+      "limits_sha256_16": "8a2837ae1feac3fd",
       "limits_text": [
         "Books only: confirm the lender's identity (name, address, PAN) for Form 3CD Clause 31, and whether this lender is excepted from s.269SS/269T beyond the lender types the rules already except (Government, a notified corporation, or another body notified under the Explanation).",
         "The mode-and-direction code follows the Form 3CD utility's own Note 1 list (A/B cash payment/receipt, I/J journal entry debit/credit, K/L any other mode debit/credit); this pack's own mapping from mode and direction to that code is a derivation from the GN's text, not verified against a specimen utility export -- confirm.",
+        "This entry is credited from an expense ledger (its other lines are expense ledgers only, besides any TDS); if it is the lender's interest or charge (s.2(28A)), name each such ledger among the loan's interest ledgers and the entry leaves clause 31. A ledger that also carries other payments must then be declared shared, and its other debits are listed as interest attributed to no loan.",
         "This entry's own amount (300000p) is below the s.269SS/269T limit on its own; it is flagged only because the running balance with this lender (GN 55.8/57.2) is at or over the limit -- report every entry from where the running balance first reaches the limit until it falls back below, not only the large ones.",
         "s.273B reasonable cause (e.g. banking facilities not available in the area) is a CA judgement call on the facts, not a books fact."
       ],
-      "ask_client_sha256_16": "8c22e5a927638b0c",
+      "ask_client_sha256_16": "e4d4c2aa594ca2de",
       "ask_client_text": [
-        "Confirm lender identity (name, address, PAN) for Clause 31."
+        "Confirm lender identity (name, address, PAN) for Clause 31.",
+        "Whether this entry is the lender's interest or charge, or a loan taken."
       ]
     }
   ],

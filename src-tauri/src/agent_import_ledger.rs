@@ -1177,11 +1177,14 @@ pub(super) fn unsettled_invoice_twin(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum NumberControl {
     /// The newest invoice of a batch whose LATEST status is `posted_verified`,
-    /// preferring one dated inside `year`: its batch, its number and its date.
+    /// preferring one dated inside `year`: its batch, its number and its date,
+    /// and the GUID its post bound it to when the journal records exactly one
+    /// bound voucher for the batch (only a diagnostic, #2162 item 13).
     Known {
         batch_id: String,
         number: String,
         date: String,
+        guid: Option<String>,
     },
     /// No invoice of this company stands as sent: none was sent, or every one
     /// sent was released by a person.
@@ -1210,6 +1213,8 @@ pub(super) fn invoice_number_control(
     let mut verified = BTreeSet::new();
     // Batches a person released, while the release stands.
     let mut released = BTreeSet::new();
+    // batch id -> the GUID its latest post-span verdict bound, when it bound one.
+    let mut bound: BTreeMap<String, String> = BTreeMap::new();
     let mut order = 0usize;
     scan_records(reader, |record, _| match record {
         Record::Batch(batch) => {
@@ -1246,6 +1251,12 @@ pub(super) fn invoice_number_control(
             if matches!(update.record_type, StatusKind::StopRelease) {
                 released.insert(update.batch_id.clone());
             }
+            // A batch has at most one post-span verdict, binding every voucher
+            // of it (`admit_post_span_verdict`), so one bound voucher is the
+            // batch's only invoice and no later record rebinds it.
+            if let Some([one]) = update.bindings.as_deref() {
+                bound.insert(update.batch_id.clone(), one.guid.clone());
+            }
             if update.sets_status() {
                 if update.status == "posted_verified" {
                     verified.insert(update.batch_id.clone());
@@ -1275,6 +1286,7 @@ pub(super) fn invoice_number_control(
             batch_id: batch_id.to_string(),
             number: number.clone(),
             date: date.clone(),
+            guid: bound.get(batch_id).cloned(),
         },
         None if invoices
             .keys()

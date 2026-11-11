@@ -22,7 +22,7 @@ The writes are cumulative: P2 runs with P1's voucher saved, and P3 with both. Ea
 - **Vouchers** (row 683-TW's `mvy` answer): eleven, all dated 20250401.
 - **Its last state:** the run coordinator names, in the kit line below, the marks answer of the last row's restore. m0 must be SAME MARKS with it.
 
-KIT LAST MARKS: <to fill: file, its row and branch, sha256>
+KIT LAST MARKS: `a-m2-M-marks.xml`, row 683-TN's m2, read after its step 8 restore (one COMPANY row, this book's GUID, ALTVCHID 11, ALTMSTID 214), on branch `lab/683-tn-answers` at `1b9412f88a2dfe603616a57aeb45b27cf1530cba` as `lab/683-tn-answers/answers/a-m2-M-marks.xml`, 3,404 B, sha256 `3d75dd1a8fb7252b93f55f9a492ddf449e2be3814feaa781685437f2548dafba` (equal to that branch's SHA256.txt). Row 683-TN was the last sitting on this book: its notes record no use of Tally between row 683-TA's sitting and its own, and no answers branch pushed since names the book.
 
 The lab fills this line by a new commit on this branch. **While it reads `<to fill>`: STOP. This row does not run.**
 

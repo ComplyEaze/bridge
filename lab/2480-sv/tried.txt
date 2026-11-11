@@ -128,3 +128,18 @@ exit 3
 $ python3 -I sv.py --judge2 qa movement a-q6a-Vm-v-qa.xml x-after-shifted.xml
 JUDGE2 qa movement: OWN 0 OF 0, OTHERS 1
 exit 3
+# Added after an independent read of the sheet: the unmodified sv.py, with this row's own numbers, on two more copies of k8:
+#   x-after-renum-qa.xml  k8 with qa's invoice's number BP/26-27/0296 (three times) turned into BP/26-27/0303
+#   x-after-renum-ka.xml  k8 with ka's invoice's number BP/26-27/0292 (three times) turned into BP/26-27/0308
+$ python3 -I sv.py --landed qa x-before-noqa.xml x-after-renum-qa.xml
+LANDED qa: ON qa
+VERDICT qa: ON ITS LEDGER
+exit 0
+$ python3 -I sv.py --landed kb x-before-noka.xml x-after-renum-ka.xml
+LANDED kb: ON ka
+VERDICT kb: ON ITS LEDGER
+exit 0
+$ python3 -I sv.py --landed qb x-before-noqa.xml x-after-renum-qa.xml
+LANDED qb: NOT ITS NUMBER
+VERDICT qb: NOT JUDGED
+exit 3

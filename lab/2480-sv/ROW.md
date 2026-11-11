@@ -62,7 +62,7 @@ Every file but the twelve new ones is SC's, byte for byte (`lab/2480-sc-sheet` a
 | **`J-<id>.xml`** (new, six) | the voucher of the table above: `I-pl.xml` with the control's name turned into the id's (seven times, escaped as master's `xml_text::escape_text` writes it), `BP/26-27/0281` into the new number (three times), and the REMOTEID tail `e81` into `ed<n+2>` (`ed3` to `ed8`, once), and nothing else |
 | **`N-<new number>.xml`** (new, six) | SC's `N-0281.xml` with the number turned into the new one, once, and nothing else |
 
-**Sizes.** Each `J-` file is 5,016 B but `qb`'s (5,100 B, its `&apos;` seven times) and `kb`'s (5,030 B). The book-wide read's answer is SC's `k8` (1,361,516 B, 17 vouchers) and grows by one invoice a landing: 91,914 B, measured as `k8` less `qa`'s invoice. Six landings make it about 1,913,000 B. An answer above 2,000,000 B is `run.py`'s stop (`BOUND`), and a seventh voucher would pass it (about 2,005,000 B). **So the control gets no voucher:** `qa` and `ua`, plain names sent first, are this row's control for the new import.
+**Sizes.** Each `J-` file is 5,016 B but `qb`'s (5,100 B, its `&apos;` seven times) and `kb`'s (5,030 B). The book-wide read's answer is SC's `k8` (1,361,516 B, 17 vouchers) and grows by one invoice a landing: 91,914 B, measured as `k8` less `qa`'s invoice. Six landings make it about 1,913,000 B. An answer above 2,000,000 B is `run.py`'s stop (`BOUND`), and a seventh voucher would pass it (about 2,005,000 B). **So the control gets no voucher:** `qa` and `ua`, plain names sent first, are this row's control for the new import. The margin at the last `v` read is about 4%. An answer above the bound there is `run.py`'s STOP, and C8 holds with the vouchers in the book.
 
 ## The sends and the wedge rule
 SC's, word for word (its ROW.md, "The sends and the wedge rule"), with this row's steps:
@@ -82,13 +82,13 @@ SC's, word for word (its ROW.md, "The sends and the wedge rule"), with this row'
 - `st.py --import` gives exit 1 on any answer but `CREATED ONE`. In step 7 that path goes to `rf.py` under exception (b).
 
 ## Files
-**SC's, byte for byte** (sha256 and size as `sc/SHA256.txt` lists them, which `gen-sv.py` checks): every file of SC's folder but its `ROW.md` and `SHA256.txt`, `sk/SHA256.txt` included.
+**SC's, byte for byte** (sha256 and size as `sc/SHA256.txt` lists them, which `gen-sv.py` checks): every file of SC's folder but its `ROW.md` and `SHA256.txt`, `sk/SHA256.txt` and `.gitattributes` included.
 
 **New for this row:** this file, `gen-sv.py` and its twelve files, `sv.py`, `tried.txt`, `SHA256.txt`.
 
 **`gen-sv.py`** checks every other file against `sc/SHA256.txt` before it writes anything. It writes the twelve files, each swap's count asserted and each swapped back to its source byte for byte. Where SK's invoice for the id is in the folder (all but `kb`), it asserts that `J-<id>` with SK's number and tail swapped in again is that invoice byte for byte, so each name is written as SK's imports wrote it. It asserts that no new number is one of `names.tsv`'s and no new tail is one MX or SK sent.
 
-`SHA256.txt` lists every file with its size (`sha256  size  path`, SK's form).
+`SHA256.txt` lists every other file with its size (`sha256  size  path`, SK's form).
 
 **Tried before this sheet was sent:**
 - `gen-sv.py`, run in this folder: its twelve files; every SC file equal to SC's.
@@ -100,6 +100,10 @@ SC's, word for word (its ROW.md, "The sends and the wedge rule"), with this row'
   - **The hand-shifted copy, which must fail:** `k8` with `qa`'s invoice's one `LEDGERNAME` of `qa`'s name turned into `qb`'s.
     - `--landed qa` against it: `ON qb`, `ON ITS SIBLING`, exit 3.
     - With SC's `k8` as the before read: `BOOK CHANGED`, `NOT JUDGED`, exit 3.
+  - **The unmodified `sv.py`, with this row's own numbers,** on two more copies of `k8`, each with one invoice's number (three times in it) turned into a new one:
+    - `--landed qa`, before = `k8` less `qa`'s invoice, after = `k8` with that invoice numbered 0303: `ON qa`, `ON ITS LEDGER`, exit 0;
+    - `--landed kb`, before = `k8` less `ka`'s invoice, after = `k8` with that invoice numbered 0308: `ON ka`, `ON ITS LEDGER`, exit 0;
+    - `--landed qb` on the first pair: `NOT ITS NUMBER`, `NOT JUDGED`, exit 3.
   - `--judge2` on SC's `q6a`, `c6a` and `w6a` answers as `qa`, and on `b8a`, `b9a` and `b10a` as `kb`, each against `k8`: `OWN 1 OF 1, OTHERS 0`, exit 0. On `qb`'s movement answer judged as `qa`: `OWN 0 OF 1, OTHERS 1`, exit 3. On `qa`'s movement answer against the shifted copy: `OWN 0 OF 0, OTHERS 1`, exit 3.
 - **Not tried:** any send to Tally; the twelve new requests, which no book has been sent; any book holding two vouchers on one of these ledgers.
 
@@ -129,25 +133,28 @@ Run each label as `python3 -I run.py URL <label> <files>`, the Gateway on 9001 a
 
 ### The vouchers and the reads
 
-6. **The book before the vouchers.** Before `v0`, write down that each holds, with the line of the notes that shows it: no STOP at steps 1 to 5; every send answered; `m1` SAME MARKS against `s6m`; every `--before-write` passed. If any does not hold, nothing of steps 6 to 8 is sent: the row goes to step 9.
+6. **The book before the vouchers.** Before `v0`, write down that each holds, with the line of the notes that shows it: no STOP at steps 1 to 5; every send answered; `m1` SAME MARKS against `s6m`; every `--before-write` passed. If any does not hold, that is a STOP at step 6, as every STOP is: nothing of steps 6 to 8 is sent, and C8 holds, so the restore waits for the run coordinator's word.
    - `v0`: `Vb-book.xml`, then `wx.py a-v0-Vb-book.xml`. EXPECT `ANSWER: VOUCHERS <n>`, SC's `k8` count (17) if the book is SC's. Record `<n>`, whatever it is.
    - `k0`: `M-marks.xml`, then `count20.py --same-row a-m1-M-marks.xml a-k0-M-marks.xml`. EXPECT SAME MARKS. On MARKS DIFFER: `k0r` once, record it, send nothing else, and STOP.
 7. **The six vouchers,** in the table's order, `n` = 1 to 6. For each, by hand, one label a command:
    - (a) `j<n>m`: `M-marks.xml`, then `python3 -I count20.py --before-write a-s1-M-marks.xml a-j<n>m-M-marks.xml`.
-   - (b) Only if that passes, and no key was pressed in Tally since: `j<n>`: `J-<id>.xml`, the import alone.
+   - (b) Only if that passes, and no key was pressed in Tally since: `j<n>`: `J-<id>.xml`, the import alone. If `--before-write` does not pass, or a key was pressed: `J-<id>.xml` is not sent, and that is a STOP at step 7, id `<id>`.
    - (c) Screenshot the whole window before the next request. A dialog: the prompt rule.
    - (d) `python3 -I st.py --import a-j<n>-J-<id>.xml`, recorded whole.
      - **Exit 0 (`CREATED ONE`):** go to (e).
      - **Exit 1:** `python3 -I rf.py a-j<n>-J-<id>.xml`, recorded whole. On `IMPORT: REFUSED` (exit 0), under exception (b): `j<n>x`: `M-marks.xml`, then `count20.py --same-row a-j<n>m-M-marks.xml a-j<n>x-M-marks.xml`. On SAME MARKS, the refusal is that id's result, **REFUSED**, its LINEERROR lines whole. No `v<n>` is sent, and the next voucher's before read is the last `v` sent. Any other line of `rf.py` or `count20.py`, or no word for (b): a STOP at step 7, id `<id>`.
+     - **Any other exit of `st.py`:** a STOP at step 7, id `<id>`.
    - (e) `v<n>`: `Vb-book.xml`, then `wx.py a-v<n>-Vb-book.xml` and `python3 -I sv.py --landed <id> <BEFORE> a-v<n>-Vb-book.xml`, each recorded whole. `<BEFORE>` is the last book-wide read sent: `a-v0-Vb-book.xml` for `n` = 1, else the last `v`.
      - **`VERDICT <id>: ON ITS LEDGER` (exit 0):** that id's result, **LANDED ON ITS LEDGER**. Go on with the next voucher.
      - **Any other `VERDICT` (exit 3): `ON ITS SIBLING`, `NOT ON ITS LEDGER` or `NOT JUDGED`.** The landing is wrong, or not known to be right. **The row ends after this read:**
        - nothing more is written or read, but the restore;
-       - RESULTS states it in one line, the first line of step 7's section: `WRONG LANDING: <id>: <the LANDED line>; <the VERDICT line>`;
+       - RESULTS states it in one line, the first line of step 7's section: `WRONG LANDING: <id>: <the LANDED line>; <the VERDICT line>`. The label covers `NOT JUDGED` too (no new voucher, its number not found, the book changed): a landing not known to be right ends the row as a wrong one does;
        - **the operator tells the run coordinator at once**, as soon as the line is read, before anything else, and the hand-back says so again in its first line;
        - then step 9, the restore, and step 10.
 
        It would be a defect of a shipped post (`qa` to `ub`, `ka`) or a fact of the raw shape (`kb`). The coordinator decides where it is written, and nothing more is said of it in public text until then.
+
+       This holds for `kb` too, though it is sent last and nothing is written after it: a wrong landing of `kb` also ends the row before step 8, and the scoped reads of the five before it are not sent. That is the run coordinator's condition for this row, kept as given.
    - **Step 7 has passed in full** only if every voucher is LANDED ON ITS LEDGER or REFUSED, and every send was answered with no dialog. Write it down, with the lines that show it.
 8. **The reads after. Only after step 7 has passed in full.** First `k1`: `M-marks.xml`, then `count20.py --same-row a-k0-M-marks.xml a-k1-M-marks.xml`, recorded (a record, not a check: the vouchers moved the voucher mark). The book-wide read they are judged against, `BOOK`, is the last `v` sent. For each id, in the table's order (`n` = 1 to 6), each send once, each answer read by its reader before the next request, and a screenshot after each `a` send:
    - `r<n>ca`, `r<n>cb`: `C-v-<id>.xml`, then `cv.py` on each and `cv.py --same` on the two;
@@ -177,7 +184,7 @@ Run each label as `python3 -I run.py URL <label> <files>`, the Gateway on 9001 a
 Estimates, not predictions.
 - **Steps 1 to 5:** SC's answers.
 - **Step 7:** no estimate for `qb` and `ub`: no row has sent a voucher naming a ledger whose key a sibling shares. For `qa`, `ua` and `ka`, `CREATED ONE` and LANDED ON ITS LEDGER, as their first invoices did. For `kb`, no estimate: SC's Part B read the altered ledger by that spelling, but no voucher has named it.
-- **Step 8:** for each id whose voucher landed, `OWN 2 OF 2, OTHERS 0` (its first invoice and this row's voucher); for `ka` and `kb`, the altered ledger's `OWN <k> OF <k>`, `<k>` 2 or 3 as `kb`'s voucher landed or was refused.
+- **Step 8:** for each of `qa` to `ub` whose voucher landed, `OWN 2 OF 2, OTHERS 0` (its first invoice and this row's voucher); for `ka` and `kb`, the altered ledger's `OWN <k> OF <k>`, `<k>` 2 or 3 as `kb`'s voucher landed or was refused.
 - **s9:** equal to s2 and s1.
 
 ## Decides

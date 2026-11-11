@@ -488,6 +488,77 @@ fn find_readback_row_matches_the_9_4d_fold() {
     assert!(find_readback_row(&rows, "an entirely different name").is_none());
 }
 
+/// #2499: the pre-check matches on master's name index keys, so a name that
+/// differs from an existing row's by a comma or one space, which the gateway
+/// took as an alteration of that row (lab row 2480-SK, one synthetic book), is
+/// refused, not read as absent.
+#[test]
+fn find_target_row_refuses_a_name_whose_key_a_row_shares() {
+    let shares = |names: &[&str], name: &str| {
+        let rows: Vec<_> = names.iter().map(|n| row(&[("NAME", n)])).collect();
+        let index = index_target_rows(&rows, MasterKind::Ledger).unwrap();
+        match find_target_row(&rows, &index, name) {
+            TargetRow::SharesKey(other) => other,
+            other => panic!("{name:?} was not refused: {other:?}"),
+        }
+    };
+    assert_eq!(
+        shares(&["BRIDGE Sk Ak Am"], "BRIDGE Sk Ak, Am"),
+        "BRIDGE Sk Ak Am"
+    );
+    assert_eq!(
+        shares(&["BRIDGE Sk Bk, Bm"], "BRIDGE Sk Bk Bm"),
+        "BRIDGE Sk Bk, Bm"
+    );
+    assert_eq!(
+        shares(&["BRIDGE Sk EkEm"], "BRIDGE Sk Ek Em"),
+        "BRIDGE Sk EkEm"
+    );
+    // A same-name row beside one that only shares a key is still refused.
+    assert_eq!(
+        shares(&["BRIDGE Sk Ak Am", "BRIDGE Sk Ak, Am"], "BRIDGE Sk Ak Am"),
+        "BRIDGE Sk Ak, Am"
+    );
+}
+
+#[test]
+fn find_target_row_keeps_the_first_same_name_row_and_reads_absence() {
+    let rows = vec![
+        row(&[("NAME", "BRIDGE Sk Zk Zm")]),
+        row(&[("NAME", "BRIDGE Sk Ak Am"), ("PARENT", "Sundry Debtors")]),
+        row(&[("NAME", "bridge sk ak am"), ("PARENT", "Sundry Creditors")]),
+    ];
+    let index = index_target_rows(&rows, MasterKind::Ledger).unwrap();
+    match find_target_row(&rows, &index, "BRIDGE SK AK AM") {
+        TargetRow::Same(found) => assert!(std::ptr::eq(found, &rows[1])),
+        other => panic!("the same-name row was not found: {other:?}"),
+    }
+    assert!(matches!(
+        find_target_row(&rows, &index, "BRIDGE Sk Ck Cm"),
+        TargetRow::Absent
+    ));
+    assert!(matches!(
+        find_target_row(&rows, &index, "  "),
+        TargetRow::Blank
+    ));
+}
+
+#[test]
+fn index_target_rows_fails_closed_on_a_row_without_a_name() {
+    for rows in [
+        vec![
+            row(&[("NAME", "BRIDGE Sk Ak Am")]),
+            row(&[("PARENT", "Primary")]),
+        ],
+        vec![row(&[("NAME", " ")])],
+    ] {
+        assert!(matches!(
+            index_target_rows(&rows, MasterKind::Group),
+            Err(MasterNameIndexError::BlankName { .. })
+        ));
+    }
+}
+
 #[test]
 fn diff_ledger_flags_a_wrong_opening_balance() {
     let l = BookLedger {

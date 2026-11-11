@@ -51,8 +51,12 @@
 //!   written as is the one measured exception (bridge#974): see
 //!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
+use super::failure_code::ReadCode;
 use super::*;
 use bridge_tally_core::master_binding::canonical_master_key;
+use bridge_tally_core::master_name_index::{
+    IndexedMaster, MasterKind as IndexKind, MasterNameIndex, MasterNameIndexError,
+};
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::is_tally_reserved_root;
@@ -439,6 +443,82 @@ fn find_readback_row<'a>(
     let key = canonical_master_key(name);
     rows.iter()
         .find(|row| canonical_master_key(row.get("NAME").map(String::as_str).unwrap_or("")) == key)
+}
+
+/// What the pre-check found for one requested name among the rows read for
+/// its kind.
+#[derive(Debug)]
+enum TargetRow<'a> {
+    /// No row shares any of the name index's keys with the name.
+    Absent,
+    /// The first row whose name has the requested name's canonical key; every
+    /// row that shares a key with the name has that canonical key too.
+    Same(&'a BTreeMap<String, String>),
+    /// A row whose name has another canonical key shares one of the index's
+    /// keys with the requested name, so Tally may take the Create as an
+    /// alteration of that row (§9.4; a removed space, §9.4d; a comma, lab row
+    /// 2480-SK on #2480). Holds the row's name.
+    SharesKey(String),
+    /// The requested name is blank, so it names no master to look for.
+    Blank,
+}
+
+/// Indexes the rows read for one kind on the keys master's own name index
+/// matches (`MasterNameIndex::collisions`). Each row's `NAME` is its one name,
+/// as these reads fetch no alias, and its position in `rows` is its identity,
+/// so the check does not depend on which fields a kind's rows carry. Fails
+/// closed on a row with no `NAME` or a blank one.
+fn index_target_rows(
+    rows: &[BTreeMap<String, String>],
+    kind: MasterKind,
+) -> Result<MasterNameIndex, MasterNameIndexError> {
+    let index_kind = match kind {
+        MasterKind::Ledger => IndexKind::Ledger,
+        _ => IndexKind::Group,
+    };
+    MasterNameIndex::new(
+        rows.iter()
+            .enumerate()
+            .map(|(position, row)| IndexedMaster {
+                kind: index_kind,
+                guid: position.to_string(),
+                alter_id: 0,
+                names: vec![row.get("NAME").cloned().unwrap_or_default()],
+            })
+            .collect(),
+    )
+}
+
+/// Finds the row of `rows` a requested name would reach, on every key of
+/// `index` (built from `rows` by [`index_target_rows`]), not on the canonical
+/// key alone.
+fn find_target_row<'a>(
+    rows: &'a [BTreeMap<String, String>],
+    index: &MasterNameIndex,
+    name: &str,
+) -> TargetRow<'a> {
+    // `collisions` refuses only a blank candidate.
+    let Ok(collisions) = index.collisions(name) else {
+        return TargetRow::Blank;
+    };
+    let key = canonical_master_key(name);
+    if let Some(other) = collisions
+        .iter()
+        .find(|collision| canonical_master_key(&collision.name) != key)
+    {
+        return TargetRow::SharesKey(other.name.clone());
+    }
+    match collisions.first() {
+        None => TargetRow::Absent,
+        Some(first) => TargetRow::Same(
+            first
+                .guid
+                .parse::<usize>()
+                .ok()
+                .and_then(|position| rows.get(position))
+                .expect("the index holds the positions of these rows"),
+        ),
+    }
 }
 
 /// The raw control character behind Tally's `&#4;`, as a book value may
@@ -1186,6 +1266,9 @@ pub(in crate::agent) async fn lab_import_masters(
         evidence = combine_evidence(evidence.clone(), read_evidence);
         let rows = parse_lab_master_rows(&xml, kind.tally_type())
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+        let index = index_target_rows(&rows, kind).map_err(|_| {
+            ToolFailure::from(ReadCode::ReadProtocolInvalid).with_prior_evidence(evidence.clone())
+        })?;
         for name in &requested {
             if kind == MasterKind::Group && book_names_reserved_root(name) {
                 // A requested Group named as Tally's own reserved-primary
@@ -1199,8 +1282,23 @@ pub(in crate::agent) async fn lab_import_masters(
                 collisions.push(format!("{}:{name}:reserved_root", kind.tally_type()));
                 continue;
             }
-            let Some(existing) = find_readback_row(&rows, name) else {
-                continue;
+            let existing = match find_target_row(&rows, &index, name) {
+                TargetRow::Absent => continue,
+                TargetRow::Same(existing) => existing,
+                TargetRow::SharesKey(other) => {
+                    // Tally may resolve the Create to `other` and alter it
+                    // with no error (see `TargetRow::SharesKey`), so refuse
+                    // before any write.
+                    collisions.push(format!(
+                        "{}:{name}:shares_a_key_with:{other}",
+                        kind.tally_type()
+                    ));
+                    continue;
+                }
+                TargetRow::Blank => {
+                    collisions.push(format!("{}:{name}:blank_name", kind.tally_type()));
+                    continue;
+                }
             };
             match kind {
                 MasterKind::Ledger => {

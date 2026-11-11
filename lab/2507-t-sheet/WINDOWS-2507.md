@@ -9,7 +9,7 @@ The answers decide:
 - whether the read-back can find the voucher by the id it sent;
 - whether Bridge must send the outward value.
 
-**Why direct XML.** No Bridge builder renders a stock voucher (`src-tauri/src/agent_import.rs:330-337` knows five accounting types; `src-tauri/src/agent_lab_import.rs:2287-2297` renders accounting and invoice vouchers only). So each import is a lab request, as in row 2016, sent by curl under the owner's standing words for shape discovery. Every read after it goes through Bridge's own tools.
+**Why direct XML.** No Bridge builder renders a stock voucher (`src-tauri/src/agent_import.rs:330-337` knows five accounting types; `src-tauri/src/agent_lab_import.rs:2287-2297` renders accounting and invoice vouchers only). So each import is a lab request, as in row 2016, sent by curl under the owner's word allowing lab curl requests for shape discovery, writes included. Every read after it goes through Bridge's own tools.
 
 **Code admits the trigger (reads only).**
 - `vouchers` with `stock_lines`: `src-tauri/src/agent_read_profiles.rs:71-74`, builder `:214`.
@@ -38,9 +38,10 @@ No client book, and no other company loaded. The book's GUID is the one row 2016
 
 **Rules.**
 - **Who acts:** the lab session does every step on the owner's standing words of 27 and 28 Oct 2026, as row 1780-W records them, including the backup and each restore on Tally's screen. Any step that needs the owner in person is a STOP that asks first.
+- **Every curl request carries `--max-time 60`.** A timeout is a STOP. Take a capture of Tally's screen after every import and every restore, and keep it.
 - **One import per row, apart from T1b,** each sent once, never retried. Keep each request as sent and each answer whole, as a file, with its headers.
-- **Restore between rows.** After each row, restore backup B0 and read `marks.xml`. EXPECT the marks of step 0, byte-equal apart from read time, before the next row starts.
-- **A dialog on Tally's screen, an import that gets no answer, or a mark that moves outside a row's import is a STOP at step N, id X.** The run lead decides; nothing more is sent.
+- **Restore between rows.** After each row, restore backup B0, read `marks.xml`, and read `vouchers` for 2026-05-21. EXPECT the marks of step 0, byte-equal apart from read time, and a complete answer with 0 rows, before the next row starts.
+- **A dialog on a capture, an import that times out, or a mark that moves outside a row's import is a STOP at step N, id X.** The run lead decides; nothing more is sent.
 - **An answer with `ERRORS` or `EXCEPTIONS` above 0, or a `LINEERROR`, is a finding for that row, not a STOP** (T2 may be refused). Record it, read as the row says, restore, go on.
 - **No figure from the book goes in public text** beyond what row 2016 already published. Keep the answers on the answers branch.
 
@@ -48,8 +49,10 @@ No client book, and no other company loaded. The book's GUID is the one row 2016
    - Take backup B0 on Tally's screen; record its size and sha256.
    - `list_companies`. EXPECT `BRIDGE SHAPE LAB` alone, with row 2016's GUID.
    - Read `marks.xml` by curl and keep it.
-   - `vouchers` for 2026-05-21. EXPECT zero rows, else STOP: the day is not empty.
-   - `stock_by_batch` for the item, as of 2026-05-31. EXPECT at least 2 Kgs of H-2504-A at Main Location, else STOP: T0 would be an over-issue, which is row T10's variable, not this sheet's.
+   - `vouchers` for 2026-05-20, as a control. EXPECT a complete answer with the vouchers row 2016 left there (at least one). RECORD the count.
+   - `vouchers` for 2026-05-21, and for 2026-05-22 to 2026-05-31. EXPECT each a complete answer with no refusal and a total of 0 rows, else STOP: a day is not empty, or the read did not answer.
+   - Find the item's GUID in Bridge's stock-item read, and record it.
+   - `stock_by_batch` for that GUID, as of 2026-05-31, which equals 21 May's balance once 22 to 31 May are empty. EXPECT at least 2 Kgs of H-2504-A at Main Location, else STOP: T0 would be an over-issue, which is row T10's variable, not this sheet's.
 1. **T0, the baseline.** Send `t0.xml`.
    - EXPECT `CREATED 1`, every other counter 0, no `LINEERROR`, else STOP: the baseline did not hold, and T1 to T3 have nothing to compare against.
    - Read `marks.xml`. EXPECT the voucher mark up by 1 and the master mark unmoved.
@@ -60,16 +63,21 @@ No client book, and no other company loaded. The book's GUID is the one row 2016
 2. **T1, the id sent.** Send `t1.xml`.
    - EXPECT `CREATED 1`.
    - Read `marks.xml`, then `vouchers` for the day with `stock_lines: true`, as T0.
-   - RECORD whether a `REMOTEID` comes back anywhere in the answer, and the row's GUID. The GUID being the `REMOTEID` sent is the question; no EXPECT.
-   - **T1b:** send `t1.xml` again, unchanged, with no restore between. RECORD every counter, then `marks.xml` and the day's `vouchers` again. The question is whether the resend creates a second voucher, alters the first, or is refused; no EXPECT. A dialog is a STOP.
+   - RECORD the marks, and the row's GUID, ALTERID and MASTERID. The stock-line read does not fetch `REMOTEID` (`src-tauri/src/agent_read_profiles.rs:71-74`), so its absence there says nothing. The question is whether the row's GUID equals the `REMOTEID` sent; no EXPECT.
+   - **T1b:** send `t1.xml` again, unchanged, with no restore between. RECORD every counter, then read `marks.xml` and the day's `vouchers` with `stock_lines` again. No EXPECT. Read the outcome this way:
+     - **a second voucher:** `CREATED 1`, voucher mark up by 1, two rows;
+     - **the first altered:** `ALTERED 1`, one row with T1's GUID and MASTERID and a higher ALTERID;
+     - **ignored:** `IGNORED 1` and nothing moved;
+     - **refused:** `EXCEPTIONS` or `ERRORS` above 0 and nothing moved.
+     Any other mix is recorded as it is. A dialog is a STOP.
    - Restore B0 and check the marks.
 3. **T2, one list name for both sides.** Send `t2.xml`.
    - RECORD every counter and any `LINEERROR`.
-   - If `CREATED 1`: read as T0, and RECORD each line's direction, godown and batch against T0's. If refused: read `marks.xml`, and EXPECT nothing moved.
+   - If `CREATED 1`: read as T0, with T0's marks EXPECT, and RECORD each line's direction, godown and batch against T0's. If refused: read `marks.xml`, and EXPECT nothing moved.
    - Restore B0 and check the marks.
 4. **T3, no outward value.** Send `t3.xml`.
    - RECORD every counter.
-   - If `CREATED 1`: read as T0, and RECORD the out and in sides' rate and amount as read and as the screen shows them. The question is whether Tally values the transfer at the source godown's cost.
+   - If `CREATED 1`: read as T0, with T0's marks EXPECT, and RECORD the out and in sides' rate and amount as read and as the screen shows them. The question is whether Tally values the transfer at the source godown's cost.
    - Restore B0 and check the marks.
 5. **End.**
    - `list_companies` and `marks.xml`. EXPECT step 0's marks.

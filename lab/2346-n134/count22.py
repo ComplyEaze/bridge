@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # count22.py ANSWER...: row 2346-MN's count21.py (lab/2346-mn-sheet at cec5d5a8) for row 2346-N134, with two changes,
-# each marked N134 below.
+# each marked N134 below. The lines from "count21.py ANSWER..." down are count21.py's own header, kept as it was.
 # 1. The W kind (the build's number read of one month) prints, in place of BRIDGEVCHISSALES alone, every child of
 # the row whose tag begins BRIDGEVCHIS (the class element the request's COMPUTE names, whichever class it is), and
 # then how many rows hold no such child. A row with none prints "class element absent": Tally omits the element of
 # a function it does not answer, so that is a result of the read, never No and never 0 rows. --guid prints the
 # same way.
 # 2. --w-diff A B, on two W answers: how many VOUCHER rows each holds, then, by GUID, each row in one answer only
-# and each row whose printed fields differ, with both lines, at most WCAP lines in all. A GUID held by two rows of
-# one answer stops: the comparison is by GUID.
+# and each row whose printed fields differ, with both lines, at most WCAP such rows in all. A GUID held by two rows
+# of one answer stops: the comparison is by GUID. An answer with no VOUCHER row stops too: every month this row
+# compares holds rows, so an empty one is a read that failed, never a match.
 # count21.py ANSWER...: row 2346-AR's count20.py (lab/2346-ar-sheet at fd0aef60) for row 2346-MN, with three changes,
 # each marked MN below.
 # 1. The N kind also prints each row's VOUCHERTYPENAME and every child whose tag begins BRIDGEVCHIS (the class
@@ -613,6 +614,9 @@ if args[:1] == ["--w-diff"]:
         return found, held
     a, b = pathlib.Path(args[1]), pathlib.Path(args[2])
     (ra, ha), (rb, hb) = by_guid(a), by_guid(b)
+    for path, found in ((a, ra), (b, rb)):
+        if not found:
+            raise SystemExit(f"STOP: {path.name} holds no VOUCHER row: the read failed or read nothing, not a match")
     print(f"== --w-diff {a.name} {b.name}: {len(ra)} and {len(rb)} VOUCHER rows")
     lines = []
     for guid in sorted(set(ha) | set(hb)):

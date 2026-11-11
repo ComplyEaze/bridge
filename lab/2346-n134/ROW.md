@@ -25,7 +25,7 @@ So N1 here is row 2346-MN's step 6 again, with a new key. Its new evidence is th
 - a note built or posted by ComplyEaze Bridge.
 
 ## Book
-`BRIDGE PILOT LAB` (synthetic), loaded alone, in a sitting of its own. `LAB-COMMON.md` in this folder (v3, byte-equal to row 2346-MN's) applies in full. Where it and this sheet differ, the stricter one holds, except for the one exception step 4 names.
+`BRIDGE PILOT LAB` (synthetic), loaded alone, in a sitting of its own. `LAB-COMMON.md` in this folder (v3, byte-equal to row 2346-MN's) applies in full. Where it and this sheet differ, the stricter one holds, except for two exceptions: the screenshot's place in step 4, and the send line (below).
 
 - **The book is pinned by GUID.** `count22.py` holds BRIDGE PILOT LAB's GUID as `BOOK`. Its M kind prints whether the COMPANY row's GUID is the book's. `--before-write` and `--same-row` STOP on any other GUID, whatever the company is called. STOP before anything is sent unless s1's COMPANY row is the book's.
 - **Its state:** row 2346-MN's restore left the marks at ALTVCHID 68 and ALTMSTID 245, and every row since has ended with a restore. Other marks at s1: stop before BK, with nothing sent.
@@ -52,7 +52,8 @@ So N1 here is row 2346-MN's step 6 again, with a new key. Its new evidence is th
   - a collection answer with no `BODY/DATA/COLLECTION`, an import answer with no counters, or an answer that does not parse (`count22.py`, which prints STOP and exits non-zero).
 - Check each file's sha256 against `SHA256.txt` before its send.
 - Count every answer with `count22.py`, and copy its whole output into RESULTS.md.
-- Close every other Bridge process first.
+- Leave any Bridge process on the lab PC running (C2: nothing in an item ends a process), and send nothing through it.
+- **The send line is the second exception.** `run.py` and `timed.py` send with row 2346-MN's line (`curl.exe -sS --fail-with-body`, the header `Content-Type: text/xml; charset=utf-16`), not C3's (`-w "%{http_code} %{size_download}"` and `-D <headers file>`). So neither script checks the status 200 or the size against CONTENT-LENGTH: `--fail-with-body` fails on a status of 400 or above, and the count stops on an answer that does not parse. Rows 2346-MN and 2162-S2 ran this line. It needs the run coordinator's yes before the sitting, recorded in RESULTS.md's deviations.
 
 ## Files
 **Byte-equal to row 2346-MN's file of the same name** (`lab/2346-mn-sheet` at cec5d5a8, folder `lab/2346-mn/`), whose ROW.md says where each came from:
@@ -62,7 +63,7 @@ So N1 here is row 2346-MN's step 6 again, with a new key. Its new evidence is th
 - `V-CN.xml`, every native field of the vouchers numbered `CN/26-27/0001` (sha256 `f113b399`);
 - `template-I-MC1.utf16le.xml` is row 2346-MN's `I-MC1.xml` (sha256 `bcec0c46`), renamed so it is never sent. It was sent once in row 2346-MN.
 
-**Byte-equal to row 2162-M1's file** (`lab/2162-m1-sheet` at eaf2a4fc): `W-08s.xml` is its `A-Y0-2026-08.xml`, the build's number read of August 2026 on this book (sha256 `b226ad52`). A test on master (`src-tauri/src/agent_import_tests.rs:2833`) pins that the build renders it byte for byte.
+**Byte-equal to row 2162-M1's file** (`lab/2162-m1-sheet` at eaf2a4fc): `W-08s.xml` is its `A-Y0-2026-08.xml`, the build's number read of August 2026 on this book (sha256 `b226ad52`). A test on master (`the_lab_month_reads_are_the_sent_ones_and_the_derived_august_drops_one_row`, `src-tauri/src/agent_import_tests.rs:2909`) checks that the build renders it byte for byte, against the sha256 `lab_number_months()` pins for August (`:2833`).
 
 **`gen.py`** writes each request below, with only the change it names, each asserted to occur exactly as often as expected. Each template's sha256 is checked first. The import is parsed, and its type, its one number, its `REFERENCE` and `REFERENCEDATE`, its six legs, its party's side and the balance of its legs are asserted. Run twice, it writes the same bytes.
 
@@ -77,27 +78,41 @@ The two `COMPUTE` lines are the element names and the form `src-tauri/src/agent_
 
 The note's party, figures, date (1 Aug 2026), `REFERENCE` (`BP/26-27/0010`, a Sales invoice the book holds, dated 1 Aug 2026) and legs are row 2346-MN's, unchanged. The party is `BRIDGE Walk-in`, which is not bill-wise, so the note carries no bill allocation.
 
-**`timed.py`** sends the import once, then R at once, at +5 s and at +60 s, each counted from the moment curl returned the import's answer. It is row 2162-S2's `run.py` (`lab/2162-s2-sheet` at a0d4c53b), with row 2346-MN's send line and stops. A stop on the import ends the run, and the reads are not sent. It writes `times-<label>.txt` and `log-<label>.txt`. With `--pause`, it waits for Enter after the import's answer and counts the three reads from that Enter. This row does not use it (step 4).
-- Tried once, against a stand-in for `curl.exe` that answers the import with one counter and each read with its own request: the three reads were sent at +0.001 s, +5.010 s and +60.001 s.
+**`timed.py`** sends the import once, then R at once, at +5 s and at +60 s, each counted from the moment curl returned the import's answer. It is row 2162-S2's `run.py` (`lab/2162-s2-sheet` at a0d4c53b), with row 2346-MN's send line and stops.
+- A stop on the import ends the run, and the reads are not sent.
+- **The import's answer is judged by C4 before any read:** every counter present once, `CREATED` 1, `ALTERED`, `DELETED`, `COMBINED`, `IGNORED`, `ERRORS`, `CANCELLED` and `EXCEPTIONS` 0, and no `LINEERROR`. Anything else stops it with the counters printed, and no read is sent.
+- **It runs once.** It refuses to start, and sends nothing, if this label's import answer or log is already in the folder.
+- **The +60 s read waits for the screenshot.** After the +5 s read it asks for Enter, pressed once the window's screenshot is taken and shows no dialog. The +60 s read goes at +60 s, or at the Enter if that is later, and the Enter's time goes into the times file.
+- It rewrites `times-<label>.txt` after every send, and keeps it on Ctrl+C. It writes `log-<label>.txt`.
+- With `--pause`, it waits for Enter after the import's answer and counts the three reads from that Enter, with no later wait. This row does not use it (step 4).
+- Tried on 11 Nov 2026 against a stand-in for `curl.exe` that answers the import with row 2346-MN's captured import answer (`a-s6-I-MC1.xml` at 7b4b9ce5) and each read with its own request:
+  - clean, with Enter given: the reads were sent at +0.001 s, +5.001 s and +60.001 s, and the Enter's line was written;
+  - that answer with `CREATED` 0 and `EXCEPTIONS` 1, with a `LINEERROR` added, or with `IGNORED` removed: each stopped after the import, with no read sent;
+  - a second run in the same folder: refused, nothing sent;
+  - SIGINT, and no Enter to read, at the prompt: stopped with the two reads sent, and the times file held both and the interrupt.
 
-**`count22.py`** is row 2346-MN's `count21.py` with two changes, each marked N134.
+**`count22.py`** is row 2346-MN's `count21.py` with two changes, each marked N134. Its header also says that count21's header below it is kept as it was.
 - **W** (the build's month read) prints every child of the row whose tag begins `BRIDGEVCHIS`, in place of `BRIDGEVCHISSALES` alone, and then how many rows hold none. A row with none prints "class element absent". Tally omits the element of a function it does not answer, so that is a result of the read, never No and never 0 rows. `--guid` prints the same way.
-- **`--w-diff A B`**, on two W answers of the same `COMPUTE`: each answer's row count, then, by GUID, each row in one answer only and each row whose printed fields differ, at most 300 lines. A GUID on two rows of one answer stops.
+- **`--w-diff A B`**, on two W answers of the same `COMPUTE`: each answer's row count, then, by GUID, each row in one answer only and each row whose printed fields differ, at most 300 such rows. Its last line is always `rows in one only or differing: <n>`. A GUID on two rows of one answer stops, and so does an answer with no VOUCHER row: August holds rows, so an empty answer is a read that failed, never a match.
 - Tried once, each exit 0:
   - W on row 2162-M1's `a-a05a-A-Y0-2026-08.xml`: 40 rows, 0 with no class element.
   - W on a scratch copy of it with the element renamed to the credit class and one row's element removed: 1 "class element absent". That copy is not committed.
   - `--w-diff` of that answer with itself: 0 rows in one only or differing. `--guid` for `BP/26-27/0010`'s GUID: 1 row.
+  - `--w-diff` of that answer against a copy with its `COLLECTION` emptied: STOP, exit 1.
 
 `SHA256.txt` lists every file with its size. Requests are UTF-16LE with a BOM, as sent.
 
 ## Steps
-Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python3 -I count22.py a-<label>-*`. A STOP from any script stops the row there, and the row goes to step 6.
+Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python3 -I count22.py a-<label>-*`.
+
+**A STOP**, from any script or any line below, stops the row there, by C8: nothing further is sent, keyed, backed up or restored, and the run coordinator is told at once.
+- Say what the book then holds: before step 3, nothing was changed; from step 3, whether the type was keyed; from step 4, whether the import was sent.
+- Step 6's restore after a STOP is made only on the run coordinator's word (C8). A STOP before step 3 needs no restore.
+- Steps 3 and 4 also name results that are not STOPs ("go to step 6"); those go on to step 6 without a word.
 
 **The prompt rule, at every step.** The only prompts answered are C5's and C6's, each with the key named, and the voucher type screen's own save as step 3 says.
-- For any other prompt, message or dialog: copy it word for word and screenshot it first.
-- Then answer No, or Esc if it offers no No. Press nothing more and send nothing.
-- Then restore BK by C6, compare as step 6, and close (C10).
-- That prompt is this row's result.
+- Any other prompt, message or dialog is C7's: screenshot it and copy it word for word. Press NO key and send NO request while it is up. Report it at once; it stays on the screen until the run coordinator answers.
+- That prompt is this row's result, and a STOP.
 
 1. **Load, check and back up.** Step 0 of C2, with no company loaded. Load BRIDGE PILOT LAB alone from Select Company (C1). Any prompt: stop, press nothing, and ask.
    - Read the Gateway's current date and period, and write them down. Before 1-Aug-2026: stop.
@@ -106,7 +121,9 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
 2. **Before anything is keyed.** `s2`: `T-types.xml V-CN.xml R-MC1.xml R-NCa.xml W-08s.xml W-08c.xml W-08d.xml M-marks.xml`.
    - EXPECT T 28 rows, `BRIDGE Credit Note Manual` 0 rows, and neither predicted GUID held. EXPECT T's sha256 equal to row 2346-MN's s2 and s13 T answers.
    - EXPECT V-CN, R-MC1 and R-NCa 0 rows each.
-   - **W-08s:** EXPECT 40 rows, each with its class element, as row 2162-M1's a05a answer. Run `count22.py --w-diff` against that answer, copied in from `lab/2162-m1-answers` at 1f250b86 as `a-m1-W-08s.xml`, and EXPECT 0 lines.
+   - **M-marks:** EXPECT ALTVCHID 68 and ALTMSTID 245, as s1.
+   - **W-08s:** EXPECT 40 rows, each with its class element, as row 2162-M1's a05a answer. Run `count22.py --w-diff` against that answer, copied in from `lab/2162-m1-answers` at 1f250b86 as `a-m1-W-08s.xml`, and EXPECT its last line to read `rows in one only or differing: 0`.
+   - A W answer with no row: STOP. The read failed; August holds 40.
    - **W-08c and W-08d:** EXPECT the same 40 rows, every one answering No to its class, and 0 with no class element.
    - A row in V-CN, the type name already held, or a predicted GUID already held: stop before step 3, with each recorded whole.
    - A W row with no class element, or a note class answering Yes: a result, not a stop. Record it whole. Steps 3 and 4 still run, and step 5 is judged against s2.
@@ -124,12 +141,13 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
    - **A series that does not read Manual and Yes is a result:** send no note, and go to step 6.
    - **The type's GUID** decides R for steps 4 and 5: `R-MC1.xml` for `000000e8`, `R-NCa.xml` for `000000ea`, and `V-CN.xml` for any other.
 4. **Create the note, and read it back at once, at +5 s and at +60 s (N1, N4).**
-   - `s4m`: `M-marks.xml`, then `count22.py --before-write a-s1-M-marks.xml a-s4m-M-marks.xml`. Only if that passes, and no key was pressed in Tally since, go on.
-   - **This step is the one exception to C3** ("after every write ... take a screenshot of the whole Tally window BEFORE the next request"). The reads at once and at +5 s are the measurement, so they go before the screenshot. The screenshot is taken while `timed.py` waits for its +60 s read, and before that read.
+   - `s4m`: `M-marks.xml`, then `count22.py --before-write a-s1-M-marks.xml a-s4m-M-marks.xml`. EXPECT ALTVCHID 68 and ALTMSTID 247, as s3r. Only if that passes, the marks are those, and no key was pressed in Tally since, go on.
+   - **This step is the one exception to C3's screenshot** ("after every write ... take a screenshot of the whole Tally window BEFORE the next request"). The reads at once and at +5 s are the measurement, so they go before the screenshot. The +60 s read goes only after it.
      - **Granted:** the run coordinator said yes to this exception on 11 Nov 2026, before any write ("coordinator's yes, 11 Nov"). Record it in RESULTS.md's deviations in those words.
-     - Run `python3 -I timed.py <gateway URL> s4 I-NC1.xml <R>`, and take the screenshot straight after its +5 s read returns.
+     - Run `python3 -I timed.py <gateway URL> s4 I-NC1.xml <R>` once. When it asks for Enter after its +5 s read, take the screenshot straight away, and press Enter only if it shows no dialog. The +60 s read is sent then, or at +60 s if that is later.
+     - `timed.py` is run once in this row: it refuses a second run. Any later read goes through `run.py`.
      - `--pause` is not used in this row. It stays in `timed.py` for a row without this yes: it waits for Enter after the import, so the screenshot comes before the first read.
-     - **A dialog in the screenshot:** the prompt rule. Stop `timed.py` with Ctrl+C if it has not sent its +60 s read, and record which reads were sent while the dialog was up.
+     - **A dialog in the screenshot:** press Ctrl+C in the window `timed.py` runs in, not Enter, then the prompt rule. The +60 s read is not sent. `times-s4.txt` keeps every send made, and the record says the two reads were sent before the screenshot showed the dialog.
    - **The wait rule.** If 5 minutes pass after the import's send with no answer and no message: send nothing, press nothing, screenshot the whole window, and report to the run coordinator. A read sent while Tally is busy can hold its gateway.
    - Record the import's every counter and any LINEERROR, word for word, and `times-s4.txt` whole.
    - EXPECT `CREATED` 1, `ERRORS` 0, `EXCEPTIONS` 0, `LASTVCHID` 45 (row 2346-MN's s6).
@@ -141,8 +159,9 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
    - **N4.** Run `count22.py --diff a-s4t00-<R> a-s4t60-<R>` and `--diff a-s4t05-<R> a-s4t60-<R>`, and record each answer's sha256. EXPECT the three byte-equal, each reading `VCHGSTSTATUSISINCLUDED` Yes, `VCHGSTSTATUSISUNCERTAIN` No, `VCHGSTSTATUSISEXCLUDED` No, `ISPOSTDATED` No, `ISCANCELLED` No and `ISOPTIONAL` No. Row 2346-CD's note read as included.
    - **An empty first read** means the filter did not find the note. Record the number and type the later reads and V-CN show. That is not a finding about the timing.
    - `s4r`: `V-CN.xml M-marks.xml`. EXPECT V-CN one row with the same number and type, `MASTERID` 45 and `REFERENCE` `BP/26-27/0010`.
-   - **A decline is a result:** record its counters and every LINEERROR, send nothing more, and go to step 6.
-5. **The month read with each class (N3), read only.** `s5`: `W-08s.xml W-08c.xml W-08d.xml`. Then `count22.py --w-diff a-s2-W-08<x>.xml a-s5-W-08<x>.xml` for each of s, c and d, and `count22.py --guid <the note's GUID> a-s5-W-08s.xml a-s5-W-08c.xml a-s5-W-08d.xml`. EXPECT:
+   - **A decline is a result:** `timed.py` stops after the import without a read when the counters are not CREATED 1 and the rest 0, or a LINEERROR is present. Record its counters and every LINEERROR, send nothing more, and go to step 6.
+   - **If R is `V-CN.xml`** (the type took neither predicted GUID): its answer holds no legs and no `ISPOSTDATED`, `ISCANCELLED` or `ISOPTIONAL`, so N1's legs and N4's flags are recorded as not judged.
+5. **The month read with each class (N3), read only.** `s5`: `W-08s.xml W-08c.xml W-08d.xml`. Then `count22.py --w-diff a-s2-W-08<x>.xml a-s5-W-08<x>.xml` for each of s, c and d, and `count22.py --guid <the note's GUID> a-s5-W-08s.xml a-s5-W-08c.xml a-s5-W-08d.xml`, with the GUID written whole: `6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d`, or the GUID s4's read-back gave if it differs. EXPECT:
 
    | Read | Rows | `--w-diff` against s2 | The note's row |
    | --- | --- | --- | --- |
@@ -150,7 +169,7 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
    | W-08c | 41 | the same one row | `BRIDGEVCHISCREDITNOTE` Yes |
    | W-08d | 41 | the same one row | `BRIDGEVCHISDEBITNOTE` No |
 
-   - In each, every other row reads as at s2, so `--w-diff` prints no other line.
+   - In each, every other row reads as at s2, so `--w-diff` prints no other row, and its last line reads `rows in one only or differing: 1`.
    - Record every line whole. A row with no class element, or a class that is not Yes or No, is a result, not a stop.
    - If W-08s's 40 earlier rows do not read as at s2, record it: the read itself moved in this sitting, and nothing in step 5 is judged.
 6. **Restore** BK by C6, with `restore-plan.txt` written first. Row 2346-MN's step 13 is the path:
@@ -162,7 +181,7 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
    Then `s6`: `M-marks.xml T-types.xml V-CN.xml W-08s.xml`, and compare:
    - `count22.py --same-row a-s1-M-marks.xml a-s6-M-marks.xml`: EXPECT it passes.
    - T: EXPECT its sha256 equal to s2's, and `BRIDGE Credit Note Manual` 0 rows.
-   - V-CN: 0 rows. W-08s: `--w-diff` against s2 prints 0 lines, and its sha256 equals s2's.
+   - V-CN: 0 rows. W-08s: `--w-diff` against s2 ends `rows in one only or differing: 0`, and its sha256 equals s2's.
    - **Any of these not equal stops the sitting:** send nothing more, and report before the close. The book is then not as it was, and the run coordinator decides.
 7. **Close** by C10. One tally.exe owns 9001.
 
@@ -175,7 +194,7 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
 The answers are read twice. The second reading is done by someone who did not run the sitting and did not write this sheet. They work only from the pushed answers branch, before any result is posted on #2346:
 1. Check each answer's sha256 and size against the notes.
 2. Run `count22.py` again on every answer, and each `--diff`, `--w-diff`, `--guid`, `--type-diff`, `--before-write` and `--same-row` line the steps name. Compare each output with RESULTS.md line by line.
-3. From `times-s4.txt`, check that the first read was sent within 1 s of the import's answer, the second at 5 s or later and the third at 60 s or later. Check that the screenshot's time falls between the second read's return and the third read's send.
+3. From `times-s4.txt`, check that the first read was sent within 1 s of the import's answer, the second at 5 s or later and the third at 60 s or later. Check that its Enter line falls after the second read's return and before the third read's send, and that the screenshot's time is before the Enter.
 4. Check each EXPECT line against the answers, not against RESULTS.md's wording.
 
 They write `READER.md` on the answers branch, with each check, whether it held, and every line that differs. A result is reported only once `READER.md` says every check held, or names each difference and how RESULTS.md answers it.
@@ -220,8 +239,8 @@ Each is PARTIAL: one sitting, one book, one release.
 ## Code admits the trigger
 Lines are at master 7a3c9e49.
 - **The build has no note type.** `VoucherType` (`src-tauri/src/agent_import.rs:331`) has Payment, Receipt, Journal, Contra and Sales. So no build sends a note, and this row sends it raw.
-- **The flag the build reads.** `resolve_voucher_type` (`src-tauri/src/agent_import_invoice_wire.rs:334`) refuses a type whose one series is not Manual with prevent-duplicates Yes (`:396`). T is its request, byte-equal.
-- **The month read.** `render_invoice_window_numbers_request` (`:467`) computes `BRIDGEVCHISSALES` from `$$IsSales` (`:480`). The build sends it for each month of the invoice's year (`src-tauri/src/agent_import_invoice.rs:2223`, `:2273`), and again after a post (`:1821`). W-08s is that request for August 2026. W-08c and W-08d change only its `COMPUTE`.
+- **The flag the build reads.** `resolve_voucher_type` (`src-tauri/src/agent_import_invoice_wire.rs:334`) refuses a type whose one series is not Manual with prevent-duplicates Yes (the match at `:390` to `:398`). T is its request, byte-equal.
+- **The month read.** `render_invoice_window_numbers_request` (`:467`) computes `BRIDGEVCHISSALES` from `$$IsSales` (`:480`). The build sends it for each month of the invoice's year (`src-tauri/src/agent_import_invoice.rs:2223`), for the month of the number's control invoice when that is dated outside the year (`:2273`), and again for each month after a post (`:1821`). W-08s is that request for August 2026. W-08c and W-08d change only its `COMPUTE`.
 - **The read-back.** R-MC1 and R-NCa are the build's read-back (`render_invoice_readback_request`, `agent_import_invoice_wire.rs:701`), with the number and the type's GUID as the build would fill them from the batch and the resolved type. The post's verification sends it straight after the import (`verify_import_after_current_dispatch`, `src-tauri/src/agent_import.rs:2469`, calling `read_back_sales_invoice` at `:2694`), after the marks, masters and window reads, with no wait in between.
 
 ## Not established after this row

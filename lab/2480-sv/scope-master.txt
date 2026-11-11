@@ -1,0 +1,11 @@
+pl	0281	BRIDGE Mx Plain	ADMITTED
+ka	0292	BRIDGE Sk Ak Am	ADMITTED
+kb	0293	BRIDGE Sk Ak, Am	REFUSED ledger_scope_name_character
+ra	0294	BRIDGE Sk Bk, Bm	REFUSED ledger_scope_name_character
+rb	0295	BRIDGE Sk Bk Bm	ADMITTED
+qa	0296	BRIDGE Sk Ck Cm	ADMITTED
+qb	0297	BRIDGE Sk Ck' Cm	REFUSED ledger_scope_name_character
+ua	0298	BRIDGE Sk Dk Dm	ADMITTED
+ub	0299	BRIDGE Sk Dk_Dm	REFUSED ledger_scope_name_character
+ea	0300	BRIDGE Sk EkEm	ADMITTED
+eb	0301	BRIDGE Sk Ek Em	ADMITTED

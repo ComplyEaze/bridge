@@ -1,0 +1,130 @@
+# sv.py tried before this sheet was sent (ROW.md, Files). Inputs: row 2480-SC's answers (lab/2480-sc-answers at f8cd7d14),
+# copied out by name, and three copies of SC's k8 made by hand from it:
+#   x-before-noqa.xml  k8 with the one VOUCHER element numbered BP/26-27/0296 (qa's invoice) taken out (wx.py: VOUCHERS 16)
+#   x-before-noka.xml  k8 with the one VOUCHER element numbered BP/26-27/0292 (ka's invoice) taken out (wx.py: VOUCHERS 16)
+#   x-after-shifted.xml  k8 with qa's invoice's one LEDGERNAME of qa's name turned into qb's (wx.py: VOUCHERS 17): the shifted copy, which must fail
+# The copy of sv.py marked (copy) differs from sv.py only in NEW_NUMBER: qa 0296 and kb 0292 in place of 0303 and 0308, so that SC's own invoices stand for this row's
+# new vouchers. Each line is the command, the output whole, and the script's own exit code.
+
+$ python3 -I wx.py a-k8-Vb-book.xml
+a-k8-Vb-book.xml: ANSWER: VOUCHERS 17
+  BP/26-27/0001 DATE 20260801 ALTERID 2 entries 4
+  BP/26-27/0002 DATE 20260801 ALTERID 11 entries 4
+  BP/26-27/0003 DATE 20260801 ALTERID 50 entries 4
+  BP/26-27/0004 DATE 20260801 ALTERID 13 entries 5
+  BP/26-27/0005 DATE 20260801 ALTERID 54 entries 5
+  BP/26-27/0006 DATE 20260801 ALTERID 48 entries 4
+  BP/26-27/0007 DATE 20260801 ALTERID 8 entries 5
+  BP/26-27/0008 DATE 20260801 ALTERID 9 entries 5
+  BP/26-27/0009 DATE 20260801 ALTERID 10 entries 7
+  BP/26-27/0011 DATE 20260801 ALTERID 16 entries 4
+  BP/26-27/0010 DATE 20260801 ALTERID 17 entries 6
+  BP/26-27/0281 DATE 20260801 ALTERID 69 entries 6
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0297 DATE 20260801 ALTERID 72 entries 6
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0299 DATE 20260801 ALTERID 74 entries 6
+exit 0
+$ python3 -I wx.py x-before-noqa.xml
+x-before-noqa.xml: ANSWER: VOUCHERS 16
+  BP/26-27/0001 DATE 20260801 ALTERID 2 entries 4
+  BP/26-27/0002 DATE 20260801 ALTERID 11 entries 4
+  BP/26-27/0003 DATE 20260801 ALTERID 50 entries 4
+  BP/26-27/0004 DATE 20260801 ALTERID 13 entries 5
+  BP/26-27/0005 DATE 20260801 ALTERID 54 entries 5
+  BP/26-27/0006 DATE 20260801 ALTERID 48 entries 4
+  BP/26-27/0007 DATE 20260801 ALTERID 8 entries 5
+  BP/26-27/0008 DATE 20260801 ALTERID 9 entries 5
+  BP/26-27/0009 DATE 20260801 ALTERID 10 entries 7
+  BP/26-27/0011 DATE 20260801 ALTERID 16 entries 4
+  BP/26-27/0010 DATE 20260801 ALTERID 17 entries 6
+  BP/26-27/0281 DATE 20260801 ALTERID 69 entries 6
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0297 DATE 20260801 ALTERID 72 entries 6
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0299 DATE 20260801 ALTERID 74 entries 6
+exit 0
+$ python3 -I wx.py x-before-noka.xml
+x-before-noka.xml: ANSWER: VOUCHERS 16
+  BP/26-27/0001 DATE 20260801 ALTERID 2 entries 4
+  BP/26-27/0002 DATE 20260801 ALTERID 11 entries 4
+  BP/26-27/0003 DATE 20260801 ALTERID 50 entries 4
+  BP/26-27/0004 DATE 20260801 ALTERID 13 entries 5
+  BP/26-27/0005 DATE 20260801 ALTERID 54 entries 5
+  BP/26-27/0006 DATE 20260801 ALTERID 48 entries 4
+  BP/26-27/0007 DATE 20260801 ALTERID 8 entries 5
+  BP/26-27/0008 DATE 20260801 ALTERID 9 entries 5
+  BP/26-27/0009 DATE 20260801 ALTERID 10 entries 7
+  BP/26-27/0011 DATE 20260801 ALTERID 16 entries 4
+  BP/26-27/0010 DATE 20260801 ALTERID 17 entries 6
+  BP/26-27/0281 DATE 20260801 ALTERID 69 entries 6
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0297 DATE 20260801 ALTERID 72 entries 6
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0299 DATE 20260801 ALTERID 74 entries 6
+exit 0
+$ python3 -I wx.py x-after-shifted.xml
+x-after-shifted.xml: ANSWER: VOUCHERS 17
+  BP/26-27/0001 DATE 20260801 ALTERID 2 entries 4
+  BP/26-27/0002 DATE 20260801 ALTERID 11 entries 4
+  BP/26-27/0003 DATE 20260801 ALTERID 50 entries 4
+  BP/26-27/0004 DATE 20260801 ALTERID 13 entries 5
+  BP/26-27/0005 DATE 20260801 ALTERID 54 entries 5
+  BP/26-27/0006 DATE 20260801 ALTERID 48 entries 4
+  BP/26-27/0007 DATE 20260801 ALTERID 8 entries 5
+  BP/26-27/0008 DATE 20260801 ALTERID 9 entries 5
+  BP/26-27/0009 DATE 20260801 ALTERID 10 entries 7
+  BP/26-27/0011 DATE 20260801 ALTERID 16 entries 4
+  BP/26-27/0010 DATE 20260801 ALTERID 17 entries 6
+  BP/26-27/0281 DATE 20260801 ALTERID 69 entries 6
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0297 DATE 20260801 ALTERID 72 entries 6
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0299 DATE 20260801 ALTERID 74 entries 6
+exit 0
+$ python3 -I sv.py --landed qa a-k8-Vb-book.xml a-k8-Vb-book.xml
+LANDED qa: NO NEW VOUCHER
+VERDICT qa: NOT JUDGED
+exit 3
+$ python3 -I sv.py(copy) --landed qa x-before-noqa.xml a-k8-Vb-book.xml
+LANDED qa: ON qa
+VERDICT qa: ON ITS LEDGER
+exit 0
+$ python3 -I sv.py(copy) --landed kb x-before-noka.xml a-k8-Vb-book.xml
+LANDED kb: ON ka
+VERDICT kb: ON ITS LEDGER
+exit 0
+$ python3 -I sv.py(copy) --landed qa x-before-noqa.xml x-after-shifted.xml
+LANDED qa: ON qb
+VERDICT qa: ON ITS SIBLING
+exit 3
+$ python3 -I sv.py(copy) --landed qa a-k8-Vb-book.xml x-after-shifted.xml
+LANDED qa: BOOK CHANGED
+VERDICT qa: NOT JUDGED
+exit 3
+$ python3 -I sv.py --judge2 qa movement a-q6a-Vm-v-qa.xml a-k8-Vb-book.xml
+JUDGE2 qa movement: OWN 1 OF 1, OTHERS 0
+exit 0
+$ python3 -I sv.py --judge2 qa census a-c6a-C-v-qa.xml a-k8-Vb-book.xml
+JUDGE2 qa census: OWN 1 OF 1, OTHERS 0
+exit 0
+$ python3 -I sv.py --judge2 qa window a-w6a-Vw-v-qa.xml a-k8-Vb-book.xml
+JUDGE2 qa window: OWN 1 OF 1, OTHERS 0
+exit 0
+$ python3 -I sv.py --judge2 kb outstandings a-b8a-L-lo-kb-20260801.xml a-k8-Vb-book.xml
+JUDGE2 kb outstandings: OWN 1 OF 1, OTHERS 0
+exit 0
+$ python3 -I sv.py --judge2 kb census a-b9a-C-v-kb.xml a-k8-Vb-book.xml
+JUDGE2 kb census: OWN 1 OF 1, OTHERS 0
+exit 0
+$ python3 -I sv.py --judge2 kb movement a-b10a-Vm-v-kb.xml a-k8-Vb-book.xml
+JUDGE2 kb movement: OWN 1 OF 1, OTHERS 0
+exit 0
+$ python3 -I sv.py --judge2 qa movement a-q7a-Vm-v-qb.xml a-k8-Vb-book.xml
+JUDGE2 qa movement: OWN 0 OF 1, OTHERS 1
+exit 3
+$ python3 -I sv.py --judge2 qa movement a-q6a-Vm-v-qa.xml x-after-shifted.xml
+JUDGE2 qa movement: OWN 0 OF 0, OTHERS 1
+exit 3

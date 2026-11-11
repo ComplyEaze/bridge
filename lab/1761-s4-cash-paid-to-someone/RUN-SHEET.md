@@ -39,7 +39,7 @@ Run it as the lab runs a staged exe over stdio, ONE launch from step 0 to the cl
 
 No other ComplyEaze Bridge may make a call against port 9001 during the row. Record the process list at step 0.
 
-**THE APPROVAL WINDOW** opens from the exe's own process and may open behind other windows (look for it on the taskbar). While it is open nobody presses a key on the PC and no tool is called, except step 4's own repeat `post_import`. [OWNER] answers it by mouse, within its time. Record the time it was seen open and the time it was answered.
+**THE APPROVAL WINDOW** opens from the exe's own process. On this build it is opened topmost and system-modal (#2107, #2193); if it is not seen in front, look for it on the taskbar and record where it was. While it is open nobody presses a key on the PC and no tool is called, except step 4's own repeat `post_import`. [OWNER] answers it by mouse, within its time. Record the time it was seen open and the time it was answered.
 
 **Marks.** MARKS means `ledger_masters`, first page, no `snapshot_id`:
 - M = `snapshot.master_alter_id`;
@@ -79,7 +79,7 @@ Take a screenshot of each ledger's screen before its accept. BRIDGE Contractor A
    Either missing = STOP (not this build, or posting is off).
 3. `list_companies`: EXPECT exactly THE COMPANY. Record its GUID; every later call passes it as `company_guid`. Anything else = STOP.
 4. MARKS: M0, V0.
-5. `masters` with `kind` `voucher_types`: record the Payment and Contra rows whole. EXPECT each to read `series_numbering.observation` `observed` and `series_numbering.method` `automatic`; otherwise STOP before anything changes.
+5. `masters` with `kind` `voucher_types`: record the Payment and Contra rows whole. EXPECT each to read `series_numbering.observation` `observed`, `series_numbering.method` `automatic` and `series_numbering.sub_method` `auto_retain`; otherwise STOP before anything changes. `post_import` refuses any other sub-method before its window (`import_voucher_numbering_not_retain`), so step 4 would test nothing.
 6. Backup BK1 (C5) into a NEW empty folder `C:\bridge-lab\1761-s4\backups\BK1\`: record the name, size and sha256. Then MARKS: M0b, V0b.
 
 The book: the masters only.

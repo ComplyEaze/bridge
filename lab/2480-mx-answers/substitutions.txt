@@ -34,7 +34,7 @@ evidence/lr-r8a.out: original 471 B sha256 aa38855bc71d6ac2a27b05d14d8c93fb19616
 evidence/lr-r8b.out: original 471 B sha256 5af8846467037c2551ea682199651e37d80e15642c78f47e759c37acc08833a4 (kept on the lab PC); 1 x -> <LAB_DIR>
 evidence/lr-r9a.out: original 471 B sha256 103159b9f8135a4aeae6688caaa5c18adc521e2c9ef5aa640a4a797fede2d34c (kept on the lab PC); 1 x -> <LAB_DIR>
 evidence/lr-r9b.out: original 471 B sha256 7d6774e9a451306627adb20e8e71367072089548028856bdb0fb42f2ede11564 (kept on the lab PC); 1 x -> <LAB_DIR>
-evidence/notes.txt: original 13834 B sha256 418485927d2ea23e460aa31816183f0a42958cea412d8f74d5d477dce953c638 (kept on the lab PC); 2 x -> <the before-write option>; 1 x -> <the before option>; 12 x -> stop
+evidence/notes.txt: original 14237 B sha256 395ed8a5535e2ea32bd02ebc710908e7a82e5591312fc1b133678897184b5673 (kept on the lab PC); 2 x -> <the before-write option>; 1 x -> <the before option>; 12 x -> stop
 evidence/run-k8.out: original 207 B sha256 41fa910abf8794f449d94fb414942ab52cf8fb7c077f7c3191343e1c213ce60f (kept on the lab PC); 1 x -> stop
 evidence/send-k0.out: original 294 B sha256 2029d7bf2a581445571473667a6bd1ff0a017abc89b616a6a3f2da56d76b98a6 (kept on the lab PC); 1 x -> <LAB_DIR>
 evidence/send-k1.out: original 198 B sha256 719e26751c6594ad900e33cadcc54756826d55d700d82296efa4bc88537052d5 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop

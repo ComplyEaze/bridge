@@ -1,4 +1,4 @@
-label, files, wall seconds from send.sh's send line to its end line (one run.py call per label; a label of several files is their sum). For a label marked [capture], the window capture after run.py's return is inside the figure, so the read itself took less; labels without one show the read alone, with python's start.
+Row 2480-MX. label, files, wall seconds from send.sh's send line to its end line (one run.py call per label; a label of several files is their sum). For a label marked [capture], the window capture after run.py's return is inside the figure, so the read itself took less; labels without one show the read alone, with python's start.
 s1	M-marks.xml	0.583 s, from the send line to run.py's return (answered)
 s2	N-0281.xml N-0282.xml N-0283.xml N-0284.xml N-0285.xml N-0286.xml N-0287.xml N-0288.xml N-0289.xml N-0290.xml N-0291.xml B-bills.xml S-snap-20260401-20260801.xml M-marks.xml	2.775 s, from the send line to run.py's return (answered)
 p1	L-lo-pl-20260801.xml	5.026 s, from the send line to run.py's return (run.py exit 1) [capture]

@@ -1,6 +1,6 @@
 # #1761 slice 4, v3: a bank cash withdrawal paid to someone, posted and read back, on a book with one seed voucher
 
-Not for merge. One row, on the synthetic company BRIDGE CASHPAY LAB that row 1761-S4 made. `LAB-COMMON.md` in this folder (v3, byte-equal to the v1 sheet's copy) applies in full. Where this sheet and it differ, the stricter holds. THE COMPANY below is BRIDGE CASHPAY LAB. Record the TallyPrime version, the licence mode and the date.
+Not for merge. One row, on the synthetic company BRIDGE CASHPAY LAB that row 1761-S4 made. `LAB-COMMON.md` in this folder (the common file's own v3, not this sheet's; byte-equal to the v1 sheet's copy) applies in full. Where this sheet and it differ, the stricter holds. THE COMPANY below is BRIDGE CASHPAY LAB. Record the TallyPrime version, the licence mode and the date.
 
 **WHY.** Slice 4 of #1761 (#2407) builds a bank cash withdrawal answered `paid_to_someone` as two vouchers on its date:
 - a Contra, Dr the cash ledger, Cr the bank, carrying the statement row's id;
@@ -37,7 +37,12 @@ Beyond the book, this sitting differs from v1's in these, none of which the seed
 - **The seed's wording** follows the screen as item 91 found it:
   - the double-entry layout (To and By lines), not v2's single-entry "Account / Particulars";
   - an F2 field that may show a date other than the header's (item 91: `2-4-2025` in the field with the header at 1-Apr-25).
-- **An [OWNER]-at-PC hold before step 4.1.** Item 91 found that the approval window needs a computer-use grant for `bridge_mcp.exe` in this row's build folder, and only the owner can approve it, at the PC.
+- **An [OWNER]-at-PC gate before the seed, and a hold before step 4.1.** The lab's report of 11 Nov says the approval window needs a computer-use grant for `bridge_mcp.exe` in this row's build folder, and that only the owner can approve it, at the PC. That report is the source: v2's RESULTS.md does not hold it, since item 91 stopped before any approval window. Item 4 before the sitting is a gate: without the owner's commitment to be at the PC for step 4, step 0.7 does not start, so an absent owner costs reads only, not a keyed seed and a restore. The hold before step 4.1 stays, with a time limit, for an owner who is late.
+- **The seed's accept and dates**, from the lab's report of 11 Nov on keyed Journals on 7.2. Ctrl+A accepted one with no message, so v3 accepts by Ctrl+A and names an "Accept ?" prompt as a STOP. F2's field is prefilled with the day after the current date, and F2 moves Tally's current date to the date keyed, so v3 names the prefill and reads the Gateway's current date after the seed (step 0.7).
+- **Cost centres, read before the seed (step 0.5).** On a 7.2 book with cost centres on, a Journal debit opened "Cost Centre Allocations", prefilled by Tally, and the ledger screen there had no cost-centre field to turn it off (row 1231-CC, `lab/1231-cost-centre-keyed-allocation-answers`). BRIDGE Suspense is no shelter: it is not a revenue ledger, and that book's default Primary Cost Category read ALLOCATENONREVENUE Yes. Such a screen would stop the seed again. Whether this book has cost centres on has not been read. Row 1761-S4 created it with every feature field as filled except inventory and GST (its notes), and a new 7.2 company's feature screen offered Enable Cost Centres No (row 1231-CC's notes), so No is expected.
+  - Step 0.5 now reads it with the build's own `company_features`. That is not a new request: 0.6.0 sent it on the lab's 7.2 in row 1231-CC, where it read `yes` for a book whose F11 screen read Yes, and its request bytes have not changed since (#1880 and #2425 each state so).
+  - Its `no` has been compared with the screen on 7.1 books only (protocol reference §12a.18). On 7.2 a `no` is this sheet's best read before the seed, not a proof, so the extra-screen STOP at step 0.7 stays.
+  - `masters` with `kind` `cost_centres` is not the gate: a book whose setting reads No can still list centres (§12a.17), so a list does not say whether the voucher screen will ask.
 - The narration names v3, and the folders and the answers branch are v3's.
 
 **WRITES.**
@@ -71,7 +76,7 @@ Run it as the lab runs a staged exe over stdio, ONE launch from step 0 to the cl
 
 No other ComplyEaze Bridge may make a call against port 9001 during the row. Record the process list at step 0.
 
-**THE APPROVAL WINDOW** opens from the exe's own process. On this build it is opened topmost and system-modal (#2107, #2193); if it is not seen in front, look for it on the taskbar and record where it was. While it is open nobody presses a key on the PC and no tool is called, except step 4's own repeat `post_import`. [OWNER] answers it by mouse, within its time. Record the time it was seen open and the time it was answered. The window needs a computer-use grant for `bridge_mcp.exe` at its path in this row's build folder, and only [OWNER] can approve that grant, at the PC (item 91): see the hold before step 4.1.
+**THE APPROVAL WINDOW** opens from the exe's own process. On this build it is opened topmost and system-modal (#2107, #2193); if it is not seen in front, look for it on the taskbar and record where it was. While it is open nobody presses a key on the PC and no tool is called, except step 4's own repeat `post_import`. [OWNER] answers it by mouse, within its time. Record the time it was seen open and the time it was answered. The window needs a computer-use grant for `bridge_mcp.exe` at its path in this row's build folder, and only [OWNER] can approve that grant, at the PC (the lab's report of 11 Nov): see item 4 before the sitting, and the hold before step 4.1.
 
 **Marks.** MARKS means `ledger_masters`, first page, no `snapshot_id`:
 - M = `snapshot.master_alter_id`;
@@ -86,7 +91,7 @@ Record each answer whole.
 1. [OWNER] Tally is LICENSED on the lab PC. Educational mode anywhere on screen = STOP (C1).
 2. Check every file against `SHA256.txt` (Get-FileHash). Copy `statement.csv` to `C:\bridge-lab\1761-s4v3\statement.csv` and check that copy's sha256 before every parse; a different file = STOP. The file is byte-equal to v1's.
 3. `C:\bridge-lab\1761-s4v3\` is absent or empty before the row; anything in it = STOP.
-4. [OWNER] Go-ahead for this row. Record whether [OWNER] will be at the PC for step 4; the hold before step 4.1 decides.
+4. [OWNER] Go-ahead for this row. **A GATE:** the run coordinator records [OWNER]'s commitment to be at the lab PC for step 4 and to approve there the computer-use grant for `bridge_mcp.exe` at its path in this row's build folder (the approval window needs it: the lab's report of 11 Nov). Without that commitment, step 0.7 does not start. Steps 0.1 to 0.6 are reads and may run; nothing is keyed, and the sitting ends with the book as row 1761-S4 left it, with no restore. The hold before step 4.1 still applies.
 
 ## The company (row 1761-S4's, as it left it)
 BRIDGE CASHPAY LAB exists on the lab PC from row 1761-S4: books beginning 2025-04-01, no inventory, no GST, its masters keyed then, with BRIDGE Contractor A's "Maintain balances bill-by-bill" No. Masters are not keyed again. Exactly one company of this name, its data folder as row 1761-S4 recorded; anything else (none, two, or a second data folder of that name) = STOP, and reuse or overwrite nothing.
@@ -98,8 +103,10 @@ BRIDGE CASHPAY LAB exists on the lab PC from row 1761-S4: books beginning 2025-0
 | BRIDGE Bank B | Bank Accounts | none |
 | BRIDGE Contractor A | Sundry Creditors, "Maintain balances bill-by-bill" No | none |
 | BRIDGE Wages | Indirect Expenses | none |
-| BRIDGE Suspense | Suspense A/c | none |
+| BRIDGE Suspense | Suspense A/c; its bill-by-bill and cost-centre fields unrecorded | none |
 | BRIDGE Capital | Capital Account | 50,000.00 Cr |
+
+BRIDGE Suspense's bill-by-bill and cost-centre fields are not recorded: row 1761-S4's notes give its group only, and its screenshot stays on the lab PC. A sub-screen at the seed is a STOP (step 0.7).
 
 Do not change the Payment, Contra, Receipt or Journal voucher types.
 
@@ -113,16 +120,18 @@ Do not change the Payment, Contra, Receipt or Journal voucher types.
 3. `list_companies`: EXPECT exactly THE COMPANY, with the GUID row 1761-S4's RESULTS.md records for it. Record it; every later call passes it as `company_guid`. Anything else = STOP.
 4. MARKS: M0, V0. EXPECT M0 214 and V0 null, reused false: row 1761-S4's M0b and V0b, the book as that row left it. Anything else = STOP, and report the marks.
 5. `masters` with `kind` `voucher_types`: record the Payment and Contra rows whole. EXPECT each to read `series_numbering.observation` `observed`, `series_numbering.method` `automatic` and `series_numbering.sub_method` `auto_retain`; otherwise STOP before anything else changes, with the book still as row 1761-S4 left it. `post_import` refuses, before its window, a series that is not Automatic (`import_voucher_numbering_not_automatic`) or not Retain (`import_voucher_numbering_not_retain`), so step 4 would test nothing. Row 1761-S4 read all three fields on this book at its step 0 (PASS). This read touches masters only, so it comes before the seed.
+
+   Then `company_features`: record the answer whole. EXPECT `result.settings.cost_centres.value` `no`. `yes` = STOP before the seed: a Journal debit may open Cost Centre Allocations (row 1231-CC), and changing the setting is a variable this row does not have. `not_reported`, a refusal or any other answer = STOP. Either STOP leaves the book as row 1761-S4 left it. A `no` makes that screen unlikely, not impossible (WHAT CHANGED FROM v2), so step 0.7's extra-screen STOP stays.
 6. **The fallback, checked.** Hash row 1761-S4's BK1 (the WRITES list): EXPECT its folder to hold that one file, 24,241 B, with the sha256 that row's RESULTS.md records. Anything else = STOP before the seed: a wrong seed would then have no way back.
 7. **The seed, keyed** on Tally's screen with THE COMPANY loaded: a Journal voucher (Accounting Vouchers, F7).
-   - **Date:** record the date the voucher screen opened with. Press F2 (Change Voucher Date) and record what its field shows: it may differ from the header (item 91 saw `2-4-2025` with the header at 1-Apr-25). Whatever it shows, type `1-4-2025` and press Enter. EXPECT the header to read 1-Apr-25.
+   - **Date:** before F7, record the Gateway's current date. Record the date the voucher screen opened with. Press F2 (Change Voucher Date). Its field is prefilled by Tally: on a keyed Journal on 7.2, with the day after the current date (the lab's report of 11 Nov; item 91 saw `2-4-2025` with the header at 1-Apr-25). Record what it showed, type `1-4-2025` over it and press Enter. EXPECT the header to read 1-Apr-25. F2 also moves Tally's current date to the date keyed (the same report), which the Gateway read below checks.
    - **Lines:** in the layout the screen shows, and in the order it asks for them, without changing the mode. Debit BRIDGE Suspense 1,000.00 and credit BRIDGE Capital 1,000.00: in the double-entry layout item 91 saw, By BRIDGE Suspense (Dr) and To BRIDGE Capital (Cr); in a Dr/Cr layout, Dr and Cr. Record the layout and the order of the lines.
    - **Narration:** `seed for row 1761-S4 v3`.
-   - Take a screenshot of the voucher screen before its accept, showing the date, both ledgers, the amount and the narration. Accept it once. A prompt other than the voucher's own accept = C7, STOP. Then leave the voucher screen as C7 says and take a screenshot of the Gateway with THE COMPANY loaded and no dialog.
+   - Take a screenshot of the voucher screen before its accept, showing the date, both ledgers, the amount and the narration. Accept it once, by Ctrl+A: on 7.2 Ctrl+A accepted a keyed Journal with no message (the lab's report of 11 Nov). An "Accept ?" prompt, or any other prompt, = C7, STOP: press no key. Then leave the voucher screen as C7 says and take a screenshot of the Gateway with THE COMPANY loaded and no dialog. **EXPECT the Gateway's current date to read 1-Apr-2025**, the date keyed, as row 1761-S4's notes recorded it at the company's creation. Another date = STOP: record it, and change no date on screen.
 
-   Neither line is a bank or cash ledger, so the Bank Allocations sub-screen a bank line opens (item 91) is not expected. That screen, or any other sub-screen (an allocation of any kind, a bill, a cost centre), is an extra screen.
+   Neither line is a bank or cash ledger, so the Bank Allocations sub-screen a bank line opens (item 91) is not expected. That screen, **Cost Centre Allocations** (on 7.2 it opened on a Journal debit, prefilled by Tally, on a book with cost centres on: row 1231-CC; step 0.5's `no` makes it unlikely here), or any other sub-screen (an allocation of any kind, a bill), is an extra screen: STOP, press no key, and accept nothing in it.
 
-   **A seed that is wrong in any way is a STOP:** a wrong date, ledger, amount or narration on the screenshot, a second accept, or any extra screen. Nothing more is keyed and the voucher is not altered or deleted on screen. After a STOP before the accept, nothing is keyed until the run coordinator's word (C8). Item 91's route back, on such a word, was a screenshot of each screen with its title and then Ctrl+Q once per screen (C7), never Escape. It left the voucher unsaved with no prompt. A quit prompt is a dialog C7 does not name: press no key and report it. Then MARKS once (C8): V null means nothing was saved, and no restore is needed. The way back is the fallback, restored (C6) on the run coordinator's RESTORE word; the seed is keyed again in a later sitting, under a new go-ahead.
+   **A seed that is wrong in any way is a STOP:** a wrong date, ledger, amount or narration on the screenshot, a second accept, an "Accept ?" prompt, any extra screen, or a Gateway date other than 1-Apr-2025 after the seed. Nothing more is keyed and the voucher is not altered or deleted on screen. After a STOP before the accept, nothing is keyed until the run coordinator's word (C8). Item 91's route back, on such a word, was a screenshot of each screen with its title and then Ctrl+Q once per screen (C7), never Escape. It left the voucher unsaved with no prompt. A quit prompt is a dialog C7 does not name: press no key and report it. Then MARKS once (C8): V null means nothing was saved, and no restore is needed. The way back is the fallback, restored (C6) on the run coordinator's RESTORE word; the seed is keyed again in a later sitting, under a new go-ahead.
 8. MARKS: M0s, V0s. **EXPECT V0s not null**, and `snapshot.reused` false. V0s null = STOP: the seed did not take, and step 3 would meet row 1761-S4's refusal again. Record M0s (whether keying a voucher moves M is not known; it is recorded, not an EXPECT).
 9. `vouchers` for 2025-04-01 to 2025-04-01. EXPECT complete, and exactly one voucher, the seed: Journal, BRIDGE Suspense Dr 1,000.00, BRIDGE Capital Cr 1,000.00, narration `seed for row 1761-S4 v3` (23 characters). Record the answer whole, with its number and its completeness. The day holds the seed, so a complete answer is reachable: the window is complete when its rows were checked voucher for voucher (row 2507-T). An answer that reads partial does not prove "exactly one": record it with its reason, and STOP (nothing has changed since the seed). Another voucher, a second one, or another ledger, amount or narration = STOP. A STOP here goes back by the fallback, as item 7 says.
 10. Backup BK1 (C5) into a NEW empty folder `C:\bridge-lab\1761-s4v3\backups\BK1\`: record the name, size and sha256. Then MARKS: M0b, V0b. **EXPECT M0b = M0s and V0b = V0s, so V0b is not null.** Nothing moves the marks between item 8 and the backup: a mark that moved = STOP, before BK1 becomes the restore point.
@@ -179,7 +188,8 @@ The book: unchanged.
 ## Step 4: the approved post (C)
 **[OWNER]-at-PC HOLD, before 4.1.** Step 4 starts only when the run coordinator records [OWNER]'s word that they are at the lab PC and that the computer-use grant is approved for `bridge_mcp.exe` at its path in this row's build folder. A grant for another exe or path does not count.
 - Until then, call nothing and press nothing. C is built and not sent, and the book is as after step 3.
-- If [OWNER] cannot come, the run coordinator chooses between waiting in this launch and step 6, the restore.
+- **The hold lasts at most 60 minutes**, counted from step 3.2's answer. Past it, or sooner if [OWNER] cannot come, the run coordinator decides between waiting longer in this launch and step 6, the restore. Until that word, nothing is called and nothing is keyed.
+- The approval's own expiry (`approval.expires_in_s`) counts from the click, which comes after the hold. No expiry of a built batch is known to this sheet, so a wait is not expected to change C.
 - C is never sent in another launch.
 
 1. MARKS: V4a, immediately before the post. EXPECT V4a = V0b.
@@ -202,7 +212,7 @@ Any other final state or refusal: record it whole, do not call again, STOP. The 
 The book: the masters, the seed, and the four vouchers of C.
 
 ## Step 5: read back
-1. MARKS: record V (EXPECT V4a + 4; see step 4).
+1. MARKS: record V. After step 4.5's `posted_verified`, EXPECT V4a + 4. After step 4.4's HOLD, V is recorded, not an EXPECT: a batch step other than 4 is what that HOLD reports.
 2. `vouchers` for 2025-04-08 to 2025-04-09: record the answer whole, with its completeness, and a table with one line per voucher: date, type, number, each ledger entry (ledger, amount, side) and the narration printed with its length in characters. Both days hold vouchers of C. EXPECT exactly these four, and no other voucher (the seed is dated 2025-04-01, outside this window):
 
    | date | type | Dr | Cr | amount | narration (exactly) |
@@ -235,6 +245,7 @@ The book: as at BK1, the masters and the seed.
 - A cash ledger other than Tally's own Cash, and a PDF statement. This row parses the CSV edge only; the voucher shapes are the same.
 - The first import into a masters-only book: row 1761-S4 measured its refusal, and this row does not ask it again.
 - A seed keyed through a bank ledger, and the Bank Allocations screen it opens (item 91): v3's seed names no bank or cash ledger, so that screen's accept and what it saves stay unmeasured.
+- A book with cost centres on: step 0.5 STOPs on it, so a seed through Cost Centre Allocations, and what that screen saves, stay unmeasured. So do BRIDGE Suspense's bill-by-bill and cost-centre fields.
 - Any TallyPrime release other than the one recorded.
 
 ## The book after each step
@@ -244,14 +255,15 @@ The book: as at BK1, the masters and the seed.
 - Steps 4 and 5: plus the four vouchers of C.
 - Step 6: as at BK1, the masters and the seed.
 
-STOP RULES: C7 and C8; any dialog before a call; an approval window other than step 4's; a mark that moves outside the step that changes it (step 0's item 7 is the only step before step 4 that may move V); any answer outside the stated shape.
+STOP RULES: C7 and C8; any dialog before a call; an approval window other than step 4's; a mark that moves outside the step that changes it (step 0's item 7 is the only step before step 4 that may move V); any answer outside the stated shape. Step 4.4's HOLD wins over that last rule: an answer step 4.4 names as a HOLD is a HOLD, not a STOP.
 
 ## Close and evidence
 - **C10:** Shut Company; leave no company loaded. THE COMPANY stays on the lab PC, as at BK1: it is synthetic.
 - **C11:** evidence to a new branch `lab/1761-s4v3-cash-paid-to-someone-answers`, with `SHA256.txt`, after the pre-push scan and the run coordinator's yes. It holds:
   - every answer whole with its size and sha256;
   - the seed's screenshots by name, size and sha256 (never pushed), the date the voucher screen opened with, what the F2 field showed, the layout and line order, and its step 0.9 read;
-  - the run coordinator's record of [OWNER]'s word at the hold before step 4.1;
+  - the run coordinator's record of [OWNER]'s commitment at item 4 before the sitting, and of [OWNER]'s word at the hold before step 4.1, with the hold's start and end times;
+  - the Gateway's current date before F7 and after the seed;
   - the fallback's check (step 0.6);
   - the step 5 voucher table;
   - the data folder's file listing after step 4 (names, sizes, sha256);

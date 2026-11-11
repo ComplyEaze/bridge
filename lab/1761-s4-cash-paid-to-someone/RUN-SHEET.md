@@ -21,7 +21,7 @@ A Payment whose payee's cash in a day comes to more than 10,000.00 is tagged in 
 
 ## Build (holds the merge of #2407)
 
-The build is the Windows bundle `unsigned-bundle-smoke-windows-latest` of the Bridge CI run on master that first holds the merge of #2407. The lab downloads it into a new empty folder and checks three hashes:
+The build is the Windows bundle `unsigned-bundle-smoke-windows-latest` of a Bridge CI run on master whose commit holds the merge of #2407 and that carries that artifact, unexpired; the run coordinator names the run in the line below. The lab downloads it into a new empty folder and checks three hashes:
 - the zip's sha256 against the artifact's digest;
 - the `.mcpb` against `archive_sha256` in its `mcpb-smoke.json`;
 - `bridge_mcp.exe` against `binary_sha256` in the same file.

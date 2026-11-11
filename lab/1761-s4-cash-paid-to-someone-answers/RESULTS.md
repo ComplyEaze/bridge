@@ -61,9 +61,10 @@ The remediation says that the company has never held a voucher, so Tally reports
 Every read before it agrees: `snapshot.voucher_alter_id` read null at steps 0, 0.6 and 2. That is the book's state the sheet asked for ("The book: the masters only").
 
 This is the documented refusal, not a new one:
-- `pre_import_mark_refusal` in `src-tauri/src/agent_import.rs` names an absent voucher mark `empty_book_first_import`.
-- ADR 0004 item 12 records that a book with no voucher is refused at the mark read.
+- `pre_import_mark_refusal` in `src-tauri/src/agent_import.rs` (line 179 at master `de54a0f26e554f574727a0bc4914b0ad6ca88583`) names an absent voucher mark `empty_book_first_import`.
 - The README's 0.5.x test notes record the same refusal on a company that held ledgers only.
+
+(Corrected 2026-11-11: an earlier version of this file also cited ADR 0004 item 12 here. That item is the duplicate-number read's control and does not record this refusal: its S8 list names "a company with no voucher" only as a control case still to be measured. ADR 0004 does not record the refusal.)
 
 So the sheet's book cannot reach step 4 on this build. The row's stop came from the sheet's design, not from the slice under test. Step 2's refusal runs before the mark read and was measured. Steps 3.2 to 6 stay unmeasured: the Contra and Payment pair in one batch, the s.40A(3) tag in a posted narration, and the read-back.
 

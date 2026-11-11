@@ -36,7 +36,7 @@ The build is the Windows bundle `unsigned-bundle-smoke-windows-latest` of a Brid
 
 It sends those three hashes to the run coordinator, who fills the line below by a new commit on this branch, after checking that the merge of #2407 is an ancestor of RC COMMIT.
 
-RC COMMIT: <to fill>  CI RUN: <to fill>  ARTIFACT: <to fill>  ZIP DIGEST: <to fill>  EXE SHA256: <to fill>
+RC COMMIT: de54a0f26e554f574727a0bc4914b0ad6ca88583  CI RUN: the Bridge CI `merge_group` run of #2502 at that commit, conclusion success (its id is written in words only, in `notes.txt` as fetched)  ARTIFACT: `unsigned-bundle-smoke-windows-latest` of that run, 60,522,001 bytes, expires 18 Nov 2026  ZIP DIGEST: sha256:5c30b5b7d62b32077d30d06aabceecc6a5b4f3bc3f3ac409f6f204c780b47106  EXE SHA256: be931eb0bd0228d5765886491970da712cb91941bc2e0a980049107c4d8267ce
 
 **While any field of this line reads `<to fill>`: STOP. This row does not run.** Before the first call, hash the exe that will run and compare it with the line; any other hash = STOP. Record the version the tool reports.
 

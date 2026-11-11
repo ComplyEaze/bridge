@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml
+# parser: parse_native_masters(StockGroups)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "SC Goods Group",
+            guid: "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-000000cf",
+            master_id: 207,
+            alter_id: 209,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: Plain,
+        },
+    ],
+})

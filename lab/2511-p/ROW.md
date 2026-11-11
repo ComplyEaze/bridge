@@ -59,7 +59,14 @@ Check every file against `SHA256.txt` (sha256, bytes, name) first, and each requ
 | `C-cat4.xml` | **NEW SHAPE.** `C-cat2.xml` with one line added after `<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>`, at the same indent: `<NATIVEMETHOD>CurrencyName</NATIVEMETHOD>`. `C-cat2-to-cat4.diff` is the diff of the two decoded texts: that one line and nothing else. The builder it is meant to become is a `StandardLedgerCatalogV4` profile in `src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs`, unbuilt (V3 is V2 plus `AlterID`). |
 | `a-twmvy-V-mvy-20250401-20260331.xml` | Row 683-TW's answer to that window, byte-equal to row 683-VD's copy: the book as found, which step 2 compares against. |
 | `run.py`, `lm.py`, `tb.py`, `cmpinfo.py`, `LAB-COMMON.md`, `.gitattributes` | The 683 rows', byte-equal. |
-| `vcmp.py` | New for this row. `vcmp.py A B` compares two movement answers VOUCHER row by VOUCHER row, matched by GUID, parsed as C4 says, never by a text search. A common row is SAME when the two elements serialise to equal text, else DIFFERS with each differing child and the text around its first differing character. Rows in one answer only are listed with DATE, type, number and narration. It ends with `COMMON SAME (common n, only in A n, only in B n)` (exit 0) or `COMMON DIFFERS` (exit 2); a read that failed is STOP (exit 1), never "0 rows". At most 400 lines. It is reviewed like any kit script before the row is queued. |
+| `vcmp.py` | New for this row. `vcmp.py A B [--only-a GUID]... [--only-b GUID]...` compares two movement answers VOUCHER row by VOUCHER row, matched by GUID, parsed as C4 says, never by a text search. See **Reading `vcmp.py`** below. |
+
+**Reading `vcmp.py`.** Run it alone, never into a pipe (`| head` or `| tail` would hide its exit code), read `$?`, and copy the whole output. It prints each answer's bytes and sha256 first.
+- **STOP (exit 1):** a read that failed, never "0 rows". That is an answer that cannot be read, does not decode as UTF-16LE or does not parse; HEADER/STATUS other than exactly 1, or none; any LINEERROR; no BODY/DATA/COLLECTION; a COLLECTION child that is not a VOUCHER; no VOUCHER row; or a GUID that is absent, not this book's GUID plus `-` and 8 lowercase hex digits, or on two rows.
+- **Forbidden characters** (C4's list, raw or as a reference) are never deleted: each becomes the character U+FFFD, then `#` and its code in two hex digits (`&#4;` reads as U+FFFD `#04`), and the count per answer is printed. Two answers that differ only there still differ.
+- **The bar.** A row in both answers is SAME when the two VOUCHER elements, each serialised by the parser without its own tail, are equal: equal after the parse's own normalisations, not byte-equal. Three are accepted for this row: a line break written CR LF reads as LF (this book's answers are written with CR LF); an empty element reads the same as `<X/>` or `<X></X>`; and a character reads the same written raw or as a reference (`&amp;` and `&#38;`). Within one sitting, by one Tally, none of the three should move.
+- **Rows in one answer only.** `--only-a` and `--only-b` name the GUIDs the step EXPECTs in that answer only; a side not named EXPECTs none.
+- **Result.** It prints the SAME rows as one count, then a block for each row that DIFFERS (each differing child, the character where it first differs and the text around it, or that the row differs only between its children), then each row in one answer only, marked named or NOT NAMED. Detail lines stop after 300. The result is decided before anything is printed, so the cap never changes it. The last line is `COMMON SAME (...)`, exit 0, only when every common row is SAME and the rows in one answer only are exactly the ones named; otherwise `COMMON DIFFERS (...)`, exit 2.
 
 The three import files are not in the kit. Steps 3 to 5 build them in the sitting through `build_import_xml`, and the row records each one's sha256 before its send.
 
@@ -83,7 +90,7 @@ Run each send as `python3 -I run.py http://127.0.0.1:9001 <label> <file>`. Each 
 0. **Step 0 by C2, with no company loaded.** Load the book alone. Record the Gateway's current date, period and date of last entry. EXPECT 1-Apr-2025, 1-Apr-25 to 31-Mar-26, and 1-Apr-25. Record the release, the licence mode and the PC's date. Launch the build, then record the two settings and the exe's hash against the build line.
 1. **`m0`:** `M-marks.xml`, then `lm.py --same-row <KIT LAST MARKS> a-m0-M-marks.xml`. EXPECT SAME MARKS. Otherwise STOP.
 2. **The book as found, and P4a,** one send at a time:
-   - **`mv0`:** `V-mvy-20250401-20260331.xml`, then `lm.py --capture a-mv0-V-mvy-20250401-20260331.xml a-twmvy-V-mvy-20250401-20260331.xml` (row 683-TW's answer, in the kit). EXPECT CAPTURE SAME, with 11 and 11. Then `vcmp.py a-twmvy-V-mvy-20250401-20260331.xml a-mv0-V-mvy-20250401-20260331.xml`, recorded whole and not an EXPECT: it shows whether a restore leaves every voucher byte-equal, which steps 4 to 6 rely on.
+   - **`mv0`:** `V-mvy-20250401-20260331.xml`, then `lm.py --capture a-mv0-V-mvy-20250401-20260331.xml a-twmvy-V-mvy-20250401-20260331.xml` (row 683-TW's answer, in the kit). EXPECT CAPTURE SAME, with 11 and 11. Then `vcmp.py a-twmvy-V-mvy-20250401-20260331.xml a-mv0-V-mvy-20250401-20260331.xml`, recorded whole and not an EXPECT: it shows whether the restores since row 683-TW left every voucher equal at `vcmp.py`'s bar. Steps 4 to 6 compare only reads of one sitting.
    - **`c4`:** `C-cat4.xml`. Size bound 200,000 B. It is a NEW SHAPE, so screenshot before the next request. Record the answer whole. For each LEDGER row record NAME, PARENT, ISBILLWISEON and CURRENCYNAME, or that CURRENCYNAME is absent, read by an XML parser as C4 says. `lm.py` is not run on this answer: its `C-` kind reads currencies.
    - **`m0b`:** `M-marks.xml`, `lm.py --same-row a-m0 a-m0b`. EXPECT SAME MARKS: the reads wrote nothing.
 3. **P1's build** (calls 1 to 3 above). Bridge reads and writes only its own data folder here. Then **BK** by C5, to a new empty local folder `bk-2511p`. Record the file and the time. Then **`mb`:** `M-marks.xml`, `lm.py --same-row a-m0b a-mb`. A difference is recorded (C5), not a STOP.
@@ -92,12 +99,12 @@ Run each send as `python3 -I run.py http://127.0.0.1:9001 <label> <file>`. Each 
 4. **P1's send** (`p1w`), then, one at a time:
    - **`m1`:** EXPECT MARKS DIFFER from `mb`. Record ALTVCHID and ALTMSTID.
    - **`d1`:** `V-day-20250402.xml`. Record the voucher whole: each entry's LEDGERNAME, AMOUNT and ISDEEMEDPOSITIVE, and every bill allocation's NAME, BILLTYPE and AMOUNT. EXPECT one voucher.
-   - **`mv1`:** `V-mvy-20250401-20260331.xml`, then `vcmp.py a-mv0 a-mv1`. EXPECT `COMMON SAME (common 11, only in A 0, only in B 1)`, and the one row only in B is P1's (its date 20250402, narration `2511-P1`).
+   - **`mv1`:** `V-mvy-20250401-20260331.xml`, then `vcmp.py a-mv0-V-mvy-20250401-20260331.xml a-mv1-V-mvy-20250401-20260331.xml --only-b <P1's GUID, copied from d1>`. EXPECT exit 0 and `COMMON SAME (common 11, differ 0, only in A 0 (0 not named), only in B 1 (0 not named), named but missing 0)`. The row only in B is dated 20250402 with narration `2511-P1`.
    - **`verify_import`** for P1's `batch_id`, through Bridge. Record the result whole: `verification_status`, and any refusal code.
-5. **P2's build and send** (`p2w`), as step 4 with `m2`, `d2` (`V-day-20250403.xml`), `mv2` against `mv1` (EXPECT `common 12, only in A 0, only in B 1`, P2's), and `verify_import` for P2's batch.
-6. **P3's build and send** (`p3w`), as step 4 with `m3`, `d3` (`V-day-20250404.xml`), `mv3` against `mv2` (EXPECT `common 13, only in A 0, only in B 1`, P3's), and `verify_import` for P3's batch.
+5. **P2's build and send** (`p2w`), as step 4 with `m2`, `d2` (`V-day-20250403.xml`), `mv2` against `mv1` with `--only-b` P2's GUID from `d2` (EXPECT exit 0, common 12, differ 0, only in B 1, named), and `verify_import` for P2's batch.
+6. **P3's build and send** (`p3w`), as step 4 with `m3`, `d3` (`V-day-20250404.xml`), `mv3` against `mv2` with `--only-b` P3's GUID from `d3` (EXPECT exit 0, common 13, differ 0, only in B 1, named), and `verify_import` for P3's batch.
 7. **`m3r`:** `M-marks.xml`, `lm.py --same-row a-m3 a-m3r`. EXPECT SAME MARKS.
-8. **The restore** from `bk-2511p`, by C6. Then **`mr`:** `lm.py --same-row a-m0 a-mr`, EXPECT SAME MARKS. Then **`mvr`:** `V-mvy-20250401-20260331.xml`, `lm.py --capture a-mvr a-mv0`, EXPECT CAPTURE SAME, with 11 and 11. Otherwise STOP: "the restore of bk-2511p did not return the book to m0".
+8. **The restore** from `bk-2511p`, by C6. Then **`mr`:** `lm.py --same-row a-m0 a-mr`, EXPECT SAME MARKS. Then **`mvr`:** `V-mvy-20250401-20260331.xml`, `lm.py --capture a-mvr a-mv0`, EXPECT CAPTURE SAME, with 11 and 11, and `vcmp.py a-mv0-V-mvy-20250401-20260331.xml a-mvr-V-mvy-20250401-20260331.xml`, recorded whole and not an EXPECT. Otherwise STOP: "the restore of bk-2511p did not return the book to m0".
 9. **Tally's date:** EXPECT as at step 0. If it differs, record it and press nothing; the run coordinator decides.
 10. **Close** by C10. End the Bridge launch from its client, by closing stdin. `GET /status` after the last request (C11).
 
@@ -131,7 +138,7 @@ From step 3 on, a STOP is followed by the restore (step 8) on the word given the
 ## Expected (estimates, not EXPECTs)
 
 - **P4a:** CURRENCYNAME `₹` on all eight rows, or the field absent. Either is a result.
-- **P1:** CREATED 1, entries plain, `vcmp.py` COMMON SAME on the eleven, `verify_import` `posted_verified`.
+- **P1:** CREATED 1, entries plain, `vcmp.py` exit 0 with P1's GUID named, `verify_import` `posted_verified`.
 - **P2, P3:** not known. That is the question.
 
 ## Decides

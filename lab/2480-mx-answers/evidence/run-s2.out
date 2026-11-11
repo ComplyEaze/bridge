@@ -1,0 +1,84 @@
+2026-11-11T00:51:31.030Z start bash send.sh s2 N-0281.xml N-0282.xml N-0283.xml N-0284.xml N-0285.xml N-0286.xml N-0287.xml N-0288.xml N-0289.xml N-0290.xml N-0291.xml B-bills.xml S-snap-20260401-20260801.xml M-marks.xml
+N-0281.xml: 3022 bytes
+N-0282.xml: 3022 bytes
+N-0283.xml: 3022 bytes
+N-0284.xml: 3022 bytes
+N-0285.xml: 3022 bytes
+N-0286.xml: 3022 bytes
+N-0287.xml: 3022 bytes
+N-0288.xml: 3022 bytes
+N-0289.xml: 3022 bytes
+N-0290.xml: 3022 bytes
+N-0291.xml: 3022 bytes
+B-bills.xml: 46 bytes
+S-snap-20260401-20260801.xml: 25480 bytes
+M-marks.xml: 3394 bytes
+== a-s2-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Mx Plain': 0 groups
+  ga 'BRIDGE Mx Ak, Am & Co': 0 groups
+  ss 'BRIDGE Mx Bk & Sons (Bm), Bn': 0 groups
+  ms 'BRIDGE Mx M/s. Ck_Cm, Cn': 0 groups
+  qd 'BRIDGE Mx "Dk" Dm & Dn': 0 groups
+  pp 'BRIDGE Mx Ek 50% + Em': 0 groups
+  hd 'BRIDGE Mx Fk #2, Fm-Fn': 0 groups
+  ad 'BRIDGE Mx Gk @ Gm.': 0 groups
+  ca "BRIDGE Mx Hk: Hm's (Hn)": 0 groups
+  xs 'BRIDGE Mx Jk! Jm *': 0 groups
+  al 'BRIDGE Mx Lk, Lm_Ln "Lp" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly\'s': 0 groups
+  groups of any other party: 0
+== a-s2-S-snap-20260401-20260801.xml
+a-s2-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Mx Plain': no row
+  ga 'BRIDGE Mx Ak, Am & Co': no row
+  ss 'BRIDGE Mx Bk & Sons (Bm), Bn': no row
+  ms 'BRIDGE Mx M/s. Ck_Cm, Cn': no row
+  qd 'BRIDGE Mx "Dk" Dm & Dn': no row
+  pp 'BRIDGE Mx Ek 50% + Em': no row
+  hd 'BRIDGE Mx Fk #2, Fm-Fn': no row
+  ad 'BRIDGE Mx Gk @ Gm.': no row
+  ca "BRIDGE Mx Hk: Hm's (Hn)": no row
+  xs 'BRIDGE Mx Jk! Jm *': no row
+  al 'BRIDGE Mx Lk, Lm_Ln "Lp" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly\'s': no row
+exit 0
+== a-s2-N-0281.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0282.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0283.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0284.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0285.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0286.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0287.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0288.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0289.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0290.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-N-0291.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s2-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0
+2026-11-11T00:51:43.933Z end, exit 0

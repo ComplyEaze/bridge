@@ -1,0 +1,4 @@
+  a-r9a-L-lo-ca-20260801.xml: 896 bytes, sha256 b6addd262f9bc68dc39b1c7c580b8fc6191eaf60326e727faf5c0681faf1a5ec
+  a-r9b-L-lo-ca-20260801.xml: 896 bytes, sha256 b6addd262f9bc68dc39b1c7c580b8fc6191eaf60326e727faf5c0681faf1a5ec
+SAME: EQUAL
+exit 0

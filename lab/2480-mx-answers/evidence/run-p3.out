@@ -1,0 +1,16 @@
+2026-11-11T00:52:06.645Z start bash p.sh
+p1 pl exit 0: ANSWER: NO BYTES
+p2 ga exit 0: ANSWER: NO BYTES
+p3 ss exit 0: ANSWER: NO BYTES
+p4 ms exit 0: ANSWER: NO BYTES
+p5 qd exit 0: ANSWER: NO BYTES
+p6 pp exit 0: ANSWER: NO BYTES
+p7 hd exit 0: ANSWER: NO BYTES
+p8 ad exit 0: ANSWER: NO BYTES
+p9 ca exit 0: ANSWER: NO BYTES
+p10 xs exit 0: ANSWER: NO BYTES
+p11 al exit 0: ANSWER: NO BYTES
+== a-p12-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  equal
+exit 0
+2026-11-11T00:54:45.281Z end, exit 0

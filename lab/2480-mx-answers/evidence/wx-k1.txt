@@ -1,0 +1,2 @@
+stop: a-k1-Vm-u-pl.xml: BP/26-27/0281: a bill allocation without one NAME
+exit 1

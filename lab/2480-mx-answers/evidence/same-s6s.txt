@@ -1,0 +1,4 @@
+  a-s6sa-S-snap-20260401-20260801.xml: 39750 bytes, sha256 3f6f6c67ff1730c09dc16c9a0904a28440e5ae69d4b38a40f2bbe69ec972dfff
+  a-s6sb-S-snap-20260401-20260801.xml: 39750 bytes, sha256 3f6f6c67ff1730c09dc16c9a0904a28440e5ae69d4b38a40f2bbe69ec972dfff
+SAME: EQUAL
+exit 0

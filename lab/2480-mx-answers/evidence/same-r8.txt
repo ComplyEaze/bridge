@@ -1,0 +1,4 @@
+  a-r8a-L-lo-ad-20260801.xml: 896 bytes, sha256 c75b4e5e2c722c4d9aa6e8f8a4144d18697272c27586ca186a9a6b7291ad5b8a
+  a-r8b-L-lo-ad-20260801.xml: 896 bytes, sha256 c75b4e5e2c722c4d9aa6e8f8a4144d18697272c27586ca186a9a6b7291ad5b8a
+SAME: EQUAL
+exit 0

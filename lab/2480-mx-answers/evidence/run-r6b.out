@@ -1,0 +1,23 @@
+2026-11-11T00:59:46.555Z start bash r6.sh hd,ad,ca,xs,al
+r1 pl: not in CREATED, not read
+r2 ga: not in CREATED, not read
+r3 ss: not in CREATED, not read
+r4 ms: not in CREATED, not read
+r5 qd: not in CREATED, not read
+r6 pp: not in CREATED, not read
+== lr.sh r7a hd exit 3
+== lr.sh r7b hd exit 3
+r7 hd: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r8a ad exit 3
+== lr.sh r8b ad exit 3
+r8 ad: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r9a ca exit 3
+== lr.sh r9b ca exit 3
+r9 ca: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r10a xs exit 3
+== lr.sh r10b xs exit 3
+r10 xs: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+== lr.sh r11a al exit 3
+== lr.sh r11b al exit 3
+r11 al: ANSWER: ROWS 1 (0 On Account)|SAME: EQUAL|ANSWER: ROWS 1 (0 On Account)|OUTCOME: told (ROWS 1 (0 On Account), sum of BILLCL -1051.00 equals closing -1051.00)|ANSWER: ROWS 1 (0 On Account)|AGAINST: EQUAL (L rows against the groups)|
+2026-11-11T01:00:40.370Z end, exit 0

@@ -1,0 +1,19 @@
+empty answer on L-lo-ad-20260801.xml: the request failed; stop, do not resend
+printwindow True saved <LAB_DIR>/shots/p8-after.png
+2026-11-11T00:53:40.701Z
+run.py exit 1
+p8 L-lo-ad-20260801.xml: run.py stopped (log-p8.txt: curl 0	0 bytes)
+answer file 0 bytes
+headers file:
+  HTTP/1.1 200 OK
+  RESPSTATUS: 1
+  CONNECTION: KEEP-ALIVE
+  CONTENT-LENGTH: 0
+  
+EXCEPTION HOLDS: HTTP 200, CONTENT-LENGTH: 0, 0 bytes
+2026-11-11T00:53:43.532Z GET /status after p8: curl 0 "status=200, bytes=51"
+== a-p8-L-lo-ad-20260801.xml
+  headers: 'HTTP/1.1 200 OK'; Content-Type absent; CONTENT-LENGTH ['0']
+a-p8-L-lo-ad-20260801.xml: 0 bytes
+ANSWER: NO BYTES
+exit 0

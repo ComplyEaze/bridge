@@ -1,0 +1,6 @@
+== a-s4hdm-M-marks.xml: 3398 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '74' ALTMSTID '251'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0

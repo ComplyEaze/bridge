@@ -1,0 +1,90 @@
+label, files, wall seconds from send.sh's send line to its end line (one run.py call per label; a label of several files is their sum). For a label marked [capture], the window capture after run.py's return is inside the figure, so the read itself took less; labels without one show the read alone, with python's start.
+s1	M-marks.xml	0.583 s, from the send line to run.py's return (answered)
+s2	N-0281.xml N-0282.xml N-0283.xml N-0284.xml N-0285.xml N-0286.xml N-0287.xml N-0288.xml N-0289.xml N-0290.xml N-0291.xml B-bills.xml S-snap-20260401-20260801.xml M-marks.xml	2.775 s, from the send line to run.py's return (answered)
+p1	L-lo-pl-20260801.xml	5.026 s, from the send line to run.py's return (run.py exit 1) [capture]
+p2	L-lo-ga-20260801.xml	7.947 s, from the send line to run.py's return (run.py exit 1) [capture]
+p3	L-lo-ss-20260801.xml	7.485 s, from the send line to run.py's return (run.py exit 1) [capture]
+p4	L-lo-ms-20260801.xml	7.435 s, from the send line to run.py's return (run.py exit 1) [capture]
+p5	L-lo-qd-20260801.xml	6.065 s, from the send line to run.py's return (run.py exit 1) [capture]
+p6	L-lo-pp-20260801.xml	6.998 s, from the send line to run.py's return (run.py exit 1) [capture]
+p7	L-lo-hd-20260801.xml	5.996 s, from the send line to run.py's return (run.py exit 1) [capture]
+p8	L-lo-ad-20260801.xml	6.292 s, from the send line to run.py's return (run.py exit 1) [capture]
+p9	L-lo-ca-20260801.xml	11.360 s, from the send line to run.py's return (run.py exit 1) [capture]
+p10	L-lo-xs-20260801.xml	23.619 s, from the send line to run.py's return (run.py exit 1) [capture]
+p11	L-lo-al-20260801.xml	3.287 s, from the send line to run.py's return (run.py exit 1) [capture]
+p12	M-marks.xml	0.443 s, from the send line to run.py's return (answered)
+s4plm	M-marks.xml	0.506 s, from the send line to run.py's return (answered)
+s4pl	LM-pl.xml	3.390 s, from the send line to run.py's return (answered) [capture]
+s5plm	M-marks.xml	0.410 s, from the send line to run.py's return (answered)
+s5pl	I-pl.xml	3.815 s, from the send line to run.py's return (answered) [capture]
+s4gam	M-marks.xml	0.418 s, from the send line to run.py's return (answered)
+s4ga	LM-ga.xml	3.154 s, from the send line to run.py's return (answered) [capture]
+s5gam	M-marks.xml	0.441 s, from the send line to run.py's return (answered)
+s5ga	I-ga.xml	3.536 s, from the send line to run.py's return (answered) [capture]
+s4ssm	M-marks.xml	0.409 s, from the send line to run.py's return (answered)
+s4ss	LM-ss.xml	3.164 s, from the send line to run.py's return (answered) [capture]
+s5ssm	M-marks.xml	0.438 s, from the send line to run.py's return (answered)
+s5ss	I-ss.xml	3.522 s, from the send line to run.py's return (answered) [capture]
+s4msm	M-marks.xml	0.416 s, from the send line to run.py's return (answered)
+s4ms	LM-ms.xml	3.201 s, from the send line to run.py's return (answered) [capture]
+s5msm	M-marks.xml	0.460 s, from the send line to run.py's return (answered)
+s5ms	I-ms.xml	3.932 s, from the send line to run.py's return (answered) [capture]
+s4qdm	M-marks.xml	0.506 s, from the send line to run.py's return (answered)
+s4qd	LM-qd.xml	3.700 s, from the send line to run.py's return (answered) [capture]
+s5qdm	M-marks.xml	0.471 s, from the send line to run.py's return (answered)
+s5qd	I-qd.xml	3.411 s, from the send line to run.py's return (answered) [capture]
+s4ppm	M-marks.xml	0.424 s, from the send line to run.py's return (answered)
+s4pp	LM-pp.xml	3.167 s, from the send line to run.py's return (answered) [capture]
+s5ppm	M-marks.xml	0.461 s, from the send line to run.py's return (answered)
+s5pp	I-pp.xml	3.461 s, from the send line to run.py's return (answered) [capture]
+s4hdm	M-marks.xml	0.424 s, from the send line to run.py's return (answered)
+s4hd	LM-hd.xml	3.090 s, from the send line to run.py's return (answered) [capture]
+s5hdm	M-marks.xml	0.425 s, from the send line to run.py's return (answered)
+s5hd	I-hd.xml	3.684 s, from the send line to run.py's return (answered) [capture]
+s4adm	M-marks.xml	0.412 s, from the send line to run.py's return (answered)
+s4ad	LM-ad.xml	3.048 s, from the send line to run.py's return (answered) [capture]
+s5adm	M-marks.xml	0.443 s, from the send line to run.py's return (answered)
+s5ad	I-ad.xml	3.521 s, from the send line to run.py's return (answered) [capture]
+s4cam	M-marks.xml	0.391 s, from the send line to run.py's return (answered)
+s4ca	LM-ca.xml	3.202 s, from the send line to run.py's return (answered) [capture]
+s5cam	M-marks.xml	0.435 s, from the send line to run.py's return (answered)
+s5ca	I-ca.xml	3.829 s, from the send line to run.py's return (answered) [capture]
+s4xsm	M-marks.xml	0.591 s, from the send line to run.py's return (answered)
+s4xs	LM-xs.xml	3.800 s, from the send line to run.py's return (answered) [capture]
+s5xsm	M-marks.xml	0.592 s, from the send line to run.py's return (answered)
+s5xs	I-xs.xml	3.832 s, from the send line to run.py's return (answered) [capture]
+s4alm	M-marks.xml	0.443 s, from the send line to run.py's return (answered)
+s4al	LM-al.xml	3.093 s, from the send line to run.py's return (answered) [capture]
+s5alm	M-marks.xml	0.395 s, from the send line to run.py's return (answered)
+s5al	I-al.xml	3.506 s, from the send line to run.py's return (answered) [capture]
+s6m	M-marks.xml	0.571 s, from the send line to run.py's return (answered)
+s6sa	S-snap-20260401-20260801.xml	0.571 s, from the send line to run.py's return (answered)
+s6sb	S-snap-20260401-20260801.xml	0.493 s, from the send line to run.py's return (answered)
+s6ba	B-bills.xml	0.467 s, from the send line to run.py's return (answered)
+s6bb	B-bills.xml	0.515 s, from the send line to run.py's return (answered)
+r1a	L-lo-pl-20260801.xml	3.699 s, from the send line to run.py's return (answered) [capture]
+r1b	L-lo-pl-20260801.xml	3.446 s, from the send line to run.py's return (answered) [capture]
+r2a	L-lo-ga-20260801.xml	3.008 s, from the send line to run.py's return (answered) [capture]
+r2b	L-lo-ga-20260801.xml	3.025 s, from the send line to run.py's return (answered) [capture]
+r3a	L-lo-ss-20260801.xml	3.252 s, from the send line to run.py's return (answered) [capture]
+r3b	L-lo-ss-20260801.xml	3.173 s, from the send line to run.py's return (answered) [capture]
+r4a	L-lo-ms-20260801.xml	2.984 s, from the send line to run.py's return (answered) [capture]
+r4b	L-lo-ms-20260801.xml	3.209 s, from the send line to run.py's return (answered) [capture]
+r5a	L-lo-qd-20260801.xml	3.225 s, from the send line to run.py's return (answered) [capture]
+r5b	L-lo-qd-20260801.xml	3.050 s, from the send line to run.py's return (answered) [capture]
+r6a	L-lo-pp-20260801.xml	3.249 s, from the send line to run.py's return (answered) [capture]
+r6b	L-lo-pp-20260801.xml	3.064 s, from the send line to run.py's return (answered) [capture]
+r7a	L-lo-hd-20260801.xml	3.482 s, from the send line to run.py's return (answered) [capture]
+r7b	L-lo-hd-20260801.xml	3.260 s, from the send line to run.py's return (answered) [capture]
+r8a	L-lo-ad-20260801.xml	3.160 s, from the send line to run.py's return (answered) [capture]
+r8b	L-lo-ad-20260801.xml	3.051 s, from the send line to run.py's return (answered) [capture]
+r9a	L-lo-ca-20260801.xml	3.053 s, from the send line to run.py's return (answered) [capture]
+r9b	L-lo-ca-20260801.xml	3.107 s, from the send line to run.py's return (answered) [capture]
+r10a	L-lo-xs-20260801.xml	3.161 s, from the send line to run.py's return (answered) [capture]
+r10b	L-lo-xs-20260801.xml	2.974 s, from the send line to run.py's return (answered) [capture]
+r11a	L-lo-al-20260801.xml	3.024 s, from the send line to run.py's return (answered) [capture]
+r11b	L-lo-al-20260801.xml	2.955 s, from the send line to run.py's return (answered) [capture]
+m1	M-marks.xml	1.617 s, from the send line to run.py's return (answered)
+k0	M-marks.xml	3.927 s, from the send line to run.py's return (answered) [capture]
+k1	Vm-u-pl.xml	3.822 s, from the send line to run.py's return (answered) [capture]
+s9	N-0281.xml N-0282.xml N-0283.xml N-0284.xml N-0285.xml N-0286.xml N-0287.xml N-0288.xml N-0289.xml N-0290.xml N-0291.xml B-bills.xml S-snap-20260401-20260801.xml M-marks.xml	2.305 s, from the send line to run.py's return (answered)

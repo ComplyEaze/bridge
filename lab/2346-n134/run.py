@@ -30,7 +30,8 @@ def c3_check(printed, headers, size):
         return (code, None), f"the headers file {headers.name} is empty"
     lines = blocks[-1].split("\n")
     status = lines[0].split()
-    lengths = [l.split(":", 1)[1].strip() for l in lines[1:] if l.split(":", 1)[0].strip().lower() == "content-length"]
+    lengths = [l.split(":", 1)[1].strip() if ":" in l else "" for l in lines[1:]
+               if l.split(":", 1)[0].strip().lower() == "content-length"]
     length = int(lengths[0]) if len(lengths) == 1 and lengths[0].isdigit() else None
     if code != 200 or len(status) < 2 or status[1] != "200":
         return (code, length), f"status {code} (headers: {lines[0]!r}), not 200"

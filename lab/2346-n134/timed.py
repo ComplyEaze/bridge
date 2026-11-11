@@ -68,7 +68,8 @@ def c3_check(printed, headers, size):
         return (code, None), f"the headers file {headers.name} is empty"
     lines = blocks[-1].split("\n")
     status = lines[0].split()
-    lengths = [l.split(":", 1)[1].strip() for l in lines[1:] if l.split(":", 1)[0].strip().lower() == "content-length"]
+    lengths = [l.split(":", 1)[1].strip() if ":" in l else "" for l in lines[1:]
+               if l.split(":", 1)[0].strip().lower() == "content-length"]
     length = int(lengths[0]) if len(lengths) == 1 and lengths[0].isdigit() else None
     if code != 200 or len(status) < 2 or status[1] != "200":
         return (code, length), f"status {code} (headers: {lines[0]!r}), not 200"
@@ -107,6 +108,21 @@ def send(name, answer_label):
     print(f"{answer.name}: {size} bytes")
     write_times(show=False)
     return end
+def drain_keys():
+    # N134: drop any key typed before the screenshot prompt, so only an Enter given at the prompt passes it.
+    try:
+        import msvcrt
+        while msvcrt.kbhit():
+            msvcrt.getwch()
+    except ImportError:
+        try:
+            import termios
+        except ImportError:
+            return
+        try:
+            termios.tcflush(sys.stdin, termios.TCIFLUSH)
+        except (termios.error, OSError, ValueError):
+            pass  # stdin is not a terminal: there is nothing typed ahead to drop
 def write_times(show=True):
     t0 = clock if clock is not None else (sent[0][3] if sent else 0)
     with open(here / f"times-{label}.txt", "w") as out:
@@ -133,6 +149,7 @@ try:
         marks.append(("Enter (screenshot taken, before the reads)", clock))
     for tag, at in (("t00", 0), ("t05", 5), ("t60", 60)):
         if tag == "t60" and not pause:
+            drain_keys()
             input("Take the window's screenshot now. Press Enter only if it shows no dialog (else Ctrl+C): ")
             marks.append(("Enter (screenshot taken, no dialog)", time.monotonic()))
         wait = clock + at - time.monotonic()

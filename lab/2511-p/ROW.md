@@ -30,7 +30,7 @@ The lab fills this line by a new commit on this branch. **While it reads `<to fi
 
 The build is the Windows bundle of a Bridge CI run on master whose commit holds 06268abe, unexpired, checked by the three hashes of the 1761-S4 sheet: the zip, the `.mcpb` and `bridge_mcp.exe`. The run coordinator fills the line by a new commit on this branch, as for 1761-S4.
 
-RC COMMIT: <to fill>  CI RUN: <to fill>  ARTIFACT: <to fill>  ZIP DIGEST: <to fill>  EXE SHA256: <to fill>
+RC COMMIT: de54a0f26e554f574727a0bc4914b0ad6ca88583  CI RUN: the Bridge CI `merge_group` run of #2502 at that commit, conclusion success (its id is written in words only, in `notes.txt` as fetched)  ARTIFACT: `unsigned-bundle-smoke-windows-latest` of that run, 60,522,001 bytes, expires 18 Nov 2026  ZIP DIGEST: sha256:5c30b5b7d62b32077d30d06aabceecc6a5b4f3bc3f3ac409f6f204c780b47106  EXE SHA256: be931eb0bd0228d5765886491970da712cb91941bc2e0a980049107c4d8267ce
 
 **While any field of this line reads `<to fill>`: STOP. This row does not run.**
 

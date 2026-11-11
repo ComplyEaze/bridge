@@ -1,0 +1,66 @@
+nm	pl	0201	BRIDGE Nm Plain	bridgenmplain
+nm	hy	0202	BRIDGE Nm Ax-Bx	bridgenmaxbx
+nm	dt	0203	BRIDGE Nm Ax.Bx	bridgenmaxbx
+nm	am	0204	BRIDGE Nm Ax&Bx	bridgenmaxbx
+nm	sl	0205	BRIDGE Nm Ax/Bx	bridgenmaxbx
+nm	lp	0206	BRIDGE Nm Ax(Bx	bridgenmaxbx
+nm	rp	0207	BRIDGE Nm Ax)Bx	bridgenmaxbx
+nm	ap	0208	BRIDGE Nm Ax'Bx	bridgenmaxbx
+nm	op	0209	BRIDGE Nm Ax and Bx	bridgenmaxandbx
+nm	dd	0210	BRIDGE Nm 2024-25	bridgenm202425
+nm	sc	0211	BRIDGE Nm नमूना	bridgenm\u{928}\u{92e}\u{942}\u{928}\u{93e}
+ns	pl	0221	BRIDGE Ns Plain	bridgensplain
+ns	hy	0222	BRIDGE Ns Hk-Hm	bridgenshkhm
+ns	dt	0223	BRIDGE Ns Dk.Dm	bridgensdkdm
+ns	am	0224	BRIDGE Ns Ak&Am	bridgensakam
+ns	sl	0225	BRIDGE Ns Sk/Sm	bridgenssksm
+ns	lp	0226	BRIDGE Ns Lk(Lm	bridgenslklm
+ns	rp	0227	BRIDGE Ns Rk)Rm	bridgensrkrm
+ns	ap	0228	BRIDGE Ns Pk'Pm	bridgenspkpm
+ns	op	0229	BRIDGE Ns Ok and Om	bridgensokandom
+ns	dd	0230	BRIDGE Ns 2023-24	bridgens202324
+ns	sc	0231	BRIDGE Ns उदाहरण	bridgens\u{909}\u{926}\u{93e}\u{939}\u{930}\u{923}
+nc	pl	0241	BRIDGE Nc Plain	bridgencplain
+nc	ad	0242	BRIDGE Nc Ak & Am Pvt. Ltd.	bridgencakampvtltd
+nc	sh	0243	BRIDGE Nc M/s Bk-Bm	bridgencmsbkbm
+nc	bd	0244	BRIDGE Nc Ck (Cm) Cn.	bridgencckcmcn
+nc	qa	0245	BRIDGE Nc Dk's & Dm	bridgencdksdm
+nc	wd	0246	BRIDGE Nc Ek and Em 2023-24	bridgencekandem202324
+nc	ns	0247	BRIDGE Nc Fk.Fm/Fn-Fp	bridgencfkfmfnfp
+nc	sm	0248	BRIDGE Nc उदाहरण & Gk.	bridgenc\u{909}\u{926}\u{93e}\u{939}\u{930}\u{923}gk
+nc	ob	0249	BRIDGE Nc (Hk) Hm	bridgenchkhm
+nc	al	0250	BRIDGE Nc Jk-Jm. & Jn/Jp (Jq) Jr's and 2023-24	bridgencjkjmjnjpjqjrsand202324
+nc	rs	0251	BRIDGE Nc Kk & Sons (India) Pvt. Ltd.	bridgenckksonsindiapvtltd
+nx	pl	0261	BRIDGE Nx Plain	bridgenxplain
+nx	cm	0262	BRIDGE Nx Ak, Am	bridgenxakam
+nx	us	0263	BRIDGE Nx Bk_Bm	bridgenxbkbm
+nx	dq	0264	BRIDGE Nx "Ck" Cm	bridgenxckcm
+nx	ps	0265	BRIDGE Nx Dk + Dm	bridgenxdkdm
+nx	at	0266	BRIDGE Nx Ek @ Em	bridgenxekem
+nx	hs	0267	BRIDGE Nx Fk #12	bridgenxfk12
+nx	cl	0268	BRIDGE Nx Gk: Gm	bridgenxgkgm
+nx	pc	0269	BRIDGE Nx Hk 15% Hm	bridgenxhk15hm
+nx	st	0270	BRIDGE Nx Jk * Jm	bridgenxjkjm
+nx	ex	0271	BRIDGE Nx Kk!	bridgenxkk
+mx	pl	0281	BRIDGE Mx Plain	bridgemxplain
+mx	ga	0282	BRIDGE Mx Ak, Am & Co	bridgemxakamco
+mx	ss	0283	BRIDGE Mx Bk & Sons (Bm), Bn	bridgemxbksonsbmbn
+mx	ms	0284	BRIDGE Mx M/s. Ck_Cm, Cn	bridgemxmsckcmcn
+mx	qd	0285	BRIDGE Mx "Dk" Dm & Dn	bridgemxdkdmdn
+mx	pp	0286	BRIDGE Mx Ek 50% + Em	bridgemxek50em
+mx	hd	0287	BRIDGE Mx Fk #2, Fm-Fn	bridgemxfk2fmfn
+mx	ad	0288	BRIDGE Mx Gk @ Gm.	bridgemxgkgm
+mx	ca	0289	BRIDGE Mx Hk: Hm's (Hn)	bridgemxhkhmshn
+mx	xs	0290	BRIDGE Mx Jk! Jm *	bridgemxjkjm
+mx	al	0291	BRIDGE Mx Lk, Lm_Ln "Lp" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly's	bridgemxlklmlnlplqlr46lsltlulvlwlxlys
+sk	pl	0281	BRIDGE Mx Plain	bridgemxplain
+sk	ka	0292	BRIDGE Sk Ak Am	bridgeskakam
+sk	kb	0293	BRIDGE Sk Ak, Am	bridgeskakam
+sk	ra	0294	BRIDGE Sk Bk, Bm	bridgeskbkbm
+sk	rb	0295	BRIDGE Sk Bk Bm	bridgeskbkbm
+sk	qa	0296	BRIDGE Sk Ck Cm	bridgeskckcm
+sk	qb	0297	BRIDGE Sk Ck' Cm	bridgeskckcm
+sk	ua	0298	BRIDGE Sk Dk Dm	bridgeskdkdm
+sk	ub	0299	BRIDGE Sk Dk_Dm	bridgeskdkdm
+sk	ea	0300	BRIDGE Sk EkEm	bridgeskekem
+sk	eb	0301	BRIDGE Sk Ek Em	bridgeskekem

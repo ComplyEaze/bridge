@@ -314,6 +314,8 @@ const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
 const NONINT_LAB_GUID: &str = "567653b1-c8be-4deb-b4fc-3ea5de801884";
 const INTEGRATED_CTRL_LAB_GUID: &str = "3fc2a3c7-1da8-4bc4-a472-44028cdebca7";
+/// BRIDGE STOCK CREATE LAB, row 1381-R1's book (`tests/fixtures/agent/stock-create-lab/PROVENANCE.md`).
+const STOCK_CREATE_LAB_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
 
 /// The base of a book with several masters, built the way
@@ -2014,6 +2016,49 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_masters(StockItems)",
         parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    // Row 1381-R1 (#1381): the candidate stock-item read, the groups, units and import answer.
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-after-plain-create.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-after-marked-create.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-with-alias.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockGroups)",
+        parse: |_, text| masters(NativeMasterKind::StockGroups, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(Units)",
+        parse: |_, text| masters(NativeMasterKind::Units, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-create-answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
     },
     Row {
         fixture: "tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml",
@@ -4209,6 +4254,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/agent/stock-create-lab/stock-create-lab-marks.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
         "tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml",
         APP_HIGH_WATER,
     ),
@@ -4626,6 +4675,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

@@ -25,7 +25,7 @@ So N1 here is row 2346-MN's step 6 again, with a new key. Its new evidence is th
 - a note built or posted by ComplyEaze Bridge.
 
 ## Book
-`BRIDGE PILOT LAB` (synthetic), loaded alone, in a sitting of its own. `LAB-COMMON.md` in this folder (v3, byte-equal to row 2346-MN's) applies in full. Where it and this sheet differ, the stricter one holds, except for two exceptions: the screenshot's place in step 4, and the send line (below).
+`BRIDGE PILOT LAB` (synthetic), loaded alone, in a sitting of its own. `LAB-COMMON.md` in this folder (v3, byte-equal to row 2346-MN's) applies in full. Where it and this sheet differ, the stricter one holds, except for the one exception step 4 names.
 
 - **The book is pinned by GUID.** `count22.py` holds BRIDGE PILOT LAB's GUID as `BOOK`. Its M kind prints whether the COMPANY row's GUID is the book's. `--before-write` and `--same-row` STOP on any other GUID, whatever the company is called. STOP before anything is sent unless s1's COMPANY row is the book's.
 - **Its state:** row 2346-MN's restore left the marks at ALTVCHID 68 and ALTMSTID 245, and every row since has ended with a restore. Other marks at s1: stop before BK, with nothing sent.
@@ -49,21 +49,25 @@ So N1 here is row 2346-MN's step 6 again, with a new key. Its new evidence is th
 **The sends:**
 - Each of these stops the run and is reported as "the request failed", never as "nothing found":
   - a curl exit other than 0, an Unknown Request, an empty answer, or an answer above 2,000,000 bytes (all four in `run.py` and `timed.py`);
+  - C3's checks, in both scripts: a status other than 200 in curl's `-w` line or the headers, or a `CONTENT-LENGTH` that is missing or not equal to the bytes curl read and the answer file holds;
   - a collection answer with no `BODY/DATA/COLLECTION`, an import answer with no counters, or an answer that does not parse (`count22.py`, which prints STOP and exits non-zero).
 - Check each file's sha256 against `SHA256.txt` before its send.
 - Count every answer with `count22.py`, and copy its whole output into RESULTS.md.
 - Leave any Bridge process on the lab PC running (C2: nothing in an item ends a process), and send nothing through it.
-- **The send line is the second exception.** `run.py` and `timed.py` send with row 2346-MN's line (`curl.exe -sS --fail-with-body`, the header `Content-Type: text/xml; charset=utf-16`), not C3's (`-w "%{http_code} %{size_download}"` and `-D <headers file>`). So neither script checks the status 200 or the size against CONTENT-LENGTH: `--fail-with-body` fails on a status of 400 or above, and the count stops on an answer that does not parse. Rows 2346-MN and 2162-S2 ran this line. It needs the run coordinator's yes before the sitting, recorded in RESULTS.md's deviations.
+- **The send line** is row 2346-MN's (`curl.exe -sS --fail-with-body`, the header `Content-Type: text/xml; charset=utf-16`), with C3's `-w "%{http_code} %{size_download}"` and `-D h-<label>-<file>.txt` added. Neither changes a byte Tally receives, so the request is as rows 2346-MN and 2162-S2 sent it. Each script records the status and `CONTENT-LENGTH`, and stops unless C3 holds (above).
 
 ## Files
 **Byte-equal to row 2346-MN's file of the same name** (`lab/2346-mn-sheet` at cec5d5a8, folder `lab/2346-mn/`), whose ROW.md says where each came from:
-- `.gitattributes`, `LAB-COMMON.md`, `run.py`, `M-marks.xml`;
+- `.gitattributes`, `LAB-COMMON.md`, `M-marks.xml`;
 - `T-types.xml`, the build's voucher-type read (sha256 `c351d6c6`, pinned by a test on master);
 - `R-MC1.xml`, the build's read-back for `CN/26-27/0001` on the type GUID ending `000000e8` (sha256 `eccb528f`);
 - `V-CN.xml`, every native field of the vouchers numbered `CN/26-27/0001` (sha256 `f113b399`);
 - `template-I-MC1.utf16le.xml` is row 2346-MN's `I-MC1.xml` (sha256 `bcec0c46`), renamed so it is never sent. It was sent once in row 2346-MN.
 
 **Byte-equal to row 2162-M1's file** (`lab/2162-m1-sheet` at eaf2a4fc): `W-08s.xml` is its `A-Y0-2026-08.xml`, the build's number read of August 2026 on this book (sha256 `b226ad52`). A test on master (`the_lab_month_reads_are_the_sent_ones_and_the_derived_august_drops_one_row`, `src-tauri/src/agent_import_tests.rs:2909`) checks that the build renders it byte for byte, against the sha256 `lab_number_months()` pins for August (`:2833`).
+
+**`run.py`** is row 2346-MN's `run.py` with one change, marked N134: C3's `-w` and `-D` on its curl line, and a stop after the curl exit check unless C3's status and length check passes. The status and `CONTENT-LENGTH` go to its log.
+- Tried on 11 Nov 2026 against a stand-in for `curl.exe` that writes the headers and the `-w` line. Clean, and with a `100 Continue` block before the 200: both reads sent. A `CONTENT-LENGTH` 10 bytes over the body, a status 201, no `CONTENT-LENGTH`, or no headers file: each stopped after the first read.
 
 **`gen.py`** writes each request below, with only the change it names, each asserted to occur exactly as often as expected. Each template's sha256 is checked first. The import is parsed, and its type, its one number, its `REFERENCE` and `REFERENCEDATE`, its six legs, its party's side and the balance of its legs are asserted. Run twice, it writes the same bytes.
 
@@ -78,7 +82,7 @@ The two `COMPUTE` lines are the element names and the form `src-tauri/src/agent_
 
 The note's party, figures, date (1 Aug 2026), `REFERENCE` (`BP/26-27/0010`, a Sales invoice the book holds, dated 1 Aug 2026) and legs are row 2346-MN's, unchanged. The party is `BRIDGE Walk-in`, which is not bill-wise, so the note carries no bill allocation.
 
-**`timed.py`** sends the import once, then R at once, at +5 s and at +60 s, each counted from the moment curl returned the import's answer. It is row 2162-S2's `run.py` (`lab/2162-s2-sheet` at a0d4c53b), with row 2346-MN's send line and stops.
+**`timed.py`** sends the import once, then R at once, at +5 s and at +60 s, each counted from the moment curl returned the import's answer. It is row 2162-S2's `run.py` (`lab/2162-s2-sheet` at a0d4c53b), with row 2346-MN's send line and stops, and the same C3 check as `run.py`.
 - A stop on the import ends the run, and the reads are not sent.
 - **The import's answer is judged by C4 before any read:** every counter present once, `CREATED` 1, `ALTERED`, `DELETED`, `COMBINED`, `IGNORED`, `ERRORS`, `CANCELLED` and `EXCEPTIONS` 0, and no `LINEERROR`. Anything else stops it with the counters printed, and no read is sent.
 - **It runs once.** It refuses to start, and sends nothing, if this label's import answer or log is already in the folder.
@@ -90,6 +94,7 @@ The note's party, figures, date (1 Aug 2026), `REFERENCE` (`BP/26-27/0010`, a Sa
   - that answer with `CREATED` 0 and `EXCEPTIONS` 1, with a `LINEERROR` added, or with `IGNORED` removed: each stopped after the import, with no read sent;
   - a second run in the same folder: refused, nothing sent;
   - SIGINT, and no Enter to read, at the prompt: stopped with the two reads sent, and the times file held both and the interrupt.
+  - with the C3 stand-in: clean, all four sends with status 200 and `CONTENT-LENGTH` in the times; a `CONTENT-LENGTH` over the body: stopped after the import, with no read sent.
 
 **`count22.py`** is row 2346-MN's `count21.py` with two changes, each marked N134. Its header also says that count21's header below it is kept as it was.
 - **W** (the build's month read) prints every child of the row whose tag begins `BRIDGEVCHIS`, in place of `BRIDGEVCHISSALES` alone, and then how many rows hold none. A row with none prints "class element absent". Tally omits the element of a function it does not answer, so that is a result of the read, never No and never 0 rows. `--guid` prints the same way.
@@ -201,7 +206,7 @@ They write `READER.md` on the answers branch, with each check, whether it held, 
 
 ## Record
 - Each answer's bytes and sha256, and `count22.py`'s lines.
-- `run.py`'s and `timed.py`'s logs for each label, and `times-s4.txt`.
+- `run.py`'s and `timed.py`'s logs for each label, `times-s4.txt`, and every `h-*.txt` headers file.
 - The `--diff`, `--w-diff`, `--guid`, `--type-diff`, `--before-write` and `--same-row` outputs, whole.
 - Step 3's screens: every field and value as text, and the screenshots by name, bytes and sha256.
 - The window after the import (shot), by name, bytes and sha256, and when it was taken against `times-s4.txt`.

@@ -10,6 +10,8 @@
 # Without --pause, it waits after the +5 s read for Enter, pressed once the window's screenshot is taken and shows no
 # dialog, and sends the +60 s read at +60 s or at the Enter, whichever is later. The Enter's time goes to the times.
 # The times file is rewritten after every send, so an interrupt (Ctrl+C) keeps every send made before it.
+# curl also gets C3's -w "%{http_code} %{size_download}" and -D h-<answer label>-<FILE>.txt, which change no
+# byte Tally receives; each send STOPs after the curl exit check unless c3_check passes (as run.py's).
 # Answers: a-<LABEL>-<IMPORT> and a-<LABEL>t00-<READ>, a-<LABEL>t05-<READ>, a-<LABEL>t60-<READ>, so count22.py reads
 # each by its kind. Every send and return time goes to times-<LABEL>.txt, and each send to log-<LABEL>.txt.
 # --pause: after the import's answer, wait for Enter (the window's screenshot is taken then), and count the three
@@ -51,21 +53,51 @@ def import_clean(raw):
     clean = read["CREATED"] == "1" and not errors and all(
         read[k] == "0" for k in COUNTERS if k not in ("CREATED", "LASTVCHID", "LASTMID"))
     return shown, None if clean else "the import was not created clean"
+def c3_check(printed, headers, size):
+    # N134: LAB-COMMON C3. curl's -w line is "<status> <bytes>"; -D keeps the headers. STOP unless the status is
+    # 200 in both, the last header block holds exactly one CONTENT-LENGTH (any case), and it, the -w byte count and
+    # the answer file's size are equal. Returns (status, content length) as read, and a reason to stop or None.
+    words = printed.split()
+    if len(words) != 2 or not all(w.isdigit() for w in words):
+        return (None, None), f"curl's -w line is {printed!r}, not '<status> <bytes>'"
+    code, downloaded = int(words[0]), int(words[1])
+    if not headers.exists():
+        return (code, None), f"no headers file {headers.name}"
+    blocks = [b for b in headers.read_bytes().decode("latin-1").replace("\r\n", "\n").split("\n\n") if b.strip()]
+    if not blocks:
+        return (code, None), f"the headers file {headers.name} is empty"
+    lines = blocks[-1].split("\n")
+    status = lines[0].split()
+    lengths = [l.split(":", 1)[1].strip() for l in lines[1:] if l.split(":", 1)[0].strip().lower() == "content-length"]
+    length = int(lengths[0]) if len(lengths) == 1 and lengths[0].isdigit() else None
+    if code != 200 or len(status) < 2 or status[1] != "200":
+        return (code, length), f"status {code} (headers: {lines[0]!r}), not 200"
+    if length is None:
+        return (code, None), f"the headers hold {len(lengths)} CONTENT-LENGTH lines {lengths!r}, not one number"
+    if not length == downloaded == size:
+        return (code, length), f"CONTENT-LENGTH {length}, curl read {downloaded}, the file holds {size}: not equal"
+    return (code, length), None
 def texts(raw):
     body = raw[2:] if raw[:2] == b"\xff\xfe" else raw
     return (body.decode("utf-16-le", "replace"), raw.decode("utf-8", "replace"))
 def send(name, answer_label):
     answer = here / f"a-{answer_label}-{name}"
     start = time.monotonic()
-    done = subprocess.run(["curl.exe", "-sS", "--fail-with-body", "-H", "Content-Type: text/xml; charset=utf-16",
-        "--data-binary", f"@{here / name}", "-o", str(answer), url])
+    headers = here / f"h-{answer_label}-{name}.txt"
+    done = subprocess.run(["curl.exe", "-sS", "--fail-with-body", "-w", "%{http_code} %{size_download}",
+        "-D", str(headers), "-H", "Content-Type: text/xml; charset=utf-16",
+        "--data-binary", f"@{here / name}", "-o", str(answer), url], stdout=subprocess.PIPE, text=True)
     end = time.monotonic()
     size = answer.stat().st_size if answer.exists() else 0
-    sent.append((name, answer.name, start, end, done.returncode, size))
+    (code, length), refused = c3_check(done.stdout, headers, size)
+    sent.append((name, answer.name, start, end, done.returncode, size, code, length))
     with open(here / f"log-{label}.txt", "a") as log:
-        log.write(f"{time.strftime('%H:%M:%S')}\t{name}\t{answer.name}\tcurl {done.returncode}\t{size} bytes\n")
+        log.write(f"{time.strftime('%H:%M:%S')}\t{name}\t{answer.name}\tcurl {done.returncode}\tstatus {code}\t"
+                  f"CONTENT-LENGTH {length}\t{size} bytes\n")
     if done.returncode != 0:
         stop(f"curl exit {done.returncode} on {name}: stop, do not resend")
+    if refused:
+        stop(f"{refused} on {name}: the request failed (C3); stop, do not resend")
     if size == 0:
         stop(f"empty answer on {name}: the request failed; stop, do not resend")
     if size > BOUND:
@@ -78,8 +110,9 @@ def send(name, answer_label):
 def write_times(show=True):
     t0 = clock if clock is not None else (sent[0][3] if sent else 0)
     with open(here / f"times-{label}.txt", "w") as out:
-        for name, answer, start, end, code, size in sent:
-            out.write(f"{name}\t{answer}\tsent +{start - t0:.3f}s\treturned +{end - t0:.3f}s\tcurl {code}\t{size} bytes\n")
+        for name, answer, start, end, exit_code, size, status, length in sent:
+            out.write(f"{name}\t{answer}\tsent +{start - t0:.3f}s\treturned +{end - t0:.3f}s\tcurl {exit_code}\t"
+                      f"status {status}\tCONTENT-LENGTH {length}\t{size} bytes\n")
         for what, at in marks:
             out.write(f"{what}\t+{at - t0:.3f}s\n")
     if show:

@@ -1,0 +1,17 @@
+{
+  "source": "Live licensed TallyPrime 7.2 answer to one raw gateway import of a single Journal voucher into a synthetic lab company with inventory integrated, debiting a ledger that sits under Stock-in-Hand (A1 Closing Stock, Dr 100.00) against a ledger under Capital Account (A1 Capital, Cr 100.00), dated 10 April 2025. The request was an Import Data envelope for one Journal, sent as UTF-16LE with a BOM by curl; no ComplyEaze Bridge build ran. Lab record: branch lab/1108-a1-stock-in-hand-journal-answers at 9d8ae44e, file answers/a1-a1-stock-journal.utf16le.xml",
+  "observed_date": "2026-11-05",
+  "source_response_bytes": 726,
+  "source_response_sha256": "2dc624f4f110c2e32d1d38245fb2e4169058b6e8f6c50ff62e0f8d1d8e730728",
+  "source_request_bytes": 1850,
+  "source_request_sha256": "113997a9df525d0d2f2def83fcc841e0f0a06db44c9b8ba0d6bc9913ec5c9f99",
+  "fixture_bytes": 726,
+  "fixture_sha256": "2dc624f4f110c2e32d1d38245fb2e4169058b6e8f6c50ff62e0f8d1d8e730728",
+  "encoding": "UTF-16LE without BOM",
+  "rows": 0,
+  "transformation": [
+    "none: the fixture is the response byte for byte"
+  ],
+  "provenance_limit": "One live import, sent once, to a licensed TallyPrime 7.2 holding one synthetic lab company, 5 Nov 2026. Establishes that a Journal with a line on a ledger under Stock-in-Hand, in a book with inventory integrated, is answered CREATED 0, ERRORS 0, EXCEPTIONS 1, every other counter 0, LASTVCHID 0, LASTMID 0, and one LINEERROR naming the ledger. Read back in the same sitting (observed once; those read-back responses are not committed here): the voucher mark did not move, the company held no voucher before or after, and no dialog showed on Tally's screen. It does not establish the answer for any other cause of rejection, for a book not integrated with inventory, for another voucher type, for the same line posted through ComplyEaze Bridge's post_import, in a batch, or on another Tally version or edition.",
+  "sensitivity_review": "Synthetic lab company and synthetic ledger names only; no GSTIN, PAN, email, phone, address, URL, credentials or machine paths. The company's GUID and number are not in this answer."
+}

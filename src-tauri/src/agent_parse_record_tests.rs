@@ -162,6 +162,26 @@ fn stock_line_rows(text: &str, guid: &str) -> String {
     ))
 }
 
+/// The `vouchers` rows as a window read that names the three e-invoice words parses them
+/// (`include_e_invoice`, §8.2j): composites withheld, each row's `IRN`, `IRNACKNO` and
+/// `IRNACKDATE` read.
+fn e_invoice_rows(text: &str, guid: &str) -> String {
+    use super::voucher_parse::{
+        parse_agent_rows_withholding_reading_gst, EInvoiceFields, NamedVoucherFields, StockLines,
+        VoucherGstFields,
+    };
+    coded(parse_agent_rows_withholding_reading_gst(
+        text,
+        guid,
+        super::GstDetailsShown::Withheld,
+        NamedVoucherFields {
+            e_invoice: EInvoiceFields::Asked,
+            gst: VoucherGstFields::NotAsked,
+        },
+        StockLines::NotAsked,
+    ))
+}
+
 fn withholding(text: &str, guid: &str) -> String {
     coded(parse_agent_rows_withholding(text, guid))
 }
@@ -690,6 +710,16 @@ fn rows() -> Vec<Row> {
         "agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
         "parse_agent_rows(EINVOICE_LAB)",
         |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml",
+        "parse_agent_rows_withholding_reading_gst(EINVOICE_LAB, e-invoice asked)",
+        |_, t| e_invoice_rows(t, EINVOICE_LAB)
     ));
     rows.push(row!(
         "agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml",

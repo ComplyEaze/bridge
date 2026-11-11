@@ -22,7 +22,8 @@ use std::{collections::HashSet, fmt};
 
 use crate::{
     native_outstandings::NativeLedgerSnapshotPeriod,
-    tolerant_xml::sanitize_invalid_numeric_references, xml_text::escape_text as xml_escape,
+    tolerant_xml::sanitize_invalid_numeric_references,
+    xml_read_profiles::compatibility::static_variables_for_unvalidated_company,
 };
 
 /// Which built-in statement a request names and a response is parsed as.
@@ -237,11 +238,17 @@ pub(crate) fn render_report_envelope(
     period: &NativeLedgerSnapshotPeriod,
     extra: &str,
 ) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>{extra}"#,
+            from = period.from().as_str(),
+            to = period.to().as_str(),
+        ),
+    );
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>{extra}</STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
-        from = period.from().as_str(),
-        to = period.to().as_str(),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC>{static_variables}</DESC></BODY></ENVELOPE>"#
     )
 }
 

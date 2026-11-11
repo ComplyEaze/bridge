@@ -1905,7 +1905,11 @@ async fn read_invoice_plan(
     answers.rates = Some(paired(client, identity, &plan.rates, &mut evidence).await?);
     answers.voucher_types =
         Some(paired(client, identity, &plan.voucher_types, &mut evidence).await?);
-    answers.number = Some(paired(client, identity, &plan.number, &mut evidence).await?);
+    for month in &plan.number {
+        answers
+            .number
+            .push(paired(client, identity, month, &mut evidence).await?);
+    }
     if let Some(request) = &plan.number_control {
         answers.number_control = Some(paired(client, identity, request, &mut evidence).await?);
     }

@@ -64,6 +64,67 @@ jobs:
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: 1.96.0
+      # The locked crates are fetched here, in a step of their own, and not during the build of the
+      # unmutated copy: a download that failed there refused the shard, opened the tracking issue
+      # and held every crate pull request until someone re-ran the night (4 of the nightly's 6 failures
+      # in the window read for the issue were fetch errors). A network failure is retried (3 attempts
+      # at most, 30 s then 60 s apart); a failure that is not a network failure ends the step at once;
+      # a network failure that persists ends it after the third attempt. A crate the registry reports
+      # missing (cargo's own text for a 404 or 410 on a download, or no such package in the index: a
+      # permanent answer) ends it at once too, and each attempt is cut off after
+      # 15 minutes (a timeout is retried like a network failure), so a stalled download cannot hold a runner
+      # for the job's whole limit. Either way the step fails
+      # with the named error below and a typed refusal in place of results, so the report says
+      # "dependency fetch failed", not a mutation result. `cargo fetch` cannot be limited to one
+      # package: it downloads the whole workspace's locked crates (about 560 registry packages against
+      # about 120 in the records crate's own closure), so a failure on a crate this shard never builds
+      # can now refuse it; the retry bounds that, and the crates are then in the runner's cache.
+      - name: Fetch the locked crates, retrying a network failure
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set +e
+          attempts=3
+          fetch_timeout="${FETCH_TIMEOUT:-15m}"
+          log="$RUNNER_TEMP/fetch.log"
+          attempt=1
+          while true; do
+            timeout --kill-after=30s "$fetch_timeout" cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-unknown-linux-gnu 2>&1 | tee "$log"
+            rc=${PIPESTATUS[0]}
+            if [ "$rc" -eq 0 ]; then
+              echo "dependency-fetch: attempt $attempt/$attempts outcome=ok"
+              exit 0
+            fi
+            kind=other
+            if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+              kind=timeout
+            elif grep -Eq 'successful HTTP response from .* got (404|410)([^0-9]|$)|no matching package named' "$log"; then
+              kind=missing
+            elif grep -Eq 'curl failed|spurious network error|download of .* failed|unable to update registry|failed to download|Could not resolve host|Couldn.t connect|Operation timed out|Connection (reset|refused)|SSL_ERROR|returned error: 5[0-9][0-9]' "$log"; then
+              kind=network
+            fi
+            if [ "$kind" = other ]; then
+              echo "dependency-fetch: attempt $attempt/$attempts outcome=other-failure (not a network failure), not retrying"
+              break
+            fi
+            if [ "$kind" = missing ]; then
+              echo "dependency-fetch: attempt $attempt/$attempts outcome=missing-crate (the registry answered not found, a permanent answer), not retrying"
+              break
+            fi
+            label=network-failure
+            if [ "$kind" = timeout ]; then label="timeout after $fetch_timeout"; fi
+            if [ "$attempt" -ge "$attempts" ]; then
+              echo "dependency-fetch: attempt $attempt/$attempts outcome=$label, no attempts left"
+              break
+            fi
+            pause=$((attempt * 30))
+            echo "dependency-fetch: attempt $attempt/$attempts outcome=$label, retrying in $pause s"
+            sleep "$pause"
+            attempt=$((attempt + 1))
+          done
+          echo "::error::dependency fetch failed after $attempt of $attempts attempts: no mutation was run on shard $SHARD of 8 (see the cargo output above)"
+          node -e 'const fs = require("fs"); const lines = fs.readFileSync(process.argv[1], "utf8").split(/\r?\n/).filter((l) => l.trim() && !/^\s*(Updating|Downloading)/.test(l)).slice(0, 20); fs.writeFileSync(process.argv[2], JSON.stringify({ refused: { shard: process.argv[3] + "/8", problems: ["dependency fetch failed after " + process.argv[4] + " of 3 attempts: no mutation was run"], output: lines } }, null, 1) + "\n");' "$log" "$RUNNER_TEMP/shard-$SHARD.json" "$SHARD" "$attempt"
+          exit 1
       # The whole list each time, and a survivor verdict never comes from a subset of the
       # tests: a proof run's killers-first pass falls back to the full suite for any
       # mutation its recorded killers do not kill. Exit 1 is a mutation not killed: this step leaves it
@@ -109,12 +170,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      actions: read
       contents: read
       issues: write
     steps:
+      # Full history: the listing below compares this run's commit with the last green night's.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version-file: .node-version
@@ -157,6 +221,29 @@ jobs:
             report.md
           if-no-files-found: warn
           retention-days: 30
+      # The nightly run is the only check of the crate's outside inputs, so a failure says which of them
+      # moved since the last green night. The last green run is read from the run list; when it cannot
+      # be found or read, the reason goes into the listing, which then says it could not be computed.
+      # That is never written as "none changed".
+      - name: List the outside inputs changed since the last green night
+        if: ${{ github.ref == 'refs/heads/master' && steps.judge.outputs.failed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set +e
+          base=""
+          reason=""
+          if ! last="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow tax-audit-mutations-nightly.yml --branch master --status success --limit 1 --json headSha --jq '.[0].headSha // ""')"; then
+            reason="could not read the run list (the gh command failed)"
+          elif [ -z "$last" ]; then
+            reason="no earlier green run was found"
+          else
+            base="$last"
+          fi
+          if ! node scripts/nightly-outside-inputs.mjs --base "$base" --head "$HEAD_SHA" --reason "$reason" > outside-inputs.md || [ ! -s outside-inputs.md ]; then
+            printf '## Outside inputs changed since the last green nightly\n\nCould not be computed: the listing step failed. This is not the same as "none changed": the list is unknown.\n' > outside-inputs.md
+          fi
       # Only master's run speaks for master: a run dispatched on another branch
       # must not close, or rewrite the failing ids of, master's issue.
       - name: Open, update or close the tracking issue
@@ -172,6 +259,9 @@ jobs:
           # The oldest open issue, if several were opened by hand.
           open="$(gh issue list --label mutation-nightly --state open --limit 100 --json number --jq 'map(.number) | min // empty')"
           { echo "Run: $RUN_URL"; echo; cat report.md; } > body.md
+          if [ "$FAILED" = "true" ]; then
+            { echo; cat outside-inputs.md 2>/dev/null || printf '## Outside inputs changed since the last green nightly\n\nCould not be computed: the listing step did not run. This is not the same as "none changed": the list is unknown.\n'; } >> body.md
+          fi
           if [ "$FAILED" = "true" ]; then
             if [ -n "$open" ]; then
               # The body carries the latest failing-ids line, which ci.yml reads.

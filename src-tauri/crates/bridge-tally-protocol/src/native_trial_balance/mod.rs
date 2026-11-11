@@ -1,6 +1,6 @@
 //! Native Trial Balance source contract and closed request profile.
 //! See TALLY_PROTOCOL_REFERENCE section 5.6 for observed field semantics.
-use crate::xml_text::escape_text as xml_escape;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use crate::{native_outstandings::NativeLedgerSnapshotPeriod, PartyLedgerMasterFieldObservation};
 use bridge_tally_primitives::ExactDecimal;
 use serde::Serialize;
@@ -151,7 +151,7 @@ impl std::error::Error for NativeTrialBalanceError {}
 /// the already-admitted snapshot period: `TBALOPENING` and `TBALCLOSING` are
 /// meaningful only for the same validated window.
 pub fn render_native_trial_balance_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_trial_balance_collection(
@@ -168,7 +168,7 @@ pub fn render_native_trial_balance_request(
 /// byte-for-byte unchanged. On the captured several-currency book every row
 /// carried it (`trial_balance_currency_forex_live`; one book, one run: PARTIAL).
 pub fn render_native_trial_balance_request_with_currency(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_trial_balance_collection(
@@ -179,15 +179,20 @@ pub fn render_native_trial_balance_request_with_currency(
 }
 
 fn render_trial_balance_collection(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
     fetch: &str,
 ) -> String {
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>"#,
+            from = period.from().as_str(),
+            to = period.to().as_str(),
+        ),
+    );
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>{fetch}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
-        from = period.from().as_str(),
-        to = period.to().as_str(),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>{fetch}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#
     )
 }
 

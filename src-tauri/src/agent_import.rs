@@ -19,6 +19,7 @@ use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
@@ -5936,7 +5937,14 @@ pub(super) fn render_import_verification_in_span(
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
-    format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>", xml_escape(company))
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
+    format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
 }
 
 pub(super) fn local_evidence(label: &str) -> Evidence {
@@ -6316,6 +6324,11 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
     let _ = file;
     Ok(())
 }
+
+/// The request bytes of every app builder, pinned by hash (#2397).
+#[cfg(test)]
+#[path = "agent_import_request_bytes_tests.rs"]
+mod request_bytes_tests;
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;

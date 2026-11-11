@@ -2275,6 +2275,9 @@ fn a_number_read_back_without_its_end_space_is_a_voucher_number_diff() {
         "read back as sent, nothing differs"
     );
     assert_eq!(diffs("PV-1"), vec![json!("voucher_number")]);
+    // A number that folds alike for the absence check (#2162 item 11) is
+    // still another number after a post.
+    assert_eq!(diffs("PV-01 "), vec![json!("voucher_number")]);
 }
 
 #[test]
@@ -2790,62 +2793,145 @@ fn the_lab_invoice_rates_request_is_the_captured_one_with_its_guids() {
     }
 }
 
-/// The sha256 of the number reads the code sends for `BP/26-27/0010`,
-/// `BP/26-27/0001` and the W18 invoice's `BP/26-27/0040`: the lab's
-/// `r09-number-new-invoice.xml`, `r10-number-control-k0.xml` and
-/// `w18-number-0040.xml` with `IRN, IRNACKNO, IRNACKDATE` added to the
-/// fetch list (DERIVED: the requests with those words were not sent to this
-/// book, and the answers replayed to them were captured without them; on
-/// another book the words changed nothing else in the answer,
-/// `lab/2162-irn-read-answers` R1, #2162 item 8).
-pub(super) const LAB_NUMBER_NEW_INVOICE_SHA256: &str =
-    "fa77d18300e04e0aeb542c664aa4f1390e43a5c08442d6329f6a0352714c3e9d";
-pub(super) const LAB_NUMBER_CONTROL_SHA256: &str =
-    "9750f0fffe721ba905ffaeb9ebf2e3b84d503eebe39112fcb400393bdeac6b49";
-pub(super) const W18_NUMBER_SHA256: &str =
-    "ec2a6c29deb324d0c14302ff4456b8a28a8f5e12cfab5b358a5ee9265f0e3726";
+/// The month reads of the pilot book's financial year 2026-27 (row 2162-M1,
+/// part A, 9 Nov 2026; fixtures/agent/pilot-lab/PROVENANCE.md): each month's
+/// first and last day, the SHA-256 of the request the lab sent for it, and
+/// Tally's answer. Ten months held no voucher and answered byte-identically.
+pub(super) fn lab_number_months() -> [(&'static str, &'static str, &'static str, &'static [u8]); 12]
+{
+    let empty: &'static [u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbers-empty-month.utf16le.xml");
+    let august: &'static [u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-08.utf16le.xml");
+    let september: &'static [u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-09.utf16le.xml");
+    [
+        (
+            "20260401",
+            "20260430",
+            "c247b44f63d3d3107f1a4eec8bb6e98f2ef163ddae0c9969d97b40fe59679ebc",
+            empty,
+        ),
+        (
+            "20260501",
+            "20260531",
+            "a4afaa7bee760457d8c199c8a83bdd9a69f1bf73f246bf868ad89f095426d518",
+            empty,
+        ),
+        (
+            "20260601",
+            "20260630",
+            "2ebf04a727ddfdc48d028b340fade10d88e18279069bbb2374645197af71ed5c",
+            empty,
+        ),
+        (
+            "20260701",
+            "20260731",
+            "80f2ca5df0fd1035956d95df44a34ab790e8105b0ec69121de325f2f8a9e3e9d",
+            empty,
+        ),
+        (
+            "20260801",
+            "20260831",
+            "b226ad52af00b919a62d9c29e2d2e6db0fe1ad4071fbe2a97da3a82852c23d26",
+            august,
+        ),
+        (
+            "20260901",
+            "20260930",
+            "9e6ff4c88df3af12f8c6be5d2b4abaf6d1cae133a0eea406b75c86af70990447",
+            september,
+        ),
+        (
+            "20261001",
+            "20261031",
+            "54e5fcb963d3d547c71d5aa61b242f39a5737120353a8832c5ca2e49ccc99853",
+            empty,
+        ),
+        (
+            "20261101",
+            "20261130",
+            "84fb20ef3ed1065e7c4534113287143d2cb36846b391770d9aa6466d2bfa8381",
+            empty,
+        ),
+        (
+            "20261201",
+            "20261231",
+            "e6df4cf0d2133d0d681ee074fce020391828ce4733614e2d3965c24035914dac",
+            empty,
+        ),
+        (
+            "20270101",
+            "20270131",
+            "3ff8a263528b18baabdfdaa8ad0457d8ff1f236782c1bbd43e7bfe8cfd40cb10",
+            empty,
+        ),
+        (
+            "20270201",
+            "20270228",
+            "a8fbb5f9cd443928bd430a481c4da1cf0040255f5c9e43901351b2a22d43d292",
+            empty,
+        ),
+        (
+            "20270301",
+            "20270331",
+            "45d1541630cc938e63c1733f97d280e9eba94ee40fcb70ac48c5e2fccdddb4af",
+            empty,
+        ),
+    ]
+}
 
+/// DERIVED, not Tally's bytes: the pilot book's August answer
+/// ([`lab_number_months`]) with the one `VOUCHER` row of `BP/26-27/0010`
+/// removed, as UTF-16LE. The replays post that invoice as a new one, and the
+/// book read on 9 Nov already held it. Nothing else in the answer differs.
+pub(super) fn lab_numbers_august_without_0010() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    BYTES.get_or_init(|| {
+        august_without_0010(&utf16le(lab_number_months()[4].3))
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect()
+    })
+}
+
+fn august_without_0010(august: &str) -> String {
+    let marker = "<VOUCHERNUMBER>BP/26-27/0010</VOUCHERNUMBER>";
+    assert_eq!(august.matches(marker).count(), 1);
+    let at = august.find(marker).unwrap();
+    let start = august[..at].rfind("<VOUCHER ").unwrap();
+    let end = at + august[at..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+    // The row's own line break goes with it.
+    let end = end + august[end..].len() - august[end..].trim_start_matches(['\r', '\n']).len();
+    format!("{}{}", &august[..start], &august[end..])
+}
+
+/// The month reads the code renders for the pilot book's year are the requests
+/// the lab sent (row 2162-M1), and the derived August differs from the
+/// captured one by exactly the row of `BP/26-27/0010`.
 #[test]
-fn the_lab_number_reads_are_the_sent_ones_with_the_e_invoice_words() {
-    let window = (stored_date("20260401"), stored_date("20270331"));
-    let sha256 = |request: &str| {
+fn the_lab_month_reads_are_the_sent_ones_and_the_derived_august_drops_one_row() {
+    for (from, to, pinned, _) in lab_number_months() {
+        let rendered = invoice::render_invoice_window_numbers_request(
+            "BRIDGE PILOT LAB",
+            (&stored_date(from), &stored_date(to)),
+        );
         let sent = [0xFF, 0xFE]
             .into_iter()
-            .chain(request.encode_utf16().flat_map(u16::to_le_bytes))
+            .chain(rendered.encode_utf16().flat_map(u16::to_le_bytes))
             .collect::<Vec<u8>>();
-        crate::agent::sha256_hex(&sent)
-    };
-    for (number, sent, pinned) in [
-        (
-            "BP/26-27/0010",
-            "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985",
-            LAB_NUMBER_NEW_INVOICE_SHA256,
-        ),
-        (
-            "BP/26-27/0001",
-            "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6",
-            LAB_NUMBER_CONTROL_SHA256,
-        ),
-        (
-            "BP/26-27/0040",
-            "84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8",
-            W18_NUMBER_SHA256,
-        ),
-    ] {
-        let rendered = invoice::render_invoice_number_request(
-            "BRIDGE PILOT LAB",
-            &invoice::InvoiceNumber::parse(number).unwrap(),
-            (&window.0, &window.1),
-        );
-        let words = ", IRN, IRNACKNO, IRNACKDATE</FETCH>";
-        assert_eq!(rendered.matches(words).count(), 1, "{number}");
-        assert_eq!(
-            sha256(&rendered.replace(words, "</FETCH>")),
-            sent,
-            "{number}"
-        );
-        assert_eq!(sha256(&rendered), pinned, "{number}");
+        assert_eq!(crate::agent::sha256_hex(&sent), pinned, "{from}");
     }
+    let august = utf16le(lab_number_months()[4].3);
+    let derived = utf16le(lab_numbers_august_without_0010());
+    let rows = |xml: &str| xml.matches("<VOUCHER ").count();
+    assert_eq!((rows(&august), rows(&derived)), (40, 39));
+    assert!(!derived.contains("BP/26-27/0010"));
+    assert!(derived.contains("<VOUCHERNUMBER>BP/26-27/0009</VOUCHERNUMBER>"));
+    // Put back, the row restores the captured bytes.
+    let at = august
+        .find("<VOUCHERNUMBER>BP/26-27/0010</VOUCHERNUMBER>")
+        .unwrap();
+    let start = august[..at].rfind("<VOUCHER ").unwrap();
+    assert_eq!(&derived[..start], &august[..start]);
+    assert!(august.ends_with(&derived[start..]));
 }
 
 /// The cut [`rates_cut_to`] makes is, on the lab's own bytes, Tally's answer to
@@ -6985,4 +7071,40 @@ fn each_captured_alias_names_its_ledger_and_a_case_variant_names_none() {
             assert_eq!(entry["match_state"], *state, "{name}: {entry}");
         }
     }
+}
+
+/// #2433: a company list that holds a marked company, one whose name no
+/// request can carry, still builds a batch for an unmarked company in the same
+/// book. Before, the list was refused for every company in it. The build reads
+/// what it read before, and the batch is the same.
+#[tokio::test]
+async fn an_unmarked_company_builds_beside_a_marked_one() {
+    let marked = "<COMPANY NAME=\"Lab&#x1;\"><GUID>00000000-0000-4000-8000-000000002433</GUID><COMPANYNUMBER>2</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION>";
+    let mut lists = 0;
+    let plans = whole_build(build_numbering_plans(&[]))
+        .into_iter()
+        .map(|mut plan| {
+            let body = plan.fixture.body().into_owned();
+            if body.contains("<COLLECTION><COMPANY NAME=\"WR2 Unicode Lab\">") {
+                lists += 1;
+                plan.fixture = Fixture::SyntheticXml(body.replace("</COLLECTION>", marked));
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    assert!(lists > 0, "the build's company lists were found");
+    let simulator = SequenceSimulator::spawn(plans).expect("captured build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
+        .await
+        .expect("the unmarked company builds");
+    assert_eq!(built.payload["result"]["voucher_count"], 2);
+    let requests = simulator.finish().unwrap();
+    assert_eq!(
+        requests.len(),
+        QUALIFIED_BUILD_REQUESTS,
+        "the same reads as before"
+    );
 }

@@ -203,7 +203,8 @@ line posts to a ledger the book's masters carry): each gains only `"MAP-0"` in
 `book_invariants_evaluated`. The fixture has no such line, so no violation is added.
 
 The two `financial_statements` goldens carry one declared behaviour difference from the reference
-(2026-10-29, #1709); see "Declared behaviour difference" below.
+(2026-10-29, #1709), and `synthetic.trial_balance.json` and `edge.tb_rows.trial_balance.json` another
+(2026-11-09, #2133); see "Declared behaviour difference" below.
 
 Batch 1 of the port (2026-09-21) adds `trial_balance`, `stale_balances_41_1`, `ledger_scrutiny`
 and `cash_book_integrity`. Two ledgers are appended after every earlier one (so no earlier ledger's
@@ -451,6 +452,54 @@ existing output to be a declared difference that names the invented book which e
 - **Where it is declared.** The divergence registry of #1809 is not on master. When it is, this
   difference belongs there, with the goldens back at the reference's bytes.
 
+## Declared behaviour difference: the closing-not-movements figure of trial_balance
+
+2026-11-09, #2133. `docs/tax-audit/parity-spec-v1.md` section 12 requires every change to an
+existing output to be a declared difference that names the invented book which exercises it.
+
+- **What differs.** For a listed row whose closing is not its opening plus its debit less its
+  credit, `trial_balance` adds the figure `tb_closing_not_movements_<tag>`: the closing less
+  (opening + debit - credit), Dr positive, in paise, with a definition that says the closing is
+  Tally's own field kept as exported and that on a Closing Stock ledger whose closing was keyed on
+  Tally's screen it is the opening, not the closing stock Tally's statements use. A row that ties
+  gets no such figure, and a read where every row ties changes in no byte. Every existing figure is
+  as before, and the new module invariant TB-3 (the figure is present exactly when the row does not
+  tie and equals the gap) adds no violation to any golden.
+- **The books.** The unit-test books of `book::tests` (`a_row_ties_when_its_closing_is_opening_plus_debit_less_credit`,
+  `the_gap_is_the_closing_less_the_movements_in_dr_positive_paise`,
+  `overflow_is_none_never_a_tie_or_a_gap`); the unit-test book of
+  `tb3_fires_when_the_gap_figure_is_missing_wrong_or_on_a_row_that_ties` in
+  `tests/module_invariants_batch1.rs`; and the two raw Trial Balance answers committed under
+  `bridge-tally-protocol/tests/fixtures/native/` (a Closing Stock ledger opened at 1,000.00 and keyed
+  to 1,400.00, on a book not integrated with inventory and on one that is), read by
+  `book::tests::the_keyed_closing_stock_row_is_the_only_one_that_does_not_tie_on_both_captures`,
+  `trial_balance_states_the_gap_beside_the_closing_field_on_both_captures` and
+  `financial_statements_use_the_movements_on_both_captures`. The captures establish the Closing Stock
+  row only: the tests build each book by hand around the rows `load_tb` reads (each ledger under its
+  parent group alone, no vouchers), and the last test sets the integrated book's stock terms
+  (opening 1,000.00, closing 1,200.00, the item-valued figure the lab's Profit and Loss answer
+  showed) itself.
+- **The goldens, each case worked by hand (by the author; the maintainers' sign-off of the values belongs with the registry entry).** Three rows of two committed goldens gain the figure.
+  `golden/synthetic.trial_balance.json`, Hardware Stock (a stale stock ledger): opening 60,000.00 +
+  debit 75,000.00 - credit 5,000.00 = 130,000.00 against a closing field of 60,000.00, so the gap is
+  -70,000.00 (-7000000 paise). Electricity: 0.00 + debit 3,650.50 - 0.00 = 3,650.50 against a closing
+  of 3,655.50, so the gap is +5.00 (500 paise), the Rs 5.00 the synthetic read carries deliberately.
+  `golden/edge.tb_rows.trial_balance.json`, Beta Traders (a closing-only row from the edge book
+  `edge-books/tb_rows.json`): no opening and no movement against a closing of 5.00 credit, so the
+  gap is -5.00 (-500 paise). Each golden gained the new figure records and nothing else; the new
+  records are placed in the dump's id order with the hash `canonical.rs` uses, as a regeneration
+  would. `golden/edge.tb_rows.trial_balance.order.json` does not move: it lists only the
+  `tb_group_` figures, in the reference's emission order, and no group figure changed.
+- **Why they were not regenerated.** `parity/python_golden.py` takes the reference engine's
+  `engine/` directory as `ENGINE`, which is not in this repository, so it was not run. The
+  reference does not emit the new figure (inferred from the existing dumps, not measured), so a
+  regeneration would remove it.
+- **What a local parity run shows.** `examples/local_parity.rs` exits non-zero on any difference. A
+  run of `trial_balance` on a real book with a row that does not tie will report the new figure as
+  present in the crate and absent in the reference. It is this declared difference, not a regression.
+- **Where it is declared.** The divergence registry of #1809 is not on master. When it is, this
+  difference belongs there, with the goldens back at the reference's bytes.
+
 ## Bytes
 
 | Fixture | Bytes | SHA-256 | Path |
@@ -462,7 +511,7 @@ existing output to be a declared difference that names the invented book which e
 | `synthetic.financial_statements.noreport.json` | 15,893 | `5d6dcd510628850aac9b0ea0b4a97bd7c7fa46e2f4df81d2f0af62122d8011af` | `golden/synthetic.financial_statements.noreport.json` |
 | `synthetic-report-totals.json` | 134 | `e772509bd6ebc52afc23ef9742b6b1f2a090737533abe3761a7448124411b7e3` | `synthetic-report-totals.json` |
 | `synthetic.applicability_44ab.json` | 11,960 | `2e67df43f09f8e2c1ba01ef8314773174882238743fd26f79014eb96bef06079` | `golden/synthetic.applicability_44ab.json` |
-| `synthetic.trial_balance.json` | 92,621 | `249306799598823277ac59bb68dcd83c4af9d693b68d648b0d2f79852e3fd69f` | `golden/synthetic.trial_balance.json` |
+| `synthetic.trial_balance.json` | 93,826 | `6bdb7d80358b323ea73baf978937870c80a6bf7f60de98d8622f0c1cc01e994c` | `golden/synthetic.trial_balance.json` |
 | `synthetic.stale_balances_41_1.json` | 10,501 | `8962228b7ab6a9c8cf95f8dcd467bcba91acac09e5b37a622518843775d31e40` | `golden/synthetic.stale_balances_41_1.json` |
 | `synthetic.ledger_scrutiny.json` | 53,038 | `f3f1505aa17b7d4b4bae46b340c439a089a3cc2e91bedad55066a7bd9cd8a628` | `golden/synthetic.ledger_scrutiny.json` |
 | `synthetic.cash_book_integrity.json` | 15,637 | `59cd53ea8fb851c28c714014795037b7f8075358cd6df6ff0cd9217b680ec48c` | `golden/synthetic.cash_book_integrity.json` |
@@ -483,7 +532,7 @@ existing output to be a declared difference that names the invented book which e
 | `edge.scrutiny_misc.ledger_scrutiny.json` | 46,305 | `015a13c75d359104fe507af79d529a562370ddf9c9df7e98b4f420920e1cefc2` | `golden/edge.scrutiny_misc.ledger_scrutiny.json` |
 | `edge.scrutiny_short.ledger_scrutiny.json` | 8,888 | `49fc16bd304aa7bdd600e1140d5914e57fefac768762c1a36a0d7b145fd9eb88` | `golden/edge.scrutiny_short.ledger_scrutiny.json` |
 | `edge.stale.stale_balances_41_1.json` | 10,520 | `c195571c72ad51ef1815dacd71328c9a40cb2a4745b27ad7528a53f96f597b51` | `golden/edge.stale.stale_balances_41_1.json` |
-| `edge.tb_rows.trial_balance.json` | 14,796 | `0ac2909425b617fcb41023efc7c886ed868404e3ef1cbee7aa8a5dea889dd6fb` | `golden/edge.tb_rows.trial_balance.json` |
+| `edge.tb_rows.trial_balance.json` | 15,396 | `ebb153477b5bbd03ca4cd15e342610d70b8928ec394ffb1fe3b1cc5101c20140` | `golden/edge.tb_rows.trial_balance.json` |
 | `edge.tb_rows.trial_balance.order.json` | 219 | `2ace3be45ee1cd6ae4757727e947e07fd2ca3600a83f480b279bdda181d5f43d` | `golden/edge.tb_rows.trial_balance.order.json` |
 | `text-probes.json` | 1,150,882 | `96ca23055262ee348a27ae2672664d9296c869d1ac95fb21f3a904b43631760c` | `text-probes.json` |
 | `synthetic-turnover-inputs.json` | 153 | `970500728d9d0447cb3fe1b6e870d5fea2c3a1bb919da05f1d601d4ba6f66929` | `synthetic-turnover-inputs.json` |

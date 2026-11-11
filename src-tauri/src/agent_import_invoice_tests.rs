@@ -1633,6 +1633,73 @@ fn an_invoice_number_refusal_names_rule_46b_and_what_it_allows() {
     );
 }
 
+/// A control the read misses is refused naming its batch, and the refusal
+/// says what the answer held (#2162 item 13): the control's number and date as
+/// the journal stores them, the Sales rows of the answer, and whether its GUID
+/// was looked for and where it was seen. Its next step is the code's own.
+#[test]
+fn a_missing_control_refusal_says_what_the_answer_held() {
+    let refusal = |guid| {
+        InvoiceRefusal {
+            code: "invoice_number_control_missing",
+            detail: RefusalDetail::ControlMissing(Box::new(ControlMissing {
+                batch_id: "b1".to_string(),
+                number: "BP/26-27/0001".to_string(),
+                date: "20260801".to_string(),
+                miss: wire::ControlMiss {
+                    sales_rows: 3,
+                    guid,
+                },
+            })),
+        }
+        .to_json()
+    };
+    let not_recorded = refusal(None);
+    assert_eq!(not_recorded["code"], "invoice_number_control_missing");
+    assert_eq!(not_recorded["detail"], "b1");
+    assert_eq!(
+        not_recorded["control"],
+        json!({"voucher_number": "BP/26-27/0001", "date": "20260801",
+               "sales_rows_in_answer": 3, "guid_in_answer": "not_recorded"})
+    );
+    assert_eq!(
+        not_recorded["remediation"].as_str(),
+        crate::agent::refusal_remediation("invoice_number_control_missing")
+    );
+    assert!(not_recorded["remediation"].is_string());
+    assert_eq!(
+        refusal(Some(wire::GuidSeen::NotSeen))["control"]["guid_in_answer"],
+        "not_seen"
+    );
+    let seen = refusal(Some(wire::GuidSeen::Seen {
+        number: Some("BP/26-27/1".to_string()),
+        date: Some("20260801".to_string()),
+        voucher_type: Some("BRIDGE Sales".to_string()),
+    }));
+    assert_eq!(
+        seen["control"]["guid_in_answer"],
+        json!({"seen_as": {"voucher_number": "BP/26-27/1", "date": "20260801",
+                           "voucher_type": "BRIDGE Sales"}})
+    );
+}
+
+/// A date is placed in its month from the month's first day to its last, both
+/// included, for every month of a financial year; a date outside the year is
+/// in none. A control dated on a month's last day is looked for in that month.
+#[test]
+fn every_month_holds_its_first_and_last_day() {
+    let date = |text: &str| bridge_tally_core::TallyDate::parse(text).expect("a YYYYMMDD date");
+    let months = wire::calendar_months(&date("20260401"), &date("20270331")).expect("a year");
+    assert_eq!(months.len(), 12);
+    for (index, (first, last)) in months.iter().enumerate() {
+        assert_eq!(month_holding(&months, first.as_str()), Some(index));
+        assert_eq!(month_holding(&months, last.as_str()), Some(index));
+    }
+    assert_eq!(months[10].1.as_str(), "20270228");
+    assert_eq!(month_holding(&months, "20260331"), None);
+    assert_eq!(month_holding(&months, "20270401"), None);
+}
+
 #[test]
 fn the_book_size_guard_admits_at_each_bound_and_refuses_one_past_it() {
     assert_eq!(voucher_mark_refusal(Some(25_000)), None);
@@ -2089,6 +2156,13 @@ fn an_invoice_is_built_alone_and_never_amended() {
     assert_eq!(
         refuse_mixed_shapes(&[voucher(), journal.clone()]),
         Err("voucher_type_shapes_mixed".to_string())
+    );
+    // Each refusal tells the caller how to split the batch.
+    assert!(crate::agent::refusal_remediation("invoice_one_per_batch")
+        .is_some_and(|step| step.contains("batch of its own")));
+    assert!(
+        crate::agent::refusal_remediation("voucher_type_shapes_mixed")
+            .is_some_and(|step| step.contains("one Sales invoice alone"))
     );
     assert_eq!(
         refuse_invoice_amendment(&[voucher()]),
@@ -3343,14 +3417,181 @@ fn a_resolved_code_is_warned_about_and_an_unresolved_one_refused() {
     assert_eq!(warnings.len(), 1);
 }
 
-/// The divergent invoice's next step must not promise that saving the invoice again repairs it:
-/// a save changes the voucher's AlterID, and what a verification reads after one is not
-/// established (voucher writes reference, section 9.16).
+/// The divergent invoice's next step must not promise that saving the invoice again repairs it.
+/// What it says of a re-saved invoice is row 2162-RS's, PARTIAL (one run, an invoice that had read
+/// back as built): an unchanged save kept the GUID and MASTERID and moved, of the fields read,
+/// only the AlterID and fields the read-back fetches and does not compare. It says that a save of
+/// an invoice that read back divergent was not tried (ADR 0004, the 2026-10-31 checklist, item 8;
+/// the re-save test below pins it on those bytes).
 #[test]
 fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
     let text = crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP;
     assert!(!text.contains("then open the invoice and save it again"));
-    assert!(text.contains("changes the invoice's AlterID"));
-    assert!(text.contains("has not been established"));
+    assert!(!text.contains("has not been established"));
+    assert!(text.contains(
+        "Saving an invoice that had read back as built again in Tally, unchanged, kept its \
+         identity on a test company (one run) and changed, of the fields read, only its AlterID \
+         and fields this check does not compare; a later verification judges an invoice on the \
+         fields it compares. That was not tried on an invoice that read back divergent."
+    ));
+    assert!(!text.contains("on the fields ComplyEaze Bridge wrote"));
     assert!(text.ends_with("Do not post it again."));
+}
+
+// ---- An invoice saved again, unchanged, on Tally's screen (9 Nov 2026, the pilot lab, row 2162-RS) ----
+
+/// The lab's read-back of `BP/26-27/0057`, created by the build's request, with no key pressed
+/// since the write: ALTERID 69.
+const RESAVE_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-before.utf16le.xml"
+);
+/// The same read once the voucher was opened from the Day Book and saved with no change.
+const RESAVE_AFTER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-after.utf16le.xml"
+);
+
+fn read_one(xml: &str) -> wire::ReadInvoice {
+    match wire::parse_invoice_readback(xml).unwrap() {
+        wire::Readback::One(read) => read,
+        other => panic!("one voucher expected, got {other:?}"),
+    }
+}
+
+/// The save moved the AlterID and filled two leg fields, which the read-back fetches and does not
+/// compare, so the invoice reads back as built on both reads. Its identity check compares the
+/// read-back with the voucher the same verification matched, which the save moved too, so it
+/// agrees. A field the read-back compares, changed, still reads divergent: a header field and a leg's
+/// amount. ADR 0004, the
+/// 2026-10-31 checklist, item 8: PARTIAL, one run.
+#[test]
+fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id() {
+    let (before_xml, after_xml) = (utf16le(RESAVE_BEFORE), utf16le(RESAVE_AFTER));
+    // What the save changed in the bytes: two leg fields the read-back fetches and does not compare.
+    assert!(!before_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
+    assert!(after_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
+    assert_eq!(before_xml.matches("<RATEOFINVOICETAX.LIST").count(), 0);
+    assert_eq!(after_xml.matches("<RATEOFINVOICETAX.LIST").count(), 2);
+    let (mut before, mut after) = (read_one(&before_xml), read_one(&after_xml));
+    let guid = after.fields["GUID"].clone();
+    assert_eq!(before.fields["GUID"], guid);
+    let alter_id = |read: &mut wire::ReadInvoice| {
+        read.fields
+            .remove("ALTERID")
+            .map(|id| id.trim().to_string())
+    };
+    assert_eq!(alter_id(&mut before).as_deref(), Some("69"));
+    assert_eq!(alter_id(&mut after).as_deref(), Some("70"));
+    assert_eq!(
+        before, after,
+        "the read-back's parse keeps nothing else the save changed"
+    );
+    // Both reads are the invoice as built.
+    let built = pilot_posted("BP/26-27/0057");
+    for bytes in [RESAVE_BEFORE, RESAVE_AFTER] {
+        assert_eq!(
+            pilot_differences(&built, bytes, "20260801"),
+            Vec::<String>::new()
+        );
+    }
+    // A later verification matches the voucher as it now is, AlterID 70, and its read-back reads
+    // 70: they agree. Only against the post's own AlterID would the save show.
+    let now = json!({"guid": guid, "alter_id": 70});
+    assert_eq!(
+        readback_identity_differences(Some(&guid), Some(" 70"), &now),
+        Vec::<String>::new()
+    );
+    let at_post = json!({"guid": guid, "alter_id": 69});
+    assert_eq!(
+        readback_identity_differences(Some(&guid), Some(" 70"), &at_post),
+        vec!["alter_id"]
+    );
+    // The control: a field the read-back compares, changed on the re-saved bytes, reads divergent.
+    let reference = "<REFERENCE TYPE=\"String\">BP/26-27/0057</REFERENCE>";
+    assert_eq!(after_xml.matches(reference).count(), 1);
+    let changed = after_xml.replacen(
+        reference,
+        "<REFERENCE TYPE=\"String\">BP/26-27/0058</REFERENCE>",
+        1,
+    );
+    assert_eq!(
+        invoice_readback_differences(&built, &read_one(&changed), "20260801"),
+        vec!["REFERENCE"]
+    );
+    // And a leg: one sales leg's amount, changed by a paisa.
+    let amount = "<AMOUNT>600.40</AMOUNT>";
+    assert_eq!(after_xml.matches(amount).count(), 1);
+    let leg_changed = after_xml.replacen(amount, "<AMOUNT>600.41</AMOUNT>", 1);
+    assert_eq!(
+        invoice_readback_differences(&built, &read_one(&leg_changed), "20260801"),
+        vec!["legs"]
+    );
+}
+
+/// Row 2162-S9b's customer after `Regular - SEZ` was chosen on Tally's Ledger Alteration screen
+/// and saved: the build's compliance read answered on `BRIDGE PILOT LAB`, byte for byte as
+/// captured (`lab/2162-s9b-answers` at 6c80eb43). The
+/// ledger holds two dated entries, 20260401 `Regular` and 20260915 `Regular - SEZ`
+/// (voucher-writes reference §9.16).
+fn s9b_customer() -> bridge_tally_protocol::PartyLedgerMasterRecord {
+    let xml = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-s9b-customer-sez-compliance.utf16le.xml"
+    ));
+    let records = bridge_tally_protocol::parse_native_party_ledger_master_records_with_evidence(
+        &xml,
+        &pilot_lab_guid(),
+    )
+    .expect("the captured compliance read parses")
+    .records
+    .into_iter()
+    .map(|row| row.record)
+    .filter(|record| record.ledger.name == "BRIDGE Customer RJ")
+    .collect::<Vec<_>>();
+    let [customer] = <[_; 1]>::try_from(records).expect("one row for the customer");
+    customer
+}
+
+/// The entry in force on the invoice's date decides the type: before the first entry nothing is
+/// known, from it the customer is Regular, and from the day Tally dated the new entry it is not.
+#[test]
+fn a_customer_made_sez_on_screen_is_refused_from_the_date_of_its_new_entry() {
+    let customer = s9b_customer();
+    let on = |date: &str| {
+        gstin_evidence(
+            customer.ledger.party_gstin.returned_text(),
+            &customer.fields.gst_registrations,
+            date,
+        )
+    };
+    // The synthetic GSTIN the setup seed gave the customer, as the capture holds it.
+    const CUSTOMER: &str = "08ZZZZZ0000Z3ZO";
+    let in_force = |kind: &str| {
+        (
+            GstinEvidence::InForce(CUSTOMER.to_string()),
+            Some(kind.to_string()),
+        )
+    };
+    assert_eq!(on("20260331"), (GstinEvidence::NoEntryInForce, None));
+    assert_eq!(on("20260401"), in_force("Regular"));
+    assert_eq!(on("20260914"), in_force("Regular"));
+    assert_eq!(on("20260915"), in_force("Regular - SEZ"));
+
+    // Both GSTINs the answer holds pass the build's check digit: the customer's, and the
+    // company's own registration in the same answer.
+    assert!(gstin_valid(CUSTOMER));
+    assert!(gstin_valid("08ZZZZZ0000Z2ZP"));
+    // The judge is given the GSTIN and the entry's type exactly as the read gives them.
+    let judged = |date: &str| {
+        let (gstin, kind) = on(date);
+        let mut facts = good_facts();
+        let party = facts.get_mut("Customer A").unwrap();
+        party.gstin = gstin;
+        party.registration_type = kind;
+        classify_sales_invoice(&voucher(), &facts, RAJ, date)
+    };
+    assert_eq!(
+        codes(judged("20260331")),
+        vec!["invoice_party_registration_not_in_force"]
+    );
+    assert!(judged("20260914").is_ok());
+    assert_eq!(codes(judged("20260915")), vec!["invoice_party_not_regular"]);
 }

@@ -147,7 +147,8 @@ fn event_view(record: GroupingEventRecord) -> GroupingEventView {
         sequence: record.sequence,
         id: record.id.as_str().to_string(),
         kind: record.event.kind().code(),
-        company_display_name: record.company_display_name,
+        // Shown by the one company-name rule; what is stored stays as given (#2449).
+        company_display_name: ShownCompanyName::of(&record.company_display_name).into_text(),
         financial_year: record.year.first_year(),
         ledger_guid: record.ledger.as_str().to_string(),
         ledger_name: record.ledger_name,

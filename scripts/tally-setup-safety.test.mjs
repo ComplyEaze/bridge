@@ -158,11 +158,12 @@ test("saved clients absent from the current probe require verification, not setu
 });
 
 test("child Tally reads keep client selection locked until every invocation settles", async () => {
-  const [frontend, allClients, outstandings, readiness] = await Promise.all([
+  const [frontend, allClients, outstandings, readiness, companyOptions] = await Promise.all([
     readFile(new URL("../src/main.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/AllClientsScreen.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/OutstandingsScreen.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/TallyReadinessFlow.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/DiscoveredCompanyOptions.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(frontend, /const changeChildTallyReadActivity = React\.useCallback\(\(delta: 1 \| -1\) => \{\s*setChildTallyReadCount\(\(current\) => Math\.max\(0, current \+ delta\)\);/s);
@@ -173,7 +174,14 @@ test("child Tally reads keep client selection locked until every invocation sett
   }
   const companySetup = frontend.slice(frontend.indexOf("{setupConnectionComplete && ("), frontend.indexOf("{selectedCompanyReady && ("));
   assert.match(companySetup, /disabled=\{!current \|\| savedCompanySelectionLocked\}/);
-  assert.match(companySetup, /bootstrapDirectCompany\(company\.name\)\} disabled=\{savedCompanySelectionLocked\}/);
+  // Both company lists take the lock and verify through bootstrapDirectCompany; the component disables each row by it.
+  const companyLists = companySetup.match(/<DiscoveredCompanyOptions\b[\s\S]*?\/>/g) ?? [];
+  assert.equal(companyLists.length, 2);
+  for (const list of companyLists) {
+    assert.match(list, /disabled=\{savedCompanySelectionLocked\}/);
+    assert.match(list, /onChoose=\{\(name\) => void bootstrapDirectCompany\(name\)\}/);
+  }
+  assert.match(companyOptions, /disabled=\{disabled \|\| refusal !== null\}/);
   assert.match(companySetup, /discoverUntrustedCompanies\(\)\} disabled=\{savedCompanySelectionLocked\}/);
   assert.match(companySetup, /saveReviewedTallySetup\(\)\} disabled=\{savedCompanySelectionLocked \|\| !passport/);
   assert.match(frontend, /onClick=\{checkTally\} disabled=\{tallyAction !== null \|\| endpointSettingsLockMessage !== null\}/);

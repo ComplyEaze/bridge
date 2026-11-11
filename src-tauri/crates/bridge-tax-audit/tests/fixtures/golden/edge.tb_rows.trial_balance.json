@@ -99,6 +99,20 @@
       ]
     },
     {
+      "id": "trial_balance.tb_closing_not_movements_3e77fa30",
+      "value": -500,
+      "unit": "paise",
+      "definition_sha256_16": "6cbfaa8809bb99da",
+      "definition_text": "The closing balance less (opening + debit - credit), Dr positive. The closing is Tally's own field kept as exported; on a Closing Stock ledger whose closing was keyed on Tally's screen it is the opening, and it is not the closing stock Tally's statements use.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Beta Traders",
+          "label": "Beta Traders"
+        }
+      ]
+    },
+    {
       "id": "trial_balance.tb_credit_3b5eb05b",
       "value": 0,
       "unit": "paise",

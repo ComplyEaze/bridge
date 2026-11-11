@@ -58,10 +58,9 @@ reconcile to the pinned `agent_desktop_journal.rs`.
 
 **The gate will not tell you when a split leaves code unpinned.** A moved
 module's parent changes, its acknowledgement is accepted, and the extracted file is
-outside the pinned surface with every check green. `scripts/surface_coverage_report.py`
-prints a report that catches the common case -- a new module declared directly by a pinned one
--- but not a new module under an unpinned parent or deeper descendants, so check
-the new files against the rule above yourself.
+outside the pinned surface with every check green. No check catches it, so check
+the new files against the rule above yourself; `docs/release-process.md` ("What no
+check sees when code moves") lists what to look for.
 
 **A pin is a decision, and that is deliberate.** `MAX_PINS` (in that test) is a fixed parse
 bound against a runaway list, not a count: adding a pin does not touch it. (It used to

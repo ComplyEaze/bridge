@@ -2030,6 +2030,17 @@ fn the_verified_and_absent_texts_say_what_is_checked_and_what_is_not() {
     assert!(next.contains("later read"), "{next}");
 }
 
+/// The table matches on the code's spelling, so a rename of the declared
+/// value would leave its entry behind; this ties the entry to the declared
+/// value, the one every company read refuses with (#2433).
+#[test]
+fn a_company_name_no_request_can_carry_leads_to_the_same_companies_step() {
+    assert_eq!(
+        not_read_back_next_step(crate::agent::failure_code::CompanyReadCode::NameInvalid.as_str()),
+        verify::NEXT_LOAD_SAME_COMPANIES
+    );
+}
+
 /// What a book that could not be read back is told to do, by what stopped it.
 #[test]
 fn a_book_that_was_not_read_back_is_told_what_to_do_by_what_stopped_it() {
@@ -2039,6 +2050,7 @@ fn a_book_that_was_not_read_back_is_told_what_to_do_by_what_stopped_it() {
         "company_identity_incomplete",
         "company_identity_mismatch",
         "company_number_invalid",
+        "company_name_invalid",
     ] {
         assert_eq!(
             not_read_back_next_step(code),

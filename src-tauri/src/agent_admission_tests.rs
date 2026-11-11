@@ -1865,13 +1865,21 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// on master merged with the schema change (#2418), the lists measured 214,075,
 /// 240,243, 242,752 and 248,129, over the budgets by 1,175, 1,343, 1,352 and
 /// 1,229. Each budget went up by 1,500, leaving margins of 325, 157, 148 and 271.
+/// On 10 Nov 2026, merged with master at cbad081f, whose `tally_status` build
+/// notice (c974cd2d) adds 224 bytes to each list, they measured 214,299,
+/// 240,467, 242,976 and 248,353: the second and third over their budgets by 67
+/// and 76. Each budget went up by 500, leaving margins of 601, 433, 424 and 547.
+/// So Sales raised each budget by 2,000 in all: 1,500 for the switch, then 500.
+/// On 11 Nov 2026, merged with master at d69b2ea8, after #2407 and #2447 (170
+/// bytes to each list), they measured 214,469, 240,637, 243,146 and 248,523,
+/// leaving margins of 431, 263, 254 and 377.
 /// An invoice's e-invoice details (#2162 item 9) add the `e_invoice` object to the invoice
-/// schema: 609 bytes to each list. On 9 Nov 2026, on #2434's head, the lists measured 214,075,
-/// 240,243, 242,752 and 248,129 without it and 214,684, 240,852, 243,361 and 248,738 with it.
-/// Each budget went up by 609, so the margins stay 325, 157, 148 and 271.
+/// schema: 609 bytes to each list. On 11 Nov 2026, merged with master at 7a3c9e49, they
+/// measured 215,078, 241,246, 243,755 and 249,132, each 609 over master's. Each budget went
+/// up by 609, so the margins stay 431, 263, 254 and 377.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [215_009, 241_009, 243_509, 249_009];
+const TOOL_LIST_BUDGETS: [usize; 4] = [215_509, 241_509, 244_009, 249_509];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

@@ -617,7 +617,7 @@ fn built_requests() -> Vec<(String, String)> {
     );
     row(
         "render_native_stock_summary_request".into(),
-        render_native_stock_summary_request(COMPANY, &snapshot),
+        render_native_stock_summary_request(&company, &snapshot),
     );
     row(
         "render_company_features_request".into(),
@@ -651,7 +651,7 @@ fn built_requests() -> Vec<(String, String)> {
         };
         row(
             format!("render_native_statement_request/{name}"),
-            render_native_statement_request(kind, COMPANY, &snapshot),
+            render_native_statement_request(kind, &company, &snapshot),
         );
     }
     // Each public report builder below (statement, stock summary, funds and
@@ -672,25 +672,25 @@ fn built_requests() -> Vec<(String, String)> {
     ) {
         row(
             format!("render_built_in_report_request/{report:?}"),
-            render_built_in_report_request(report, COMPANY, &snapshot),
+            render_built_in_report_request(report, &company, &snapshot),
         );
     }
     // The same request as `render_native_stock_summary_exploded_request` below.
     row(
         "render_exploded_stock_summary_request".into(),
-        render_exploded_stock_summary_request(COMPANY, &snapshot),
+        render_exploded_stock_summary_request(&company, &snapshot),
     );
     row(
         "render_stock_query_request".into(),
-        render_stock_query_request(COMPANY, &item, &snapshot),
+        render_stock_query_request(&company, &item, &snapshot),
     );
     row(
         "render_native_funds_flow_request".into(),
-        render_native_funds_flow_request(COMPANY, &months),
+        render_native_funds_flow_request(&company, &months),
     );
     row(
         "render_native_cash_flow_request".into(),
-        render_native_cash_flow_request(COMPANY, &months),
+        render_native_cash_flow_request(&company, &months),
     );
     for kind in every!(MonthRegisterKind: Sales, Purchase) {
         let name = match kind {
@@ -699,24 +699,24 @@ fn built_requests() -> Vec<(String, String)> {
         };
         row(
             format!("render_native_month_register_request/{name}"),
-            render_native_month_register_request(kind, COMPANY, &months),
+            render_native_month_register_request(kind, &company, &months),
         );
     }
     row(
         "render_native_negative_ledgers_request".into(),
-        render_native_negative_ledgers_request(COMPANY, &snapshot),
+        render_native_negative_ledgers_request(&company, &snapshot),
     );
     row(
         "render_native_godown_summary_request".into(),
-        render_native_godown_summary_request(COMPANY, &snapshot),
+        render_native_godown_summary_request(&company, &snapshot),
     );
     row(
         "render_native_stock_summary_exploded_request".into(),
-        render_native_stock_summary_exploded_request(COMPANY, &snapshot),
+        render_native_stock_summary_exploded_request(&company, &snapshot),
     );
     row(
         "render_native_negative_stock_request".into(),
-        render_native_negative_stock_request(COMPANY, &snapshot),
+        render_native_negative_stock_request(&company, &snapshot),
     );
 
     row(

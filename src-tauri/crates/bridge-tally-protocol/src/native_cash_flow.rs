@@ -18,6 +18,7 @@
 //! The parser is closed: anything other than well-formed rows of the expected
 //! shape is refused, and a failure, an unknown report, an empty answer and a
 //! different set of months each have their own error.
+use crate::xml_read_profiles::ValidatedCompanyName;
 use bridge_tally_primitives::TallyDate;
 use quick_xml::{
     events::{BytesStart, Event},
@@ -158,7 +159,10 @@ impl WholeMonthWindow {
 
 /// Renders the only supported request: Tally's own Cash Flow by name over the
 /// window, for the named company. No TDL.
-pub fn render_native_cash_flow_request(company: &str, window: &WholeMonthWindow) -> String {
+pub fn render_native_cash_flow_request(
+    company: &ValidatedCompanyName,
+    window: &WholeMonthWindow,
+) -> String {
     render_built_in_report_request(BuiltInReport::CashFlow, company, window.period())
 }
 

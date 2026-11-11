@@ -13,6 +13,7 @@
 //!
 //! An empty answer cannot be told from a report that was not rendered, so it is
 //! an error here, never "no negative stock".
+use crate::xml_read_profiles::ValidatedCompanyName;
 use quick_xml::{
     events::{BytesStart, Event},
     Reader,
@@ -33,7 +34,7 @@ use crate::{
 /// Renders the only supported request: Tally's own Negative Stock by name over
 /// the period, for the named company. No TDL.
 pub fn render_native_negative_stock_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_built_in_report_request(BuiltInReport::NegativeStock, company, period)

@@ -18,6 +18,7 @@
 //! directly under the root, each at that godown's own cost; an item inside a
 //! stock group gets none (§12a.24). [`items_by_godown`] returns those lines only
 //! where they add up to the item's own line.
+use crate::xml_read_profiles::ValidatedCompanyName;
 use crate::{
     native_outstandings::NativeLedgerSnapshotPeriod,
     native_statement_reports::{
@@ -34,7 +35,7 @@ use bridge_tally_primitives::ExactDecimal;
 /// the period, for the named company. No TDL, and no variable that names a
 /// godown.
 pub fn render_native_godown_summary_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_built_in_report_request(BuiltInReport::GodownSummary, company, period)
@@ -43,7 +44,7 @@ pub fn render_native_godown_summary_request(
 /// The Stock Summary by name over the period with the explode flag, the one
 /// request that carries a value per godown below the godown's own line.
 pub fn render_native_stock_summary_exploded_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_exploded_stock_summary_request(company, period)

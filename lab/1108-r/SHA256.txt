@@ -1,0 +1,21 @@
+# sha256  bytes  file  (LAB-COMMON.md, check-request-ids.py, check_1108.py, .gitattributes and requests/* byte-equal to lab/1108-a2-partial-landing at 02b20332; batches/r0.json byte-equal to its batches/p2.json, r1.json and r2.json its three objects reordered; relay-keep.py and check-relay-keep.py made from its relay.py and check-relay.py)
+f50b500ac7ddb47b8fbf83724776360fd559a27996b047ed134226093f27014e  67  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+dba83c757893c50a394cec1259b01b1e8bcfb36985ea7051fca5121a37d4580c  26204  RUN-SHEET.md
+d87c28629ce5701317bf1bde79e183ab0b9404f36c5bae33ff9bcf3a28982e7d  690  batches/r0.json
+bb1a568c204f4bb74c1ffbfab8c7c27d38041f5724a601e9426523623d7cee90  690  batches/r1.json
+f79836aa915ed3a42c96e56a9e634139c4ab90275b70a9db8053ce9b23545fd2  690  batches/r2.json
+c5c98647f5c63964c61d62fa5b165eb26818b1530eb6911f3cb7d441ee325bce  4822  check-exchanges.py
+6f93e15a5aa2c3862ab4ec431d15cb728d59ceb6d3cdbb45a6da823bfe5fc60c  8748  check-relay-keep.py
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
+0898e7c15cfefb9a9ff14e3f1e07e5eea818e342afe75f43c14992fff9146436  5360  check_1108.py
+ca2c0018e9f4ddb09d4abbeac869a076a4ca0760265db934f1bbceffb15c2117  10024  relay-keep.py
+7146a97fb35faeed0df69dc208f0999e4549433819030011f63fc7d1523585b2  1154  requests/flags.utf16le.xml
+6b8bda84c414413acccf231e0c295aa3a4aab9bb9d844b0bab9c1316684421f0  1124  requests/ledgers.utf16le.xml
+5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b  990  requests/marks.utf16le.xml
+a03151bf69b06e173ee49dbff63e355a5b5684796aee132f701bf2f76820c507  1822  requests/s0-seed-journal.utf16le.xml
+6af4d7142baffbae2d0133b25251d4762e030d1db64a2bccd0900dd69445b9a8  1450  requests/vouchers.utf16le.xml
+0072f0ada6ca24e8855195545ad9e0cb7d2d0e52f44cfc8fcf7f9c65b2e9207d  1032  requests/w1-stock-ledger.utf16le.xml
+9bb8f7a4aad86679164beae28d69d3cba6738924c42030ef3490e57d79dfff6b  1012  requests/w2-capital-ledger.utf16le.xml
+a302d01d102239f4fe7cd9ecfcec0db97460bdb6a1a0afadf8fcad4d9be14929  1016  requests/w3-expense-ledger.utf16le.xml
+902ae1912fa4b0f04ab2b81471b914af54ea240d7ca1d77e9bb413fe6561af30  5374  test-exchanges.py

@@ -91,6 +91,7 @@ fn derive(report: NativeTrialBalance, tally: &NativeStatement) -> DerivedStateme
         tally,
         None,
         InventoryFlags::NotRead,
+        &StockRows::NotRead,
     )
     .unwrap()
 }
@@ -301,6 +302,7 @@ fn a_ledger_under_a_user_created_primary_group_blocks_every_result() {
         &known_lab_balance_sheet(),
         None,
         InventoryFlags::NotRead,
+        &StockRows::NotRead,
     )
     .unwrap();
     assert_eq!(
@@ -427,7 +429,8 @@ fn a_row_whose_columns_do_not_add_up_is_refused() {
             &groups(),
             &known_lab_balance_sheet(),
             None,
-            InventoryFlags::NotRead
+            InventoryFlags::NotRead,
+            &StockRows::NotRead,
         )
         .unwrap_err(),
         StatementsError::RowInconsistent(RowGap {
@@ -449,7 +452,8 @@ fn a_closing_that_no_movement_explains_is_refused_even_with_empty_columns() {
             &groups(),
             &known_lab_balance_sheet(),
             None,
-            InventoryFlags::NotRead
+            InventoryFlags::NotRead,
+            &StockRows::NotRead,
         )
         .unwrap_err(),
         StatementsError::RowInconsistent(RowGap {
@@ -471,7 +475,8 @@ fn a_second_root_ledger_is_refused() {
             &groups(),
             &known_lab_balance_sheet(),
             None,
-            InventoryFlags::NotRead
+            InventoryFlags::NotRead,
+            &StockRows::NotRead,
         )
         .unwrap_err(),
         StatementsError::RootLedgerRepeated
@@ -490,7 +495,8 @@ fn each_gate_takes_only_its_own_statement() {
             &groups(),
             &profit_and_loss,
             None,
-            InventoryFlags::NotRead
+            InventoryFlags::NotRead,
+            &StockRows::NotRead,
         )
         .unwrap_err(),
         StatementsError::GateNotABalanceSheet
@@ -501,7 +507,8 @@ fn each_gate_takes_only_its_own_statement() {
             &groups(),
             &known_lab_balance_sheet(),
             Some(&known_lab_balance_sheet()),
-            InventoryFlags::NotRead
+            InventoryFlags::NotRead,
+            &StockRows::NotRead,
         )
         .unwrap_err(),
         StatementsError::GateNotAProfitAndLoss
@@ -523,6 +530,7 @@ fn derive_with_profit_and_loss(
         &known_lab_balance_sheet(),
         Some(tally),
         InventoryFlags::NotRead,
+        &StockRows::NotRead,
     )
     .unwrap()
 }
@@ -640,6 +648,7 @@ impl Capture {
             &balance_sheet,
             Some(&profit_and_loss),
             InventoryFlags::NotRead,
+            &StockRows::NotRead,
         )
         .unwrap();
         let tie = derived.profit_and_loss_tie.clone().unwrap();
@@ -673,6 +682,7 @@ fn reads_lab_with_profit_and_loss(lines: &[(&str, &str, &str)]) -> DerivedStatem
         &balance_sheet,
         Some(&profit_and_loss(lines)),
         InventoryFlags::NotRead,
+        &StockRows::NotRead,
     )
     .unwrap()
 }
@@ -1002,6 +1012,7 @@ fn tieout_b_with(
         &balance_sheet,
         profit_and_loss,
         inventory,
+        &StockRows::NotRead,
     )
     .unwrap()
 }
@@ -1057,7 +1068,10 @@ fn tallys_closing_stock_closes_every_gap_on_the_inventory_book() {
     let (_, _, _, tally) = TIEOUT_B.parts();
     let derived = tieout_b_with(Some(&tally), integrated());
     match &derived.closing_stock {
-        ClosingStockUse::Applied { value } => assert!(value.numeric_eq(&decimal("-2100.00"))),
+        ClosingStockUse::Applied {
+            value,
+            opening: None,
+        } => assert!(value.numeric_eq(&decimal("-2100.00"))),
         other => panic!("expected Applied, got {other:?}"),
     }
     // Gross 500 and net 0 as Tally's screen shows them, the carried line 0.
@@ -1149,30 +1163,46 @@ const OPENING_STOCK_BOOK_OCT_MAR: &[u8] = include_bytes!(
 );
 
 #[test]
-fn a_captured_book_with_opening_stock_is_declined_by_its_opening_stock_line() {
+fn a_captured_book_with_opening_stock_offers_both_figures_for_the_checks() {
     // Real bytes, not a mutation: the year (read before the October sale) carries Opening Stock
-    // -1000.00 and Closing Stock -2640.00; the second half-year carries -2640.00 and -2040.00. The slice is for a book whose
-    // Opening Stock Tally shows empty, so both decline, and the reason is the opening stock.
-    for bytes in [OPENING_STOCK_BOOK_YEAR, OPENING_STOCK_BOOK_OCT_MAR] {
+    // -1000.00 and Closing Stock -2640.00; the second half-year carries -2640.00 and -2040.00.
+    // Each is offered with its opening stock; whether either is used is for the checks against
+    // the book's Trial Balance and Balance Sheet, which were not captured with these.
+    for (bytes, opening, closing) in [
+        (OPENING_STOCK_BOOK_YEAR, "-1000.00", "-2640.00"),
+        (OPENING_STOCK_BOOK_OCT_MAR, "-2640.00", "-2040.00"),
+    ] {
         let statement =
             parse_native_statement(NativeStatementKind::ProfitAndLoss, &utf16(bytes)).unwrap();
         assert_eq!(
             TallyClosingStock::from_profit_and_loss(&statement),
-            Err(ClosingStockDeclined::OpeningStockNotShownEmpty)
+            Ok(Some(TallyClosingStock {
+                amount: decimal(closing),
+                opening: Some(decimal(opening)),
+            }))
         );
     }
 }
 
 #[test]
 fn a_closing_stock_not_as_captured_is_declined_by_its_shape() {
-    // synthetic mutation: opening stock carrying an amount.
+    // synthetic mutation: an opening stock, with no Stock Summary read beside it (#692's rule 2).
     let derived = tieout_b_edited(
         |lines| replace_line(lines, "Opening Stock", "-100.00", ""),
         integrated(),
     );
     assert_eq!(
         declined(&derived),
-        ClosingStockDeclined::OpeningStockNotShownEmpty
+        ClosingStockDeclined::StockSummaryNotRead
+    );
+    // synthetic mutation: an opening stock in the main column.
+    let derived = tieout_b_edited(
+        |lines| replace_line(lines, "Opening Stock", "", "-100.00"),
+        integrated(),
+    );
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::OpeningStockNotAsSeen
     );
     // synthetic mutation: no Opening Stock line at all.
     let derived = tieout_b_edited(
@@ -1181,7 +1211,7 @@ fn a_closing_stock_not_as_captured_is_declined_by_its_shape() {
     );
     assert_eq!(
         declined(&derived),
-        ClosingStockDeclined::OpeningStockNotShownEmpty
+        ClosingStockDeclined::OpeningStockNotAsSeen
     );
     // synthetic mutation: a credit.
     let derived = tieout_b_edited(
@@ -1258,6 +1288,7 @@ fn a_stock_in_hand_balance_still_blocks_before_the_figure_is_considered() {
         &balance_sheet,
         Some(&tally),
         integrated(),
+        &StockRows::NotRead,
     )
     .unwrap();
     assert_eq!(derived.closing_stock, ClosingStockUse::NotApplicable);
@@ -1277,6 +1308,7 @@ fn a_book_with_no_stock_is_untouched_by_the_flags() {
         &balance_sheet,
         Some(&tally),
         integrated(),
+        &StockRows::NotRead,
     )
     .unwrap();
     let without = derive_statements(
@@ -1285,6 +1317,7 @@ fn a_book_with_no_stock_is_untouched_by_the_flags() {
         &balance_sheet,
         Some(&tally),
         InventoryFlags::NotRead,
+        &StockRows::NotRead,
     )
     .unwrap();
     assert_eq!(with, without);
@@ -1380,6 +1413,7 @@ fn a_book_whose_trial_balance_does_not_balance_does_not_use_the_figure() {
         &balance_sheet,
         Some(&tally),
         integrated(),
+        &StockRows::NotRead,
     )
     .unwrap();
     assert_eq!(
@@ -1433,6 +1467,7 @@ fn the_captured_export_that_leaves_out_the_opening_difference_says_its_sides_and
         &balance_sheet,
         Some(&profit_and_loss),
         integrated(),
+        &StockRows::NotRead,
     )
     .unwrap();
     let sides = derived.tally_balance_sheet_sides.as_ref().unwrap();
@@ -1461,6 +1496,7 @@ fn a_balance_sheet_that_balances_has_no_sides_to_report() {
             &balance_sheet,
             None,
             InventoryFlags::NotRead,
+            &StockRows::NotRead,
         )
         .unwrap();
         assert_eq!(derived.tally_balance_sheet_sides, None);
@@ -1516,6 +1552,7 @@ fn a_profit_and_loss_that_differs_keeps_its_reason_beside_unbalanced_sides() {
         &tally,
         Some(&profit_and_loss(&[("Sales Accounts", "", "1.00")])),
         InventoryFlags::NotRead,
+        &StockRows::NotRead,
     )
     .unwrap();
     let expected = Established::NotEstablished {

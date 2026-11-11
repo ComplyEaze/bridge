@@ -303,7 +303,37 @@ pub(super) enum Begin {
     /// Something else is held; refused with this code.
     Busy(&'static str),
     /// This batch's dialog ended in a refusal no call has read: returned now.
-    Refused(String),
+    Refused(KeptRefusalCode),
+}
+
+/// A kept refusal's code, as the one call that reads it receives it (#2516).
+/// Only [`PostApprovals::take_refusal`] makes one, so only a refusal that was
+/// kept between calls can carry the cause `approval_answered_earlier`; a No given to a
+/// call while it waits is a plain code, as before.
+pub(super) struct KeptRefusalCode(String);
+
+impl KeptRefusalCode {
+    /// The refusal's own code, unchanged, for tests that read it: the product
+    /// only converts it into the tool's failure.
+    #[cfg(test)]
+    pub(super) fn code(&self) -> &str {
+        &self.0
+    }
+
+    /// A kept refusal of `code`, for tests of a code no scripted dialog
+    /// gives, such as a timeout.
+    #[cfg(test)]
+    pub(in crate::agent) fn kept_for_test(code: &str) -> Self {
+        Self(code.to_owned())
+    }
+}
+
+impl From<KeptRefusalCode> for crate::agent::ToolFailure {
+    fn from(kept: KeptRefusalCode) -> Self {
+        let mut failure = Self::from(kept.0);
+        failure.cause = Some(crate::agent::APPROVAL_ANSWERED_EARLIER);
+        failure
+    }
 }
 
 /// What waiting on a joined dialog came to.
@@ -553,10 +583,10 @@ impl PostApprovals {
     }
 
     /// `batch_id`'s kept refusal, removed: it is returned once.
-    fn take_refusal(&self, batch_id: &str) -> Option<String> {
+    fn take_refusal(&self, batch_id: &str) -> Option<KeptRefusalCode> {
         let mut refusals = self.refusals();
         let at = refusals.iter().position(|kept| kept.batch_id == batch_id)?;
-        refusals.remove(at).map(|kept| kept.code)
+        refusals.remove(at).map(|kept| KeptRefusalCode(kept.code))
     }
 
     fn expired(&self, answered: &Answered) -> bool {

@@ -1596,11 +1596,20 @@ fn master_failure_outcome(
     }
     match attempted {
         Some(false) => {
-            if let Some(next_step) = master_next_step(&failure.code).or_else(|| {
-                failure
-                    .unanswered
-                    .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
-            }) {
+            // A kept refusal's step (#2516) comes first: the code's own step
+            // reads as if this call's box had been answered.
+            let kept = failure
+                .cause
+                .filter(|cause| *cause == crate::agent::APPROVAL_ANSWERED_EARLIER)
+                .and_then(crate::agent::refusal_remediation);
+            if let Some(next_step) =
+                kept.or_else(|| master_next_step(&failure.code))
+                    .or_else(|| {
+                        failure
+                            .unanswered
+                            .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
+                    })
+            {
                 error["next_step"] = json!(next_step);
             }
         }

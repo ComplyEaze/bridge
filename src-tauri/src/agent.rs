@@ -1424,6 +1424,12 @@ const LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET: usize = 16_384;
 const MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED: &str = "movement_catalogue_deadline_exceeded";
 const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 
+/// The cause a kept approval refusal's answer carries (#2516): its code is the
+/// answer of a box an earlier call for this batch opened, given or ended after
+/// that call had returned, and the call that reads it showed no box. Set only
+/// from a kept refusal (`agent_import_approval.rs`). It carries no data.
+const APPROVAL_ANSWERED_EARLIER: &str = "approval_answered_earlier";
+
 /// Guidance for refusals whose remedy a caller cannot derive from the code alone.
 ///
 /// Deliberately sparse. A code without a documented, concrete next step returns
@@ -1435,6 +1441,15 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        // A kept approval refusal (#2516): no approval code has a step of its
+        // own, so this is the step its answer carries.
+        APPROVAL_ANSWERED_EARLIER => Some(
+            "This call showed no approval box. The approval box an earlier call opened for this \
+             batch was answered No, ran out of time or ended unanswered after that call had \
+             returned, and this answer is that one, returned once. Nothing was sent. If the \
+             person still wants it, call the same tool again with the same batch_id: that call \
+             asks them again in a new approval box.",
+        ),
         // Only `derive_statements` raises it, under `profit_and_loss` and `balance_sheet`.
         "statement_trial_balance_row_inconsistent" => Some(
             "No statement figure was returned: ComplyEaze Bridge derives the statements only from \

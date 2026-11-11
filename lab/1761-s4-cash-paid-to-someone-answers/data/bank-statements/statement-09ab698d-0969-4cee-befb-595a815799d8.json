@@ -1,0 +1,66 @@
+{
+  "account_last4": "4321",
+  "bank": "csv_bank_a",
+  "bank_ledger": "BRIDGE Bank A",
+  "controls": {
+    "closing_balance": "35000.00",
+    "opening_balance": "50000.00",
+    "total_credits": null,
+    "total_debits": null
+  },
+  "controls_source": "prior_statement",
+  "coverage": null,
+  "created_at": "2026-11-11T09:35:43.145Z",
+  "proposals_id": "statement-09ab698d-0969-4cee-befb-595a815799d8",
+  "records": [
+    {
+      "amount": "12000.00",
+      "bridge_txn_id": "st-20250408-be621b1463b52f1b",
+      "cash_answer": null,
+      "cash_movement": "withdrawal",
+      "date": "2025-04-08",
+      "direction": "outflow",
+      "disposition": "needs_answer",
+      "instrument": null,
+      "ledger": "",
+      "party": "ATM CASH WITHDRAWAL",
+      "reference": null,
+      "reversed_same_day": false,
+      "row": 1,
+      "suspense": false
+    },
+    {
+      "amount": "3000.00",
+      "bridge_txn_id": "st-20250409-ef7d14f34a7b0412",
+      "cash_answer": null,
+      "cash_movement": "withdrawal",
+      "date": "2025-04-09",
+      "direction": "outflow",
+      "disposition": "needs_answer",
+      "instrument": null,
+      "ledger": "",
+      "party": "ATM CASH WITHDRAWAL",
+      "reference": null,
+      "reversed_same_day": false,
+      "row": 2,
+      "suspense": false
+    }
+  ],
+  "schema": "bridge.bank_statement.proposals.v2",
+  "statement_sha256": "ebca906726de102cb23dcf15767de2cee5bba0ff4c401debd6e7b9fb3bf776ff",
+  "suspense_ledger": "BRIDGE Suspense",
+  "vouchers": [],
+  "window": {
+    "first_row_date": "2025-04-08",
+    "last_row_date": "2025-04-09",
+    "tie_out": {
+      "basis": "statement_rows_by_value_date",
+      "closing_balance": "35000.00",
+      "first_date": "2025-04-08",
+      "last_date": "2025-04-09",
+      "opening_balance": "50000.00",
+      "state": "established"
+    },
+    "whole_statement": true
+  }
+}

@@ -1,0 +1,15 @@
+2026-11-11T09:31:45Z exe sha256 507da806d9d49a72fdb144be3263e6b1c303bfc964b103616b0ea92ee7b02bf6 ok; launch-env.json sha256 335c6f21b9adbfbae176682b135376367fd1b4d95219e178f7c6329c2f379938; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-11T09:31:45Z launched pid 3020; stderr to server-stderr-20261111T093145Z.log
+2026-11-11T09:31:45Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-11T09:31:51Z 000-tools-list.json tool=list secs=0.029 isError=None error=None saved_sha256=8a1caca41ea6250cbf6d49aa797452acf11d26cccc8c1462aa85989e66226649
+2026-11-11T09:32:07Z 001-list-companies.json tool=list_companies secs=0.107 isError=False error=None saved_sha256=910c6708667b92cba1e53596db91203ff40c057f339a7ba8ef535567d08826dd
+2026-11-11T09:32:19Z 002-s0-marks.json tool=ledger_masters secs=0.826 isError=False error=None saved_sha256=f39477388787e5dd3c487e0d3a2d0664c477a1e6f864a53b26f6a6819e918f0a
+2026-11-11T09:32:20Z 003-s0-vt.json tool=masters secs=0.808 isError=False error=None saved_sha256=a6b2f3d3290916d93214e6faa74d22e60137f5b38eeeef6e27bf5fd9eb1d3483
+2026-11-11T09:35:36Z 004-s0b-marks.json tool=ledger_masters secs=0.758 isError=False error=None saved_sha256=7d7db611afc147582da59b589420773f531d5b978f837e9d25b39e673d9dc54b
+2026-11-11T09:35:43Z 005-s1-parse.json tool=parse_bank_statement_csv secs=0.129 isError=False error=None saved_sha256=a2e5c49dc5235f32c73deff5fba8e3e70966cd846c277668ebdb3f7f24691312
+2026-11-11T09:36:12Z 006-s2-parse.json tool=parse_bank_statement_csv secs=0.084 isError=False error=None saved_sha256=4c3f56ca7fe82f1b55bc7c7f62a66f9f49a82a8f1de1c496c1b722a31e926a8a
+2026-11-11T09:36:35Z 007-s2-build.json tool=build_import_xml secs=1.770 isError=False error=None saved_sha256=4af4afb91861081f67b6ed2aecc201e55b8d6ac367830d0b5c0c8609ef5c2603
+2026-11-11T09:36:47Z 008-s2-marks.json tool=ledger_masters secs=0.727 isError=False error=None saved_sha256=601da76dc0dc95545c2ac8195a90ef73e7812e4437e286cd102e86edc898011d
+2026-11-11T09:37:03Z 009-s3-parse.json tool=parse_bank_statement_csv secs=0.136 isError=False error=None saved_sha256=8c65b40be15dff009cc96d7fd4e12edc66ec85db9132ad2dc3fb5b2485375826
+2026-11-11T09:37:21Z 010-s3-build.json tool=build_import_xml secs=2.431 isError=True error=None saved_sha256=478fddb31f6dfc34133dcbe8d8b51b139f7c52a3b914d361ae28efbcb0b6c165
+2026-11-11T09:39:13Z session ended; server pid 3020 exit code 0

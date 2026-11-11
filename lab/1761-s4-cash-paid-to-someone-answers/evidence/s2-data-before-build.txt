@@ -1,0 +1,4 @@
+<LAB_DIR>/data/agent-egress.jsonl 17202
+<LAB_DIR>/data/terms-acceptance.jsonl 90
+<LAB_DIR>/data/bank-statements/statement-09ab698d-0969-4cee-befb-595a815799d8.json 1853
+<LAB_DIR>/data/bank-statements/statement-f54ce5c7-f4ce-477f-b774-18d7f39b4e63.json 4184

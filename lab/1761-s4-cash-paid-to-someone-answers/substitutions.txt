@@ -1,0 +1,26 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed (no captured byte is altered except a tool answer's company_number value):
+answers-mcp/answers/001-list-companies.json: original 1566 B sha256 910c6708667b92cba1e53596db91203ff40c057f339a7ba8ef535567d08826dd (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/002-s0-marks.json: original 4027 B sha256 f39477388787e5dd3c487e0d3a2d0664c477a1e6f864a53b26f6a6819e918f0a (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/004-s0b-marks.json: original 4027 B sha256 7d7db611afc147582da59b589420773f531d5b978f837e9d25b39e673d9dc54b (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/005-s1-parse.json: original 8547 B sha256 a2e5c49dc5235f32c73deff5fba8e3e70966cd846c277668ebdb3f7f24691312 (kept on the lab PC); the client wrapper's arguments.statement_path -> <LAB_DIR>/statement.csv (the path the lab client recorded; the server's answer does not hold it)
+answers-mcp/answers/006-s2-parse.json: original 5374 B sha256 4c3f56ca7fe82f1b55bc7c7f62a66f9f49a82a8f1de1c496c1b722a31e926a8a (kept on the lab PC); the client wrapper's arguments.statement_path -> <LAB_DIR>/statement.csv (the path the lab client recorded; the server's answer does not hold it)
+answers-mcp/answers/007-s2-build.json: original 3507 B sha256 4af4afb91861081f67b6ed2aecc201e55b8d6ac367830d0b5c0c8609ef5c2603 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/008-s2-marks.json: original 4028 B sha256 601da76dc0dc95545c2ac8195a90ef73e7812e4437e286cd102e86edc898011d (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/009-s3-parse.json: original 5313 B sha256 8c65b40be15dff009cc96d7fd4e12edc66ec85db9132ad2dc3fb5b2485375826 (kept on the lab PC); the client wrapper's arguments.statement_path -> <LAB_DIR>/statement.csv (the path the lab client recorded; the server's answer does not hold it)
+answers-mcp/inbox/005-s1-parse.json: original 313 B sha256 b11224c64087e97f72f3d99212ef839778a398e18e06d57d6e2dd4f8527aeeda (kept on the lab PC); 1 x -> <LAB_DIR>
+answers-mcp/inbox/006-s2-parse.json: original 605 B sha256 52caa75e7e99137619e6a3efc47274a4d9383bda6e80b72f7ebf31eda34e5479 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers-mcp/inbox/009-s3-parse.json: original 596 B sha256 3f07758b128cc2a85374092afca20ab275150d40c9b50fed76178864d0ae5e55 (kept on the lab PC); 1 x -> <LAB_DIR>
+args/s1-parse.json: original 271 B sha256 ee2733e1c4cff24b7c33394042ccfa64b16460c2be76312b82c54ff22b7fe235 (kept on the lab PC); 1 x -> <LAB_DIR>
+args/s2-parse.json: original 603 B sha256 77e2d707df26a3fa9146f4351b716b2362a1a9e789dd3c96cc9d225b79bdfcce (kept on the lab PC); 1 x -> <LAB_DIR>
+args/s3-parse.json: original 594 B sha256 f766d406612974a1ecdda6f04c07fbe6d087271c008ca598105070987d9b471e (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/notes.txt: original 8563 B sha256 bcc8faa50e08d90bc197d28977c5b0c96710736bb9bdd3e5cb5a57641a8046b6 (kept on the lab PC); 1 x the step 0.6 path written with two backspace bytes and a tilde -> <LAB_DIR>\\backups\\BK1; 1 x -> <BUILD_DIR>; 1 x -> <LAB_DIR>; 3 x -> stop; 1 x -> "status=200, bytes=51"
+evidence/s0-netstat.txt: original 7458 B sha256 e248b282d87e62772c7fd9820d54b0fe386dca3d4d40919b7e23b041cfad90c4 (kept on the lab PC); cut to the port-9001 LISTENING lines
+evidence/s2-data-after-build.txt: original 309 B sha256 7a425f0c6e540fc4ecb07e58595f73087ceab8dffed437c9077463583140fc93 (kept on the lab PC); 4 x -> <LAB_DIR>
+evidence/s2-data-before-build.txt: original 309 B sha256 d328e7c4f81a32973aaa224c09d87ef5f4a783781fb2c0feb8dfbfa20274a8a8 (kept on the lab PC); 4 x -> <LAB_DIR>
+evidence/s3-data-after-build.txt: original 468 B sha256 d14e0da1552219923ff8ac1c81cab6fc671cb01573abcca3d21d20d04c983c6d (kept on the lab PC); 6 x -> <LAB_DIR>
+scripts/client.py: original 4687 B sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (kept on the lab PC); 1 x -> lab-client; 3 x -> stop
+scripts/step0.py: original 2788 B sha256 9e836530ee44f8650af70726d003492d7ef29936b06639cb23450a80decb7f5e (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 436 B sha256 e6c95dad0122750ce8de12f54261d13a24416602c93d492666be3bd860bcf762 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/mk-launch.py: original 1251 B sha256 f524752b1739db8b944765d294168ae9e190d823ed2065ec827e080ad376a563 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/mk-1761s4-prep2.py: original 1620 B sha256 4d72180891fb11c09b729137fbf162c76f9f0d0e48152b0e146bbc997f1f57de (kept on the lab PC); 1 x -> <SHEET_DIR>; 2 x -> <lab folder>
+scripts/1761-s4-prep-2.py: original 2756 B sha256 06c9504b63ef494ff00ce89fc7bd671d3f77b600e7618becebd5db295fdb0d86 (kept on the lab PC); 1 x -> <SHEET_DIR>; 2 x -> <LAB_DIR>; 3 x -> <lab folder>

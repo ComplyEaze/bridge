@@ -1,0 +1,10 @@
+2026-11-11T09:31:50.841Z 000-tools-list.json list secs 0.029 bytes 243365 isError None
+2026-11-11T09:32:06.730Z 001-list-companies.json list_companies secs 0.107 bytes 1566 isError False
+2026-11-11T09:32:17.803Z 002-s0-marks.json ledger_masters secs 0.826 bytes 4027 isError False
+2026-11-11T09:32:19.647Z 003-s0-vt.json masters secs 0.808 bytes 28946 isError False
+2026-11-11T09:35:35.520Z 004-s0b-marks.json ledger_masters secs 0.758 bytes 4027 isError False
+2026-11-11T09:35:43.033Z 005-s1-parse.json parse_bank_statement_csv secs 0.129 bytes 8547 isError False
+2026-11-11T09:36:12.603Z 006-s2-parse.json parse_bank_statement_csv secs 0.084 bytes 5374 isError False
+2026-11-11T09:36:33.274Z 007-s2-build.json build_import_xml secs 1.77 bytes 3507 isError False
+2026-11-11T09:37:02.932Z 009-s3-parse.json parse_bank_statement_csv secs 0.136 bytes 5313 isError False
+2026-11-11T09:37:18.160Z 010-s3-build.json build_import_xml secs 2.431 bytes 2192 isError True

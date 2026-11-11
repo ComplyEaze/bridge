@@ -79,7 +79,7 @@ Take a screenshot of each ledger's screen before its accept. BRIDGE Contractor A
    Either missing = STOP (not this build, or posting is off).
 3. `list_companies`: EXPECT exactly THE COMPANY. Record its GUID; every later call passes it as `company_guid`. Anything else = STOP.
 4. MARKS: M0, V0.
-5. `masters` with `kind` `voucher_types`: record the Payment and Contra rows whole. EXPECT each to read `series_numbering.observation` `observed`, `series_numbering.method` `automatic` and `series_numbering.sub_method` `auto_retain`; otherwise STOP before anything changes. `post_import` refuses any other sub-method before its window (`import_voucher_numbering_not_retain`), so step 4 would test nothing.
+5. `masters` with `kind` `voucher_types`: record the Payment and Contra rows whole. EXPECT each to read `series_numbering.observation` `observed`, `series_numbering.method` `automatic` and `series_numbering.sub_method` `auto_retain`; otherwise STOP before anything changes. `post_import` refuses, before its window, a series that is not Automatic (`import_voucher_numbering_not_automatic`) or not Retain (`import_voucher_numbering_not_retain`), so step 4 would test nothing.
 6. Backup BK1 (C5) into a NEW empty folder `C:\bridge-lab\1761-s4\backups\BK1\`: record the name, size and sha256. Then MARKS: M0b, V0b.
 
 The book: the masters only.
@@ -96,7 +96,7 @@ EXPECT:
   - `st-20250408-be621b1463b52f1b`, 12000.00 on 2025-04-08;
   - `st-20250409-ef7d14f34a7b0412`, 3000.00 on 2025-04-09.
 
-These are the answers the parse gave at #2407's head `f8f9cf3f`, run on a Mac with no Tally (verified there; partial for the merged build). Other ids, counts or amounts = STOP; record the answer whole.
+These are the answers the parse gave at #2407's head `f8f9cf3f`, run on a Mac with no Tally (verified there; on master 7a3c9e49 the two ids were also recomputed from the code's id rule without running it, and the slice's crate code is unchanged since that head). Other ids, counts or amounts = STOP; record the answer whole.
 
 The book: unchanged.
 
@@ -142,7 +142,7 @@ The book: unchanged.
    - `post_location.state` `target_only`, with `post_location.target_voucher_step` reading `before` V4a, `after` V4a + 4, `step` 4 and `matches_created` true;
    - `post_span_binding.state` `bound`.
 
-   That V moves by one per voucher created is recorded for a post of one voucher (0.7.0 row W1) and unverified for a batch: a `step` or a V other than V4a + 4, with `matches_created` true, is a FINDING, recorded, not a STOP. Then, before any other call, take a screenshot of the whole Tally window: a dialog or a half-entered screen = C7, STOP.
+   That V moves by one per voucher created is recorded for a post of one voucher (0.7.0 row W1) and unverified for a batch. For a batch, a `step` other than 4 reads `matches_created` false, and the answer is then `reconciliation_required` (`batch_step_unconfirmed`), not `posted_verified`. That is a FINDING: record it whole, then STOP as the last line of this step says, with no repeat call and no rebuild. Then, before any other call, take a screenshot of the whole Tally window: a dialog or a half-entered screen = C7, STOP.
 5. `verify_import` of C: EXPECT `verification_status` `posted_verified` and `post_span_binding.state` `bound`, with no `rollback_recorded` and no `voucher_mark_contradiction` anywhere in the answer. Record the answer whole.
 
 Any other final state or refusal: record it whole, do not call again, STOP.

@@ -1,0 +1,41 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed (no captured byte is altered except a tool answer's company_number value):
+answers-mcp/answers/001-s2-companies.json: original 1563 B sha256 ab8fa31f85780d792e9d1384333864be2fc1977490588120c01dcbda4d9817b5 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/002-s2-marks.json: original 4690 B sha256 897fe6f57cd4b05a9b4c001c34d9e1956abc59151df645dac75821579374b607 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/005-s8-marks.json: original 4690 B sha256 0c4d9818c66175c018d062cd9fce95a87fd74b3576e08d3f33cdfedf18c3c250 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+evidence/bk0.txt: original 110 B sha256 5f2bf78c3a75b1b25ecb008fadc3bfa16de4dc7f43adf15e6165c213a4499bbb (kept on the lab PC); 1 x -> <company number>
+evidence/c10-netstat.txt: original 7839 B sha256 899504451b24d1ef94e2e32f18166187dbc2e48454233fb2bdcd91bdd256d18b (kept on the lab PC); cut to the port-9001 LISTENING lines
+evidence/c10-status.txt: original 158 B sha256 8100240713cd818b7c16235f115bb9cf154a90b6d203322b76d85f6ab70f4a89 (kept on the lab PC); 1 x -> printed: status=200, bytes=51
+evidence/cover-idle.txt: original 760 B sha256 a4889df9e082eb13d6876f9d4f890b02a7f27c2ad83b892b77a74a97dd79ea9f (kept on the lab PC); 2 x -> <desktop client>
+evidence/h0-timeline.txt: original 2446 B sha256 46d5f7ba043e9670f651189bfcf685a6ff197f3e33bb8bbd06cec783619ac14f (kept on the lab PC); 2 x -> <BUILD_DIR>; 7 x -> <LAB_DIR>
+evidence/h0.txt: original 368 B sha256 5a84c01c9e88c72593769c6b16ead071cc2445c964d92c6d2e9cb2e866506960 (kept on the lab PC); 1 x -> <BUILD_DIR>
+evidence/ha-timeline.txt: original 3988 B sha256 f0eb7c71f017400d2976f8400bd58868b17107cae6b870b7325bdf1316aced5a (kept on the lab PC); 2 x -> <BUILD_DIR>; 6 x -> <LAB_DIR>
+evidence/ha.txt: original 368 B sha256 e79e821aeefafccec198322f508a3d08f0ed9d0e7858e0e001aa00042e02d53d (kept on the lab PC); 1 x -> <BUILD_DIR>
+evidence/k-timeline.txt: original 2859 B sha256 756bfe064c65eb0fb95446490f0cbc4f4d55e72b1b7577cc971b690e9755a050 (kept on the lab PC); 2 x -> <BUILD_DIR>; 6 x -> <LAB_DIR>
+evidence/k.txt: original 367 B sha256 e489d833aa68630bfdcdd6262106074c07744e709e2ed0cfdc674c2864f82cd9 (kept on the lab PC); 1 x -> <BUILD_DIR>
+evidence/k2-timeline.txt: original 3888 B sha256 3aa983ea232c68dd3936a7461cc52e57ae90402f6f589e2318c86e968111f3e3 (kept on the lab PC); 2 x -> <BUILD_DIR>; 6 x -> <LAB_DIR>
+evidence/k2.txt: original 369 B sha256 99ea0ae6f341c85247276720226b56d90e9f79f3fcb3589a15c40786e817e090 (kept on the lab PC); 1 x -> <BUILD_DIR>
+evidence/notes.txt: original 10138 B sha256 67f0493bca82d6e1046c5b5a4ece7c8258102fe31fc32c118aebeed6b34e2fc0 (kept on the lab PC); the company number replaced in 1 place(s); 2 x -> <LAB_DIR>; 1 x -> stop; 1 x -> GET /status 200, 51 B
+evidence/p0-netstat.txt: original 7913 B sha256 7e60a66c07cbc1dcf6e1a9afef58430fb85d0692595dd5633f7b86b9a545bf63 (kept on the lab PC); cut to the port-9001 LISTENING lines
+evidence/p0-status.txt: original 158 B sha256 4cae59c1fc2b2081c6a6447687509eef0541d84368b621aa9670235c0b162758 (kept on the lab PC); 1 x -> printed: status=200, bytes=51
+evidence/s-timeline.txt: original 3687 B sha256 6134f7202883dd7e78e93c042cc871e333faa1208df96e6022b4aa0fa8a80fa0 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-h0.txt: original 2676 B sha256 c19446b103501ee8e0aabee46466a71f6fa9c8a3c8042fc5d3e4ed936159e368 (kept on the lab PC); 2 x -> <BUILD_DIR>
+evidence/trace-ha.txt: original 7069 B sha256 ef6ce075dee1626cd5fc68afec199db6b86e353dd45bbbee7f7e877bd65c17f2 (kept on the lab PC); 2 x -> <BUILD_DIR>
+evidence/trace-k.txt: original 2778 B sha256 aaab75d2d13fd4b753a5afc6f8fbc8ded00d893566201827b58d2d855d9e368e (kept on the lab PC); 2 x -> <BUILD_DIR>
+evidence/trace-k2.txt: original 3323 B sha256 fed542178f9e50cffec46d16a3d7b4f486d26f4db20dfa3f5aa7d23753d0d990 (kept on the lab PC); 2 x -> <BUILD_DIR>
+evidence/trace-s.txt: original 3760 B sha256 539aa5211e8545aaaac9ca40171bcb2f3bc3704f28a96ac5c1d20b9bc68e4226 (kept on the lab PC); 2 x -> <BUILD_DIR>
+scripts/mk-wcell2.py: original 2462 B sha256 14b9cd463efd5238fb78c20ad6a3abfe9e6d0d45d69a83902812c8cdf9d54621 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/b3c.ps1: original 1198 B sha256 774275a53a043109634011258480686a4a3db227ea34243eafbdcfca761bef7a (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/leftover.ps1: original 2100 B sha256 906c7d62fcfa353494fbc29573293fcd2992bb9707701bdeb71d0a363afbe894 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/step0.ps1: original 1933 B sha256 263e11ae60bcb637ceb0cae7c141ca8a8a1b072bc5776da7f99960c6f7bf3b0a (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/marks.py: original 2975 B sha256 ede86aeab5b46e936f5a565735626aa3d2a0a5cff26fc99d125bbf092ab7cc06 (kept on the lab PC); 1 x -> <LAB_DIR>; 4 x -> stop
+scripts/mk-helpers.py: original 1351 B sha256 b5a1dbd5c548684b0a0060823c8c8383ef322dde5242acfb441395aca38b2073 (kept on the lab PC); 4 x -> <LAB_DIR>; 4 x -> <ROW_1780H_DIR>
+scripts/mk-s.py: original 2722 B sha256 a2fdcdc3d8a1f1f2938ea4880251794e5f118bb371ad089a39fc03da941d90ec (kept on the lab PC); 1 x -> <LAB_DIR>; 3 x -> <ROW_1780H_DIR>
+scripts/s3.py: original 1218 B sha256 c10b78ddcffbee4c4c108c65e88c29a317128d5cbe43773dd61c6cfdd4c23c28 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/writes-off.py: original 1196 B sha256 e91a346816c60915f1610ee31e2a28c35f5657ba75e97a4e627f3e638453c6da (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/client.py: original 4834 B sha256 f677b914fcc14a58d0cd44c5d84811dca627e54561c75686c80ca16f94e721ba (kept on the lab PC); 1 x -> <BUILD_DIR>; 1 x -> <LAB_DIR>; 1 x -> lab-client; 4 x -> stop
+scripts/call.py: original 1217 B sha256 cddb758ac446483bcd954db34843c65b2e29e1665a4e9b782677a5627a00a07a (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/one.py: original 948 B sha256 84d5c00c47846b82ba23b8ad496f8af8a91c6d6642e2c195adbf844e2485418c (kept on the lab PC); 1 x -> '<LAB_DIR>'
+scripts/h0.cmd: original 377 B sha256 5cbb8f5e2ac3d91b54e188b4051fa9df268ad3d8aedb35f348061f07a994431d (kept on the lab PC); 1 x -> <BUILD_DIR>; 3 x -> <LAB_DIR>
+scripts/k.cmd: original 376 B sha256 ab2ddadcfd397bc0c2e10a4946fad4e50ead784265a3689872c6fb7267857523 (kept on the lab PC); 1 x -> <BUILD_DIR>; 3 x -> <LAB_DIR>
+scripts/k2.cmd: original 377 B sha256 d50ddbb36389db7622d9f035518b11bbcc10bd269f6a6752fe4bd3078f00ef7d (kept on the lab PC); 1 x -> <BUILD_DIR>; 3 x -> <LAB_DIR>
+scripts/ha.cmd: original 377 B sha256 0889d3335a2a9b1de0f5447848d5775658473dc8445ec1d53665cd249a00972b (kept on the lab PC); 1 x -> <BUILD_DIR>; 3 x -> <LAB_DIR>

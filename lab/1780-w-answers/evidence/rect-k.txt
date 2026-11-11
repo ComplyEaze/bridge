@@ -1,0 +1,8 @@
+E 2026-11-11T08:26:41.296Z dpi_context=ok
+B 2026-11-11T08:26:41.296Z hwnd=0x120946 pid=7680 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher?
+F 2026-11-11T08:26:41.296Z hwnd=0x120946 pid=7680 title=ComplyEaze Bridge — post this voucher?
+K 2026-11-11T08:26:41.296Z class=Shell_TrayWnd hwnd=0x1012a visible=1 rect=0,1030,1920,1080
+K 2026-11-11T08:26:41.296Z class=ReBarWindow32 hwnd=0x10182 visible=1 rect=478,1030,1277,1080
+K 2026-11-11T08:26:41.296Z class=MSTaskSwWClass hwnd=0x10188 visible=1 rect=480,1030,1231,1080
+K 2026-11-11T08:26:41.296Z class=MSTaskListWClass hwnd=0x1018a visible=1 rect=480,1030,1231,1080
+E 2026-11-11T08:26:41.296Z boxes=1

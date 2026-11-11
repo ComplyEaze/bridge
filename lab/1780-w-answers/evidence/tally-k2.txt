@@ -1,0 +1,2 @@
+2026-11-11T08:28:33.432Z name=k2a dpi=ok tally_pid=22572 hwnd=0xba0722 rect=0,0,1920,1030 print_window=True
+2026-11-11T08:28:37.975Z name=k2b dpi=ok tally_pid=22572 hwnd=0xba0722 rect=0,0,1920,1030 print_window=True

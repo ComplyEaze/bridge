@@ -1,0 +1,1 @@
+2026-11-11T08:25:35.389Z name=b3c dpi=ok tally_pid=22572 hwnd=0xba0722 rect=0,0,1920,1030 print_window=True

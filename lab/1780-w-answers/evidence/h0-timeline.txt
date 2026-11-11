@@ -1,0 +1,13 @@
+H0 runner pid 9380; Tally window 0xba0722 pid 22572
+H0 trace pre-armed 2026-11-11T08:23:51.335Z pid 15828: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <LAB_DIR>\evidence\trace-h0.txt -Seconds 100
+H0 Tally title clicked (Tally in front) 2026-11-11T08:23:53.434Z at logical (330,14) = screen tool (313,13); fg 0xba0722 pid 22572 class Ganeshji 'TallyPrime:9001'
+H0 started 2026-11-11T08:23:54.688Z: explorer.exe "<LAB_DIR>\h0.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\spawn-parent.ps1 -Target child -ChildExe <BUILD_DIR>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <LAB_DIR>\requests\confirm-input.txt -Stdio files -Out <LAB_DIR>\evidence\h0.txt -TimeoutSeconds 60
+H0 Tally title clicked ONCE 2026-11-11T08:23:58.714Z (4.03 s after the start); fg 0xba0722 pid 22572 class Ganeshji 'TallyPrime:9001'
+H0-T0 2026-11-11T08:24:06.421Z from: SPAWN 2026-11-11T08:24:06.421Z child_pid=14956
+H0 box 0x1b0708 found 2026-11-11T08:24:06.852Z rect logical 549,145,1003,741; exstyle 0x00010108; No button 0x90654
+H0 t0p8 probe 2026-11-11T08:24:14.477Z to 2026-11-11T08:24:15.430Z (T0+9.06 s at its end) : 1,1,1,14956,ComplyEaze Bridge - post this voucher? | 4,0,0,22572,TallyPrime:9001 | visible_titled_windows,13
+H0 box-rect-probe ended 2026-11-11T08:24:15.835Z (T0+9.41 s): Processing -File '<LAB_DIR> | equestsox-rect-probe.ps1' failed: Illegal characters in path. Specify a valid path for the -File parameter. | Windows PowerShell | Copyright (C) Microsoft Corporation. All rights reserved. |  | Try the new cross-platform PowerShell https://aka.ms/pscore6 | 
+H0 T0+10: No clicked 2026-11-11T08:24:16.611Z at T0+10.19 s, logical (850,709) = screen tool (806,672)
+H0 spawn file: SPAWN 2026-11-11T08:24:06.297Z parent_pid=8496 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<BUILD_DIR>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-11-11T08:24:06.421Z child_pid=14956 || SPAWN 2026-11-11T08:24:16.899Z pid=14956 exit_code=1 stdout_bytes_read=0 elapsed_s=10.5
+H0 stderr: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+H0 DONE 2026-11-11T08:24:54.539Z code 0

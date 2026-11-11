@@ -1,0 +1,13 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. The *-tally.png files are the Tally window (PrintWindow); the .jpg files are screen-tool screenshots.
+evidence/b3c-tally.png 68949 B 1cd68e99495544d4e14638415bbca88c937a4aeb996af96cc539967e6a5c1fee
+evidence/ha-switcher-screen.png 519538 B 8bca1bc95e89ecb2936a8c5611ecb91521db47c3a04c12ef4a3d9a71e59ef298
+evidence/idle-print.png 54864 B ac41ca7bacc9280611a228b75a53e96ed9cfecd2ffc55a44235c2696437b544a
+evidence/idle-screen.png 96660 B 0c2b8c6a3f6bff96f315a81fbb5d5e9078ad9eace8ec5ea2f960201025c400d7
+evidence/k2a-tally.png 68949 B 1cd68e99495544d4e14638415bbca88c937a4aeb996af96cc539967e6a5c1fee
+evidence/k2b-tally.png 68959 B 030e869061c7814e3d7d0329ee23a71be5092c507be0c9760ea07f97d4efb3c4
+shots/b3c-screen-after.jpg 34598 B 0b705aae8319b151cc6e6ba2706de6e4155b3e4c643a36a2ee5d45dd267d307b
+shots/b3c-screen-before.jpg 30311 B 58ee6c79acaab60acff0bf65711363fba8d7dd1f49b3b1ae70ffd6ab3686a598
+shots/c10-select-company.jpg 41491 B 73c7a0bdd6140caecf0f029bae99c508b879447ef9b48c2a6b847ebdb19d9647
+shots/c10-tally.png 72935 B 78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6
+shots/p0-tally.png 44393 B 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c
+shots/s0-backup-accept.jpg 26868 B 61b79cc1b6bb6fd7bccae07959831b5646b3509094eadec9200e72eee0c3abc9

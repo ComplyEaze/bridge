@@ -1,0 +1,1 @@
+2026-11-11T08:25:54.917Z name=idle dpi=ok tray=0x1012a rect=0,1030,1920,1080 print_window=True

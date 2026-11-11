@@ -1,0 +1,6 @@
+command: netstat -ano 2>&1
+time: 2026-11-11T08:20:02.021Z
+exit: 0
+(cut: 2 of 109 lines kept, the port-9001 LISTENING lines)
+  TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       22572
+  TCP    [::]:9001              [::]:0                 LISTENING       22572

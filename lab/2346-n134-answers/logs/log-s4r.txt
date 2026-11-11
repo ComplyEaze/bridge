@@ -1,0 +1,2 @@
+14:35:32	V-CN.xml	a-s4r-V-CN.xml	curl 0	status 200	CONTENT-LENGTH 52886	52886 bytes
+14:35:32	M-marks.xml	a-s4r-M-marks.xml	curl 0	status 200	CONTENT-LENGTH 3396	3396 bytes

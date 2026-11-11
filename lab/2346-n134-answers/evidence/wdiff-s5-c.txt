@@ -1,0 +1,3 @@
+== --w-diff a-s2-W-08c.xml a-s5-W-08c.xml: 40 and 41 VOUCHER rows
+  only in a-s5-W-08c.xml: GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d : DATE '20260801'; VOUCHERNUMBER 'CN/26-27/0001'; VOUCHERTYPENAME 'BRIDGE Credit Note Manual'; ISCANCELLED 'No'; ISDELETED 'No' ; BRIDGEVCHISCREDITNOTE 'Yes' ; IRN none
+  rows in one only or differing: 1

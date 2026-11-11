@@ -1,0 +1,3 @@
+14:35:43	W-08s.xml	a-s5-W-08s.xml	curl 0	status 200	CONTENT-LENGTH 118032	118032 bytes
+14:35:43	W-08c.xml	a-s5-W-08c.xml	curl 0	status 200	CONTENT-LENGTH 118786	118786 bytes
+14:35:43	W-08d.xml	a-s5-W-08d.xml	curl 0	status 200	CONTENT-LENGTH 118620	118620 bytes

@@ -1,0 +1,2 @@
+14:33:56	T-types.xml	a-s3r-T-types.xml	curl 0	status 200	CONTENT-LENGTH 319942	319942 bytes
+14:33:56	M-marks.xml	a-s3r-M-marks.xml	curl 0	status 200	CONTENT-LENGTH 3394	3394 bytes

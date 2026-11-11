@@ -1,0 +1,4 @@
+14:38:43	M-marks.xml	a-s6-M-marks.xml	curl 0	status 200	CONTENT-LENGTH 3394	3394 bytes
+14:38:43	T-types.xml	a-s6-T-types.xml	curl 0	status 200	CONTENT-LENGTH 306946	306946 bytes
+14:38:43	V-CN.xml	a-s6-V-CN.xml	curl 0	status 200	CONTENT-LENGTH 3022	3022 bytes
+14:38:43	W-08s.xml	a-s6-W-08s.xml	curl 0	status 200	CONTENT-LENGTH 115168	115168 bytes

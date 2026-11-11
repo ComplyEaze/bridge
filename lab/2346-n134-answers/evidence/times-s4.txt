@@ -1,0 +1,5 @@
+I-NC1.xml	a-s4-I-NC1.xml	sent +-0.718s	returned +0.000s	curl 0	status 200	CONTENT-LENGTH 540	540 bytes
+R-MC1.xml	a-s4t00-R-MC1.xml	sent +0.000s	returned +0.203s	curl 0	status 200	CONTENT-LENGTH 94548	94548 bytes
+R-MC1.xml	a-s4t05-R-MC1.xml	sent +5.000s	returned +5.172s	curl 0	status 200	CONTENT-LENGTH 94548	94548 bytes
+R-MC1.xml	a-s4t60-R-MC1.xml	sent +60.016s	returned +60.157s	curl 0	status 200	CONTENT-LENGTH 94548	94548 bytes
+Enter (screenshot taken, no dialog)	+18.453s

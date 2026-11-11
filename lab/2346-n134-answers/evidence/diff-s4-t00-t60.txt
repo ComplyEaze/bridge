@@ -1,0 +1,3 @@
+== --diff a-s4t00-R-MC1.xml a-s4t60-R-MC1.xml
+   lists compared: 1
+   legs: 6 -> 6

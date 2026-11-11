@@ -1,0 +1,2 @@
+== --w-diff a-s2-W-08s.xml a-s6-W-08s.xml: 40 and 40 VOUCHER rows
+  rows in one only or differing: 0

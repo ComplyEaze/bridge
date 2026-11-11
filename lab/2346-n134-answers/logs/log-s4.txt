@@ -1,0 +1,4 @@
+14:34:21	I-NC1.xml	a-s4-I-NC1.xml	curl 0	status 200	CONTENT-LENGTH 540	540 bytes
+14:34:22	R-MC1.xml	a-s4t00-R-MC1.xml	curl 0	status 200	CONTENT-LENGTH 94548	94548 bytes
+14:34:27	R-MC1.xml	a-s4t05-R-MC1.xml	curl 0	status 200	CONTENT-LENGTH 94548	94548 bytes
+14:35:22	R-MC1.xml	a-s4t60-R-MC1.xml	curl 0	status 200	CONTENT-LENGTH 94548	94548 bytes

@@ -1,0 +1,8 @@
+14:30:41	T-types.xml	a-s2-T-types.xml	curl 0	status 200	CONTENT-LENGTH 306946	306946 bytes
+14:30:41	V-CN.xml	a-s2-V-CN.xml	curl 0	status 200	CONTENT-LENGTH 3022	3022 bytes
+14:30:41	R-MC1.xml	a-s2-R-MC1.xml	curl 0	status 200	CONTENT-LENGTH 3022	3022 bytes
+14:30:41	R-NCa.xml	a-s2-R-NCa.xml	curl 0	status 200	CONTENT-LENGTH 3022	3022 bytes
+14:30:41	W-08s.xml	a-s2-W-08s.xml	curl 0	status 200	CONTENT-LENGTH 115168	115168 bytes
+14:30:41	W-08c.xml	a-s2-W-08c.xml	curl 0	status 200	CONTENT-LENGTH 115900	115900 bytes
+14:30:42	W-08d.xml	a-s2-W-08d.xml	curl 0	status 200	CONTENT-LENGTH 115740	115740 bytes
+14:30:42	M-marks.xml	a-s2-M-marks.xml	curl 0	status 200	CONTENT-LENGTH 3394	3394 bytes

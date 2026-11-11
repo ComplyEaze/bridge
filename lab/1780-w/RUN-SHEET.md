@@ -42,9 +42,10 @@ What this row reads, and no earlier row has:
 
 ## Rules (they add to `LAB-COMMON.md`; where they differ, the stricter holds)
 - **KEYS.** From the start of a cell until its box is answered or gone, no key is pressed and nothing is typed, except under one of the three carve-outs. Everything that reads is pre-armed before the cell. Boxes are answered by mouse, at the centre of the No button.
+- **The key after its probe.** Each carve-out key is pressed within 1 s of its gating probe's last line printing. Later than 2 s after it: the key is not pressed, and the cell records "key not pressed: late". A window can still change between the probe and the key. The sheet bounds what that can do: a Down that reaches the box only moves its button focus, and cell HA's Esc is pressed only into a switcher seen open.
 - **Carve-out K (cell K only).** ONE press of the letter `n`, only while the probe just before shows the box holding the foreground. Never `y`, Enter, Space, Tab or any other key.
 - **Carve-out K2 (cell K2 only).** ONE press of Down, only when the probe just before shows Tally holding the foreground with the box topmost above it, AND that cell's Tally copy shows Gateway of Tally. Any other Tally screen, or a copy that cannot be read: K2's key is not pressed. Write "K2 not run: <what the copy showed>".
-- **Carve-out HA (cell HA only, on the run coordinator's yes).** Alt, Tab and Esc, in the order cell HA gives, only while the probe just before shows Tally holding the foreground. Never Enter, Space, Y, N or any other key. An Esc that reached the box would be its Cancel, which is a decline.
+- **Carve-out HA (cell HA only, on the run coordinator's yes).** Alt, Tab and Esc, in the order cell HA gives, only while the probe just before shows Tally holding the foreground. Esc is pressed only while the switcher is seen open. Never Enter, Space, Y, N or any other key. An Esc that reached the box would be its Cancel, which is a decline.
 - **C2 carve-out.** As v2: `spawn-parent.ps1` ends only the child it started itself, by its own pid and handle, after `-TimeoutSeconds` (60). The lab stops only the server launch it started itself, by closing its own launcher. Nothing else is ended.
 - **A box under Tally.** As v2: one click on Tally's minimise button, No by mouse, one click on Tally's own taskbar button. Record each click. The box's own taskbar button, if one shows, is never clicked.
 - **WRITES OFF.** On any STOP or FAIL after S1, and after part D:
@@ -68,7 +69,7 @@ What this row reads, and no earlier row has:
 - **P0.** BRIDGE BATCH LAB is in Select Company's list. Load it alone, by its name typed as a filter, one row, Enter. Otherwise STOP: do not restore it, and do not use another book. MARKS: record ALTVCHID and ALTMSTID.
 - **B1.** Fetch and check BUILD-W as above, and hash every file of this folder against `SHA256.txt`.
 - **B3. Probe known answer.** Click Tally's title once, then run `zorder-probe-k.ps1`. EXPECT Tally listed with foreground 1. Record P-time, the run time of one probe.
-- **B3b. Trace known answer and the owner.** Run part H's recipe once as cell H0: no click into Tally at any point, and No by mouse at about T0+10. EXPECT:
+- **B3b. Trace known answer and the owner.** Run part H's recipe once as cell H0: no click into Tally after step 2's title click, and No by mouse at about T0+10. EXPECT:
   - a `FIRST` line, and a first window block within 1 s, in `trace-H0.txt`;
   - the box's line with `owner` not 0, `owner_class` `Static` and `owner_topmost` 1;
   - exit 1, `stdout_bytes=0`, and at least one `box-fit:` line in `H0.stderr`, each reading `fits=true` with the box's own rectangle (never `0,0,0,0`).
@@ -82,7 +83,7 @@ What this row reads, and no earlier row has:
 
   A blank, black or different copy: the script has no known answer. K2 is then not run ("K2 not run: no Tally copy"); the rest of the row runs.
 - **B4. The two frames.** Record the screen tool's frame, and the screen's logical size and scale. Every click below is recorded in both frames, with the box's rectangle in logical pixels.
-- **B4b. The idle taskbar.** As v2, with the lab's consoles started minimised: `taskbar-cover.ps1` and `taskbar-capture.ps1 -Name idle`.
+- **B4b. The idle taskbar.** As v2, with the lab's consoles started minimised: `taskbar-cover.ps1 -Out <evidence>\cover-idle.txt`, then `taskbar-capture.ps1 -Name idle -OutDir <evidence> -Out <evidence>\capture-idle.txt`.
 - **B5 before.**
 
 ## Part H: the product's child under the lab's stand-in parent (no server; nothing can post)
@@ -94,7 +95,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\bridge-lab\1780w\requests
 **The recipe**, for H0 and the cells below unless a cell says otherwise:
 1. **Pre-arm**, each in its own window, started minimised and waiting:
    - `box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <evidence>\trace-<cell>.txt -Seconds 100`;
-   - the timing helper, for `zorder-probe-k.ps1` at T0+8 and T0+11, and at C+0 and C+6 if the cell clicks into Tally;
+   - the timing helper, for `zorder-probe-k.ps1` at T0+8 and T0+11, and at C+0 and C+6 if the cell clicks into Tally, and for every later read the cell names, at its time. Nothing is started by hand after step 2: a click or key into a console would move the foreground;
    - after those, `box-rect-probe.ps1 -Out <evidence>\rect-<cell>.txt`.
 
    Tally is maximised on Gateway of Tally and in front.
@@ -104,17 +105,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\bridge-lab\1780w\requests
 
 ### Cell K: a typed `n` while the box holds the foreground
 The recipe, with no click into Tally after step 2's title click.
-1. **At T0+11,** the pre-armed probe must show the box topmost and holding the foreground. Otherwise write "K not run: the box did not hold the foreground", answer No by mouse, and go to K2.
-2. **At about T0+13:** press `n` ONCE (carve-out K). Press nothing else.
-3. **Read:** one `zorder-probe-k.ps1` at about T0+15.
+1. **At T0+12,** an extra pre-armed probe must show the box topmost and holding the foreground. Otherwise write "K not run: the box did not hold the foreground", answer No by mouse, and go to K2.
+2. **As soon as that probe prints** (rule "The key after its probe"): press `n` ONCE (carve-out K). Press nothing else.
+3. **Read:** the pre-armed `zorder-probe-k.ps1` at T0+15.
 4. EXPECT the box gone by that probe, and `<cell>.txt` ending exit 1, `stdout_bytes=0`, as a mouse No does in 2161-B and 2161-C. Expect only `fits=true` lines. If the box is still open at the probe: record "the key did not answer the box", answer No by mouse, and STOP before K2.
 
 ### Cell K2: Down after a click into Tally
 The recipe, with these additions:
-1. **The click into Tally, at T0+14 (±2 s):** ONE left click on a blank part of Tally's Gateway screen. It must be at least 150 logical pixels from every edge of the box, and not on a menu item, button, list line or field. Record the point in both frames and its distance from the box. The pre-armed reads run at once (C+0) and 6 s later (C+6). At C+6, the helper also runs `tally-window-capture.ps1 -Name k2a`.
-2. **The gate (carve-out K2).** The C+6 probe shows Tally holding the foreground with the box topmost above it, AND `k2a-tally.png` shows Gateway of Tally. If either fails, write "K2 not run: <the probe line, or what the copy showed>", answer No by mouse, and go to part S.
-3. **At about C+8:** press Down ONCE.
-4. **At about C+10:** one `zorder-probe-k.ps1`, then `tally-window-capture.ps1 -Name k2b`.
+1. **The click into Tally, at T0+14 (±2 s):** ONE left click on a blank part of Tally's Gateway screen. It must be at least 150 logical pixels from every edge of the box, and not on a menu item, button, list line or field. Record the point in both frames and its distance from the box. The helper is armed on the click's planned time: reads at C+0 and C+6, then `tally-window-capture.ps1 -Name k2a`, then one more `zorder-probe-k.ps1` at C+7; and at C+10, `zorder-probe-k.ps1` then `tally-window-capture.ps1 -Name k2b`.
+2. **The gate (carve-out K2).** The C+7 probe shows Tally holding the foreground with the box topmost above it, AND `k2a-tally.png` shows Gateway of Tally. If either fails, write "K2 not run: <the probe line, or what the copy showed>", answer No by mouse, and go to part S.
+3. **As soon as the C+7 probe prints** (rule "The key after its probe"): press Down ONCE.
+4. **At C+10:** the pre-armed probe and `k2b` copy run.
 5. EXPECT:
    - the box still open, topmost and above Tally;
    - Tally holding the foreground;
@@ -124,21 +125,22 @@ The recipe, with these additions:
 ### Cell HA: Alt+Tab while Tally holds the foreground (only on the run coordinator's yes; otherwise write "HA not run")
 This runs under the stand-in parent, not inside part S, so that part S stays one post answered once, inside the call's wait of about 40 s (`CALL_BUDGET`, `src-tauri/src/agent_import_approval.rs:46`). The box under test is the same child and the same owner code.
 
-The recipe, with K2's step 1 click and C+0 and C+6 reads, and no Tally copy.
-1. **At C+6,** the probe must show the box topmost and Tally holding the foreground. Otherwise write "HA skipped: Tally did not hold the foreground", answer No by mouse, and go to B5.
-2. **At about C+8:** press and HOLD Alt, press Tab ONCE, and keep Alt held. The switcher opens.
+The recipe, with K2's step 1 click, pre-armed reads at C+0, C+6, C+7 and C+20, and no Tally copy.
+1. **At C+7,** the probe must show the box topmost and Tally holding the foreground. Otherwise write "HA skipped: Tally did not hold the foreground", answer No by mouse, and go to B5.
+2. **As soon as the C+7 probe prints** (rule "The key after its probe"): press and HOLD Alt, press Tab ONCE, and keep Alt held.
+   - If no switcher is seen open: press nothing more, release Alt, record "switcher not seen" and what came to the front, and go to step 5.
 3. **Read the switcher by eye**, Alt still held. Write down the title of every tile, in order, and whether one reads "ComplyEaze Bridge". The screen tool takes no capture.
    - **STOP rule: HA never selects the box's tile.** If the switcher shows a "ComplyEaze Bridge" tile anywhere, highlighted or not, press no further Tab and never release Alt while the switcher is open: Esc comes first.
-4. **With Alt still held, press Esc ONCE.** Then release Alt.
+4. **With Alt still held, press Esc ONCE, by C+16 at the latest.** Then release Alt.
    - If the switcher is still open after the Esc: keep Alt held, press nothing else, click nothing, and STOP. Alt is released only on the run coordinator's word.
-5. **Read:** one `zorder-probe-k.ps1`. EXPECT Tally in front. If the box is in front, record "the switch was not cancelled".
+5. **Read:** the pre-armed `zorder-probe-k.ps1` at C+20. EXPECT Tally in front. If the box is in front, record "the switch was not cancelled".
 6. **No** by mouse. EXPECT exit 1 and `stdout_bytes=0`.
 
 Run B5 after part H.
 
 ## Part S: a real post on BUILD-W under the lab's launch, answered No
 - **S0.** Back up THE COMPANY (BK0, C5) to the new empty folder `C:\bridge-lab\1780w\bk0\`. Record its name, size and sha256.
-- **S1. Posting on for this launch.** In the launch's environment file, set `BRIDGE_AGENT_ENABLE_WRITES` to `true` and point the launch at BUILD-W's `bridge_mcp.exe`. Record the file's key names (not values) and its sha256. Start the launch.
+- **S1. Posting on for this launch.** Part S's calls go through the lab's own launch: its launcher, its environment file and its stdio client, as used in row 1392-E. In the launch's environment file, set `BRIDGE_AGENT_ENABLE_WRITES` to `true` and point the launch at BUILD-W's `bridge_mcp.exe`. Record the file's key names (not values) and its sha256. Start the launch.
 - **S2.** `tally_status` (agent.rs:3548) and `list_companies` (agent.rs:3507): EXPECT BUILD-W's version, and THE COMPANY as the one company. Then `ledger_masters` (agent.rs:3505), basic: record the voucher and master marks. Every later compare is against these.
 - **S3.** `build_import_xml` (agent.rs:3495) with the exact content of `build-1591-s1.json`. EXPECT `result.voucher_count` 1, and `total_debit` and `total_credit` 141 each. Record `verification_preflight` whole. Keep `result.batch_id` as BATCH-S. A refusal, or another count or total = STOP (nothing has been sent).
 - **S4.** With Tally maximised on Gateway of Tally and in front, click its title area ONCE and stamp it. Then call `post_import` (agent.rs:3533) with BOTH `company_guid` and `batch_id` BATCH-S, and stamp T0. The server starts the dialog child (`--confirm-journal`, lib.rs:113), which shows `show_review` inside `guarded`.
@@ -153,7 +155,7 @@ Run B5 after part H.
 - **S8.** `ledger_masters` (basic): EXPECT the marks as at S2; a moved mark = FAIL. Then B5, stop the launch, and apply WRITES OFF unless part D runs next.
 
 ## Part D: the desktop client as the server's parent
-- **D0. The entry.** Part D runs only through the lab's standing desktop-client entry for ComplyEaze Bridge: one permanent entry with posting on and the owner's Terms value typed once, updated to a new build by the lab, path and hash recorded (the owner's word of 15 Oct). Write "Part D not run: <reason>" and finish the row with B5 and C10 if any of these holds:
+- **D0. The entry.** Part D runs only through the lab's standing desktop-client entry for ComplyEaze Bridge: one permanent entry with posting on and the owner's Terms value typed once, updated to a new build by the lab, path and hash recorded (the owner's word of 15 Oct). Write "Part D not run: <reason>", then apply WRITES OFF, check the marks unchanged, and finish the row with B5 and C10, if any of these holds:
   - no such entry exists;
   - pointing it at BUILD-W needs anything other than its executable path;
   - the Terms value would need to be typed again;
@@ -161,7 +163,7 @@ Run B5 after part H.
 
   Do not improvise another entry or route.
 - **D1.** Point the entry at BUILD-W's `bridge_mcp.exe`, restart the desktop client, and record the entry's key names and the executable's sha256. THE COMPANY is loaded alone and Tally is in front on Gateway of Tally.
-- **D2.** Build a new batch from `build-1591-s1.json` through the desktop client (BATCH-D), so that nothing answered in part S can answer it. Pre-arm the trace and reads as in S4. Then ask the desktop client to post BATCH-D, answer its own tool prompt for `post_import`, and stamp T0 when the call starts. Click once into Tally at T0+16 (±2 s), as in S6, then answer **No** by mouse.
+- **D2.** Build a new batch from `build-1591-s1.json` through the desktop client (BATCH-D), so that nothing answered in part S can answer it. Pre-arm the trace and reads as in S4. Then ask the desktop client to post BATCH-D. If the desktop client asks permission to run the `post_import` tool, click its Allow: that is the client's own prompt, not the approval box, and it is not a Yes. Stamp T0 when the call starts. Click once into Tally at T0+16 (±2 s), as in S6, then answer **No** by mouse before T0+38. If the call has already answered `pending`, click No all the same and record "MODE BLOCKED". Any other end of the desktop client's call is recorded whole.
 - **D3.** Record what part H's step 4 records, except the stderr (a server does not keep the child's). EXPECT `import_approval_declined`.
 - **D4.** Point the entry back at the executable it had before D1, recording its sha256. WRITES OFF, the marks unchanged, B5.
 
@@ -181,6 +183,8 @@ C10: shut THE COMPANY. EXPECT one tally.exe owning 9001 and `GET /status` 200, w
 | K2: the box answered or gone | A finding: a key typed for Tally answered the box after a click had given Tally the foreground. STOP. |
 | HA: a "ComplyEaze Bridge" tile | **W3:** the owned box is listed in Alt+Tab, so there is a keyboard route back to it. |
 | HA: no such tile | **W3:** the owned box is not in Alt+Tab; only its place on top shows it. |
+| K, K2 or HA not run, skipped, or a key not pressed as late | That reading is not measured. Write which and why; nothing is inferred from it. |
+| S or D: "MODE BLOCKED" | The call answered `pending` before the No. The box readings still count; the decline is then kept for the batch's next call, which is not made. |
 | `owner` 0 anywhere, a `fits=false` line, `0,0,0,0`, exit 77, or `import_review_too_large` | Report the lines whole. |
 | Anything else | Record it whole and infer nothing. |
 

@@ -156,6 +156,9 @@ fn one_exception_in_a_batch_of_three_is_never_read_as_not_created() {
     // The Stock-in-Hand refusal counts one exception. Sent in a batch of three, that count does
     // not say which voucher Tally rejected (the other two may be twins), so none is labelled,
     // whatever the voucher mark did and however many the readback cannot find.
+    // The count mismatch (one exception against three sent) alone decides it, so the four
+    // combinations below are one case seen four ways, not four separate cases; the step and
+    // unmatched branches are tested by the other tests of this file.
     for (unmatched, step) in [(1, Some(0)), (1, Some(2)), (3, Some(0)), (1, None)] {
         assert_eq!(
             unmatched_cause(

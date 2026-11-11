@@ -110,7 +110,8 @@ mode. A second cause of rejection is measured below.
 company with inventory integrated). A Journal with one line on a ledger under Stock-in-Hand, which
 ComplyEaze Bridge's own checks admit, was sent once: `CREATED 0, EXCEPTIONS 1`, every other counter 0,
 and a `LINEERROR` reading "Cannot use '<ledger>': Ledger under Stock-in-Hand!" placed ahead of the
-counters. The voucher mark did not move, no voucher was added and no dialog showed. A Journal with a
+counters. The lab read, in the same sitting and without committing the answers, that the voucher mark did
+not move, that no voucher was added and that no dialog showed. A Journal with a
 line on the Cash ledger, sent the same way, was stored (`CREATED 1`). So `EXCEPTIONS` again counted
 the rejected voucher, here for a cause other than a missing ledger, and the `LINEERROR` again named
 a ledger, not a voucher. The answer is preserved byte for byte as a test fixture

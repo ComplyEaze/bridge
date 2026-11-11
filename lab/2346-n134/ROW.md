@@ -77,7 +77,7 @@ The two `COMPUTE` lines are the element names and the form `src-tauri/src/agent_
 
 The note's party, figures, date (1 Aug 2026), `REFERENCE` (`BP/26-27/0010`, a Sales invoice the book holds, dated 1 Aug 2026) and legs are row 2346-MN's, unchanged. The party is `BRIDGE Walk-in`, which is not bill-wise, so the note carries no bill allocation.
 
-**`timed.py`** sends the import once, then R at once, at +5 s and at +60 s, each counted from the moment curl returned the import's answer. It is row 2162-S2's `run.py` (`lab/2162-s2-sheet` at a0d4c53b), with row 2346-MN's send line and stops. A stop on the import ends the run, and the reads are not sent. It writes `times-<label>.txt` and `log-<label>.txt`. With `--pause`, it waits for Enter after the import's answer and counts the three reads from that Enter (step 4).
+**`timed.py`** sends the import once, then R at once, at +5 s and at +60 s, each counted from the moment curl returned the import's answer. It is row 2162-S2's `run.py` (`lab/2162-s2-sheet` at a0d4c53b), with row 2346-MN's send line and stops. A stop on the import ends the run, and the reads are not sent. It writes `times-<label>.txt` and `log-<label>.txt`. With `--pause`, it waits for Enter after the import's answer and counts the three reads from that Enter. This row does not use it (step 4).
 - Tried once, against a stand-in for `curl.exe` that answers the import with one counter and each read with its own request: the three reads were sent at +0.001 s, +5.010 s and +60.001 s.
 
 **`count22.py`** is row 2346-MN's `count21.py` with two changes, each marked N134.
@@ -126,8 +126,9 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
 4. **Create the note, and read it back at once, at +5 s and at +60 s (N1, N4).**
    - `s4m`: `M-marks.xml`, then `count22.py --before-write a-s1-M-marks.xml a-s4m-M-marks.xml`. Only if that passes, and no key was pressed in Tally since, go on.
    - **This step is the one exception to C3** ("after every write ... take a screenshot of the whole Tally window BEFORE the next request"). The reads at once and at +5 s are the measurement, so they go before the screenshot. The screenshot is taken while `timed.py` waits for its +60 s read, and before that read.
-     - With the run coordinator's yes to this exception when queuing the row: `python3 -I timed.py <gateway URL> s4 I-NC1.xml <R>`.
-     - Without that yes: `python3 -I timed.py <gateway URL> s4 I-NC1.xml <R> --pause`. Take the screenshot when it asks, then press Enter. Record that N4's first read came after the screenshot, and how long after the import's answer (`times-s4.txt`).
+     - **Granted:** the run coordinator said yes to this exception on 11 Nov 2026, before any write ("coordinator's yes, 11 Nov"). Record it in RESULTS.md's deviations in those words.
+     - Run `python3 -I timed.py <gateway URL> s4 I-NC1.xml <R>`, and take the screenshot straight after its +5 s read returns.
+     - `--pause` is not used in this row. It stays in `timed.py` for a row without this yes: it waits for Enter after the import, so the screenshot comes before the first read.
      - **A dialog in the screenshot:** the prompt rule. Stop `timed.py` with Ctrl+C if it has not sent its +60 s read, and record which reads were sent while the dialog was up.
    - **The wait rule.** If 5 minutes pass after the import's send with no answer and no message: send nothing, press nothing, screenshot the whole window, and report to the run coordinator. A read sent while Tally is busy can hold its gateway.
    - Record the import's every counter and any LINEERROR, word for word, and `times-s4.txt` whole.
@@ -174,7 +175,7 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
 The answers are read twice. The second reading is done by someone who did not run the sitting and did not write this sheet. They work only from the pushed answers branch, before any result is posted on #2346:
 1. Check each answer's sha256 and size against the notes.
 2. Run `count22.py` again on every answer, and each `--diff`, `--w-diff`, `--guid`, `--type-diff`, `--before-write` and `--same-row` line the steps name. Compare each output with RESULTS.md line by line.
-3. From `times-s4.txt`, check that the first read was sent within 1 s of the import's answer, the second at 5 s or later and the third at 60 s or later. With `--pause`, check the gap the record gives instead.
+3. From `times-s4.txt`, check that the first read was sent within 1 s of the import's answer, the second at 5 s or later and the third at 60 s or later. Check that the screenshot's time falls between the second read's return and the third read's send.
 4. Check each EXPECT line against the answers, not against RESULTS.md's wording.
 
 They write `READER.md` on the answers branch, with each check, whether it held, and every line that differs. A result is reported only once `READER.md` says every check held, or names each difference and how RESULTS.md answers it.
@@ -188,7 +189,7 @@ They write `READER.md` on the answers branch, with each check, whether it held, 
 - Every prompt, message and busy screen, word for word, with the key that answered it and its time (UTC).
 - The BK file and the restore, as C5 and C6 ask.
 - The release on Tally's screen and the Gateway's date and period.
-- Whether the run coordinator said yes to step 4's exception.
+- Step 4's exception, as granted: "coordinator's yes, 11 Nov".
 
 ## Expected
 Estimates, not predictions.

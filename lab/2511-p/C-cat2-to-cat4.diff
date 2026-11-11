@@ -1,0 +1,8 @@
+--- C-cat2.xml (decoded)
++++ C-cat4.xml (decoded)
+@@ -19,4 +19,5 @@
+                         <NATIVEMETHOD>Parent</NATIVEMETHOD>
+                         <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>
++                        <NATIVEMETHOD>CurrencyName</NATIVEMETHOD>
+                         <COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>
+                         <COMPUTE>BRIDGECOMPANYNAME:##SVCurrentCompany</COMPUTE>

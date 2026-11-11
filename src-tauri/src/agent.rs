@@ -4327,3 +4327,7 @@ mod tests;
 #[cfg(test)]
 #[path = "agent_financial_profile_tests.rs"]
 mod financial_profile_tests;
+
+#[cfg(test)]
+#[path = "agent_lab_2511_p_render_tests.rs"]
+mod lab_2511_p_render_tests;

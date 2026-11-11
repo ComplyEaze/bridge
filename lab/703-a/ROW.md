@@ -92,12 +92,14 @@ The row decides nothing about Tally, about Bridge's tool text beyond what is ser
 - **The lab session does every step**, including each configuration `add` and `restore`, the app's quits and starts, and switching the ComplyEaze Bridge extension off and on, on the owner's standing words of 27 and 28 Oct 2026, as row 1780-W records them (`lab/1780-w-approval-box-master`, `lab/1780-w/RUN-SHEET.md`). **Any step that needs the owner in person is a STOP that asks first:** for one, row H found the lab session's own permission check refusing changes to the app's configuration (notes at 11:29Z on 4 Nov); if it refuses again, that is such a STOP, before anything else is changed.
 - **The lab session** also prepares the folder, checks the hashes, drives the app (opens each new chat or session, types each prompt, answers each tool prompt by the table), keeps the approval log, runs `steps.py` and writes the record. **The lab session never calls the servers' tools itself, and never types anything into a chat but the prompt and, where the sheet says, the second prompt or the nudge.** It has read this sheet, so its own words would measure nothing.
 
-**Across a quit.** The lab session runs inside the app, so a quit ends it (row H's restart helper, its header). Steps 1, 5 and 7 therefore each run as one detached hand-over, started by the lab session as its last act:
-- before it, the lab session appends to `C:\bridge-lab\703-a\handover.txt` the step, B0 and the before-copy paths, with the UTC time;
-- the hand-over runs the restart helper with `-CloseOnly` and a tag naming the step, then the step's `desktop_config.py` lines in order, appending each line's output and exit code to `handover.txt`. It stops at the first exit code that is not 0 and leaves the app shut;
+**Across a quit.** The lab session runs inside the app, so a quit ends it (row H's restart helper, its header). Steps 1, 5 and 7 therefore each end with one detached hand-over, started by the lab session as its last act. `C:\bridge-lab\703-a\handover.txt` is the one record of every change to the configuration:
+- every `desktop_config.py` line the lab session runs itself (step 1's `add-sleep`) is appended to `handover.txt` as the command line before it runs and its output and exit code after;
+- before the hand-over, the lab session appends the step, B0 and the before-copy paths, with the UTC time;
+- the hand-over runs the restart helper with `-CloseOnly` and a tag naming the step. It then counts the app's processes by the name the helper uses; if any remains, it appends the count and stops, changing nothing, with the app as it is;
+- it then runs the step's `desktop_config.py` lines in order, appending each command line before it runs and its output and exit code after. It stops at the first exit code that is not 0 and leaves the app shut. A command line with no output after it is a line that was cut off while it ran;
 - only if every line exited 0 does it start the app by its AppID, as the helper does, and append `started`.
 
-The lab session opened after the start reads `handover.txt` first and goes on from the step it names, checking each EXPECT against the lines there. A hand-over that left the app shut, or an EXPECT not met, is a STOP; after the STOP, the person who opens the app reads `handover.txt` for the configuration's state.
+**The next session.** The run coordinator opens a new lab session in the app after each start, with these first words, exactly: `Read C:\bridge-lab\703-a\handover.txt and go on with row 703-A from the step it names.` That session reads `handover.txt` first and checks each EXPECT against the lines there before anything else. A hand-over that stopped, a command line with no output after it, or an EXPECT not met, is a STOP. After a STOP, whoever opens the app next reads `handover.txt` for the configuration's state.
 
 **The configuration path.** The app is a packaged app: the path its own sessions see is redirected. `add` and `restore` use the real file outside the package, as row H's second try did (row H notes, 10:55Z on 5 Nov).
 
@@ -193,10 +195,10 @@ One at a time. Every answer goes to a file, whole. All times are in UTC.
    - Record `node --version`, the app's version (`Get-AppxPackage`, name and version only) and the Code tab's version from its own `--version`.
    - Record the names and values of any `MCP_TIMEOUT` or `MCP_TOOL_TIMEOUT` in the user and machine environment (row H recorded none of the Code tab's settings), or that none is set.
    - Record the app's configured server names (names only) and whether the ComplyEaze Bridge extension is on.
-   - The Code tab's own MCP servers and allow rules, names only, read from its files and never by a command that starts a server: `mcpServers` at the top of `.claude.json` in the user's folder and under each of its projects; `permissions.allow` entries beginning `mcp__` and `enabledPlugins` in `.claude\settings.json` there. If any names ComplyEaze Bridge, the sitting is Chat-tab only (Rules).
+   - The Code tab's own MCP servers and allow rules, names only, read from its files and never by a command that starts a server: `mcpServers` at the top of `.claude.json` in the user's folder and under each of its projects; `permissions.allow` entries beginning `mcp__` and `enabledPlugins` in `.claude\settings.json` there; for each enabled plugin, the servers its own folder declares; and a managed settings file, if the machine has one. A server that none of these names (one an administrator pushed by another route) is not covered, and the record says the check covers these files only. If any names ComplyEaze Bridge, the sitting is Chat-tab only (Rules).
 1. **Setup for phase H.**
    - Switch the ComplyEaze Bridge extension off in the app's settings. Record that it shows off.
-   - `python -I desktop_config.py add-sleep <config> C:\bridge-lab\703-a\desktop-config-before-h.json C:\bridge-lab\703-a\kit\mcp-sleep-server.mjs C:\bridge-lab\703-a\log\h.jsonl`. EXPECT `add ok`, B0, B1, and step 0's server names plus `bridge-lab-703h`. Anything else: STOP, with the configuration as the line says.
+   - Logged to `handover.txt` as Rules says: `python -I desktop_config.py add-sleep <config> C:\bridge-lab\703-a\desktop-config-before-h.json C:\bridge-lab\703-a\kit\mcp-sleep-server.mjs C:\bridge-lab\703-a\log\h.jsonl`. EXPECT `add ok`, B0, B1, and step 0's server names plus `bridge-lab-703h`. Anything else: STOP, with the configuration as the line says.
    - Hash the before-copy: it must be B0.
    - Quit and start the app with row H's restart helper (`lab/2119-h-answers`, `scripts/restart-desktop.ps1`), as on 5 Nov, as a hand-over (Rules) with no `desktop_config.py` line.
 2. **After the start** (a new lab session, which reads `handover.txt` first).
@@ -243,7 +245,7 @@ Read every number from its file. Put any STOP, skip, or EXPECT not met in the fi
 - A call still `open` in `steps.py` 10 minutes after it was received.
 - Anything sent to Tally, or any key in Tally.
 
-If the sitting ends for any other reason (the PC sleeps, time runs out, the lab session ends), step 7 is run before the sitting closes, or the report names the entry still in the configuration and its before-copy.
+If the sitting ends for any other reason (the PC sleeps, time runs out, the lab session ends), step 7 is run before the sitting closes, or a line in `handover.txt` and in the report names the entry still in the configuration and its before-copy.
 
 After a STOP, the restore (step 7) waits for the run coordinator's word. The report lists the configuration's state, the extension's state, and whether the app is running.
 

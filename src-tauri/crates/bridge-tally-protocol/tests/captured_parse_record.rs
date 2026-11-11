@@ -1216,6 +1216,12 @@ const ROWS: &[Row] = &[
         parser: "parse_import_outcome",
         parse: |_, text| untyped(parse_import_outcome(text)),
     },
+    Row {
+        fixture: "tests/fixtures/agent/single-import-stock-in-hand-journal.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
     // The master-fields lab's create and alter answers (native/PROVENANCE.md, §9.4a): import
     // responses, read by production's parse_import_outcome; no test parses them.
     Row {

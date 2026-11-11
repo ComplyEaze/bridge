@@ -1,0 +1,1199 @@
+{
+  "file": "src-tauri/src/agent_import_stop.rs",
+  "base_commit": "f49b7533",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again). A tool mutant that survived was run again in the whole_set and survivors_again runs as the same edit written as text, under the id named in its run's command.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2216,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_stop.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|stop/)'",
+      "time": "2026-11-10T19:51:22Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 146,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/stop|acknowledge|ack_tests|verify/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5038,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5038, for the tool's two missed mutants (T1 is 381:13, T2 is 432:34) and the eleven hand-written ones that survived",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5040,
+      "command": "as the whole_set run, for the same thirteen",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 56,
+      "missed": 1,
+      "unviable": 6
+    },
+    "hand": {
+      "caught": 58,
+      "missed": 4
+    },
+    "survived_at_base": {
+      "tool": 2,
+      "hand": 11
+    },
+    "equivalent": {
+      "tool": 1,
+      "hand": 4
+    }
+  },
+  "tool_results": {
+    "67:9 replace Seen::of -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `Seen: std::default::Default` is not satisfied"
+    },
+    "81:52 replace == with != in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable",
+      "killer_at": "base"
+    },
+    "102:13 delete match arm (\"posted_verified\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "106:13 delete match arm (\"posted_divergent\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_does_not_show_text_that_could_mislead",
+      "killer_at": "base"
+    },
+    "107:13 delete match arm (\"posted_not_effective\", Some(\"voucher_cancelled\")) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "110:13 delete match arm (\"posted_not_effective\", Some(\"voucher_optional\")) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "123:13 delete match arm (\"sent_not_attributed\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::an_unattributed_invoice_after_an_unclean_answer_drops_the_edit_example",
+      "killer_at": "base"
+    },
+    "126:13 delete match arm (\"matching_content_observed\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "129:13 delete match arm (\"duplicate_fingerprint\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "132:13 delete match arm (\"not_attributable\", Some(\"tag_precedes_pre_import_voucher_mark\" | \"fingerprint_precedes_pre_import_voucher_mark\"),) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "138:13 delete match arm (\"not_attributable\", Some(\"observed_voucher_already_attributed\")) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "141:13 delete match arm (\"not_attributable\", Some(\"bound_master_id_changed\")) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "144:13 delete match arm (\"bound_not_in_window\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "147:13 delete match arm (\"book_rolled_back\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "152:13 delete match arm (\"not_found\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "155:13 delete match arm (\"tally_reported_not_created\", _) in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "116:20 replace match guard row[\"next_step\"] == super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP with true in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_needs_the_person_and_survives_a_restart",
+      "killer_at": "base"
+    },
+    "116:20 replace match guard row[\"next_step\"] == super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP with false in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::an_unattributed_invoice_after_an_unclean_answer_drops_the_edit_example",
+      "killer_at": "base"
+    },
+    "117:21 replace == with != in Seen::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_needs_the_person_and_survives_a_restart",
+      "killer_at": "base"
+    },
+    "167:9 replace Seen::unreadable -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `Seen: std::default::Default` is not satisfied"
+    },
+    "169:13 replace || with && in Seen::unreadable": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "168:38 replace == with != in Seen::unreadable": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "169:27 replace == with != in Seen::unreadable": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "172:30 replace == with != in Seen::unreadable": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "185:9 replace Seen::recorded -> ledger::ReleaseSeen with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ReleaseSeen: std::default::Default` is not satisfied"
+    },
+    "194:9 replace Seen::reported -> (&'static str, &str) with (\"\", \"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "194:9 replace Seen::reported -> (&'static str, &str) with (\"\", \"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "194:9 replace Seen::reported -> (&'static str, &str) with (\"xyzzy\", \"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "194:9 replace Seen::reported -> (&'static str, &str) with (\"xyzzy\", \"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "202:9 replace Seen::words -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "202:9 replace Seen::words -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "217:5 replace verified_words -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "217:5 replace verified_words -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "220:13 delete match arm Some(\"accounting_fingerprint\") in verified_words": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "221:13 delete match arm Some(\"remote_id\") in verified_words": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "224:12 delete ! in verified_words": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "231:26 replace == with != in verified_words": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "232:39 replace != with == in verified_words": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "253:5 replace shown -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "253:5 replace shown -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "257:17 replace || with && in shown": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "272:5 replace release_preview -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "272:5 replace release_preview -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "276:24 delete ! in release_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "312:9 replace Server::release_invoice_stop -> Result<ToolOutcome, ToolFailure> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ToolOutcome: std::default::Default` is not satisfied"
+    },
+    "322:24 replace || with && in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::only_a_batch_that_stops_the_company_can_be_released",
+      "killer_at": "base"
+    },
+    "322:12 delete ! in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "322:27 delete ! in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "328:12 delete ! in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "346:29 replace match guard failure.code == \"request_cancelled\" with true in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "346:29 replace match guard failure.code == \"request_cancelled\" with false in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "346:42 replace == with != in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "381:13 replace || with && in Server::release_invoice_stop": {
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "380:13 replace || with && in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_stop_that_lifts_and_returns_while_the_dialog_is_open_is_not_released",
+      "killer_at": "base"
+    },
+    "379:31 replace != with == in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "380:37 replace != with == in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "381:16 delete ! in Server::release_invoice_stop": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "407:9 replace Server::require_stop -> Result<(), ToolFailure> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_needs_the_person_and_survives_a_restart",
+      "killer_at": "base"
+    },
+    "415:9 replace Server::stop_held -> Result<Option<ledger::BatchSnapshot>, String> with Ok(None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "415:9 replace Server::stop_held -> Result<Option<ledger::BatchSnapshot>, String> with Ok(Some(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `BatchSnapshot: std::default::Default` is not satisfied"
+    },
+    "416:12 delete ! in Server::stop_held": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "432:9 replace Server::stop_outcome -> ToolOutcome with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ToolOutcome: std::default::Default` is not satisfied"
+    },
+    "432:34 replace == with != in Server::stop_outcome": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_whose_read_finds_the_stop_gone_asks_nothing",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "S01": {
+      "what": "ROWS_MISSING: the missing-row code takes the repeated-row code",
+      "edits": [
+        {
+          "from": "const ROWS_MISSING: &str = \"import_verification_rows_missing\";",
+          "to": "const ROWS_MISSING: &str = \"invoice_rows_repeated\";"
+        }
+      ],
+      "mutation": "1ed8b636359d0c577ddd2573d600ae99",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable",
+      "killer_at": "base"
+    },
+    "S02": {
+      "what": "ROWS_REPEATED: the repeated-row code takes the missing-row code",
+      "edits": [
+        {
+          "from": "const ROWS_REPEATED: &str = \"invoice_rows_repeated\";",
+          "to": "const ROWS_REPEATED: &str = \"import_verification_rows_missing\";"
+        }
+      ],
+      "mutation": "a9ef12a7c6a3d9688706059ed31a6e44",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable",
+      "killer_at": "base"
+    },
+    "S03": {
+      "what": "Seen::of: every voucher is counted as an invoice (filter dropped)",
+      "edits": [
+        {
+          "from": "            .filter(|voucher| voucher.voucher_type.is_invoice())\n            .collect::<Vec<_>>();",
+          "to": "            .collect::<Vec<_>>();"
+        }
+      ],
+      "mutation": "fb863c77b85fe18a43a686822541b275",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable",
+      "killer_at": "base"
+    },
+    "S04": {
+      "what": "Seen::of: several rows for the invoice read as its first row",
+      "edits": [
+        {
+          "from": "            [..] => {\n                return Self::NotEstablished(Why {\n                    status: ROWS_REPEATED.into(),\n                    words: \"not established: the read gave this invoice more than one row\".into(),\n                })\n            }",
+          "to": "            [row, ..] => row,"
+        }
+      ],
+      "mutation": "3cd0e09677153e7b651ab7eb145ba1f1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable",
+      "killer_at": "base"
+    },
+    "S05": {
+      "what": "Seen::of: several rows for the invoice read as no row",
+      "edits": [
+        {
+          "from": "            [..] => {\n                return Self::NotEstablished(Why {\n                    status: ROWS_REPEATED.into(),\n                    words: \"not established: the read gave this invoice more than one row\".into(),\n                })\n            }",
+          "to": "            [..] => return missing(),"
+        }
+      ],
+      "mutation": "bf17342f7a51ce6eda7e477fbfb77e60",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable",
+      "killer_at": "base"
+    },
+    "S06": {
+      "what": "Seen::of: a row without a status reads as an empty status, not as missing",
+      "edits": [
+        {
+          "from": "        let Some(status) = row[\"status\"].as_str() else {\n            return missing();\n        };",
+          "to": "        let status = row[\"status\"].as_str().unwrap_or(\"\");"
+        }
+      ],
+      "mutation": "69caab4d5ed03d0f202cd3b6ea16f506",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable",
+      "killer_at": "base"
+    },
+    "S07": {
+      "what": "Seen::of: posted_divergent reads as not established",
+      "edits": [
+        {
+          "from": "(\"posted_divergent\", _) => Self::Found(",
+          "to": "(\"posted_divergent\", _) => Self::NotEstablished("
+        }
+      ],
+      "mutation": "4e332579a9785a5f928673be2793f9c6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S08": {
+      "what": "Seen::of: a cancelled voucher reads as not established",
+      "edits": [
+        {
+          "from": "Some(\"voucher_cancelled\")) => {\n                Self::Found(",
+          "to": "Some(\"voucher_cancelled\")) => {\n                Self::NotEstablished("
+        }
+      ],
+      "mutation": "8c5bbd470b2717a2478649169e78a92b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S09": {
+      "what": "Seen::of: an optional voucher reads as not established",
+      "edits": [
+        {
+          "from": "Some(\"voucher_optional\")) => {\n                Self::Found(",
+          "to": "Some(\"voucher_optional\")) => {\n                Self::NotEstablished("
+        }
+      ],
+      "mutation": "70c27b58d774838281750e68fd502d4a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S10": {
+      "what": "Seen::of: after an answer that was not clean, the words keep the edit example",
+      "edits": [
+        {
+          "from": "\"not established: no voucher matching this invoice was found, and one may be in the book\",",
+          "to": "\"not established: no voucher matching this invoice was found, and one may be in the book, changed or entered in Tally\","
+        }
+      ],
+      "mutation": "0ebc423d7a046d71d7faaeea1a721be9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::an_unattributed_invoice_after_an_unclean_answer_drops_the_edit_example",
+      "killer_at": "base"
+    },
+    "S11": {
+      "what": "Seen::of: matching_content_observed reads as found",
+      "edits": [
+        {
+          "from": "(\"matching_content_observed\", _) => Self::NotEstablished(",
+          "to": "(\"matching_content_observed\", _) => Self::Found("
+        }
+      ],
+      "mutation": "2eba44814a90f6eaaf6cf6b21ab43a7e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S12": {
+      "what": "Seen::of: duplicate_fingerprint reads as found",
+      "edits": [
+        {
+          "from": "(\"duplicate_fingerprint\", _) => Self::NotEstablished(",
+          "to": "(\"duplicate_fingerprint\", _) => Self::Found("
+        }
+      ],
+      "mutation": "5184801cd156bb3574d3f93b0ff6c00b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S13": {
+      "what": "Seen::of: a fingerprint before the mark is not placed (alternative dropped)",
+      "edits": [
+        {
+          "from": "Some(\"tag_precedes_pre_import_voucher_mark\" | \"fingerprint_precedes_pre_import_voucher_mark\"),",
+          "to": "Some(\"tag_precedes_pre_import_voucher_mark\"),"
+        }
+      ],
+      "mutation": "84d6205ae14c17de2cdd5fcad7e177df",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S14": {
+      "what": "Seen::of: a tag before the mark is not placed (alternative dropped)",
+      "edits": [
+        {
+          "from": "Some(\"tag_precedes_pre_import_voucher_mark\" | \"fingerprint_precedes_pre_import_voucher_mark\"),",
+          "to": "Some(\"fingerprint_precedes_pre_import_voucher_mark\"),"
+        }
+      ],
+      "mutation": "fb2d69835a30fe0eaee535bf014a6c39",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S15": {
+      "what": "Seen::of: an already-attributed voucher is not placed",
+      "edits": [
+        {
+          "from": "(\"not_attributable\", Some(\"observed_voucher_already_attributed\"))",
+          "to": "(\"not_attributable\", Some(\"observed_voucher_already_attributed_\"))"
+        }
+      ],
+      "mutation": "71df18ca21bf9378e3f52702dc6c5e63",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S16": {
+      "what": "Seen::of: a changed master id is not placed",
+      "edits": [
+        {
+          "from": "(\"not_attributable\", Some(\"bound_master_id_changed\"))",
+          "to": "(\"not_attributable\", Some(\"bound_master_id_changed_\"))"
+        }
+      ],
+      "mutation": "eac066eae642fae5672b8f444a64e65a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S17": {
+      "what": "Seen::of: bound_not_in_window reads as found",
+      "edits": [
+        {
+          "from": "(\"bound_not_in_window\", _) => Self::NotEstablished(",
+          "to": "(\"bound_not_in_window\", _) => Self::Found("
+        }
+      ],
+      "mutation": "5c782314c46c3bccc685ed38ea234265",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S18": {
+      "what": "Seen::of: book_rolled_back reads as found",
+      "edits": [
+        {
+          "from": "(\"book_rolled_back\", _) => {\n                Self::NotEstablished(",
+          "to": "(\"book_rolled_back\", _) => {\n                Self::Found("
+        }
+      ],
+      "mutation": "6317381b283a46f968a9fc815dd46e7d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S19": {
+      "what": "Seen::of: not_found reads as found",
+      "edits": [
+        {
+          "from": "(\"not_found\", _) => {\n                Self::NotEstablished(",
+          "to": "(\"not_found\", _) => {\n                Self::Found("
+        }
+      ],
+      "mutation": "70e985d3750e0211a68fcf3c470f934e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S20": {
+      "what": "Seen::of: tally_reported_not_created reads as found",
+      "edits": [
+        {
+          "from": "(\"tally_reported_not_created\", _) => {\n                Self::NotEstablished(",
+          "to": "(\"tally_reported_not_created\", _) => {\n                Self::Found("
+        }
+      ],
+      "mutation": "2e788f66726eed7b4a020733146c24bb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S21": {
+      "what": "Seen::of: a status it does not place reads as found",
+      "edits": [
+        {
+          "from": "            _ => Self::NotEstablished(why(\n                \"not established: the read gave this invoice a state",
+          "to": "            _ => Self::Found(why(\n                \"not established: the read gave this invoice a state"
+        }
+      ],
+      "mutation": "c47856c8db9a7bbe3a3fecb7112dc495",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S22": {
+      "what": "Seen::of: a verified row's words leave out why it is not confirmed",
+      "edits": [
+        {
+          "from": "                words: verified_words(result),",
+          "to": "                words: \"found in Tally as built\".into(),"
+        }
+      ],
+      "mutation": "f2faa982f725ec1b05ab784c41485b08",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "S23": {
+      "what": "unreadable: a deadline failure code is not told as no answer in time",
+      "edits": [
+        {
+          "from": "if failure.code == \"request_deadline_exceeded\"\n",
+          "to": "if failure.code == \"request_deadline_exceeded_\"\n"
+        }
+      ],
+      "mutation": "bbd8df80c3729af86ee1236f91d2b713",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "S24": {
+      "what": "unreadable: an unanswered deadline is not told as no answer in time",
+      "edits": [
+        {
+          "from": "|| unanswered == Some(\"request_deadline_exceeded\")",
+          "to": "|| unanswered == Some(\"request_deadline_exceeded_\")"
+        }
+      ],
+      "mutation": "109e33e0955718afdfc8e055abe0a628",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "S25": {
+      "what": "unreadable: an unreachable endpoint is told as no answer in time",
+      "edits": [
+        {
+          "from": "Some(\"Tally did not answer\")\n        } else {",
+          "to": "Some(\"Tally did not answer in time\")\n        } else {"
+        }
+      ],
+      "mutation": "c524365a73e955d4cf19cafdd7d3e733",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "S26": {
+      "what": "recorded: found is recorded as not established",
+      "edits": [
+        {
+          "from": "Self::Found(_) => ledger::ReleaseSeen::Found,",
+          "to": "Self::Found(_) => ledger::ReleaseSeen::NotEstablished,"
+        }
+      ],
+      "mutation": "635c97ee3f3ea03601c2622f875c3c93",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S27": {
+      "what": "recorded: unreadable is recorded as not established",
+      "edits": [
+        {
+          "from": "Self::Unreadable { .. } => ledger::ReleaseSeen::Unreadable,",
+          "to": "Self::Unreadable { .. } => ledger::ReleaseSeen::NotEstablished,"
+        }
+      ],
+      "mutation": "3f6484d6b00f8e3187003bcdd402fce9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "S28": {
+      "what": "reported: found is reported as not established",
+      "edits": [
+        {
+          "from": "Self::Found(why) => (\"found\", &why.status),",
+          "to": "Self::Found(why) => (\"not_established\", &why.status),"
+        }
+      ],
+      "mutation": "115f7343311c5647faf1f2315c54ae2e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::what_was_seen_is_placed_for_every_status_the_verification_writes",
+      "killer_at": "base"
+    },
+    "S29": {
+      "what": "reported: an unreadable read reports no code",
+      "edits": [
+        {
+          "from": "Self::Unreadable { code, .. } => (\"unreadable\", code),",
+          "to": "Self::Unreadable { .. } => (\"unreadable\", \"\"),"
+        }
+      ],
+      "mutation": "7a15c54a60a72a9c921588438e603f7a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "S30": {
+      "what": "words: what Tally did not do is left out",
+      "edits": [
+        {
+          "from": "answer.map_or_else(String::new, |answer| format!(\": {answer}\"))",
+          "to": "answer.map_or_else(String::new, |_| String::new())"
+        }
+      ],
+      "mutation": "aa103952a552c445591849bc186f277d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_failed_read_is_shown_by_its_code",
+      "killer_at": "base"
+    },
+    "S31": {
+      "what": "verified_words: a same-content duplicate gets the generic words",
+      "edits": [
+        {
+          "from": "Some(\"accounting_fingerprint\") => \"another voucher has the same content\",",
+          "to": "Some(\"accounting_fingerprint\") => \"another voucher reads as its duplicate\","
+        }
+      ],
+      "mutation": "d2ab91fffa190e0d1c97128f69e922fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "S32": {
+      "what": "verified_words: a same-remote-id duplicate gets the generic words",
+      "edits": [
+        {
+          "from": "Some(\"remote_id\") => \"another voucher has the same remote id\",",
+          "to": "Some(\"remote_id\") => \"another voucher reads as its duplicate\","
+        }
+      ],
+      "mutation": "91e5f36f4afd897f9a2a152fbfeebeff",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "S33": {
+      "what": "verified_words: a repeated clause is not dropped",
+      "edits": [
+        {
+          "from": "        if !clauses.contains(&clause) {\n            clauses.push(clause);\n        }",
+          "to": "        clauses.push(clause);"
+        }
+      ],
+      "mutation": "5ba694c03e6e12431b1d27cda918eb2e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "S34": {
+      "what": "verified_words: the masters clause is added beside a duplicate",
+      "edits": [
+        {
+          "from": "} else if clauses.is_empty() {",
+          "to": "} else {"
+        }
+      ],
+      "mutation": "42486516082c61684b65c32cca61401c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_verified_row_says_why_it_is_not_confirmed",
+      "killer_at": "base"
+    },
+    "S35": {
+      "what": "shown: a layout character is shown (check dropped)",
+      "edits": [
+        {
+          "from": "            if post::has_unsafe_review_layout_character(&one)\n                || post::has_unreviewable_format_character(&one)",
+          "to": "            if post::has_unreviewable_format_character(&one)"
+        }
+      ],
+      "mutation": "80200eca9b849848afb4518a620afdea",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_does_not_show_text_that_could_mislead",
+      "killer_at": "base"
+    },
+    "S36": {
+      "what": "shown: a format character is shown (check dropped)",
+      "edits": [
+        {
+          "from": "            if post::has_unsafe_review_layout_character(&one)\n                || post::has_unreviewable_format_character(&one)",
+          "to": "            if post::has_unsafe_review_layout_character(&one)"
+        }
+      ],
+      "mutation": "4f0f76590a2193f76f40895987a7a94f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "S37": {
+      "what": "release_preview: a company with no name shows nothing, not its GUID",
+      "edits": [
+        {
+          "from": ".unwrap_or(&line.company_guid);\n    let (company_name",
+          "to": ".unwrap_or(\"\");\n    let (company_name"
+        }
+      ],
+      "mutation": "bf14b6a7d15c1ce140193de7a74e1e38",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_does_not_show_text_that_could_mislead",
+      "killer_at": "base"
+    },
+    "S38": {
+      "what": "release_preview: an empty company name is shown, not the GUID (filter dropped)",
+      "edits": [
+        {
+          "from": "        .filter(|name| !name.is_empty())\n        .unwrap_or(&line.company_guid);",
+          "to": "        .unwrap_or(&line.company_guid);"
+        }
+      ],
+      "mutation": "7f25dcef53caee05481d1ebf76b0b6cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_does_not_show_text_that_could_mislead",
+      "killer_at": "base"
+    },
+    "S39": {
+      "what": "release_preview: the company name is shown raw",
+      "edits": [
+        {
+          "from": "let (company_name, batch_id) = (shown(company), shown(&line.batch_id));",
+          "to": "let (company_name, batch_id) = (company.to_string(), shown(&line.batch_id));"
+        }
+      ],
+      "mutation": "5daed724b6dfe556bf5a189f05f82db3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_does_not_show_text_that_could_mislead",
+      "killer_at": "base"
+    },
+    "S40": {
+      "what": "release_preview: the batch id is shown raw",
+      "edits": [
+        {
+          "from": "let (company_name, batch_id) = (shown(company), shown(&line.batch_id));",
+          "to": "let (company_name, batch_id) = (shown(company), line.batch_id.clone());"
+        }
+      ],
+      "mutation": "0b24e82fc91434dbb841ed5cf91d35bb",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_lists_only_the_invoice_and_shows_no_reordering_character",
+      "killer_at": "this_commit"
+    },
+    "S41": {
+      "what": "release_preview: the invoice number is shown raw",
+      "edits": [
+        {
+          "from": "shown(voucher.voucher_number.as_deref().unwrap_or(\"(no number)\")),",
+          "to": "voucher.voucher_number.as_deref().unwrap_or(\"(no number)\").to_string(),"
+        }
+      ],
+      "mutation": "4eb96938786ae851146b63c386d861fb",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_lists_only_the_invoice_and_shows_no_reordering_character",
+      "killer_at": "this_commit"
+    },
+    "S42": {
+      "what": "release_preview: every voucher is listed, not only the invoice",
+      "edits": [
+        {
+          "from": "        .filter(|voucher| voucher.voucher_type.is_invoice())\n        .map(|voucher| {",
+          "to": "        .map(|voucher| {"
+        }
+      ],
+      "mutation": "74e8c6d0c45ce4599724c2baa38f9e3c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::the_release_dialog_lists_only_the_invoice_and_shows_no_reordering_character",
+      "killer_at": "this_commit"
+    },
+    "S43": {
+      "what": "release_preview: what was seen is left out",
+      "edits": [
+        {
+          "from": "        batch_id,\n        seen.words()\n    )",
+          "to": "        batch_id,\n        \"\"\n    )"
+        }
+      ],
+      "mutation": "93991b3ccb9ebe34d0776e27ea437b7e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "S44": {
+      "what": "release_invoice_stop: a batch never dispatched is let past the first check",
+      "edits": [
+        {
+          "from": "if !dispatched || !holds_an_invoice(&line) {",
+          "to": "if !holds_an_invoice(&line) {"
+        }
+      ],
+      "mutation": "0265ab9418290378ab2520bf27b93e63",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::only_a_batch_that_stops_the_company_can_be_released",
+      "killer_at": "base"
+    },
+    "S45": {
+      "what": "release_invoice_stop: a batch holding no invoice is let past the first check",
+      "edits": [
+        {
+          "from": "if !dispatched || !holds_an_invoice(&line) {",
+          "to": "if !dispatched {"
+        }
+      ],
+      "mutation": "3d716365d92a6607e945db67e27fafad",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::only_a_batch_that_stops_the_company_can_be_released",
+      "killer_at": "base"
+    },
+    "S46": {
+      "what": "release_invoice_stop: the company GUID is compared case-sensitively",
+      "edits": [
+        {
+          "from": ".eq_ignore_ascii_case(required_string(args, \"company_guid\")?)",
+          "to": ".eq(required_string(args, \"company_guid\")?)"
+        }
+      ],
+      "mutation": "17af5e4e063b1bdbfaee7fb527a6c534",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_naming_its_company_in_capitals_goes_ahead_under_the_batch_s_company",
+      "killer_at": "this_commit"
+    },
+    "S47": {
+      "what": "release_invoice_stop: a batch that stops nothing is not refused before the read",
+      "edits": [
+        {
+          "from": "        self.require_stop(&line)?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "5a355d6a9a2ffd9847bd4432d05e5197",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_needs_the_person_and_survives_a_restart",
+      "killer_at": "base"
+    },
+    "S48": {
+      "what": "release_invoice_stop: a cancelled read is shown as unreadable, not refused",
+      "edits": [
+        {
+          "from": "            Err(failure) if failure.code == \"request_cancelled\" => return Err(failure),\n",
+          "to": ""
+        }
+      ],
+      "mutation": "947fac0974ed0bbb765e29e10a328663",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_cancelled_release_is_refused_with_no_dialog",
+      "killer_at": "base"
+    },
+    "S49": {
+      "what": "release_invoice_stop: a stop that lifted during the read is answered as released",
+      "edits": [
+        {
+          "from": "return Ok(self.stop_outcome(&line, \"not_held\", None, evidence));",
+          "to": "return Ok(self.stop_outcome(&line, \"stop_released\", None, evidence));"
+        }
+      ],
+      "mutation": "34c72a29ff477c153c8e235a4e31e7c6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_whose_read_finds_the_stop_gone_asks_nothing",
+      "killer_at": "base"
+    },
+    "S50": {
+      "what": "release_invoice_stop: the dialog shows the batch as first read, not as held after the read",
+      "edits": [
+        {
+          "from": "let preview = release_preview(&held.batch, &seen);",
+          "to": "let preview = release_preview(&line, &seen);"
+        }
+      ],
+      "mutation": "3e519a7292c63eb9c59d97ddeb637448",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S51": {
+      "what": "release_invoice_stop: the dialog is asked for as a row release, not a stop release",
+      "edits": [
+        {
+          "from": "ReviewAcknowledged::confirm(ReviewKind::StopRelease, count, &preview)",
+          "to": "ReviewAcknowledged::confirm(ReviewKind::RowRelease, count, &preview)"
+        }
+      ],
+      "mutation": "44f531f3a635eb5eb967fc260b587d8d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_needs_the_person_and_survives_a_restart",
+      "killer_at": "base"
+    },
+    "S52": {
+      "what": "release_invoice_stop: the batch's sha256 is not compared under the lock",
+      "edits": [
+        {
+          "from": "            || current.batch.sha256 != line.sha256\n",
+          "to": ""
+        }
+      ],
+      "mutation": "9a5e2b4ec1ef51240e9d23864f814a76",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S53": {
+      "what": "release_invoice_stop: the generation is not compared under the lock",
+      "edits": [
+        {
+          "from": "        if current.generation != held.generation\n            || current.batch.sha256",
+          "to": "        if current.batch.sha256"
+        }
+      ],
+      "mutation": "afd900027fc740146952808cc90bfaf4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_stop_that_lifts_and_returns_while_the_dialog_is_open_is_not_released",
+      "killer_at": "base"
+    },
+    "S54": {
+      "what": "release_invoice_stop: whether the batch still stops the company is not checked under the lock",
+      "edits": [
+        {
+          "from": "            || current.batch.sha256 != line.sha256\n            || !self\n                .import_invoice_stops_while_admitted(&line.company_guid)?\n                .contains(&line.batch_id)\n        {",
+          "to": "            || current.batch.sha256 != line.sha256\n        {"
+        }
+      ],
+      "mutation": "de6f1f33b7034ba380b85d94dc5b7eff",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S55": {
+      "what": "release_invoice_stop: the record says found whatever was seen",
+      "edits": [
+        {
+          "from": "            seen.recorded(),",
+          "to": "            ledger::ReleaseSeen::Found,"
+        }
+      ],
+      "mutation": "74d48831a382f072d17bd14130f56302",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "S56": {
+      "what": "release_invoice_stop: a stop still standing after the record is not refused",
+      "edits": [
+        {
+          "from": "        if self\n            .import_invoice_stops_while_admitted(&line.company_guid)?\n            .contains(&line.batch_id)\n        {\n            return Err(ToolFailure::from(\"ack_stop_not_recorded\".to_string())\n                .with_prior_evidence(evidence));\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "11025ac1aee14683fb5c2c0bf94039e3",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S57": {
+      "what": "release_invoice_stop: the answer leaves out what was seen",
+      "edits": [
+        {
+          "from": "Ok(self.stop_outcome(&line, \"stop_released\", Some(&seen), evidence))",
+          "to": "Ok(self.stop_outcome(&line, \"stop_released\", None, evidence))"
+        }
+      ],
+      "mutation": "a68d61bd6551f1b08f0d7471f90efe40",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_goes_ahead_while_tally_cannot_be_read",
+      "killer_at": "base"
+    },
+    "S58": {
+      "what": "release_invoice_stop: a change while reviewing takes the not-held code",
+      "edits": [
+        {
+          "from": "ToolFailure::from(\"ack_stop_changed_while_reviewing\".to_string())",
+          "to": "ToolFailure::from(\"ack_stop_not_held\".to_string())"
+        }
+      ],
+      "mutation": "50aec22104a769cc63e36397ac1c630b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_stop_that_changes_while_the_dialog_is_open_is_not_released",
+      "killer_at": "base"
+    },
+    "S59": {
+      "what": "release_invoice_stop: a batch not sent takes the not-held code",
+      "edits": [
+        {
+          "from": "return Err(\"ack_stop_batch_not_sent\".to_string().into());",
+          "to": "return Err(\"ack_stop_not_held\".to_string().into());"
+        }
+      ],
+      "mutation": "4903e51d3b15128710cfd673c80f1d06",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::only_a_batch_that_stops_the_company_can_be_released",
+      "killer_at": "base"
+    },
+    "S60": {
+      "what": "require_stop: a batch that stops nothing takes the not-sent code",
+      "edits": [
+        {
+          "from": ".ok_or_else(|| \"ack_stop_not_held\".to_string().into())",
+          "to": ".ok_or_else(|| \"ack_stop_batch_not_sent\".to_string().into())"
+        }
+      ],
+      "mutation": "d6eec1946c2cf138dacab7db5a759c92",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_needs_the_person_and_survives_a_restart",
+      "killer_at": "base"
+    },
+    "S61": {
+      "what": "stop_outcome: the released next step drops what it allows",
+      "edits": [
+        {
+          "from": "\"The stop is released. Invoices for this company can be built and posted again.\"",
+          "to": "\"The stop is released.\""
+        }
+      ],
+      "mutation": "f4a26625101f102117ace761128743ed",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_needs_the_person_and_survives_a_restart",
+      "killer_at": "base"
+    },
+    "S62": {
+      "what": "stop_outcome: the answer names no company",
+      "edits": [
+        {
+          "from": "            company_guid: Some(line.company_guid.clone()),\n            truncated: false,",
+          "to": "            company_guid: None,\n            truncated: false,"
+        }
+      ],
+      "mutation": "642bdd97dc11a1320d9d2db1cf523511",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::a_release_naming_its_company_in_capitals_goes_ahead_under_the_batch_s_company",
+      "killer_at": "this_commit"
+    }
+  },
+  "accepted_survivors": {
+    "381:13 replace || with && in Server::release_invoice_stop": {
+      "reason": "equivalent: with && the check refuses when the generation changed, or when the sha256 changed and the batch no longer stops the company. With the generation unchanged no record of the batch was written since stop_held read it under the same lock as the stop it found. Whether a batch stops its company is decided by that batch's own records alone (ledger::invoice_stops), each of which moves its generation, and a batch's sha256 is fixed for its id. So with the generation unchanged both later conditions read false, and the check refuses exactly when it does at base"
+    },
+    "S50": {
+      "mutation": "3e519a7292c63eb9c59d97ddeb637448",
+      "reason": "equivalent: the batch held after the read differs from the batch first read only by the records of it written in between, which change its status (persist_import_verification copies the line and sets its status). release_preview reads the company, company GUID, batch id and vouchers, never the status"
+    },
+    "S52": {
+      "mutation": "9a5e2b4ec1ef51240e9d23864f814a76",
+      "reason": "equivalent: a batch's sha256 is fixed for its id. The build is the only writer of a batch line and mints a new batch id for each, and a verification's record copies the line with its sha256, so the batch held under the lock has the sha256 first read"
+    },
+    "S54": {
+      "mutation": "de6f1f33b7034ba380b85d94dc5b7eff",
+      "reason": "equivalent: whether a batch stops its company is decided by that batch's own records alone (ledger::invoice_stops reads its batch lines and its dispatch, release and status records), and every one of them moves the batch's generation. stop_held read that generation under the same lock as the stop it found, so with the generation unchanged the batch still stops the company and this condition reads false"
+    },
+    "S56": {
+      "mutation": "11025ac1aee14683fb5c2c0bf94039e3",
+      "reason": "equivalent, unreachable: the stop_release record appended just before, under the same exclusive lock, names this batch, and ledger::invoice_stops leaves out a batch released since its latest posted_verified; nothing else is written before the journal is read again"
+    }
+  }
+}

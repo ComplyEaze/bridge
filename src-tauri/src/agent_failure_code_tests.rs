@@ -93,6 +93,23 @@ const INVOICE_NUMBER_AFTER_POST: &[(InvoiceNumberAfterPostCode, &str)] = &[
     ),
 ];
 
+/// The lab master tool's refusals that name what they refused (#2499).
+#[cfg(feature = "lab-writes")]
+const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
+    (
+        LabMastersCode::OpeningBillsUnsupported,
+        "lab_opening_bills_unsupported",
+    ),
+    (
+        LabMastersCode::RootParentUnmeasured,
+        "lab_root_parent_unmeasured",
+    ),
+    (
+        LabMastersCode::NameSharesKey,
+        "lab_master_name_shares_a_key",
+    ),
+];
+
 /// Every pin of every enum, as the failure code its variant makes, beside the pinned string.
 fn pinned() -> Vec<(FailureCode, &'static str)> {
     fn of<C: Copy + Into<FailureCode>>(
@@ -102,7 +119,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
             .map(|(code, text)| ((*code).into(), *text))
             .collect()
     }
-    [
+    let pins = [
         of(GST_UNCERTAIN),
         of(BANK_STATEMENT_IMPORT),
         of(READ),
@@ -112,7 +129,10 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(OUTSTANDINGS),
         of(INVOICE_NUMBER_AFTER_POST),
     ]
-    .concat()
+    .concat();
+    #[cfg(feature = "lab-writes")]
+    let pins = [pins, of(LAB_MASTERS)].concat();
+    pins
 }
 
 /// Every declared variant of every enum, as the failure code it makes.
@@ -120,7 +140,7 @@ fn declared() -> Vec<FailureCode> {
     fn of<C: Copy + Into<FailureCode>>(all: &[C]) -> Vec<FailureCode> {
         all.iter().map(|code| (*code).into()).collect()
     }
-    [
+    let codes = [
         of(GstUncertainCode::ALL),
         of(BankStatementImportCode::ALL),
         of(ReadCode::ALL),
@@ -130,7 +150,10 @@ fn declared() -> Vec<FailureCode> {
         of(OutstandingsCode::ALL),
         of(InvoiceNumberAfterPostCode::ALL),
     ]
-    .concat()
+    .concat();
+    #[cfg(feature = "lab-writes")]
+    let codes = [codes, of(LabMastersCode::ALL)].concat();
+    codes
 }
 
 /// The pins cover every variant, once each and in declaration order, so a variant added without a
@@ -154,6 +177,8 @@ fn every_variant_has_one_pinned_string() {
         variants(INVOICE_NUMBER_AFTER_POST),
         InvoiceNumberAfterPostCode::ALL
     );
+    #[cfg(feature = "lab-writes")]
+    assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -189,6 +214,8 @@ fn each_declared_code_is_the_string_its_site_wrote() {
         INVOICE_NUMBER_AFTER_POST,
         InvoiceNumberAfterPostCode::as_str,
     );
+    #[cfg(feature = "lab-writes")]
+    check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -206,7 +233,12 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    assert_eq!(codes.len(), 27, "the declared codes");
+    // The three lab master codes are declared only in a build with `lab-writes`.
+    #[cfg(not(feature = "lab-writes"))]
+    let expected = 27;
+    #[cfg(feature = "lab-writes")]
+    let expected = 30;
+    assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");

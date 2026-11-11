@@ -192,6 +192,20 @@ failure_codes! {
     }
 }
 
+#[cfg(feature = "lab-writes")]
+failure_codes! {
+    /// The refusals of `lab_import_masters` that name what they refused, each before any write.
+    pub(crate) enum LabMastersCode {
+        /// A ledger carries opening bill allocations (bridge#1500).
+        OpeningBillsUnsupported = "lab_opening_bills_unsupported",
+        /// A group's parent is the root, or absent (bridge#974).
+        RootParentUnmeasured = "lab_root_parent_unmeasured",
+        /// A requested name shares one of master's name-index keys with a target master whose name
+        /// has another canonical key (#2499).
+        NameSharesKey = "lab_master_name_shares_a_key",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

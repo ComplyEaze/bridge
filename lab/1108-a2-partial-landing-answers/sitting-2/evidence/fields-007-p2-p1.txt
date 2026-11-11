@@ -1,0 +1,14 @@
+post_import isError True round trip 11.604 s, sent 2026-11-11T07:07:00Z
+created: null | attempt_recorded: null
+dispatch: state "reconciliation_required" | response_state "response_not_clean" | resent false
+dispatch.response.outcome counters: {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 2, "deleted": 0, "errors": 0, "exceptions": 1, "ignored": 0, "line_error_count": 1}
+tally_line_errors: [{"text": "Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!", "truncated": false}]
+outcome other keys: {"application_status": "not_reported", "exceptions_were_reported": true, "last_vch_id": 3}
+error.code: "import_reconciliation_required" | error.message: "The saved attempt has not been confirmed as the intended new voucher. Reconcile this original batch without resending it."
+next_step: null
+verification_status: "verification_incomplete" | counts (non-zero): {"matching_content_observed": 2, "sent_not_attributed": 1}
+voucher "b1108-p2-1" | status "matching_content_observed" | attribution "not_established" | next_step null | other {"guid": "<company guid>-00000002", "master_id": "2"}
+voucher "b1108-p2-2" | status "sent_not_attributed" | attribution null | next_step "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again." | other {}
+voucher "b1108-p2-3" | status "matching_content_observed" | attribution "not_established" | next_step null | other {"guid": "<company guid>-00000003", "master_id": "3"}
+duplicates: []
+post_span_binding: {"code": "span_counters_not_clean", "state": "refused", "summary": "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."}

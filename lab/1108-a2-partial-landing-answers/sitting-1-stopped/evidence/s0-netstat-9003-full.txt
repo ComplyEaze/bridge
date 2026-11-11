@@ -1,0 +1,1 @@
+(EXCERPT of netstat -ano: only the LISTENING lines on ports 9001 and 9003; the full output had 22 LISTENING lines and is kept on the lab PC)

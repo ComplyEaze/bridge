@@ -1,0 +1,3 @@
+2026-11-11T06:42:04.228Z check of p1-p1 for batch bridge-a6e199c1-aeb0-4d7e-8150-8ee96597b2d1: HELPER ERROR RuntimeError: no WAITING line in the box log
+NOT ALL PASS (fail closed)
+2026-11-11T06:42:04.228Z answer file written: No

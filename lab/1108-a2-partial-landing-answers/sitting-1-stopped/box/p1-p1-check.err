@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "<LAB_DIR>\boxcheck.py", line 39, in <module>
+    t, reads = read_whole()
+  File "<LAB_DIR>\boxcheck.py", line 36, in read_whole
+    raise RuntimeError('no WAITING line in the box log')
+RuntimeError: no WAITING line in the box log

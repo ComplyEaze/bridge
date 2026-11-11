@@ -1,0 +1,6 @@
+$ python -I check_1108.py diff p2post-vouchers.utf16le.xml p3post-vouchers.utf16le.xml
+exit 0
+rows before: 3  after: 5
+ADDED VOUCHER None <company guid>-00000004
+ADDED VOUCHER None <company guid>-00000005
+unchanged rows: 3

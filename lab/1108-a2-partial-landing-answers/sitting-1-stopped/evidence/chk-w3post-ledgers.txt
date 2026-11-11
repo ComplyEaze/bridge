@@ -1,0 +1,28 @@
+$ python -I check_1108.py rows w3post-ledgers.utf16le.xml
+exit 0
+rows: 5
+LEDGER 'A1 Capital' (10 characters) GUID <company guid>-000000d2
+  MASTERID '210'
+  ALTERID '212'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>A1 Capital</NAME></NAME.LIST></LANGUAGENAME.LIST>
+  PARENT 'Capital Account'
+LEDGER 'A1 Closing Stock' (16 characters) GUID <company guid>-000000d1
+  MASTERID '209'
+  ALTERID '211'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>A1 Closing Stock</NAME></NAME.LIST></LANGUAGENAME.LIST>
+  PARENT 'Stock-in-Hand'
+LEDGER 'A2 Expense' (10 characters) GUID <company guid>-000000d3
+  MASTERID '211'
+  ALTERID '213'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>A2 Expense</NAME></NAME.LIST></LANGUAGENAME.LIST>
+  PARENT 'Indirect Expenses'
+LEDGER 'Cash' (4 characters) GUID <company guid>-0000001f
+  MASTERID '31'
+  ALTERID '32'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>Cash</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>
+  PARENT 'Cash-in-Hand'
+LEDGER 'Profit & Loss A/c' (17 characters) GUID <company guid>-0000001e
+  MASTERID '30'
+  ALTERID '31'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>Profit & Loss A/c</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>
+  PARENT 'Primary'

@@ -1,0 +1,3 @@
+2026-11-11T06:56:40.205Z watch start: tally window 0xba0722; see within 3 s; answer by 5 s
+2026-11-11T06:56:43.295Z NO BOX seen within 3 s
+2026-11-11T06:56:43.654Z capture selftest-s2-nobox.png 1920x1080 380981 B sha256 fa412daeec44cd036ad5d4a42b9ea1edf47653d39b995d01342cf923421f7b90

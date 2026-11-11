@@ -1,0 +1,9 @@
+2026-11-11T07:08:18.253Z check of p3-p1 for batch bridge-14bc5272-847e-45f3-b2db-c5b418d939b0, 3 voucher(s), total 94 (log read whole after 28 read(s))
+PASS box seen
+PASS (a) one Create line, whole: Create 3 vouchers in "BRIDGE STOCK CREATE LAB"
+PASS (b) Company GUID line, whole
+PASS (b) Batch line, whole: Batch: bridge-14bc5272-847e-45f3-b2db-c5b418d939b0
+PASS (c) totals line, whole: Total debit: 94  Total credit: 94
+  Create lines seen: ['Create 3 vouchers in "BRIDGE STOCK CREATE LAB"']
+ALL PASS
+2026-11-11T07:08:18.253Z answer file written: Yes

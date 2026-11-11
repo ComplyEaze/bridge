@@ -1,0 +1,26 @@
+args-post-p1.json 5cf4a131ffacd171
+args-verify-p1.json 5cf4a131ffacd171
+--- mN-before
+2026-11-11T06:34:19Z p1pre-marks.utf16le.xml request sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b curl exit 0 status 200 CONTENT-LENGTH 3406 answer 3406 B sha256 19929a5e192943063e0793ce7e12c05fa9a44137ee4ffce7d82b291b4ab028f8
+  parses as XML (C4)
+exit 0
+COMPANY rows: 1
+  GUID <company guid> ALTVCHID 1 ALTMSTID 213
+GUID check: 1 GUID(s) named, 0 not beginning with THE COMPANY's
+--- post_import start 2026-11-11T06:34:22.372Z
+005-p1-p1.json: post_import sent 2026-11-11T06:34:22.664Z secs 40.042 bytes 1773 isError False rpc False
+{'attempt_recorded': False, 'batch_id': 'bridge-a6e199c1-aeb0-4d7e-8150-8ee96597b2d1', 'dispatch': {'resent': False, 'state': 'not_dispatched'}}
+post_import end 2026-11-11T06:35:03.154Z
+2026-11-11T06:35:03.155Z approval pending: retry_after_s 15; calling again as p1-p1-r1 after 15 s
+006-p1-p1-r1.json: post_import sent 2026-11-11T06:35:18.352Z secs 40.069 bytes 1507 isError False rpc False
+{'attempt_recorded': False, 'batch_id': 'bridge-a6e199c1-aeb0-4d7e-8150-8ee96597b2d1', 'dispatch': {'resent': False, 'state': 'not_dispatched'}}
+call end 2026-11-11T06:35:58.962Z
+2026-11-11T06:35:58.963Z approval pending: retry_after_s 15; calling again as p1-p1-r2 after 15 s
+007-p1-p1-r2.json: post_import sent 2026-11-11T06:36:14.111Z secs 14.626 bytes 1607 isError True rpc False
+{'attempt_recorded': False, 'batch_id': 'bridge-a6e199c1-aeb0-4d7e-8150-8ee96597b2d1', 'error': {'code': 'import_approval_timed_out', 'message': 'No posting attempt was recorded. Review the error before requesting approval again.'}}
+call end 2026-11-11T06:36:29.311Z
+--- box log
+Traceback (most recent call last):
+  File "<LAB_DIR>\p1108.py", line 39, in <module>
+    print('--- box log'); print('\n'.join(l[:240] for l in open(f'{R}/box/{tag}-box.txt', encoding='utf-8-sig').read().splitlines() if 'child' not in l).replace(open(R + '/guid.txt').read().strip(), '<company guid>'))
+FileNotFoundError: [Errno 2] No such file or directory: '<LAB_DIR>/box/p1-p1-box.txt'

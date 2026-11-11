@@ -1,0 +1,4 @@
+$ python -I check_1108.py diff base-ledgers.utf16le.xml s9-ledgers.utf16le.xml
+exit 0
+rows before: 2  after: 2
+unchanged rows: 2

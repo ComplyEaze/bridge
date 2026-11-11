@@ -1,0 +1,13 @@
+2026-11-11T07:03:23.582Z 000-s5-list-companies.json list_companies secs 0.112 bytes 1577 isError False
+2026-11-11T07:03:24.503Z 001-s5-tally-status.json tally_status secs 0.059 bytes 1831 isError False
+2026-11-11T07:03:25.806Z 002-s5-voucher-types.json masters secs 0.796 bytes 28943 isError False
+2026-11-11T07:03:38.583Z 003-p1-build.json build_import_xml secs 4.107 bytes 8632 isError False
+2026-11-11T07:03:55.213Z 004-p1-p1.json post_import secs 13.686 bytes 13285 isError True
+2026-11-11T07:04:15.066Z 005-p1-verify.json verify_import secs 2.976 bytes 13298 isError True
+2026-11-11T07:06:47.406Z 006-p2-build.json build_import_xml secs 4.128 bytes 9126 isError False
+2026-11-11T07:07:00.602Z 007-p2-p1.json post_import secs 11.604 bytes 14781 isError True
+2026-11-11T07:07:14.836Z 008-p2-verify.json verify_import secs 3.118 bytes 14263 isError True
+2026-11-11T07:07:58.772Z 009-p3-build.json build_import_xml secs 4.113 bytes 9125 isError False
+2026-11-11T07:08:11.241Z 010-p3-p1.json post_import secs 12.007 bytes 14567 isError True
+2026-11-11T07:08:25.854Z 011-p3-verify.json verify_import secs 3.161 bytes 14048 isError True
+2026-11-11T07:11:10.693Z 012-egress.json egress_log secs 0.056 bytes 199775 isError False

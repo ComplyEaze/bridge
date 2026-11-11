@@ -1,0 +1,4 @@
+$ python -I check_1108.py diff base-vouchers.utf16le.xml s9-vouchers.utf16le.xml
+exit 0
+rows before: 0  after: 0
+unchanged rows: 0

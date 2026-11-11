@@ -1,0 +1,9 @@
+2026-11-11T07:04:02.427Z check of p1-p1 for batch bridge-9cd47867-ffa3-40be-80cd-a74fab8fdf49, 1 voucher(s), total 10 (log read whole after 29 read(s))
+PASS box seen
+PASS (a) one Create line, whole: Create ONE Journal in "BRIDGE STOCK CREATE LAB"
+PASS (b) Company GUID line, whole
+PASS (b) Batch line, whole: Batch: bridge-9cd47867-ffa3-40be-80cd-a74fab8fdf49
+PASS (c) totals line, whole: Total debit: 10  Total credit: 10
+  Create lines seen: ['Create ONE Journal in "BRIDGE STOCK CREATE LAB"']
+ALL PASS
+2026-11-11T07:04:02.427Z answer file written: Yes

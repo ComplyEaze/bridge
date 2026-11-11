@@ -1,0 +1,104 @@
+args-post-p3.json 133a7e3deccda0e4
+args-verify-p3.json 133a7e3deccda0e4
+--- mN-before
+2026-11-11T07:08:10Z p3pre-marks.utf16le.xml request sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b curl exit 0 status 200 CONTENT-LENGTH 3408 answer 3408 B sha256 9201fe00d04aec617c67cd9a52db50c3d90cdd2b90b1666f7d27cffecbabefc5
+  parses as XML (C4)
+exit 0
+COMPANY rows: 1
+  GUID <company guid> ALTVCHID 3 ALTMSTID 213
+GUID check: 1 GUID(s) named, 0 not beginning with THE COMPANY's
+box.ps1 argv: ['powershell', '-NoProfile', '-File', '<LAB_DIR>\\box.ps1', '-RowDir', '<LAB_DIR>', '-Tag', 'p3-p1', '-SeeWithin', '120', '-AnswerBy', '120']
+box.ps1 watching: 2026-11-11T07:08:10.870Z watch start: tally window 0xba0722; see within 120 s; answer by 120 s
+--- post_import start 2026-11-11T07:08:11.147Z
+010-p3-p1.json: post_import sent 2026-11-11T07:08:11.241Z secs 12.007 bytes 14567 isError True rpc False
+{'batch_id': 'bridge-14bc5272-847e-45f3-b2db-c5b418d939b0', 'dispatch': {'application_status': 'not_reported', 'automatic_retry': False, 'counters': {'altered': 0, 'cancelled': 0, 'counter_presence': {'altered': True, 'cancelled': True, 'created': True, 'deleted': True, 'errors': True, 'exceptions': True, 'ignored': True}, 'created': 2, 'deleted': 0, 'errors': 0, 'exceptions': 1, 'ignored': 0, 'line_error_count': 1}, 'resent': False, 'response': {'bytes': 726, 'outcome': {'application_status': 'not_reported', 'counters': {'altered': 0, 'cancelled': 0, 'counter_presence': {'altered': True, 'cancelled': True, 'created': True, 'deleted': True, 'errors': True, 'exceptions': True, 'ignored':
+post_import end 2026-11-11T07:08:23.947Z
+--- box log
+2026-11-11T07:08:10.870Z watch start: tally window 0xba0722; see within 120 s; answer by 120 s
+2026-11-11T07:08:17.820Z BOX SEEN 0x1520772 pid 22740 title 'ComplyEaze Bridge — post 3 vouchers?' class #32770
+2026-11-11T07:08:17.904Z rect 686,105,1252,1002 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-11T07:08:17.920Z foreground 0x1520772 pid 22740 bridge_mcp title 'ComplyEaze Bridge — post 3 vouchers?'
+is posted until you answer.
+
+Create 3 vouchers in "BRIDGE STOCK CREATE LAB"
+Company number: <company number>  Books from: 1-Apr-2025
+Types: 3 Journal
+Dates: 16-Apr-2025 to 16-Apr-2025  Voucher numbers: Tally assigns them
+Total debit: 94  Total credit: 94
+Journals may also move cash/bank ledgers; see the per-ledger totals
+Company GUID: <company guid>
+Tally: http://127.0.0.1:9003
+Each voucher: type, date, amount, ledger, narration (references not shown):
+Each line ends with its narration, quoted; a cut one is marked … (+N characters).
+Journal 16-Apr-2025  31  Dr "A2 Expense"  Cr "A1 Capital"  "Row 1108-P3 twin"
+Journal 16-Apr-2025  32  Dr "A1 Closing Stock"  Cr "A1 Capital"  "Row 1108-P3 stoc"… (+5 characters)
+Journal 16-Apr-2025  31  Dr "A2 Expense"  Cr "A1 Capital"  "Row 1108-P3 twin"
+
+Dr 0  Cr 94  3 entries  "A1 Capital"
+Dr 32  Cr 0  1 entry  "A1 Closing Stock"
+Dr 62  Cr 0  2 entries  "A2 Expense"
+
+Batch: bridge-14bc5272-847e-45f3-b2db-c5b418d939b0
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+2026-11-11T07:08:18.145Z capture p3-p1-open.png 1920x1080 248631 B sha256 a6f2a9d1a357f6774595c8f6f24367017d7658dfb9839df166847b0b3f845b0d
+2026-11-11T07:08:18.145Z WAITING for <LAB_DIR>\box\p3-p1.answer
+2026-11-11T07:08:18.442Z before click: foreground 0x1520772 pid 22740 bridge_mcp title 'ComplyEaze Bridge — post 3 vouchers?'
+2026-11-11T07:08:18.473Z CLICKED Yes at 951,962 (physical) 2026-11-11T07:08:18.458Z; seen-to-click 0.6 s
+2026-11-11T07:08:19.306Z after click: box visible False; foreground 0xa02e4 pid 17400 <other application> title '<other window>'
+--- check
+2026-11-11T07:08:18.253Z check of p3-p1 for batch bridge-14bc5272-847e-45f3-b2db-c5b418d939b0, 3 voucher(s), total 94 (log read whole after 28 read(s))
+PASS box seen
+PASS (a) one Create line, whole: Create 3 vouchers in "BRIDGE STOCK CREATE LAB"
+PASS (b) Company GUID line, whole
+PASS (b) Batch line, whole: Batch: bridge-14bc5272-847e-45f3-b2db-c5b418d939b0
+PASS (c) totals line, whole: Total debit: 94  Total credit: 94
+  Create lines seen: ['Create 3 vouchers in "BRIDGE STOCK CREATE LAB"']
+ALL PASS
+2026-11-11T07:08:18.253Z answer file written: Yes
+--- post answer 010-p3-p1.json
+post_import secs 12.007 isError True rpc_error None
+result keys ['alter_id_delta', 'batch_id', 'batch_sha256', 'built_at', 'company', 'counts', 'dispatch', 'dispatch_response', 'duplicates', 'error', 'evidence', 'masters_after_post', 'post_location', 'post_span_binding', 'pre_import_mark', 'unrelated_duplicates_in_window', 'verification_status', 'verified_at', 'vouchers']
+batch_id: "bridge-14bc5272-847e-45f3-b2db-c5b418d939b0"
+verification_status: "verification_incomplete"
+counts: {"bound_not_in_window": 0, "cancelled_with_effective_copy": 0, "duplicate_fingerprint": 2, "matching_content_observed": 0, "not_attributable": 0, "not_found": 0, "posted_divergent": 0, "posted_not_effective": 0, "posted_verified": 0, "sent_not_attributed": 1}
+dispatch: {"application_status": "not_reported", "automatic_retry": false, "counters": {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 2, "deleted": 0, "errors": 0, "exceptions": 1, "ignored": 0, "line_error_count": 1}, "resent": false, "response": {"bytes": 726, "outcome": {"application_status": "not_reported", "counters": {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 2, "deleted": 0, "errors": 0, "exceptions": 1, "ignored": 0, "line_error_count": 1}, "exceptions_were_reported": true, "last_vch_id": 5, "tally_line_errors": [{"text": "Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!", "truncated": false}]}, "request_sha256": "d673c2dcc5cc30331f4df4304a0f6aab5fa9cc99770d1e7a4522312a2547621d", "response_sha256": "609cb603488a334e90a28b52919327d8062c51177af02d4e5e7d49b3ad5ca850"}, "response_state": "response_not_clean", "state": "reconciliation_required"}
+--- capture
+capture p3-after.png 68840 B sha256 ad80ca1e2885a0088f3d96167e33b83660affab8cbabfdba33c402c048fddc57
+--- mN-after
+2026-11-11T07:08:25Z p3post-marks.utf16le.xml request sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b curl exit 0 status 200 CONTENT-LENGTH 3408 answer 3408 B sha256 9fc08f51bf69c7af89e743810763e3374117f14b4efa280c3dcde50a82c9d486
+  parses as XML (C4)
+exit 0
+COMPANY rows: 1
+  GUID <company guid> ALTVCHID 5 ALTMSTID 213
+GUID check: 1 GUID(s) named, 0 not beginning with THE COMPANY's
+2026-11-11T07:08:25Z p3post-vouchers.utf16le.xml request sha256 6af4d7142baffbae2d0133b25251d4762e030d1db64a2bccd0900dd69445b9a8 curl exit 0 status 200 CONTENT-LENGTH 26984 answer 26984 B sha256 f2a5e9f566a5cbcaa40fe4802167376488c85fb8f871526291a5ef3fe8943377
+  parses as XML (C4)
+exit 0
+rows before: 3  after: 5
+ADDED VOUCHER None <company guid>-00000004
+ADDED VOUCHER None <company guid>-00000005
+unchanged rows: 3
+GUID check: 2 GUID(s) named, 0 not beginning with THE COMPANY's
+--- verify_import 2026-11-11T07:08:25.781Z
+011-p3-verify.json: verify_import sent 2026-11-11T07:08:25.854Z secs 3.161 bytes 14048 isError True rpc False
+{'batch_id': 'bridge-14bc5272-847e-45f3-b2db-c5b418d939b0', 'dispatch': {'resent': False, 'response': {'bytes': 726, 'outcome': {'application_status': 'not_reported', 'counters': {'altered': 0, 'cancelled': 0, 'counter_presence': {'altered': True, 'cancelled': True, 'created': True, 'delet
+verify_import secs 3.161 isError True rpc_error None
+result keys ['alter_id_delta', 'batch_id', 'batch_sha256', 'built_at', 'company', 'counts', 'dispatch', 'dispatch_response', 'duplicates', 'error', 'evidence', 'items', 'masters_after_post', 'offset', 'post_span_binding', 'pre_import_mark', 'proof', 'transfers', 'unrelated_duplicates_in_window', 'unverified_vouchers', 'verification_status', 'verified_at', 'verified_total']
+batch_id: "bridge-14bc5272-847e-45f3-b2db-c5b418d939b0"
+verification_status: "verification_incomplete"
+counts: {"bound_not_in_window": 0, "cancelled_with_effective_copy": 0, "duplicate_fingerprint": 2, "matching_content_observed": 0, "not_attributable": 0, "not_found": 0, "posted_divergent": 0, "posted_not_effective": 0, "posted_verified": 0, "sent_not_attributed": 1}
+dispatch: {"resent": false, "response": {"bytes": 726, "outcome": {"application_status": "not_reported", "counters": {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 2, "deleted": 0, "errors": 0, "exceptions": 1, "ignored": 0, "line_error_count": 1}, "exceptions_were_reported": true, "last_vch_id": 5, "tally_line_errors": [{"text": "Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!", "truncated": false}]}, "request_sha256": "d673c2dcc5cc30331f4df4304a0f6aab5fa9cc99770d1e7a4522312a2547621d", "response_sha256": "609cb603488a334e90a28b52919327d8062c51177af02d4e5e7d49b3ad5ca850"}, "response_state": "response_not_clean", "state": "reconciliation_required"}
+transfers: {
+ "next_steps": {},
+ "open": [],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 0,
+ "skips_paired": 0,
+ "state": "computed"
+}

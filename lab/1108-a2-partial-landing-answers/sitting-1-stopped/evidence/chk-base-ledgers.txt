@@ -1,0 +1,13 @@
+$ python -I check_1108.py rows base-ledgers.utf16le.xml
+exit 0
+rows: 2
+LEDGER 'Cash' (4 characters) GUID <company guid>-0000001f
+  MASTERID '31'
+  ALTERID '32'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>Cash</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>
+  PARENT 'Cash-in-Hand'
+LEDGER 'Profit & Loss A/c' (17 characters) GUID <company guid>-0000001e
+  MASTERID '30'
+  ALTERID '31'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>Profit & Loss A/c</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>
+  PARENT 'Primary'

@@ -1,0 +1,41 @@
+2026-11-11T07:07:00.463Z watch start: tally window 0xba0722; see within 120 s; answer by 120 s
+2026-11-11T07:07:07.078Z BOX SEEN 0xf70a34 pid 17248 title 'ComplyEaze Bridge — post 3 vouchers?' class #32770
+2026-11-11T07:07:07.119Z rect 686,105,1252,1002 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-11T07:07:07.147Z foreground 0x30472 pid 13792 <other application> title '<other window>'
+2026-11-11T07:07:07.147Z child Button rect 901,946,1001,979 text: &Yes
+2026-11-11T07:07:07.147Z child Button rect 1011,946,1111,979 text: &No
+2026-11-11T07:07:07.162Z child Button rect 1121,946,1221,979 text: Cancel
+2026-11-11T07:07:07.162Z child Static rect 723,176,763,216 text: 
+2026-11-11T07:07:07.162Z child Static rect 773,176,1203,900 text: Press Y (or click Yes) to post these 3 vouchers into Tally. Press N (or click No) to cancel. Nothing
+is posted until you answer.
+
+Create 3 vouchers in "BRIDGE STOCK CREATE LAB"
+Company number: <company number>  Books from: 1-Apr-2025
+Types: 3 Journal
+Dates: 14-Apr-2025 to 14-Apr-2025  Voucher numbers: Tally assigns them
+Total debit: 66  Total credit: 66
+Journals may also move cash/bank ledgers; see the per-ledger totals
+Company GUID: <company guid>
+Tally: http://127.0.0.1:9003
+Each voucher: type, date, amount, ledger, narration (references not shown):
+Each line ends with its narration, quoted; a cut one is marked … (+N characters).
+Journal 14-Apr-2025  21  Dr "A2 Expense"  Cr "A1 Capital"  "Row 1108-P2 first"
+Journal 14-Apr-2025  22  Dr "A1 Closing Stock"  Cr "A1 Capital"  "Row 1108-P2 stoc"… (+5 characters)
+Journal 14-Apr-2025  23  Dr "A2 Expense"  Cr "A1 Capital"  "Row 1108-P2 third"
+
+Dr 0  Cr 66  3 entries  "A1 Capital"
+Dr 22  Cr 0  1 entry  "A1 Closing Stock"
+Dr 44  Cr 0  2 entries  "A2 Expense"
+
+Batch: bridge-2573f0c2-65df-4729-9244-ae59c6b01b86
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+2026-11-11T07:07:07.371Z capture p2-p1-open.png 1920x1080 410144 B sha256 d8beeb47d83e8e9ff6291b816d02214a5161d5a74a77055c0560bc399e78ecf8
+2026-11-11T07:07:07.386Z WAITING for <LAB_DIR>\box\p2-p1.answer
+2026-11-11T07:07:07.681Z before click: foreground 0xf70a34 pid 17248 bridge_mcp title 'ComplyEaze Bridge — post 3 vouchers?'
+2026-11-11T07:07:07.697Z CLICKED Yes at 951,962 (physical) 2026-11-11T07:07:07.697Z; seen-to-click 0.6 s
+2026-11-11T07:07:08.533Z after click: box visible False; foreground 0xa02e4 pid 17400 <other application> title '<other window>'

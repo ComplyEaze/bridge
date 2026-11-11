@@ -1,0 +1,7 @@
+$ python -I check_1108.py diff base-ledgers.utf16le.xml last-ledgers.utf16le.xml
+exit 0
+rows before: 2  after: 5
+ADDED LEDGER 'A1 Closing Stock' (16 characters) <company guid>-000000d1
+ADDED LEDGER 'A1 Capital' (10 characters) <company guid>-000000d2
+ADDED LEDGER 'A2 Expense' (10 characters) <company guid>-000000d3
+unchanged rows: 2

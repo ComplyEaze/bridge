@@ -1,0 +1,35 @@
+2026-11-11T07:03:54.788Z watch start: tally window 0xba0722; see within 120 s; answer by 120 s
+2026-11-11T07:04:01.632Z BOX SEEN 0x1907be pid 4012 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-11-11T07:04:01.702Z rect 688,200,1252,907 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 3 (lower = nearer the top); above tally True
+2026-11-11T07:04:01.736Z foreground 0x1907be pid 4012 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-11T07:04:01.744Z child Button rect 901,851,1001,884 text: &Yes
+2026-11-11T07:04:01.747Z child Button rect 1011,851,1111,884 text: &No
+2026-11-11T07:04:01.779Z child Button rect 1121,851,1221,884 text: Cancel
+2026-11-11T07:04:01.786Z child Static rect 725,271,765,311 text: 
+2026-11-11T07:04:01.791Z child Static rect 775,271,1203,805 text: Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Journal in "BRIDGE STOCK CREATE LAB"
+Company GUID: <company guid>
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9003
+Date: 12-Apr-2025  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 10.00  "A1 Closing Stock"
+Cr 10.00  "A1 Capital"
+
+Total debit: 10  Total credit: 10
+Batch: bridge-9cd47867-ffa3-40be-80cd-a74fab8fdf49
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration: "Row 1108-P1 stock leg"
+2026-11-11T07:04:02.327Z capture p1-p1-open.png 1920x1080 377902 B sha256 22964f64cdee6e19075ab24a783615b399b23866327f1c7d8d808431977bc39b
+2026-11-11T07:04:02.333Z WAITING for <LAB_DIR>\box\p1-p1.answer
+2026-11-11T07:04:02.637Z before click: foreground 0x1907be pid 4012 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-11T07:04:02.985Z CLICKED Yes at 951,868 (physical) 2026-11-11T07:04:02.664Z; seen-to-click 1.1 s
+2026-11-11T07:04:03.853Z after click: box visible False; foreground 0xa02e4 pid 17400 <other application> title '<other window>'

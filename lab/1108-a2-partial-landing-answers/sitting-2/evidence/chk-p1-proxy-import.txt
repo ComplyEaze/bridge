@@ -1,0 +1,13 @@
+$ python -I check_1108.py import proxy-import-1-body.xml
+exit 0
+CREATED 0
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 1
+LASTVCHID 0
+LASTMID 0
+LINEERROR "Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!"

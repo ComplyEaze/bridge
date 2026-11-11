@@ -1,0 +1,12 @@
+post_import isError True round trip 13.686 s, sent 2026-11-11T07:03:55Z
+created: null | attempt_recorded: null
+dispatch: state "reconciliation_required" | response_state "response_not_clean" | resent false
+dispatch.response.outcome counters: {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 0, "deleted": 0, "errors": 0, "exceptions": 1, "ignored": 0, "line_error_count": 1}
+tally_line_errors: [{"text": "Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!", "truncated": false}]
+outcome other keys: {"application_status": "not_reported", "exceptions_were_reported": true, "last_vch_id": 0}
+error.code: "import_reconciliation_required" | error.message: "The saved attempt has not been confirmed as the intended new voucher. Reconcile this original batch without resending it."
+next_step: null
+verification_status: "verification_incomplete" | counts (non-zero): {"tally_reported_not_created": 1}
+voucher "b1108-p1-1" | status "tally_reported_not_created" | attribution null | next_step "Tally reported this voucher as not created. ComplyEaze Bridge will not send this saved voucher again; do not import it again through Tally's Import menu. Ask the user to check in Tally whether it is in the book. Once they say each voucher of the batch is in the book or will not be posted, call acknowledge_post_review with doubt not_created: it asks them in a dialog you cannot answer, and closes the batch." | other {}
+duplicates: []
+post_span_binding: {"code": "span_counters_not_clean", "state": "refused", "summary": "Tally reported that this post created none of its vouchers: follow each voucher's next step."}

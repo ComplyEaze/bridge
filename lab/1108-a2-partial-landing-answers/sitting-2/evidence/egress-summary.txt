@@ -1,0 +1,7 @@
+records 21 | order newest_first | omitted_for_size 3
+record keys ['args_sha256', 'bytes_prepared', 'bytes_written', 'company_guid', 'enforced_bytes', 'error', 'fields_prepared', 'receipt_id', 'record_type', 'redaction_preset', 'request_trail', 'response_sha256', 'rows_prepared', 'tool', 'truncated', 'ts']
+{"bytes_written": 13345, "receipt_id": "92e62b15-f9e3-4fa1-9fa4-62501925e6a0", "record_type": "stdio_write_completed", "response_sha256": "cff988069c5015ce12ee5fa01d7ff1e6039cad5175d9077802d5fd536694d603", "ts": "2026-11-11T07:08:29.282Z"}
+{"record_type": "response_prepared", "receipt_id": "92e62b15-f9e3-4fa1-9fa4-62501925e6a0", "ts": "2026-11-11T07:08:29.236Z", "tool": "verify_import", "args_sha256": "936a5d965e67e1d0291823df759147bfd9a0d8fb3a61a27578a8571c2fb4cd0f", "company_guid": "<company guid>", "rows_prepared": 0, "fields_prepa
+{"bytes_written": 13833, "receipt_id": "d2ba64d2-2a5a-49b1-91e3-93e15831b86a", "record_type": "stdio_write_completed", "response_sha256": "68ae7a7138539c318e411e5996ac4f01ba7b6a799c15ca0e16085f5302e37ee3", "ts": "2026-11-11T07:08:23.571Z"}
+by tool {None: 11, 'verify_import': 3, 'post_import': 3, 'build_import_xml': 3, 'masters': 1}
+destinations ['None']

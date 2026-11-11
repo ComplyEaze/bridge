@@ -34,7 +34,7 @@ Prints, in this order:
     tool (list_companies) in the window that were not answered.
 
 Sheet version 3 adds the following. What it reads from a log of version 2's server is unchanged; the output gains
-the lines and `facts` fields below.
+the lines and `facts` fields below. A call that arrived before the previous call ended shows `gap overlap`.
   - the repository's sleep server (`mcp-sleep-server.mjs`, rows H1 to H4) logs `result_sent` for an answered call;
     its call line ends `slept <elapsed> of <seconds asked>`, counted as answered;
   - a log of the server run with `--continue-by arguments` (its `company` line says so) carries no read_id, so
@@ -53,7 +53,7 @@ the lines and `facts` fields below.
     the call that asked for about that many seconds, and an end that could belong to more than one call is marked
     `(pid uncertain)`. A sleep call's answered end reads `slept <elapsed> of <seconds asked>`;
   - one `closed <kind> pid <pid> running <n> at <time>` line per stdin_closed, signal or stdout_error in the whole
-    log, a `cancel_ignored` line (cancels for a call already ended, in the window) and a `live_reads` line (reads
+    log (marked `(pid uncertain)` for a sleep-server close after its second start), a `cancel_ignored` line (cancels for a call already ended, in the window) and a `live_reads` line (reads
     over the whole log not finished, dropped, expired or evicted);
   - in `facts`: `leftover_dropped`, reads started before the window and dropped or expired in it (not counted in
     `dropped` or `expired`); `continued_leftover`, the window's vouchers calls that ran a step of a read started
@@ -120,7 +120,9 @@ def read(path, since="", until="9999"):
         if kind == "company" and event.get("continue_by") == "arguments":
             arguments_mode = True
         if kind in ("stdin_closed", "signal", "stdout_error"):
-            closed.append("closed {} pid {} running {} at {}".format(kind, pid, event.get("running"), event["time"]))
+            # A sleep-server close names no pid: after a second start it may be any earlier process's.
+            closed.append("closed {} pid {} running {} at {}{}".format(kind, pid, event.get("running"), event["time"],
+                                                                      " (pid uncertain)" if "pid" not in event and len(pids) > 1 else ""))
         if kind == "cancel_ignored":
             ignored.append((event["time"], event.get("id")))
         if kind == "received" and event.get("truncated"):
@@ -221,6 +223,7 @@ def read(path, since="", until="9999"):
     previous = None
     for number, call in enumerate(window, 1):
         gap = "-" if previous is None or previous["ended_at"] is None else "{:.1f}".format(seconds_between(previous["ended_at"], call["time"]))
+        gap = "overlap" if gap.startswith("-") and gap != "-" else gap
         out.append("call {} received {} gap {} pid {} id {} tool {} meta {} arguments {} read_id {} end {}".format(
             number, call["time"], gap, "-" if call["pid"] is None else call["pid"], json.dumps(call["id"]), call["tool"], call["meta"],
             json.dumps(call["arguments"], sort_keys=True), call["read_id"] or "-", call["end"] or "open"))

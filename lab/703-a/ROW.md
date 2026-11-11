@@ -51,10 +51,10 @@ If the Chat tab shows no tool prompt for the sleep server, H3 cannot be read: re
 ### H4: the same process after a cut
 On each tab, one chat: a 75 s call, which row H says is cut at about 60 s. After the chat shows the cut, wait until the call line is no longer `open`, or 120 s after its `received` time, whichever comes first. Then type the second prompt, a 5 s call, in the same chat.
 - **The same process:** no `started` time on the `started` line falls between the 75 s call's `received` time and the 5 s call's.
-- **A new process:** one does. Then record whether the old process's pid has a `closed` line (`stdin_closed` or `signal`: the host closed it), and when.
+- **A new process:** one does. Then record any `closed` line (`stdin_closed` or `signal`: the host closed a process) by its time, against the `started` times and the call lines. A sleep-server close after the second start is marked `(pid uncertain)`: which process it closed is not told apart by the log, and the record says so.
 - Record how the 75 s call ended (H1's table) and whether the 5 s call answered.
 
-The sleep server writes a pid only on its `started` line. So H4 is read from the `started` and `closed` times, never from a call line's pid (`steps.py`, docstring). If the window holds more than one `started` time, the window's raw lines of `h.jsonl` are copied into the record beside `steps.py`'s output.
+The sleep server writes a pid only on its `started` line. So H4 is read from the `started` and `closed` times, never from a call line's or a `closed` line's pid (`steps.py`, docstring). If the window holds more than one `started` time, the window's raw lines of `h.jsonl` are copied into the record beside `steps.py`'s output.
 
 ### S1: continuation by the same arguments
 Each chat is read on its own, from `steps.py a.jsonl --since <T> --until <T-next>`, with the chat's words and the approval log. **The rows are read from the top; the first row that matches decides that chat.**
@@ -89,8 +89,15 @@ The row decides nothing about Tally, about Bridge's tool text beyond what is ser
 `LAB-COMMON.md` in this folder is a byte copy of v3 (sha256 5370c6d2…). Its Tally rules C1 to C11 apply only so far as they touch this row: no Tally request is sent, and no key goes to Tally. Tally is left exactly as the row finds it, and its window is not captured. Where LAB-COMMON and this sheet differ, the stricter one holds.
 
 **Who acts.**
-- **The lab session does every step**, including each configuration `add` and `restore`, the app's quits and starts, and switching the ComplyEaze Bridge extension off and on, on the owner's standing words of 27 and 28 Oct, as in row 1780-W. **Any step that needs the owner in person is a STOP that asks first:** for one, row H found the lab session's own permission check refusing changes to the app's configuration (notes at 11:29Z on 4 Nov); if it refuses again, that is such a STOP, before anything else is changed.
+- **The lab session does every step**, including each configuration `add` and `restore`, the app's quits and starts, and switching the ComplyEaze Bridge extension off and on, on the owner's standing words of 27 and 28 Oct 2026, as row 1780-W records them (`lab/1780-w-approval-box-master`, `lab/1780-w/RUN-SHEET.md`). **Any step that needs the owner in person is a STOP that asks first:** for one, row H found the lab session's own permission check refusing changes to the app's configuration (notes at 11:29Z on 4 Nov); if it refuses again, that is such a STOP, before anything else is changed.
 - **The lab session** also prepares the folder, checks the hashes, drives the app (opens each new chat or session, types each prompt, answers each tool prompt by the table), keeps the approval log, runs `steps.py` and writes the record. **The lab session never calls the servers' tools itself, and never types anything into a chat but the prompt and, where the sheet says, the second prompt or the nudge.** It has read this sheet, so its own words would measure nothing.
+
+**Across a quit.** The lab session runs inside the app, so a quit ends it (row H's restart helper, its header). Steps 1, 5 and 7 therefore each run as one detached hand-over, started by the lab session as its last act:
+- before it, the lab session appends to `C:\bridge-lab\703-a\handover.txt` the step, B0 and the before-copy paths, with the UTC time;
+- the hand-over runs the restart helper with `-CloseOnly` and a tag naming the step, then the step's `desktop_config.py` lines in order, appending each line's output and exit code to `handover.txt`. It stops at the first exit code that is not 0 and leaves the app shut;
+- only if every line exited 0 does it start the app by its AppID, as the helper does, and append `started`.
+
+The lab session opened after the start reads `handover.txt` first and goes on from the step it names, checking each EXPECT against the lines there. A hand-over that left the app shut, or an EXPECT not met, is a STOP; after the STOP, the person who opens the app reads `handover.txt` for the configuration's state.
 
 **The configuration path.** The app is a packaged app: the path its own sessions see is redirected. `add` and `restore` use the real file outside the package, as row H's second try did (row H notes, 10:55Z on 5 Nov).
 
@@ -100,7 +107,7 @@ The row decides nothing about Tally, about Bridge's tool text beyond what is ser
 
 **At most plan + 4 tool prompts per S1 chat:** 9 in a week chat, 16 in a month chat. **At most 3 per H chat, and 4 in H4's** (its second prompt is one). The next is denied, and the chat ends there.
 
-**No ComplyEaze Bridge tool can be reached from a Code-tab chat.** The Code tab reads MCP servers and allow rules of its own, beside the app's configuration and its extension, and an allowed tool raises no prompt to deny. Step 0 records them; if any names ComplyEaze Bridge, the sitting is Chat-tab only, recorded as such and not a STOP: every Code-tab chat (H2, H4-K, K1 to K6) is skipped and owed to a later sitting. In any chat, a call shown to any tool other than the lab servers' is a STOP.
+**No ComplyEaze Bridge tool can be reached from a Code-tab chat.** The Code tab reads MCP servers and allow rules of its own, beside the app's configuration and its extension, and an allowed tool raises no prompt to deny. Step 0 records them; if any names ComplyEaze Bridge, the sitting is Chat-tab only, recorded as such and not a STOP: every Code-tab chat (H2, H4-K, K1 to K6) is skipped and owed to a later sitting. A tool prompt for any other tool is denied and recorded (the dialog table). A ComplyEaze Bridge tool call that ran with no prompt, or any request seen at Tally, is a STOP.
 
 ## Build and files
 - No ComplyEaze Bridge build.
@@ -156,7 +163,7 @@ The phase S prompts give the dates, so the server instructions' rule to ask befo
 | C1, C2, C3 / K1, K2, K3 | Chat / Code | W | at once |
 | C4, C5, C6 / K4, K5, K6 | Chat / Code | M | at once |
 
-Each is a new chat (Chat tab) or a new session in a new empty folder (Code tab). Nothing is resumed. Before each, `steps.py` on the phase's log shows no `open` call.
+In a Chat-tab-only sitting (Rules) the Code rows are skipped and recorded as skipped. Each is a new chat (Chat tab) or a new session in a new empty folder (Code tab). Nothing is resumed. Before each, `steps.py` on the phase's log shows no `open` call.
 
 ## The approval log
 For every tool prompt, one line in `approvals.txt`: the chat, the prompt's number in that chat, the tool and arguments it shows, the UTC time it was first seen, the UTC time Allow once was clicked, and what was clicked. Times from `[DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')`, run at the moment of each, so the log is the lab session's own clock, to the second at best; the server's `received` time is the exact moment the host sent the call. A call that ran with no prompt is a line too: `no prompt`. For a held approval (H3), the hold is timed from the "first seen" time, and the click is made when the clock reads that time plus the hold.
@@ -186,25 +193,25 @@ One at a time. Every answer goes to a file, whole. All times are in UTC.
    - Record `node --version`, the app's version (`Get-AppxPackage`, name and version only) and the Code tab's version from its own `--version`.
    - Record the names and values of any `MCP_TIMEOUT` or `MCP_TOOL_TIMEOUT` in the user and machine environment (row H recorded none of the Code tab's settings), or that none is set.
    - Record the app's configured server names (names only) and whether the ComplyEaze Bridge extension is on.
-   - In a new empty folder, `claude mcp list` with the Code tab's own command (names only), and the `mcp__` entries of `permissions.allow` in the Code tab's user settings (names only). If any names ComplyEaze Bridge, the sitting is Chat-tab only (Rules).
+   - The Code tab's own MCP servers and allow rules, names only, read from its files and never by a command that starts a server: `mcpServers` at the top of `.claude.json` in the user's folder and under each of its projects; `permissions.allow` entries beginning `mcp__` and `enabledPlugins` in `.claude\settings.json` there. If any names ComplyEaze Bridge, the sitting is Chat-tab only (Rules).
 1. **Setup for phase H.**
    - Switch the ComplyEaze Bridge extension off in the app's settings. Record that it shows off.
    - `python -I desktop_config.py add-sleep <config> C:\bridge-lab\703-a\desktop-config-before-h.json C:\bridge-lab\703-a\kit\mcp-sleep-server.mjs C:\bridge-lab\703-a\log\h.jsonl`. EXPECT `add ok`, B0, B1, and step 0's server names plus `bridge-lab-703h`. Anything else: STOP, with the configuration as the line says.
    - Hash the before-copy: it must be B0.
-   - Quit and start the app with row H's restart helper (`lab/2119-h-answers`, `scripts/restart-desktop.ps1`), as on 5 Nov.
-2. **After the start.**
+   - Quit and start the app with row H's restart helper (`lab/2119-h-answers`, `scripts/restart-desktop.ps1`), as on 5 Nov, as a hand-over (Rules) with no `desktop_config.py` line.
+2. **After the start** (a new lab session, which reads `handover.txt` first).
    - `desktop_config.py compare <config> C:\bridge-lab\703-a\desktop-config-before-h.json`. EXPECT `added bridge-lab-703h`, `removed -`. A rewrite by the app is recorded, not a STOP.
    - `steps.py h.jsonl`: record each `initialize` line. No `started` within 2 minutes of the start: STOP; the entry did not load, and the restore is step 7.
 3. **Phase H, the Chat tab:** H1-30, H1-45, H1-55, H3a, H3b, H4-C. For each: a new chat; write down T, from the approval log's time command, in the form `2026-11-10T09:30:00.000Z` (`steps.py` refuses any other); type its prompt; answer each tool prompt by the table, logging it. Record every word the chat showed, with the time of each tool prompt, each result and each error as the chat shows them, and the chat's final words, copied exactly. Then `steps.py h.jsonl --since <T> --until <T of the next chat, or omitted for the last>`, whole, to `steps-<chat>.txt`. (Run each `--until` once the next chat's T is written, so every file is complete.)
-4. **Phase H, the Code tab:** H2-30, H2-45, H2-55, H4-K, as step 3, each in a new session in `C:\bridge-lab\703-a\empty-<n>\`, never the lab's own session. Then `steps.py h.jsonl` with no window to `steps-h-all.txt`.
+4. **Phase H, the Code tab** (skipped and recorded in a Chat-tab-only sitting, Rules): H2-30, H2-45, H2-55, H4-K, as step 3, each in a new session in `C:\bridge-lab\703-a\empty-<n>\`, never the lab's own session. Then `steps.py h.jsonl` with no window to `steps-h-all.txt`.
 5. **From phase H to phase S.**
-   - Quit the app with the restart helper, set to close only. Before it starts again: `desktop_config.py restore <config> C:\bridge-lab\703-a\desktop-config-before-h.json <B0>`. EXPECT `restore ok B0`. Anything else: STOP, leave the app shut, report the configuration's state.
-   - With the app still shut: `python -I desktop_config.py add <config> C:\bridge-lab\703-a\desktop-config-before-s.json C:\bridge-lab\703-a\kit\stepped-vouchers-server.mjs C:\bridge-lab\703-a\kit\tools-args.json C:\bridge-lab\703-a\log\a.jsonl arguments 0.5`. EXPECT `add ok` with the same B0 as step 1, and step 0's server names plus `bridge-lab-703a`. A different B0: STOP.
-   - Start the app. `desktop_config.py compare <config> C:\bridge-lab\703-a\desktop-config-before-s.json`: EXPECT `added bridge-lab-703a`, `removed -`. `steps.py a.jsonl`: record each `initialize` line; no `started` within 2 minutes: STOP, and the restore is step 7.
-6. **Phase S:** C1 to C6 on the Chat tab, then K1 to K6 on the Code tab, as steps 3 and 4, with the phase S prompts and the nudge, each chat's window read from `a.jsonl`. Before each chat, `steps.py a.jsonl` with no window: a `live_reads` line other than `-` is written down, and that chat is recorded as "after a leftover". Record any cap or continue control and each nudge with the words before it. Then `steps.py a.jsonl` with no window to `steps-a-all.txt`.
+   - One hand-over (Rules) with these two lines, then the start. First: `desktop_config.py restore <config> C:\bridge-lab\703-a\desktop-config-before-h.json <B0>`. EXPECT `restore ok B0`.
+   - Then, with the app still shut: `python -I desktop_config.py add <config> C:\bridge-lab\703-a\desktop-config-before-s.json C:\bridge-lab\703-a\kit\stepped-vouchers-server.mjs C:\bridge-lab\703-a\kit\tools-args.json C:\bridge-lab\703-a\log\a.jsonl arguments 0.5`. EXPECT `add ok` with the same B0 as step 1, and step 0's server names plus `bridge-lab-703a`. A different B0: STOP.
+   - After the start, the new lab session reads `handover.txt`, checks both EXPECTs there, and runs `desktop_config.py compare <config> C:\bridge-lab\703-a\desktop-config-before-s.json`: EXPECT `added bridge-lab-703a`, `removed -`. `steps.py a.jsonl`: record each `initialize` line; no `started` within 2 minutes: STOP, and the restore is step 7.
+6. **Phase S:** C1 to C6 on the Chat tab, then K1 to K6 on the Code tab (skipped and recorded in a Chat-tab-only sitting), as steps 3 and 4, with the phase S prompts and the nudge, each chat's window read from `a.jsonl`. Before each chat, `steps.py a.jsonl` with no window: a `live_reads` line other than `-` is written down, and that chat is recorded as "after a leftover". Record any cap or continue control and each nudge with the words before it. Then `steps.py a.jsonl` with no window to `steps-a-all.txt`.
 7. **Restore.**
-   - Quit the app with the restart helper, set to close only. Before it starts again: `desktop_config.py restore <config> <the before-copy of the last add> <B0>`. EXPECT `restore ok B0`. Anything else: STOP, leave the app shut, report the configuration's state.
-   - Start the app. `desktop_config.py compare <config> <that before-copy>`: EXPECT no server added or removed. A rewrite on start is recorded, not a STOP.
+   - One hand-over (Rules) with one line, then the start: `desktop_config.py restore <config> <the before-copy of the last add> <B0>`. EXPECT `restore ok B0`.
+   - After the start, the new lab session reads `handover.txt`, checks the EXPECT there, and runs `desktop_config.py compare <config> <that before-copy>`: EXPECT no server added or removed. A rewrite on start is recorded, not a STOP.
 8. **Close.**
    - Switch the ComplyEaze Bridge extension back to its step 0 state. Record it.
    - No `node.exe` runs either of this folder's servers (`Get-CimInstance Win32_Process`, read only). One still running is recorded; nothing is ended by hand.
@@ -252,7 +259,7 @@ After a STOP, the restore (step 7) waits for the run coordinator's word. The rep
 
 ## Keep
 On `lab/703-a-answers`, with `SHA256.txt`:
-- every `steps.py` output, `approvals.txt`, and every compare line;
+- every `steps.py` output, `approvals.txt`, `handover.txt`, the restart helper's log, and every compare line;
 - `h.jsonl` and `a.jsonl` (no names or values beyond the servers' own);
 - each chat's and session's words, with account, organisation, device and conversation ids replaced by `<redacted>` (the raw file's sha256 recorded beside it);
 - the versions and the timeout variables;

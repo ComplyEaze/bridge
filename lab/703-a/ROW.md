@@ -32,7 +32,10 @@ For each call, from `steps.py h.jsonl --since <T> --until <T-next>` and the chat
 | an error, a timeout or a disconnect | `cancelled <t>` | **cut, cancel sent** at t s |
 | an error, a timeout or a disconnect | `slept <N>` | **cut, no cancel**: the server answered a call the host had dropped |
 | an error, a timeout or a disconnect | `stdin_closed`, `signal` or `stdout_error` with `running 1` | **cut, the process closed** |
-| anything else, or the call line is `open` 10 minutes after its `received` time | | goes to the run coordinator as it is |
+| a refusal that the tool is busy | `refused busy (inferred)` | **a second call while one ran** (the server logs nothing for it; `steps.py` infers it). Recorded, with whether the model or the host sent it, as far as the chat's words tell. |
+| anything else, an end marked `(pid uncertain)`, or the call line is `open` 10 minutes after its `received` time | | goes to the run coordinator as it is, with the window's raw lines of `h.jsonl` |
+
+An answered end reads `slept <elapsed> of <seconds asked>`. A `cancel_ignored` line naming the call means the host sent a cancel after the answer had gone.
 
 The tab's result is the longest N answered and the shortest N cut, with the time of the cut from the chat (the time the chat showed the error) and from the call line. A 55 s call answered on both tabs is the margin the proposal's question 3 needs; one run per length is a sighting, recorded as partial.
 
@@ -48,10 +51,10 @@ If the Chat tab shows no tool prompt for the sleep server, H3 cannot be read: re
 ### H4: the same process after a cut
 On each tab, one chat: a 75 s call, which row H says is cut at about 60 s. After the chat shows the cut, wait until the call line is no longer `open`, or 120 s after its `received` time, whichever comes first. Then type the second prompt, a 5 s call, in the same chat.
 - **The same process:** no `started` time on the `started` line falls between the 75 s call's `received` time and the 5 s call's.
-- **A new process:** one does. Then record whether the old process logged `stdin_closed` or `signal` (the host closed it), and when.
+- **A new process:** one does. Then record whether the old process's pid has a `closed` line (`stdin_closed` or `signal`: the host closed it), and when.
 - Record how the 75 s call ended (H1's table) and whether the 5 s call answered.
 
-The sleep server writes a pid only on its `started` line. So H4 is read from the `started` times, never from a call line's pid (`steps.py`, docstring).
+The sleep server writes a pid only on its `started` line. So H4 is read from the `started` and `closed` times, never from a call line's pid (`steps.py`, docstring). If the window holds more than one `started` time, the window's raw lines of `h.jsonl` are copied into the record beside `steps.py`'s output.
 
 ### S1: continuation by the same arguments
 Each chat is read on its own, from `steps.py a.jsonl --since <T> --until <T-next>`, with the chat's words and the approval log. **The rows are read from the top; the first row that matches decides that chat.**
@@ -62,13 +65,16 @@ Each chat is read on its own, from `steps.py a.jsonl --since <T> --until <T-next
 | 2 | `cut` above 0, or the chat showed an error for a call | **A step was cut** at no more than 27.5 s. Record the step, `max_cut_elapsed` and the approval log for that call. Goes to the run coordinator: H1 and H2 say whether it should have been. |
 | 3 | `busy` above 0 | **Two calls overlapped.** Either the host gave up on a call without telling the server and the model called again, or the model sent two calls at once. The log does not tell these apart; the chat's words may. Goes to the run coordinator as it is; S1 is not kept in that chat. |
 | 4 | the app stopped the turn at a cap, or asked whether to continue (its own control, not the model's words) | **A host cap.** Record the call count it stopped at and its text. Goes to the run coordinator: a hard cap bounds the steps a read may plan. |
-| 5 | `reads_started` above 1, `dropped` above 0, `expired` above 0, `new_read_after_answered_step` above 0, or `refused` above 0 | **S1 fails in that chat:** the model changed the arguments, started over, waited past the idle limit, or sent an argument the tool does not serve (a `read_id` is refused as `argument_unknown:read_id`). |
-| 6 | the model stopped before `done`, asked the person anything before the answer, or needed the nudge | **S1 fails in that chat.** A nudge is recorded, never averaged away. |
-| 7 | one `read` line, `steps <n> of <n> done true` with n the plan's, `vouchers_calls` n, `answered` n, `cut 0`, `busy 0`, `refused 0`, `open 0`, `other_calls_not_answered 0`; the chat showed no error for any call; the chat's answer names the party `Lab Party <code>` with the `read` line's code; no nudge | **S1 kept in that chat.** |
+| 5 | `continued_leftover` above 0 | **The chat ran a step of an earlier chat's read** (the same arguments, within 15 minutes). Goes to the run coordinator as it is; not counted for or against S1. |
+| 6 | `reads_started` above 1, `dropped` above 0, `expired` above 0, `new_read_after_answered_step` above 0, `distinct_arguments` above 1, or `refused` above 0 | **S1 fails in that chat:** the model changed the arguments (even an argument sent on one call at its default and left out on another), started over, waited past the idle limit, or sent an argument the tool does not serve (a `read_id` is refused as `argument_unknown:read_id`). |
+| 7 | the model stopped before `done`, asked the person anything before the answer, or needed the nudge | **S1 fails in that chat.** A nudge is recorded, never averaged away. |
+| 8 | one `read` line, `steps <n> of <n> done true` with n the plan's, `vouchers_calls` n, `answered` n, `cut 0`, `busy 0`, `refused 0`, `open 0`, `continued_leftover 0`, `distinct_arguments 1`, `other_calls_not_answered 0`; the chat showed no error for any call; the chat's answer names the party `Lab Party <code>` with the `read` line's code; no nudge | **S1 kept in that chat.** |
 
-A chat that fits no row goes to the run coordinator as it is. "The chat showed no error" is part of row 7 because a host that gives up on a call without telling the server leaves the server's log looking whole: the chat's words are the only trace, so the lab session copies them in full.
+`leftover_dropped` above 0 means the chat's first call dropped an earlier chat's unfinished read. It is recorded and does not fail the chat; `dropped` and `expired` count only the chat's own reads.
 
-**A tab keeps S1 only when all six of its chats (C1 to C6, or K1 to K6) meet row 7.** Five of six is a fail, recorded with the chat that failed. Each plan's 3 of 3 is reported on its own, so a tab that keeps the week and fails the month says so.
+A chat that fits no row goes to the run coordinator as it is. "The chat showed no error" is part of row 8 because a host that gives up on a call without telling the server leaves the server's log looking whole: the chat's words are the only trace, so the lab session copies them in full.
+
+**A tab keeps S1 only when all six of its chats (C1 to C6, or K1 to K6) meet row 8.** Five of six is a fail, recorded with the chat that failed. Each plan's 3 of 3 is reported on its own, so a tab that keeps the week and fails the month says so.
 
 **Tool prompts are the host's, not the model's.** If a tab asks approval on every step, that is recorded per tab (prompts per call) and does not fail S1: the proposal needs to know it, because a click per step is the person's cost of a stepped read.
 
@@ -90,9 +96,11 @@ The row decides nothing about Tally, about Bridge's tool text beyond what is ser
 
 **The ComplyEaze Bridge extension is switched off** for the row (PERSON, step 1) and back to its step 0 state at step 8. A model that called a ComplyEaze Bridge tool could send a request to Tally. Its state before and after is recorded.
 
-**One call at a time.** Both servers refuse a second call while one runs, in band (`busy`). The sleep server logs nothing for that refusal, so such a call stays `open` in `steps.py`; the chat's words show it. Nothing is typed while a call runs.
+**One call at a time.** Both servers refuse a second call while one runs, in band (`busy`). The sleep server logs nothing for that refusal; `steps.py` ends such a call as `refused busy (inferred)`. Nothing is typed while a call runs.
 
-**At most plan + 4 tool prompts per S1 chat:** 9 in a week chat, 16 in a month chat. **At most 3 per H chat.** The next is denied, and the chat ends there.
+**At most plan + 4 tool prompts per S1 chat:** 9 in a week chat, 16 in a month chat. **At most 3 per H chat, and 4 in H4's** (its second prompt is one). The next is denied, and the chat ends there.
+
+**No ComplyEaze Bridge tool can be reached from a Code-tab chat.** The Code tab reads MCP servers and allow rules of its own, beside the app's configuration and its extension, and an allowed tool raises no prompt to deny. Step 0 records them; if any names ComplyEaze Bridge, every Code-tab chat (H2, H4-K, K1 to K6) is skipped and recorded as skipped, and the run coordinator decides. In any chat, a call shown to any tool other than the lab servers' is a STOP.
 
 ## Build and files
 - No ComplyEaze Bridge build.
@@ -101,7 +109,7 @@ The row decides nothing about Tally, about Bridge's tool text beyond what is ser
 - **The text the model sees is Bridge's.** `tools-args.json` is written by `extract_text.py <folder> e24f1244 arguments` from master e24f1244's `src-tauri/src/` files `agent_protocol.rs`, `agent_catalog.rs`, `agent_import.rs` and `agent_voucher_search.rs`, each piece taken exactly once or the extractor fails, and put together as Bridge puts it together: the server instructions (`SERVER_INSTRUCTIONS` and the closing sentence of the default bundle, which prepares but does not post); the `list_companies` and `vouchers` descriptions, each followed by the read-receipt sentence every read tool carries, with the read tools' annotations (`readOnlyHint` true); and the whole shipped `vouchers` input schema, with each parameter's description by the first matching arm of `parameter_description`. Every object is served with its keys sorted, as Bridge's `serde_json` sends them. It was run on the build Mac on the four files as `git show e24f1244:<path>` prints them; anyone can repeat it and compare the hash in `SHA256.txt`. The lab PC checks the hash only. Without the third word it writes version 2's `tools.json`, byte for byte (`tried.txt`).
 - **What differs from what Bridge ships, and is the one thing S1 varies:** three planned texts the build would add (`extract_text.py`, `PLANNED_STEP_SENTENCE_ARGS`, `PLANNED_INSTRUCTION_ARGS`, `NEXT_STEP_ARGS`): one sentence appended to the server instructions, one paragraph appended to the `vouchers` description, and the `next_step` a `done: false` result carries ("Call vouchers again with exactly the same arguments."). No `read_id` is served or accepted. They are listed under `planned` in `tools-args.json`.
 - **How the server continues** (`stepped-vouchers-server.mjs`, `vouchersCall`): it holds one live read. A `vouchers` call whose other arguments equal the live read's, with a schema default standing for an argument left out, continues it. Any other drops it (`read_dropped`) and starts a new read; so does the same call after 15 minutes idle (`read_expired`). A finished read is never continued, so the same arguments after it start a new read. A cancelled step does not count, so the next call runs it again.
-- **Stated differences that are not under test:** the results are in Bridge's shape (`company`, then `result`; refusals as `vouchers: refused` with a code, `isError` true), but every value is invented here: one company, `Lab Stepped Traders`, and three vouchers whose party is `Lab Party <code>`, a five-letter code minted per read.
+- **Stated differences that are not under test:** the results are in Bridge's shape (`company`, then `result`; refusals as `vouchers: refused` with a code, `isError` true), but every value is invented here: one company, `Lab Stepped Traders`, and three vouchers, two with the party `Lab Party <code>` (a five-letter code minted per read) and one with `Lab Rent`. The server names itself `bridge-lab-703a`, declares only `tools` and answers the protocol revision the host asks for. The server instructions are e24f1244's: master `7a3c9e49` adds one sentence about `tally_status`, a tool not served here.
 - **The plans** (`PLANS`, at `--step-scale 0.5`): a window of up to 10 days is `five`, 20, 25, 20, 27.5 and 15 s; a longer one is `twelve`, 20, 20, 25, 20, 20, 27.5, 20, 20, 25, 20, 27.5 and 15 s. Every log line carries the pid; every message received is logged whole, `initialize` capabilities and any `_meta` included.
 - Copy the folder to `C:\bridge-lab\703-a\kit\`. The logs are `C:\bridge-lab\703-a\log\h.jsonl` (phase H) and `C:\bridge-lab\703-a\log\a.jsonl` (phase S); neither may exist at its `add` (`desktop_config.py` refuses if it does).
 - The Code-tab chats each use a new empty folder, `C:\bridge-lab\703-a\empty-<n>\`, as the session folder, so no session can read this sheet.
@@ -115,8 +123,8 @@ The row decides nothing about Tally, about Bridge's tool text beyond what is ser
 | `tools-args.json` | the text served in phase S, from `extract_text.py ... arguments` |
 | `tools.json` | version 2's text (S2), not served in this sitting |
 | `extract_text.py` | writes either text from Bridge's source |
-| `desktop_config.py` | row H's helper: `add-sleep` adds `bridge-lab-703h`; `add ... arguments 0.5` adds `bridge-lab-703a`; each keeps the before-copy (B0) and refuses, leaving nothing behind, if either entry is already there; `restore` puts those bytes back and checks them by sha256; `compare` lists server names after a start |
-| `steps.py` | reads either log into one line per call (with the gap before it), one per read, a `started` line with each process's start time, a `sleep` line, and the `facts` line, between `--since` and `--until` |
+| `desktop_config.py` | row H's helper: `add-sleep` adds `bridge-lab-703h`; `add ... arguments 0.5` adds `bridge-lab-703a`; each keeps the before-copy (B0) and refuses, leaving nothing behind, if either entry is already there; a write that fails says whether the configuration is unchanged (the before-copy is then removed) or gives its sha256; `restore` puts those bytes back and checks them by sha256; `compare` lists server names after a start |
+| `steps.py` | reads either log into one line per call (with the gap before it), one per read, a `started` line with each process's start time, `closed`, `cancel_ignored` and `live_reads` lines, a `sleep` line, and the `facts` line, between `--since` and `--until` |
 | `prescreen.sh` | the macOS CLI pre-screen (below); not run on the lab PC |
 | `tried.txt` | the build Mac's smoke runs of both servers and both modes, with `steps.py`'s output |
 
@@ -135,7 +143,7 @@ Phase S:
 
 The phase S prompts give the dates, so the server instructions' rule to ask before a read over more than one month does not apply, and they name no company, so with one company open the instructions say to use it.
 
-**The one nudge (phase S).** If the model stops before the answer, asks a question, or says it will go on and calls nothing, the lab session types once, exactly: `Yes, carry on until it is done.` A second stop ends the chat. Each nudge is recorded with its time and the model's words before it. Any nudge fails that chat (row 6); the nudge is there to see whether the read could finish, not to pass it. Phase H has no nudge: a chat that does not call the tool is recorded and ends.
+**The one nudge (phase S).** If the model stops before the answer, asks a question, or says it will go on and calls nothing, the lab session types once, exactly: `Yes, carry on until it is done.` A second stop ends the chat. Each nudge is recorded with its time and the model's words before it. Any nudge fails that chat (row 7); the nudge is there to see whether the read could finish, not to pass it. Phase H has no nudge: a chat that does not call the tool is recorded and ends.
 
 ## The chats, in this order
 | chat | tab | prompt | approval |
@@ -178,6 +186,7 @@ One at a time. Every answer goes to a file, whole. All times are in UTC.
    - Record `node --version`, the app's version (`Get-AppxPackage`, name and version only) and the Code tab's version from its own `--version`.
    - Record the names and values of any `MCP_TIMEOUT` or `MCP_TOOL_TIMEOUT` in the user and machine environment (row H recorded none of the Code tab's settings), or that none is set.
    - Record the app's configured server names (names only) and whether the ComplyEaze Bridge extension is on.
+   - In a new empty folder, `claude mcp list` with the Code tab's own command (names only), and the `mcp__` entries of `permissions.allow` in the Code tab's user settings (names only). If any names ComplyEaze Bridge, the Code-tab chats are skipped (Rules).
 1. **Setup for phase H** (PERSON).
    - Switch the ComplyEaze Bridge extension off in the app's settings. Record that it shows off.
    - `python -I desktop_config.py add-sleep <config> C:\bridge-lab\703-a\desktop-config-before-h.json C:\bridge-lab\703-a\kit\mcp-sleep-server.mjs C:\bridge-lab\703-a\log\h.jsonl`. EXPECT `add ok`, B0, B1, and step 0's server names plus `bridge-lab-703h`. Anything else: STOP, with the configuration as the line says.
@@ -186,13 +195,13 @@ One at a time. Every answer goes to a file, whole. All times are in UTC.
 2. **After the start.**
    - `desktop_config.py compare <config> C:\bridge-lab\703-a\desktop-config-before-h.json`. EXPECT `added bridge-lab-703h`, `removed -`. A rewrite by the app is recorded, not a STOP.
    - `steps.py h.jsonl`: record each `initialize` line. No `started` within 2 minutes of the start: STOP; the entry did not load, and the restore is step 7.
-3. **Phase H, the Chat tab:** H1-30, H1-45, H1-55, H3a, H3b, H4-C. For each: a new chat; write down T; type its prompt; answer each tool prompt by the table, logging it. Record every word the chat showed, with the time of each tool prompt, each result and each error as the chat shows them, and the chat's final words, copied exactly. Then `steps.py h.jsonl --since <T> --until <T of the next chat, or omitted for the last>`, whole, to `steps-<chat>.txt`. (Run each `--until` once the next chat's T is written, so every file is complete.)
+3. **Phase H, the Chat tab:** H1-30, H1-45, H1-55, H3a, H3b, H4-C. For each: a new chat; write down T, from the approval log's time command, in the form `2026-11-10T09:30:00.000Z` (`steps.py` refuses any other); type its prompt; answer each tool prompt by the table, logging it. Record every word the chat showed, with the time of each tool prompt, each result and each error as the chat shows them, and the chat's final words, copied exactly. Then `steps.py h.jsonl --since <T> --until <T of the next chat, or omitted for the last>`, whole, to `steps-<chat>.txt`. (Run each `--until` once the next chat's T is written, so every file is complete.)
 4. **Phase H, the Code tab:** H2-30, H2-45, H2-55, H4-K, as step 3, each in a new session in `C:\bridge-lab\703-a\empty-<n>\`, never the lab's own session. Then `steps.py h.jsonl` with no window to `steps-h-all.txt`.
 5. **From phase H to phase S** (PERSON).
    - Quit the app with the restart helper, set to close only. Before it starts again: `desktop_config.py restore <config> C:\bridge-lab\703-a\desktop-config-before-h.json <B0>`. EXPECT `restore ok B0`. Anything else: STOP, leave the app shut, report the configuration's state.
    - With the app still shut: `python -I desktop_config.py add <config> C:\bridge-lab\703-a\desktop-config-before-s.json C:\bridge-lab\703-a\kit\stepped-vouchers-server.mjs C:\bridge-lab\703-a\kit\tools-args.json C:\bridge-lab\703-a\log\a.jsonl arguments 0.5`. EXPECT `add ok` with the same B0 as step 1, and step 0's server names plus `bridge-lab-703a`. A different B0: STOP.
    - Start the app. `desktop_config.py compare <config> C:\bridge-lab\703-a\desktop-config-before-s.json`: EXPECT `added bridge-lab-703a`, `removed -`. `steps.py a.jsonl`: record each `initialize` line; no `started` within 2 minutes: STOP, and the restore is step 7.
-6. **Phase S:** C1 to C6 on the Chat tab, then K1 to K6 on the Code tab, as steps 3 and 4, with the phase S prompts and the nudge, each chat's window read from `a.jsonl`. Record any cap or continue control and each nudge with the words before it. Then `steps.py a.jsonl` with no window to `steps-a-all.txt`.
+6. **Phase S:** C1 to C6 on the Chat tab, then K1 to K6 on the Code tab, as steps 3 and 4, with the phase S prompts and the nudge, each chat's window read from `a.jsonl`. Before each chat, `steps.py a.jsonl` with no window: a `live_reads` line other than `-` is written down, and that chat is recorded as "after a leftover". Record any cap or continue control and each nudge with the words before it. Then `steps.py a.jsonl` with no window to `steps-a-all.txt`.
 7. **Restore** (PERSON).
    - Quit the app with the restart helper, set to close only. Before it starts again: `desktop_config.py restore <config> <the before-copy of the last add> <B0>`. EXPECT `restore ok B0`. Anything else: STOP, leave the app shut, report the configuration's state.
    - Start the app. `desktop_config.py compare <config> <that before-copy>`: EXPECT no server added or removed. A rewrite on start is recorded, not a STOP.
@@ -227,10 +236,12 @@ Read every number from its file. Put any STOP, skip, or EXPECT not met in the fi
 - A call still `open` in `steps.py` 10 minutes after it was received.
 - Anything sent to Tally, or any key in Tally.
 
+If the sitting ends for any other reason (the PC sleeps, time runs out, the lab session ends), step 7 is run before the person leaves, or the report names the entry still in the configuration and its before-copy.
+
 After a STOP, the restore (step 7) waits for the run coordinator's word. The report lists the configuration's state, the extension's state, and whether the app is running.
 
 ## The macOS CLI pre-screen (before the sitting, not on the lab PC)
-`sh prescreen.sh <empty folder> 3 sonnet arguments` runs phase S's server and `tools-args.json` through `claude -p` on a Mac: three week and three month runs, each a new session with only this server's two tools allowed and no other MCP server, at `--step-scale 0.05` (it measures the model, not a host's wait). It prints PASS for a run only on row 7's conditions that a log can show (not the chat's error, which `claude -p` prints in its answer). A FAIL there is reported before the sitting, with its `facts` line; the text is not changed to make it pass (one variable at a time). It does not stand in for S1: the host, its prompts and its wait differ. Its verdict lines go with this sheet's answers. Phase H does not depend on it.
+`sh prescreen.sh <empty folder> 3 sonnet arguments` runs phase S's server and `tools-args.json` through `claude -p` on a Mac: three week and three month runs, each a new session with only this server's two tools allowed and no other MCP server, at `--step-scale 0.05` (it measures the model, not a host's wait). It prints PASS for a run only on row 8's conditions that a log can show (not the chat's error, which `claude -p` prints in its answer). A FAIL there is reported before the sitting, with its `facts` line; the text is not changed to make it pass (one variable at a time). It does not stand in for S1: the host, its prompts and its wait differ. Its verdict lines go with this sheet's answers. Phase H does not depend on it.
 
 ## Limits
 - One sitting, one app version, one PC, the model each tab chose (record its name if shown). One call per length in H1 and H2, one chat each in H3 and H4: sightings, recorded as partial. Three chats per plan per tab in S1: a 3 of 3 is a small sample, recorded as partial, not a rate.

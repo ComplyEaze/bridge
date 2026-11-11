@@ -5,7 +5,8 @@
 # Each run is a new non-interactive session in an empty folder, with only this server's two tools allowed and no
 # other MCP server, at --step-scale 0.05 (steps of 1.5 to 2.75 s: this measures the model, not a host's wait).
 # Writes, per run, the answer text, the server log and steps.py's output; prints one verdict line per run:
-#   PASS only when the run started 1 read, finished it, made exactly the plan's vouchers calls with no refusal, every
+#   PASS only when the run started 1 read, finished it, made exactly the plan's vouchers calls with no refusal and one
+#   set of arguments (read_id aside), every
 #   other call was answered, and the answer names the last step's party, Lab Party <code>. Anything else is FAIL with the facts line.
 # It does not stand in for the Windows row: the host, its tool prompts and its wait differ.
 set -u
@@ -43,7 +44,7 @@ JSON
     [ -n "$code" ] && grep -q "Lab Party $code" "$out/$tag.answer.txt" && named=1
     if [ "$(echo "$readline" | grep -c .)" = 1 ] && echo "$readline" | grep -q " steps $of of $of done true" \
        && echo "$facts" | grep -q " vouchers_calls $of answered $of cut 0 busy 0 refused 0 arguments_changed 0 open 0 " \
-       && echo "$facts" | grep -q " other_calls_not_answered 0$" \
+       && echo "$facts" | grep -q " leftover_dropped 0 continued_leftover 0 distinct_arguments 1 other_calls_not_answered 0$" \
        && [ "$named" -gt 0 ]; then
       echo "$tag PASS"
     else

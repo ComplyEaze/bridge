@@ -1,5 +1,5 @@
-# tried.txt: the build Mac's smoke runs of sheet 703-A version 3 (11 Nov 2026). Paths are written <kit> and <tmp>.
-# node v24.21.0, python 3.14.8. drive.mjs is a throwaway driver kept off the branch; every step below is at --step-scale 0.01. Each sha256 is cut to its first 8 characters.
+# tried.txt: the build Mac's smoke runs of sheet 703-A version 3 (11 Nov 2026), after the independent read. Paths are written <kit> and <tmp>.
+# node v24.21.0, python 3.14.8. drive.mjs, leftover.mjs and lo2.mjs are throwaway drivers kept off the branch; every step below is at --step-scale 0.01. Each sha256 is cut to its first 8 characters.
 
 ## extract_text.py on e24f1244's four files, both modes
 id mode exit 0; cmp with tools.json: equal
@@ -27,53 +27,59 @@ M 2 {"step":2,"steps":12,"done":false,"state":"in_progress"}
 M 3 after cancel (reruns step 3) {"step":3,"steps":12,"done":false,"state":"in_progress"}
 W again (drops M) {"step":1,"steps":5,"done":false,"state":"in_progress"}
 ### steps.py arguments.jsonl
-initialize 2026-11-11T07:28:52.671Z pid 84858 client smoke protocol 2025-06-18 capabilities - tasks no
-call 1 received 2026-11-11T07:28:52.675Z gap - pid 84858 id 3 tool list_companies meta - arguments {} read_id - end companies
-call 2 received 2026-11-11T07:28:52.676Z gap 0.0 pid 84858 id 4 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "read_id": "rdabc", "to": "2026-11-08"} read_id rdabc end refused argument_unknown:read_id
-call 3 received 2026-11-11T07:28:52.677Z gap 0.0 pid 84858 id 5 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdtuawjpspvfcwjp 0.401
-call 4 received 2026-11-11T07:28:53.083Z gap 0.0 pid 84858 id 6 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 2 of 5 done false read_id rdtuawjpspvfcwjp 0.501
-call 5 received 2026-11-11T07:28:53.591Z gap 0.0 pid 84858 id 7 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 3 of 5 done false read_id rdtuawjpspvfcwjp 0.400
-call 6 received 2026-11-11T07:28:53.992Z gap 0.0 pid 84858 id 8 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 4 of 5 done false read_id rdtuawjpspvfcwjp 0.552
-call 7 received 2026-11-11T07:28:54.546Z gap 0.0 pid 84858 id 9 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 5 of 5 done true read_id rdtuawjpspvfcwjp 0.302
-call 8 received 2026-11-11T07:28:54.850Z gap 0.0 pid 84858 id 10 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdxdqmgymeqgskjz 0.401
-call 9 received 2026-11-11T07:28:55.252Z gap 0.0 pid 84858 id 11 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 1 of 12 done false read_id rdhpjwckhgmcjejv 0.402
-call 10 received 2026-11-11T07:28:55.658Z gap 0.0 pid 84858 id 12 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 2 of 12 done false read_id rdhpjwckhgmcjejv 0.407
-call 11 received 2026-11-11T07:28:55.689Z gap -0.4 pid 84858 id 13 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end refused busy
-call 12 received 2026-11-11T07:28:56.069Z gap 0.4 pid 84858 id 14 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end cancelled 0.032 reason smoke
-call 13 received 2026-11-11T07:28:56.700Z gap 0.6 pid 84858 id 15 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 3 of 12 done false read_id rdhpjwckhgmcjejv 0.502
-call 14 received 2026-11-11T07:28:57.203Z gap 0.0 pid 84858 id 16 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdwgrmfspqwwgmaj 0.402
-read rdtuawjpspvfcwjp pid 84858 plan five span_days 7 code BZDZB steps 5 of 5 done true
-read rdxdqmgymeqgskjz pid 84858 plan five span_days 7 code ZBKRH steps 1 of 5 done false
-read rdhpjwckhgmcjejv pid 84858 plan twelve span_days 31 code PDKGE steps 3 of 12 done false
-read rdwgrmfspqwwgmaj pid 84858 plan five span_days 7 code WKXNQ steps 1 of 5 done false
+initialize 2026-11-11T07:51:35.220Z pid 93168 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:51:35.222Z gap - pid 93168 id 3 tool list_companies meta - arguments {} read_id - end companies
+call 2 received 2026-11-11T07:51:35.223Z gap 0.0 pid 93168 id 4 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "read_id": "rdabc", "to": "2026-11-08"} read_id rdabc end refused argument_unknown:read_id
+call 3 received 2026-11-11T07:51:35.223Z gap 0.0 pid 93168 id 5 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdhacxpdzehvcafp 0.401
+call 4 received 2026-11-11T07:51:35.626Z gap 0.0 pid 93168 id 6 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 2 of 5 done false read_id rdhacxpdzehvcafp 0.502
+call 5 received 2026-11-11T07:51:36.129Z gap 0.0 pid 93168 id 7 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 3 of 5 done false read_id rdhacxpdzehvcafp 0.402
+call 6 received 2026-11-11T07:51:36.532Z gap 0.0 pid 93168 id 8 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 4 of 5 done false read_id rdhacxpdzehvcafp 0.552
+call 7 received 2026-11-11T07:51:37.084Z gap 0.0 pid 93168 id 9 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 5 of 5 done true read_id rdhacxpdzehvcafp 0.302
+call 8 received 2026-11-11T07:51:37.387Z gap 0.0 pid 93168 id 10 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdnkfxfshwvythgf 0.402
+call 9 received 2026-11-11T07:51:37.789Z gap 0.0 pid 93168 id 11 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 1 of 12 done false read_id rdvvtsezmhmgmrzt 0.402
+call 10 received 2026-11-11T07:51:38.192Z gap 0.0 pid 93168 id 12 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 2 of 12 done false read_id rdvvtsezmhmgmrzt 0.402
+call 11 received 2026-11-11T07:51:38.224Z gap -0.4 pid 93168 id 13 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-10-01", "to": "2026-10-31"} read_id - end refused busy
+call 12 received 2026-11-11T07:51:38.595Z gap 0.4 pid 93168 id 14 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-10-01", "to": "2026-10-31"} read_id - end cancelled 0.032 reason smoke
+call 13 received 2026-11-11T07:51:39.228Z gap 0.6 pid 93168 id 15 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 3 of 12 done false read_id rdvvtsezmhmgmrzt 0.501
+call 14 received 2026-11-11T07:51:39.730Z gap 0.0 pid 93168 id 16 tool vouchers meta - arguments {"company_guid": "kjfgjqhk-bcav-rehb-txeb-myuvgmbdxgvm", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdvqzynmmcwzvrgt 0.401
+read rdhacxpdzehvcafp pid 93168 plan five span_days 7 code CNEWA steps 5 of 5 done true
+read rdnkfxfshwvythgf pid 93168 plan five span_days 7 code GHWWB steps 1 of 5 done false
+read rdvvtsezmhmgmrzt pid 93168 plan twelve span_days 31 code NVKVV steps 3 of 12 done false
+read rdvqzynmmcwzvrgt pid 93168 plan five span_days 7 code WUUCS steps 1 of 5 done false
 evicted -
-started 1 pids 84858 at 2026-11-11T07:28:52.666Z
-sleep calls 0 answered 0 cut 0 open 0 max_answered_elapsed - max_cut_elapsed -
-facts since - until - vouchers_calls 13 answered 10 cut 1 busy 1 refused 1 arguments_changed 0 open 0 new_read_after_answered_step 3 no_read_id_after_cut - ids_not_issued rdabc ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.552 max_cut_elapsed 0.032 reads_started 4 reads_done 1 dropped 2 expired 0 other_calls_not_answered 0
+started 1 pids 93168 at 2026-11-11T07:51:35.217Z
+closed stdin_closed pid 93168 running 0 at 2026-11-11T07:51:40.133Z
+cancel_ignored -
+live_reads rdvqzynmmcwzvrgt
+sleep calls 0 answered 0 cut 0 busy 0 open 0 max_answered_elapsed - max_cut_elapsed -
+facts since - until - vouchers_calls 13 answered 10 cut 1 busy 1 refused 1 arguments_changed 0 open 0 new_read_after_answered_step 3 no_read_id_after_cut - ids_not_issued rdabc ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.552 max_cut_elapsed 0.032 reads_started 4 reads_done 1 dropped 2 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 2 other_calls_not_answered 0
 exit 0
 
 ## drive.mjs id
 schema has read_id true
-id 1 {"step":1,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
-id 2 {"step":2,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
-id 3 {"step":3,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
-id 4 {"step":4,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
-id 5 {"step":5,"steps":5,"done":true,"read_id":"rdgqybxeuqwwrjrq","state":"observed","rows":3}
+id 1 {"step":1,"steps":5,"done":false,"read_id":"rddkxugqgyhxhzcz","state":"in_progress"}
+id 2 {"step":2,"steps":5,"done":false,"read_id":"rddkxugqgyhxhzcz","state":"in_progress"}
+id 3 {"step":3,"steps":5,"done":false,"read_id":"rddkxugqgyhxhzcz","state":"in_progress"}
+id 4 {"step":4,"steps":5,"done":false,"read_id":"rddkxugqgyhxhzcz","state":"in_progress"}
+id 5 {"step":5,"steps":5,"done":true,"read_id":"rddkxugqgyhxhzcz","state":"observed","rows":3}
 id finished {"code":"read_finished","message":"ComplyEaze Bridge refused this operation."}
 ### steps.py id.jsonl
-initialize 2026-11-11T07:28:57.708Z pid 85055 client smoke protocol 2025-06-18 capabilities - tasks no
-call 1 received 2026-11-11T07:28:57.709Z gap - pid 85055 id 3 tool list_companies meta - arguments {} read_id - end companies
-call 2 received 2026-11-11T07:28:57.710Z gap 0.0 pid 85055 id 4 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdgqybxeuqwwrjrq 0.402
-call 3 received 2026-11-11T07:28:58.119Z gap 0.0 pid 85055 id 5 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 2 of 5 done false read_id rdgqybxeuqwwrjrq 0.502
-call 4 received 2026-11-11T07:28:58.630Z gap 0.0 pid 85055 id 6 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 3 of 5 done false read_id rdgqybxeuqwwrjrq 0.403
-call 5 received 2026-11-11T07:28:59.034Z gap 0.0 pid 85055 id 7 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 4 of 5 done false read_id rdgqybxeuqwwrjrq 0.552
-call 6 received 2026-11-11T07:28:59.587Z gap 0.0 pid 85055 id 8 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 5 of 5 done true read_id rdgqybxeuqwwrjrq 0.302
-call 7 received 2026-11-11T07:28:59.892Z gap 0.0 pid 85055 id 9 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end refused read_finished
-read rdgqybxeuqwwrjrq pid 85055 plan five span_days 7 code NAWVQ steps 5 of 5 done true
+initialize 2026-11-11T07:51:40.244Z pid 93235 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:51:40.245Z gap - pid 93235 id 3 tool list_companies meta - arguments {} read_id - end companies
+call 2 received 2026-11-11T07:51:40.246Z gap 0.0 pid 93235 id 4 tool vouchers meta - arguments {"company_guid": "sqpwxfka-vyyh-pdxz-fegp-pvkdjuekqxnc", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rddkxugqgyhxhzcz 0.402
+call 3 received 2026-11-11T07:51:40.650Z gap 0.0 pid 93235 id 5 tool vouchers meta - arguments {"company_guid": "sqpwxfka-vyyh-pdxz-fegp-pvkdjuekqxnc", "from": "2026-11-02", "read_id": "rddkxugqgyhxhzcz", "to": "2026-11-08"} read_id rddkxugqgyhxhzcz end step 2 of 5 done false read_id rddkxugqgyhxhzcz 0.501
+call 4 received 2026-11-11T07:51:41.152Z gap 0.0 pid 93235 id 6 tool vouchers meta - arguments {"company_guid": "sqpwxfka-vyyh-pdxz-fegp-pvkdjuekqxnc", "from": "2026-11-02", "read_id": "rddkxugqgyhxhzcz", "to": "2026-11-08"} read_id rddkxugqgyhxhzcz end step 3 of 5 done false read_id rddkxugqgyhxhzcz 0.401
+call 5 received 2026-11-11T07:51:41.555Z gap 0.0 pid 93235 id 7 tool vouchers meta - arguments {"company_guid": "sqpwxfka-vyyh-pdxz-fegp-pvkdjuekqxnc", "from": "2026-11-02", "read_id": "rddkxugqgyhxhzcz", "to": "2026-11-08"} read_id rddkxugqgyhxhzcz end step 4 of 5 done false read_id rddkxugqgyhxhzcz 0.552
+call 6 received 2026-11-11T07:51:42.107Z gap 0.0 pid 93235 id 8 tool vouchers meta - arguments {"company_guid": "sqpwxfka-vyyh-pdxz-fegp-pvkdjuekqxnc", "from": "2026-11-02", "read_id": "rddkxugqgyhxhzcz", "to": "2026-11-08"} read_id rddkxugqgyhxhzcz end step 5 of 5 done true read_id rddkxugqgyhxhzcz 0.302
+call 7 received 2026-11-11T07:51:42.410Z gap 0.0 pid 93235 id 9 tool vouchers meta - arguments {"company_guid": "sqpwxfka-vyyh-pdxz-fegp-pvkdjuekqxnc", "from": "2026-11-02", "read_id": "rddkxugqgyhxhzcz", "to": "2026-11-08"} read_id rddkxugqgyhxhzcz end refused read_finished
+read rddkxugqgyhxhzcz pid 93235 plan five span_days 7 code DQKJQ steps 5 of 5 done true
 evicted -
-started 1 pids 85055 at 2026-11-11T07:28:57.704Z
-sleep calls 0 answered 0 cut 0 open 0 max_answered_elapsed - max_cut_elapsed -
-facts since - until - vouchers_calls 6 answered 5 cut 0 busy 0 refused 1 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.552 max_cut_elapsed - reads_started 1 reads_done 1 dropped 0 expired 0 other_calls_not_answered 0
+started 1 pids 93235 at 2026-11-11T07:51:40.241Z
+closed stdin_closed pid 93235 running 0 at 2026-11-11T07:51:42.411Z
+cancel_ignored -
+live_reads -
+sleep calls 0 answered 0 cut 0 busy 0 open 0 max_answered_elapsed - max_cut_elapsed -
+facts since - until - vouchers_calls 6 answered 5 cut 0 busy 0 refused 1 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.552 max_cut_elapsed - reads_started 1 reads_done 1 dropped 0 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 1 other_calls_not_answered 0
 exit 0
 
 ## drive.mjs sleep
@@ -81,14 +87,17 @@ sleep {"text":"slept 0.2 s"}
 busy? {}
 first {"text":"slept 0.5 s"}
 ### steps.py sleep.jsonl
-initialize 2026-11-11T07:29:00.006Z pid 85068 client smoke protocol 2025-06-18 capabilities - tasks no
-call 1 received 2026-11-11T07:29:00.007Z gap - pid 85068 id 2 tool sleep meta - arguments {"seconds": 0.2} read_id - end slept 0.202
-call 2 received 2026-11-11T07:29:00.211Z gap 0.0 pid 85068 id 3 tool sleep meta - arguments {"seconds": 0.5} read_id - end slept 0.502
-call 3 received 2026-11-11T07:29:00.262Z gap -0.5 pid 85068 id 4 tool sleep meta - arguments {"seconds": 0.1} read_id - end open
+initialize 2026-11-11T07:51:42.505Z pid 93257 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:51:42.506Z gap - pid 93257 id 2 tool sleep meta - arguments {"seconds": 0.2} read_id - end slept 0.202 of 0.2
+call 2 received 2026-11-11T07:51:42.709Z gap 0.0 pid 93257 id 3 tool sleep meta - arguments {"seconds": 0.5} read_id - end slept 0.501 of 0.5
+call 3 received 2026-11-11T07:51:42.761Z gap -0.4 pid 93257 id 4 tool sleep meta - arguments {"seconds": 0.1} read_id - end refused busy (inferred)
 evicted -
-started 1 pids 85068 at 2026-11-11T07:29:00.003Z
-sleep calls 3 answered 2 cut 0 open 1 max_answered_elapsed 0.502 max_cut_elapsed -
-facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 other_calls_not_answered 0
+started 1 pids 93257 at 2026-11-11T07:51:42.502Z
+closed stdin_closed pid 93257 running 0 at 2026-11-11T07:51:43.211Z
+cancel_ignored -
+live_reads -
+sleep calls 3 answered 2 cut 0 busy 1 open 0 max_answered_elapsed 0.501 max_cut_elapsed -
+facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 0 other_calls_not_answered 0
 exit 0
 
 ## idle expiry (createServer with an injected clock: the same call 901 s later)
@@ -96,15 +105,65 @@ company received read_started step_started step_result received read_expired rea
 steps 1,1
 
 ## H4 by hand: a 2 s sleep cut by closing stdin at 0.4 s, then a new process on the same log
-initialize 2026-11-11T07:29:02.051Z pid 85079 client smoke protocol 2025-06-18 capabilities - tasks no
-initialize 2026-11-11T07:29:02.455Z pid 85106 client smoke protocol 2025-06-18 capabilities - tasks no
-call 1 received 2026-11-11T07:29:02.051Z gap - pid 85079 id 2 tool sleep meta - arguments {"seconds": 2} read_id - end stdin_closed running 1 at 2026-11-11T07:29:02.419Z
-call 2 received 2026-11-11T07:29:02.456Z gap 0.0 pid 85106 id 2 tool sleep meta - arguments {"seconds": 0.1} read_id - end slept 0.102
+initialize 2026-11-11T07:51:44.513Z pid 93284 client smoke protocol 2025-06-18 capabilities - tasks no
+initialize 2026-11-11T07:51:44.925Z pid 93286 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:51:44.513Z gap - pid 93284 id 2 tool sleep meta - arguments {"seconds": 2} read_id - end stdin_closed running 1 at 2026-11-11T07:51:44.892Z
+call 2 received 2026-11-11T07:51:44.926Z gap 0.0 pid 93286 id 2 tool sleep meta - arguments {"seconds": 0.1} read_id - end slept 0.101 of 0.1
 evicted -
-started 2 pids 85079,85106 at 2026-11-11T07:29:02.047Z,2026-11-11T07:29:02.453Z
-sleep calls 2 answered 1 cut 1 open 0 max_answered_elapsed 0.102 max_cut_elapsed -
-facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 other_calls_not_answered 0
+started 2 pids 93284,93286 at 2026-11-11T07:51:44.510Z,2026-11-11T07:51:44.923Z
+closed stdin_closed pid 93284 running 1 at 2026-11-11T07:51:44.892Z
+closed stdin_closed pid 93286 running 0 at 2026-11-11T07:51:45.300Z
+cancel_ignored -
+live_reads -
+sleep calls 2 answered 1 cut 1 busy 0 open 0 max_answered_elapsed 0.101 max_cut_elapsed -
+facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 0 other_calls_not_answered 0
 exit 0
+
+## synthetic sleep logs (written by hand, to the sleep server's format)
+### syn-busy: a second call while a 75 s one runs
+call 1 received 2026-11-11T08:00:01.000Z gap - pid 111 id 2 tool sleep meta - arguments {"seconds": 75} read_id - end slept 75.000 of 75
+call 2 received 2026-11-11T08:00:02.000Z gap -1.0 pid 111 id 3 tool sleep meta - arguments {"seconds": 5} read_id - end refused busy (inferred)
+evicted -
+started 1 pids 111 at 2026-11-11T08:00:00.000Z
+cancel_ignored -
+live_reads -
+sleep calls 2 answered 1 cut 0 busy 1 open 0 max_answered_elapsed 75.000 max_cut_elapsed -
+facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 0 other_calls_not_answered 0
+### syn-close: a cancel, then the process closed with nothing running
+call 1 received 2026-11-11T08:00:01.000Z gap - pid 111 id 2 tool sleep meta - arguments {"seconds": 75} read_id - end cancelled 60.000 reason None
+evicted -
+started 1 pids 111 at 2026-11-11T08:00:00.000Z
+closed stdin_closed pid 111 running 0 at 2026-11-11T08:00:03.000Z
+cancel_ignored -
+live_reads -
+sleep calls 1 answered 0 cut 1 busy 0 open 0 max_answered_elapsed - max_cut_elapsed 60.000
+facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 0 other_calls_not_answered 0
+### syn-overlap: two processes, the same id, the old answer arriving after the new call
+call 1 received 2026-11-11T08:00:01.000Z gap - pid 111 id 2 tool sleep meta - arguments {"seconds": 55} read_id - end slept 55.000 of 55
+call 2 received 2026-11-11T08:00:03.000Z gap -1.0 pid 222 id 2 tool sleep meta - arguments {"seconds": 5} read_id - end slept 5.000 of 5
+evicted -
+started 2 pids 111,222 at 2026-11-11T08:00:00.000Z,2026-11-11T08:00:02.000Z
+cancel_ignored -
+live_reads -
+sleep calls 2 answered 2 cut 0 busy 0 open 0 max_answered_elapsed 55.000 max_cut_elapsed -
+facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 0 other_calls_not_answered 0
+
+## leftovers and distinct arguments (arguments mode): chat A stops after 2 of 5; chat B asks a month; chat C asks the week with offset 0 and goods_lines false on two calls
+### window A
+read rdkwkscnwvkbjypy pid 93309 plan five span_days 7 code QMYNA steps 2 of 5 done false
+live_reads -
+facts since 2026-11-11T07:51:45.480Z until 2026-11-11T07:51:46.408Z vouchers_calls 2 answered 2 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut - ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.502 max_cut_elapsed - reads_started 1 reads_done 0 dropped 0 expired 0 leftover_dropped 0 continued_leftover 0 distinct_arguments 1 other_calls_not_answered 0
+### window B
+read rdbbuypyqrkeccnw pid 93309 plan twelve span_days 31 code UJAKX steps 1 of 12 done false
+live_reads -
+facts since 2026-11-11T07:51:46.408Z until 2026-11-11T07:51:46.832Z vouchers_calls 1 answered 1 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut - ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.402 max_cut_elapsed - reads_started 1 reads_done 0 dropped 0 expired 0 leftover_dropped 1 continued_leftover 0 distinct_arguments 1 other_calls_not_answered 0
+### window C
+read rdyqxhshajkqfwbn pid 93309 plan five span_days 7 code FPTWP steps 5 of 5 done true
+live_reads -
+facts since 2026-11-11T07:51:46.832Z until - vouchers_calls 5 answered 5 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut - ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.551 max_cut_elapsed - reads_started 1 reads_done 1 dropped 0 expired 0 leftover_dropped 1 continued_leftover 0 distinct_arguments 3 other_calls_not_answered 0
+### the same arguments after a chat stopped at 2 of 5: the next chat's window
+live_reads -
+facts since 2026-11-11T07:51:50.096Z until - vouchers_calls 3 answered 3 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut - ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.552 max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 leftover_dropped 0 continued_leftover 3 distinct_arguments 1 other_calls_not_answered 0
 
 ## desktop_config.py on a throwaway configuration
 add ok B0 537dff86… (46 bytes) B1 b4e7ea7b… (574 bytes) servers bridge-lab-703h,other
@@ -119,6 +178,8 @@ FAIL: the step scale must be a number from 0.01 to 1, not 2
 exit 1
 FAIL: continuation by id is served with tools.json, not <kit>/tools-args.json
 exit 1
+FAIL: the configuration could not be written ([Errno 13] Permission denied: '<tmp>/cfg/c.json'); it is unchanged, sha256 537dff86…, and the before-copy was removed
+exit 1 (configuration made read-only); before-copy left behind: no
 add ok B0 537dff86… (46 bytes) B1 2347ee4a… (887 bytes) servers bridge-lab-703a,other
 exit 0; second B0 equals the first: yes
 entry args ['--tools', '<kit>/tools-args.json', '--log', '<tmp>/cfg/log/a.jsonl', '--continue-by', 'arguments', '--step-scale', '0.5']

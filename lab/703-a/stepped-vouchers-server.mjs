@@ -8,7 +8,8 @@
 // Run: node stepped-vouchers-server.mjs --tools <tools.json> [--log <file>] [--step-scale <0.01 to 1>]
 //        [--continue-by id|arguments]
 //
-// Sheet version 3 adds `--continue-by arguments` (default `id`, which is version 2's server, unchanged). With it,
+// Sheet version 3 adds `--continue-by arguments`. The default, `id`, answers as version 2's server did; its log lines
+// gain a `continue_by` field, and it refuses to start on a text served for the other mode. With `arguments`,
 // served with tools-args.json, no read_id is issued or accepted: a vouchers call whose other arguments equal the one
 // live read's continues it, and any other starts a new read. There is one live read, as in the #703 design note's
 // design 1: a call with other arguments drops it (read_dropped), and so does 15 minutes idle (read_expired, then a

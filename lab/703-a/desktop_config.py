@@ -109,18 +109,34 @@ def add_entry(config_path, before_path, entry, args, paths, log_path):
     found[entry] = {"command": "node", "args": args}
     config["mcpServers"] = found
     out = json.dumps(config, indent=2, ensure_ascii=False).encode("utf-8")
-    with open(config_path, "wb") as handle:
-        handle.write(out)
+    try:
+        write_whole(config_path, out)
+    except OSError as error:
+        # Nothing was written over the configuration: drop the before-copy so the same command can be run again.
+        # Otherwise the before-copy is kept, and `restore` with B0 puts the bytes back.
+        state = sha256(read(config_path))
+        if state == sha256(data):
+            os.remove(before_path)
+            raise Failed("the configuration could not be written ({}); it is unchanged, sha256 {}, and the before-copy "
+                         "was removed".format(error, state))
+        raise Failed("the configuration could not be written ({}); it reads sha256 {}, not B0 {}; the before-copy {} "
+                     "is kept".format(error, state, sha256(data), before_path))
     return "add ok B0 {} ({} bytes) B1 {} ({} bytes) servers {}".format(
         sha256(data), len(data), sha256(read(config_path)), len(out), ",".join(sorted(found)))
+
+
+def write_whole(path, data):
+    # Written in place, as row H's helper wrote it on the lab PC: a rename over the file would give the packaged
+    # app's configuration a new file identity and the folder's permissions. A failed write is reported by its sha256.
+    with open(path, "wb") as handle:
+        handle.write(data)
 
 
 def restore(config_path, before_path, expected):
     data = read(before_path)
     if sha256(data) != expected:
         raise Failed("the before-copy's sha256 is {}, not {}".format(sha256(data), expected))
-    with open(config_path, "wb") as handle:
-        handle.write(data)
+    write_whole(config_path, data)
     now = sha256(read(config_path))
     if now != expected:
         raise Failed("the configuration reads {} after the write, not {}".format(now, expected))

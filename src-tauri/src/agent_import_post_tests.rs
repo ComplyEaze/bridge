@@ -394,16 +394,19 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     // that returns it and the two fields it holds.
     for part in [
         "If a receipt of the post_import call",
-        "read_evidence",
+        "egress_log",
         "request_trail",
         "held_ms",
         "outcome",
-        "A missing receipt means the process ended before it was written.",
+        "A missing receipt may mean the process ended before it was written.",
         "without resending it",
     ] {
         assert!(step.contains(part), "{part}");
     }
     // It promises no receipt and no cause, and reasons about neither.
+    // The cap the text names is the trail's own.
+    let cap = format!("the last {} sends", crate::request_trail::TRAIL_LAST);
+    assert!(step.contains(&cap), "{cap}");
     for word in ["always", "will be", "because", "caused"] {
         assert!(!step.contains(word), "{word}");
     }

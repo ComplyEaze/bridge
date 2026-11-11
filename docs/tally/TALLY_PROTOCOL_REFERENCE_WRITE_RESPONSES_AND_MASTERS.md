@@ -106,6 +106,30 @@ test fixtures (`batch-import-all-missing-ledgers`,
 `batch-import-two-missing-ledgers-in-one-voucher`). Not measured: any other cause of rejection, Gold
 and Education.
 
+**Through `post_import`, with a second cause — PARTIAL, one run each** (TallyPrime 7.2, single-user
+edition, a synthetic company with accounts integrated with inventory, a master build reporting
+0.7.0, 2026-11-11; bridge#1108).
+
+The refused voucher was a Journal debiting a ledger under Stock-in-Hand, and Bridge's own checks
+before approval passed it. Tally refused it in the answer, with one `LINEERROR` naming the ledger.
+
+- **Alone:** `CREATED 0, EXCEPTIONS 1`, `LASTVCHID` 0. Neither mark moved.
+- **Second of three Journals:** `CREATED 2, EXCEPTIONS 1`, every other counter 0, `LASTVCHID` 3.
+  - The voucher mark stepped by 2 and the master mark did not move.
+  - The two created vouchers took AlterID and MasterID 2 and 3, in request order.
+  - No row was found for the refused one.
+- **Between two identical Journals:** `CREATED 2, EXCEPTIONS 1`, `LASTVCHID` 5. Both identical
+  vouchers were created.
+- **In all three:** all seven counters present, and `COMBINED` and `LASTMID` 0.
+
+So `EXCEPTIONS` counted the refused voucher for this cause too. Each request, as Bridge rendered it,
+and each answer is preserved byte for byte as a test fixture (`import_post_partial_landing_*`).
+Bridge's own span, mark and verification reads of these posts were not kept as bytes and are not
+committed.
+
+Not measured through `post_import`: a refused voucher first or last, two refusals, a refusal of
+one of two identical vouchers, another release, and a multi-user edition.
+
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 
 **VERIFIED, on an automatically numbered voucher type.** Re-sending an identical voucher payload

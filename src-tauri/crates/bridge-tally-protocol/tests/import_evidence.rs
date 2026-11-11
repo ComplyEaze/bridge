@@ -459,6 +459,69 @@ fn a_captured_partial_commit_keeps_tallys_line_error_text() {
     assert!(!outcome.counters().is_clean_success_for(49, 0, 0));
 }
 
+/// Three answers captured from posts sent through Bridge's own `post_import`, each holding one
+/// Journal Tally refused for a ledger under Stock-in-Hand (bridge#1108;
+/// `IMPORT_POST_PARTIAL_LANDING_CAPTURE_PROVENANCE.md`): alone, then in the middle of three, then
+/// in the middle of two identical vouchers. The answer names no voucher in any of them.
+const POST_PARTIAL_LANDING_LIVE: [(&str, &[u8], u64, u64, u64); 3] = [
+    (
+        "p1",
+        include_bytes!("fixtures/import_post_partial_landing_p1_live.utf16le.xml"),
+        1,
+        0,
+        0,
+    ),
+    (
+        "p2",
+        include_bytes!("fixtures/import_post_partial_landing_p2_live.utf16le.xml"),
+        3,
+        2,
+        3,
+    ),
+    (
+        "p3",
+        include_bytes!("fixtures/import_post_partial_landing_p3_live.utf16le.xml"),
+        3,
+        2,
+        5,
+    ),
+];
+
+/// Each captured answer reports every counter, counts the one refused voucher in `EXCEPTIONS`,
+/// carries `LASTVCHID`, and is not clean for the number sent or for the number created.
+#[test]
+fn captured_post_import_partial_landings_count_the_refused_voucher() {
+    for (row, bytes, sent, created, last_vch_id) in POST_PARTIAL_LANDING_LIVE {
+        let outcome = parse_import_outcome(&captured(bytes)).expect("captured response");
+        let counters = outcome.counters();
+        assert!(counters.counter_presence.all_reported(), "{row}");
+        assert_eq!(counters.created, created, "{row}");
+        assert_eq!(counters.exceptions, sent - created, "{row}");
+        assert_eq!(
+            (
+                counters.altered,
+                counters.deleted,
+                counters.ignored,
+                counters.errors,
+                counters.cancelled
+            ),
+            (0, 0, 0, 0, 0),
+            "{row}"
+        );
+        assert_eq!(counters.line_error_count, 1, "{row}");
+        assert_eq!(outcome.last_vch_id(), Some(last_vch_id), "{row}");
+        let line_errors = outcome.tally_line_errors();
+        assert_eq!(line_errors.len(), 1, "{row}");
+        assert_eq!(
+            line_errors[0].text(),
+            "Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!",
+            "{row}"
+        );
+        assert!(!counters.is_clean_success_for(sent, 0, 0), "{row}");
+        assert!(!counters.is_clean_success_for(created, 0, 0), "{row}");
+    }
+}
+
 /// Each text is clipped to 512 characters on a character boundary, at most
 /// 64 are kept, and every clip or omission is explicit.
 #[test]

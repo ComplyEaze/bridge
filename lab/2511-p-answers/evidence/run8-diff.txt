@@ -1,0 +1,8 @@
+run.py e48c7eb8ba52bff794c5b9f9c8a050edaaed5925bf439401d5667c872b250a3d 2383 B
+run8.py 998ac2b5173ec8545f906302ce32b079503cf31589e6c247259246a2540ecbd7 2382 B
+--- run.py
++++ run8.py
+@@ -22 +22 @@
+-        done = subprocess.run(["curl.exe", "-sS", "--fail-with-body", "-H", "Content-Type: text/xml; charset=utf-16",
++        done = subprocess.run(["curl.exe", "-sS", "--fail-with-body", "-H", "Content-Type: text/xml; charset=utf-8",
+changed lines: 2

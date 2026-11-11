@@ -1,0 +1,86 @@
+{
+  "alter_id_delta": {
+    "after_seen": 14,
+    "before": 13,
+    "delta": 1,
+    "from": "build_mark"
+  },
+  "batch_id": "bridge-ccb399de-9a6b-419e-9262-bfbcb717e6d5",
+  "batch_sha256": "07d1e3bd48f16578451fc0a47416c725c887665020bb969733dd41ed511e87b3",
+  "built_at": "2026-11-11T13:38:47.042Z",
+  "company": {
+    "books_from": "20250401",
+    "company_number": "<redacted: company number>",
+    "guid": "1bb48be5-baba-45b2-90d8-7593244915a9",
+    "identity_state": "verified_tuple",
+    "missing_field": null,
+    "name": "BRIDGE FOREXGROUP LAB"
+  },
+  "counts": {
+    "bound_not_in_window": 0,
+    "cancelled_with_effective_copy": 0,
+    "duplicate_fingerprint": 0,
+    "matching_content_observed": 0,
+    "not_attributable": 0,
+    "not_found": 0,
+    "posted_divergent": 0,
+    "posted_not_effective": 0,
+    "posted_verified": 1
+  },
+  "dispatch_record": {
+    "state": "none_on_record",
+    "summary": "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status."
+  },
+  "dispatch_response": null,
+  "duplicates": [],
+  "evidence": {
+    "company": {
+      "bytes": 8040,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_sha256": "98ffc8a37fa17d944405363b09c614acbfb65d016f71936723d584106eaba4bf",
+      "state": "complete"
+    },
+    "mode_closing": null,
+    "mode_opening": {
+      "bytes": 4071,
+      "request_sha256": "08553f864e24068d545afb217c89b88f63c7f380d8ca74454ff2f9af2704f1b8",
+      "response_sha256": "6f9dabefb60c08c8c031dbb2aa6b7b46bb6bef6d5401c028e34fcd361d00c574",
+      "state": "complete"
+    },
+    "voucher_read": {
+      "bytes": 18096,
+      "request_sha256": "415bbbef9022f22b29ffa84df444c10107bcda828cbf0d4a21030a02db228e0d",
+      "response_sha256": "dd0a1f57b82830584873b0e39303a4333ac25ad51cb28033686f5ce49352a8c4",
+      "state": "complete"
+    },
+    "voucher_read_corroboration": {
+      "bytes": 18096,
+      "request_sha256": "415bbbef9022f22b29ffa84df444c10107bcda828cbf0d4a21030a02db228e0d",
+      "response_sha256": "dd0a1f57b82830584873b0e39303a4333ac25ad51cb28033686f5ce49352a8c4",
+      "state": "complete"
+    },
+    "voucher_read_sha256": "dd0a1f57b82830584873b0e39303a4333ac25ad51cb28033686f5ce49352a8c4"
+  },
+  "post_span_binding": {
+    "state": "not_applicable"
+  },
+  "pre_import_mark": {
+    "kind": "company_high_water",
+    "master_value": 214,
+    "value": 13
+  },
+  "unrelated_duplicates_in_window": [],
+  "verification_status": "posted_verified",
+  "verified_at": "2026-11-11T13:39:36.562Z",
+  "vouchers": [
+    {
+      "alter_id": 14,
+      "bridge_txn_id": "2511-P3",
+      "guid": "1bb48be5-baba-45b2-90d8-7593244915a9-0000000e",
+      "marker": "narration_tag",
+      "master_id": "14",
+      "status": "posted_verified",
+      "voucher_number": "6"
+    }
+  ]
+}

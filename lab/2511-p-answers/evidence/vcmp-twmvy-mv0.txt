@@ -1,0 +1,11 @@
+a-twmvy-V-mvy-20250401-20260331.xml: 59524 bytes, sha256 56554b6a655a92afc74f28527484647098f8cf43e774142d8caa5eb7736f4df7
+  forbidden characters replaced by '�#'<hex>: 0
+  HEADER/STATUS 1
+  VOUCHER rows: 11
+a-mv0-V-mvy-20250401-20260331.xml: 59524 bytes, sha256 56554b6a655a92afc74f28527484647098f8cf43e774142d8caa5eb7736f4df7
+  forbidden characters replaced by '�#'<hex>: 0
+  HEADER/STATUS 1
+  VOUCHER rows: 11
+  SAME: 11 of 11 common rows
+COMMON SAME (common 11, differ 0, only in A 0 (0 not named), only in B 0 (0 not named), named but missing 0)
+exit 0

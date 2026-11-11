@@ -1,0 +1,12 @@
+a-mv0-V-mvy-20250401-20260331.xml: 59524 bytes, sha256 56554b6a655a92afc74f28527484647098f8cf43e774142d8caa5eb7736f4df7
+  forbidden characters replaced by '�#'<hex>: 0
+  HEADER/STATUS 1
+  VOUCHER rows: 11
+a-mv1-V-mvy-20250401-20260331.xml: 65666 bytes, sha256 4e83348d3fae433fde013d16a270234b80123ead5555eadfd0bcf27cab782b76
+  forbidden characters replaced by '�#'<hex>: 0
+  HEADER/STATUS 1
+  VOUCHER rows: 12
+  SAME: 11 of 11 common rows
+  only in B (named): 1bb48be5-baba-45b2-90d8-7593244915a9-0000000c 20250402 'Receipt' '4' '2511-P1 [BRIDGE:ff97f108-294e-8de4-a48a-5b3d9385da47]'
+COMMON SAME (common 11, differ 0, only in A 0 (0 not named), only in B 1 (0 not named), named but missing 0)
+exit 0

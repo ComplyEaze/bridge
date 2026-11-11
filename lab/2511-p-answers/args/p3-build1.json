@@ -1,0 +1,1 @@
+{"company_guid": "1bb48be5-baba-45b2-90d8-7593244915a9", "vouchers": [{"bridge_txn_id": "2511-P3", "date": "2025-04-04", "voucher_type": "Receipt", "narration": "2511-P3", "entries": [{"ledger": "BRIDGE USD Customer", "amount": "100.00", "side": "Cr"}, {"ledger": "Cash", "amount": "100.00", "side": "Dr"}]}]}

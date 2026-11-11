@@ -1,0 +1,1 @@
+{"tool": "build_import_xml", "arguments": {"company_guid": "1bb48be5-baba-45b2-90d8-7593244915a9", "vouchers": [{"bridge_txn_id": "2511-P2", "date": "2025-04-03", "voucher_type": "Receipt", "narration": "2511-P2", "entries": [{"ledger": "BRIDGE INR Customer", "amount": "100.00", "side": "Cr"}, {"ledger": "BRIDGE Lab Bank", "amount": "100.00", "side": "Dr"}]}]}}

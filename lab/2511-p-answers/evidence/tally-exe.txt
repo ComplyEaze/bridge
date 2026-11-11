@@ -1,0 +1,5 @@
+path C:\Program Files\TallyPrime\tally.exe
+file version 1.1.7.2
+product version 1.1.7.2
+sha256 856e5236a7664c0d8d580585e1c31b443720badd7a0078512d41f6c380b7ed73
+PC date 2026-11-11 18:57:46 +05:30

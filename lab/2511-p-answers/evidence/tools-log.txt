@@ -1,0 +1,11 @@
+2026-11-11T13:28:06.120Z 000-tools-list.json list secs 0.02 bytes 217113 isError None
+2026-11-11T13:29:57.078Z 001-list-companies.json list_companies secs 0.109 bytes 1573 isError False
+2026-11-11T13:30:05.710Z 002-p1-build1.json build_import_xml secs 1.739 bytes 6022 isError False
+2026-11-11T13:31:15.336Z 003-p1-build2.json build_import_xml secs 5.147 bytes 14525 isError False
+2026-11-11T13:36:38.698Z 004-p1-verify.json verify_import secs 2.955 bytes 7606 isError False
+2026-11-11T13:37:06.862Z 005-p2-build1.json build_import_xml secs 1.725 bytes 6033 isError False
+2026-11-11T13:37:18.678Z 006-p2-build2.json build_import_xml secs 5.135 bytes 14536 isError False
+2026-11-11T13:38:13.513Z 007-p2-verify.json verify_import secs 2.785 bytes 7606 isError False
+2026-11-11T13:38:32.355Z 008-p3-build1.json build_import_xml secs 1.739 bytes 6023 isError False
+2026-11-11T13:38:45.101Z 009-p3-build2.json build_import_xml secs 5.467 bytes 14526 isError False
+2026-11-11T13:39:33.656Z 010-p3-verify.json verify_import secs 2.803 bytes 7607 isError False

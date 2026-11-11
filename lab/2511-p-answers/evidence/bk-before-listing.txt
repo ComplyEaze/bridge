@@ -1,0 +1,8 @@
+listing before: C:\lab\bk-2511p
+ls: cannot access '/c/lab/bk-2511p': No such file or directory
+exit 2
+made new: C:\lab\bk-2511p
+total 8
+drwxr-xr-x links=1 <user> group=197609 size=0 Nov 11 19:02 .
+drwxr-xr-x links=1 <user> group=197609 size=0 Nov 11 19:02 ..
+exit 0

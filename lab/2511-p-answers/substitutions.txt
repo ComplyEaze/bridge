@@ -1,0 +1,52 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed (no captured byte is altered except a company_number value in a tool answer or a JSON file of the data folder):
+logs/log-c4.txt: original 56 B sha256 13bfe94e0cdf48bc2292dc4054718048205468a4256a2b92c51db5005398adf5 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-d1.txt: original 71 B sha256 4cc2c5d94d885151c1c02e30607159fed9cb57a31836a67317aaf83d8d524ed6 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-d2.txt: original 71 B sha256 cc30ed06ff8ef51b4dde7e69442e2e06914a04a2b03f8958b796b7e587851a05 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-d3.txt: original 71 B sha256 379663f0d630c7e3bbe2df63a2c045f7ca59c917bfd422180da838b3703d10d3 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m0.txt: original 57 B sha256 8cc385ab15717e841adf1033d700dfc81960af7a71c8a22e443641b7aa95142d (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m0b.txt: original 58 B sha256 4c9933f68f859c1e66ab82fb99e30ac7508a210019341144a00deeeb82443827 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m1.txt: original 57 B sha256 e802f9179d73c99517951af844651251694af2a6061183698a2d43849d05b4f3 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m2.txt: original 57 B sha256 dc8c73a0c7d07c51a0a13d2b73796b65c31e63349c8e85c1ce05654e378f1746 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m2pre.txt: original 60 B sha256 1cc5d2c32a7bdd6abf5c8445549312da895f7047919260ebf59d42ec20b584cf (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m3.txt: original 57 B sha256 d750ca1dc9e3f6943000d8728ed69285d2e7f87c69b7996861421a9ecddfad44 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m3pre.txt: original 60 B sha256 c211c71736bb553a88d161e8a04ee809b216d0ee7695af53f8e6383ad442f33d (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-m3r.txt: original 58 B sha256 ea7d9286ffd7c9f20e7d35c9017ebe249299d5857d98afdd7339a4d814be03af (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-mb.txt: original 57 B sha256 286bfe25fcdbb057705912b1bb88c01e4e707be9e870da9b85f6a6e7dcbd233a (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-mr.txt: original 57 B sha256 23298c5d65732efa46a750a13c0de667738d5bffe93fac8a32030a867141eb7d (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-mv0.txt: original 91 B sha256 859522f0c8c5ac6d54d72a480110bd6ec05dafe544074ed3c643ac5906870b9f (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-mv1.txt: original 91 B sha256 1463b883ea9eba2457feeae1bddd82455249a952fd2e2189409925171ac93c0a (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-mv2.txt: original 91 B sha256 be06e22c6f30516f98409611d9c510b2f4e23880a8a0d0f9d4a7319ab7bae6d2 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-mv3.txt: original 91 B sha256 486752589e263f1ee33912b328f7a007dc6f751adb71e25be515ec179f7f43fb (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-mvr.txt: original 91 B sha256 023b1ba7e7c4de64a1fb0f45e85692d693948760bc4702738bfe8c3bf5682daa (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-p1w.txt: original 129 B sha256 496485d2ccfed85499b944c8018381058976e944e603771bec4c0329a46f9f38 (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-p2w.txt: original 129 B sha256 8a676ee6dbe7fe0a143a525adc2b41fb356c487dcb1c16415a3343615710a99b (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+logs/log-p3w.txt: original 129 B sha256 b6ff261de73e456eff309695f41910ea7d5f81bdcd3ad865b6ad394660402c0b (kept on the lab PC); 1 x -> curl exit=\1\tbytes=\2
+answers-mcp/answers/001-list-companies.json: original 1573 B sha256 72e85dc6d6f1da8fc09ece3e32cd80441cfadea120165942a0b9ff30fb118233 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/002-p1-build1.json: original 6022 B sha256 415360fa7d31ecd1c7342f3c5cc54bc6c0b7da46b3b9c735ed7b14ecd532bf73 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/004-p1-verify.json: original 7606 B sha256 54809af703f4fd977cfd8baaeba0928d9bc5500063267f63b929d68c5e6a814f (kept on the lab PC); company_number -> <redacted: company number> in 4 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/005-p2-build1.json: original 6033 B sha256 90894c6f3e2d497eafb226a5818200baaa42fcc33d7bb0728c7dd862d4401df6 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/007-p2-verify.json: original 7606 B sha256 ee03b4030c5f5b3851dcfa9742fe166100bf851e8d2490209c55aeba18dca073 (kept on the lab PC); company_number -> <redacted: company number> in 4 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/008-p3-build1.json: original 6023 B sha256 f3afb4b9586e5de73e3815d173f16e2c02ec144ac08d9ae488e12107304fba50 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/010-p3-verify.json: original 7607 B sha256 06f853048816d81ab278d738a09f019e346b50c3e6f3b63889cbf52845db2923 (kept on the lab PC); company_number -> <redacted: company number> in 4 place(s), found by a JSON parser, nested JSON text included
+data/agent-import-ledger.jsonl: original 4555 B sha256 a9c2a838b03d3b85cdf6babe83c3ee8360da48fb4b3a22ab72c2721a63eba54d (kept on the lab PC); company_number -> <redacted: company number> in 3 place(s), found by a JSON parser, nested JSON text included
+data/imports/bridge-40498869-1272-42fe-86fa-1e446aa75938.proof.20261111T133641244Z.397c04a52ad8384f8d7f976e5556081a8e40dfb2b9977369ea6426cc02dc5faa.json: original 2984 B sha256 397c04a52ad8384f8d7f976e5556081a8e40dfb2b9977369ea6426cc02dc5faa (kept on the lab PC); company_number -> <redacted: company number> in 1 place(s), found by a JSON parser, nested JSON text included
+data/imports/bridge-ccb399de-9a6b-419e-9262-bfbcb717e6d5.proof.20261111T133936564Z.cb911cd8e013f09c85e43272fbcbe5bfceaec40cac5a0e6cb7460b59e8e3c57d.json: original 2984 B sha256 cb911cd8e013f09c85e43272fbcbe5bfceaec40cac5a0e6cb7460b59e8e3c57d (kept on the lab PC); company_number -> <redacted: company number> in 1 place(s), found by a JSON parser, nested JSON text included
+data/imports/bridge-cf17ad15-a81e-45fb-a207-233ba1addd70.proof.20261111T133816442Z.fc100ce0db2b335268bf977d2de1751d62d884e3da7cc03d014eb77d417d458a.json: original 2984 B sha256 fc100ce0db2b335268bf977d2de1751d62d884e3da7cc03d014eb77d417d458a (kept on the lab PC); company_number -> <redacted: company number> in 1 place(s), found by a JSON parser, nested JSON text included
+evidence/bk-before-listing.txt: original 230 B sha256 aeeb89b93a3b6d0259eef1ccc108c960804c5f63d09881f9952236d3d29a75f0 (kept on the lab PC); 2 x -> \1 links=\2 \3 group=\4 size=\5 ; 2 x user name -> <user>
+evidence/c10-netstat.txt: original 7754 B sha256 0744c9d2f6de056158b99403553040094c629b483eaa321717e55096fa6d6466 (kept on the lab PC); cut to the port-9001 LISTENING lines
+evidence/notes.txt: original 13324 B sha256 654f2bb839aa859adb0102105ade60027067959a2f3aa166fd0f8703059a4eeb (kept on the lab PC); 1 x -> <Tally data folder>; 1 x -> stop; 2 x -> decision; 2 x -> "status=200, bytes=51"
+evidence/s0-netstat.txt: original 7542 B sha256 bc917716729bac73d798d6606994570e93610a5cc02a9cc87e56864880b4f91e (kept on the lab PC); cut to the port-9001 LISTENING lines
+scripts/client.py: original 4687 B sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (kept on the lab PC); 1 x -> lab-client; 3 x -> stop
+scripts/step0.py: original 2788 B sha256 9e836530ee44f8650af70726d003492d7ef29936b06639cb23450a80decb7f5e (kept on the lab PC); 1 x -> <lab folder>
+scripts/shot.sh: original 431 B sha256 87e64dd774ea3bdab997fd15dd4dc9d4cba99c0fdac3bb97793682759eb9f23b (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/send.sh: original 901 B sha256 ad926362d973d788c2423f21bd89eba973652c744cb9cb5b71ebddfa01cdccbc (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/send-w.sh: original 1143 B sha256 35a453c3a2a35d87985bc2e8f6fa04c729f44691415200398344032f48d8fc65 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> decision
+scripts/note.py: original 489 B sha256 d0503ec4367f4ecf21ba821f3151171b028e0185c667a284d45952c9cb0ea31f (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/ledgers.py: original 2213 B sha256 a3dc8ced0ccdcfae8d78bee71209340f95b68568dd12ddba86077845b3dd57d7 (kept on the lab PC); 3 x -> stop
+scripts/impfile.py: original 2427 B sha256 f36b52914dabf33117bd7c11efc3c55ea5979255e5ad57cc9d5006836fd1eb61 (kept on the lab PC); 2 x -> stop
+scripts/impans.py: original 2281 B sha256 c97f4cd052d6b6be6d6e40527352b0e00ca68a4034c6e1a4dc97ccb8a3411340 (kept on the lab PC); 2 x -> stop
+scripts/dayread.py: original 3293 B sha256 053a6e2cee2f971ff429ca7ef07ebac19224c93281b200b2867e16f82a3f3e46 (kept on the lab PC); 4 x -> stop
+scripts/prep-c6.py: original 3241 B sha256 05e53c86f2013d77fdcb7a29b1555cfa873de0f0bdc914ac659e5af42422a8dc (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> <Tally data folder>
+scripts/mk-run8.py: original 1183 B sha256 267edf4de18214fa07ca551cb1b3fcb6eeb179eb5df72676374a8c19dc83b784 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> decision
+scripts/fix-bk-line.py: original 700 B sha256 9d932cd44b03a7093a6c06796371fe8e7df7484c17f99c732e3d90316cfe46ec (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/mk-row.py: original 2398 B sha256 5cb72ebbc83508176937d2fdb68ae35224219cf9de45e673576dea8ec48bc542 (kept on the lab PC); 1 x -> <SHEET_DIR>; 3 x -> <LAB_DIR>; 1 x -> <ROW_2507T_DIR>

@@ -28,7 +28,7 @@ The build is the Windows bundle `unsigned-bundle-smoke-windows-latest` of a Brid
 
 It sends those three hashes to the run coordinator, who fills the line below by a new commit on this branch, after checking that the merge of #2407 is an ancestor of RC COMMIT. While any field reads `<to fill>`, this row does not run: STOP. Before the first call, hash the exe that will run and compare it with the line; any other hash = STOP. Record the version the tool reports.
 
-RC COMMIT: <to fill>  CI RUN: <to fill>  ARTIFACT: <to fill>  ZIP DIGEST: <to fill>  EXE SHA256: <to fill>
+RC COMMIT: 06268abe63d659a605ca2592ee4d0a2d65eba0ea  CI RUN: the Bridge CI `merge_group` run of #2500 at that commit, conclusion success (its id is written in words only, in `notes.txt` as fetched)  ARTIFACT: `unsigned-bundle-smoke-windows-latest` of that run, 60,519,571 bytes, expires 18 Nov 2026  ZIP DIGEST: sha256:ea1068f80898b1c0369cceb83cf991e4911cdac9fb8ee56de53f9b5842a8c0de  EXE SHA256: 507da806d9d49a72fdb144be3263e6b1c303bfc964b103616b0ea92ee7b02bf6
 
 Run it as the lab runs a staged exe over stdio, ONE launch from step 0 to the close, never relaunched in between. Environment:
 - `BRIDGE_TALLY_HOST=127.0.0.1` and `BRIDGE_TALLY_PORT=9001`;

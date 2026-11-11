@@ -11373,7 +11373,7 @@
   "what": "loans_interest: the loan rows read a ledger on a nil line as another ledger of the voucher",
   "file": "src/loans_interest.rs",
   "from": "        let others = posted_others_than(v, loan_ledger);",
-  "to": "        let others = others_than(v, loan_ledger);"
+  "to": "        let others = v.lines.iter().filter(|l| &l.ledger != loan_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>();"
  },
  {
   "id": "L1259-02",
@@ -11397,7 +11397,7 @@
   "what": "loans_interest: LOAN-3 re-derives a paired loan's interest journals with a nil line's ledger among the rest",
   "file": "src/loans_interest.rs",
   "from": "                        let rest: Vec<&str> = posted_others_than(v, loan)",
-  "to": "                        let rest: Vec<&str> = others_than(v, loan)"
+  "to": "                        let rest: Vec<&str> = v.lines.iter().filter(|l| &l.ledger != loan).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>()"
  },
  {
   "id": "L1259-05",
@@ -11589,7 +11589,7 @@
   "what": "loans_interest: the TDS-journal test reads the ledgers on nil lines (the reference's reads those on lines with an amount)",
   "file": "src/loans_interest.rs",
   "from": "            && others\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n",
-  "to": "            && others_than(v, loan_ledger)\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n"
+  "to": "            && v.lines.iter().filter(|l| &l.ledger != loan_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>()\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n"
  },
  {
   "id": "L1259-30",
@@ -15453,7 +15453,7 @@
   "what": "loans_interest: charge_shaped reads the ledgers on nil lines again (#1875 item 1)",
   "file": "src/loans_interest.rs",
   "from": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)",
-  "to": "            let counter: Vec<&str> = others_than(v, loan_ledger)"
+  "to": "            let counter: Vec<&str> = v.lines.iter().filter(|l| &l.ledger != loan_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>()"
  },
  {
   "id": "L1875-2",
@@ -15478,6 +15478,30 @@
   "file": "src/loans_interest.rs",
   "from": "                    .any(|l| paired.contains(l.ledger.as_str()) && l.amount_paise != 0)",
   "to": "                    .any(|l| paired.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "L2242-1",
+  "by": "author",
+  "what": "loans_interest: the shared-interest pairing on the figure side reads the ledgers on nil lines again (#2242 site 1)",
+  "file": "src/loans_interest.rs",
+  "from": "            let others = posted_others_than(v, il);",
+  "to": "            let others = v.lines.iter().filter(|l| &l.ledger != il).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>();"
+ },
+ {
+  "id": "L2242-2",
+  "by": "author",
+  "what": "loans_interest: LOAN-3's re-derivation of the shared-interest pairing reads the ledgers on nil lines again (#2242 site 2)",
+  "file": "src/loans_interest.rs",
+  "from": "                            posted_others_than(v, interest_ledger),",
+  "to": "                            v.lines.iter().filter(|l| &l.ledger != interest_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>(),"
+ },
+ {
+  "id": "L2242-3",
+  "by": "author",
+  "what": "loans_interest: LOAN-2 (A) reads the ledgers on nil lines again when it asks about an entry on a loan (#2242 site 3)",
+  "file": "src/loans_interest.rs",
+  "from": "            let others = posted_others_than(v, loan);",
+  "to": "            let others = v.lines.iter().filter(|l| &l.ledger != *loan).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>();"
  },
  {
   "id": "TBM-01",

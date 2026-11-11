@@ -242,16 +242,8 @@ fn net_on(v: &Voucher, ledgers: &BTreeSet<String>) -> i128 {
         .sum()
 }
 
-fn others_than<'a>(v: &'a Voucher, ledger: &str) -> BTreeSet<&'a str> {
-    v.lines
-        .iter()
-        .filter(|l| l.ledger != ledger)
-        .map(|l| l.ledger.as_str())
-        .collect()
-}
-
-/// [`others_than`] without the ledgers on nil lines: a ledger on a nil line is no posting
-/// (bridge#1259 item 3, as `two_sided` and the loan listing read it).
+/// The ledgers on a voucher other than `ledger`, without those on nil lines: a ledger on a nil
+/// line is no posting (bridge#1259 item 3, as `two_sided` and the loan listing read it).
 fn posted_others_than<'a>(v: &'a Voucher, ledger: &str) -> BTreeSet<&'a str> {
     v.lines
         .iter()
@@ -3148,7 +3140,7 @@ fn shared_interest(
             if cited.contains(&at) || v.base_type == "Contra" {
                 continue;
             }
-            let others = others_than(v, il);
+            let others = posted_others_than(v, il);
             for (i, l) in v.lines.iter().enumerate() {
                 if l.ledger != *il || l.amount_paise == 0 {
                     continue;
@@ -3902,7 +3894,7 @@ or from another ledger, so part of what is counted as interest is principal or s
         let mut cited = voucher_ids(fig);
         cited.extend(listed_sides(h, "credit").into_keys());
         for v in &pop {
-            let others = others_than(v, loan);
+            let others = posted_others_than(v, loan);
             if v.base_type == "Contra"
                 || cited.contains(&v.guid)
                 || mis_cited.contains(&v.guid)
@@ -4163,7 +4155,7 @@ are {debit_pop}p",
                             (&v.date, n, i),
                             n,
                             i128::from(l.amount_paise),
-                            others_than(v, interest_ledger),
+                            posted_others_than(v, interest_ledger),
                         ));
                     }
                 }
@@ -5021,6 +5013,189 @@ which does not both credit and debit the loan in the books population."
         assert_eq!(
             count(&[("Loan A", -2_500_000), ("Office Charges", 2_500_000)]),
             Some(Value::Int(1))
+        );
+    }
+
+    // #2242: a ledger on a nil line is no posting where a shared interest ledger's reversal is
+    // paired with its debit (the figure side and LOAN-3's re-derivation) and where LOAN-2 (A)
+    // re-derives the entries the misposted-interest finding cites. A declared difference from the
+    // reference (parity spec §12, #1998): the reference still reads the nil line's ledger there.
+
+    const SHARED_BOOK: [(&str, &str); 3] = [
+        ("Interest S", "Indirect Expenses"),
+        ("Bank A", "Bank Accounts"),
+        ("Suspense", "Suspense A/c"),
+    ];
+
+    fn on_day(day: &str, mut v: Voucher) -> Voucher {
+        v.date = TallyDate::parse(day.to_string()).unwrap();
+        v
+    }
+
+    /// `run_loans` with the reversal rule switched on, which is dormant in the shipped rule
+    /// ([`NET_REVERSALS`]), and the module check under the same switch.
+    fn shared_figures(
+        debit: &[(&str, i64)],
+        credit: &[(&str, i64)],
+    ) -> ([Option<Value>; 4], Vec<String>) {
+        let mut b = book_with(
+            vec![
+                on_day("20250630", journal_of("j1", debit)),
+                on_day("20250731", journal_of("j2", credit)),
+            ],
+            &SHARED_BOOK,
+        );
+        // The trial balance row LOAN-3 ties the ledger's debits to: every book here debits the
+        // shared ledger once, by 10,000,000p.
+        b.tb.insert(
+            "Interest S".to_string(),
+            crate::book::TbRow {
+                opening_paise: 0,
+                debit_paise: 10_000_000,
+                credit_paise: 0,
+                closing_paise: 10_000_000,
+            },
+        );
+        let rules = Rules::vendored().unwrap();
+        let loans = loan_config(&table(ONE_LOAN)).unwrap();
+        let (cash, bank, tds, shared) = (
+            names(&["Cash"]),
+            names(&["Bank A"]),
+            names(&[]),
+            names(&["Interest S"]),
+        );
+        let r = run_with(
+            &b,
+            &rules,
+            "firm",
+            &loans,
+            &Inputs {
+                previous_year_turnover_paise: None,
+                cash: &cash,
+                bank: &bank,
+                shared_interest_ledgers: &shared,
+                tds_payable_ledgers: &tds,
+                deductor_activity: None,
+                turnover_is_placeholder: false,
+            },
+            true,
+        )
+        .unwrap();
+        let get = |name: &str| figure(&r, &b, name, "Interest S");
+        (
+            [
+                get("shared_interest_unpaired_debits"),
+                get("shared_interest_reversed_credits"),
+                get("shared_interest_unmatched_credits"),
+                get("shared_interest_unattributed"),
+            ],
+            check_invariants_with(&b, &r, true)
+                .unwrap()
+                .into_iter()
+                .filter(|l| l.starts_with("LOAN-3"))
+                .collect(),
+        )
+    }
+
+    fn paise_figures(f: [i64; 4]) -> [Option<Value>; 4] {
+        f.map(|x| Some(Value::Int(x)))
+    }
+
+    const J1: [(&str, i64); 2] = [("Interest S", 10_000_000), ("Bank A", -10_000_000)];
+    const J2: [(&str, i64); 2] = [("Interest S", -10_000_000), ("Bank A", 10_000_000)];
+
+    /// The control: the pair matches with no nil line. A nil line on the credit's voucher, on the
+    /// debit's, or on different ledgers on each, pairs them the same way, and LOAN-3 agrees.
+    #[test]
+    fn a_nil_line_does_not_stop_a_shared_interest_reversal_from_pairing() {
+        let matched = paise_figures([10_000_000, 10_000_000, 0, 0]);
+        fn with_nil<'a>(base: [(&'a str, i64); 2], ledger: &'a str) -> Vec<(&'a str, i64)> {
+            let mut lines = base.to_vec();
+            lines.push((ledger, 0));
+            lines
+        }
+        for (debit, credit) in [
+            (J1.to_vec(), J2.to_vec()),
+            (J1.to_vec(), with_nil(J2, "Suspense")),
+            (with_nil(J1, "Suspense"), J2.to_vec()),
+            (with_nil(J1, "Suspense"), with_nil(J2, "Cash")),
+        ] {
+            let (figures, loan_3) = shared_figures(&debit, &credit);
+            assert_eq!(figures, matched, "{debit:?} / {credit:?}");
+            assert!(loan_3.is_empty(), "{debit:?} / {credit:?}: {loan_3:?}");
+        }
+    }
+
+    /// The nil line pairs what the other conditions allow and nothing more: a credit of another
+    /// amount is unmatched, and a credit against another posted ledger is unmatched.
+    #[test]
+    fn a_nil_line_pairs_no_reversal_the_other_conditions_refuse() {
+        let (figures, loan_3) = shared_figures(
+            &J1,
+            &[
+                ("Interest S", -9_000_000),
+                ("Bank A", 9_000_000),
+                ("Suspense", 0),
+            ],
+        );
+        assert_eq!(
+            figures,
+            paise_figures([10_000_000, 0, 9_000_000, 10_000_000])
+        );
+        assert!(loan_3.is_empty(), "{loan_3:?}");
+        let (figures, loan_3) = shared_figures(
+            &J1,
+            &[
+                ("Interest S", -10_000_000),
+                ("Cash", 10_000_000),
+                ("Suspense", 0),
+            ],
+        );
+        assert_eq!(
+            figures,
+            paise_figures([10_000_000, 0, 10_000_000, 10_000_000])
+        );
+        assert!(loan_3.is_empty(), "{loan_3:?}");
+    }
+
+    /// LOAN-2 (A): an entry on Loan Q against only Loan P's interest ledger, beside a nil line on a
+    /// ledger that is no interest ledger, is one the misposted-interest finding cites. With that
+    /// citation taken out, the check names it, as it does without the nil line.
+    #[test]
+    fn loan_2_a_reads_a_nil_line_as_no_posting_when_it_asks_about_an_entry() {
+        let two_loans = "[\"Loan P\"]\nlender = \"p\"\nlender_type = \"person\"\n\
+                         interest_ledger = \"Interest P\"\n\
+                         [\"Loan Q\"]\nlender = \"q\"\nlender_type = \"person\"\n\
+                         interest_ledger = \"Interest Q\"\n";
+        let ledgers = [
+            ("Loan P", "Unsecured Loans"),
+            ("Loan Q", "Unsecured Loans"),
+            ("Interest P", "Indirect Expenses"),
+            ("Interest Q", "Indirect Expenses"),
+            ("Suspense", "Suspense A/c"),
+        ];
+        let named = |lines: &[(&str, i64)]| -> usize {
+            let b = book_with(vec![journal_of("m1", lines)], &ledgers);
+            let mut r = run_loans(&b, two_loans, &[], &[]);
+            let h = stable_ledger_tag(&b, "Loan Q").unwrap();
+            let id = format!("{TEST_ID}.possible_misposted_interest_{h}");
+            if let Some(f) = r.figures.iter_mut().find(|f| f.id == id) {
+                f.evidence.retain(|e| e.kind != "voucher");
+            }
+            check_invariants(&b, &r)
+                .unwrap()
+                .iter()
+                .filter(|l| l.starts_with("LOAN-2: voucher") && l.contains("does not cite it"))
+                .count()
+        };
+        let entry = [("Interest P", 1_000_000), ("Loan Q", -1_000_000)];
+        let mut with_nil = entry.to_vec();
+        with_nil.push(("Suspense", 0));
+        assert_eq!(named(&entry), 1, "the control");
+        assert_eq!(
+            named(&with_nil),
+            1,
+            "a nil line on a ledger that is no interest ledger"
         );
     }
 }

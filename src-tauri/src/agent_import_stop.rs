@@ -72,7 +72,7 @@ impl Seen {
         let invoices = line
             .vouchers
             .iter()
-            .filter(|voucher| voucher.voucher_type.is_invoice())
+            .filter(|voucher| voucher.voucher_type.invoice_class().is_some())
             .collect::<Vec<_>>();
         let [invoice] = invoices.as_slice() else {
             return missing();
@@ -280,7 +280,7 @@ pub(super) fn release_preview(line: &ImportLedgerLine, seen: &Seen) -> String {
     let invoices = line
         .vouchers
         .iter()
-        .filter(|voucher| voucher.voucher_type.is_invoice())
+        .filter(|voucher| voucher.voucher_type.invoice_class().is_some())
         .map(|voucher| {
             format!(
                 "  {} dated {}",

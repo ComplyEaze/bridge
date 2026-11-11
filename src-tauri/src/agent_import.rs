@@ -242,7 +242,9 @@ impl<D: PayloadDate> ImportVoucher<D> {
     /// What a read-back must find, and what a render writes.
     fn filed_type_name(&self) -> &str {
         match &self.invoice {
-            Some(detail) if self.voucher_type.is_invoice() => &detail.voucher_type_name,
+            Some(detail) if self.voucher_type.invoice_class().is_some() => {
+                &detail.voucher_type_name
+            }
             _ => self.voucher_type.as_str(),
         }
     }
@@ -264,7 +266,7 @@ impl<D: PayloadDate> ImportVoucher<D> {
     /// type the build held to Manual with duplicates prevented.
     fn numbering_at_post(&self) -> (&str, post::numbering::OwnNumber) {
         match self.numbering_at_build() {
-            invoice if self.voucher_type.is_invoice() => invoice,
+            invoice if self.voucher_type.invoice_class().is_some() => invoice,
             (filed, _) => (filed, post::numbering::OwnNumber::Absent),
         }
     }
@@ -347,11 +349,34 @@ impl VoucherType {
         }
     }
 
-    /// A GST invoice: a party leg, a sales or purchase leg and tax legs, with
-    /// an invoice view. It shares nothing of the bank shape and is refused
-    /// beside any other shape.
-    fn is_invoice(&self) -> bool {
-        matches!(self, Self::Sales)
+    /// The invoice class of a GST invoice: a party leg, a sales or purchase
+    /// leg and tax legs, with an invoice view. It shares nothing of the bank
+    /// shape and is refused beside any other shape. `None` for every other
+    /// type. The match names each type, so a type added later is placed here
+    /// by the compiler, not by a default (#2346).
+    fn invoice_class(&self) -> Option<InvoiceClass> {
+        match self {
+            Self::Sales => Some(InvoiceClass::Sales),
+            Self::Payment | Self::Receipt | Self::Journal | Self::Contra => None,
+        }
+    }
+}
+
+/// The reserved class an invoice is built in, carried as a value from the
+/// voucher type to the type resolver and the number's month reads (#2346).
+/// Sales is the one class built today.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum InvoiceClass {
+    Sales,
+}
+
+impl InvoiceClass {
+    /// The reserved voucher class whose name the type resolver walks to and
+    /// whose `$$Is<Class>` compute the number reads carry (§8.2e).
+    pub(super) const fn reserved(self) -> super::voucher_type_class::ReservedVoucherClass {
+        match self {
+            Self::Sales => super::voucher_type_class::ReservedVoucherClass::Sales,
+        }
     }
 }
 
@@ -1466,7 +1491,7 @@ impl Server {
         if payload
             .vouchers
             .iter()
-            .any(|voucher| voucher.voucher_type.is_invoice())
+            .any(|voucher| voucher.voucher_type.invoice_class().is_some())
             && !self.settings.posting.enabled()
         {
             return Err(INVOICE_POST_NOT_ENABLED.to_string().into());
@@ -1514,7 +1539,7 @@ impl Server {
             // the named voucher type, the party's bill-wise flag, the company's
             // state), classifies every leg from them and records what it saw on
             // the voucher. A journal-only or bank batch never takes this path.
-            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice()) {
+            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.invoice_class().is_some()) {
                 match self
                     .admit_sales_invoice(&identity, &company, &mut payload.vouchers[0], &ledger_masters)
                     .await
@@ -1627,7 +1652,7 @@ impl Server {
             })?;
             // The admission above read the stop before this lock; a post may
             // have gone out since. No file is written for a stopped company.
-            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())
+            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.invoice_class().is_some())
                 && self
                     .import_invoice_stop_while_admitted(&payload.company_guid)?
                     .is_some()
@@ -4052,7 +4077,7 @@ const ROWS_IN_BOOK_NEXT_STEP: &str = "Do not post or import this batch yet: the 
 fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
     line.vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice())
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
 }
 
 /// Why no file was written for a row another batch already sent (#876), and what
@@ -4501,7 +4526,7 @@ fn live_evidence(vouchers: &[ImportVoucher]) -> Vec<Value> {
     let mut sources = BTreeMap::<(&str, &str), BTreeSet<&str>>::new();
     for voucher in vouchers {
         let source = match voucher.voucher_type.bank_shape() {
-            None if voucher.voucher_type.is_invoice() => (
+            None if voucher.voucher_type.invoice_class().is_some() => (
                 "hand_keyed_reads_and_hand_imports_not_bridge_posted",
                 "docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md",
             ),
@@ -4580,7 +4605,7 @@ fn refuse_mixed_shapes<D: PayloadDate>(vouchers: &[ImportVoucher<D>]) -> Result<
     // numbering and its party are read for that one voucher.
     let invoices = vouchers
         .iter()
-        .filter(|voucher| voucher.voucher_type.is_invoice())
+        .filter(|voucher| voucher.voucher_type.invoice_class().is_some())
         .count();
     if invoices > 0 && invoices != vouchers.len() {
         return Err("voucher_type_shapes_mixed".to_string());
@@ -5829,7 +5854,7 @@ fn render_voucher_xml(
         .as_deref()
         .map(|value| format!("<VOUCHERNUMBER>{}</VOUCHERNUMBER>", xml_escape(value)))
         .unwrap_or_default();
-    if voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_some() {
         let date = voucher.date.as_str().to_string();
         // An invoice reaches here only after the build recorded what it
         // observed (`admit_saved_voucher_integrity` refuses one that has not).

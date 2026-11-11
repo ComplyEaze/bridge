@@ -638,7 +638,7 @@ pub(super) fn refuse_supplied_observed<D: super::PayloadDate>(
 pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(), String> {
     if vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice())
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
     {
         return Err("invoice_amendment_not_supported".to_string());
     }
@@ -648,7 +648,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
 pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
-    if !voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_none() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
             None => Ok(()),
@@ -1151,7 +1151,7 @@ impl super::super::Server {
         let Some(voucher) = line
             .vouchers
             .iter()
-            .find(|voucher| voucher.voucher_type.is_invoice())
+            .find(|voucher| voucher.voucher_type.invoice_class().is_some())
         else {
             return Ok(None);
         };
@@ -1182,7 +1182,7 @@ pub(super) fn queued_invoice_for<'a>(
 > {
     let invoiced = vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice());
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some());
     match (invoiced, invoice, control, vouchers) {
         (false, None, None, _) => Ok(None),
         (true, Some(queued), Some(control), [voucher]) => Ok(Some((voucher, queued, control))),
@@ -1781,7 +1781,8 @@ impl super::super::Server {
             return only("invoice_readback_book_too_large", mark_evidence);
         }
         let date = voucher.date.as_str();
-        let (Some(year), Some(type_guid), Some(number)) = (
+        let (Some(class), Some(year), Some(type_guid), Some(number)) = (
+            voucher.voucher_type.invoice_class(),
             financial_year_window(date),
             VoucherTypeGuid::parse(&observed.voucher_type_guid),
             voucher
@@ -1820,6 +1821,7 @@ impl super::super::Server {
                     for month in &months {
                         let request = super::super::invoice_window_numbers_read(
                             &company.name,
+                            class,
                             (&month.0, &month.1),
                         );
                         match self.post_read(identity, request).await {
@@ -1845,6 +1847,7 @@ impl super::super::Server {
             } else {
                 differences.extend(wire::number_after_post_difference(
                     &answers,
+                    class,
                     number.as_str(),
                     posted_type.as_deref(),
                 ));
@@ -1957,9 +1960,7 @@ pub(super) fn party_bill_wise_in(
 /// of the customer's bills.
 pub(super) fn new_ref_party(voucher: &ImportVoucher) -> Option<&str> {
     // Only an invoice has one, whatever detail another voucher may carry.
-    if !voucher.voucher_type.is_invoice() {
-        return None;
-    }
+    voucher.voucher_type.invoice_class()?;
     let detail = voucher.invoice.as_ref()?;
     if !detail.observed.as_ref()?.party_bill_wise {
         return None;
@@ -2222,6 +2223,7 @@ impl InvoiceJudge<'_> {
                     .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))?;
                 admitted(super::super::invoice_window_numbers_read(
                     company,
+                    self.class()?,
                     (&month.0, &month.1),
                 ))
             }
@@ -2231,6 +2233,15 @@ impl InvoiceJudge<'_> {
             },
             Need::Marks | Need::Listing => Err(unusable("invoice_read_plan_inconsistent")),
         }
+    }
+
+    /// The invoice's class, from its voucher type. A judge is made only for
+    /// an invoice, so `None` is a plan that cannot be (#2346).
+    fn class(&self) -> Result<super::InvoiceClass, Verdict> {
+        self.voucher
+            .voucher_type
+            .invoice_class()
+            .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))
     }
 
     /// The invoice's number, parsed once: the month reads compare it after
@@ -2272,6 +2283,7 @@ impl InvoiceJudge<'_> {
             .ok_or_else(unreadable)?;
         admitted(super::super::invoice_window_numbers_read(
             self.identity.display_name(),
+            self.class()?,
             (&month.0, &month.1),
         ))
         .map(Some)
@@ -2406,7 +2418,8 @@ impl InvoiceJudge<'_> {
         };
         let types = wire::parse_voucher_types(types_body)
             .map_err(|code| Verdict::Failed(code.to_string()))?;
-        let resolved = wire::resolve_voucher_type(&types, &type_name, "Sales")
+        let class = self.class()?;
+        let resolved = wire::resolve_voucher_type(&types, &type_name, class.reserved())
             .map_err(|code| refusing(refuse_value(code, &type_name)))?;
 
         // 3b. The number must not already be in use on a Sales-class voucher
@@ -2418,8 +2431,9 @@ impl InvoiceJudge<'_> {
         let number = number.as_str();
         let months = self.months()?;
         for body in &answers.number {
-            if let wire::NumberHolding::Held { with_irn } = wire::number_holding(body, number)
-                .map_err(|code| Verdict::Failed(code.to_string()))?
+            if let wire::NumberHolding::Held { with_irn } =
+                wire::number_holding(body, class, number)
+                    .map_err(|code| Verdict::Failed(code.to_string()))?
             {
                 let code = if with_irn {
                     "invoice_number_already_used_with_irn"
@@ -2457,10 +2471,10 @@ impl InvoiceJudge<'_> {
                         None => return Err(Verdict::Need(Need::NumberControl)),
                     },
                 };
-                if !wire::control_row_found(control_body, known, date)
+                if !wire::control_row_found(control_body, class, known, date)
                     .map_err(|code| Verdict::Failed(code.to_string()))?
                 {
-                    let miss = wire::control_miss(control_body, guid.as_deref())
+                    let miss = wire::control_miss(control_body, class, guid.as_deref())
                         .map_err(|code| Verdict::Failed(code.to_string()))?;
                     return Err(refusing(InvoiceRefusal {
                         code: "invoice_number_control_missing",

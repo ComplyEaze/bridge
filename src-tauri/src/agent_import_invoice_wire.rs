@@ -18,7 +18,9 @@
 //! GST registration, each GUID the company's GUID with a suffix, the
 //! registration's dated rows under `GSTREGISTRATIONDETAILS.LIST`.
 
+use super::super::super::voucher_type_class::ReservedVoucherClass;
 use super::super::verification::folded_number;
+use super::super::InvoiceClass;
 use super::InvoiceNumber;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
@@ -334,7 +336,7 @@ pub(super) fn parse_voucher_types(xml: &str) -> Result<Vec<VoucherTypeRow>, &'st
 pub(super) fn resolve_voucher_type(
     types: &[VoucherTypeRow],
     name: &str,
-    class: &str,
+    class: ReservedVoucherClass,
 ) -> Result<ResolvedVoucherType, &'static str> {
     let named = types
         .iter()
@@ -366,7 +368,7 @@ pub(super) fn resolve_voucher_type(
             _ => return Err("invoice_voucher_type_parent_ambiguous"),
         };
     };
-    if reached != class {
+    if reached != class.name() {
         return Err("invoice_voucher_type_wrong_class");
     }
     // The GUID goes into the read-back's formula: checked here, at the build,
@@ -442,6 +444,8 @@ pub(in crate::agent) fn render_invoice_number_request(
     (from, to): (&TallyDate, &TallyDate),
 ) -> String {
     let (number, from, to) = (number.as_str(), from.as_str(), to.as_str());
+    // The one-number captures this request is pinned to were Sales.
+    let compute = class_compute(InvoiceClass::Sales);
     let static_variables = static_variables_for_unvalidated_company(
         company,
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
@@ -450,7 +454,7 @@ pub(in crate::agent) fn render_invoice_number_request(
         ),
     );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH>{compute}<FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -466,9 +470,11 @@ pub(in crate::agent) fn render_invoice_number_request(
 /// year and for a whole year (`lab/2162-s7-sheet` at b63accd9).
 pub(in crate::agent) fn render_invoice_window_numbers_request(
     company: &str,
+    class: InvoiceClass,
     (from, to): (&TallyDate, &TallyDate),
 ) -> String {
     let (from, to) = (from.as_str(), to.as_str());
+    let compute = class_compute(class);
     let static_variables = static_variables_for_unvalidated_company(
         company,
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
@@ -477,7 +483,7 @@ pub(in crate::agent) fn render_invoice_window_numbers_request(
         ),
     );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH>{compute}<FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -511,17 +517,26 @@ pub(in crate::agent) fn calendar_months(
     Some(months)
 }
 
-/// The element the Sales class compute answers in (the name the voucher reads
-/// already use).
-const SALES_CLASS_TAG: &str = "BRIDGEVCHISSALES";
+/// The number reads' per-row class compute: the class's `$$Is<Class>` of the
+/// row's voucher type, answered in the element the voucher reads already use
+/// for that class (bridge#625, §8.2e). For Sales it is
+/// `BRIDGEVCHISSALES:$$IsSales:$VoucherTypeName`.
+fn class_compute(class: InvoiceClass) -> String {
+    let class = class.reserved();
+    format!(
+        "<COMPUTE>{}:{}:$VoucherTypeName</COMPUTE>",
+        class.tag(),
+        class.function()
+    )
+}
 
-/// The returned vouchers that are Sales-class. A row whose class element is
+/// The returned vouchers of the invoice's class. A row whose class element is
 /// missing or is neither Yes nor No is an error: an unknown function omits its
 /// element, so a gap is never a No.
-fn sales_rows(xml: &str) -> Result<Vec<Row>, &'static str> {
+fn class_rows(xml: &str, class: InvoiceClass) -> Result<Vec<Row>, &'static str> {
     let mut sales = Vec::new();
     for row in rows(xml, "VOUCHER")? {
-        match row.one(SALES_CLASS_TAG)? {
+        match row.one(class.reserved().tag())? {
             Some("Yes") => sales.push(row),
             Some("No") => {}
             _ => return Err("invoice_number_class_unread"),
@@ -553,8 +568,12 @@ pub(super) enum GuidSeen {
     },
 }
 
-pub(super) fn control_miss(xml: &str, guid: Option<&str>) -> Result<ControlMiss, &'static str> {
-    let sales_rows = sales_rows(xml)?.len();
+pub(super) fn control_miss(
+    xml: &str,
+    class: InvoiceClass,
+    guid: Option<&str>,
+) -> Result<ControlMiss, &'static str> {
+    let sales_rows = class_rows(xml, class)?.len();
     let guid = match guid {
         None => None,
         Some(guid) => {
@@ -590,10 +609,14 @@ pub(super) enum NumberHolding {
     Held { with_irn: bool },
 }
 
-pub(super) fn number_holding(xml: &str, number: &str) -> Result<NumberHolding, &'static str> {
+pub(super) fn number_holding(
+    xml: &str,
+    class: InvoiceClass,
+    number: &str,
+) -> Result<NumberHolding, &'static str> {
     let wanted = folded_number(number);
     let mut holding = NumberHolding::Unheld;
-    for row in sales_rows(xml)? {
+    for row in class_rows(xml, class)? {
         let held = row.one("VOUCHERNUMBER")?.and_then(folded_number);
         if wanted.is_some() && held == wanted {
             let with_irn = row.one("IRN")?.is_some();
@@ -618,6 +641,7 @@ pub(super) fn number_holding(xml: &str, number: &str) -> Result<NumberHolding, &
 /// A month or row that cannot be read is a difference, never a pass (P3).
 pub(super) fn number_after_post_difference(
     months: &[String],
+    class: InvoiceClass,
     number: &str,
     posted_type: Option<&str>,
 ) -> Option<String> {
@@ -626,7 +650,7 @@ pub(super) fn number_after_post_difference(
     let wanted = folded_number(number);
     let mut holders = Vec::new();
     for xml in months {
-        let sales = match sales_rows(xml) {
+        let sales = match class_rows(xml, class) {
             Ok(sales) => sales,
             Err(unread) => return Some(unread.to_owned()),
         };
@@ -675,16 +699,21 @@ pub(super) fn number_after_post_difference(
 /// carrying exactly that number and that date, read as Sales class. Any other
 /// row is not the control, and a row whose class cannot be read is an error,
 /// as for the read it controls.
-pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<bool, &'static str> {
+pub(super) fn control_row_found(
+    xml: &str,
+    class: InvoiceClass,
+    number: &str,
+    date: &str,
+) -> Result<bool, &'static str> {
     let mut found = false;
     for row in rows(xml, "VOUCHER")? {
-        let class = match row.one(SALES_CLASS_TAG)? {
+        let in_class = match row.one(class.reserved().tag())? {
             Some("Yes") => true,
             Some("No") => false,
             _ => return Err("invoice_number_class_unread"),
         };
         found |=
-            class && row.one("VOUCHERNUMBER")? == Some(number) && row.one("DATE")? == Some(date);
+            in_class && row.one("VOUCHERNUMBER")? == Some(number) && row.one("DATE")? == Some(date);
     }
     Ok(found)
 }

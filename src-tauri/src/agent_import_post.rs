@@ -1061,7 +1061,7 @@ impl Server {
             if line
                 .vouchers
                 .iter()
-                .any(|voucher| voucher.voucher_type.is_invoice())
+                .any(|voucher| voucher.voucher_type.invoice_class().is_some())
             {
                 let (evidence, plan) = Box::pin(self.recheck_sales_invoice(
                     &identity,
@@ -1231,7 +1231,7 @@ impl Server {
                     if line
                         .vouchers
                         .iter()
-                        .any(|voucher| voucher.voucher_type.is_invoice())
+                        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
                     {
                         // The catalogue read before the dialog is as old as the
                         // dialog: read it again, so the party's bill-wise flag
@@ -3177,7 +3177,7 @@ pub(super) fn admit_saved_voucher_integrity(
     // An invoice renders only from what its build observed in Tally: one saved
     // without that is not postable, and is never rendered as an empty message.
     if line.vouchers.iter().any(|voucher| {
-        voucher.voucher_type.is_invoice()
+        voucher.voucher_type.invoice_class().is_some()
             && voucher
                 .invoice
                 .as_ref()
@@ -3407,7 +3407,7 @@ fn review_text(
         return batch_review_text(line, company, &origin, &debit, &credit, footer, form);
     }
     let voucher = &line.vouchers[0];
-    if voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_some() {
         return invoice_review_preview(
             line,
             company,

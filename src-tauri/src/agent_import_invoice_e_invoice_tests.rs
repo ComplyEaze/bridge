@@ -120,23 +120,39 @@ fn the_e_invoice_read_is_the_measured_vouchers_read_over_one_date() {
     assert!(vouchers_call.contains("<SVFROMDATE TYPE=\"Date\">20250403</SVFROMDATE>"));
 }
 
-/// The rows of a captured answer on `BRIDGE EINVOICE LAB` (`einvoice-lab-dispatch`, row 2027-D2):
-/// Sales `1` keyed with details, Sales `2` without, and a Payment, read as the e-invoice read's
-/// own parse reads them. DERIVED: this answer is to the class-shape read that also names the GST
-/// words and a voucher type. The read the post sends was answered in full on the same book
-/// (§8.2j), but that answer is not committed, so these tests rest on the three elements, direct
-/// children of `VOUCHER`, coming back the same in both.
-fn captured_rows() -> Vec<Value> {
-    let bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml"
-    );
-    let xml = String::from_utf16(
+/// A captured fixture's text: UTF-16LE, with its byte order mark dropped if it has one.
+fn utf16le(bytes: &[u8]) -> String {
+    let bytes = bytes.strip_prefix(&[0xff, 0xfe]).unwrap_or(bytes);
+    String::from_utf16(
         &bytes
             .chunks_exact(2)
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect::<Vec<_>>(),
     )
-    .expect("UTF-16LE");
+    .expect("UTF-16LE")
+}
+
+/// The request row 2440-ED sent to `BRIDGE EINVOICE LAB` for 3 April 2025 is byte for byte the
+/// e-invoice read this build renders for that book and day, so the answer below is the answer to
+/// this read (`einvoice-lab-readback/PROVENANCE.md`).
+#[test]
+fn the_captured_request_is_the_e_invoice_read() {
+    let date = bridge_tally_core::TallyDate::parse("20250403".to_string()).expect("date");
+    let request =
+        crate::agent::invoice_e_invoice_read("BRIDGE EINVOICE LAB", &date).expect("renders");
+    let sent = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.request.utf16le.xml"
+    ));
+    assert_eq!(request.as_str(), sent);
+}
+
+/// The rows of Tally's answer to that request on `BRIDGE EINVOICE LAB` (row 2440-ED, captured):
+/// Sales `1` keyed with details, Sales `2` with the three elements empty, and a Payment, read by
+/// the e-invoice read's own parse.
+fn captured_rows() -> Vec<Value> {
+    let xml = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml"
+    ));
     super::read_rows(&xml, "eb2f5190-292e-4ed8-bfd3-eace839fe699")
         .expect("the captured answer parses")
 }

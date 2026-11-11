@@ -1,0 +1,6 @@
+2026-11-11T14:02:01.797Z 000-tools-list.json tools/list secs 0.07 bytes 287 isError None
+2026-11-11T14:02:14.125Z 001-tools-list.json list secs 0.022 bytes 243366 isError None
+2026-11-11T14:02:40.661Z 002-list-companies.json list_companies secs 0.08 bytes 1566 isError False
+2026-11-11T14:02:47.130Z 003-s0-marks.json ledger_masters secs 0.759 bytes 4028 isError False
+2026-11-11T14:02:54.651Z 004-s0-vt.json masters secs 0.751 bytes 28947 isError False
+2026-11-11T14:06:10.659Z 005-s07-marks.json ledger_masters secs 0.779 bytes 4028 isError False

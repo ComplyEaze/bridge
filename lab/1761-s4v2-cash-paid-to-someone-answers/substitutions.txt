@@ -1,0 +1,17 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed (no captured byte is altered except a tool answer's company_number value):
+answers-mcp/answers/002-list-companies.json: original 1566 B sha256 b9a84ba1a09c3a451c0c1a3cc8b8acea2df1040e8263df1dc3739583c65dc51b (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/003-s0-marks.json: original 4028 B sha256 dc676988498690534501a4272650282c92ea10aa4182092df3c24eb49341c97f (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+answers-mcp/answers/005-s07-marks.json: original 4028 B sha256 cc952bccf38983ef6d09b434907911e0ffb29e5f6eb3c2fb575d16e9cdb1d340 (kept on the lab PC); company_number -> <redacted: company number> in 2 place(s), found by a JSON parser, nested JSON text included
+args/s1-parse.json: original 274 B sha256 56817229c42e475a86c5299f22f48bac7f12996f7f635327b30d0bd47fbbac77 (kept on the lab PC); 1 x -> <LAB_DIR>
+args/s2-parse.json: original 606 B sha256 18ba426d048c9b8232129d09609f476f50be76ccae68816fea09e25328268b71 (kept on the lab PC); 1 x -> <LAB_DIR>
+args/s3-parse.json: original 597 B sha256 4138b90963a823ba91c1494841f60448f3a2b8ea3a80758efaa21e79ac4cfb99 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/c10-netstat.txt: original 7981 B sha256 8cc035a57a996f58a7607ddf1548fc3c293e1d4ce03f2aad8d2a22c6895cb588 (kept on the lab PC); cut to the port-9001 LISTENING lines
+evidence/notes.txt: original 4479 B sha256 1b8f0d277d291131b4681b2e2296c6e3fca5613300bb3dcdac051097f66912a1 (kept on the lab PC); 2 x -> stop; 2 x -> decision; 2 x -> "status=200, bytes=51"
+evidence/s0-netstat.txt: original 7540 B sha256 6fd283f1590be40e728222e90dd447705eb4da6a39cccb0824b46954472faf57 (kept on the lab PC); cut to the port-9001 LISTENING lines
+scripts/client.py: original 4687 B sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (kept on the lab PC); 1 x -> lab-client; 3 x -> stop
+scripts/step0.py: original 2788 B sha256 9e836530ee44f8650af70726d003492d7ef29936b06639cb23450a80decb7f5e (kept on the lab PC); 1 x -> <RC070_DIR>
+scripts/shot.sh: original 438 B sha256 94a73f43393d726905db92cba080845dd94cdb4acac3542132f594eda3feece0 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <RC070_DIR>
+scripts/note.py: original 539 B sha256 1502d2cc91d0474920f5fc6c5728fdd89ea907a4541366f147d9fa71a7cfa708 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/mk-args.py: original 1795 B sha256 4a2f2bfa0e9863201138c826008b5ede7c70859474cd0202c4a16293cd533011 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/fallback-check.py: original 1612 B sha256 ce679869e36607e4a4d100f322554ecdd35ebd1d7c59dc08b8648a634ab52d6e (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <ROW_1761S4_DIR>
+scripts/mk-row.py: original 4252 B sha256 115fc59fc3d3b428e4df069290fad41384599043cb6f562c2cc86c1153a1d116 (kept on the lab PC); 5 x -> <LAB_DIR>; 1 x -> <WORKTREE>; 1 x -> <ROW_2511P_DIR>; 1 x -> <RC070_DIR>

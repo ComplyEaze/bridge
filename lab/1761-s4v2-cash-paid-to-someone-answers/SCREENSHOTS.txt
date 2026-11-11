@@ -1,0 +1,6 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. Each is the Tally window (PrintWindow).
+shots/c10-window.png 72933 B acc2cec8345d704022abd2303c64247f9ccd67e5e0bdd4155fd001dfbcb972fb
+shots/s0-gateway.png 44810 B 61110fa7188c3f7e46262c69b68167c0e153dbb0255bed08c4d4ae6ef7be2881
+shots/s0-seed-bank-alloc.png 38441 B f3180038f7c6492f28b9e6e438b5cc12ec183f8929e70343e0a7437a990355d4
+shots/s0-window.png 72363 B e89ad746a4290b3d422f62623626d57517d3d3429b628e0af1f7c2e9b13ac378
+shots/s07-after-quit.png 44820 B e385753b301fd685e5715f472a6559350954519b837163278006d5c17e8e2670

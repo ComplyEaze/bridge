@@ -1,0 +1,3 @@
+fallback: row 1761-S4's BK1 folder, 1 entries
+TDBK1800_<company number>.001 24241 B sha256 bce8c06cc0dcf344bc4408e34e0c8374b9920518387552e916e44e0fc4c23986 written 2026-11-11 15:05:10 local
+equal to that row's record (24241 B, sha256 bce8c06cc0dcf344bc4408e34e0c8374b9920518387552e916e44e0fc4c23986): True

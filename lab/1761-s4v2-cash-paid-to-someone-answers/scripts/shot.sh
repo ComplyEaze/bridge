@@ -1,0 +1,2 @@
+# Lab helper (row 1761-S4 v2, row 2511-P's shot.sh with the folder changed; not product code): one PrintWindow capture of the Tally window to shots/<name>.png, then the UTC time.
+H=$(powershell -NoProfile -Command '[int64](Get-Process tally | Select-Object -First 1).MainWindowHandle'); powershell -NoProfile -File <RC070_DIR>/tools/capwin.ps1 -Handle $H -Out "<LAB_DIR>/shots/$1.png" | tail -1; date -u +%FT%T.%3NZ

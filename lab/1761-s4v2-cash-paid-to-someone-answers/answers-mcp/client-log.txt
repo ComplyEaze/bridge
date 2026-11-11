@@ -1,0 +1,10 @@
+2026-11-11T14:01:58Z exe sha256 be931eb0bd0228d5765886491970da712cb91941bc2e0a980049107c4d8267ce ok; launch-env.json sha256 fbc39f491a19679b62b0f451aef727b9eb66e0565baec26fd04b5a90e9dd5af3; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-11T14:01:58Z launched pid 13388; stderr to server-stderr-20261111T140158Z.log
+2026-11-11T14:01:59Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-11T14:02:02Z 000-tools-list.json tool=tools/list secs=0.070 isError=None error={'code': -32602, 'message': 'tool_not_found'} saved_sha256=2389425314e03faf5bf82675e4ba30b9c281320154294b7f901b57cdf95b0536
+2026-11-11T14:02:14Z 001-tools-list.json tool=list secs=0.022 isError=None error=None saved_sha256=24f209be4408e63e564984c70b863d57f527d2f098bc8c92d37ba4acbb90c144
+2026-11-11T14:02:41Z 002-list-companies.json tool=list_companies secs=0.080 isError=False error=None saved_sha256=b9a84ba1a09c3a451c0c1a3cc8b8acea2df1040e8263df1dc3739583c65dc51b
+2026-11-11T14:02:48Z 003-s0-marks.json tool=ledger_masters secs=0.759 isError=False error=None saved_sha256=dc676988498690534501a4272650282c92ea10aa4182092df3c24eb49341c97f
+2026-11-11T14:02:55Z 004-s0-vt.json tool=masters secs=0.751 isError=False error=None saved_sha256=8146583ceb4b2a961e1a3ba02dee767dad0cbcc3322629a265b06d26359c655b
+2026-11-11T14:06:11Z 005-s07-marks.json tool=ledger_masters secs=0.779 isError=False error=None saved_sha256=cc952bccf38983ef6d09b434907911e0ffb29e5f6eb3c2fb575d16e9cdb1d340
+2026-11-11T14:06:20Z session ended; server pid 13388 exit code 0

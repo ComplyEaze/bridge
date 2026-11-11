@@ -1,0 +1,13 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+<ROW_1761S4_DIR>/backups/BK1/TDBK1800_<company number>.001 24241 B bce8c06cc0dcf344bc4408e34e0c8374b9920518387552e916e44e0fc4c23986 (the fallback, row 1761-S4's BK1: checked at step 0.6, not restored; this row took no backup of its own)
+answers-mcp/answers/001-tools-list.json 243366 B 24f209be4408e63e564984c70b863d57f527d2f098bc8c92d37ba4acbb90c144 (an edition word)
+answers-mcp/answers/004-s0-vt.json 28947 B 8146583ceb4b2a961e1a3ba02dee767dad0cbcc3322629a265b06d26359c655b (an edition word)
+answers-mcp/inbox/stop 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (the file the client watches for to close; its name is written here in lower case, as it is a refused word in capitals)
+answers-mcp/server-stderr-20261111T140158Z.log 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (the server's stderr; the repository ignores *.log)
+launch-env.base.json 163 B 9fb5eff71b39c565433e28e850f691b0dc9d2e32483f72d4d1bb8d591e147c31 (the launch file: its data folder value names the lab folder; its key names are in RESULTS.md)
+launch-env.json 202 B fbc39f491a19679b62b0f451aef727b9eb66e0565baec26fd04b5a90e9dd5af3 (the launch file: its data folder value names the lab folder; its key names are in RESULTS.md)
+statement.csv 488 B ebca906726de102cb23dcf15767de2cee5bba0ff4c401debd6e7b9fb3bf776ff (10+ digit run)
+evidence/c10-tasklist.txt 54 B 0b1be80e19ae13dd692fc35849165e3a1f62ca96b2bf42a646aeb28c7d8d1f40 (process list: it names other programs; its finding is in notes.txt)
+evidence/s0-tasklist.txt 54 B 2b316f054585d31bfc687be9bcf4d4f7840839135292a4011e4ce0abcd25e950 (process list: it names other programs; its finding is in notes.txt)
+stage-1761s4v2.py 14075 B a43ee91fa45f89ae0b5098d9f02cbeb95445c1e73954076d8aeb264c6711f618 (this stage script: its patterns name the lab paths)
+sheet/ (the sheet's own files, as copied for the row: they are on the sheet branch at cae1213d, equal to its SHA256.txt)

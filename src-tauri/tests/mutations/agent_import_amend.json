@@ -1,0 +1,1163 @@
+{
+  "file": "src-tauri/src/agent_import_amend.rs",
+  "base_commit": "7a3c9e49",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again). A tool mutant that survived was run again in the whole_set and survivors_again runs as the same edit written as text, under the id named in its run's command.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2188,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_amend.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|amend/)'",
+      "time": "2026-11-11T02:06:09Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 213,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/amend|verif|baseline/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5044,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5044, for the tool's one missed mutant (T1 is 48:51, && replaced with || in the check for the lineage's original) and the fourteen hand-written ones the filtered run missed; none was caught there",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5051,
+      "command": "as the whole_set run, for the fifteen still missed there",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 30,
+      "missed": 0,
+      "unviable": 5
+    },
+    "hand": {
+      "caught": 67,
+      "missed": 3
+    },
+    "survived_at_base": {
+      "tool": 1,
+      "hand": 14
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 3
+    }
+  },
+  "tool_results": {
+    "46:5 replace admit_lineage -> Result<Lineage, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "47:8 delete ! in admit_lineage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "48:51 replace && with || in admit_lineage": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_build_naming_itself_as_amended_is_no_lineage_root",
+      "killer_at": "this_commit"
+    },
+    "48:30 replace == with != in admit_lineage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "54:38 replace != with == in admit_lineage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "57:34 replace != with == in admit_lineage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "60:12 delete ! in admit_lineage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "63:45 replace != with == in admit_lineage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "85:9 replace Lineage::versions -> impl Iterator<Item =(&'a str, &'a ImportVoucher)> with ::std::iter::empty()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "85:9 replace Lineage::versions -> impl Iterator<Item =(&'a str, &'a ImportVoucher)> with ::std::iter::once((\"\", Box::leak(Box::new(Default::default()))))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the iterator yields a mutable reference"
+    },
+    "85:9 replace Lineage::versions -> impl Iterator<Item =(&'a str, &'a ImportVoucher)> with ::std::iter::once((\"xyzzy\", Box::leak(Box::new(Default::default()))))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the iterator yields a mutable reference"
+    },
+    "90:62 replace == with != in Lineage::versions": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "112:9 replace Lineage::admit_proposal -> Result<(), String> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "118:42 replace != with == in Lineage::admit_proposal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "121:44 replace != with == in Lineage::admit_proposal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "124:39 replace != with == in Lineage::admit_proposal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_not_change_a_reference_against_any_build",
+      "killer_at": "base"
+    },
+    "136:9 replace Lineage::window -> Option<(TallyDate, TallyDate)> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_amendment_built_against_an_unchanged_book_reuses_the_original_remote_id",
+      "killer_at": "base"
+    },
+    "136:9 replace Lineage::window -> Option<(TallyDate, TallyDate)> with Some((Default::default(), Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "164:9 replace Lineage::compare_and_swap -> Result<Result<Vec<Value>, Vec<Value>>, String> with Ok(Ok(vec![]))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "164:9 replace Lineage::compare_and_swap -> Result<Result<Vec<Value>, Vec<Value>>, String> with Ok(Ok(vec![Default::default()]))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "175:21 replace == with != in Lineage::compare_and_swap": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "180:16 delete ! in Lineage::compare_and_swap": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "195:59 replace == with != in Lineage::compare_and_swap": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "226:40 replace && with || in Lineage::compare_and_swap": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "226:80 replace == with != in Lineage::compare_and_swap": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "255:25 replace && with || in Lineage::compare_and_swap": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_edited_missing_or_cancelled_voucher_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "255:56 replace != with == in Lineage::compare_and_swap": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "276:5 replace canonical_read_voucher -> Result<ReadVoucher, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "298:9 replace VerifiedBaselines::alter_id -> Option<u64> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "298:9 replace VerifiedBaselines::alter_id -> Option<u64> with Some(0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "298:9 replace VerifiedBaselines::alter_id -> Option<u64> with Some(1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "305:5 replace record_first_verified -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_failed_baseline_write_leaves_the_previous_file_whole",
+      "killer_at": "base"
+    },
+    "305:5 replace record_first_verified -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_unreadable_snapshot_after_the_post_still_checks_the_ledgers",
+      "killer_at": "base"
+    },
+    "307:30 replace != with == in record_first_verified": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_unreadable_snapshot_after_the_post_still_checks_the_ledgers",
+      "killer_at": "base"
+    },
+    "316:12 delete ! in record_first_verified": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_unreadable_snapshot_after_the_post_still_checks_the_ledgers",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "A01": {
+      "what": "admit_lineage: the identity is the named batch's own id, not its lineage's",
+      "edits": [
+        {
+          "from": "let identity_batch_id = named.batch.identity_batch_id().to_string();",
+          "to": "let identity_batch_id = named.batch.batch_id.clone();"
+        }
+      ],
+      "mutation": "dca7716097960403543efa0c582fbbad",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_holds_the_original_and_its_amendments_and_no_other_batch",
+      "killer_at": "base"
+    },
+    "A02": {
+      "what": "admit_lineage: the original need not be an original (an amendment with the identity's id counts)",
+      "edits": [
+        {
+          "from": "build.batch.batch_id == identity_batch_id && build.batch.amends_batch_id.is_none()",
+          "to": "build.batch.batch_id == identity_batch_id"
+        }
+      ],
+      "mutation": "b1d3b28e344f1ce4d542bc8ce4ddc564",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_build_naming_itself_as_amended_is_no_lineage_root",
+      "killer_at": "this_commit"
+    },
+    "A03": {
+      "what": "admit_lineage: a lineage without its original is admitted",
+      "edits": [
+        {
+          "from": "    if !builds.iter().any(|build| {",
+          "to": "    if false && !builds.iter().any(|build| {"
+        }
+      ],
+      "mutation": "0bec4b3490fdeb90fc1bca5331461514",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A04": {
+      "what": "admit_lineage: a lineage without its original refuses with another code",
+      "edits": [
+        {
+          "from": "    }) {\n        return Err(\"import_amend_lineage_invalid\".into());",
+          "to": "    }) {\n        return Err(\"import_amend_original_missing\".into());"
+        }
+      ],
+      "mutation": "f3dcd88d7051b1efbb3cd491b1a31f6f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A05": {
+      "what": "admit_lineage: a build under another identity is admitted",
+      "edits": [
+        {
+          "from": "if batch.identity_batch_id() != identity_batch_id {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "d1329931b000636a7463eacfcbff6cf8",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A06": {
+      "what": "admit_lineage: a build under another identity refuses with another code",
+      "edits": [
+        {
+          "from": "if batch.identity_batch_id() != identity_batch_id {\n            return Err(\"import_amend_lineage_invalid\".into());",
+          "to": "if batch.identity_batch_id() != identity_batch_id {\n            return Err(\"import_amend_identity_mismatch\".into());"
+        }
+      ],
+      "mutation": "3fc81d1efa9de585439b5aaa93815b2e",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A07": {
+      "what": "admit_lineage: the identity scheme is not checked",
+      "edits": [
+        {
+          "from": "if batch.identity_scheme != Some(ImportIdentityScheme::BatchV1) {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "27381650e4385e41ad534946794dec06",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A08": {
+      "what": "admit_lineage: an unsupported identity scheme refuses as an invalid lineage",
+      "edits": [
+        {
+          "from": "return Err(\"import_amend_identity_scheme_unsupported\".into());",
+          "to": "return Err(\"import_amend_lineage_invalid\".into());"
+        }
+      ],
+      "mutation": "8f5af89b46d863e67a1bf0c0c4329cbf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A09": {
+      "what": "admit_lineage: the company is not checked",
+      "edits": [
+        {
+          "from": "if !batch_guid_matches(&batch.company_guid, company_guid) {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "9c796ec2853b8a6c45f227df11f9028c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A10": {
+      "what": "admit_lineage: the company GUID is compared with case",
+      "edits": [
+        {
+          "from": "if !batch_guid_matches(&batch.company_guid, company_guid) {",
+          "to": "if batch.company_guid != company_guid {"
+        }
+      ],
+      "mutation": "e7af046fe960870ae8a6b869619c08d0",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_matches_its_company_in_any_case_and_needs_its_recorded_endpoint",
+      "killer_at": "this_commit"
+    },
+    "A11": {
+      "what": "admit_lineage: another company refuses as an invalid lineage",
+      "edits": [
+        {
+          "from": "return Err(\"import_batch_company_mismatch\".into());",
+          "to": "return Err(\"import_amend_lineage_invalid\".into());"
+        }
+      ],
+      "mutation": "acd2cb16ce2c3a0e79df83ea6ae789e5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A12": {
+      "what": "admit_lineage: the endpoint is not checked",
+      "edits": [
+        {
+          "from": "if batch.endpoint_origin.as_deref() != Some(endpoint_origin) {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "90a405b116bb0f4e20134e42324419cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A13": {
+      "what": "admit_lineage: a build with no recorded endpoint is admitted",
+      "edits": [
+        {
+          "from": "if batch.endpoint_origin.as_deref() != Some(endpoint_origin) {",
+          "to": "if batch.endpoint_origin.as_deref().is_some_and(|origin| origin != endpoint_origin) {"
+        }
+      ],
+      "mutation": "09e1075805f48f27926113bc7188eafe",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_matches_its_company_in_any_case_and_needs_its_recorded_endpoint",
+      "killer_at": "this_commit"
+    },
+    "A14": {
+      "what": "admit_lineage: another endpoint refuses as an invalid lineage",
+      "edits": [
+        {
+          "from": "return Err(\"import_amend_endpoint_mismatch\".into());",
+          "to": "return Err(\"import_amend_lineage_invalid\".into());"
+        }
+      ],
+      "mutation": "18f834ff081c8c862ba0ce015ccb2bb0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_from_another_company_endpoint_or_identity_scheme_is_refused",
+      "killer_at": "base"
+    },
+    "A15": {
+      "what": "admit_lineage: a native dispatch is not checked",
+      "edits": [
+        {
+          "from": "if build.dispatched {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "595f555a4d7044942aebc3d96f04e5d4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::any_native_dispatch_in_the_lineage_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A16": {
+      "what": "admit_lineage: only the named batch's own dispatch refuses",
+      "edits": [
+        {
+          "from": "if build.dispatched {",
+          "to": "if build.dispatched && build.batch.batch_id == named.batch.batch_id {"
+        }
+      ],
+      "mutation": "d63ab54abd18790b94a5f67e4db803e5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::any_native_dispatch_in_the_lineage_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A17": {
+      "what": "admit_lineage: a native dispatch refuses as an invalid lineage",
+      "edits": [
+        {
+          "from": "return Err(\"import_amend_natively_posted\".into());",
+          "to": "return Err(\"import_amend_lineage_invalid\".into());"
+        }
+      ],
+      "mutation": "d187b2cb5f4d4877ba99bf655b6c4457",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::any_native_dispatch_in_the_lineage_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A18": {
+      "what": "admit_lineage: only the named batch is checked, not every build",
+      "edits": [
+        {
+          "from": "for build in &builds {",
+          "to": "for build in std::iter::once(named) {"
+        }
+      ],
+      "mutation": "80dc657d61d289a71453f2f06185207d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::any_native_dispatch_in_the_lineage_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A19": {
+      "what": "versions: every voucher of each build is a version, whatever its transaction",
+      "edits": [
+        {
+          "from": "                .filter(move |voucher| voucher.bridge_txn_id == txn_id)\n",
+          "to": ""
+        }
+      ],
+      "mutation": "f00bf30f318b42ee9a6f751344b0fc56",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "A20": {
+      "what": "versions: every version is named by the first build's batch id",
+      "edits": [
+        {
+          "from": ".map(move |voucher| (build.batch.batch_id.as_str(), voucher))",
+          "to": ".map(move |voucher| (self.builds[0].batch.batch_id.as_str(), voucher))"
+        }
+      ],
+      "mutation": "59b581c8311c831e3dd8e7926d81ec90",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "A21": {
+      "what": "versions: newest first",
+      "edits": [
+        {
+          "from": "self.builds.iter().flat_map(move |build| {",
+          "to": "self.builds.iter().rev().flat_map(move |build| {"
+        }
+      ],
+      "mutation": "c55e079a5c17557cb34f645a99afa2cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_build_whose_record_equals_the_book_admits_even_when_not_first",
+      "killer_at": "base"
+    },
+    "A22": {
+      "what": "admit_proposal: a transaction in no build is admitted",
+      "edits": [
+        {
+          "from": "if versions.peek().is_none() {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "abf51e0659ed852575f031b6c7f9a8aa",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "A23": {
+      "what": "admit_proposal: a transaction in no build refuses with another code",
+      "edits": [
+        {
+          "from": "return Err(\"import_amend_txn_not_in_batch\".into());",
+          "to": "return Err(\"import_amend_voucher_type_changed\".into());"
+        }
+      ],
+      "mutation": "78e3ddf6e75a685c88e4eb1941d11208",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "A24": {
+      "what": "admit_proposal: only the first build's version is compared",
+      "edits": [
+        {
+          "from": "for (_, recorded) in versions {",
+          "to": "for (_, recorded) in versions.take(1) {"
+        }
+      ],
+      "mutation": "d43846b521f9b0f57120159669be7ac0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_not_change_a_reference_against_any_build",
+      "killer_at": "base"
+    },
+    "A25": {
+      "what": "admit_proposal: only the latest build's version is compared",
+      "edits": [
+        {
+          "from": "for (_, recorded) in versions {",
+          "to": "for (_, recorded) in versions.last() {"
+        }
+      ],
+      "mutation": "baebf2bb621bfe3763c167183710b5bf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_not_change_a_reference_against_any_build",
+      "killer_at": "base"
+    },
+    "A26": {
+      "what": "admit_proposal: the voucher type is not compared",
+      "edits": [
+        {
+          "from": "if recorded.voucher_type != voucher.voucher_type {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "2247a5d174188bc01b0ef58b443cd174",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "A27": {
+      "what": "admit_proposal: a changed voucher type refuses with another code",
+      "edits": [
+        {
+          "from": "return Err(\"import_amend_voucher_type_changed\".into());",
+          "to": "return Err(\"import_amend_voucher_number_changed\".into());"
+        }
+      ],
+      "mutation": "abdb592540e9301d3fbaeaa03d73e4ec",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "A28": {
+      "what": "admit_proposal: the voucher number is not compared",
+      "edits": [
+        {
+          "from": "if recorded.voucher_number != voucher.voucher_number {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "0d82e8c23dfec91a98226e41569f2101",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "A29": {
+      "what": "admit_proposal: a changed voucher number refuses with another code",
+      "edits": [
+        {
+          "from": "return Err(\"import_amend_voucher_number_changed\".into());",
+          "to": "return Err(\"import_amend_voucher_type_changed\".into());"
+        }
+      ],
+      "mutation": "4f0bcee62e55e634fe3354e4b305a534",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership",
+      "killer_at": "base"
+    },
+    "A30": {
+      "what": "admit_proposal: the reference is not compared",
+      "edits": [
+        {
+          "from": "if recorded.reference != voucher.reference {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "9ee0b598a3828e0628b1f7f501e10a4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_not_change_a_reference_against_any_build",
+      "killer_at": "base"
+    },
+    "A31": {
+      "what": "admit_proposal: a changed reference refuses with another code",
+      "edits": [
+        {
+          "from": "return Err(\"import_amend_voucher_reference_changed\".into());",
+          "to": "return Err(\"import_amend_voucher_type_changed\".into());"
+        }
+      ],
+      "mutation": "2e111a233a7500a7b1e8d636073f002f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_proposal_may_not_change_a_reference_against_any_build",
+      "killer_at": "base"
+    },
+    "A32": {
+      "what": "window: only the proposed dates",
+      "edits": [
+        {
+          "from": "std::iter::once(&voucher.date).chain(\n                self.versions(&voucher.bridge_txn_id)\n                    .map(|(_, recorded)| &recorded.date),\n            )",
+          "to": "std::iter::once(&voucher.date)"
+        }
+      ],
+      "mutation": "ae1c08d2477ffb32e252de6ef2720d58",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_window_holds_where_a_voucher_is_and_where_the_amendment_moves_it",
+      "killer_at": "base"
+    },
+    "A33": {
+      "what": "window: only the recorded dates",
+      "edits": [
+        {
+          "from": "std::iter::once(&voucher.date).chain(",
+          "to": "std::iter::empty().chain("
+        }
+      ],
+      "mutation": "1ccd639efcc97b1db2c25cfa70fecf8b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_window_holds_where_a_voucher_is_and_where_the_amendment_moves_it",
+      "killer_at": "base"
+    },
+    "A34": {
+      "what": "compare_and_swap: the marker is the latest build's own identity, not the lineage's",
+      "edits": [
+        {
+          "from": "let tag = import_identity(&self.identity_batch_id, txn_id).to_string();",
+          "to": "let tag = import_identity(&self.builds.last().unwrap().batch.batch_id, txn_id).to_string();"
+        }
+      ],
+      "mutation": "7ed6ab426862a5a18ee7f19658af3f9b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "A35": {
+      "what": "compare_and_swap: the row's last marker is read, not its first",
+      "edits": [
+        {
+          "from": "narration_markers(narration).next().flatten()",
+          "to": "narration_markers(narration).last().flatten()"
+        }
+      ],
+      "mutation": "acd5d59ee49f45a29a17e8deadfae716",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A36": {
+      "what": "compare_and_swap: a voucher not in the book refuses as diverged",
+      "edits": [
+        {
+          "from": "\"reason\":\"not_in_book\"",
+          "to": "\"reason\":\"book_voucher_diverged\""
+        }
+      ],
+      "mutation": "9404f705cf92d6679a3f61bd11c6199d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_edited_missing_or_cancelled_voucher_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A37": {
+      "what": "compare_and_swap: a cancelled or optional voucher is not refused",
+      "edits": [
+        {
+          "from": "if !voucher_is_accounting_effective(row)? {",
+          "to": "if false && !voucher_is_accounting_effective(row)? {"
+        }
+      ],
+      "mutation": "9dbc56e1aea060e0f9a8d9b22540440a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_edited_missing_or_cancelled_voucher_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A38": {
+      "what": "compare_and_swap: a cancelled or optional voucher is refused and then compared",
+      "edits": [
+        {
+          "from": "\"guid\":row.guid,\"alter_id\":row.alter_id}),\n                );\n                continue;\n",
+          "to": "\"guid\":row.guid,\"alter_id\":row.alter_id}),\n                );\n"
+        }
+      ],
+      "mutation": "3d9088503ed00e2dba379e798ce8f612",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_cancelled_voucher_is_refused_once_naming_its_guid_and_alter_id",
+      "killer_at": "this_commit"
+    },
+    "A39": {
+      "what": "compare_and_swap: a cancelled or optional voucher's refusal names no GUID or ALTERID",
+      "edits": [
+        {
+          "from": "\"reason\":\"voucher_cancelled_or_optional\",\n                    \"guid\":row.guid,\"alter_id\":row.alter_id})",
+          "to": "\"reason\":\"voucher_cancelled_or_optional\"})"
+        }
+      ],
+      "mutation": "4b5fb8129fdf720e427e34dcbf418dc7",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_cancelled_voucher_is_refused_once_naming_its_guid_and_alter_id",
+      "killer_at": "this_commit"
+    },
+    "A40": {
+      "what": "compare_and_swap: the book's amounts are not put in canonical form",
+      "edits": [
+        {
+          "from": "let row = canonical_read_voucher(row)?;",
+          "to": "let row = row.clone();"
+        }
+      ],
+      "mutation": "7b1902520f6f35c950055a39adf8d3f4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A41": {
+      "what": "compare_and_swap: the entries are not compared",
+      "edits": [
+        {
+          "from": "canonical_entry_fingerprint(recorded) == actual_entry_fingerprint(&row);",
+          "to": "true;"
+        }
+      ],
+      "mutation": "740d739aae71f17b0ff2a73bfd69158a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "A42": {
+      "what": "compare_and_swap: the narration is compared as one Bridge wrote untagged",
+      "edits": [
+        {
+          "from": "WrittenNarration::Tagged(&tag),",
+          "to": "WrittenNarration::Untagged,"
+        }
+      ],
+      "mutation": "7b3170a9aa8d51c3abf3a84fdc4a9ad5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A43": {
+      "what": "compare_and_swap: only the latest build the book matches counts as matching",
+      "edits": [
+        {
+          "from": "matching.push(batch_id);",
+          "to": "matching = vec![batch_id];"
+        }
+      ],
+      "mutation": "1e4561a7bea0ed9e608ef4795f20fa0e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_unimported_amendment_does_not_hide_the_verified_build",
+      "killer_at": "base"
+    },
+    "A44": {
+      "what": "compare_and_swap: the diffs reported are the first build's that differ, not the latest's",
+      "edits": [
+        {
+          "from": "last_diffs = diffs;",
+          "to": "if last_diffs.is_empty() {\n                    last_diffs = diffs;\n                }"
+        }
+      ],
+      "mutation": "390ef43a076653b041a136fa744dc540",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_refusal_names_the_latest_builds_diffs_and_the_marks_it_compared",
+      "killer_at": "this_commit"
+    },
+    "A45": {
+      "what": "compare_and_swap: a voucher with no ALTERID can equal a build with no baseline",
+      "edits": [
+        {
+          "from": "row.alter_id.is_some() && baselines.alter_id(batch_id, txn_id) == row.alter_id",
+          "to": "baselines.alter_id(batch_id, txn_id) == row.alter_id"
+        }
+      ],
+      "mutation": "372b58c09b8120bdfe87e014f597de78",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_build_whose_record_equals_the_book_admits_even_when_not_first",
+      "killer_at": "base"
+    },
+    "A46": {
+      "what": "compare_and_swap: any baseline admits, equal or not",
+      "edits": [
+        {
+          "from": "row.alter_id.is_some() && baselines.alter_id(batch_id, txn_id) == row.alter_id",
+          "to": "row.alter_id.is_some() && baselines.alter_id(batch_id, txn_id).is_some()"
+        }
+      ],
+      "mutation": "a7711da5202dfbb857c4d6b0670f0d75",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "A47": {
+      "what": "compare_and_swap: only the latest matching build's baseline is compared",
+      "edits": [
+        {
+          "from": "let equal = matching.iter().copied().find(|batch_id| {",
+          "to": "let equal = matching.last().copied().into_iter().find(|batch_id| {"
+        }
+      ],
+      "mutation": "c836c4d710ee1dba1d229add239893e0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_unimported_amendment_does_not_hide_the_verified_build",
+      "killer_at": "base"
+    },
+    "A48": {
+      "what": "compare_and_swap: the admitted voucher names the latest matching build, not the one with the equal baseline",
+      "edits": [
+        {
+          "from": "(Some(_), Some(batch_id)) => Some(batch_id),",
+          "to": "(Some(latest), Some(_)) => Some(*latest),"
+        }
+      ],
+      "mutation": "d14198bed888f5288e5226806944bd1a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_unimported_amendment_does_not_hide_the_verified_build",
+      "killer_at": "base"
+    },
+    "A49": {
+      "what": "compare_and_swap: the altered refusal names the oldest verified build, not the newest",
+      "edits": [
+        {
+          "from": "let verified = matching.iter().rev().find_map(|batch_id| {",
+          "to": "let verified = matching.iter().find_map(|batch_id| {"
+        }
+      ],
+      "mutation": "cf5af7936260218bbec1fdb50c81ac1a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_build_whose_record_equals_the_book_admits_even_when_not_first",
+      "killer_at": "base"
+    },
+    "A50": {
+      "what": "compare_and_swap: an altered voucher refuses as never verified",
+      "edits": [
+        {
+          "from": "\"reason\":\"voucher_altered_since_verified\"",
+          "to": "\"reason\":\"voucher_never_verified\""
+        }
+      ],
+      "mutation": "f8287fce65afaa5f878ce990251e9cfc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "A51": {
+      "what": "compare_and_swap: the altered refusal names no build",
+      "edits": [
+        {
+          "from": "\"reason\":\"voucher_altered_since_verified\",\"book_matches_batch_id\":batch_id,",
+          "to": "\"reason\":\"voucher_altered_since_verified\","
+        }
+      ],
+      "mutation": "91ba21d7d50727ab39fff093c0e920bf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_build_whose_record_equals_the_book_admits_even_when_not_first",
+      "killer_at": "base"
+    },
+    "A52": {
+      "what": "compare_and_swap: the altered refusal gives no verified ALTERID",
+      "edits": [
+        {
+          "from": "\"verified_alter_id\":verified,",
+          "to": ""
+        }
+      ],
+      "mutation": "692269103273112d98b47b2bcc5a0bf6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_build_whose_record_equals_the_book_admits_even_when_not_first",
+      "killer_at": "base"
+    },
+    "A53": {
+      "what": "compare_and_swap: the altered refusal gives no current ALTERID",
+      "edits": [
+        {
+          "from": "\"verified_alter_id\":verified,\"alter_id\":row.alter_id,\"guid\":row.guid}),",
+          "to": "\"verified_alter_id\":verified,\"guid\":row.guid}),"
+        }
+      ],
+      "mutation": "faa947b8c5322f94fbc73ddfc9272796",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_refusal_names_the_latest_builds_diffs_and_the_marks_it_compared",
+      "killer_at": "this_commit"
+    },
+    "A54": {
+      "what": "compare_and_swap: the never-verified refusal names no builds",
+      "edits": [
+        {
+          "from": "\"reason\":\"voucher_never_verified\",\"book_matches_batch_ids\":matching,",
+          "to": "\"reason\":\"voucher_never_verified\","
+        }
+      ],
+      "mutation": "1877faebc9d3f955bb533e435421e901",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_refusal_names_the_latest_builds_diffs_and_the_marks_it_compared",
+      "killer_at": "this_commit"
+    },
+    "A55": {
+      "what": "compare_and_swap: the admitted voucher names no GUID",
+      "edits": [
+        {
+          "from": "\"book_matches_batch_id\":batch_id,\"guid\":row.guid,\"master_id\":row.master_id,",
+          "to": "\"book_matches_batch_id\":batch_id,\"master_id\":row.master_id,"
+        }
+      ],
+      "mutation": "0ce03d608617cab8ac7ce17fdd9abca6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A56": {
+      "what": "compare_and_swap: the admitted voucher names no MASTERID",
+      "edits": [
+        {
+          "from": "\"guid\":row.guid,\"master_id\":row.master_id,\n",
+          "to": "\"guid\":row.guid,\n"
+        }
+      ],
+      "mutation": "7057d008f918f3a6bcb0356c9d4c254b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A57": {
+      "what": "compare_and_swap: the admitted voucher names no ALTERID",
+      "edits": [
+        {
+          "from": "\"master_id\":row.master_id,\n                    \"alter_id\":row.alter_id});",
+          "to": "\"master_id\":row.master_id});"
+        }
+      ],
+      "mutation": "a52e006c3ab02e1a606d6009be2ddedb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A58": {
+      "what": "compare_and_swap: an effective date read is reported as not observed",
+      "edits": [
+        {
+          "from": "if row.effective_date.is_none()\n",
+          "to": "if row.effective_date.is_some()\n"
+        }
+      ],
+      "mutation": "82334d525d613f05c64d0168a8928bbc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A59": {
+      "what": "compare_and_swap: a Journal's missing effective date is reported as not observed",
+      "edits": [
+        {
+          "from": "if row.effective_date.is_none()\n                        && row.voucher_type.as_deref() != Some(\"Journal\")\n",
+          "to": "if row.effective_date.is_none()\n"
+        }
+      ],
+      "mutation": "a16fb46e811e20738669f714c0b8ee5c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::an_admitted_journal_carries_no_effective_date_caveat",
+      "killer_at": "this_commit"
+    },
+    "A60": {
+      "what": "compare_and_swap: what was not observed names nothing",
+      "edits": [
+        {
+          "from": "entry[\"not_observed\"] = json!([\"effective_date\"]);",
+          "to": "entry[\"not_observed\"] = json!([]);"
+        }
+      ],
+      "mutation": "3a1f68997ee2c9d35d50388334d4e2a9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A61": {
+      "what": "compare_and_swap: a diverged voucher's refusal gives no diffs",
+      "edits": [
+        {
+          "from": "\"diffs_from_latest_build\":last_diffs,",
+          "to": ""
+        }
+      ],
+      "mutation": "5abc5055f73044c9a4f47268c97c45ba",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_edited_missing_or_cancelled_voucher_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A62": {
+      "what": "compare_and_swap: a diverged voucher refuses as not in the book",
+      "edits": [
+        {
+          "from": "\"reason\":\"book_voucher_diverged\",\n",
+          "to": "\"reason\":\"not_in_book\",\n"
+        }
+      ],
+      "mutation": "b514572b14d05370a9c6c29a4989569b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_edited_missing_or_cancelled_voucher_refuses_the_amendment",
+      "killer_at": "base"
+    },
+    "A63": {
+      "what": "compare_and_swap: one admitted voucher admits the amendment beside a refused one",
+      "edits": [
+        {
+          "from": "Ok(if refused.is_empty() {",
+          "to": "Ok(if refused.len() < vouchers.len() {"
+        }
+      ],
+      "mutation": "af294359174eb6a454d777bdf34d4d72",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::one_diverged_voucher_refuses_the_whole_amendment",
+      "killer_at": "base"
+    },
+    "A64": {
+      "what": "canonical_read_voucher: the amounts are checked but kept as read",
+      "edits": [
+        {
+          "from": "entry.amount = canonical_verification_amount(&entry.amount)?;",
+          "to": "let _ = canonical_verification_amount(&entry.amount)?;"
+        }
+      ],
+      "mutation": "27e3548ccee3897fa1522d25651a5853",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "A65": {
+      "what": "canonical_read_voucher: an amount that does not read is kept as read",
+      "edits": [
+        {
+          "from": "entry.amount = canonical_verification_amount(&entry.amount)?;",
+          "to": "entry.amount = canonical_verification_amount(&entry.amount).unwrap_or_else(|_| entry.amount.clone());"
+        }
+      ],
+      "mutation": "3ecacd959945afede32e8b189f4d745a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_book_amount_that_does_not_read_fails_the_compare_and_swap",
+      "killer_at": "this_commit"
+    },
+    "A66": {
+      "what": "VerifiedBaselines::alter_id: a voucher's baseline is taken from any build",
+      "edits": [
+        {
+          "from": "self.0.get(batch_id)?.vouchers.get(txn_id).copied()",
+          "to": "self.0.values().find_map(|baseline| baseline.vouchers.get(txn_id).copied())"
+        }
+      ],
+      "mutation": "d8803d8855ff77dc8468364a8f604457",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "A67": {
+      "what": "record_first_verified: a voucher of any status is recorded",
+      "edits": [
+        {
+          "from": "if voucher[\"status\"] != \"posted_verified\" {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "ba996a76f36c484c71818fcafbd9cd1e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_verified_baseline_records_each_voucher_once_and_never_changes_it",
+      "killer_at": "base"
+    },
+    "A68": {
+      "what": "record_first_verified: a voucher already recorded is overwritten",
+      "edits": [
+        {
+          "from": "if !existing.vouchers.contains_key(txn_id) {",
+          "to": "if true {"
+        }
+      ],
+      "mutation": "8b98f055e4256a3875839b5733b91a8c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_verified_baseline_file_is_written_once_per_voucher",
+      "killer_at": "base"
+    },
+    "A69": {
+      "what": "record_first_verified: a voucher with no ALTERID is recorded at zero",
+      "edits": [
+        {
+          "from": "voucher[\"alter_id\"].as_u64(),",
+          "to": "voucher[\"alter_id\"].as_u64().or(Some(0)),"
+        }
+      ],
+      "mutation": "fdfeb99ccc95991f4c6dd2847e95f821",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::amend_tests::a_verified_voucher_without_an_alter_id_records_no_baseline",
+      "killer_at": "this_commit"
+    },
+    "A70": {
+      "what": "record_first_verified: only the first voucher of the proof is read",
+      "edits": [
+        {
+          "from": "proof[\"vouchers\"].as_array().into_iter().flatten() {",
+          "to": "proof[\"vouchers\"].as_array().into_iter().flatten().take(1) {"
+        }
+      ],
+      "mutation": "344496a38f45a8ceb18e7fd4b2fea2bd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_verified_baseline_file_is_written_once_per_voucher",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "A05": {
+      "mutation": "d1329931b000636a7463eacfcbff6cf8",
+      "reason": "equivalent, unreachable: the only caller, amendment_lineage_while_admitted, passes as builds what ledger::read_lineage returns for the named batch's identity, and read_lineage keeps only batch records whose identity_batch_id equals it, so every build shares the identity and this check never refuses. A caller that takes its builds from anywhere else reopens it"
+    },
+    "A06": {
+      "mutation": "3fc81d1efa9de585439b5aaa93815b2e",
+      "reason": "equivalent, unreachable: the only caller, amendment_lineage_while_admitted, passes as builds what ledger::read_lineage returns for the named batch's identity, and read_lineage keeps only batch records whose identity_batch_id equals it, so every build shares the identity and this check never refuses. A caller that takes its builds from anywhere else reopens it"
+    },
+    "A35": {
+      "mutation": "acd5d59ee49f45a29a17e8deadfae716",
+      "reason": "equivalent: ImportReadSource::admit refuses a row whose narration holds the marker prefix twice, so a row holds at most one marker and its first is its last. Its only caller passes the preflight read of the build, built by that admission; a source not built by it reopens this"
+    }
+  }
+}

@@ -1416,3 +1416,175 @@ fn an_amendment_reads_verified_only_above_the_build_mark() {
     assert!(amend::record_first_verified(&mut baseline, &imported));
     assert_eq!(baseline.vouchers["txn-001"], 51);
 }
+
+// The tests below hold what the mutation record for this module found no test
+// holding (#2058): the lineage root, the company and endpoint checks, and the
+// fields of each per-voucher answer.
+
+/// A build that names itself as the batch it amends is no lineage root: the
+/// root must be an original. The build never writes such a record, since it
+/// mints a fresh batch id and amends an existing batch's identity.
+#[test]
+fn a_build_naming_itself_as_amended_is_no_lineage_root() {
+    let looped = build(ORIGINAL, Some(ORIGINAL), "12.50", "20260901");
+    assert_eq!(looped.identity_batch_id(), ORIGINAL);
+    assert_eq!(
+        lineage_of(&journal(&[&looped]), ORIGINAL).err().unwrap(),
+        "import_amend_lineage_invalid"
+    );
+    // Control: the original under the same id is the root.
+    let original = build(ORIGINAL, None, "12.50", "20260901");
+    assert!(lineage_of(&journal(&[&original]), ORIGINAL).is_ok());
+}
+
+#[test]
+fn a_lineage_matches_its_company_in_any_case_and_needs_its_recorded_endpoint() {
+    let admit = |line: &ImportLedgerLine, company_guid: &str| {
+        let text = journal(&[line]);
+        let named = ledger::read_snapshot(std::io::Cursor::new(text.as_bytes()), Some(ORIGINAL))
+            .unwrap()
+            .unwrap();
+        let builds = ledger::read_lineage(std::io::Cursor::new(text.as_bytes()), ORIGINAL).unwrap();
+        amend::admit_lineage(&named, builds, company_guid, &origin()).map(|_| ())
+    };
+    let mut lettered = build(ORIGINAL, None, "12.50", "20260901");
+    lettered.company_guid = "0a0b0c0d-0000-4000-8000-00000000000e".into();
+    assert_eq!(
+        admit(&lettered, "0A0B0C0D-0000-4000-8000-00000000000E"),
+        Ok(())
+    );
+    // A build recorded before its endpoint was is not known to be this Tally's.
+    let mut unrecorded = build(ORIGINAL, None, "12.50", "20260901");
+    unrecorded.endpoint_origin = None;
+    assert_eq!(
+        admit(&unrecorded, GUID).err().unwrap(),
+        "import_amend_endpoint_mismatch"
+    );
+}
+
+/// A cancelled voucher is refused as cancelled and nothing else, even when it
+/// was edited as well, and the refusal names the row it saw.
+#[test]
+fn a_cancelled_voucher_is_refused_once_naming_its_guid_and_alter_id() {
+    let original = build(ORIGINAL, None, "12.50", "20260901");
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    let proposal = build(AMENDMENT, None, "18.00", "20260901").vouchers;
+    let mut cancelled = book_row(&original);
+    cancelled.cancelled = Some(true);
+    cancelled.entries[0].amount = "13.00".into();
+    cancelled.entries[1].amount = "-13.00".into();
+    let refused = lineage
+        .compare_and_swap(
+            &proposal,
+            &book(vec![cancelled]),
+            &verified_as_booked(&lineage),
+        )
+        .unwrap()
+        .expect_err("refused");
+    assert_eq!(
+        json!(refused),
+        json!([{"bridge_txn_id":"txn-001","reason":"voucher_cancelled_or_optional",
+            "guid":format!("{GUID}-00000005"),"alter_id":40}])
+    );
+}
+
+#[test]
+fn a_refusal_names_the_latest_builds_diffs_and_the_marks_it_compared() {
+    let original = build(ORIGINAL, None, "12.50", "20260901");
+    let first = build(AMENDMENT, Some(ORIGINAL), "15.00", "20260902");
+    let lineage = lineage_of(&journal(&[&original, &first]), ORIGINAL).unwrap();
+    let proposal = build(UNRELATED, None, "18.00", "20260903").vouchers;
+    let refusal = |row: ReadVoucher, baselines: &amend::VerifiedBaselines| {
+        lineage
+            .compare_and_swap(&proposal, &book(vec![row]), baselines)
+            .unwrap()
+            .expect_err("refused")
+    };
+    // The first amendment, redated in Tally: it differs from the original by
+    // its date and entries and from the amendment by its date alone.
+    let mut redated = book_row(&first);
+    redated.date = bridge_tally_core::TallyDate::parse("20260905").unwrap();
+    assert_eq!(
+        refusal(redated, &verified_as_booked(&lineage))[0]["diffs_from_latest_build"],
+        json!(["date"])
+    );
+    // Altered since it was first verified: the ALTERID now beside the one then.
+    let mut altered = book_row(&first);
+    altered.alter_id = Some(41);
+    assert_eq!(
+        json!(refusal(altered, &verified_as_booked(&lineage))),
+        json!([{"bridge_txn_id":"txn-001","reason":"voucher_altered_since_verified",
+            "book_matches_batch_id":AMENDMENT,"verified_alter_id":40,"alter_id":41,
+            "guid":format!("{GUID}-00000005")}])
+    );
+    // Never verified: every build the book matches.
+    assert_eq!(
+        json!(refusal(
+            book_row(&first),
+            &amend::VerifiedBaselines::default()
+        )),
+        json!([{"bridge_txn_id":"txn-001","reason":"voucher_never_verified",
+            "book_matches_batch_ids":[AMENDMENT],"alter_id":40,
+            "guid":format!("{GUID}-00000005")}])
+    );
+}
+
+/// The caveat that the effective date was not observed is for a voucher other
+/// than a Journal, as the check names it; an admitted Journal carries none.
+#[test]
+fn an_admitted_journal_carries_no_effective_date_caveat() {
+    let mut original = build(ORIGINAL, None, "12.50", "20260901");
+    original.vouchers[0].voucher_type = VoucherType::Journal;
+    original.sha256 = sha256_hex(
+        render_import_xml(
+            "Synthetic Accounts",
+            &original.vouchers,
+            original.identity_batch_id(),
+        )
+        .as_bytes(),
+    );
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    let mut proposal = build(AMENDMENT, None, "18.00", "20260901").vouchers;
+    proposal[0].voucher_type = VoucherType::Journal;
+    let row = book_row(&original);
+    assert!(row.effective_date.is_none());
+    let admitted = lineage
+        .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
+        .unwrap()
+        .expect("admitted");
+    assert!(
+        admitted[0].get("not_observed").is_none(),
+        "{}",
+        json!(admitted)
+    );
+}
+
+/// A book amount that does not read is an error, never a difference to
+/// report or a value to compare as text.
+#[test]
+fn a_book_amount_that_does_not_read_fails_the_compare_and_swap() {
+    let original = build(ORIGINAL, None, "12.50", "20260901");
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    let proposal = build(AMENDMENT, None, "18.00", "20260901").vouchers;
+    let mut row = book_row(&original);
+    row.entries[0].amount = "twelve".into();
+    assert_eq!(
+        lineage
+            .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
+            .err()
+            .unwrap(),
+        "import_verification_amount_invalid"
+    );
+}
+
+/// A verification that reports a voucher posted without its ALTERID records
+/// no baseline for it: an absent ALTERID is not zero.
+#[test]
+fn a_verified_voucher_without_an_alter_id_records_no_baseline() {
+    let mut baseline = amend::VerifiedBaseline::default();
+    assert!(!amend::record_first_verified(
+        &mut baseline,
+        &json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified"}]})
+    ));
+    assert!(baseline.vouchers.is_empty());
+}

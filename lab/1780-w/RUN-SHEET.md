@@ -42,7 +42,7 @@ What this row reads, and no earlier row has:
 
 ## Rules (they add to `LAB-COMMON.md`; where they differ, the stricter holds)
 - **KEYS.** From the start of a cell until its box is answered or gone, no key is pressed and nothing is typed, except under one of the three carve-outs. Everything that reads is pre-armed before the cell. Boxes are answered by mouse, at the centre of the No button.
-- **The key after its probe.** Each carve-out key is pressed within 1 s of its gating probe's last line printing. Later than 2 s after it: the key is not pressed, and the cell records "key not pressed: late". A window can still change between the probe and the key. The sheet bounds what that can do: a Down that reaches the box only moves its button focus, and cell HA's Esc is pressed only into a switcher seen open.
+- **The key after its probe.** Each carve-out key is pressed as soon as its gating probe's last line prints. If more than 1 s has passed since then, the key is not pressed, and the cell records "key not pressed: late". A window can still change between the probe and the key. The sheet bounds what that can do: Down is not one of the box's answer keys in Windows' documented box keys, though that is not measured here, and cell HA's Esc is pressed only into a switcher seen open.
 - **Carve-out K (cell K only).** ONE press of the letter `n`, only while the probe just before shows the box holding the foreground. Never `y`, Enter, Space, Tab or any other key.
 - **Carve-out K2 (cell K2 only).** ONE press of Down, only when the probe just before shows Tally holding the foreground with the box topmost above it, AND that cell's Tally copy shows Gateway of Tally. Any other Tally screen, or a copy that cannot be read: K2's key is not pressed. Write "K2 not run: <what the copy showed>".
 - **Carve-out HA (cell HA only, on the run coordinator's yes).** Alt, Tab and Esc, in the order cell HA gives, only while the probe just before shows Tally holding the foreground. Esc is pressed only while the switcher is seen open. Never Enter, Space, Y, N or any other key. An Esc that reached the box would be its Cancel, which is a decline.
@@ -107,8 +107,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\bridge-lab\1780w\requests
 The recipe, with no click into Tally after step 2's title click.
 1. **At T0+12,** an extra pre-armed probe must show the box topmost and holding the foreground. Otherwise write "K not run: the box did not hold the foreground", answer No by mouse, and go to K2.
 2. **As soon as that probe prints** (rule "The key after its probe"): press `n` ONCE (carve-out K). Press nothing else.
-3. **Read:** the pre-armed `zorder-probe-k.ps1` at T0+15.
-4. EXPECT the box gone by that probe, and `<cell>.txt` ending exit 1, `stdout_bytes=0`, as a mouse No does in 2161-B and 2161-C. Expect only `fits=true` lines. If the box is still open at the probe: record "the key did not answer the box", answer No by mouse, and STOP before K2.
+3. **Read:** the pre-armed `zorder-probe-k.ps1` at T0+15, and again at T0+18.
+4. EXPECT the box gone by the T0+18 probe at the latest, and `<cell>.txt` ending exit 1, `stdout_bytes=0`, as a mouse No does in 2161-B and 2161-C. Expect only `fits=true` lines. If the box is still open at the T0+18 probe: record "the key did not answer the box", answer No by mouse, and STOP before K2.
 
 ### Cell K2: Down after a click into Tally
 The recipe, with these additions:
@@ -184,7 +184,7 @@ C10: shut THE COMPANY. EXPECT one tally.exe owning 9001 and `GET /status` 200, w
 | HA: a "ComplyEaze Bridge" tile | **W3:** the owned box is listed in Alt+Tab, so there is a keyboard route back to it. |
 | HA: no such tile | **W3:** the owned box is not in Alt+Tab; only its place on top shows it. |
 | K, K2 or HA not run, skipped, or a key not pressed as late | That reading is not measured. Write which and why; nothing is inferred from it. |
-| S or D: "MODE BLOCKED" | The call answered `pending` before the No. The box readings still count; the decline is then kept for the batch's next call, which is not made. |
+| S or D: "MODE BLOCKED" | The call answered `pending` before the No. The box readings still count. The No is then kept for the batch's next call (`src-tauri/src/agent_import_approval.rs:15-19`, seen once in row 1392-E), and that call is not made. |
 | `owner` 0 anywhere, a `fits=false` line, `0,0,0,0`, exit 77, or `import_review_too_large` | Report the lines whole. |
 | Anything else | Record it whole and infer nothing. |
 

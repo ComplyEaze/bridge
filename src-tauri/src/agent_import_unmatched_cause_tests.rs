@@ -5,6 +5,8 @@
 //! derived from live captures (counter shape only, see
 //! EDUCATION_IMPORT_COUNTERS_PROVENANCE.md). Tests marked synthetic exist only
 //! to hold the guards that no capture reaches.
+//! The 7.2 answer of a Journal Tally refused for a Stock-in-Hand line is committed byte for
+//! byte too.
 use super::{later_unmatched_cause, measured_voucher_step, unmatched_cause, UnmatchedCause};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportResult};
 
@@ -37,6 +39,15 @@ fn rejected_one_education() -> TallyImportResult {
 fn rejected_one_silver() -> TallyImportResult {
     counters(&utf16(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/single-import-missing-ledger.utf16le.xml"
+    )))
+}
+
+/// A rejected single Journal, licensed 7.2, refused for a different cause than the
+/// others: a line on a ledger under Stock-in-Hand (CREATED 0, EXCEPTIONS 1, the `LINEERROR`
+/// ahead of the counters; row 1108-A1, one run, `PARTIAL`).
+fn rejected_one_stock_in_hand_journal() -> TallyImportResult {
+    counters(&utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/single-import-stock-in-hand-journal.utf16le.xml"
     )))
 }
 
@@ -82,6 +93,12 @@ fn the_captured_answers_are_what_these_tests_say() {
         (silver.created, silver.altered, silver.exceptions),
         (0, 0, 1)
     );
+    let stock = rejected_one_stock_in_hand_journal();
+    assert!(stock.counter_presence.all_reported(), "{stock:?}");
+    assert_eq!(
+        (stock.created, stock.altered, stock.errors, stock.exceptions),
+        (0, 0, 0, 1)
+    );
     let partial = committed_49_of_50();
     assert_eq!(
         (partial.created, partial.altered, partial.exceptions),
@@ -108,7 +125,11 @@ fn the_captured_answers_are_what_these_tests_say() {
 
 #[test]
 fn a_rejected_single_voucher_is_reported_not_created() {
-    for answer in [rejected_one_education(), rejected_one_silver()] {
+    for answer in [
+        rejected_one_education(),
+        rejected_one_silver(),
+        rejected_one_stock_in_hand_journal(),
+    ] {
         assert!(answer.counter_presence.all_reported(), "{answer:?}");
         assert_eq!(
             unmatched_cause(Some(&answer), 1, 1, None),
@@ -126,6 +147,28 @@ fn a_partial_commit_is_never_read_as_not_created() {
         assert_eq!(
             unmatched_cause(Some(&committed_49_of_50()), 50, unmatched, Some(49)),
             UnmatchedCause::NotEstablished
+        );
+    }
+}
+
+#[test]
+fn one_exception_in_a_batch_of_three_is_never_read_as_not_created() {
+    // The Stock-in-Hand refusal counts one exception. Sent in a batch of three, that count does
+    // not say which voucher Tally rejected (the other two may be twins), so none is labelled,
+    // whatever the voucher mark did and however many the readback cannot find.
+    // The count mismatch (one exception against three sent) alone decides it, so the four
+    // combinations below are one case seen four ways, not four separate cases; the step and
+    // unmatched branches are tested by the other tests of this file.
+    for (unmatched, step) in [(1, Some(0)), (1, Some(2)), (3, Some(0)), (1, None)] {
+        assert_eq!(
+            unmatched_cause(
+                Some(&rejected_one_stock_in_hand_journal()),
+                3,
+                unmatched,
+                step
+            ),
+            UnmatchedCause::NotEstablished,
+            "{unmatched} {step:?}"
         );
     }
 }

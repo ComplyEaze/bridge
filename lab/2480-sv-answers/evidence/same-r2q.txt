@@ -1,0 +1,2 @@
+SAME: EQUAL (21014 B sha256 bd7eb80d1cb8c266; 21014 B sha256 bd7eb80d1cb8c266)
+exit 0

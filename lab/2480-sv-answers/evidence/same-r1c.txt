@@ -1,0 +1,2 @@
+SAME: EQUAL (7822 B sha256 bc60a6424d2bd794; 7822 B sha256 bc60a6424d2bd794)
+exit 0

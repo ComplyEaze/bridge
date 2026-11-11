@@ -1,0 +1,113 @@
+2026-11-11T07:53:56.968Z start bash r8.sh 6 kb a-v6-Vb-book.xml
+== er.sh r6ca C-v-kb.xml exit 3
+C-v-kb.xml: 10262 bytes
+printwindow True saved <LAB_DIR>/shots/r6ca-after.png
+2026-11-11T07:54:00.974Z
+a-r6ca-C-v-kb.xml: ANSWER: VOUCHERS 3
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002e ALTERID 70 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000037 ALTERID 79 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000038 ALTERID 80 DATE 20260801
+exit 0
+r6ca: answered with bytes (evidence/cv-r6ca.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r6cb C-v-kb.xml exit 3
+C-v-kb.xml: 10262 bytes
+printwindow True saved <LAB_DIR>/shots/r6cb-after.png
+2026-11-11T07:54:06.093Z
+a-r6cb-C-v-kb.xml: ANSWER: VOUCHERS 3
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002e ALTERID 70 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000037 ALTERID 79 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000038 ALTERID 80 DATE 20260801
+exit 0
+r6cb: answered with bytes (evidence/cv-r6cb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (10262 B sha256 d6c79e2b1c51c296; 10262 B sha256 d6c79e2b1c51c296)
+exit 0
+== er.sh r6qa Vm-v-kb.xml exit 3
+Vm-v-kb.xml: 29978 bytes
+printwindow True saved <LAB_DIR>/shots/r6qa-after.png
+2026-11-11T07:54:11.651Z
+a-r6qa-Vm-v-kb.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r6qa: answered with bytes (evidence/wx-r6qa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r6qb Vm-v-kb.xml exit 3
+Vm-v-kb.xml: 29978 bytes
+printwindow True saved <LAB_DIR>/shots/r6qb-after.png
+2026-11-11T07:54:16.779Z
+a-r6qb-Vm-v-kb.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r6qb: answered with bytes (evidence/wx-r6qb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (29978 B sha256 9de9f2c6736552e9; 29978 B sha256 9de9f2c6736552e9)
+exit 0
+== er.sh r6wa Vw-v-kb.xml exit 3
+Vw-v-kb.xml: 278376 bytes
+printwindow True saved <LAB_DIR>/shots/r6wa-after.png
+2026-11-11T07:54:22.156Z
+a-r6wa-Vw-v-kb.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r6wa: answered with bytes (evidence/wx-r6wa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r6wb Vw-v-kb.xml exit 3
+Vw-v-kb.xml: 278376 bytes
+printwindow True saved <LAB_DIR>/shots/r6wb-after.png
+2026-11-11T07:54:27.188Z
+a-r6wb-Vw-v-kb.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r6wb: answered with bytes (evidence/wx-r6wb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (278376 B sha256 8ac6d771ca75938c; 278376 B sha256 8ac6d771ca75938c)
+exit 0
+== er.sh r6la L-lo-kb-20260801.xml exit 3
+L-lo-kb-20260801.xml: 2588 bytes
+printwindow True saved <LAB_DIR>/shots/r6la-after.png
+2026-11-11T07:54:32.462Z
+== a-r6la-L-lo-kb-20260801.xml
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['2588']
+  BILLREF 'BP/26-27/0292' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0307' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0308' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: -3153.00
+ANSWER: ROWS 3 (0 On Account)
+exit 0
+r6la: answered with bytes (evidence/nm-r6la.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r6lb L-lo-kb-20260801.xml exit 3
+L-lo-kb-20260801.xml: 2588 bytes
+printwindow True saved <LAB_DIR>/shots/r6lb-after.png
+2026-11-11T07:54:37.632Z
+== a-r6lb-L-lo-kb-20260801.xml
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['2588']
+  BILLREF 'BP/26-27/0292' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0307' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0308' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: -3153.00
+ANSWER: ROWS 3 (0 On Account)
+exit 0
+r6lb: answered with bytes (evidence/nm-r6lb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (2588 B sha256 bbbaaccf1c9ac677; 2588 B sha256 bbbaaccf1c9ac677)
+exit 0
+JUDGE2 kb census: OWN 3 OF 3, OTHERS 0
+exit 0
+JUDGE2 kb movement: OWN 3 OF 3, OTHERS 0
+exit 0
+JUDGE2 kb window: OWN 3 OF 3, OTHERS 0
+exit 0
+JUDGE2 kb outstandings: OWN 3 OF 3, OTHERS 0
+exit 0
+STEP 8 kb: DONE (empty under (a): )
+2026-11-11T07:54:42.307Z end, exit 0

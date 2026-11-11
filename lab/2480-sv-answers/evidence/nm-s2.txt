@@ -1,0 +1,29 @@
+== a-s2-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Mx Plain': 0 groups
+  ka 'BRIDGE Sk Ak Am': 0 groups
+  kb 'BRIDGE Sk Ak, Am': 0 groups
+  ra 'BRIDGE Sk Bk, Bm': 0 groups
+  rb 'BRIDGE Sk Bk Bm': 0 groups
+  qa 'BRIDGE Sk Ck Cm': 0 groups
+  qb "BRIDGE Sk Ck' Cm": 0 groups
+  ua 'BRIDGE Sk Dk Dm': 0 groups
+  ub 'BRIDGE Sk Dk_Dm': 0 groups
+  ea 'BRIDGE Sk EkEm': 0 groups
+  eb 'BRIDGE Sk Ek Em': 0 groups
+  groups of any other party: 0
+== a-s2-S-snap-20260401-20260801.xml
+a-s2-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Mx Plain': no row
+  ka 'BRIDGE Sk Ak Am': no row
+  kb 'BRIDGE Sk Ak, Am': no row
+  ra 'BRIDGE Sk Bk, Bm': no row
+  rb 'BRIDGE Sk Bk Bm': no row
+  qa 'BRIDGE Sk Ck Cm': no row
+  qb "BRIDGE Sk Ck' Cm": no row
+  ua 'BRIDGE Sk Dk Dm': no row
+  ub 'BRIDGE Sk Dk_Dm': no row
+  ea 'BRIDGE Sk EkEm': no row
+  eb 'BRIDGE Sk Ek Em': no row
+exit 0

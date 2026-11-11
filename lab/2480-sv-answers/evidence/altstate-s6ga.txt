@@ -1,0 +1,3 @@
+a-s6ga-G-cat.xml: LEDGER rows 24
+ALTERED STATE k: AS SK RECORDED
+exit 0

@@ -1,0 +1,5 @@
+2026-11-11T07:44:40.897Z start env SHOT=j2-after bash send.sh j2 J-qb.xml
+J-qb.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/j2-after.png
+2026-11-11T07:44:45.729Z
+2026-11-11T07:44:45.928Z end, exit 0

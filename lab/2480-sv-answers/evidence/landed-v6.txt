@@ -1,0 +1,3 @@
+LANDED kb: ON ka
+VERDICT kb: ON ITS LEDGER
+exit 0

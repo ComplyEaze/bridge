@@ -1,0 +1,5 @@
+2026-11-11T07:46:14.228Z start env SHOT=j4-after bash send.sh j4 J-ub.xml
+J-ub.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/j4-after.png
+2026-11-11T07:46:18.522Z
+2026-11-11T07:46:18.704Z end, exit 0

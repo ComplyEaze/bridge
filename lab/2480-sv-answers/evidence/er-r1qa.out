@@ -1,0 +1,8 @@
+Vm-v-qa.xml: 20966 bytes
+printwindow True saved <LAB_DIR>/shots/r1qa-after.png
+2026-11-11T07:49:55.118Z
+a-r1qa-Vm-v-qa.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0303 DATE 20260801 ALTERID 75 entries 6
+exit 0
+r1qa: answered with bytes (evidence/wx-r1qa.txt)

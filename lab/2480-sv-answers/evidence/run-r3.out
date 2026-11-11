@@ -1,0 +1,75 @@
+2026-11-11T07:51:26.461Z start bash r8.sh 3 ua a-v6-Vb-book.xml
+== er.sh r3ca C-v-ua.xml exit 3
+C-v-ua.xml: 7822 bytes
+printwindow True saved <LAB_DIR>/shots/r3ca-after.png
+2026-11-11T07:51:32.557Z
+a-r3ca-C-v-ua.xml: ANSWER: VOUCHERS 2
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031 ALTERID 73 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000035 ALTERID 77 DATE 20260801
+exit 0
+r3ca: answered with bytes (evidence/cv-r3ca.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r3cb C-v-ua.xml exit 3
+C-v-ua.xml: 7822 bytes
+printwindow True saved <LAB_DIR>/shots/r3cb-after.png
+2026-11-11T07:51:37.728Z
+a-r3cb-C-v-ua.xml: ANSWER: VOUCHERS 2
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031 ALTERID 73 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000035 ALTERID 77 DATE 20260801
+exit 0
+r3cb: answered with bytes (evidence/cv-r3cb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (7822 B sha256 c703b1aa189f254a; 7822 B sha256 c703b1aa189f254a)
+exit 0
+== er.sh r3qa Vm-v-ua.xml exit 3
+Vm-v-ua.xml: 20966 bytes
+printwindow True saved <LAB_DIR>/shots/r3qa-after.png
+2026-11-11T07:51:43.472Z
+a-r3qa-Vm-v-ua.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0305 DATE 20260801 ALTERID 77 entries 6
+exit 0
+r3qa: answered with bytes (evidence/wx-r3qa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r3qb Vm-v-ua.xml exit 3
+Vm-v-ua.xml: 20966 bytes
+printwindow True saved <LAB_DIR>/shots/r3qb-after.png
+2026-11-11T07:51:48.626Z
+a-r3qb-Vm-v-ua.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0305 DATE 20260801 ALTERID 77 entries 6
+exit 0
+r3qb: answered with bytes (evidence/wx-r3qb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (20966 B sha256 02e3a378af80ba29; 20966 B sha256 02e3a378af80ba29)
+exit 0
+== er.sh r3wa Vw-v-ua.xml exit 3
+Vw-v-ua.xml: 186564 bytes
+printwindow True saved <LAB_DIR>/shots/r3wa-after.png
+2026-11-11T07:51:54.054Z
+a-r3wa-Vw-v-ua.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0305 DATE 20260801 ALTERID 77 entries 6
+exit 0
+r3wa: answered with bytes (evidence/wx-r3wa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r3wb Vw-v-ua.xml exit 3
+Vw-v-ua.xml: 186564 bytes
+printwindow True saved <LAB_DIR>/shots/r3wb-after.png
+2026-11-11T07:51:59.242Z
+a-r3wb-Vw-v-ua.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0298 DATE 20260801 ALTERID 73 entries 6
+  BP/26-27/0305 DATE 20260801 ALTERID 77 entries 6
+exit 0
+r3wb: answered with bytes (evidence/wx-r3wb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (186564 B sha256 9ee7bb58e4c6f70c; 186564 B sha256 9ee7bb58e4c6f70c)
+exit 0
+JUDGE2 ua census: OWN 2 OF 2, OTHERS 0
+exit 0
+JUDGE2 ua movement: OWN 2 OF 2, OTHERS 0
+exit 0
+JUDGE2 ua window: OWN 2 OF 2, OTHERS 0
+exit 0
+STEP 8 ua: DONE (empty under (a): )
+2026-11-11T07:52:04.282Z end, exit 0

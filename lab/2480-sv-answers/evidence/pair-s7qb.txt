@@ -1,0 +1,5 @@
+a-s7qb-G-cat.xml: LEDGER rows 22
+  NAMES qa: EQUAL (one row, its own GUID)
+  NAMES qb: EQUAL (one row, its own GUID)
+PAIR qa qb: BOTH
+exit 0

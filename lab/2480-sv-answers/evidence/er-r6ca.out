@@ -1,0 +1,9 @@
+C-v-kb.xml: 10262 bytes
+printwindow True saved <LAB_DIR>/shots/r6ca-after.png
+2026-11-11T07:54:00.974Z
+a-r6ca-C-v-kb.xml: ANSWER: VOUCHERS 3
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002e ALTERID 70 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000037 ALTERID 79 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000038 ALTERID 80 DATE 20260801
+exit 0
+r6ca: answered with bytes (evidence/cv-r6ca.txt)

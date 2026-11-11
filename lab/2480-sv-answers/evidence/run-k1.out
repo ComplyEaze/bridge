@@ -1,0 +1,11 @@
+2026-11-11T07:48:44.565Z start env SHOT=k1-after bash send.sh k1 M-marks.xml
+M-marks.xml: 3406 bytes
+printwindow True saved <LAB_DIR>/shots/k1-after.png
+2026-11-11T07:48:48.546Z
+== a-k1-M-marks.xml: 3406 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '80' ALTMSTID '252'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0
+2026-11-11T07:48:49.204Z end, exit 0

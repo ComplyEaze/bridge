@@ -1,0 +1,113 @@
+2026-11-11T07:52:56.708Z start bash r8.sh 5 ka a-v6-Vb-book.xml
+== er.sh r5ca C-v-ka.xml exit 3
+C-v-ka.xml: 10262 bytes
+printwindow True saved <LAB_DIR>/shots/r5ca-after.png
+2026-11-11T07:53:00.895Z
+a-r5ca-C-v-ka.xml: ANSWER: VOUCHERS 3
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002e ALTERID 70 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000037 ALTERID 79 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000038 ALTERID 80 DATE 20260801
+exit 0
+r5ca: answered with bytes (evidence/cv-r5ca.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r5cb C-v-ka.xml exit 3
+C-v-ka.xml: 10262 bytes
+printwindow True saved <LAB_DIR>/shots/r5cb-after.png
+2026-11-11T07:53:06.783Z
+a-r5cb-C-v-ka.xml: ANSWER: VOUCHERS 3
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002e ALTERID 70 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000037 ALTERID 79 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000038 ALTERID 80 DATE 20260801
+exit 0
+r5cb: answered with bytes (evidence/cv-r5cb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (10262 B sha256 d6c79e2b1c51c296; 10262 B sha256 d6c79e2b1c51c296)
+exit 0
+== er.sh r5qa Vm-v-ka.xml exit 3
+Vm-v-ka.xml: 29978 bytes
+printwindow True saved <LAB_DIR>/shots/r5qa-after.png
+2026-11-11T07:53:13.941Z
+a-r5qa-Vm-v-ka.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r5qa: answered with bytes (evidence/wx-r5qa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r5qb Vm-v-ka.xml exit 3
+Vm-v-ka.xml: 29978 bytes
+printwindow True saved <LAB_DIR>/shots/r5qb-after.png
+2026-11-11T07:53:19.303Z
+a-r5qb-Vm-v-ka.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r5qb: answered with bytes (evidence/wx-r5qb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (29978 B sha256 9de9f2c6736552e9; 29978 B sha256 9de9f2c6736552e9)
+exit 0
+== er.sh r5wa Vw-v-ka.xml exit 3
+Vw-v-ka.xml: 278376 bytes
+printwindow True saved <LAB_DIR>/shots/r5wa-after.png
+2026-11-11T07:53:24.621Z
+a-r5wa-Vw-v-ka.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r5wa: answered with bytes (evidence/wx-r5wa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r5wb Vw-v-ka.xml exit 3
+Vw-v-ka.xml: 278376 bytes
+printwindow True saved <LAB_DIR>/shots/r5wb-after.png
+2026-11-11T07:53:29.557Z
+a-r5wb-Vw-v-ka.xml: ANSWER: VOUCHERS 3
+  BP/26-27/0292 DATE 20260801 ALTERID 70 entries 6
+  BP/26-27/0307 DATE 20260801 ALTERID 79 entries 6
+  BP/26-27/0308 DATE 20260801 ALTERID 80 entries 6
+exit 0
+r5wb: answered with bytes (evidence/wx-r5wb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (278376 B sha256 8ac6d771ca75938c; 278376 B sha256 8ac6d771ca75938c)
+exit 0
+== er.sh r5la L-lo-ka-20260801.xml exit 3
+L-lo-ka-20260801.xml: 2588 bytes
+printwindow True saved <LAB_DIR>/shots/r5la-after.png
+2026-11-11T07:53:35.179Z
+== a-r5la-L-lo-ka-20260801.xml
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['2588']
+  BILLREF 'BP/26-27/0292' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0307' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0308' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: -3153.00
+ANSWER: ROWS 3 (0 On Account)
+exit 0
+r5la: answered with bytes (evidence/nm-r5la.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r5lb L-lo-ka-20260801.xml exit 3
+L-lo-ka-20260801.xml: 2588 bytes
+printwindow True saved <LAB_DIR>/shots/r5lb-after.png
+2026-11-11T07:53:40.070Z
+== a-r5lb-L-lo-ka-20260801.xml
+  headers: 'HTTP/1.1 200 OK'; Content-Type ['text/xml; charset=utf-16']; CONTENT-LENGTH ['2588']
+  BILLREF 'BP/26-27/0292' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0307' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  BILLREF 'BP/26-27/0308' BILLDATE '1-Aug-26' BILLCL '-1051.00' BILLDUE '1-Aug-26' BILLOVERDUE '0'
+  sum of BILLCL: -3153.00
+ANSWER: ROWS 3 (0 On Account)
+exit 0
+r5lb: answered with bytes (evidence/nm-r5lb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (2588 B sha256 bbbaaccf1c9ac677; 2588 B sha256 bbbaaccf1c9ac677)
+exit 0
+JUDGE2 ka census: OWN 3 OF 3, OTHERS 0
+exit 0
+JUDGE2 ka movement: OWN 3 OF 3, OTHERS 0
+exit 0
+JUDGE2 ka window: OWN 3 OF 3, OTHERS 0
+exit 0
+JUDGE2 ka outstandings: OWN 3 OF 3, OTHERS 0
+exit 0
+STEP 8 ka: DONE (empty under (a): )
+2026-11-11T07:53:44.509Z end, exit 0

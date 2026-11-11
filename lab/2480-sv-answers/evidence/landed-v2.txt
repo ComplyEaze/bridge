@@ -1,0 +1,3 @@
+LANDED qb: ON qb
+VERDICT qb: ON ITS LEDGER
+exit 0

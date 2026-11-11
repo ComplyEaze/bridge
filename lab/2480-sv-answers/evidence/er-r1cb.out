@@ -1,0 +1,8 @@
+C-v-qa.xml: 7822 bytes
+printwindow True saved <LAB_DIR>/shots/r1cb-after.png
+2026-11-11T07:49:49.515Z
+a-r1cb-C-v-qa.xml: ANSWER: VOUCHERS 2
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002f ALTERID 71 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000033 ALTERID 75 DATE 20260801
+exit 0
+r1cb: answered with bytes (evidence/cv-r1cb.txt)

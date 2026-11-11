@@ -1,0 +1,3 @@
+2026-11-11T07:38:48Z pair k (ka, kb): ALTERED, AS SK RECORDED
+2026-11-11T07:39:33Z pair q (qa, qb): BOTH
+2026-11-11T07:40:20Z pair u (ua, ub): BOTH

@@ -1,0 +1,3 @@
+LANDED ua: ON ua
+VERDICT ua: ON ITS LEDGER
+exit 0

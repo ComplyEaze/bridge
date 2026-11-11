@@ -1,0 +1,75 @@
+2026-11-11T07:49:39.768Z start bash r8.sh 1 qa a-v6-Vb-book.xml
+== er.sh r1ca C-v-qa.xml exit 3
+C-v-qa.xml: 7822 bytes
+printwindow True saved <LAB_DIR>/shots/r1ca-after.png
+2026-11-11T07:49:44.277Z
+a-r1ca-C-v-qa.xml: ANSWER: VOUCHERS 2
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002f ALTERID 71 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000033 ALTERID 75 DATE 20260801
+exit 0
+r1ca: answered with bytes (evidence/cv-r1ca.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r1cb C-v-qa.xml exit 3
+C-v-qa.xml: 7822 bytes
+printwindow True saved <LAB_DIR>/shots/r1cb-after.png
+2026-11-11T07:49:49.515Z
+a-r1cb-C-v-qa.xml: ANSWER: VOUCHERS 2
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002f ALTERID 71 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000033 ALTERID 75 DATE 20260801
+exit 0
+r1cb: answered with bytes (evidence/cv-r1cb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (7822 B sha256 bc60a6424d2bd794; 7822 B sha256 bc60a6424d2bd794)
+exit 0
+== er.sh r1qa Vm-v-qa.xml exit 3
+Vm-v-qa.xml: 20966 bytes
+printwindow True saved <LAB_DIR>/shots/r1qa-after.png
+2026-11-11T07:49:55.118Z
+a-r1qa-Vm-v-qa.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0303 DATE 20260801 ALTERID 75 entries 6
+exit 0
+r1qa: answered with bytes (evidence/wx-r1qa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r1qb Vm-v-qa.xml exit 3
+Vm-v-qa.xml: 20966 bytes
+printwindow True saved <LAB_DIR>/shots/r1qb-after.png
+2026-11-11T07:50:00.239Z
+a-r1qb-Vm-v-qa.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0303 DATE 20260801 ALTERID 75 entries 6
+exit 0
+r1qb: answered with bytes (evidence/wx-r1qb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (20966 B sha256 6eab493fc8e73399; 20966 B sha256 6eab493fc8e73399)
+exit 0
+== er.sh r1wa Vw-v-qa.xml exit 3
+Vw-v-qa.xml: 186562 bytes
+printwindow True saved <LAB_DIR>/shots/r1wa-after.png
+2026-11-11T07:50:06.100Z
+a-r1wa-Vw-v-qa.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0303 DATE 20260801 ALTERID 75 entries 6
+exit 0
+r1wa: answered with bytes (evidence/wx-r1wa.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+== er.sh r1wb Vw-v-qa.xml exit 3
+Vw-v-qa.xml: 186562 bytes
+printwindow True saved <LAB_DIR>/shots/r1wb-after.png
+2026-11-11T07:50:11.070Z
+a-r1wb-Vw-v-qa.xml: ANSWER: VOUCHERS 2
+  BP/26-27/0296 DATE 20260801 ALTERID 71 entries 6
+  BP/26-27/0303 DATE 20260801 ALTERID 75 entries 6
+exit 0
+r1wb: answered with bytes (evidence/wx-r1wb.txt)
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+SAME: EQUAL (186562 B sha256 d705cccd48789752; 186562 B sha256 d705cccd48789752)
+exit 0
+JUDGE2 qa census: OWN 2 OF 2, OTHERS 0
+exit 0
+JUDGE2 qa movement: OWN 2 OF 2, OTHERS 0
+exit 0
+JUDGE2 qa window: OWN 2 OF 2, OTHERS 0
+exit 0
+STEP 8 qa: DONE (empty under (a): )
+2026-11-11T07:50:15.030Z end, exit 0

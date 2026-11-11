@@ -1,0 +1,8 @@
+C-v-ua.xml: 7822 bytes
+printwindow True saved <LAB_DIR>/shots/r3ca-after.png
+2026-11-11T07:51:32.557Z
+a-r3ca-C-v-ua.xml: ANSWER: VOUCHERS 2
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031 ALTERID 73 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000035 ALTERID 77 DATE 20260801
+exit 0
+r3ca: answered with bytes (evidence/cv-r3ca.txt)

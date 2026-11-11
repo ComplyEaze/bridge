@@ -1,0 +1,5 @@
+2026-11-11T07:46:59.592Z start env SHOT=j5-after bash send.sh j5 J-ka.xml
+J-ka.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/j5-after.png
+2026-11-11T07:47:03.887Z
+2026-11-11T07:47:04.194Z end, exit 0

@@ -1,0 +1,2 @@
+JUDGE2 ka outstandings: OWN 3 OF 3, OTHERS 0
+exit 0

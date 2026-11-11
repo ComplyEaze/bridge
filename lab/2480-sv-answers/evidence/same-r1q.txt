@@ -1,0 +1,2 @@
+SAME: EQUAL (20966 B sha256 6eab493fc8e73399; 20966 B sha256 6eab493fc8e73399)
+exit 0

@@ -1,0 +1,5 @@
+2026-11-11T07:45:29.093Z start env SHOT=j3-after bash send.sh j3 J-ua.xml
+J-ua.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/j3-after.png
+2026-11-11T07:45:35.315Z
+2026-11-11T07:45:35.487Z end, exit 0

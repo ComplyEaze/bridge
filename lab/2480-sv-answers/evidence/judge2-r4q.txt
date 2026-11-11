@@ -1,0 +1,2 @@
+JUDGE2 ub movement: OWN 2 OF 2, OTHERS 0
+exit 0

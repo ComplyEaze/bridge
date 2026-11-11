@@ -1,0 +1,2 @@
+# Lab helper (row 2480-SC, from row 2480-SK, from row 2480-MW, from row 2480-MX, from row 2480-CV, from row 2480-NX, from row 2480-NC, from row 2480-NS, from row 2480-NM, from row 2346-TD's): one capture of the whole Tally window to shots/<name>.png, with its UTC time.
+H=$(powershell -NoProfile -Command '[int64](Get-Process tally | Select-Object -First 1).MainWindowHandle'); powershell -NoProfile -File <lab folder>/rc070/tools/capwin.ps1 -Handle $H -Out "<LAB_DIR>/shots/$1.png" | tail -1; date -u +%FT%T.%3NZ

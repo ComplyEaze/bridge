@@ -1,0 +1,2 @@
+JUDGE pl window: OWN YES, SIBLING none, OTHERS 0
+exit 0

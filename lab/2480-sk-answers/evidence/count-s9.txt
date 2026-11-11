@@ -1,0 +1,39 @@
+== a-s9-N-0281.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0292.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0293.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0294.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0295.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0296.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0297.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0298.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0299.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0300.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0301.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0

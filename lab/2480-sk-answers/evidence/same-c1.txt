@@ -1,0 +1,2 @@
+SAME: EQUAL (5374 B sha256 7bf8ec4b1d3efdd8; 5374 B sha256 7bf8ec4b1d3efdd8)
+exit 0

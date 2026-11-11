@@ -1,0 +1,13 @@
+a-s9-G-cat.xml: LEDGER rows 18
+  NAMES pl: no row
+  NAMES ka: no row
+  NAMES kb: no row
+  NAMES ra: no row
+  NAMES rb: no row
+  NAMES qa: no row
+  NAMES qb: no row
+  NAMES ua: no row
+  NAMES ub: no row
+  NAMES ea: no row
+  NAMES eb: no row
+exit 0

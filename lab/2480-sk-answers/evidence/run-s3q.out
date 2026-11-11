@@ -1,0 +1,56 @@
+2026-11-11T03:20:34.953Z start bash pair.sh qa qb
+== a-s4qam-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'71'", "'250'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s4qa exit 0
+LM-qa.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4qa-after.png
+2026-11-11T03:20:43.203Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s4qa-LM-qa.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4qa LM-qa.xml a exit 0
+== a-s5qam-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'71'", "'251'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s5qa exit 0
+I-qa.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5qa-after.png
+2026-11-11T03:20:50.271Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s5qa-I-qa.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 48, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5qa I-qa.xml a exit 0
+== a-s4qbm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'72'", "'251'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s4qb exit 0
+LM-qb.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4qb-after.png
+2026-11-11T03:20:56.832Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s4qb-LM-qb.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4qb LM-qb.xml b exit 0
+a-s7qb-G-cat.xml: LEDGER rows 23
+  NAMES qa: EQUAL (one row, its own GUID)
+  NAMES qb: EQUAL (one row, its own GUID)
+PAIR qa qb: BOTH
+exit 0
+== a-s5qbm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'72'", "'252'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s5qb exit 0
+I-qb.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5qb-after.png
+2026-11-11T03:21:08.512Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s5qb-I-qb.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 49, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5qb I-qb.xml a exit 0
+PAIR q RESULT: BOTH
+2026-11-11T03:21:09.550Z end, exit 0

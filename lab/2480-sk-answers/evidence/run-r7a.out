@@ -1,0 +1,42 @@
+2026-11-11T03:25:31.584Z start bash r.sh pl,qa pl,ka,ra,qa,qb,ua,ub,ea
+== er.sh r1a L-lo-pl-20260801.xml exit 3: ANSWER: ROWS 1 (0 On Account)
+== er.sh r1b L-lo-pl-20260801.xml exit 3: ANSWER: ROWS 1 (0 On Account)
+== same-r1: SAME: EQUAL exit 0
+== er.sh c1a C-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh c1b C-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== same-c1: SAME: EQUAL (5374 B sha256 7bf8ec4b1d3efdd8; 5374 B sha256 7bf8ec4b1d3efdd8) exit 0
+== er.sh q1a Vm-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh q1b Vm-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== same-q1: SAME: EQUAL (11946 B sha256 bab794dd1417d3c2; 11946 B sha256 bab794dd1417d3c2) exit 0
+== er.sh w1a Vw-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh w1b Vw-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== same-w1: SAME: EQUAL (94744 B sha256 defbad8a3668ec20; 94744 B sha256 defbad8a3668ec20) exit 0
+== against-1: AGAINST: EQUAL (L rows against the groups) exit 0
+== own-1: OWN: YES exit 0
+== match-q1: MATCH pl movement: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) exit 0
+== match-w1: MATCH pl window: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0281 New Ref -1051.00; 14 own fields equal) exit 0
+== judge-r1: JUDGE pl outstandings: OWN YES, SIBLING none, OTHERS 0 exit 0
+== judge-c1: JUDGE pl census: OWN YES, SIBLING none, OTHERS 0 exit 0
+== judge-q1: JUDGE pl movement: OWN YES, SIBLING none, OTHERS 0 exit 0
+== judge-w1: JUDGE pl window: OWN YES, SIBLING none, OTHERS 0 exit 0
+== er.sh r6a L-lo-qa-20260801.xml exit 3: ANSWER: ROWS 1 (0 On Account)
+== er.sh r6b L-lo-qa-20260801.xml exit 3: ANSWER: ROWS 1 (0 On Account)
+== same-r6: SAME: EQUAL exit 0
+== er.sh c6a C-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh c6b C-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-c6: SAME: EQUAL (5374 B sha256 33983e637255389b; 5374 B sha256 33983e637255389b) exit 0
+== er.sh q6a Vm-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh q6b Vm-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-q6: SAME: EQUAL (11946 B sha256 0516080da74d945f; 11946 B sha256 0516080da74d945f) exit 0
+== er.sh w6a Vw-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh w6b Vw-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-w6: SAME: EQUAL (94744 B sha256 43e5c99da0f4fc3f; 94744 B sha256 43e5c99da0f4fc3f) exit 0
+== against-6: AGAINST: EQUAL (L rows against the groups) exit 0
+== own-6: OWN: YES exit 0
+== match-q6: MATCH qa movement: EQUAL (1 voucher, BP/26-27/0296 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) exit 0
+== match-w6: MATCH qa window: EQUAL (1 voucher, BP/26-27/0296 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0296 New Ref -1051.00; 14 own fields equal) exit 0
+== judge-r6: JUDGE qa outstandings: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== judge-c6: JUDGE qa census: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== judge-q6: JUDGE qa movement: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== judge-w6: JUDGE qa window: OWN YES, SIBLING NO, OTHERS 0 exit 0
+2026-11-11T03:27:07.549Z end, exit 0

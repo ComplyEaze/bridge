@@ -1,0 +1,14 @@
+a-s2-S-snap-20260401-20260801.xml: LEDGER rows 18
+  pl 'BRIDGE Mx Plain': no row
+  ka 'BRIDGE Sk Ak Am': no row
+  kb 'BRIDGE Sk Ak, Am': no row
+  ra 'BRIDGE Sk Bk, Bm': no row
+  rb 'BRIDGE Sk Bk Bm': no row
+  qa 'BRIDGE Sk Ck Cm': no row
+  qb "BRIDGE Sk Ck' Cm": no row
+  ua 'BRIDGE Sk Dk Dm': no row
+  ub 'BRIDGE Sk Dk_Dm': no row
+  ea 'BRIDGE Sk EkEm': no row
+  eb 'BRIDGE Sk Ek Em': no row
+NAMES: EQUAL
+exit 0

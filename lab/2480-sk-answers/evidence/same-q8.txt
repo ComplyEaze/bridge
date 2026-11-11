@@ -1,0 +1,2 @@
+SAME: EQUAL (11946 B sha256 d5f88014ae01e6ec; 11946 B sha256 d5f88014ae01e6ec)
+exit 0

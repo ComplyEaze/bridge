@@ -1,0 +1,6 @@
+a-c7a-C-v-qb.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031 ALTERID 73 DATE 20260801
+qb's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031 ALTERID 73 DATE 20260801 (new vouchers 8)
+  observation: its GUID is not I-qb.xml's REMOTEID
+OWN: YES
+exit 0

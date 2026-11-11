@@ -1,0 +1,17 @@
+a-s6sa-S-snap-20260401-20260801.xml: LEDGER rows 26
+  name list not the NAME attribute: NAME 'BRIDGE Sk Ak Am', names ['BRIDGE Sk Ak, Am']
+  name list not the NAME attribute: NAME 'BRIDGE Sk Bk, Bm', names ['BRIDGE Sk Bk Bm']
+  name list not the NAME attribute: NAME 'BRIDGE Sk EkEm', names ['BRIDGE Sk Ek Em']
+  pl 'BRIDGE Mx Plain': names ['BRIDGE Mx Plain']
+  ka 'BRIDGE Sk Ak Am': names ['BRIDGE Sk Ak, Am']
+  kb 'BRIDGE Sk Ak, Am': no row
+  ra 'BRIDGE Sk Bk, Bm': names ['BRIDGE Sk Bk Bm']
+  rb 'BRIDGE Sk Bk Bm': no row
+  qa 'BRIDGE Sk Ck Cm': names ['BRIDGE Sk Ck Cm']
+  qb "BRIDGE Sk Ck' Cm": names ["BRIDGE Sk Ck' Cm"]
+  ua 'BRIDGE Sk Dk Dm': names ['BRIDGE Sk Dk Dm']
+  ub 'BRIDGE Sk Dk_Dm': names ['BRIDGE Sk Dk_Dm']
+  ea 'BRIDGE Sk EkEm': names ['BRIDGE Sk Ek Em']
+  eb 'BRIDGE Sk Ek Em': no row
+NAMES: DIFFER
+exit 0

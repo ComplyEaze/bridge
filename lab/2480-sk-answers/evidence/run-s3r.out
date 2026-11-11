@@ -1,0 +1,49 @@
+2026-11-11T03:19:40.706Z start bash pair.sh ra rb
+== a-s4ram-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'70'", "'248'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s4ra exit 0
+LM-ra.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4ra-after.png
+2026-11-11T03:19:50.748Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s4ra-LM-ra.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4ra LM-ra.xml a exit 0
+== a-s5ram-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'70'", "'249'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s5ra exit 0
+I-ra.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5ra-after.png
+2026-11-11T03:20:12.363Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s5ra-I-ra.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 47, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5ra I-ra.xml a exit 0
+== a-s4rbm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'71'", "'249'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s4rb exit 0
+LM-rb.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4rb-after.png
+2026-11-11T03:20:18.775Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s4rb-LM-rb.xml: CREATED 0, ALTERED 1, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: stop (CREATED is not 1; ALTERED is not 0)
+exit 1
+a-s4rb-LM-rb.xml: CREATED 0, ALTERED 1, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+ALTERED ONE
+exit 0
+== a-s4rbx-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'71'", "'250'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== a-s4rbx-M-marks.xml against a-s4rbm-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'71'", "'250'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'71'", "'249'")
+stop: the COMPANY row differs
+exit 1
+ALTERED: s4rb taken as the first ledger on import
+== w.sh i s4rb LM-rb.xml b exit 5
+PAIR r RESULT: ALTERED
+2026-11-11T03:20:22.286Z end, exit 0

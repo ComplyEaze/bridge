@@ -1,0 +1,56 @@
+2026-11-11T03:21:22.228Z start bash pair.sh ua ub
+== a-s4uam-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'73'", "'252'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s4ua exit 0
+LM-ua.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4ua-after.png
+2026-11-11T03:21:28.556Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s4ua-LM-ua.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4ua LM-ua.xml a exit 0
+== a-s5uam-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'73'", "'253'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s5ua exit 0
+I-ua.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5ua-after.png
+2026-11-11T03:21:36.070Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s5ua-I-ua.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 50, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5ua I-ua.xml a exit 0
+== a-s4ubm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'253'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s4ub exit 0
+LM-ub.xml: 538 bytes
+printwindow True saved <LAB_DIR>/shots/s4ub-after.png
+2026-11-11T03:21:42.723Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s4ub-LM-ub.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 0, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s4ub LM-ub.xml b exit 0
+a-s7ub-G-cat.xml: LEDGER rows 25
+  NAMES ua: EQUAL (one row, its own GUID)
+  NAMES ub: EQUAL (one row, its own GUID)
+PAIR ua ub: BOTH
+exit 0
+== a-s5ubm-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'254'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  one COMPANY row, the same GUID: the write may be sent
+exit 0
+== w.sh m s5ub exit 0
+I-ub.xml: 540 bytes
+printwindow True saved <LAB_DIR>/shots/s5ub-after.png
+2026-11-11T03:21:54.233Z
+capture ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a, one of the Gateway captures in evidence/gateway-refs.txt
+a-s5ub-I-ub.xml: CREATED 1, ALTERED 0, DELETED 0, LASTVCHID 51, LASTMID 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LINEERROR 0
+IMPORT: CREATED ONE
+exit 0
+== w.sh i s5ub I-ub.xml a exit 0
+PAIR u RESULT: BOTH
+2026-11-11T03:21:55.363Z end, exit 0

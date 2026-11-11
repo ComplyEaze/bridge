@@ -1,0 +1,16 @@
+G-cat.xml: 28610 bytes
+printwindow True saved <LAB_DIR>/shots/s7qb-after.png
+2026-11-11T03:21:01.284Z
+a-s7qb-G-cat.xml: LEDGER rows 23
+  NAMES pl: EQUAL (one row, its own GUID)
+  NAMES ka: DIFFER (its names are ['BRIDGE Sk Ak, Am'])
+  NAMES kb: no row
+  NAMES ra: DIFFER (its names are ['BRIDGE Sk Bk Bm'])
+  NAMES rb: no row
+  NAMES qa: EQUAL (one row, its own GUID)
+  NAMES qb: EQUAL (one row, its own GUID)
+  NAMES ua: no row
+  NAMES ub: no row
+  NAMES ea: no row
+  NAMES eb: no row
+exit 0

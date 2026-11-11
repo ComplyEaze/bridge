@@ -6,6 +6,13 @@
 // timestamped event log. It sends nothing to Tally and holds no book: every row it returns is invented here.
 //
 // Run: node stepped-vouchers-server.mjs --tools <tools.json> [--log <file>] [--step-scale <0.01 to 1>]
+//        [--continue-by id|arguments]
+//
+// Sheet version 3 adds `--continue-by arguments` (default `id`, which is version 2's server, unchanged). With it,
+// served with tools-args.json, no read_id is issued or accepted: a vouchers call whose other arguments equal the one
+// live read's continues it, and any other starts a new read. There is one live read, as in the #703 design note's
+// design 1: a call with other arguments drops it (read_dropped), and so does 15 minutes idle (read_expired, then a
+// new read). A finished read is never continued, so the same arguments after it start a new read.
 //
 // It serves Bridge's own text, taken from source by extract_text.py into tools.json: the server instructions,
 // and the `list_companies` and `vouchers` tools with their shipped descriptions plus the build's planned stepping
@@ -39,16 +46,17 @@ export const PLANS = {
   five: [40, 50, 40, 55, 30],
   twelve: [40, 40, 50, 40, 40, 55, 40, 40, 50, 40, 55, 30],
 };
-const USAGE = "usage: node stepped-vouchers-server.mjs --tools <tools.json> [--log <file>] [--step-scale <0.01 to 1>]";
+const USAGE = "usage: node stepped-vouchers-server.mjs --tools <tools.json> [--log <file>] [--step-scale <0.01 to 1>] [--continue-by id|arguments]";
 
 export function parseArgs(argv) {
-  const args = { tools: null, log: null, stepScale: 1 };
+  const args = { tools: null, log: null, stepScale: 1, continueBy: "id" };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i + 1];
     if (value === undefined || value.startsWith("--")) throw new Error(USAGE);
     if (argv[i] === "--tools") args.tools = value;
     else if (argv[i] === "--log") args.log = value;
     else if (argv[i] === "--step-scale") args.stepScale = Number(value);
+    else if (argv[i] === "--continue-by" && (value === "id" || value === "arguments")) args.continueBy = value;
     else throw new Error(USAGE);
     i += 1;
   }
@@ -64,8 +72,13 @@ export function sortKeys(value) {
 }
 
 // Strips the kit's own `planned` markers, which the model must not see.
-export function loadTools(text) {
+export function loadTools(text, continueBy = "id") {
   const document = JSON.parse(text);
+  // The text and the mode must agree: the arguments text serves no read_id, the id text does.
+  const servesId = Object.hasOwn(document.tools?.[1]?.inputSchema?.properties ?? {}, "read_id");
+  if (servesId !== (continueBy === "id") || (document.planned?.continue_by ?? "id") !== continueBy) {
+    throw new Error(`tools.json does not match --continue-by ${continueBy}`);
+  }
   const tools = document.tools.map((tool) => sortKeys(JSON.parse(JSON.stringify(tool, (key, value) => (key === "planned" ? undefined : value)))));
   if (tools.map((tool) => tool.name).join(",") !== "list_companies,vouchers") throw new Error("tools.json must hold list_companies and vouchers");
   if (typeof document.planned?.next_step !== "string") throw new Error("tools.json must hold planned.next_step");
@@ -113,13 +126,13 @@ export function readVoucherArguments(input, schema) {
   return { readId: input.read_id ?? null, key, from, to, guid: input.company_guid };
 }
 
-export function createServer({ send, log, tools, stepScale = 1, idleSeconds = READ_IDLE_SECONDS, now = () => performance.now(), mint = mintReadId, code = mintCode }) {
+export function createServer({ send, log, tools, stepScale = 1, continueBy = "id", idleSeconds = READ_IDLE_SECONDS, now = () => performance.now(), mint = mintReadId, code = mintCode }) {
   const company = { name: "Lab Stepped Traders", guid: `${letters(8)}-${letters(4)}-${letters(4)}-${letters(4)}-${letters(12)}`, books_from: "2026-04-01" };
   const vouchersSchema = tools.tools[1].inputSchema;
   const calls = new Map(); // request id (as JSON) -> { timer, started }
   const reads = new Map(); // read id -> { plan, seconds, done, key, code, finished, used, from, to }
   const id = (value) => JSON.stringify(value);
-  log({ event: "company", guid: company.guid, source_commit: tools.sourceCommit, step_scale: stepScale });
+  log({ event: "company", guid: company.guid, source_commit: tools.sourceCommit, step_scale: stepScale, continue_by: continueBy });
 
   const companyJson = () => ({ name: company.name, guid: company.guid, company_number: "lab", books_from: company.books_from, identity_state: "verified_tuple", missing_field: null });
   function result(requestId, value) {
@@ -158,7 +171,24 @@ export function createServer({ send, log, tools, stepScale = 1, idleSeconds = RE
     if (parsed.guid !== company.guid) return refuse(requestId, "vouchers", "company_not_open", parsed.readId);
     let readId = parsed.readId;
     let read;
-    if (readId === null) {
+    if (continueBy === "arguments") {
+      // One live read. The same other arguments continue it; anything else drops it. The schema served with this
+      // mode has no read_id, so a call carrying one was refused above as argument_unknown:read_id.
+      const live = [...reads].filter(([, r]) => !r.finished);
+      for (const [liveId, r] of live) {
+        if (r.key === parsed.key && (now() - r.used) / 1000 <= idleSeconds) {
+          readId = liveId;
+          read = r;
+          read.used = now();
+        } else {
+          reads.delete(liveId);
+          log({ event: r.key === parsed.key ? "read_expired" : "read_dropped", id: requestId, read_id: liveId, step: r.done, of: r.seconds.length });
+        }
+      }
+    }
+    if (read) {
+      // continued by its arguments
+    } else if (readId === null) {
       const live = [...reads].filter(([, r]) => !r.finished).sort(([, a], [, b]) => a.used - b.used);
       if (live.length >= MAX_LIVE_READS) {
         reads.delete(live[0][0]);
@@ -169,7 +199,7 @@ export function createServer({ send, log, tools, stepScale = 1, idleSeconds = RE
       readId = mint();
       read = { plan, seconds: PLANS[plan], done: 0, key: parsed.key, code: code(), finished: false, used: now(), from: parsed.from, to: parsed.to };
       reads.set(readId, read);
-      log({ event: "read_started", id: requestId, read_id: readId, plan, of: read.seconds.length, span_days: span, code: read.code });
+      log({ event: "read_started", id: requestId, read_id: readId, plan, of: read.seconds.length, span_days: span, code: read.code, continue_by: continueBy });
     } else {
       read = reads.get(readId);
       if (!read) return refuse(requestId, "vouchers", "read_unknown", readId);
@@ -191,7 +221,9 @@ export function createServer({ send, log, tools, stepScale = 1, idleSeconds = RE
       read.finished = read.done >= read.seconds.length;
       const elapsed = (performance.now() - started) / 1000;
       const window = { from: iso(read.from), to: iso(read.to) };
-      const progress = { read_id: readId, step: read.done, steps: read.seconds.length, done: read.finished };
+      const progress = continueBy === "arguments"
+        ? { step: read.done, steps: read.seconds.length, done: read.finished }
+        : { read_id: readId, step: read.done, steps: read.seconds.length, done: read.finished };
       const payload = read.finished
         ? { company: companyJson(), result: { state: "observed", ...window, ...progress, vouchers: rows(read), offset: 0, next_offset: null, truncated: false } }
         : { company: companyJson(), result: { state: "in_progress", ...window, ...progress, next_step: tools.nextStep } };
@@ -260,7 +292,7 @@ function main() {
   let tools;
   try {
     args = parseArgs(process.argv.slice(2));
-    tools = loadTools(readFileSync(args.tools, "utf-8"));
+    tools = loadTools(readFileSync(args.tools, "utf-8"), args.continueBy);
   } catch (cause) {
     process.stderr.write(`${cause.message}\n`);
     process.exit(2);
@@ -276,7 +308,7 @@ function main() {
     process.stderr.write(`cannot write the log ${args.log}: ${cause.message}\n`);
     process.exit(2);
   }
-  const server = createServer({ send: (message) => process.stdout.write(`${JSON.stringify(message)}\n`), log, tools, stepScale: args.stepScale });
+  const server = createServer({ send: (message) => process.stdout.write(`${JSON.stringify(message)}\n`), log, tools, stepScale: args.stepScale, continueBy: args.continueBy });
   const input = createInterface({ input: process.stdin });
   input.on("line", (line) => server.handleLine(line));
   input.on("close", () => {

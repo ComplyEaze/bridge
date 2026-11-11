@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Adds row 703-A's one lab server entry to the desktop app's configuration, and puts the original bytes back.
+"""Adds one of row 703-A's lab server entries to the desktop app's configuration, and puts the original bytes back.
 
 The configuration is the file the app reads (its path is recorded in the notes on the lab PC and never pushed). No
 editor opens it, so no save prompt can appear: this script reads and writes its bytes.
 
-  python -I desktop_config.py add <config> <before-copy> <server.mjs> <tools.json> <log>
-      Refuses if <before-copy> exists. Copies the configuration's bytes to <before-copy>, prints its sha256 (B0), adds
-      the entry `bridge-lab-703a` to `mcpServers` (refused if that name is already there; every other key and entry is
-      kept as parsed), writes the file as UTF-8 without a byte-order mark, and prints the new sha256 (B1).
+  python -I desktop_config.py add <config> <before-copy> <server.mjs> <tools.json> <log> [arguments <step-scale>]
+      Refuses if <before-copy> or <log> exists. Copies the configuration's bytes to <before-copy>, prints its sha256
+      (B0), adds the entry `bridge-lab-703a` to `mcpServers` (refused if that name is already there; every other key
+      and entry is kept as parsed), writes the file as UTF-8 without a byte-order mark, and prints the new sha256
+      (B1). With `arguments <step-scale>` (sheet version 3, phase S) the entry runs the server with
+      `--continue-by arguments --step-scale <step-scale>` (0.01 to 1), and <tools.json> must be tools-args.json.
+  python -I desktop_config.py add-sleep <config> <before-copy> <mcp-sleep-server.mjs> <log>
+      The same, for phase H: the entry `bridge-lab-703h` runs the repository's sleep server with `--log <log>`.
   python -I desktop_config.py restore <config> <before-copy> <B0>
       Refuses unless <before-copy>'s sha256 is B0. Writes those bytes back over the configuration, reads the file again
       and prints its sha256, which must be B0 (exit 1 otherwise). Run it before the app is started again: the app
@@ -24,6 +28,7 @@ import os
 import sys
 
 ENTRY = "bridge-lab-703a"
+SLEEP_ENTRY = "bridge-lab-703h"
 
 
 class Failed(Exception):
@@ -57,8 +62,33 @@ def servers(config):
     return found
 
 
-def add(config_path, before_path, server_path, tools_path, log_path):
-    for path in (server_path, tools_path, log_path):
+def add(config_path, before_path, server_path, tools_path, log_path, mode=None, scale=None):
+    if mode not in (None, "arguments"):
+        raise Failed("the sixth word may only be arguments, not {}".format(mode))
+    if mode == "arguments":
+        if os.path.basename(tools_path) != "tools-args.json":
+            raise Failed("continuation by arguments is served with tools-args.json, not {}".format(tools_path))
+        try:
+            ok = 0.01 <= float(scale) <= 1
+        except ValueError:
+            ok = False
+        if not ok:
+            raise Failed("the step scale must be a number from 0.01 to 1, not {}".format(scale))
+    elif os.path.basename(tools_path) != "tools.json":
+        raise Failed("continuation by id is served with tools.json, not {}".format(tools_path))
+    args = [server_path, "--tools", tools_path, "--log", log_path] + (
+        ["--continue-by", "arguments", "--step-scale", scale] if mode else [])
+    return add_entry(config_path, before_path, ENTRY, args, (server_path, tools_path, log_path), log_path)
+
+
+def add_sleep(config_path, before_path, server_path, log_path):
+    if os.path.basename(server_path) != "mcp-sleep-server.mjs":
+        raise Failed("{} is not the sleep server".format(server_path))
+    return add_entry(config_path, before_path, SLEEP_ENTRY, [server_path, "--log", log_path], (server_path, log_path), log_path)
+
+
+def add_entry(config_path, before_path, entry, args, paths, log_path):
+    for path in paths:
         if not os.path.isabs(path):
             raise Failed("{} is not an absolute path (the app starts the server in a folder of its own)".format(path))
     if os.path.exists(before_path):
@@ -67,14 +97,16 @@ def add(config_path, before_path, server_path, tools_path, log_path):
         raise Failed("{} exists: the row's log starts empty".format(log_path))
     data = read(config_path)
     config = parse(data, config_path)
+    # Checked before the before-copy is written, so a refused add leaves nothing behind (version 3).
+    found = servers(config)
+    for name in (ENTRY, SLEEP_ENTRY):
+        if name in found:
+            raise Failed("{} is already in mcpServers".format(name))
     with open(before_path, "xb") as handle:
         handle.write(data)
     if read(before_path) != data:
         raise Failed("the before-copy differs from the configuration")
-    found = servers(config)
-    if ENTRY in found:
-        raise Failed("{} is already in mcpServers".format(ENTRY))
-    found[ENTRY] = {"command": "node", "args": [server_path, "--tools", tools_path, "--log", log_path]}
+    found[entry] = {"command": "node", "args": args}
     config["mcpServers"] = found
     out = json.dumps(config, indent=2, ensure_ascii=False).encode("utf-8")
     with open(config_path, "wb") as handle:
@@ -109,8 +141,10 @@ def compare(config_path, before_path):
 
 
 def main(argv):
-    if len(argv) == 6 and argv[0] == "add":
+    if len(argv) in (6, 8) and argv[0] == "add":
         return add(*argv[1:])
+    if len(argv) == 5 and argv[0] == "add-sleep":
+        return add_sleep(*argv[1:])
     if len(argv) == 4 and argv[0] == "restore":
         return restore(*argv[1:])
     if len(argv) == 3 and argv[0] == "compare":

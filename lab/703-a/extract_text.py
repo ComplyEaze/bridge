@@ -2,6 +2,10 @@
 """Writes tools.json: the text the dev server serves, taken from Bridge's own source (lab row 703-A, #703).
 
   python -I extract_text.py <folder holding the four files below> <commit, 8 characters> > tools.json
+  python -I extract_text.py <folder> <commit> arguments > tools-args.json
+
+The second form (sheet version 3) writes the text for continuation by the same arguments: the planned texts are the
+`*_ARGS` ones below, and the `vouchers` schema gets no read_id. Everything taken from the source is the same.
 
 The four files are `agent_protocol.rs`, `agent_catalog.rs`, `agent_import.rs` and `agent_voucher_search.rs` from
 `src-tauri/src/`, as `git show <commit>:<path>` prints them. The row measures whether a model carries a read_id on
@@ -36,6 +40,18 @@ PLANNED_INSTRUCTION = (
     "without asking the user."
 )
 NEXT_STEP = "Call vouchers again with the same arguments and this read_id."
+# Continuation by the same arguments (sheet version 3, question 2(a) of the #703 design note): no read_id is served.
+PLANNED_STEP_SENTENCE_ARGS = (
+    "A read too long for one call is served in steps: a result with done false carries step and steps and no rows. "
+    "Call vouchers again with exactly the same arguments, without asking the user, until done is true; only that "
+    "last result carries the rows. Each step returns in under a minute. A read left idle for 15 minutes, or followed "
+    "by a vouchers call with other arguments, is dropped, and the next call starts it again from its first step."
+)
+PLANNED_INSTRUCTION_ARGS = (
+    " A result with done false is not an answer: call the same tool again with exactly the same arguments until done "
+    "is true, without asking the user."
+)
+NEXT_STEP_ARGS = "Call vouchers again with exactly the same arguments."
 READ_ID_DESCRIPTION = (
     "Optional: the read_id of a read still in progress (done false), to run its next step. Give the same other "
     "arguments as the first call."
@@ -85,7 +101,7 @@ def constant(source, name, what):
     return once(r"const " + name + r": usize = ([0-9]+);", source, what)
 
 
-def main(directory, commit):
+def main(directory, commit, continue_by="id"):
     protocol = read(directory, "agent_protocol.rs")
     catalog = read(directory, "agent_catalog.rs")
     names = constant(read(directory, "agent_import.rs"), "MAX_MASTER_NAME_CHARS", "MAX_MASTER_NAME_CHARS")
@@ -117,29 +133,36 @@ def main(directory, commit):
             raise Failed("no parameter_description arm for vouchers parameter {}".format(name))
         first = arms[0][1]
         entry["description"] = guid if first == "COMPANY_GUID_DESCRIPTION" else unescape(first[1:-1])
-    schema["properties"]["read_id"] = {"type": "string", "minLength": 1, "maxLength": 64,
-                                       "description": READ_ID_DESCRIPTION, "planned": True}
+    if continue_by == "arguments":
+        step_sentence, instruction = PLANNED_STEP_SENTENCE_ARGS, PLANNED_INSTRUCTION_ARGS
+        planned = {"continue_by": "arguments", "instruction": instruction.strip(),
+                   "vouchers_description": step_sentence, "next_step": NEXT_STEP_ARGS}
+    else:
+        step_sentence, instruction = PLANNED_STEP_SENTENCE, PLANNED_INSTRUCTION
+        schema["properties"]["read_id"] = {"type": "string", "minLength": 1, "maxLength": 64,
+                                           "description": READ_ID_DESCRIPTION, "planned": True}
+        planned = {"instruction": PLANNED_INSTRUCTION.strip(), "vouchers_description": PLANNED_STEP_SENTENCE,
+                   "read_id": READ_ID_DESCRIPTION, "next_step": NEXT_STEP}
     return {
         "source_commit": commit,
         "reach": "Prepare",
-        "instructions": instructions + " " + prepare + PLANNED_INSTRUCTION,
-        "planned": {"instruction": PLANNED_INSTRUCTION.strip(), "vouchers_description": PLANNED_STEP_SENTENCE,
-                    "read_id": READ_ID_DESCRIPTION, "next_step": NEXT_STEP},
+        "instructions": instructions + " " + prepare + instruction,
+        "planned": planned,
         "tools": [
             {"name": "list_companies", "description": companies + " " + receipt,
              "inputSchema": {"type": "object", "additionalProperties": False}, "annotations": annotations},
-            {"name": "vouchers", "description": vouchers + " " + receipt + " " + PLANNED_STEP_SENTENCE,
+            {"name": "vouchers", "description": vouchers + " " + receipt + " " + step_sentence,
              "inputSchema": schema, "annotations": annotations},
         ],
     }
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or not re.fullmatch(r"[0-9a-f]{8}", sys.argv[2]):
+    if len(sys.argv) not in (3, 4) or not re.fullmatch(r"[0-9a-f]{8}", sys.argv[2]) or sys.argv[3:] not in ([], ["arguments"]):
         print(__doc__)
         sys.exit(2)
     try:
-        document = main(sys.argv[1], sys.argv[2])
+        document = main(sys.argv[1], sys.argv[2], "arguments" if sys.argv[3:] else "id")
     except (Failed, OSError, ValueError) as error:
         print("FAIL: {}".format(error), file=sys.stderr)
         sys.exit(1)

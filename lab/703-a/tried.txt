@@ -1,0 +1,126 @@
+# tried.txt: the build Mac's smoke runs of sheet 703-A version 3 (11 Nov 2026). Paths are written <kit> and <tmp>.
+# node v24.21.0, python 3.14.8. drive.mjs is a throwaway driver kept off the branch; every step below is at --step-scale 0.01. Each sha256 is cut to its first 8 characters.
+
+## extract_text.py on e24f1244's four files, both modes
+id mode exit 0; cmp with tools.json: equal
+arguments mode exit 0; cmp with tools-args.json: equal
+where the two texts differ: instructions and tools[1].description by the planned sentences only; planned.*; read_id served only in id mode
+
+## the server refuses a text that does not match its mode
+tools.json does not match --continue-by arguments
+exit 2
+tools.json does not match --continue-by id
+exit 2
+
+## drive.mjs arguments
+schema has read_id false
+with read_id {"code":"argument_unknown:read_id","message":"ComplyEaze Bridge refused this operation."}
+W 1 {"step":1,"steps":5,"done":false,"state":"in_progress"}
+W 2 {"step":2,"steps":5,"done":false,"state":"in_progress"}
+W 3 {"step":3,"steps":5,"done":false,"state":"in_progress"}
+W 4 {"step":4,"steps":5,"done":false,"state":"in_progress"}
+W 5 {"step":5,"steps":5,"done":true,"state":"observed","rows":3}
+W after done {"step":1,"steps":5,"done":false,"state":"in_progress"}
+M 1 (drops W) {"step":1,"steps":12,"done":false,"state":"in_progress"}
+busy {"code":"busy","message":"ComplyEaze Bridge refused this operation."}
+M 2 {"step":2,"steps":12,"done":false,"state":"in_progress"}
+M 3 after cancel (reruns step 3) {"step":3,"steps":12,"done":false,"state":"in_progress"}
+W again (drops M) {"step":1,"steps":5,"done":false,"state":"in_progress"}
+### steps.py arguments.jsonl
+initialize 2026-11-11T07:28:52.671Z pid 84858 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:28:52.675Z gap - pid 84858 id 3 tool list_companies meta - arguments {} read_id - end companies
+call 2 received 2026-11-11T07:28:52.676Z gap 0.0 pid 84858 id 4 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "read_id": "rdabc", "to": "2026-11-08"} read_id rdabc end refused argument_unknown:read_id
+call 3 received 2026-11-11T07:28:52.677Z gap 0.0 pid 84858 id 5 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdtuawjpspvfcwjp 0.401
+call 4 received 2026-11-11T07:28:53.083Z gap 0.0 pid 84858 id 6 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 2 of 5 done false read_id rdtuawjpspvfcwjp 0.501
+call 5 received 2026-11-11T07:28:53.591Z gap 0.0 pid 84858 id 7 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 3 of 5 done false read_id rdtuawjpspvfcwjp 0.400
+call 6 received 2026-11-11T07:28:53.992Z gap 0.0 pid 84858 id 8 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 4 of 5 done false read_id rdtuawjpspvfcwjp 0.552
+call 7 received 2026-11-11T07:28:54.546Z gap 0.0 pid 84858 id 9 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 5 of 5 done true read_id rdtuawjpspvfcwjp 0.302
+call 8 received 2026-11-11T07:28:54.850Z gap 0.0 pid 84858 id 10 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdxdqmgymeqgskjz 0.401
+call 9 received 2026-11-11T07:28:55.252Z gap 0.0 pid 84858 id 11 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 1 of 12 done false read_id rdhpjwckhgmcjejv 0.402
+call 10 received 2026-11-11T07:28:55.658Z gap 0.0 pid 84858 id 12 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 2 of 12 done false read_id rdhpjwckhgmcjejv 0.407
+call 11 received 2026-11-11T07:28:55.689Z gap -0.4 pid 84858 id 13 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end refused busy
+call 12 received 2026-11-11T07:28:56.069Z gap 0.4 pid 84858 id 14 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end cancelled 0.032 reason smoke
+call 13 received 2026-11-11T07:28:56.700Z gap 0.6 pid 84858 id 15 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-10-01", "to": "2026-10-31"} read_id - end step 3 of 12 done false read_id rdhpjwckhgmcjejv 0.502
+call 14 received 2026-11-11T07:28:57.203Z gap 0.0 pid 84858 id 16 tool vouchers meta - arguments {"company_guid": "aevaxgrd-drem-azbd-btdp-ybnabvcpkjug", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdwgrmfspqwwgmaj 0.402
+read rdtuawjpspvfcwjp pid 84858 plan five span_days 7 code BZDZB steps 5 of 5 done true
+read rdxdqmgymeqgskjz pid 84858 plan five span_days 7 code ZBKRH steps 1 of 5 done false
+read rdhpjwckhgmcjejv pid 84858 plan twelve span_days 31 code PDKGE steps 3 of 12 done false
+read rdwgrmfspqwwgmaj pid 84858 plan five span_days 7 code WKXNQ steps 1 of 5 done false
+evicted -
+started 1 pids 84858 at 2026-11-11T07:28:52.666Z
+sleep calls 0 answered 0 cut 0 open 0 max_answered_elapsed - max_cut_elapsed -
+facts since - until - vouchers_calls 13 answered 10 cut 1 busy 1 refused 1 arguments_changed 0 open 0 new_read_after_answered_step 3 no_read_id_after_cut - ids_not_issued rdabc ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.552 max_cut_elapsed 0.032 reads_started 4 reads_done 1 dropped 2 expired 0 other_calls_not_answered 0
+exit 0
+
+## drive.mjs id
+schema has read_id true
+id 1 {"step":1,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
+id 2 {"step":2,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
+id 3 {"step":3,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
+id 4 {"step":4,"steps":5,"done":false,"read_id":"rdgqybxeuqwwrjrq","state":"in_progress"}
+id 5 {"step":5,"steps":5,"done":true,"read_id":"rdgqybxeuqwwrjrq","state":"observed","rows":3}
+id finished {"code":"read_finished","message":"ComplyEaze Bridge refused this operation."}
+### steps.py id.jsonl
+initialize 2026-11-11T07:28:57.708Z pid 85055 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:28:57.709Z gap - pid 85055 id 3 tool list_companies meta - arguments {} read_id - end companies
+call 2 received 2026-11-11T07:28:57.710Z gap 0.0 pid 85055 id 4 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "to": "2026-11-08"} read_id - end step 1 of 5 done false read_id rdgqybxeuqwwrjrq 0.402
+call 3 received 2026-11-11T07:28:58.119Z gap 0.0 pid 85055 id 5 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 2 of 5 done false read_id rdgqybxeuqwwrjrq 0.502
+call 4 received 2026-11-11T07:28:58.630Z gap 0.0 pid 85055 id 6 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 3 of 5 done false read_id rdgqybxeuqwwrjrq 0.403
+call 5 received 2026-11-11T07:28:59.034Z gap 0.0 pid 85055 id 7 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 4 of 5 done false read_id rdgqybxeuqwwrjrq 0.552
+call 6 received 2026-11-11T07:28:59.587Z gap 0.0 pid 85055 id 8 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end step 5 of 5 done true read_id rdgqybxeuqwwrjrq 0.302
+call 7 received 2026-11-11T07:28:59.892Z gap 0.0 pid 85055 id 9 tool vouchers meta - arguments {"company_guid": "wjkvwbkb-pebc-myjy-yjna-xfarfbkbcppc", "from": "2026-11-02", "read_id": "rdgqybxeuqwwrjrq", "to": "2026-11-08"} read_id rdgqybxeuqwwrjrq end refused read_finished
+read rdgqybxeuqwwrjrq pid 85055 plan five span_days 7 code NAWVQ steps 5 of 5 done true
+evicted -
+started 1 pids 85055 at 2026-11-11T07:28:57.704Z
+sleep calls 0 answered 0 cut 0 open 0 max_answered_elapsed - max_cut_elapsed -
+facts since - until - vouchers_calls 6 answered 5 cut 0 busy 0 refused 1 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed 0.552 max_cut_elapsed - reads_started 1 reads_done 1 dropped 0 expired 0 other_calls_not_answered 0
+exit 0
+
+## drive.mjs sleep
+sleep {"text":"slept 0.2 s"}
+busy? {}
+first {"text":"slept 0.5 s"}
+### steps.py sleep.jsonl
+initialize 2026-11-11T07:29:00.006Z pid 85068 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:29:00.007Z gap - pid 85068 id 2 tool sleep meta - arguments {"seconds": 0.2} read_id - end slept 0.202
+call 2 received 2026-11-11T07:29:00.211Z gap 0.0 pid 85068 id 3 tool sleep meta - arguments {"seconds": 0.5} read_id - end slept 0.502
+call 3 received 2026-11-11T07:29:00.262Z gap -0.5 pid 85068 id 4 tool sleep meta - arguments {"seconds": 0.1} read_id - end open
+evicted -
+started 1 pids 85068 at 2026-11-11T07:29:00.003Z
+sleep calls 3 answered 2 cut 0 open 1 max_answered_elapsed 0.502 max_cut_elapsed -
+facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 other_calls_not_answered 0
+exit 0
+
+## idle expiry (createServer with an injected clock: the same call 901 s later)
+company received read_started step_started step_result received read_expired read_started step_started step_result
+steps 1,1
+
+## H4 by hand: a 2 s sleep cut by closing stdin at 0.4 s, then a new process on the same log
+initialize 2026-11-11T07:29:02.051Z pid 85079 client smoke protocol 2025-06-18 capabilities - tasks no
+initialize 2026-11-11T07:29:02.455Z pid 85106 client smoke protocol 2025-06-18 capabilities - tasks no
+call 1 received 2026-11-11T07:29:02.051Z gap - pid 85079 id 2 tool sleep meta - arguments {"seconds": 2} read_id - end stdin_closed running 1 at 2026-11-11T07:29:02.419Z
+call 2 received 2026-11-11T07:29:02.456Z gap 0.0 pid 85106 id 2 tool sleep meta - arguments {"seconds": 0.1} read_id - end slept 0.102
+evicted -
+started 2 pids 85079,85106 at 2026-11-11T07:29:02.047Z,2026-11-11T07:29:02.453Z
+sleep calls 2 answered 1 cut 1 open 0 max_answered_elapsed 0.102 max_cut_elapsed -
+facts since - until - vouchers_calls 0 answered 0 cut 0 busy 0 refused 0 arguments_changed 0 open 0 new_read_after_answered_step 0 no_read_id_after_cut 0 ids_not_issued - ids_from_other_pid - pid_changes 0 max_answered_elapsed - max_cut_elapsed - reads_started 0 reads_done 0 dropped 0 expired 0 other_calls_not_answered 0
+exit 0
+
+## desktop_config.py on a throwaway configuration
+add ok B0 537dff86… (46 bytes) B1 b4e7ea7b… (574 bytes) servers bridge-lab-703h,other
+exit 0
+FAIL: bridge-lab-703h is already in mcpServers
+exit 1; before-copy left behind: no
+restore ok 537dff86… (46 bytes)
+exit 0
+FAIL: continuation by arguments is served with tools-args.json, not <kit>/tools.json
+exit 1
+FAIL: the step scale must be a number from 0.01 to 1, not 2
+exit 1
+FAIL: continuation by id is served with tools.json, not <kit>/tools-args.json
+exit 1
+add ok B0 537dff86… (46 bytes) B1 2347ee4a… (887 bytes) servers bridge-lab-703a,other
+exit 0; second B0 equals the first: yes
+entry args ['--tools', '<kit>/tools-args.json', '--log', '<tmp>/cfg/log/a.jsonl', '--continue-by', 'arguments', '--step-scale', '0.5']
+compare sha256 2347ee4a… servers_now bridge-lab-703a,other servers_before other added bridge-lab-703a removed - keys_added - keys_removed - keys_changed -
+exit 0

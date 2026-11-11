@@ -33,6 +33,21 @@ Prints, in this order:
     and of a cancelled one; the reads started and finished; and `other_calls_not_answered`, the calls to any other
     tool (list_companies) in the window that were not answered.
 
+Sheet version 3 adds three things, and changes nothing else for a log of version 2's server:
+  - the repository's sleep server (`mcp-sleep-server.mjs`, rows H1 to H4) logs `result_sent` for an answered call;
+    its call line ends `slept <elapsed>`, counted as answered;
+  - a log of the server run with `--continue-by arguments` (its `read_started` lines say so) carries no read_id, so
+    there `new_read_after_answered_step` counts the reads started after the window's first answered vouchers step,
+    not the calls without an id;
+  - `dropped` and `expired` in `facts`: the live reads that server dropped for a call with other arguments, and for
+    15 minutes idle, in the window;
+  - `started` also prints each process's start time. The sleep server writes a pid only on that line, so its other
+    lines take the latest start's pid (by order, exact only while one process writes the log); row H4 reads whether a
+    process started between two calls from these times, never from a call's pid. The sleep server logs no event when
+    it refuses a second call, so such a call stays `open`;
+  - a `sleep` line before `facts`: the window's sleep calls, how many were answered, cut and still open, and the
+    largest elapsed of an answered and of a cut one. `other_calls_not_answered` no longer counts sleep calls.
+
 A line that does not parse as JSON, an event without a time, a log with no `started` event, or a `received` event the
 server truncated, fails the whole read (exit 1): a log that cannot be read whole is never "no calls". Exit 0 = read,
 2 = the command line is wrong.
@@ -74,12 +89,17 @@ def read(path, since="", until="9999"):
     pids = []
     reads = {}
     evicted = []
+    dropped = []
     truncated = 0
+    starts = []
     for event in events(path):
         kind = event["event"]
-        pid = event.get("pid")
+        # The sleep server writes a pid only on its `started` line; its other lines take the pid of the latest
+        # `started` before them, an attribution by order that is exact only while one process writes the log.
+        pid = event.get("pid", pids[-1] if pids else None)
         if kind == "started":
             pids.append(pid)
+            starts.append(event["time"])
             continue
         if kind == "received" and event.get("truncated"):
             truncated += 1
@@ -106,10 +126,14 @@ def read(path, since="", until="9999"):
             continue
         if kind == "read_started":
             reads[event.get("read_id")] = {"pid": pid, "time": event["time"], "code": event.get("code"),
+                                           "continue_by": event.get("continue_by", "id"),
                                            "plan": event.get("plan"), "of": event.get("of"),
                                            "span": event.get("span_days"), "steps": 0, "done": False}
         if kind == "read_evicted":
             evicted.append((event["time"], event.get("read_id")))
+            continue
+        if kind in ("read_dropped", "read_expired"):
+            dropped.append((event["time"], kind))
             continue
         # Ends are matched by JSON-RPC id and pid where the event names an id; the server runs one call at a time.
         matching = [c for c in calls if c["end"] is None and c["pid"] == pid and ("id" not in event or c["id"] == event.get("id"))]
@@ -132,6 +156,10 @@ def read(path, since="", until="9999"):
             ended(call, "error {} {}".format(event.get("code"), event.get("message")), "error", event["time"])
         elif kind == "companies_sent":
             ended(call, "companies", "companies", event["time"])
+        elif kind == "result_sent":
+            # The repository's sleep server (rows H1 to H4): one answered call.
+            call["elapsed"] = event.get("elapsed", -1)
+            ended(call, "slept {:.3f}".format(event.get("elapsed", -1)), "answered", event["time"])
         elif kind == "cancelled":
             call["elapsed"] = event.get("elapsed", -1)
             ended(call, "cancelled {:.3f} reason {}".format(event.get("elapsed", -1), event.get("reason")), "cut",
@@ -150,7 +178,7 @@ def read(path, since="", until="9999"):
     for number, call in enumerate(window, 1):
         gap = "-" if previous is None or previous["ended_at"] is None else "{:.1f}".format(seconds_between(previous["ended_at"], call["time"]))
         out.append("call {} received {} gap {} pid {} id {} tool {} meta {} arguments {} read_id {} end {}".format(
-            number, call["time"], gap, call["pid"], json.dumps(call["id"]), call["tool"], call["meta"],
+            number, call["time"], gap, "-" if call["pid"] is None else call["pid"], json.dumps(call["id"]), call["tool"], call["meta"],
             json.dumps(call["arguments"], sort_keys=True), call["read_id"] or "-", call["end"] or "open"))
         previous = call
     window_reads = {k: v for k, v in reads.items() if since <= v["time"] < until}
@@ -172,6 +200,12 @@ def read(path, since="", until="9999"):
             no_id_after_cut += 1
         answered_before = answered_before or c["kind"] == "answered"
         cut_before = cut_before or c["kind"] == "cut"
+    if any(r["continue_by"] == "arguments" for r in window_reads.values()):
+        # No id is served in this mode, so a new read shows only as a read started after a step was answered.
+        first = next((c["ended_at"] for c in stepped if c["kind"] == "answered"), None)
+        new_read_after_answered = sum(1 for r in window_reads.values() if first is not None and r["time"] > first)
+        no_id_after_cut = "-"
+    window_dropped = [k for at, k in dropped if since <= at < until]
     not_issued = sorted({c["read_id"] for c in stepped if c["read_id"] and c["read_id"] not in reads})
     other_pid = sorted({c["read_id"] for c in stepped if c["read_id"] in reads and reads[c["read_id"]]["pid"] != c["pid"]})
     pid_changes = sum(1 for a, b in zip(stepped, stepped[1:]) if a["pid"] != b["pid"])
@@ -179,19 +213,25 @@ def read(path, since="", until="9999"):
     cut = [c["elapsed"] for c in stepped if c["kind"] == "cut" and c["elapsed"] is not None]
     count = lambda kind: sum(1 for c in stepped if c["kind"] == kind)
     fmt = lambda values: "{:.3f}".format(max(values)) if values else "-"
-    out.append("started {} pids {}".format(len(pids), ",".join(str(p) for p in pids) or "-"))
+    out.append("started {} pids {} at {}".format(len(pids), ",".join(str(p) for p in pids) or "-", ",".join(starts) or "-"))
     changed = sum(1 for c in stepped if c["end"] == "refused read_arguments_changed")
     # Any call to another tool that did not end as answered: a refused, cut or open list_companies counts here.
-    others = sum(1 for c in window if c["tool"] != "vouchers" and c["kind"] != "companies")
+    others = sum(1 for c in window if c["tool"] not in ("vouchers", "sleep") and c["kind"] != "companies")
+    slept = [c for c in window if c["tool"] == "sleep"]
+    out.append("sleep calls {} answered {} cut {} open {} max_answered_elapsed {} max_cut_elapsed {}".format(
+        len(slept), sum(1 for c in slept if c["kind"] == "answered"), sum(1 for c in slept if c["kind"] == "cut"),
+        sum(1 for c in slept if c["end"] is None), fmt([c["elapsed"] for c in slept if c["kind"] == "answered"]),
+        fmt([c["elapsed"] for c in slept if c["kind"] == "cut" and c["elapsed"] is not None])))
     out.append("facts since {} until {} vouchers_calls {} answered {} cut {} busy {} refused {} arguments_changed {} open {} "
                "new_read_after_answered_step {} "
                "no_read_id_after_cut {} ids_not_issued {} ids_from_other_pid {} pid_changes {} max_answered_elapsed {} "
-               "max_cut_elapsed {} reads_started {} reads_done {} other_calls_not_answered {}".format(
+               "max_cut_elapsed {} reads_started {} reads_done {} dropped {} expired {} other_calls_not_answered {}".format(
                    since or "-", until if until != "9999" else "-", len(stepped), count("answered"), count("cut"),
                    count("busy"), count("refused"), changed,
                    sum(1 for c in stepped if c["end"] is None), new_read_after_answered, no_id_after_cut,
                    ",".join(not_issued) or "-", ",".join(other_pid) or "-", pid_changes, fmt(answered), fmt(cut),
-                   len(window_reads), sum(1 for r in window_reads.values() if r["done"]), others))
+                   len(window_reads), sum(1 for r in window_reads.values() if r["done"]),
+                   window_dropped.count("read_dropped"), window_dropped.count("read_expired"), others))
     return "\n".join(out)
 
 

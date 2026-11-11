@@ -1,6 +1,7 @@
 #!/bin/sh
 # The macOS CLI pre-screen for row 703-A (#703): the same server and text as the lab row, through `claude -p`.
-#   sh prescreen.sh <empty results folder> [runs, default 3] [model, default sonnet]
+#   sh prescreen.sh <empty results folder> [runs, default 3] [model, default sonnet] [id|arguments, default id]
+# `arguments` (sheet version 3) serves tools-args.json with --continue-by arguments: no read_id, the same arguments continue.
 # Each run is a new non-interactive session in an empty folder, with only this server's two tools allowed and no
 # other MCP server, at --step-scale 0.05 (steps of 1.5 to 2.75 s: this measures the model, not a host's wait).
 # Writes, per run, the answer text, the server log and steps.py's output; prints one verdict line per run:
@@ -8,7 +9,8 @@
 #   other call was answered, and the answer names the last step's party, Lab Party <code>. Anything else is FAIL with the facts line.
 # It does not stand in for the Windows row: the host, its tool prompts and its wait differ.
 set -u
-out=${1:?results folder}; runs=${2:-3}; model=${3:-sonnet}
+out=${1:?results folder}; runs=${2:-3}; model=${3:-sonnet}; mode=${4:-id}
+case $mode in id) tools=tools.json ;; arguments) tools=tools-args.json ;; *) echo "FAIL: mode is id or arguments"; exit 2 ;; esac
 kit=$(cd "$(dirname "$0")" && pwd -P)
 [ -d "$out" ] && [ -z "$(ls -A "$out")" ] || { echo "FAIL: $out must be an existing empty folder"; exit 2; }
 out=$(cd "$out" && pwd -P)
@@ -22,7 +24,7 @@ for plan in five twelve; do
     tag=$plan-$n
     log="$out/$tag.jsonl"
     cat > "$out/$tag.mcp.json" <<JSON
-{"mcpServers":{"lab703":{"command":"node","args":["$kit/stepped-vouchers-server.mjs","--tools","$kit/tools.json","--log","$log","--step-scale","0.05"]}}}
+{"mcpServers":{"lab703":{"command":"node","args":["$kit/stepped-vouchers-server.mjs","--tools","$kit/$tools","--log","$log","--step-scale","0.05","--continue-by","$mode"]}}}
 JSON
     (cd "$out/cwd" && perl -e 'alarm shift; exec @ARGV' 900 claude -p "$prompt" --model "$model" \
       --strict-mcp-config --mcp-config "$out/$tag.mcp.json" --setting-sources "" --no-session-persistence \

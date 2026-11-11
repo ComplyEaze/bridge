@@ -69,6 +69,24 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The differences of the number's month reads sent again after a clean read-back (#2162). Each
+    /// is a read-back difference, so `posted_verified` is never given; `InAnotherType` is followed
+    /// in the difference by the names of the Sales types that hold the number.
+    pub(crate) enum InvoiceNumberAfterPostCode {
+        /// A month read after the post failed.
+        ReadFailed = "invoice_number_read_failed",
+        /// The posted type, or a returned row's type, could not be read.
+        TypeUnread = "invoice_number_type_unread",
+        /// A Sales voucher of another type holds the number.
+        InAnotherType = "invoice_number_in_another_type",
+        /// No Sales-class voucher holds the number, though the read-back found the invoice.
+        ReadMissedInvoice = "invoice_number_read_missed_invoice",
+        /// More than one Sales voucher of the posted type holds the number.
+        NotUnique = "invoice_number_not_unique",
+    }
+}
+
+failure_codes! {
     /// The refusals of a read for a listed company, before any request names it.
     pub(crate) enum CompanyReadCode {
         /// The company's name, as Tally reported it, is one a request cannot carry (#2433).

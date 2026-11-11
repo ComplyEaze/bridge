@@ -1,0 +1,114 @@
+# fixture: tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml
+# parser: parse_native_masters(StockItems)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "SC Sibling Goods",
+            guid: "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-000000d0",
+            master_id: 208,
+            alter_id: 210,
+            parent: Some(
+                "SC Goods Group",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [
+                        HsnDetailsEntry {
+                            applicable_from: "20250401",
+                            hsn_code: Some(
+                                "39239090",
+                            ),
+                            description: Some(
+                                "Plastic Articles for Conveyance",
+                            ),
+                            source: Some(
+                                "Specify Details Here",
+                            ),
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+                gst: Entries {
+                    entries: [
+                        GstDetailsEntry {
+                            applicable_from: "20250401",
+                            taxability: Some(
+                                "Taxable",
+                            ),
+                            source: Some(
+                                "Specify Details Here",
+                            ),
+                            ineligible_itc: None,
+                            states: [
+                                GstStateDetails {
+                                    state_name: Some(
+                                        "�#4; Any",
+                                    ),
+                                    rates: [
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "CGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Value {
+                                                raw: " 9",
+                                                decimal: "9",
+                                            },
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "SGST/UTGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Value {
+                                                raw: " 9",
+                                                decimal: "9",
+                                            },
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "IGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Value {
+                                                raw: " 18",
+                                                decimal: "18",
+                                            },
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "�#4; Not Applicable",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "State Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                    ],
+                                    slab_rates_present: false,
+                                },
+                            ],
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+            },
+        },
+    ],
+})

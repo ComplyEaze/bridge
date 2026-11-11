@@ -47,6 +47,8 @@ const NOTES_LAB: &str = "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0";
 const EINVOICE_LAB: &str = "eb2f5190-292e-4ed8-bfd3-eace839fe699";
 const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+/// Row 1381-R1's book, BRIDGE STOCK CREATE LAB (`stock-create-lab/PROVENANCE.md`).
+const STOCK_CREATE_LAB: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
 const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
 const COST_KEY_LAB: &str = "ddf3a557-704c-4f61-ae8d-46a3380062a1";
 const CORPUS_DENSE: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
@@ -239,6 +241,10 @@ fn rows() -> Vec<Row> {
     rows.extend(high_water_rows!(
         "agent/d3-batch-company-high-water.utf16le.xml",
         IMPORT_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/stock-create-lab/stock-create-lab-marks.utf16le.xml",
+        STOCK_CREATE_LAB
     ));
     rows.extend(high_water_rows!(
         "agent/d3-cancelled-company-high-water.utf16le.xml",

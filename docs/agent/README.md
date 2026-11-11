@@ -1518,24 +1518,38 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   result is the one a book without the figure would get, and `closing_stock`
   says why it was declined:
   - the line is spelled exactly so, appears once, carries a debit in its sub
-    column alone, the `Opening Stock` line is shown empty (opening stock is
-    not measured) and the `Cost of Sales :` heading appears once;
+    column alone, the `Opening Stock` line appears once and is shown empty or
+    carries a debit in its sub column alone, and the `Cost of Sales :` heading
+    appears once, carrying an amount when there is opening stock (#692);
   - the company's own flags (`ISINTEGRATED` and `ISINVENTORYON`, read only
     when the Profit and Loss offers the figure) are both `Yes`;
   - no Stock-in-Hand ledger carries an amount;
-  - the derived Balance Sheet lines sum to zero (a Trial Balance that does not
-    balance leaves Tally's `Difference in opening balances` out of this book's
-    Balance Sheet export, so the statement would not balance);
-  - that one figure closes every gap at once: Current Assets (compared with
-    the derived group plus the figure), the Balance Sheet's Profit & Loss A/c
-    line and the trading result (moved by the figure), and the `Cost of Sales :`
-    heading (the derived Purchase Accounts plus Direct Expenses, less the
-    figure). `Add: Purchase Accounts`, Tally's name for the purchase line on
+  - the derived Balance Sheet lines sum to minus the opening stock, or to zero
+    without one (a Trial Balance that does not balance leaves Tally's
+    `Difference in opening balances` out of this book's Balance Sheet export,
+    so the statement would not balance);
+  - the figures close every gap at once: Current Assets (compared with the
+    derived group plus the closing stock), the Balance Sheet's Profit & Loss
+    A/c line and the trading result (moved by the opening less the closing
+    stock), and the `Cost of Sales :` heading (the derived Purchase Accounts
+    plus Direct Expenses, plus the opening and less the closing stock). With
+    opening stock, a Direct Expenses line with an amount in its main column
+    refuses;
+  - with opening stock, Tally's own Stock Summary for the same window, sent by
+    the request `stock_summary` sends and read only in this case, carries a
+    value on every row (a row of negative stock carries none). It is read only
+    for a window from 1 April to a month's last day in that financial year, on
+    a book whose master mark `stock_summary` admits in one read; any other
+    window or book declines the opening stock without sending it. `Add: Purchase Accounts`, Tally's name for the purchase line on
     such a book, then ties to Purchase Accounts.
   `closing_stock` is `{"state": "applied", "value", "source":
-  "tally_profit_and_loss_less_closing_stock"}`, `{"state": "declined", "why",
-  "lines"}` (`why` is `shape_not_as_seen`, `not_a_debit`,
-  `opening_stock_not_shown_empty`, `book_not_shown_integrated`,
+  "tally_profit_and_loss_less_closing_stock"}`, with `"opening": {"value",
+  "source": "tally_profit_and_loss_opening_stock"}` where opening stock was
+  used, `{"state": "declined", "why", "lines"}` (`why` is `shape_not_as_seen`,
+  `not_a_debit`, `opening_stock_not_as_seen`,
+  `cost_of_sales_heading_without_amount`, `stock_summary_window_not_measured`,
+  `stock_summary_too_large`, `stock_summary_not_read`,
+  `stock_summary_row_without_value`, `book_not_shown_integrated`,
   `inventory_flags_not_read`, `balance_sheet_does_not_balance` or
   `does_not_close_every_gap`), or null when no closing stock was considered:
   the Profit and Loss offered none, or the statement was refused for another
@@ -1547,9 +1561,25 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   `balance_sheet` whose Profit and Loss cannot be read (no closing stock is
   considered and the sheet is the one it always was). The figure is Tally's, not derived or taken from
   `stock_summary`, and the derived Current Assets line keeps the Trial
-  Balance's sum. Measured on one synthetic book (three items, TallyPrime 7.1 Silver): opening stock, a costing
-  method, a non-integrated book, a window spanning two years and more than one
-  item or purchase rate are not.
+  Balance's sum. Measured without opening stock on one synthetic book (three
+  items, TallyPrime 7.1 Silver), and on another whose second year opens with
+  stock Tally carried from the first (TallyPrime 7.2 Silver: each year, a
+  half-year, both years together, one item's costing changed, and one direct
+  expense). Of those windows, only a year from 1 April is one the tools now
+  establish with opening stock: the half-year from October and the two years
+  together refuse as `stock_summary_window_not_measured`. A Stock Summary that
+  lists no rows refuses as `stock_summary_not_read`. Its rows are not tied to
+  the stock items or to the report's own total, and once read, the answer's
+  size and row count are not checked against the admitted estimate and the
+  book's master mark, as `stock_summary` checks them; only a value on every
+  listed row is required. A window to any other month's
+  last day, February's included, is admitted by `stock_summary`'s month-end
+  rule, and no run read one. A
+  company split into a new year, a non-integrated book, costing other than Avg.
+  Cost or FIFO, godowns, batches and GST beside opening stock are not. A
+  Profit & Loss A/c ledger whose closing is not its own opening plus the
+  window's movement is refused as for any such row: after one item's costing
+  was changed, Tally kept the carried opening and moved that closing.
 
 ### Ledger-movement opening decision
 

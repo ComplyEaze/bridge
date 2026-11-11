@@ -1,0 +1,18 @@
+# fixture: tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml
+# parser: parse_native_masters(Units)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Nos",
+            guid: "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-000000ce",
+            master_id: 206,
+            alter_id: 208,
+            parent: None,
+            detail: Unit {
+                decimal_places: 0,
+                simple: true,
+            },
+        },
+    ],
+})

@@ -51,7 +51,7 @@
 //!   written as is the one measured exception (bridge#974): see
 //!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
-use super::failure_code::ReadCode;
+use super::failure_code::{LabMastersCode, ReadCode};
 use super::*;
 use bridge_tally_core::master_binding::canonical_master_key;
 use bridge_tally_core::master_name_index::{
@@ -457,7 +457,8 @@ enum TargetRow<'a> {
     /// A row whose name has another canonical key shares one of the index's
     /// keys with the requested name, so Tally may take the Create as an
     /// alteration of that row (§9.4; a removed space, §9.4d; a comma, lab row
-    /// 2480-SK on #2480). Holds the row's name.
+    /// 2480-SK on #2480). Holds the row's name. The call is refused with
+    /// [`LabMastersRefusal::NameSharesKey`].
     SharesKey(String),
     /// The requested name is blank, so it names no master to look for.
     Blank,
@@ -1135,13 +1136,27 @@ enum LabMastersRefusal {
     /// refused for a godown and a stock item (bridge#974), and no root form
     /// has been measured for a Group, so none is sent.
     RootParentUnmeasured { groups: Vec<String> },
+    /// The requested names that share a key of master's name index with a
+    /// target master of their kind whose name has another canonical key (see
+    /// [`TargetRow::SharesKey`]), found by the pre-check's reads, each with
+    /// that master's name (#2499).
+    NameSharesKey { names: Vec<SharedKeyName> },
+}
+
+/// A requested name and the target master's name it shares a key with.
+#[derive(Debug, PartialEq, Eq)]
+struct SharedKeyName {
+    kind: MasterKind,
+    requested: String,
+    existing: String,
 }
 
 impl LabMastersRefusal {
-    fn code(&self) -> &'static str {
+    fn code(&self) -> LabMastersCode {
         match self {
-            Self::OpeningBillsUnsupported { .. } => "lab_opening_bills_unsupported",
-            Self::RootParentUnmeasured { .. } => "lab_root_parent_unmeasured",
+            Self::OpeningBillsUnsupported { .. } => LabMastersCode::OpeningBillsUnsupported,
+            Self::RootParentUnmeasured { .. } => LabMastersCode::RootParentUnmeasured,
+            Self::NameSharesKey { .. } => LabMastersCode::NameSharesKey,
         }
     }
 
@@ -1156,6 +1171,17 @@ impl LabMastersRefusal {
             Self::RootParentUnmeasured { groups } => groups
                 .iter()
                 .map(|name| format!("Group:{name}:root_parent"))
+                .collect(),
+            Self::NameSharesKey { names } => names
+                .iter()
+                .map(|shared| {
+                    format!(
+                        "{}:{}:shares_a_key_with:{}",
+                        shared.kind.tally_type(),
+                        shared.requested,
+                        shared.existing
+                    )
+                })
                 .collect(),
         }
     }
@@ -1214,16 +1240,29 @@ pub(in crate::agent) async fn lab_import_masters(
     // Before the first request: a refused book costs Tally nothing.
     if let Err(refusal) = refuse_unsendable_masters(&masters) {
         persist_lab_precheck_collisions(server, &refusal.logged_entries());
-        return Err(ToolFailure::from(refusal.code().to_string()));
+        return Err(ToolFailure::from(refusal.code()));
     }
     let guid = required_string(args, "company_guid")?;
 
-    let (_company, identity, mut evidence) = admit_lab_target(server).await?;
+    let (_company, identity, evidence) = admit_lab_target(server).await?;
     if !identity_matches_requested_guid(&identity, guid) {
         return Err(ToolFailure::from("lab_target_company_mismatch".to_string())
             .with_prior_evidence(evidence));
     }
+    import_admitted_masters(server, masters, guid, identity, evidence).await
+}
 
+/// `lab_import_masters` after the lab guards have admitted the target: the
+/// pre-check's reads, then the writes. Every write batch admits the target
+/// again (`admit_lab_target`), so only the pre-check's reads run on this
+/// admission alone.
+async fn import_admitted_masters(
+    server: &Server,
+    masters: BookMasters,
+    guid: &str,
+    identity: VerifiedCompanyIdentity,
+    mut evidence: Evidence,
+) -> Result<ToolOutcome, ToolFailure> {
     // ---- Create-overwrite pre-check (§9.4): refuse before any write if the
     // target already carries a same-name master under ANY kind requested --
     // except a Tally *default* (ledger `Cash`/`Profit & Loss A/c`, or any
@@ -1235,6 +1274,7 @@ pub(in crate::agent) async fn lab_import_masters(
     // its only differences from the book are in writable fields (parent
     // matches) -- see `reconcile_ledger_alters` below.
     let mut collisions: Vec<String> = Vec::new();
+    let mut shared_keys: Vec<SharedKeyName> = Vec::new();
     let mut default_ledger_alters: Vec<(BookLedger, BTreeMap<String, String>)> = Vec::new();
     // Ordinary (non-default) pre-existing ledgers whose PARENT matches the
     // book but some other writable field does not -- reconciled via the same
@@ -1285,14 +1325,15 @@ pub(in crate::agent) async fn lab_import_masters(
             let existing = match find_target_row(&rows, &index, name) {
                 TargetRow::Absent => continue,
                 TargetRow::Same(existing) => existing,
-                TargetRow::SharesKey(other) => {
-                    // Tally may resolve the Create to `other` and alter it
+                TargetRow::SharesKey(existing) => {
+                    // Tally may resolve the Create to `existing` and alter it
                     // with no error (see `TargetRow::SharesKey`), so refuse
                     // before any write.
-                    collisions.push(format!(
-                        "{}:{name}:shares_a_key_with:{other}",
-                        kind.tally_type()
-                    ));
+                    shared_keys.push(SharedKeyName {
+                        kind,
+                        requested: name.clone(),
+                        existing,
+                    });
                     continue;
                 }
                 TargetRow::Blank => {
@@ -1374,6 +1415,12 @@ pub(in crate::agent) async fn lab_import_masters(
             collisions.push(format!("{}:{name}", kind.tally_type()));
         }
     }
+    if !shared_keys.is_empty() {
+        let refusal = LabMastersRefusal::NameSharesKey { names: shared_keys };
+        collisions.extend(refusal.logged_entries());
+        persist_lab_precheck_collisions(server, &collisions);
+        return Err(ToolFailure::from(refusal.code()).with_prior_evidence(evidence));
+    }
     if !collisions.is_empty() {
         persist_lab_precheck_collisions(server, &collisions);
         return Err(ToolFailure::from("lab_master_already_exists".to_string())
@@ -1439,7 +1486,7 @@ pub(in crate::agent) async fn lab_import_masters(
             let chunk_masters = chunked_masters(&creatable, kind, chunk_start, MAX_MASTER_BATCH);
             let chunk_len = kind.count(&chunk_masters);
             let xml = render_master_batch_xml(identity.display_name(), kind, &chunk_masters)
-                .map_err(|refusal| ToolFailure::from(refusal.code().to_string()))?;
+                .map_err(|refusal| ToolFailure::from(refusal.code()))?;
             let (response, post_evidence) =
                 post_lab_batch(server, &identity, "lab_import_masters.write", xml).await?;
             evidence = combine_evidence(evidence.clone(), post_evidence);

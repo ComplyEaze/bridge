@@ -109,7 +109,7 @@ All are master's voucher reads, BRIDGE PILOT LAB, the one day 1-Aug-2026 (`SVFRO
   - `--same` compares two answers' bytes;
   - `--match ID FIELDS SCOPED BOOK` prints one line for one id. It says whether the ledger-scoped answer holds exactly the vouchers of the book-wide answer that carry that ledger, matched by `VOUCHERKEY`, each the same in its own fields and in its lines on the ledger. For the window read, that includes each line's bill allocations.
 
-  It never prints a `VOUCHERKEY`'s value. Its rules are whole in its header.
+  It never prints a `VOUCHERKEY`'s value. `--match` exits 0 on `EQUAL` and 3 on any other line: exit 3 is a result, not a STOP. Exit 1 is its STOP, in every mode. Its rules are whole in its header.
 
 **A ledger read** (LR below) is the report's two sends for one ledger, `fetch_party_bills`'s second pair (`runtime_party_bills.rs:57`): `r<n>a` and `r<n>b`, the same file twice. The snapshot's pair is sent once for all ledgers, in step 5, before any LR.
 
@@ -166,7 +166,7 @@ All are master's voucher reads, BRIDGE PILOT LAB, the one day 1-Aug-2026 (`SVFRO
     - `NOT JUDGED` when the book-wide answer held two vouchers on the ledger, a voucher with another number, an empty answer or a `STATUS`;
     - a STOP on no headers file, on HTTP 500, on a length other than 0, on a missing file, on a voucher listed twice, on a `LINEERROR` under `STATUS` 1, on a non-voucher element, on a `VOUCHERKEY` that is not a whole number, on a GUID that is not the book's, and on a field named twice;
     - `--same` `EQUAL` and `DIFFER`, two empty answers `EQUAL`.
-  - The copy as committed STOPs on master's captures, whose GUIDs are other books'.
+  - The copy as committed STOPs on master's captures: on the bill-trail capture because its GUIDs are another book's; on this book's audit capture because one voucher there, dated 20-Aug-2026, outside step 8's day, has a line with no ledger name, which `wx.py` refuses wherever it is. Cut by an XML parser to its eleven vouchers of 1-Aug-2026, that capture reads as `ANSWER: VOUCHERS 11`. So a voucher of 1-Aug-2026 with such a line would make `k7` a STOP of step 8.
 - **Not tried:** any send to Tally.
 
 ## Steps
@@ -186,7 +186,7 @@ Run each label as `python3 -I run.py http://127.0.0.1:9001 <label> <files>`, the
 | 8 | B | `k0` to `k8` |
 | 9 | B | `q<n>a`, `q<n>b`, `w<n>a`, `w<n>b`, then `k9`, `k10` |
 | 10 | | `s9` |
-| repeats | | `p12r`, `m1r`, `k8r`, `k10r`: a marks read sent once more after MARKS DIFFER, as steps 3, 7, 8 and 9 say |
+| repeats | | `p12r`, `m1r`, `k0r`, `k8r`, `k10r`: a marks read sent once more after MARKS DIFFER, as steps 3, 7, 8 and 9 say |
 
 **The prompt rule, at every step.** The only prompts answered are C5's and C6's, each with the key named. For any other prompt, message or dialog:
 - copy it word for word and screenshot it first;
@@ -255,41 +255,39 @@ The set-up (step 4) is not run as a loop. If a script sends any of it, the scrip
    - **Part B starts only after part A has passed in full.** Before `k0`, write down that each of these holds, with the line of the notes that shows it:
      - no STOP at any step from 1 to 7;
      - every send of part A answered: each ended with an answer `run.py` kept, or with an empty `L-lo-` answer the exception admits;
-     - the marks reads unchanged: every `--before-write` passed, `p12` and `m1` gave SAME MARKS, and no `p12r` or `m1r` was sent;
+     - the marks unchanged by every read: `p12` gave SAME MARKS against `s1`, and `m1` against `s6m`, and no `p12r` or `m1r` was sent (`count20.py --same-row` compares GUID, ALTVCHID and ALTMSTID);
+     - the book the same before every write and after every refusal: every `--before-write` passed (`count20.py --before-write` checks one COMPANY row with the book's GUID, not the marks), and every refusal's `--same-row` gave SAME MARKS;
      - the control `pl` is in CREATED, and its step 6 reads gave the outcome `told` with `AGAINST: EQUAL`.
 
-     If any does not hold, part B is not sent, nothing of it: the row goes to step 10, and the report says which did not hold. (A STOP is already C8's, and then the restore waits for the coordinator.)
-   - **B's ids** are CREATED, in table order: an id refused at its ledger or its invoice, or skipped at step 3, is not in part B, and the report names it with its reason. A part A result for an id in CREATED (no bytes at step 6, another ledger's rows, `DIFFER`, a code) does not take it out: part B reads it, and the report sets the two results side by side.
-   - Then, each sent once, with a screenshot of the whole Tally window after each, at once, before the next request (each `V` request but `Vb-book.xml` is a request this book has not been sent). A dialog: the prompt rule.
-     - `k0`: `M-marks.xml`.
-     - `k1`: `Vm-u-pl.xml`; `k2`: `Vm-uv-pl.xml`; `k3`: `Vm-v-pl.xml`.
-     - `k4`: `Vw-u-pl.xml`; `k5`: `Vw-uv-pl.xml`; `k6`: `Vw-v-pl.xml`.
-     - `k7`: `Vb-book.xml`.
-     - `k8`: `M-marks.xml`.
-   - Then, each recorded whole:
-     - `wx.py` on each of `a-k1-…` to `a-k7-…`;
-     - `wx.py --same` on `a-k1` and `a-k2`, `a-k1` and `a-k3`, `a-k4` and `a-k5`, `a-k4` and `a-k6`;
-     - `wx.py --match pl movement a-k1-Vm-u-pl.xml a-k7-Vb-book.xml` and `wx.py --match pl window a-k4-Vw-u-pl.xml a-k7-Vb-book.xml`;
-     - `count20.py --same-row a-k0-M-marks.xml a-k8-M-marks.xml`.
-   - **The shape step passes only if all of these hold:**
-     - `a-k1` and `a-k4` each give `MATCH pl …: EQUAL`, so master's two reads hold the control's one invoice, as the book-wide read of the day shows it;
-     - `a-k3` is byte-equal to `a-k1`, and `a-k6` to `a-k4` (`SAME: EQUAL`), so the `##LedgerName` form gave master's bytes for each read;
-     - `a-k2` is byte-equal to `a-k1`, and `a-k5` to `a-k4`, so the added variable changed nothing in master's form;
-     - SAME MARKS from `k0` to `k8`;
-     - every send answered, with no empty answer and no dialog.
-   - **Anything else is the STOP of the shape step, part B's own:** a difference, a `STATUS`, an empty answer, `DIFFER` or `NOT JUDGED`, a STOP of a script, an answer above the bound, a dialog, or a send with no answer. It is "a STOP at step 8", with the id `pl` where the send was one of `k1` to `k6`. Nothing more is sent: not the ten names, not a marks read beyond C8's. On MARKS DIFFER alone, `M-marks.xml` is sent once more as `k8r` and recorded first. Record each answer whole, screenshot the window, and report to the run coordinator. C8 holds, and the restore waits for the coordinator's word. Part A's answers stand as recorded.
-9. **The ledger reads of part B. Only after step 8 has passed.** For each id of B's ids in table order, `n` the table's, four sends, each once, in this order:
-   - `q<n>a`, `q<n>b`: `Vm-v-<id>.xml`, the same file twice;
-   - `w<n>a`, `w<n>b`: `Vw-v-<id>.xml`, the same file twice.
+     If any does not hold, part B is not sent, nothing of it: the row goes to step 10, and the report says which did not hold. (A STOP is already C8's, and then the restore waits for the coordinator.) A step 5 result that is not the intended state (a name list not its own, a state other than the intended one) is a part A result, not a failure of part A: part B still runs, and the report says so in both sections.
+   - **B's ids** are CREATED, in table order: an id refused at its ledger or its invoice, or skipped at step 3, is not in part B, and the report names it with its reason. A part A result for an id in CREATED (no bytes at step 6, another ledger's rows, `DIFFER`, a code) does not take it out: part B reads it, and part B's section sets the two results side by side.
+   - **Then the sends, one at a time, each once, each checked before the next.** After each send, at once and before the next request: screenshot the whole Tally window (each `V` request but `Vb-book.xml` is a request this book has not been sent; a dialog: the prompt rule), then run the check named for it, recorded whole. **The next request is sent only if that check gave what it names.** Anything else is the STOP of the shape step (below), and nothing more is sent.
 
-   Screenshot the whole Tally window after each `q<n>a` and `w<n>a`, before the next request. A dialog: the prompt rule.
-   - After the last id: `k9`: `Vb-book.xml`, the file `k7` sent; then `k10`: `M-marks.xml`.
-   - Then, for each id, each recorded whole:
-     - `wx.py a-q<n>a-Vm-v-<id>.xml` and `wx.py a-w<n>a-Vw-v-<id>.xml`;
-     - `wx.py --same a-q<n>a-Vm-v-<id>.xml a-q<n>b-Vm-v-<id>.xml` and `wx.py --same a-w<n>a-Vw-v-<id>.xml a-w<n>b-Vw-v-<id>.xml`;
-     - `wx.py --match <id> movement a-q<n>a-Vm-v-<id>.xml a-k7-Vb-book.xml` and `wx.py --match <id> window a-w<n>a-Vw-v-<id>.xml a-k7-Vb-book.xml`: one line each.
-   - And once: `wx.py --same a-k7-Vb-book.xml a-k9-Vb-book.xml`, and `count20.py --same-row a-k8-M-marks.xml a-k10-M-marks.xml`. EXPECT `SAME: EQUAL` and SAME MARKS: step 9 only reads. On MARKS DIFFER: send `M-marks.xml` once more as `k10r` and record it; send nothing else, and STOP. If `k9` is not equal to `k7`, record both: every `--match` line was judged against `k7`, and the report says that the book-wide read changed during part B.
-   - **An answer `wx.py` reads never stops the row,** whatever it holds: each is a result, recorded in full. That includes an `EMPTY ANSWER` under the exception, a `STATUS`, and every `MATCH` line. A STOP of `wx.py` (an answer it cannot read, or a failed send), a dialog and a send with no answer are part B's STOPs, as everywhere. Each is "a STOP at step 9, id X". Nothing more is sent, C8 holds, and part A's answers, and part B's answers before it, stand as recorded.
+     | label | file | check, run before the next send | it must give |
+     | --- | --- | --- | --- |
+     | `k0` | `M-marks.xml` | `count20.py --same-row a-m1-M-marks.xml a-k0-M-marks.xml` | SAME MARKS |
+     | `k1` | `Vm-u-pl.xml` | `wx.py a-k1-Vm-u-pl.xml` | `ANSWER: VOUCHERS <n>` |
+     | `k2` | `Vm-uv-pl.xml` | `wx.py --same a-k1-Vm-u-pl.xml a-k2-Vm-uv-pl.xml` | `SAME: EQUAL` |
+     | `k3` | `Vm-v-pl.xml` | `wx.py --same a-k1-Vm-u-pl.xml a-k3-Vm-v-pl.xml` | `SAME: EQUAL` |
+     | `k4` | `Vw-u-pl.xml` | `wx.py a-k4-Vw-u-pl.xml` | `ANSWER: VOUCHERS <n>` |
+     | `k5` | `Vw-uv-pl.xml` | `wx.py --same a-k4-Vw-u-pl.xml a-k5-Vw-uv-pl.xml` | `SAME: EQUAL` |
+     | `k6` | `Vw-v-pl.xml` | `wx.py --same a-k4-Vw-u-pl.xml a-k6-Vw-v-pl.xml` | `SAME: EQUAL` |
+     | `k7` | `Vb-book.xml` | `wx.py a-k7-Vb-book.xml`, then `wx.py --match pl movement a-k1-Vm-u-pl.xml a-k7-Vb-book.xml` and `wx.py --match pl window a-k4-Vw-u-pl.xml a-k7-Vb-book.xml` | `ANSWER: VOUCHERS <n>`, then `MATCH pl movement: EQUAL` and `MATCH pl window: EQUAL` |
+     | `k8` | `M-marks.xml` | `count20.py --same-row a-k0-M-marks.xml a-k8-M-marks.xml` | SAME MARKS |
+
+     Once `k8` has passed, also run `wx.py` on each of `a-k2`, `a-k3`, `a-k5` and `a-k6`, for the record (each is byte-equal to `a-k1` or `a-k4` by then).
+   - **The shape step passes only if every check above gave what it names**, every send answered, and no dialog came up. Then, on this book and release: master's two reads hold the control's one invoice as the book-wide read of the day shows it (`k1`, `k4` against `k7`); the added variable changed nothing in master's form (`k2`, `k5`); the `##LedgerName` form gave master's bytes for each read (`k3`, `k6`); and these reads left the marks as they were (`k0` to `k8`).
+   - **Anything else is the STOP of the shape step, part B's own:** a check that did not give what it names (a `STATUS`, an empty answer, `SAME: DIFFER`, a `MATCH` line other than `EQUAL`, MARKS DIFFER), a STOP of a script, an answer above the bound, a dialog, or a send with no answer. It is "a STOP at step 8", with the id `pl` where the send was one of `k1` to `k6`. Nothing more is sent: not the rest of the step, not the ten names, not a marks read beyond C8's. On MARKS DIFFER at `k0` or `k8` alone, `M-marks.xml` is sent once more as `k0r` or `k8r` and recorded first. Record each answer whole, screenshot the window, and report to the run coordinator. C8 holds, and the restore waits for the coordinator's word. Part A's answers stand as recorded.
+9. **The ledger reads of part B. Only after step 8 has passed.** For each id of B's ids in table order, `n` the table's, four sends, each once, in this order, **each read by `wx.py` before the next request**:
+   - `q<n>a`, then `wx.py a-q<n>a-Vm-v-<id>.xml`;
+   - `q<n>b`, the same file `Vm-v-<id>.xml`, then `wx.py a-q<n>b-Vm-v-<id>.xml` and `wx.py --same a-q<n>a-Vm-v-<id>.xml a-q<n>b-Vm-v-<id>.xml`;
+   - `w<n>a`: `Vw-v-<id>.xml`, then `wx.py a-w<n>a-Vw-v-<id>.xml`;
+   - `w<n>b`, the same file `Vw-v-<id>.xml`, then `wx.py a-w<n>b-Vw-v-<id>.xml` and `wx.py --same a-w<n>a-Vw-v-<id>.xml a-w<n>b-Vw-v-<id>.xml`;
+   - then, before the next id: `wx.py --match <id> movement a-q<n>a-Vm-v-<id>.xml a-k7-Vb-book.xml` and `wx.py --match <id> window a-w<n>a-Vw-v-<id>.xml a-k7-Vb-book.xml`, one line each.
+
+   Screenshot the whole Tally window after each `q<n>a` and `w<n>a`, before its `wx.py` read. A dialog: the prompt rule. An `EMPTY ANSWER` under the exception takes the exception's own steps (keep, screenshot, one `GET /status`, then `wx.py`) right after that send, before the next request, as at step 6; an empty `q<n>a` or `w<n>a` is followed by its `b` send, as for any other answer.
+   - After the last id: `k9`: `Vb-book.xml`, the file `k7` sent, then `wx.py a-k9-Vb-book.xml` and `wx.py --same a-k7-Vb-book.xml a-k9-Vb-book.xml`; then `k10`: `M-marks.xml`, then `count20.py --same-row a-k8-M-marks.xml a-k10-M-marks.xml`. EXPECT `SAME: EQUAL` and SAME MARKS: step 9 only reads. On MARKS DIFFER: send `M-marks.xml` once more as `k10r` and record it; send nothing else, and STOP. If `k9` is not equal to `k7`, record both: every `--match` line was judged against `k7`, and the report says that the book-wide read changed during part B.
+   - **An answer `wx.py` reads never stops the row,** whatever it holds: each is a result, recorded in full. That includes an `EMPTY ANSWER` under the exception, a `STATUS`, `SAME: DIFFER`, and every `MATCH` line. `wx.py --match` exits 3 on a line other than `EQUAL`: that is a result, not a STOP. Only its exit 1 is a STOP. A STOP of `wx.py` (an answer it cannot read, or a failed send), a dialog and a send with no answer are part B's STOPs, as everywhere, and the `wx.py` read after each send finds it before the next request. Each is "a STOP at step 9, id X". Nothing more is sent, C8 holds, and part A's answers, and part B's answers before it, stand as recorded.
 10. **Restore** BK by C6, with `restore-plan.txt` written first. NX's step 8 is the path, with its two prompts ("Accept ?" y; the folder-exists question, R Replace). List the data folder before and after, as NX and CV did.
     - Then `s9`: every file of s2, in s2's order, and compare whole:
       - `count20.py --same-row a-s1-M-marks.xml a-s9-M-marks.xml` passes;
@@ -303,7 +301,7 @@ The set-up (step 4) is not run as a loop. If a script sends any of it, the scrip
 **Stop**, with no key pressed, if Tally's window shows a dialog at any point but those the prompt rule and C6 name, or if the gateway stops answering. Screenshot the window, send it and the answers to the run coordinator, and ask before anything else is pressed or sent. Say in the report to the coordinator what the book then holds. What the branch says about it is the STOP rule of "The sends": only "a STOP at step N", with the id where one applies.
 
 ## Record
-- **RESULTS keeps part A and part B as two sections,** each with its own confidence line, its own deviations and its own "not measured". A STOP of part B is written in part B's section; part A's section is written from part A's answers alone.
+- **RESULTS keeps part A and part B as two sections,** each with its own confidence line, its own deviations and its own "not measured". A STOP of part B is written in part B's section; part A's section is written from part A's answers alone. Where one id's two results are set side by side, that is in part B's section.
 - Each answer's bytes and sha256, its headers file whole, and each script's lines, whole.
 - `run.py`'s log for each label, and how long each read took, except for the send of a STOP the STOP rule names.
 - Every `--before-write`, `--same-row`, `--import`, `--before`, `--names`, `--outcome`, `--against`, `--same` and `--match` output, and every `rf.py` and `wx.py` output, whole.

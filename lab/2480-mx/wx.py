@@ -50,7 +50,7 @@ OWN = ("DATE", "VOUCHERNUMBER", "VOUCHERTYPENAME", "PARTYLEDGERNAME", "NARRATION
 OWN_WINDOW = ("ISPOSTDATED", "REFERENCE", "ISINVOICE", "PARTYGSTIN")  # and the window FETCH's others
 NAMES = ("PARTYLEDGERNAME", "NARRATION", "LEDGERNAME", "NAME")  # never trimmed (C4)
 here = pathlib.Path(__file__).resolve().parent
-# st.py's, nm.py's, rf.py's and cv.py's: a character XML forbids, raw or as a reference, kept as U+FFFD.
+# st.py's, nm.py's, rf.py's and row 2480-CV's cv.py's: a character XML forbids, raw or as a reference, kept as U+FFFD.
 FORBIDDEN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]|&#(?:x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));", re.I)
 lines = 0
 where = ""  # the answer being read, for a STOP's message

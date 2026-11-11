@@ -11,19 +11,28 @@ A Payment whose payee's cash in a day comes to more than 10,000.00 is tagged in 
 - that each voucher lands with its ledgers, amounts and narration intact, the tag included;
 - that the build refuses a bank ledger named as the cash ledger, by reading the book's groups.
 
-**WHAT CHANGED FROM v1** (`lab/1761-s4-cash-paid-to-someone-sheet` at 5e9580d8). The one variable is the seed voucher; the other changes below follow from it or from row 2507-T. Row 1761-S4 (`lab/1761-s4-cash-paid-to-someone-answers`, its RESULTS.md) stopped at step 3.2. Its book held masters only, so the voucher mark read null, and the build refused the batch with `empty_book_first_import`, the refusal `pre_import_mark_refusal` (`src-tauri/src/agent_import.rs:179`) names for an absent voucher mark, and that the README's 0.5.x test notes record on a company that held ledgers only: with no voucher mark there is no "before" to attribute an import against. Nothing was sent, and the book is unchanged since that row's backup.
+**WHAT CHANGED FROM v1** (`lab/1761-s4-cash-paid-to-someone-sheet` at 5e9580d8). In the book, the one variable is the seed voucher; the book changes below follow from it or from row 2507-T. The sitting also differs from v1's, as the list after them says. Row 1761-S4 (`lab/1761-s4-cash-paid-to-someone-answers`, its RESULTS.md) stopped at step 3.2. Its book held masters only, so the voucher mark read null, and the build refused the batch with `empty_book_first_import`, the refusal `pre_import_mark_refusal` (`src-tauri/src/agent_import.rs:179`) names for an absent voucher mark, and that the README's 0.5.x test notes record on a company that held ledgers only: with no voucher mark there is no "before" to attribute an import against. Nothing was sent, and the book is unchanged since that row's backup.
 - v2 keys one seed voucher on Tally's screen before BK1, so the voucher mark has a value.
 - **Why keyed, not built:** `build_import_xml` is the call that refused. On a masters-only book it refuses the first voucher whatever it holds, so a seed built by it cannot exist on this build.
 - **Why this voucher:** a Receipt dated 1-Apr-2025, Dr BRIDGE Bank B, Cr BRIDGE Capital, 1,000.00. It touches neither Cash nor BRIDGE Bank A, the two ledgers this row reads, so BRIDGE Bank A still opens the statement days at 50,000.00 Dr, as the statement says, and every ledger figure in step 5 is v1's. It is a Receipt, so the Contra and Payment series the batch numbers stay as v1 found them. Its date is the Gateway's current date, so keying it changes no date, and it is a day before every statement row.
 - The figures that move are the marks only: V has a value from the seed on, and every V EXPECT below is stated against the marks read in this sitting.
-- Reads that v1 asked of a window holding only empty days (step 4's timeout branch and step 6) are not asked to read complete: on 0.7.0, an empty day on a book with vouchers beside the window reads partial, never complete (row 2507-T). Step 6 reads the seed's own day instead.
+- Reads that v1 asked of a window holding only empty days (step 4's timeout branch and step 6) are not asked to read complete: on 0.7.0, an empty day on a book with vouchers beside the window reads partial, never complete (row 2507-T). Step 6 reads the seed's own day, which holds a voucher, and reads the statement days only for a listed voucher.
 - New folders under `C:\bridge-lab\1761-s4v2\`, so nothing of v1's is reused.
+
+Beyond the book, this sitting differs from v1's in these, none of which the seed causes:
+- **The build.** It is master de54a0f2, not v1's 06268abe, so the exe and its hash differ: this row is not v1's exe with a voucher added. Between the two commits the product source changed by one comment in `src-tauri/src/tally/approved_import.rs`; the rest of the diff is tests, fixtures and docs.
+- **The approval window's wording** names #2107 and #2193 as merged, which they are on this build.
+- **The numbering read** (step 0.5) now EXPECTs `auto_retain` as well, a re-check of a field row 1761-S4 read on this book at its step 0, and runs before the seed.
+- **Step 4's batch-step wording** states what a `step` other than 4 reads, and a HOLD after it instead of a STOP (step 4.4).
+- **BRIDGE Contractor A's bill-by-bill setting** is now a master row 1761-S4 already changed to No, not a step of this row.
+- **Step 6** no longer reads the four vouchers' days complete; it reads them for a listed voucher only (step 6.3).
 
 **WRITES.**
 - The seed voucher is keyed BY HAND on Tally's screen. The masters are row 1761-S4's, keyed then, and are not changed.
 - One batch of four vouchers is posted by the build's own `post_import`, after [OWNER]'s approval.
 - Nothing is sent by curl, so the request-ID preflight finds no request to check.
 - The book is restored to BK1 at the end: the masters and the seed.
+- **The fallback** is row 1761-S4's own BK1, which restores the masters-only book from before the seed: `C:\bridge-lab\1761-s4\backups\BK1\TDBK1800_<company number>.001`, 24,241 B, sha256 beginning `bce8c06c` (in full in that row's RESULTS.md), written 11 Nov 2026 at 15:05 local. It stays on the lab PC. It is restored (C6) only on the run coordinator's RESTORE word.
 
 **[OWNER] steps** are marked [OWNER]: the owner at the lab PC. Everything else is the operator's. The run coordinator's word, where the row asks for it (go-ahead, RESTORE, the evidence push), comes from the run coordinator.
 
@@ -90,11 +99,14 @@ Do not change the Payment, Contra or Receipt voucher types.
    Either missing = STOP (not this build, or posting is off).
 3. `list_companies`: EXPECT exactly THE COMPANY, with the GUID row 1761-S4's RESULTS.md records for it. Record it; every later call passes it as `company_guid`. Anything else = STOP.
 4. MARKS: M0, V0. EXPECT M0 214 and V0 null, reused false: row 1761-S4's M0b and V0b, the book as that row left it. Anything else = STOP, and report the marks.
-5. **The seed, keyed** on Tally's screen with THE COMPANY loaded: a Receipt voucher (Accounting Vouchers, F6), date 1-Apr-2025 (the current date; change nothing), Account BRIDGE Bank B, Particulars BRIDGE Capital, amount 1,000.00, narration `seed for row 1761-S4 v2`. Take a screenshot of the voucher screen before its accept. Accept it once. A prompt other than the voucher's own accept = C7, STOP. Then leave the voucher screen as C7 says and take a screenshot of the Gateway with THE COMPANY loaded and no dialog.
-6. MARKS: M0s, V0s. **EXPECT V0s not null**, and `snapshot.reused` false. V0s null = STOP: the seed did not take, and step 3 would meet row 1761-S4's refusal again. Record M0s (whether keying a voucher moves M is not known; it is recorded, not an EXPECT).
-7. `vouchers` for 2025-04-01 to 2025-04-01. EXPECT exactly one voucher, the seed: Receipt, BRIDGE Bank B Dr 1,000.00, BRIDGE Capital Cr 1,000.00, narration `seed for row 1761-S4 v2` (23 characters). Record the answer whole, with its number and its completeness. Another voucher, a second one, or another ledger, amount or narration = STOP.
-8. `masters` with `kind` `voucher_types`: record the Payment and Contra rows whole. EXPECT each to read `series_numbering.observation` `observed`, `series_numbering.method` `automatic` and `series_numbering.sub_method` `auto_retain`; otherwise STOP before anything else changes. `post_import` refuses, before its window, a series that is not Automatic (`import_voucher_numbering_not_automatic`) or not Retain (`import_voucher_numbering_not_retain`), so step 4 would test nothing.
-9. Backup BK1 (C5) into a NEW empty folder `C:\bridge-lab\1761-s4v2\backups\BK1\`: record the name, size and sha256. Then MARKS: M0b, V0b. **EXPECT V0b not null.** V0b null = STOP.
+5. `masters` with `kind` `voucher_types`: record the Payment and Contra rows whole. EXPECT each to read `series_numbering.observation` `observed`, `series_numbering.method` `automatic` and `series_numbering.sub_method` `auto_retain`; otherwise STOP before anything else changes, with the book still as row 1761-S4 left it. `post_import` refuses, before its window, a series that is not Automatic (`import_voucher_numbering_not_automatic`) or not Retain (`import_voucher_numbering_not_retain`), so step 4 would test nothing. Row 1761-S4 read all three fields on this book at its step 0 (PASS). This read touches masters only, so it comes before the seed.
+6. **The fallback, checked.** Hash row 1761-S4's BK1 (the WRITES list): EXPECT its folder to hold that one file, 24,241 B, with the sha256 that row's RESULTS.md records. Anything else = STOP before the seed: a wrong seed would then have no way back.
+7. **The seed, keyed** on Tally's screen with THE COMPANY loaded: a Receipt voucher (Accounting Vouchers, F6). Set the voucher's date to 1-Apr-2025 on the voucher screen (F2), whatever date it opens with, and record the date it opened with. Account BRIDGE Bank B, Particulars BRIDGE Capital, amount 1,000.00, narration `seed for row 1761-S4 v2`. Take a screenshot of the voucher screen before its accept, showing the date, both ledgers, the amount and the narration. Accept it once. A prompt other than the voucher's own accept = C7, STOP. Then leave the voucher screen as C7 says and take a screenshot of the Gateway with THE COMPANY loaded and no dialog.
+
+   **A seed that is wrong in any way is a STOP:** a wrong date, ledger, amount or narration on the screenshot, a second accept, or any extra screen. Nothing more is keyed and the voucher is not altered or deleted on screen. The way back is the fallback, restored (C6) on the run coordinator's RESTORE word; the seed is keyed again in a later sitting, under a new go-ahead.
+8. MARKS: M0s, V0s. **EXPECT V0s not null**, and `snapshot.reused` false. V0s null = STOP: the seed did not take, and step 3 would meet row 1761-S4's refusal again. Record M0s (whether keying a voucher moves M is not known; it is recorded, not an EXPECT).
+9. `vouchers` for 2025-04-01 to 2025-04-01. EXPECT complete, and exactly one voucher, the seed: Receipt, BRIDGE Bank B Dr 1,000.00, BRIDGE Capital Cr 1,000.00, narration `seed for row 1761-S4 v2` (23 characters). Record the answer whole, with its number and its completeness. The day holds the seed, so a complete answer is reachable: the window is complete when its rows were checked voucher for voucher (row 2507-T). An answer that reads partial does not prove "exactly one": record it with its reason, and STOP (nothing has changed since the seed). Another voucher, a second one, or another ledger, amount or narration = STOP. A STOP here goes back by the fallback, as item 7 says.
+10. Backup BK1 (C5) into a NEW empty folder `C:\bridge-lab\1761-s4v2\backups\BK1\`: record the name, size and sha256. Then MARKS: M0b, V0b. **EXPECT M0b = M0s and V0b = V0s, so V0b is not null.** Nothing moves the marks between item 8 and the backup: a mark that moved = STOP, before BK1 becomes the restore point.
 
 **Before step 1, V0b is not null.** Step 1 does not start otherwise.
 
@@ -152,16 +164,16 @@ The book: unchanged.
    - If it reads `approved` without a send: call again at once. This is the tool's own flow, not a retry.
 
    Record every answer whole.
-3. If an answer reads `import_approval_timed_out`: record it whole, read MARKS and `vouchers` for 2025-04-08 to 2025-04-09 once each, and STOP. That `vouchers` read covers two days that hold no voucher if nothing was posted, so its completeness is recorded, not required: on 0.7.0 it may read partial (row 2507-T). C is not called again without the run coordinator's word, and only if the answer read `attempt_recorded` false, V = V4a, and the `vouchers` read lists no voucher.
+3. If an answer reads `import_approval_timed_out`: record it whole, read MARKS and `vouchers` for 2025-04-08 to 2025-04-09 once each, and STOP. That `vouchers` read covers two days that hold no voucher if nothing was posted, so its completeness is recorded, not required: on 0.7.0 it may read partial (row 2507-T). C is not called again without the run coordinator's word, and only if the answer read `attempt_recorded` false and V = V4a: those two are the proof that nothing was sent. The `vouchers` read listing no voucher only corroborates them; a partial, empty answer proves nothing alone.
 4. EXPECT, in the answer of the call that sent the post:
    - `dispatch.state` `posted_verified` and `dispatch.counters.created` 4;
    - `post_location.state` `target_only`, with `post_location.target_voucher_step` reading `before` V4a, `after` V4a + 4, `step` 4 and `matches_created` true;
    - `post_span_binding.state` `bound`.
 
-   That V moves by one per voucher created is recorded for a post of one voucher (0.7.0 row W1) and unverified for a batch. For a batch, a `step` other than 4 reads `matches_created` false, and the answer is then `reconciliation_required` (`batch_step_unconfirmed`), not `posted_verified`. That is a FINDING: record it whole, then STOP as the last line of this step says, with no repeat call and no rebuild. Then, before any other call, take a screenshot of the whole Tally window: a dialog or a half-entered screen = C7, STOP.
+   That V moves by one per voucher created is recorded for a post of one voucher (0.7.0 row W1) and unverified for a batch. For a batch, a `step` other than 4 reads `matches_created` false, and the answer is then `reconciliation_required` (`batch_step_unconfirmed`), not `posted_verified`; its text says Tally reported creating the batch and every voucher reads back. That is a FINDING and a **HOLD**, not a STOP: record it whole, call nothing, and take a screenshot of the whole Tally window (a dialog or a half-entered screen = C7, STOP). Then report to the run coordinator, who may order step 5 (reads only) and then step 6; without that word, STOP. `post_import` of C is never called again and C is never rebuilt, whatever the word. Step 4.5 is not run after a HOLD.
 5. `verify_import` of C: EXPECT `verification_status` `posted_verified` and `post_span_binding.state` `bound`, with no `rollback_recorded` and no `voucher_mark_contradiction` anywhere in the answer. Record the answer whole.
 
-Any other final state or refusal: record it whole, do not call again, STOP.
+Any other final state or refusal: record it whole, do not call again, STOP. The one exception is step 4.4's HOLD.
 
 The book: the masters, the seed, and the four vouchers of C.
 
@@ -185,9 +197,10 @@ The book: the masters, the seed, and the four vouchers of C.
 The book: as after step 4.
 
 ## Step 6: the restore
-1. [OWNER] Restore BK1 (C6), on the run coordinator's explicit RESTORE. There is no fallback backup: a restore that does not complete is a STOP, reported as C6 says.
+1. [OWNER] Restore BK1 (C6), on the run coordinator's explicit RESTORE. A restore that does not complete is a STOP, reported as C6 says; the fallback is then row 1761-S4's BK1 (the WRITES list), restored only on the run coordinator's word, which leaves the masters-only book, without the seed.
 2. MARKS first (C6): EXPECT M and V equal to M0b and V0b.
-3. Then `list_companies` (as step 0), and `vouchers` for 2025-04-01 to 2025-04-01: EXPECT exactly the seed, as at step 0.7. Else STOP, and report what the book holds. The statement days are not read here: a read of days with no voucher on this book is not asked to read complete (row 2507-T), and V equal to V0b already shows that no voucher was added since BK1.
+3. Then `list_companies` (as step 0), and `vouchers` for 2025-04-01 to 2025-04-01: EXPECT complete, and exactly the seed, as at step 0.9. A partial answer is recorded with its reason and is a FINDING: it does not prove "exactly the seed". Another voucher, or none = STOP, and report what the book holds.
+4. `vouchers` for 2025-04-08 to 2025-04-09, once, to corroborate the restore: STOP only if a voucher is listed. These days hold no voucher after the restore, so the answer may read partial (row 2507-T); a partial, empty answer is recorded and proves nothing alone. V equal to V0b at item 2 is the proof that no voucher was added since BK1.
 
 The book: as at BK1, the masters and the seed.
 
@@ -200,18 +213,20 @@ The book: as at BK1, the masters and the seed.
 - Any TallyPrime release other than the one recorded.
 
 ## The book after each step
-- Step 0, before item 5: the masters only, as row 1761-S4 left it.
-- Step 0 from item 5, and steps 1 to 3: the masters and the seed.
+- Step 0, before item 7: the masters only, as row 1761-S4 left it.
+- Step 0 from item 7, and steps 1 to 3: the masters and the seed.
+- After a STOP in step 0 from item 7 on, and the fallback restored: the masters only.
 - Steps 4 and 5: plus the four vouchers of C.
 - Step 6: as at BK1, the masters and the seed.
 
-STOP RULES: C7 and C8; any dialog before a call; an approval window other than step 4's; a mark that moves outside the step that changes it (step 0's item 5 is the only step before step 4 that may move V); any answer outside the stated shape.
+STOP RULES: C7 and C8; any dialog before a call; an approval window other than step 4's; a mark that moves outside the step that changes it (step 0's item 7 is the only step before step 4 that may move V); any answer outside the stated shape.
 
 ## Close and evidence
 - **C10:** Shut Company; leave no company loaded. THE COMPANY stays on the lab PC, as at BK1: it is synthetic.
 - **C11:** evidence to a new branch `lab/1761-s4v2-cash-paid-to-someone-answers`, with `SHA256.txt`, after the pre-push scan and the run coordinator's yes. It holds:
   - every answer whole with its size and sha256;
-  - the seed's screenshots by name, size and sha256 (never pushed), and its step 0.7 read;
+  - the seed's screenshots by name, size and sha256 (never pushed), the date the voucher screen opened with, and its step 0.9 read;
+  - the fallback's check (step 0.6);
   - the step 5 voucher table;
   - the data folder's file listing after step 4 (names, sizes, sha256);
   - BK1's name, size and sha256, and the build's hashes;

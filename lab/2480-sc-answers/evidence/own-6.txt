@@ -1,0 +1,6 @@
+a-c6a-C-v-qa.xml: ANSWER: VOUCHERS 1
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002f ALTERID 71 DATE 20260801
+qa's invoice: 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002f ALTERID 71 DATE 20260801 (new vouchers 6)
+  observation: its GUID is not I-qa.xml's REMOTEID
+OWN: YES
+exit 0

@@ -1,0 +1,21 @@
+2026-11-11T05:22:21.093Z start bash k.sh 0 pl,ka,qa,qb,ua,ub
+== k0 marks against m1:   equal exit 0
+== k-k1: a-k1-Vm-u-pl.xml: ANSWER: VOUCHERS 1 exit 0
+== k-k1-ref: REF Vm-u-pl.xml: DIFFER (11946 B sha256 6bfed90dc3924f58; kept 11954 B sha256 b8eab7b26d95eccb) exit 3
+== k-k2: SAME: EQUAL (11946 B sha256 6bfed90dc3924f58; 11946 B sha256 6bfed90dc3924f58) exit 0
+== k-k2-ref: REF Vm-v-pl.xml: DIFFER (11946 B sha256 6bfed90dc3924f58; kept 11954 B sha256 b8eab7b26d95eccb) exit 3
+== k-k3: a-k3-Vw-u-pl.xml: ANSWER: VOUCHERS 1 exit 0
+== k-k3-ref: REF Vw-u-pl.xml: DIFFER (94744 B sha256 991626a8de845fb9; kept 94752 B sha256 f158857ba662a10f) exit 3
+== k-k4: SAME: EQUAL (94744 B sha256 991626a8de845fb9; 94744 B sha256 991626a8de845fb9) exit 0
+== k-k4-ref: REF Vw-v-pl.xml: DIFFER (94744 B sha256 991626a8de845fb9; kept 94752 B sha256 f158857ba662a10f) exit 3
+== k-k5: ANSWER: ROWS 1 (0 On Account) exit 0
+== k-k5-ref: REF L-lo-pl-20260801.xml: EQUAL (896 B sha256 19c796774ac740b6; kept 896 B sha256 19c796774ac740b6) exit 0
+== k-k6: a-k6-C-u-pl.xml: ANSWER: VOUCHERS 1 exit 0
+== k-k7: SAME: EQUAL (5374 B sha256 38951574e67e6d11; 5374 B sha256 38951574e67e6d11) exit 0
+== k-k8: a-k8-Vb-book.xml: ANSWER: VOUCHERS 17 exit 0
+== k-k8-movement: MATCH pl movement: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) exit 0
+== k-k8-window: MATCH pl window: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0281 New Ref -1051.00; 14 own fields equal) exit 0
+== k-k8-own: OWN: YES exit 0
+== k9 marks against k0:   equal exit 0
+the shape step passes
+2026-11-11T05:23:19.497Z end, exit 0

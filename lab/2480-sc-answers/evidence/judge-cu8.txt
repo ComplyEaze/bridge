@@ -1,0 +1,2 @@
+JUDGE ua census: OWN YES, SIBLING NO, OTHERS 0
+exit 0

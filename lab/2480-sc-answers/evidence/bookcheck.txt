@@ -1,0 +1,4 @@
+BRIDGE PILOT LAB: folder <N>, GUID hits 2, excluded GUID hits 0
+folders named so: 1
+exit 0
+(written after the row from the printout of step 0 at 2026-11-11T05:13:24Z; the file step 0 wrote under this name held the folder name alone and stays on the lab PC)

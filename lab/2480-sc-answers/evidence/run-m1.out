@@ -1,0 +1,11 @@
+2026-11-11T05:22:02.770Z start bash send.sh m1 M-marks.xml
+M-marks.xml: 3398 bytes
+printwindow True saved <LAB_DIR>/shots/m1-after.png
+2026-11-11T05:22:05.986Z
+== a-m1-M-marks.xml: 3398 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '74' ALTMSTID '252'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0
+2026-11-11T05:22:06.638Z end, exit 0

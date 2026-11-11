@@ -1,0 +1,21 @@
+== a-s6bb-B-bills.xml
+  BILLFIXED groups: 6
+  pl 'BRIDGE Mx Plain': 1 groups
+    BILLREF 'BP/26-27/0281'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ka 'BRIDGE Sk Ak Am': 1 groups
+    BILLREF 'BP/26-27/0292'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  kb 'BRIDGE Sk Ak, Am': 0 groups
+  ra 'BRIDGE Sk Bk, Bm': 0 groups
+  rb 'BRIDGE Sk Bk Bm': 0 groups
+  qa 'BRIDGE Sk Ck Cm': 1 groups
+    BILLREF 'BP/26-27/0296'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  qb "BRIDGE Sk Ck' Cm": 1 groups
+    BILLREF 'BP/26-27/0297'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ua 'BRIDGE Sk Dk Dm': 1 groups
+    BILLREF 'BP/26-27/0298'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ub 'BRIDGE Sk Dk_Dm': 1 groups
+    BILLREF 'BP/26-27/0299'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ea 'BRIDGE Sk EkEm': 0 groups
+  eb 'BRIDGE Sk Ek Em': 0 groups
+  groups of any other party: 0
+exit 0

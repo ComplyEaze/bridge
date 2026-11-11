@@ -1,0 +1,5 @@
+a-s7ub-G-cat.xml: LEDGER rows 24
+  NAMES ua: EQUAL (one row, its own GUID)
+  NAMES ub: EQUAL (one row, its own GUID)
+PAIR ua ub: BOTH
+exit 0

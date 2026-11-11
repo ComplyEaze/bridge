@@ -1,0 +1,2 @@
+JUDGE-B ka window: OWN YES, OTHERS 0
+exit 0

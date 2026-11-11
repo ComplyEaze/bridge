@@ -1,0 +1,2 @@
+JUDGE-B kb outstandings: OWN YES, OTHERS 0
+exit 0

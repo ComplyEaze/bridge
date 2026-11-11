@@ -1,0 +1,2 @@
+REF L-lo-pl-20260801.xml: EQUAL (896 B sha256 19c796774ac740b6; kept 896 B sha256 19c796774ac740b6)
+exit 0

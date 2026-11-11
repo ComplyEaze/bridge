@@ -1,0 +1,2 @@
+MATCH qa window: EQUAL (1 voucher, BP/26-27/0296 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0296 New Ref -1051.00; 14 own fields equal)
+exit 0

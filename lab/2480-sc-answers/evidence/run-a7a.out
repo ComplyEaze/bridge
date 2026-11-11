@@ -1,0 +1,50 @@
+2026-11-11T05:23:33.278Z start bash a.sh qa,qb
+== er.sh c6a C-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh c6b C-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-c6: SAME: EQUAL (5374 B sha256 856db9384934017bcb660fa7c4a8e49621e242db801e63ad0375c7aae56386df; 5374 B sha256 856db9384934017bcb660fa7c4a8e49621e242db801e63ad0375c7aae56386df) exit 0
+== er.sh q6a Vm-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh q6b Vm-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-q6: SAME: EQUAL (11946 B sha256 86a8fba249d28d2f; 11946 B sha256 86a8fba249d28d2f) exit 0
+== er.sh w6a Vw-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh w6b Vw-v-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-w6: SAME: EQUAL (94744 B sha256 0e44a2d9c9793c04; 94744 B sha256 0e44a2d9c9793c04) exit 0
+== er.sh cu6a C-u-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh cu6b C-u-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-cu6: SAME: EQUAL (5374 B sha256 856db9384934017bcb660fa7c4a8e49621e242db801e63ad0375c7aae56386df; 5374 B sha256 856db9384934017bcb660fa7c4a8e49621e242db801e63ad0375c7aae56386df) exit 0
+== er.sh qu6a Vm-u-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh qu6b Vm-u-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-qu6: SAME: EQUAL (11946 B sha256 86a8fba249d28d2f; 11946 B sha256 86a8fba249d28d2f) exit 0
+== er.sh wu6a Vw-u-qa.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh wu6b Vw-u-qa.xml exit 3: ANSWER: VOUCHERS 1
+== same-wu6: SAME: EQUAL (94744 B sha256 0e44a2d9c9793c04; 94744 B sha256 0e44a2d9c9793c04) exit 0
+== own-6: OWN: YES exit 0
+== judge-c6: JUDGE qa census: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== match-q6: MATCH qa movement: EQUAL (1 voucher, BP/26-27/0296 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) exit 0
+== judge-q6: JUDGE qa movement: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== match-w6: MATCH qa window: EQUAL (1 voucher, BP/26-27/0296 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0296 New Ref -1051.00; 14 own fields equal) exit 0
+== judge-w6: JUDGE qa window: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== own-u6: OWN: YES exit 0
+== judge-cu6: JUDGE qa census: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== match-qu6: MATCH qa movement: EQUAL (1 voucher, BP/26-27/0296 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) exit 0
+== judge-qu6: JUDGE qa movement: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== match-wu6: MATCH qa window: EQUAL (1 voucher, BP/26-27/0296 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0296 New Ref -1051.00; 14 own fields equal) exit 0
+== judge-wu6: JUDGE qa window: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== ff-c6: SAME: EQUAL (5374 B sha256 856db9384934017bcb660fa7c4a8e49621e242db801e63ad0375c7aae56386df; 5374 B sha256 856db9384934017bcb660fa7c4a8e49621e242db801e63ad0375c7aae56386df) exit 0
+== ff-q6: SAME: EQUAL (11946 B sha256 86a8fba249d28d2f; 11946 B sha256 86a8fba249d28d2f) exit 0
+== ff-w6: SAME: EQUAL (94744 B sha256 0e44a2d9c9793c04; 94744 B sha256 0e44a2d9c9793c04) exit 0
+== er.sh c7a C-v-qb.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh c7b C-v-qb.xml exit 3: ANSWER: VOUCHERS 1
+== same-c7: SAME: EQUAL (5374 B sha256 8bbd92c8d9dc1d56; 5374 B sha256 8bbd92c8d9dc1d56) exit 0
+== er.sh q7a Vm-v-qb.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh q7b Vm-v-qb.xml exit 3: ANSWER: VOUCHERS 1
+== same-q7: SAME: EQUAL (11970 B sha256 dbbbe17aa5d1b72e; 11970 B sha256 dbbbe17aa5d1b72e) exit 0
+== er.sh w7a Vw-v-qb.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh w7b Vw-v-qb.xml exit 3: ANSWER: VOUCHERS 1
+== same-w7: SAME: EQUAL (94768 B sha256 9b326b88e6468162; 94768 B sha256 9b326b88e6468162) exit 0
+== own-7: OWN: YES exit 0
+== judge-c7: JUDGE qb census: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== match-q7: MATCH qb movement: EQUAL (1 voucher, BP/26-27/0297 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) exit 0
+== judge-q7: JUDGE qb movement: OWN YES, SIBLING NO, OTHERS 0 exit 0
+== match-w7: MATCH qb window: EQUAL (1 voucher, BP/26-27/0297 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0297 New Ref -1051.00; 14 own fields equal) exit 0
+== judge-w7: JUDGE qb window: OWN YES, SIBLING NO, OTHERS 0 exit 0
+2026-11-11T05:25:21.483Z end, exit 0

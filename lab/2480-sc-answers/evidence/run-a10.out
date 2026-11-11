@@ -1,0 +1,7 @@
+2026-11-11T05:27:33.568Z start bash a10.sh a10 a11 k9
+== a10 ANSWER: VOUCHERS 17 exit 0
+== a10 against k8 SAME: EQUAL (1361516 B sha256 3fd7b8ffc5965cc4; 1361516 B sha256 3fd7b8ffc5965cc4)
+== a-a11-M-marks.xml against a-k9-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'252'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'74'", "'252'")
+  equal
+exit 0
+2026-11-11T05:27:44.051Z end, exit 0

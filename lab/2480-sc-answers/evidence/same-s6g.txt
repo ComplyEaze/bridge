@@ -1,0 +1,4 @@
+  a-s6ga-G-cat.xml: 29706 bytes, sha256 797def7057568d629821a33cc69f3a0cb79a5ac9057b2ceac60655f3c64a69a1
+  a-s6gb-G-cat.xml: 29706 bytes, sha256 797def7057568d629821a33cc69f3a0cb79a5ac9057b2ceac60655f3c64a69a1
+SAME: EQUAL
+exit 0

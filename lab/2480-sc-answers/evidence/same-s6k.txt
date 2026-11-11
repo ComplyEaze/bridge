@@ -1,0 +1,4 @@
+  a-s6ka-C-book.xml: 44458 bytes, sha256 a29f9e255571363cdce35f6346e909d9f28f13d326abb9020213e9525707d43c
+  a-s6kb-C-book.xml: 44458 bytes, sha256 a29f9e255571363cdce35f6346e909d9f28f13d326abb9020213e9525707d43c
+SAME: EQUAL
+exit 0

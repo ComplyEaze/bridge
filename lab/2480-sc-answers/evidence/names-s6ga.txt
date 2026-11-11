@@ -1,0 +1,13 @@
+a-s6ga-G-cat.xml: LEDGER rows 24
+  NAMES pl: EQUAL (one row, its own GUID)
+  NAMES ka: DIFFER (its names are ['BRIDGE Sk Ak, Am'])
+  NAMES kb: no row
+  NAMES ra: no row
+  NAMES rb: no row
+  NAMES qa: EQUAL (one row, its own GUID)
+  NAMES qb: EQUAL (one row, its own GUID)
+  NAMES ua: EQUAL (one row, its own GUID)
+  NAMES ub: EQUAL (one row, its own GUID)
+  NAMES ea: no row
+  NAMES eb: no row
+exit 0

@@ -1,0 +1,22 @@
+2026-11-11T05:29:23.157Z start bash b.sh 7 11
+== er.sh b7a Vw-u-ka.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh b7b Vw-u-ka.xml exit 3: ANSWER: VOUCHERS 1
+== same-b7: SAME: EQUAL (94744 B sha256 15c268a3ee2131d2; 94744 B sha256 15c268a3ee2131d2) exit 0
+== judge-b7: JUDGE-B ka window: OWN YES, OTHERS 0 exit 0
+== er.sh b8a L-lo-kb-20260801.xml exit 3: ANSWER: ROWS 1 (0 On Account)
+== er.sh b8b L-lo-kb-20260801.xml exit 3: ANSWER: ROWS 1 (0 On Account)
+== same-b8: SAME: EQUAL (896 B sha256 c903147e8e3bd785; 896 B sha256 c903147e8e3bd785) exit 0
+== judge-b8: JUDGE-B kb outstandings: OWN YES, OTHERS 0 exit 0
+== er.sh b9a C-v-kb.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh b9b C-v-kb.xml exit 3: ANSWER: VOUCHERS 1
+== same-b9: SAME: EQUAL (5374 B sha256 7ceaf55cb3f94042; 5374 B sha256 7ceaf55cb3f94042) exit 0
+== judge-b9: JUDGE-B kb census: OWN YES, OTHERS 0 exit 0
+== er.sh b10a Vm-v-kb.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh b10b Vm-v-kb.xml exit 3: ANSWER: VOUCHERS 1
+== same-b10: SAME: EQUAL (11946 B sha256 17ea00c4b315a2e7; 11946 B sha256 17ea00c4b315a2e7) exit 0
+== judge-b10: JUDGE-B kb movement: OWN YES, OTHERS 0 exit 0
+== er.sh b11a Vw-v-kb.xml exit 3: ANSWER: VOUCHERS 1
+== er.sh b11b Vw-v-kb.xml exit 3: ANSWER: VOUCHERS 1
+== same-b11: SAME: EQUAL (94744 B sha256 15c268a3ee2131d2; 94744 B sha256 15c268a3ee2131d2) exit 0
+== judge-b11: JUDGE-B kb window: OWN YES, OTHERS 0 exit 0
+2026-11-11T05:30:22.808Z end, exit 0

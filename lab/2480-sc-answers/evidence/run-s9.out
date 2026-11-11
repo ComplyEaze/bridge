@@ -1,0 +1,114 @@
+2026-11-11T05:33:41.614Z start bash send.sh s9 N-0281.xml N-0292.xml N-0293.xml N-0294.xml N-0295.xml N-0296.xml N-0297.xml N-0298.xml N-0299.xml N-0300.xml N-0301.xml B-bills.xml S-snap-20260401-20260801.xml C-book.xml G-cat.xml M-marks.xml
+N-0281.xml: 3022 bytes
+N-0292.xml: 3022 bytes
+N-0293.xml: 3022 bytes
+N-0294.xml: 3022 bytes
+N-0295.xml: 3022 bytes
+N-0296.xml: 3022 bytes
+N-0297.xml: 3022 bytes
+N-0298.xml: 3022 bytes
+N-0299.xml: 3022 bytes
+N-0300.xml: 3022 bytes
+N-0301.xml: 3022 bytes
+B-bills.xml: 46 bytes
+S-snap-20260401-20260801.xml: 25480 bytes
+C-book.xml: 29814 bytes
+G-cat.xml: 23100 bytes
+M-marks.xml: 3394 bytes
+printwindow True saved <LAB_DIR>/shots/s9-after.png
+2026-11-11T05:33:51.029Z
+== a-s9-B-bills.xml
+  BILLFIXED groups: 0
+  pl 'BRIDGE Mx Plain': 0 groups
+  ka 'BRIDGE Sk Ak Am': 0 groups
+  kb 'BRIDGE Sk Ak, Am': 0 groups
+  ra 'BRIDGE Sk Bk, Bm': 0 groups
+  rb 'BRIDGE Sk Bk Bm': 0 groups
+  qa 'BRIDGE Sk Ck Cm': 0 groups
+  qb "BRIDGE Sk Ck' Cm": 0 groups
+  ua 'BRIDGE Sk Dk Dm': 0 groups
+  ub 'BRIDGE Sk Dk_Dm': 0 groups
+  ea 'BRIDGE Sk EkEm': 0 groups
+  eb 'BRIDGE Sk Ek Em': 0 groups
+  groups of any other party: 0
+== a-s9-S-snap-20260401-20260801.xml
+a-s9-S-snap-20260401-20260801.xml: HEADER/STATUS 1
+  LEDGER rows: 18
+  pl 'BRIDGE Mx Plain': no row
+  ka 'BRIDGE Sk Ak Am': no row
+  kb 'BRIDGE Sk Ak, Am': no row
+  ra 'BRIDGE Sk Bk, Bm': no row
+  rb 'BRIDGE Sk Bk Bm': no row
+  qa 'BRIDGE Sk Ck Cm': no row
+  qb "BRIDGE Sk Ck' Cm": no row
+  ua 'BRIDGE Sk Dk Dm': no row
+  ub 'BRIDGE Sk Dk_Dm': no row
+  ea 'BRIDGE Sk EkEm': no row
+  eb 'BRIDGE Sk Ek Em': no row
+exit 0
+== a-s9-N-0281.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0292.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0293.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0294.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0295.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0296.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0297.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0298.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0299.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0300.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-N-0301.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+== a-s9-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '245'
+  GUID is the book's: yes
+  COMPANY rows: 1
+exit 0
+a-s9-C-book.xml: ANSWER: VOUCHERS 11
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000001 ALTERID 2 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000002 ALTERID 11 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000003 ALTERID 50 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000004 ALTERID 13 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000005 ALTERID 54 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000006 ALTERID 48 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000007 ALTERID 8 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000008 ALTERID 9 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000009 ALTERID 10 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000a ALTERID 16 DATE 20260801
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b ALTERID 17 DATE 20260801
+exit 0
+a-s9-G-cat.xml: LEDGER rows 18
+  NAMES pl: no row
+  NAMES ka: no row
+  NAMES kb: no row
+  NAMES ra: no row
+  NAMES rb: no row
+  NAMES qa: no row
+  NAMES qb: no row
+  NAMES ua: no row
+  NAMES ub: no row
+  NAMES ea: no row
+  NAMES eb: no row
+exit 0
+2026-11-11T05:33:53.113Z end, exit 0

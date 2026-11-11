@@ -1,0 +1,7 @@
+Row 1761-S4 build check, 2026-11-11 (UTC about 08:50Z). Sheet lab/1761-s4-cash-paid-to-someone-sheet at bb3df89e350f5f0ab38b04a8bb8e41fd4ba3ed89.
+Run: the Bridge CI merge_group run of #2500 at 06268abe63d659a605ca2592ee4d0a2d65eba0ea (conclusion success); 06268abe is origin/master's head at the time and the merge of #2407 (4f3c62c40bf42884605720e9cadead62f2b7d386) is its ancestor. The push run on master at d5b34fd1 carried no Windows smoke artifact.
+Artifact: unsigned-bundle-smoke-windows-latest, 60519571 B, not expired (expires 2026-11-18T08:32:08Z), downloaded into a new empty folder (dl).
+1. zip sha256 ea1068f80898b1c0369cceb83cf991e4911cdac9fb8ee56de53f9b5842a8c0de = the artifact digest.
+2. bridge-tally.mcpb sha256 9da9c5bdeeda5ba1366de3aea5f86b70f451bf66397a8effc05e3f7db9ad00cf = archive_sha256 in mcpb-smoke.json.
+3. bridge_mcp.exe sha256 507da806d9d49a72fdb144be3263e6b1c303bfc964b103616b0ea92ee7b02bf6 = binary_sha256 in mcpb-smoke.json (extracted from the .mcpb, 9 entries, into build).
+Also: pdfium.dll 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118 = pdfium_library_sha256; manifest and server_version 0.7.0; mcpb-smoke.json sha256 362d00a1008ad82169b2db329c7d24272a3bb89039c4677b66fb5d450167c169.

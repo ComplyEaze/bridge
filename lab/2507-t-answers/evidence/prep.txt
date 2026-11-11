@@ -1,0 +1,28 @@
+sheet/.gitattributes 62 B sha256 a8eed56a095678b8a7514768dd2bef2e6ac942db1053f4e4aac4a2d81b11345c (byte copy, equal to SHA256.txt)
+sheet/SHA256.txt 556 B sha256 d3b4cb3e3543eb31d22c5765b5edfc21c78c53d4ca46c1fe521e78345332438b (byte copy)
+sheet/WINDOWS-2507.md 8274 B sha256 e3a829a41f54fcdd21a6a474c4a3c045090aa8fccb730ee662d541bbe555d2cd (byte copy, equal to SHA256.txt)
+sheet/marks.xml 976 B sha256 f556551d09682fd94d41b40bcf539d5d34bf06260d6da4bb44ad7023c598fcb1 (byte copy, equal to SHA256.txt)
+sheet/t0.xml 3266 B sha256 7b9a96c1d0db1655851f56674c538e17ee12aaf741123b4e6d15aeade7d8e6b5 (byte copy, equal to SHA256.txt)
+sheet/t1.xml 3322 B sha256 265c82234eb662a954a0e6ba50360c741d1e5e5050e69710f2c1812679fea0ad (byte copy, equal to SHA256.txt)
+sheet/t2.xml 3270 B sha256 229031bf3c433cbb1b57a8fc8ce8cc57c312b7ed528955ed1e36e2d6290e8f98 (byte copy, equal to SHA256.txt)
+sheet/t3.xml 3134 B sha256 2baa074ff91e96eac57790f1f654e8da9b5f5cc214ef6b1c4b00627bd1c63559 (byte copy, equal to SHA256.txt)
+requests/t0.xml sha256 7b9a96c1d0db1655851f56674c538e17ee12aaf741123b4e6d15aeade7d8e6b5 (byte copy of the sheet file)
+requests/t1.xml sha256 265c82234eb662a954a0e6ba50360c741d1e5e5050e69710f2c1812679fea0ad (byte copy of the sheet file)
+requests/t2.xml sha256 229031bf3c433cbb1b57a8fc8ce8cc57c312b7ed528955ed1e36e2d6290e8f98 (byte copy of the sheet file)
+requests/t3.xml sha256 2baa074ff91e96eac57790f1f654e8da9b5f5cc214ef6b1c4b00627bd1c63559 (byte copy of the sheet file)
+requests/marks.xml sha256 f556551d09682fd94d41b40bcf539d5d34bf06260d6da4bb44ad7023c598fcb1 (byte copy of the sheet file)
+client.py 4687 B sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (byte copy from row 1761-S4)
+call.py 2757 B sha256 5a70d96a5fc3218a25a84edcd059d0429a75def94cb3861c47b6fc4192f567d6 (byte copy from row 1761-S4)
+show.py 864 B sha256 ee1d9599ac9502b5d33f7684542899163e3f1c9001f4dcdb382cc96ba0d2b0e6 (byte copy from row 1761-S4)
+step0.py 2788 B sha256 9e836530ee44f8650af70726d003492d7ef29936b06639cb23450a80decb7f5e (byte copy from row 1761-S4)
+shot.sh sha256 848f639a98aa84d51b2135437618ef6d63418c0d921e5901f19f937aab7a0d48 (row 1761-S4 copy, folder changed)
+launch-env.json sha256 8147e455a8e92ee8d424c045e0f437fa7dd810be8c450098c9f6d136edee33c2 keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED'] (no posting setting, no redaction, no byte limit)
+c3-send-mt.ps1 sha256 7decf58f16c2a9c6e92f56e70d42447e1951b2a12313de923d79ba0d1fa92666 (the lab c3-send.ps1 a90f514fa24bd1fb9bc3b820811b75b8f9cc300333ff4cd728076b29461b81db with --max-time 60)
+send.ps1 sha256 9dc92647355e25c9943a0ad0748a1737d9671181112dcd8a3ec5ce63e8f90f21
+args/none.json sha256 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
+args/items.json sha256 f9b6650cfccb0dd9952e73f9407e7b99e5cc026ee2779567dde0a24bfa38a943
+args/v0520.json sha256 395492bcc168e33c62816bc756509e780fe506f3f2724767d5c7577988470556
+args/v0521.json sha256 9d0fc35a2e3c29348be0df4b369a69806c2da0516d97229a0a6f129ab3bddb74
+args/v0522-31.json sha256 20e483c1cbab544aa01d01a20dbe07616ceaa073d6d2e615d14129bc30b6e014
+args/v0521-sl.json sha256 d6a6bdbb7d33ee43e89b87de3b66e88b13c727caa3e820569553946273f253a3
+data and backups/B0 new and empty

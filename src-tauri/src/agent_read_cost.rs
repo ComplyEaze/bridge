@@ -35,10 +35,13 @@ use serde_json::{json, Value};
 /// to the runtime's constant by a test that reads its source).
 pub(super) const SPACING_MS: u64 = 500;
 
-/// The one call limit that has been measured: Claude Desktop's chat app on
+/// The call limit `host_240` judges against: Claude Desktop's chat app on
 /// macOS, bundle 2.19675.0, cancelled a silent 250 s call at 240 s in two runs
 /// (protocol reference 11f). Calls between 130 s and 240 s were not tried, and
 /// whether progress notifications would extend the limit is not answered.
+/// It is not the shortest limit measured: on Windows both tabs of the Claude
+/// desktop app cut a call at about 60 s (#2119, row H; `host_limits`). Which
+/// limit a fit is judged against is open on #703.
 const DESKTOP_CALL_LIMIT_MS: u64 = 240_000;
 
 /// A call this slow is worth a statement: from here, thirty one-day calls take
@@ -269,7 +272,8 @@ fn block(cost: Cost, ended: Ended, window_reads: u64) -> Option<Value> {
 pub(super) fn host_limits() -> Value {
     json!([
         {"host": "claude_desktop_chat_macos", "seconds": 240, "basis": "measured_twice_one_build_silent_calls"},
-        {"host": "claude_desktop_chat_windows", "seconds": null, "basis": "unmeasured"},
+        {"host": "claude_desktop_chat_windows", "seconds": 60, "basis": "cut_a_60s_call_at_about_60s_no_cancel_sent_one_run_each_shorter_calls_unmeasured"},
+        {"host": "claude_desktop_code_tab_windows", "seconds": 60, "basis": "cut_a_90s_call_at_60s_cancel_sent_one_run_each_settings_not_recorded"},
         {"host": "claude_code", "seconds": null, "basis": "default_completed_150s_two_builds_configured_60s_cut_at_60s_earlier_60s_unexplained"},
     ])
 }

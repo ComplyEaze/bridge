@@ -9,7 +9,7 @@ The answers decide:
 - whether the read-back can find the voucher by the id it sent;
 - whether Bridge must send the outward value.
 
-**Why direct XML.** No Bridge builder renders a stock voucher (`src-tauri/src/agent_import.rs:330-337` knows five accounting types; `src-tauri/src/agent_lab_import.rs:2287-2297` renders accounting and invoice vouchers only). So each import is a lab request, as in row 2016, sent by curl under the owner's word allowing lab curl requests for shape discovery, writes included. Every read after it goes through Bridge's own tools.
+**Why direct XML.** No Bridge builder renders a stock voucher (`src-tauri/src/agent_import.rs:330-337` knows five accounting types; `src-tauri/src/agent_lab_import.rs:2287-2297` renders accounting and invoice vouchers only). So each import is a lab request, as in row 2016, sent by curl under the owner's ruling of 26 Oct 2026 allowing lab curl requests for shape discovery, writes included; it covers these four Stock Journal creates on BRIDGE SHAPE LAB. Every read after it goes through Bridge's own tools.
 
 **Code admits the trigger (reads only).**
 - `vouchers` with `stock_lines`: `src-tauri/src/agent_read_profiles.rs:71-74`, builder `:214`.
@@ -81,7 +81,7 @@ No client book, and no other company loaded. The book's GUID is the one row 2016
    - Restore B0 and check the marks.
 5. **End.**
    - `list_companies` and `marks.xml`. EXPECT step 0's marks.
-   - `vouchers` for 2026-05-21. EXPECT zero rows.
+   - `vouchers` for 2026-05-21. EXPECT a complete answer with no refusal and a total of 0 rows.
    - Record `bridge_mcp.exe`'s sha256.
 
 **Fails** if:

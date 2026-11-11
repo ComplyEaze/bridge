@@ -2,7 +2,7 @@
 
 **Outcome: every step run, T0 to T3 and the end; no stop after the first write.** The four questions have answers:
 - **T0, the baseline:** created, one `in` and one `out` line as sent; Bridge's read equals Tally's screen.
-- **T1, the id sent:** created. The row's GUID is Tally's own (the company GUID and the MASTERID), not the `REMOTEID` sent. Sent again (T1b), the same voucher was **altered** in place: `ALTERED 1`, the same GUID and MASTERID, a higher ALTERID, still one row.
+- **T1, the id sent:** created. The row's GUID is Tally's own (the company GUID and the MASTERID), not the `REMOTEID` sent. Sent again (T1b), the same voucher was **altered** in place: `ALTERED 1`, the same GUID and MASTERID, a higher ALTERID, still one row. Both are **PARTIAL**: one run on one book.
 - **T2, one list name for both sides:** **refused**, `EXCEPTIONS 1`, no `LINEERROR`, nothing created; the marks did not move. A finding, as the sheet allows.
 - **T3, no outward value:** created, and **Tally did not value the transfer**: both sides read with rate and amount empty, and the screen shows both sides blank with no total value.
 
@@ -45,8 +45,8 @@
 | 1 | T0 read (008): one Stock Journal, `in` Factory Floor H-2504-A 2.000 Kgs, rate and amount empty; `out` Main Location H-2504-A 2.000 Kgs, 30.00/Kgs, 60.00 | PASS |
 | 1 | T0 on screen: Source (Consumption) Main Location 2.000 Kgs, 30.00/Kgs (in italics), 60.00; Destination (Production) Factory Floor 2.000 Kgs, rate and amount blank | equal to the read |
 | 1 | restore B0; marks byte-equal to step 0's; the empty-day check | PASS |
-| 2 | T1: `CREATED 1`; marks ALTVCHID 127, ALTMSTID 300; read (011): GUID `...-00000063`, ALTERID 127, MASTERID 99, lines as T0 | recorded (no EXPECT on the GUID) |
-| 2 | T1b, the same request again with no restore: `CREATED 0`, `ALTERED 1`, every other counter 0; marks ALTVCHID 128, ALTMSTID 300; read (012): one row, the same GUID and MASTERID, ALTERID 128 | **the first altered** |
+| 2 | T1: `CREATED 1`; marks ALTVCHID 127, ALTMSTID 300; read (011): GUID `...-00000063`, ALTERID 127, MASTERID 99, lines as T0 | recorded (no EXPECT on the GUID; PARTIAL: one run, one book) |
+| 2 | T1b, the same request again with no restore: `CREATED 0`, `ALTERED 1`, every other counter 0; marks ALTVCHID 128, ALTMSTID 300; read (012): one row, the same GUID and MASTERID, ALTERID 128 | **the first altered** (PARTIAL: one run, one book) |
 | 2 | restore B0; marks byte-equal; the empty-day check | PASS |
 | 3 | T2: `EXCEPTIONS 1`, every other counter 0 (`LASTVCHID` 0), no `LINEERROR`; marks ALTVCHID 126, ALTMSTID 300; 2026-05-21 still empty | **refused, nothing moved (a finding)** |
 | 3 | restore B0; marks byte-equal; the empty-day check | PASS |
@@ -62,9 +62,9 @@ Each import's capture shows the Gateway with no dialog. Each restore answered ex
 
 **T0.** The recorded shape imports as a Stock Journal in Tally's Transfer of Materials view. `INVENTORYENTRIESOUT.LIST` is the Source (Consumption) side and Bridge reads it as `out`. `INVENTORYENTRIESIN.LIST` is the Destination (Production) side, read as `in`. The in side's rate and amount read `empty`, as row 2016 read them. The screen shows them blank, while the source side's rate shows in italics. The batch is in Bridge's read (`batches[0].batch`) on both sides. The screen does not show a batch column.
 
-**T1.** The voucher's GUID is `<company GUID>-00000063`, which is Tally's own form: the company GUID and the MASTERID 99 in hex. The `REMOTEID` sent (`lab-2507-t1-0001`) is not the row's GUID. Bridge's stock-line read does not fetch `REMOTEID`, as the sheet notes, so the read-back cannot find the voucher by the id sent. It finds it by date and by the GUID Tally gives back.
+**T1 (PARTIAL: one run, one book).** The voucher's GUID is `<company GUID>-00000063`, which is Tally's own form: the company GUID and the MASTERID 99 in hex. The `REMOTEID` sent (`lab-2507-t1-0001`) is not the row's GUID. Bridge's stock-line read does not fetch `REMOTEID`, as the sheet notes, so the read-back cannot find the voucher by the id sent. It finds it by date and by the GUID Tally gives back.
 
-**T1b.** The same request sent again altered the first voucher: `ALTERED 1`, still one row, the same GUID, MASTERID and number, and ALTERID 127 to 128. Field by field, the two reads differ only in `alter_id`, `voucher_alter_id` and their read times. So a resend of this shape with a `REMOTEID` does not create a second voucher.
+**T1b (PARTIAL: one run, one book).** The same request sent again altered the first voucher: `ALTERED 1`, still one row, the same GUID, MASTERID and number, and ALTERID 127 to 128. Field by field, the two reads differ only in `alter_id`, `voucher_alter_id` and their read times. So a resend of this shape with a `REMOTEID` does not create a second voucher.
 
 **T2.** With both lines under the one list name `ALLINVENTORYENTRIES.LIST` (children unchanged, `ISDEEMEDPOSITIVE` Yes on the in side and No on the out side), Tally refused the voucher: `EXCEPTIONS 1`, no `LINEERROR`, and `LASTVCHID` 0. No row was created and the marks did not move. So a builder for this view has to write the two named lists.
 
@@ -84,9 +84,14 @@ The step 0 reads stopped the row before any write, and the run lead decided (202
 
 check-empty.py applied conditions 1 to 3 to each check's answers. All six checks passed: step 0, after each of the four restores, and step 5. Condition 4 passed at step 0 (005).
 
+## Open observation (UNVERIFIED): two company fields after the refused T2
+
+`marks.xml` fetches `GUID`, `ALTVCHID` and `ALTMSTID`, but Tally's answer also holds other company fields. GODOWN, STOCKITEM, CURRENCY, TAXUNIT, VOUCHERNUMBERSERIES and VOUCHER read 0 at step 0, and above 0 after T0, T1 and T1b. After the refused T2, TAXUNIT and VOUCHERNUMBERSERIES read 1, though no voucher was created and the three marks held. Each read 0 again after its restore and load, where the whole answer was byte-equal to step 0's.
+
+The sheet's "nothing moved" EXPECT names the three marks, and those held at T2, so the row's reading stands (the run lead, 2026-11-11). Why the two fields read 1 after a refusal is **not explained**. It could be a session counter, or an object the refused import left behind. Nothing is to be built on it. A future row can decide it by listing those collections before and after a refusal.
+
 ## Other notes
 
-- **The marks answer carries more than the three marks.** `marks.xml` fetches `GUID`, `ALTVCHID` and `ALTMSTID`, but Tally's answer also holds other company fields. GODOWN, STOCKITEM, CURRENCY, TAXUNIT, VOUCHERNUMBERSERIES and VOUCHER read 0 at step 0. They read above 0 after T0, T1 and T1b. After the refused T2 only TAXUNIT and VOUCHERNUMBERSERIES read 1. Each read 0 again after its restore and load, where the whole answer was byte-equal to step 0's. They are outside the request's fetch, so the row read "nothing moved" at T2 on the three marks; the two fields are recorded here for the run lead.
 - **Side files at a restore.** Each restore took the company folder from 24 entries to 17 (seven Tally side files gone), and the load brought six back (`Index.1800` not), as on BRIDGE PILOT LAB in an earlier row. The listings name the company number, so they stay on the lab PC.
 - **Each restore** followed a written plan (restore-plan-t0.txt to restore-plan-t3.txt, kept local as they name the company number), made by prep-c6.py, which also re-hashed B0.
 - **The screen views** (T0 and T3): Day Book, F2 to 21-5-2026, Enter on the one row, which opens Inventory Voucher Alteration (Secondary). Nothing was typed. Each was left by Ctrl+Q once a capture showed its title (no prompt), and the Day Book by Escape. The marks read after each view were byte-equal to the ones before it.
@@ -107,6 +112,8 @@ check-empty.py applied conditions 1 to 3 to each check's answers. All six checks
 ## Not established
 
 - Whether Tally matched T1b to T1 by the `REMOTEID` or by other fields: the sheet sends no resend of T0 without one.
+- Whether T1's and T1b's outcomes hold beyond this one run on this one book.
+- Why TAXUNIT and VOUCHERNUMBERSERIES read 1 after the refused T2 (the open observation above).
 - Which line T2's exception was for: Tally's answer names none.
 - Rows T6 to T14 and TB, as the sheet says.
 

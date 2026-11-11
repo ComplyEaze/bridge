@@ -1,0 +1,26 @@
+== a-s6ba-B-bills.xml
+  BILLFIXED groups: 11
+  pl 'BRIDGE Mx Plain': 1 groups
+    BILLREF 'BP/26-27/0281'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ga 'BRIDGE Mx Ak, Am & Co': 1 groups
+    BILLREF 'BP/26-27/0282'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ss 'BRIDGE Mx Bk & Sons (Bm), Bn': 1 groups
+    BILLREF 'BP/26-27/0283'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ms 'BRIDGE Mx M/s. Ck_Cm, Cn': 1 groups
+    BILLREF 'BP/26-27/0284'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  qd 'BRIDGE Mx "Dk" Dm & Dn': 1 groups
+    BILLREF 'BP/26-27/0285'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  pp 'BRIDGE Mx Ek 50% + Em': 1 groups
+    BILLREF 'BP/26-27/0286'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  hd 'BRIDGE Mx Fk #2, Fm-Fn': 1 groups
+    BILLREF 'BP/26-27/0287'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ad 'BRIDGE Mx Gk @ Gm.': 1 groups
+    BILLREF 'BP/26-27/0288'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  ca "BRIDGE Mx Hk: Hm's (Hn)": 1 groups
+    BILLREF 'BP/26-27/0289'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  xs 'BRIDGE Mx Jk! Jm *': 1 groups
+    BILLREF 'BP/26-27/0290'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  al 'BRIDGE Mx Lk, Lm_Ln "Lp" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly\'s': 1 groups
+    BILLREF 'BP/26-27/0291'; BILLDATE '1-Aug-26'; BILLCL '-1051.00'; BILLDUE '1-Aug-26'; BILLOVERDUE '0'
+  groups of any other party: 0
+exit 0

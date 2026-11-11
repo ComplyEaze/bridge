@@ -1,0 +1,2 @@
+SAME: EQUAL (94776 B sha256 25ff5fc742a622f1; 94776 B sha256 25ff5fc742a622f1)
+exit 0

@@ -1,0 +1,2 @@
+MATCH ga movement: EQUAL (1 voucher, BP/26-27/0282 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal)
+exit 0

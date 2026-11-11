@@ -1,0 +1,18 @@
+2026-11-11T01:49:38.972Z start bash k8.sh
+== k0 marks against m1:   equal exit 0
+== k1 ANSWER: VOUCHERS 1 exit 0
+== k2 SAME: EQUAL (11954 B sha256 b8eab7b26d95eccb; 11954 B sha256 b8eab7b26d95eccb) exit 0
+== k3 SAME: EQUAL (11954 B sha256 b8eab7b26d95eccb; 11954 B sha256 b8eab7b26d95eccb) exit 0
+== k4 ANSWER: VOUCHERS 1 exit 0
+== k5 SAME: EQUAL (94752 B sha256 f158857ba662a10f; 94752 B sha256 f158857ba662a10f) exit 0
+== k6 SAME: EQUAL (94752 B sha256 f158857ba662a10f; 94752 B sha256 f158857ba662a10f) exit 0
+== k7 ANSWER: VOUCHERS 22 exit 0
+== k7 MATCH pl movement: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) exit 0
+== k7 MATCH pl window: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0281 New Ref -1051.00; 14 own fields equal) exit 0
+== k8 marks against k0:   equal exit 0
+== record k2:Vm-uv-pl.xml: ANSWER: VOUCHERS 1
+== record k3:Vm-v-pl.xml: ANSWER: VOUCHERS 1
+== record k5:Vw-uv-pl.xml: ANSWER: VOUCHERS 1
+== record k6:Vw-v-pl.xml: ANSWER: VOUCHERS 1
+the shape step passes
+2026-11-11T01:50:26.531Z end, exit 0

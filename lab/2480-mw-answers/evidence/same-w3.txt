@@ -1,0 +1,2 @@
+SAME: EQUAL (94820 B sha256 6c2d49e8267a4a2f; 94820 B sha256 6c2d49e8267a4a2f)
+exit 0

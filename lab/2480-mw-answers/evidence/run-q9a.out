@@ -1,0 +1,44 @@
+2026-11-11T01:51:37.456Z start bash q9.sh pl,ga,ss,ms,qd,pp
+== vr.sh q1a Vm-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q1b Vm-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== q1 SAME: EQUAL (11954 B sha256 b8eab7b26d95eccb; 11954 B sha256 b8eab7b26d95eccb)
+== vr.sh w1a Vw-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w1b Vw-v-pl.xml exit 3: ANSWER: VOUCHERS 1
+== w1 SAME: EQUAL (94752 B sha256 f158857ba662a10f; 94752 B sha256 f158857ba662a10f)
+n=1 pl: MATCH pl movement: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH pl window: EQUAL (1 voucher, BP/26-27/0281 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0281 New Ref -1051.00; 14 own fields equal)
+== vr.sh q2a Vm-v-ga.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q2b Vm-v-ga.xml exit 3: ANSWER: VOUCHERS 1
+== q2 SAME: EQUAL (11994 B sha256 b678a7fef67a9651; 11994 B sha256 b678a7fef67a9651)
+== vr.sh w2a Vw-v-ga.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w2b Vw-v-ga.xml exit 3: ANSWER: VOUCHERS 1
+== w2 SAME: EQUAL (94792 B sha256 20c26f96821bfa50; 94792 B sha256 20c26f96821bfa50)
+n=2 ga: MATCH ga movement: EQUAL (1 voucher, BP/26-27/0282 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH ga window: EQUAL (1 voucher, BP/26-27/0282 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0282 New Ref -1051.00; 14 own fields equal)
+== vr.sh q3a Vm-v-ss.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q3b Vm-v-ss.xml exit 3: ANSWER: VOUCHERS 1
+== q3 SAME: EQUAL (12022 B sha256 7c1ea25bdeb07437; 12022 B sha256 7c1ea25bdeb07437)
+== vr.sh w3a Vw-v-ss.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w3b Vw-v-ss.xml exit 3: ANSWER: VOUCHERS 1
+== w3 SAME: EQUAL (94820 B sha256 6c2d49e8267a4a2f; 94820 B sha256 6c2d49e8267a4a2f)
+n=3 ss: MATCH ss movement: EQUAL (1 voucher, BP/26-27/0283 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH ss window: EQUAL (1 voucher, BP/26-27/0283 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0283 New Ref -1051.00; 14 own fields equal)
+== vr.sh q4a Vm-v-ms.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q4b Vm-v-ms.xml exit 3: ANSWER: VOUCHERS 1
+== q4 SAME: EQUAL (11990 B sha256 fe370ab141c89bac; 11990 B sha256 fe370ab141c89bac)
+== vr.sh w4a Vw-v-ms.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w4b Vw-v-ms.xml exit 3: ANSWER: VOUCHERS 1
+== w4 SAME: EQUAL (94788 B sha256 f0f23981eb074253; 94788 B sha256 f0f23981eb074253)
+n=4 ms: MATCH ms movement: EQUAL (1 voucher, BP/26-27/0284 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH ms window: EQUAL (1 voucher, BP/26-27/0284 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0284 New Ref -1051.00; 14 own fields equal)
+== vr.sh q5a Vm-v-qd.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q5b Vm-v-qd.xml exit 3: ANSWER: VOUCHERS 1
+== q5 SAME: EQUAL (12038 B sha256 a85d084b2729fc8b; 12038 B sha256 a85d084b2729fc8b)
+== vr.sh w5a Vw-v-qd.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w5b Vw-v-qd.xml exit 3: ANSWER: VOUCHERS 1
+== w5 SAME: EQUAL (94836 B sha256 e4c224348d107f2f; 94836 B sha256 e4c224348d107f2f)
+n=5 qd: MATCH qd movement: EQUAL (1 voucher, BP/26-27/0285 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH qd window: EQUAL (1 voucher, BP/26-27/0285 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0285 New Ref -1051.00; 14 own fields equal)
+== vr.sh q6a Vm-v-pp.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q6b Vm-v-pp.xml exit 3: ANSWER: VOUCHERS 1
+== q6 SAME: EQUAL (11978 B sha256 7793b8210b2901c3; 11978 B sha256 7793b8210b2901c3)
+== vr.sh w6a Vw-v-pp.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w6b Vw-v-pp.xml exit 3: ANSWER: VOUCHERS 1
+== w6 SAME: EQUAL (94776 B sha256 25ff5fc742a622f1; 94776 B sha256 25ff5fc742a622f1)
+n=6 pp: MATCH pp movement: EQUAL (1 voucher, BP/26-27/0286 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH pp window: EQUAL (1 voucher, BP/26-27/0286 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0286 New Ref -1051.00; 14 own fields equal)
+2026-11-11T01:53:42.720Z end, exit 0

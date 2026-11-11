@@ -1,0 +1,37 @@
+2026-11-11T01:54:09.850Z start bash q9.sh hd,ad,ca,xs,al
+== vr.sh q7a Vm-v-hd.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q7b Vm-v-hd.xml exit 3: ANSWER: VOUCHERS 1
+== q7 SAME: EQUAL (11982 B sha256 c5067d431c3e1c72; 11982 B sha256 c5067d431c3e1c72)
+== vr.sh w7a Vw-v-hd.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w7b Vw-v-hd.xml exit 3: ANSWER: VOUCHERS 1
+== w7 SAME: EQUAL (94780 B sha256 f190b8a4b4593b0e; 94780 B sha256 f190b8a4b4593b0e)
+n=7 hd: MATCH hd movement: EQUAL (1 voucher, BP/26-27/0287 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH hd window: EQUAL (1 voucher, BP/26-27/0287 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0287 New Ref -1051.00; 14 own fields equal)
+== vr.sh q8a Vm-v-ad.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q8b Vm-v-ad.xml exit 3: ANSWER: VOUCHERS 1
+== q8 SAME: EQUAL (11966 B sha256 d1a44c0313af45c4; 11966 B sha256 d1a44c0313af45c4)
+== vr.sh w8a Vw-v-ad.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w8b Vw-v-ad.xml exit 3: ANSWER: VOUCHERS 1
+== w8 SAME: EQUAL (94764 B sha256 aaa8f807445890187fdba4f969cf7dc6a9ca1f90c187447c35abcf5fcb6e8ed9; 94764 B sha256 aaa8f807445890187fdba4f969cf7dc6a9ca1f90c187447c35abcf5fcb6e8ed9)
+n=8 ad: MATCH ad movement: EQUAL (1 voucher, BP/26-27/0288 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH ad window: EQUAL (1 voucher, BP/26-27/0288 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0288 New Ref -1051.00; 14 own fields equal)
+== vr.sh q9a Vm-v-ca.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q9b Vm-v-ca.xml exit 3: ANSWER: VOUCHERS 1
+== q9 SAME: EQUAL (12006 B sha256 cb0fc2dd8f3290ff; 12006 B sha256 cb0fc2dd8f3290ff)
+== vr.sh w9a Vw-v-ca.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w9b Vw-v-ca.xml exit 3: ANSWER: VOUCHERS 1
+== w9 SAME: EQUAL (94806 B sha256 e1709841e70aadd4; 94806 B sha256 e1709841e70aadd4)
+n=9 ca: MATCH ca movement: EQUAL (1 voucher, BP/26-27/0289 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH ca window: EQUAL (1 voucher, BP/26-27/0289 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0289 New Ref -1051.00; 14 own fields equal)
+== vr.sh q10a Vm-v-xs.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q10b Vm-v-xs.xml exit 3: ANSWER: VOUCHERS 1
+== q10 SAME: EQUAL (11966 B sha256 ea4019e3547cfac2; 11966 B sha256 ea4019e3547cfac2)
+== vr.sh w10a Vw-v-xs.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w10b Vw-v-xs.xml exit 3: ANSWER: VOUCHERS 1
+== w10 SAME: EQUAL (94766 B sha256 e555279f4bfebbdf; 94766 B sha256 e555279f4bfebbdf)
+n=10 xs: MATCH xs movement: EQUAL (1 voucher, BP/26-27/0290 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH xs window: EQUAL (1 voucher, BP/26-27/0290 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0290 New Ref -1051.00; 14 own fields equal)
+== vr.sh q11a Vm-v-al.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh q11b Vm-v-al.xml exit 3: ANSWER: VOUCHERS 1
+== q11 SAME: EQUAL (12258 B sha256 129c54dfd3c3a18a; 12258 B sha256 129c54dfd3c3a18a)
+== vr.sh w11a Vw-v-al.xml exit 3: ANSWER: VOUCHERS 1
+== vr.sh w11b Vw-v-al.xml exit 3: ANSWER: VOUCHERS 1
+== w11 SAME: EQUAL (95058 B sha256 65bc7a5de6e7ff72; 95058 B sha256 65bc7a5de6e7ff72)
+n=11 al: MATCH al movement: EQUAL (1 voucher, BP/26-27/0291 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; 10 own fields equal) | MATCH al window: EQUAL (1 voucher, BP/26-27/0291 of 20260801, matched by VOUCHERKEY; its line Yes -1051.00; bill BP/26-27/0291 New Ref -1051.00; 14 own fields equal)
+2026-11-11T01:55:55.955Z end, exit 0

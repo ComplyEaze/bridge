@@ -1,0 +1,14 @@
+a-s6sa-S-snap-20260401-20260801.xml: LEDGER rows 29
+  pl 'BRIDGE Mx Plain': names ['BRIDGE Mx Plain']
+  ga 'BRIDGE Mx Ak, Am & Co': names ['BRIDGE Mx Ak, Am & Co']
+  ss 'BRIDGE Mx Bk & Sons (Bm), Bn': names ['BRIDGE Mx Bk & Sons (Bm), Bn']
+  ms 'BRIDGE Mx M/s. Ck_Cm, Cn': names ['BRIDGE Mx M/s. Ck_Cm, Cn']
+  qd 'BRIDGE Mx "Dk" Dm & Dn': names ['BRIDGE Mx "Dk" Dm & Dn']
+  pp 'BRIDGE Mx Ek 50% + Em': names ['BRIDGE Mx Ek 50% + Em']
+  hd 'BRIDGE Mx Fk #2, Fm-Fn': names ['BRIDGE Mx Fk #2, Fm-Fn']
+  ad 'BRIDGE Mx Gk @ Gm.': names ['BRIDGE Mx Gk @ Gm.']
+  ca "BRIDGE Mx Hk: Hm's (Hn)": names ["BRIDGE Mx Hk: Hm's (Hn)"]
+  xs 'BRIDGE Mx Jk! Jm *': names ['BRIDGE Mx Jk! Jm *']
+  al 'BRIDGE Mx Lk, Lm_Ln "Lp" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly\'s': names ['BRIDGE Mx Lk, Lm_Ln "Lp" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly\'s']
+NAMES: EQUAL
+exit 0

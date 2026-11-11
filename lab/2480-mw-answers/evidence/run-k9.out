@@ -1,0 +1,7 @@
+2026-11-11T01:56:25.959Z start bash k9.sh
+== k9 ANSWER: VOUCHERS 22 exit 0
+== k9 against k7 SAME: EQUAL (1821796 B sha256 1b0e20f5545faff5; 1821796 B sha256 1b0e20f5545faff5)
+== a-k10-M-marks.xml against a-k8-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'79'", "'256'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'79'", "'256'")
+  equal
+exit 0
+2026-11-11T01:56:37.286Z end, exit 0

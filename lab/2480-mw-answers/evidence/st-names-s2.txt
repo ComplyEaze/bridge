@@ -1,0 +1,14 @@
+a-s2-S-snap-20260401-20260801.xml: LEDGER rows 18
+  pl 'BRIDGE Mx Plain': no row
+  ga 'BRIDGE Mx Ak, Am & Co': no row
+  ss 'BRIDGE Mx Bk & Sons (Bm), Bn': no row
+  ms 'BRIDGE Mx M/s. Ck_Cm, Cn': no row
+  qd 'BRIDGE Mx "Dk" Dm & Dn': no row
+  pp 'BRIDGE Mx Ek 50% + Em': no row
+  hd 'BRIDGE Mx Fk #2, Fm-Fn': no row
+  ad 'BRIDGE Mx Gk @ Gm.': no row
+  ca "BRIDGE Mx Hk: Hm's (Hn)": no row
+  xs 'BRIDGE Mx Jk! Jm *': no row
+  al 'BRIDGE Mx Lk, Lm_Ln "Lp" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly\'s': no row
+NAMES: EQUAL
+exit 0

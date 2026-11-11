@@ -1,0 +1,2 @@
+SAME: EQUAL (95058 B sha256 65bc7a5de6e7ff72; 95058 B sha256 65bc7a5de6e7ff72)
+exit 0

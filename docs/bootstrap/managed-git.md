@@ -53,6 +53,22 @@ personal information.
   directly makes documentation pull requests permanently unmergeable. The gate
   fails when a job the scope selected was skipped, so a skip it accepts is
   always one the scope chose.
+- A draft pull request's green run is never called a full run: it ran no
+  native, bundle or seam job.
+- Working rule for a ready pull request whose change the queue runs the bundle
+  and seam jobs for and its own pull-request run does not (#2455):
+  - The merge queue run is its bundle and seam proof.
+  - For that proof, a manual run of `ci.yml`
+    (`gh workflow run ci.yml --ref <branch>`) is requested before queueing only
+    when the author needs release-profile proof, and the author gives the
+    reason in the pull-request body. The manual run for macOS native evidence
+    in `AGENTS.md`, and the one after an ejection below, are separate.
+  - After the queue ejects it, the pull request is not queued again until
+    the failing job has passed on the fixed head outside the queue, on the
+    system it failed on: in one manual run, or, for a Windows failure, in the
+    pull-request run if the pull request's whole change now selects that job.
+    The exception is a log that shows an infrastructure error, such as a
+    download 5xx, a timeout or a fetch failure.
 - Enable private vulnerability reporting.
 - Restrict merge permissions to maintainers.
 - Require issue and pull-request templates.

@@ -1,0 +1,11 @@
+Rows 1108-R C6 restore plan (bk0): bk0
+Source folder: <LAB_DIR>\backups\bk0 (one file)
+File: TDBK1800_<company number>.001
+Bytes: 24219
+sha256: df1eed2ecf4e4945a872525ad57d63cebbb9c47127c20c9e7919b291cfac9b39
+Backup written: 2026-11-12 23:04 local (the Restore list must show this date and time)
+Company: BRIDGE STOCK CREATE LAB, number <company number>
+Restore Data Path: <Tally data folder> (Tally data folder)
+Source: Specify Path = the source folder above; select BRIDGE STOCK CREATE LAB only; End of List
+Prompts expected, the only ones answered: "Accept ?" = y; "Company data folder (<company number>) already exists ... Replace ..." = Replace
+After: load THE COMPANY alone (filter, one row, Enter); then marks, ledgers and vouchers as the step EXPECTs

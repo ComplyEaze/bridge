@@ -1,0 +1,25 @@
+pass a read comes back byte for byte
+pass an import answer comes back byte for byte
+pass two requests on one connection
+pass a read is timed and kept whole as x-1
+pass the import is kept whole as x-2 too
+pass the import took the stand-in's delay
+pass first byte is not after last
+pass Bridge stayed
+pass the sent line came first
+pass no lost reply
+pass the import request is kept
+pass the import answer is kept
+pass Bridge leaving mid-import is timed
+pass Tally's answer still read to its end
+pass the lost reply is logged
+pass the lost answer is kept whole
+pass the proxy still serves after a lost reply
+pass Bridge sees the connection end
+pass a Tally that hangs up is logged and timed
+pass that import's request is kept and no answer
+pass no proxy_error in any of it
+pass every answered exchange is numbered once, in order
+pass the unanswered import is x-5: its request kept and no answer
+pass each kept request and answer matches its logged sizes and sha256
+0 failed

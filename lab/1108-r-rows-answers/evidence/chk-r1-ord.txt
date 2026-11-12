@@ -1,0 +1,4 @@
+$ python -I check_1108.py diff r0post-vouchers.utf16le.xml r1post-vouchers.utf16le.xml
+exit 0
+rows before: 3  after: 3
+unchanged rows: 3

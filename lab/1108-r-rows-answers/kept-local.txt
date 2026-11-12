@@ -1,0 +1,22 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backups/bk0/TDBK1800_<company number>.001 24219 B df1eed2ecf4e4945a872525ad57d63cebbb9c47127c20c9e7919b291cfac9b39 (BK-0, the START book)
+backups/bkr/TDBK1800_<company number>.001 26485 B f02e31d171d92e41cf2120bdcbdf50375383e461da64d8c273df16d8b9179e59 (BK-R, the BASELINE book)
+guid.txt 36 B d49ecd16b69118dfafd544af8d9fd62f835d93cdcd1a0624140562166f95e249 (lab copy: the company GUID or number)
+company-number.txt 6 B 7b501a4208b6b1a3afe9249a145f73df675eb13a0888b44d6e746f285320fd08 (lab copy: the company GUID or number)
+agent-run-r0/inbox/<close file> 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (the empty file that closes the client)
+agent-run-r0/client.py 4687 B 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (the held-book client, byte for byte: its clientInfo name holds a desk word)
+agent-run-r1/inbox/<close file> 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (the empty file that closes the client)
+agent-run-r1/client.py 4687 B 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (the held-book client, byte for byte: its clientInfo name holds a desk word)
+agent-run-r2/inbox/<close file> 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (the empty file that closes the client)
+agent-run-r2/client.py 4687 B 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (the held-book client, byte for byte: its clientInfo name holds a desk word)
+scripts/stage-1108r.py 15379 B bcf859410d2ea00c8348a6b43a19a947b1bb2fbcf39d886dfaafc2250135b62f (a stage script or its maker: its patterns name the lab paths)
+scripts/mk-stage-2.py 2964 B 47f2d03572682634a32a632c25b303d37f9d15a2dd243de35624636e1da9b6aa (a stage script or its maker: its patterns name the lab paths)
+scripts/stage-1108r-2.py 16092 B c9a42030a97bd2841df5a4bf9f6932708acd6d8f660fc35fc9c2d8745dacbc8d (a stage script or its maker: its patterns name the lab paths)
+scripts/mk-stage-3.py 2725 B 504a4061ec9563343d9eef56feddaccf2803cac0a3bba14e23eba04369ddd7db (a stage script or its maker: its patterns name the lab paths)
+scripts/mk-stage-3b.py 2917 B 19f855624b94e0a61ad2bbe994e4bd7e53a8a50c7b016e42d797c81a7320caa8 (a stage script or its maker: its patterns name the lab paths)
+scripts/stage-1108r-3.py 16580 B e7c8c1a413e9b872b335fe1504f9df772dca7d622a3560684820f454e3a17fa3 (a stage script or its maker: its patterns name the lab paths)
+scripts/mk-stage-4.py 1993 B 1d3ebcf64c1870d687deacaa6cd568e1c5415c07d2b4078520840b367d8361ac (a stage script or its maker: its patterns name the lab paths)
+scripts/stage-1108r-4.py 16918 B 304c155f7bb9392dc954b5b181cc64c08f63217565ed44c9a997a8006c9b430a (a stage script or its maker: its patterns name the lab paths)
+stage-try-1: stage attempt 1, stopped part way: files a=1653, bytes b=6238805, sha256 of its sorted listing 931af5dffe25af8056b3904d548d3d06166c71b1ae1ed5574342d2400b0038fa
+stage-try-2: stage attempt 2, stopped part way: files a=1687, bytes b=6289869, sha256 of its sorted listing 90a1de23dc0e5efaf6f89ea09823caeb2aaffbe80969465be71b699d7d9ab7a1
+stage-try-3: stage attempt 3, stopped part way: files a=1718, bytes b=6535020, sha256 of its sorted listing bc91e3d069010b1552fda8a456e6e550952bfbdd1c36d17d19d1486beb340928

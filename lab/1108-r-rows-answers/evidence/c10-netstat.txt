@@ -1,0 +1,4 @@
+TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       23160
+TCP    127.0.0.1:9003         0.0.0.0:0              LISTENING       8408
+TCP    [::]:9001              [::]:0                 LISTENING       23160
+(EXCERPT of netstat -ano: only the LISTENING lines on ports 9001 and 9003, k=3; the whole output had n=36 LISTENING lines and is kept on the lab PC)

@@ -1,0 +1,18 @@
+pass a folder as written: ok 5, one import
+pass each request's HEADER is read, BOM or not, UTF-16 or UTF-8
+pass a bodiless GET /status is listed as a status exchange
+pass an import is checked against its import-N files
+pass a range lists only its exchanges
+pass FIRST above LAST fails, never ok 0
+pass a range of zero fails, never ok 0
+pass an answer one byte longer fails
+pass an answer removed fails
+pass a HEADER that does not parse fails, the log agreeing
+pass an import-N answer that is not byte-equal to its x-N fails
+pass an import-N file no log line names fails
+pass a request with no logged answer fails as NO ANSWER
+pass a gap in the numbers fails
+pass a range past the last exchange fails
+pass a folder with no log is NOT READ
+pass a log with no x-N file is NOT READ, never 0 exchanges
+0 failed

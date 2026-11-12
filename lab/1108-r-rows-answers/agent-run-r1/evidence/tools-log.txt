@@ -1,0 +1,7 @@
+2026-11-12T17:44:25.448Z 000-r1-list-companies.json list_companies secs 0.11 bytes 1576 isError False
+2026-11-12T17:44:26.469Z 001-r1-tally-status.json tally_status secs 0.1 bytes 1829 isError False
+2026-11-12T17:44:27.606Z 002-r1-vt.json masters secs 0.821 bytes 28943 isError False
+2026-11-12T17:44:38.003Z 003-r1-build.json build_import_xml secs 4.245 bytes 9176 isError False
+2026-11-12T17:44:57.477Z 004-r1-p1.json post_import secs 14.226 bytes 14781 isError True
+2026-11-12T17:45:18.701Z 005-r1-verify.json verify_import secs 3.437 bytes 14262 isError True
+2026-11-12T17:45:50.883Z 006-r1-egress.json egress_log secs 0.093 bytes 82241 isError False

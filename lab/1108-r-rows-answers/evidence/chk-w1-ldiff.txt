@@ -1,0 +1,5 @@
+$ python -I check_1108.py diff start-ledgers.utf16le.xml w1post-ledgers.utf16le.xml
+exit 0
+rows before: 2  after: 3
+ADDED LEDGER 'A1 Closing Stock' (16 characters) <company guid>-000000d1
+unchanged rows: 2

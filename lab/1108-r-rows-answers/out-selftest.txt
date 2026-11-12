@@ -1,0 +1,7 @@
+box.ps1 argv: ['powershell', '-NoProfile', '-File', '<LAB_DIR>\\box.ps1', '-RowDir', '<LAB_DIR>', '-Tag', 'selftest-r', '-SeeWithin', '3', '-AnswerBy', '5']
+row folder exists: True | box folder exists: True | characters below 32 in the argv: 0
+watch start line: 2026-11-12T17:31:23.363Z watch start: tally window 0x1130730; see within 3 s; answer by 5 s
+box.ps1 exit: 3 | its console output bytes: 0
+2026-11-12T17:31:23.363Z watch start: tally window 0x1130730; see within 3 s; answer by 5 s
+2026-11-12T17:31:26.547Z NO BOX seen within 3 s
+2026-11-12T17:31:26.888Z capture selftest-r-nobox.png 1920x1080 234686 B sha256 964a59b0802418ce40007c2994e8bd829448eeb7f0a36f35f00fc08c2e28a54a

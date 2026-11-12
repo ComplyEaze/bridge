@@ -1262,3 +1262,695 @@ fn a_padded_256_byte_debit_cannot_bind_although_its_canonical_form_would() {
         }
     );
 }
+
+// Tests added for the #2058 mutation record: each holds a change that the
+// tests above let survive (`src-tauri/tests/mutations/agent_import_span_identity.json`).
+
+fn row_mut(read: &mut ImportReadSource, alter_id: u64) -> &mut ReadVoucher {
+    read.rows
+        .iter_mut()
+        .find(|row| row.alter_id == Some(alter_id))
+        .unwrap()
+}
+
+fn bind_default(
+    span: &PostSpan,
+    vouchers: &[ImportVoucher],
+    read: &ImportReadSource,
+) -> Result<Vec<PostedVoucherIdentity>, BindError> {
+    bind(span, COMPANY_GUID, vouchers, read, &BTreeSet::new())
+}
+
+/// The captured span, ended on `last` instead of the captured `LASTVCHID`.
+fn span_ending_at(last: u64) -> PostSpan {
+    PostSpan::after_clean_response(
+        PreMark::recorded(1795),
+        &outcome_with(
+            "<LASTVCHID>1733</LASTVCHID>",
+            &format!("<LASTVCHID>{last}</LASTVCHID>"),
+        ),
+        10,
+    )
+    .unwrap()
+}
+
+/// Numbers the ten captured rows, in AlterID order, with the MasterIDs
+/// `first`, `first + 1`, ... (wrapping) and the GUIDs that follow them.
+fn renumber(read: &mut ImportReadSource, first: u64) {
+    for row in &mut read.rows {
+        let master_id = first.wrapping_add(row.alter_id.unwrap() - 1796);
+        row.master_id = Some(master_id.to_string());
+        row.guid = Some(format!("{COMPANY_GUID}-{master_id:08x}"));
+    }
+}
+
+/// A day that no captured voucher carries.
+fn other_day() -> bridge_tally_core::TallyDate {
+    bridge_tally_core::TallyDate::parse(concat!("2026", "0712")).unwrap()
+}
+
+fn reply(
+    status: &str,
+    created: &str,
+    altered: &str,
+    last_vch_id: &str,
+) -> bridge_tally_protocol::TallyImportOutcome {
+    bridge_tally_protocol::parse_import_outcome(&format!(
+        "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>{created}</CREATED><ALTERED>{altered}</ALTERED><DELETED>0</DELETED>{last_vch_id}<IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>"
+    ))
+    .unwrap()
+}
+
+#[test]
+fn every_refusal_and_unsettled_code_is_its_own_string_whatever_its_fields() {
+    let cases = [
+        (SpanRefusal::EmptyBatch, "span_empty_batch"),
+        (SpanRefusal::StatusFailure, "span_response_status_failure"),
+        (SpanRefusal::CountersNotClean, "span_counters_not_clean"),
+        (
+            SpanRefusal::CreatedNotCount {
+                created: 1,
+                count: 2,
+            },
+            "span_created_not_count",
+        ),
+        (
+            SpanRefusal::CreatedNotCount {
+                created: 0,
+                count: 0,
+            },
+            "span_created_not_count",
+        ),
+        (SpanRefusal::LastVchIdAbsent, "span_lastvchid_absent"),
+        (SpanRefusal::MarkWentBack, "span_mark_went_back"),
+        (
+            SpanRefusal::StepNotCreated {
+                step: 1,
+                created: 1,
+            },
+            "span_step_not_created",
+        ),
+        (
+            SpanRefusal::StepNotCreated {
+                step: 0,
+                created: 0,
+            },
+            "span_step_not_created",
+        ),
+        (
+            SpanRefusal::SpanCount {
+                expected: 1,
+                observed: 1,
+            },
+            "span_count_mismatch",
+        ),
+        (
+            SpanRefusal::SpanCount {
+                expected: 0,
+                observed: 0,
+            },
+            "span_count_mismatch",
+        ),
+        (
+            SpanRefusal::Position { position: 3 },
+            "span_position_mismatch",
+        ),
+        (
+            SpanRefusal::Content {
+                position: 3,
+                fields: vec!["date"],
+            },
+            "span_content_mismatch",
+        ),
+        (
+            SpanRefusal::NotEffective { position: 3 },
+            "span_voucher_not_effective",
+        ),
+        (
+            SpanRefusal::MasterIdNotInSequence { position: 3 },
+            "span_master_id_not_in_sequence",
+        ),
+        (
+            SpanRefusal::GuidNotMasterId { position: 3 },
+            "span_guid_not_master_id",
+        ),
+        (
+            SpanRefusal::IdentityReused { position: 3 },
+            "span_identity_reused",
+        ),
+    ];
+    for (refusal, code) in &cases {
+        assert_eq!(refusal.code(), *code, "{refusal:?}");
+    }
+    let distinct = cases.iter().map(|(_, code)| *code).collect::<BTreeSet<_>>();
+    assert_eq!(distinct.len(), 14);
+    assert_eq!(
+        BindUnsettled::EffectiveDateNotObserved.code(),
+        "binding_effective_date_not_observed"
+    );
+    assert_eq!(
+        BindUnsettled::JournalUnreadable.code(),
+        "binding_journal_unreadable"
+    );
+}
+
+#[test]
+fn a_counter_that_is_not_zero_or_not_reported_is_not_a_clean_create() {
+    let before = PreMark::recorded(1795);
+    for counter in [
+        "ALTERED",
+        "DELETED",
+        "IGNORED",
+        "ERRORS",
+        "CANCELLED",
+        "EXCEPTIONS",
+    ] {
+        let one = outcome_with(
+            &format!("<{counter}>0</{counter}>"),
+            &format!("<{counter}>1</{counter}>"),
+        );
+        assert_eq!(
+            PostSpan::after_clean_response(before, &one, 10),
+            Err(SpanRefusal::CountersNotClean),
+            "{counter} reported as 1"
+        );
+    }
+    // DELETED, CANCELLED and EXCEPTIONS may be left out of a reply: a counter
+    // that was not reported is not a zero.
+    for counter in ["DELETED", "CANCELLED", "EXCEPTIONS"] {
+        let none = outcome_with(&format!("<{counter}>0</{counter}>"), "");
+        assert_eq!(
+            PostSpan::after_clean_response(before, &none, 10),
+            Err(SpanRefusal::CountersNotClean),
+            "{counter} not reported"
+        );
+    }
+    // A LINEERROR beside all-zero counters.
+    let line_error = outcome_with(
+        "<EXCEPTIONS>0</EXCEPTIONS>",
+        "<EXCEPTIONS>0</EXCEPTIONS><LINEERROR>synthetic line error</LINEERROR>",
+    );
+    assert_eq!(
+        PostSpan::after_clean_response(before, &line_error, 10),
+        Err(SpanRefusal::CountersNotClean)
+    );
+}
+
+#[test]
+fn a_created_count_above_the_batch_refuses_as_one_below_does() {
+    let before = PreMark::recorded(1795);
+    assert_eq!(
+        PostSpan::after_clean_response(
+            before,
+            &outcome_with("<CREATED>10</CREATED>", "<CREATED>11</CREATED>"),
+            10
+        ),
+        Err(SpanRefusal::CreatedNotCount {
+            created: 11,
+            count: 10
+        })
+    );
+    // 2^32 + 10: not 10 on a target whose usize is narrower than 64 bits, where
+    // a cast would drop the high bits and read the count as matched.
+    let wide = (1_u64 << 32) + 10;
+    assert_eq!(
+        PostSpan::after_clean_response(
+            before,
+            &outcome_with(
+                "<CREATED>10</CREATED>",
+                &format!("<CREATED>{wide}</CREATED>")
+            ),
+            10
+        ),
+        Err(SpanRefusal::CreatedNotCount {
+            created: wide,
+            count: 10
+        })
+    );
+}
+
+#[test]
+fn the_checks_of_a_clean_create_refuse_in_a_fixed_order() {
+    let before = PreMark::recorded(1795);
+    let last = "<LASTVCHID>1733</LASTVCHID>";
+    // The clean reply itself makes a span.
+    assert!(PostSpan::after_clean_response(before, &reply("1", "10", "0", last), 10).is_ok());
+    // An empty batch is refused before the reply's status is read.
+    assert_eq!(
+        PostSpan::after_clean_response(before, &reply("0", "10", "0", last), 0),
+        Err(SpanRefusal::EmptyBatch)
+    );
+    // The status is read before the counters.
+    assert_eq!(
+        PostSpan::after_clean_response(before, &reply("0", "10", "1", last), 10),
+        Err(SpanRefusal::StatusFailure)
+    );
+    // The counters are read before CREATED, and CREATED before LASTVCHID.
+    assert_eq!(
+        PostSpan::after_clean_response(before, &reply("1", "9", "1", last), 10),
+        Err(SpanRefusal::CountersNotClean)
+    );
+    assert_eq!(
+        PostSpan::after_clean_response(before, &reply("1", "10", "1", ""), 10),
+        Err(SpanRefusal::CountersNotClean)
+    );
+    assert_eq!(
+        PostSpan::after_clean_response(before, &reply("1", "9", "0", ""), 10),
+        Err(SpanRefusal::CreatedNotCount {
+            created: 9,
+            count: 10
+        })
+    );
+}
+
+#[test]
+fn a_mark_that_cannot_hold_the_span_is_refused_and_one_that_just_can_binds() {
+    // 10 past u64::MAX - 9 is past the largest mark: nothing is wrapped or
+    // saturated into a span.
+    assert_eq!(
+        PostSpan::after_clean_response(PreMark::recorded(u64::MAX - 9), &outcome(), 10),
+        Err(SpanRefusal::MarkWentBack)
+    );
+    assert_eq!(
+        PostSpan::after_clean_response(PreMark::recorded(u64::MAX), &outcome(), 10),
+        Err(SpanRefusal::MarkWentBack)
+    );
+    // A POST whose mark after it was read cannot end past the largest mark
+    // either: the step is then not the count.
+    assert_eq!(
+        PostSpan::after_clean_post(PreMark::recorded(u64::MAX - 9), u64::MAX, &outcome(), 10),
+        Err(BindError::Refused(SpanRefusal::StepNotCreated {
+            step: 9,
+            created: 10
+        }))
+    );
+    assert!(
+        PostSpan::after_clean_post(PreMark::recorded(u64::MAX - 10), u64::MAX, &outcome(), 10)
+            .is_ok()
+    );
+    // The span that ends on the largest mark is made, and binds the rows at
+    // the top of the range.
+    let top = u64::MAX - 10;
+    let span = PostSpan::after_clean_response(PreMark::recorded(top), &outcome(), 10).unwrap();
+    assert_eq!(
+        span.alter_id_span(),
+        crate::agent::AlterIdSpan {
+            after: top,
+            through: u64::MAX
+        }
+    );
+    let mut read = span_read();
+    for row in &mut read.rows {
+        row.alter_id = Some(top + (row.alter_id.unwrap() - 1795));
+    }
+    let bound = bind_default(&span, &sent(), &read).unwrap();
+    assert_eq!(bound.len(), 10);
+    assert_eq!(bound[0].master_id, 1724);
+    // One row off by one at the very top refuses at its position.
+    row_mut(&mut read, u64::MAX - 1).alter_id = Some(u64::MAX);
+    assert_eq!(
+        refusal(bind_default(&span, &sent(), &read)),
+        SpanRefusal::Position { position: 8 }
+    );
+}
+
+#[test]
+fn a_step_below_the_count_refuses_as_one_above_does() {
+    assert_eq!(
+        PostSpan::after_clean_post(PreMark::recorded(1795), 1804, &outcome(), 10),
+        Err(BindError::Refused(SpanRefusal::StepNotCreated {
+            step: 9,
+            created: 10
+        }))
+    );
+}
+
+#[test]
+fn the_vouchers_sent_and_the_rows_read_must_each_be_the_span_count() {
+    let span = span();
+    let read = span_read();
+    let mut nine = sent();
+    nine.pop();
+    assert_eq!(
+        refusal(bind_default(&span, &nine, &read)),
+        SpanRefusal::SpanCount {
+            expected: 10,
+            observed: 10
+        }
+    );
+    let mut eleven = sent();
+    eleven.push(eleven[0].clone());
+    assert_eq!(
+        refusal(bind_default(&span, &eleven, &read)),
+        SpanRefusal::SpanCount {
+            expected: 10,
+            observed: 10
+        }
+    );
+    let mut more = span_read();
+    more.rows.push(more.rows[0].clone());
+    assert_eq!(
+        refusal(bind_default(&span, &sent(), &more)),
+        SpanRefusal::SpanCount {
+            expected: 10,
+            observed: 11
+        }
+    );
+    // Both short: the count of the rows read is what is reported.
+    let mut short = span_read();
+    short.rows.pop();
+    assert_eq!(
+        refusal(bind_default(&span, &nine, &short)),
+        SpanRefusal::SpanCount {
+            expected: 10,
+            observed: 9
+        }
+    );
+    // The counts are checked before the first MasterID is worked out.
+    let mut short = span_read();
+    short.rows.remove(4);
+    assert_eq!(
+        refusal(bind_default(&span_ending_at(3), &sent(), &short)),
+        SpanRefusal::SpanCount {
+            expected: 10,
+            observed: 9
+        }
+    );
+}
+
+#[test]
+fn rows_are_taken_in_alter_id_order_whatever_their_order_or_masterids() {
+    let span = span();
+    let expected = bind_default(&span, &sent(), &span_read()).unwrap();
+    let mut reversed = span_read();
+    reversed.rows.reverse();
+    assert_eq!(bind_default(&span, &sent(), &reversed).unwrap(), expected);
+    // The AlterIDs of the rows at positions 1 and 2 keep their order while
+    // their MasterIDs and GUIDs swap: the row at position 1 holds the wrong id.
+    let mut swapped = span_read();
+    let (master_id, guid) = {
+        let second = row_mut(&mut swapped, 1797);
+        (second.master_id.clone(), second.guid.clone())
+    };
+    let third = row_mut(&mut swapped, 1798);
+    let (third_master_id, third_guid) = (third.master_id.clone(), third.guid.clone());
+    third.master_id = master_id;
+    third.guid = guid;
+    let second = row_mut(&mut swapped, 1797);
+    second.master_id = third_master_id;
+    second.guid = third_guid;
+    assert_eq!(
+        refusal(bind_default(&span, &sent(), &swapped)),
+        SpanRefusal::MasterIdNotInSequence { position: 1 }
+    );
+    // Two rows with one AlterID keep the order they were read in: the second
+    // is the one out of place.
+    let mut doubled = span_read();
+    row_mut(&mut doubled, 1797).alter_id = Some(1796);
+    assert_eq!(
+        refusal(bind_default(&span, &sent(), &doubled)),
+        SpanRefusal::Position { position: 1 }
+    );
+}
+
+#[test]
+fn the_company_guid_is_trimmed_and_lower_cased_before_it_is_compared() {
+    let padded = format!("  {}\t", COMPANY_GUID.to_ascii_uppercase());
+    let bound = bind(&span(), &padded, &sent(), &span_read(), &BTreeSet::new()).unwrap();
+    assert_eq!(bound, bind_default(&span(), &sent(), &span_read()).unwrap());
+    assert_eq!(bound[0].guid, format!("{COMPANY_GUID}-{:08x}", 1724));
+}
+
+#[test]
+fn the_first_masterid_is_lastvchid_minus_count_plus_one_and_never_wraps() {
+    // LASTVCHID 9 ends exactly the ten ids 0 to 9.
+    let mut from_zero = span_read();
+    renumber(&mut from_zero, 0);
+    let bound = bind_default(&span_ending_at(9), &sent(), &from_zero).unwrap();
+    assert_eq!(
+        bound.iter().map(|id| id.master_id).collect::<Vec<_>>(),
+        (0..10).collect::<Vec<u64>>()
+    );
+    assert_eq!(bound[0].guid, format!("{COMPANY_GUID}-{:08x}", 0));
+    // LASTVCHID 3 is below the count: ids 0 to 9 are not saturated into a fit,
+    // and ids that wrap around zero are not accepted either.
+    assert_eq!(
+        refusal(bind_default(&span_ending_at(3), &sent(), &from_zero)),
+        SpanRefusal::MasterIdNotInSequence { position: 0 }
+    );
+    let mut wrapped = span_read();
+    renumber(&mut wrapped, u64::MAX - 5);
+    assert_eq!(
+        refusal(bind_default(&span_ending_at(3), &sent(), &wrapped)),
+        SpanRefusal::MasterIdNotInSequence { position: 0 }
+    );
+    // A LASTVCHID of u64::MAX cannot be added to: nothing binds.
+    let mut last = span_read();
+    renumber(&mut last, u64::MAX - 9);
+    assert_eq!(
+        refusal(bind_default(&span_ending_at(u64::MAX), &sent(), &last)),
+        SpanRefusal::MasterIdNotInSequence { position: 0 }
+    );
+    // The largest LASTVCHID that can be added to binds the ids up to it.
+    let mut top = span_read();
+    renumber(&mut top, u64::MAX - 10);
+    let bound = bind_default(&span_ending_at(u64::MAX - 1), &sent(), &top).unwrap();
+    assert_eq!(bound[9].master_id, u64::MAX - 1);
+    assert_eq!(bound[0].master_id, u64::MAX - 10);
+}
+
+#[test]
+fn masterids_are_read_as_full_width_numbers_without_padding() {
+    // Above 2^32: a narrower parse would refuse these.
+    let wide = 1_u64 << 32;
+    let mut read = span_read();
+    renumber(&mut read, wide);
+    let bound = bind_default(&span_ending_at(wide + 9), &sent(), &read).unwrap();
+    assert_eq!(bound[0].master_id, wide);
+    assert_eq!(bound[9].master_id, wide + 9);
+    assert_eq!(bound[9].guid, format!("{COMPANY_GUID}-{:08x}", wide + 9));
+}
+
+#[test]
+fn a_row_out_of_place_refuses_at_its_own_position() {
+    let span = span();
+    // The row at position 3 moved past the end of the span.
+    let mut moved = span_read();
+    row_mut(&mut moved, 1799).alter_id = Some(1900);
+    assert_eq!(
+        refusal(bind_default(&span, &sent(), &moved)),
+        SpanRefusal::Position { position: 3 }
+    );
+    // Its MasterID with a space before it is not the number it spells.
+    let mut padded = span_read();
+    row_mut(&mut padded, 1799).master_id = Some(" 1727".into());
+    assert_eq!(
+        refusal(bind_default(&span, &sent(), &padded)),
+        SpanRefusal::MasterIdNotInSequence { position: 3 }
+    );
+    // The fifth GUID in upper case is not the GUID that follows its MasterID.
+    let mut upper = span_read();
+    row_mut(&mut upper, 1800).guid = Some(format!(
+        "{}-{:08x}",
+        COMPANY_GUID.to_ascii_uppercase(),
+        1728
+    ));
+    assert_eq!(
+        refusal(bind_default(&span, &sent(), &upper)),
+        SpanRefusal::GuidNotMasterId { position: 4 }
+    );
+}
+
+#[test]
+fn at_one_position_the_checks_run_content_then_effective_then_masterid_then_guid_then_reuse() {
+    let span = span();
+    let reused = BTreeSet::from([format!("{COMPANY_GUID}-{:08x}", 1726)]);
+    let read_with = |cancelled: bool, wrong_master_id: bool, wrong_guid: bool| {
+        let mut read = span_read();
+        let row = row_mut(&mut read, 1798);
+        if cancelled {
+            row.cancelled = Some(true);
+        }
+        if wrong_master_id {
+            row.master_id = Some("1".into());
+        }
+        if wrong_guid {
+            row.guid = Some("wrong".into());
+        }
+        read
+    };
+    let mut changed = sent();
+    changed[2].narration = Some("changed".into());
+    assert_eq!(
+        refusal(bind(
+            &span,
+            COMPANY_GUID,
+            &changed,
+            &read_with(true, true, true),
+            &reused
+        )),
+        SpanRefusal::Content {
+            position: 2,
+            fields: vec!["narration"]
+        }
+    );
+    let cases = [
+        (
+            (true, true, true),
+            SpanRefusal::NotEffective { position: 2 },
+        ),
+        (
+            (false, true, true),
+            SpanRefusal::MasterIdNotInSequence { position: 2 },
+        ),
+        (
+            (false, false, true),
+            SpanRefusal::GuidNotMasterId { position: 2 },
+        ),
+        (
+            (false, false, false),
+            SpanRefusal::IdentityReused { position: 2 },
+        ),
+    ];
+    for ((cancelled, master_id, guid), expected) in cases {
+        assert_eq!(
+            refusal(bind(
+                &span,
+                COMPANY_GUID,
+                &sent(),
+                &read_with(cancelled, master_id, guid),
+                &reused
+            )),
+            expected
+        );
+    }
+}
+
+/// The first captured voucher bound after `edit_row` changes its row and
+/// `edit_sent` what was sent as it.
+fn first_voucher_refusal(
+    edit_row: impl FnOnce(&mut ReadVoucher),
+    edit_sent: impl FnOnce(&mut ImportVoucher),
+) -> SpanRefusal {
+    let mut read = span_read();
+    edit_row(row_mut(&mut read, 1796));
+    let mut vouchers = sent();
+    edit_sent(&mut vouchers[0]);
+    refusal(bind_default(&span(), &vouchers, &read))
+}
+
+fn first_differs_in(fields: Vec<&'static str>) -> SpanRefusal {
+    SpanRefusal::Content {
+        position: 0,
+        fields,
+    }
+}
+
+#[test]
+fn each_field_that_differs_is_named_alone_and_a_repeated_entry_is_counted() {
+    // A different DATE read back, the EFFECTIVEDATE still the day sent.
+    assert_eq!(
+        first_voucher_refusal(|row| row.date = other_day(), |_| {}),
+        first_differs_in(vec!["date"])
+    );
+    // A different EFFECTIVEDATE, the DATE still the day sent.
+    assert_eq!(
+        first_voucher_refusal(|row| row.effective_date = Some(other_day()), |_| {}),
+        first_differs_in(vec!["effective_date"])
+    );
+    // Another bank voucher type sent, or none read, or the same name in
+    // another case.
+    assert_eq!(
+        first_voucher_refusal(|_| {}, |sent| sent.voucher_type = VoucherType::Receipt),
+        first_differs_in(vec!["voucher_type"])
+    );
+    assert_eq!(
+        first_voucher_refusal(|row| row.voucher_type = None, |_| {}),
+        first_differs_in(vec!["voucher_type"])
+    );
+    assert_eq!(
+        first_voucher_refusal(|row| row.voucher_type = Some("payment".into()), |_| {}),
+        first_differs_in(vec!["voucher_type"])
+    );
+    // A repeated entry read that was sent once, and sent twice but read once.
+    assert_eq!(
+        first_voucher_refusal(
+            |row| {
+                let repeat = row.entries[0].clone();
+                row.entries.push(repeat);
+            },
+            |_| {}
+        ),
+        first_differs_in(vec!["entries"])
+    );
+    assert_eq!(
+        first_voucher_refusal(
+            |_| {},
+            |sent| {
+                let repeat = sent.entries[0].clone();
+                sent.entries.push(repeat);
+            }
+        ),
+        first_differs_in(vec!["entries"])
+    );
+    // Every field differing: named in the order date, effective_date,
+    // voucher_type, entries, narration.
+    assert_eq!(
+        first_voucher_refusal(
+            |_| {},
+            |sent| {
+                sent.date = other_day();
+                sent.voucher_type = VoucherType::Receipt;
+                sent.entries[0].amount = ImportAmount::parse("1181.00").unwrap();
+                sent.narration = Some("changed".into());
+            }
+        ),
+        first_differs_in(vec![
+            "date",
+            "effective_date",
+            "voucher_type",
+            "entries",
+            "narration"
+        ])
+    );
+}
+
+#[test]
+fn a_journal_has_no_effective_date_to_differ_in_and_its_date_alone_is_named() {
+    let outcome = bridge_tally_protocol::parse_import_outcome(&captured(JOURNAL_RESPONSE)).unwrap();
+    let span = PostSpan::after_clean_post(PreMark::recorded(1805), 1810, &outcome, 5).unwrap();
+    let read = ImportReadSource::admit(
+        parse_import_voucher_rows(&captured(JOURNAL_SPAN_READ), COMPANY_GUID).unwrap(),
+    )
+    .unwrap();
+    let other_day = other_day();
+    // An EFFECTIVEDATE on a Journal row is no difference.
+    let mut dated = read.clone();
+    row_mut(&mut dated, 1806).effective_date = Some(other_day.clone());
+    assert!(bind_default(&span, &sent_journals(), &dated).is_ok());
+    // Its DATE is.
+    let mut redated = read;
+    row_mut(&mut redated, 1806).date = other_day;
+    assert_eq!(
+        refusal(bind_default(&span, &sent_journals(), &redated)),
+        SpanRefusal::Content {
+            position: 0,
+            fields: vec!["date"]
+        }
+    );
+}
+
+#[test]
+fn a_posted_voucher_identity_reads_back_only_its_three_fields() {
+    let whole = r#"{"bridge_txn_id":"a","guid":"b","master_id":1}"#;
+    assert_eq!(
+        serde_json::from_str::<PostedVoucherIdentity>(whole).unwrap(),
+        PostedVoucherIdentity {
+            bridge_txn_id: "a".into(),
+            guid: "b".into(),
+            master_id: 1
+        }
+    );
+    let extra = r#"{"bridge_txn_id":"a","guid":"b","master_id":1,"other":2}"#;
+    assert!(serde_json::from_str::<PostedVoucherIdentity>(extra).is_err());
+}

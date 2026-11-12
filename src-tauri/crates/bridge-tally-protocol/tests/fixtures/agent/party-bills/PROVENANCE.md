@@ -8,6 +8,15 @@ are synthetic. Part A only read; Part B made its parties and bills behind a back
 
 - Part A: evidence branch `lab/2377-l-answers` at `a2be6d96` (its `SHA256.txt` lists each file with the same hash).
 - Part B: evidence branch `lab/2377-b-answers` at `44e44b28`.
+- Row 2377-NB: evidence branch `lab/2377-nb-answers` at `61a5c1bf`, on another synthetic company, `BRIDGE PILOT LAB`,
+  loaded alone on TallyPrime 7.2, 9 Nov 2026, reads only. Its bill-wise payable party `BRIDGE Supplier RJ` to
+  31 July 2026, before its first entry, answered no bytes twice, with headers byte-equal to
+  `ledger-outstandings-unknown-party.headers.txt`, and the snapshot to the same date carries the party, bill-wise, with
+  an empty `CLOSINGBALANCE` (`ledger-snapshot-supplier-rj-20260731.utf16le.xml`). That snapshot request was
+  `render_native_ledger_snapshot_request` from the book's first day, 1 April 2026 (its books begin then, as
+  `agent/pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml` records), to the same date: the period the
+  party-bills read builds. Only that snapshot tells this party
+  from a name no ledger carries (protocol reference §12a.27).
 - The Ledger Outstandings request: `<ID>Ledger Outstandings</ID>`, `SVCURRENTCOMPANY`, `LedgerName`, `SVTODATE`,
   `SVEXPORTFORMAT` `$$SysName:XML` and `EXPLODEFLAG` `Yes`; no `SVFROMDATE`, no fetch list. The snapshot request is
   `render_native_ledger_snapshot_request` from the books' first day, 1 April 2025, to the same to-date.
@@ -48,3 +57,4 @@ open bills (§12a.27 records one on another book); other releases, editions, a c
 | `ledger-outstandings-trailing-space.utf16le.xml` | 852 | `72b8f02a2aae65f8a8125ce66a04d8d4fda1df5e4e9e8bcbd01000a3e8b7a086` | Part B `answers/b5-trail-r-lo.answer.xml` | `L5 Trail ` sent with its trailing space: the party's one bill, -100.00 |
 | `ledger-snapshot-trailing-space.utf16le.xml` | 29,934 | `5f78ea690df025c61bdceaf3b73b568b3fc06c81de67805a5b1df1ca57720123` | Part B `answers/b5-trail-snap.answer.xml` | the whole book's snapshot after it, 22 ledgers: Tally holds the party as `L5 Trail`, without the space |
 | `ledger-outstandings-two-on-account.utf16le.xml` | 1,636 | `00b538866cc8327666694432575889e787dde4d5c6c496d799d3b1914406477c` | Part B `answers/b6-r-lo.answer.xml` | `L7 Party` with two On Account rows, -100.00 and -50.00; the second leaves BILLDUE and BILLOVERDUE empty |
+| `ledger-snapshot-supplier-rj-20260731.utf16le.xml` | 25,298 | `552bc05e5ff566f3b51372b3bd5e9f3ce56e1b49b40aa12e4b0585dfeaac423f` | Row 2377-NB `answers/a-s2-S-snap-20260401-20260731.xml` | `BRIDGE PILOT LAB`'s `List of Ledgers` from its first day, 1 April 2026, to 31 July 2026: `BRIDGE Supplier RJ` bill-wise with an empty `CLOSINGBALANCE`; every closing in it is empty |

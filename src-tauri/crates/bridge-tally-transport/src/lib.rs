@@ -320,6 +320,13 @@ pub enum TallyTransportError {
     UnsupportedContentEncoding,
     #[error("Tally response encoding was invalid ({code})")]
     InvalidEncoding { code: &'static str },
+    /// Tally answered with HTTP 200, one `Content-Length: 0`, no `Content-Type` and no body
+    /// byte, as its `Ledger Outstandings` report answers a party it reports nothing for
+    /// (protocol reference §12a.27). Any other empty answer is `InvalidEncoding` as before.
+    /// Its message and safe code are `InvalidEncoding`'s for the same missing type, so a caller
+    /// that does not ask for it by name says exactly what it said before it existed.
+    #[error("Tally response encoding was invalid (response_content_type_unsupported)")]
+    EmptyAnswer,
     /// The endpoint's wire gate refused the send; nothing was sent.
     #[error("Tally send was held back by the endpoint wire lock ({refusal:?})")]
     WireRefused { refusal: WireRefusal },
@@ -343,7 +350,7 @@ impl TallyTransportError {
             Self::ResponseTruncated => "response_truncated",
             Self::ResponseReadFailed => "response_read_failed",
             Self::UnsupportedContentEncoding => "response_content_encoding_unsupported",
-            Self::InvalidEncoding { .. } => "response_encoding_invalid",
+            Self::InvalidEncoding { .. } | Self::EmptyAnswer => "response_encoding_invalid",
             Self::WireRefused { refusal } => refusal.safe_code(),
             Self::SendWithdrawn => "request_cancelled",
         }
@@ -736,7 +743,8 @@ impl TallyHttpTransport {
                 TallyTransportError::HttpStatus { .. }
                 | TallyTransportError::ResponseTooLarge { .. }
                 | TallyTransportError::UnsupportedContentEncoding
-                | TallyTransportError::InvalidEncoding { .. } => true,
+                | TallyTransportError::InvalidEncoding { .. }
+                | TallyTransportError::EmptyAnswer => true,
                 // A probe never meets these: it is built here, sent once, and
                 // not gated.
                 TallyTransportError::EndpointInvalid { .. }
@@ -1207,7 +1215,10 @@ async fn read_response(
     max_bytes: usize,
     expected_encoding: ExpectedTallyTextEncoding,
 ) -> Result<TallyHttpResponse, TallyTransportError> {
-    let head = validate_response_head(&response, max_bytes, expected_encoding)?;
+    let head = match validate_response_head(&response, max_bytes, expected_encoding)? {
+        ResponseHead::Typed(head) => head,
+        ResponseHead::EmptyCandidate => return Err(read_empty_candidate(response).await),
+    };
     let initial_capacity = response
         .content_length()
         .and_then(|length| usize::try_from(length).ok())
@@ -1255,11 +1266,58 @@ struct ValidatedResponseHead {
     content_type: String,
 }
 
+/// A head the readers go on from: one whose body is decoded by its type, or the one head
+/// that may be [`TallyTransportError::EmptyAnswer`] once its body is read.
+enum ResponseHead {
+    Typed(ValidatedResponseHead),
+    EmptyCandidate,
+}
+
+/// The refusal a head with no `Content-Type` has always had.
+const CONTENT_TYPE_MISSING: TallyTransportError = TallyTransportError::InvalidEncoding {
+    code: "response_content_type_unsupported",
+};
+
+/// Whether a head with no usable `Content-Type` is the empty answer's (protocol reference
+/// §12a.27): status exactly 200, no `Content-Type` header at all, and exactly one
+/// `Content-Length` whose value is the single byte `0`. The content encoding is checked before
+/// this, as for every head. The body is still read before anything is returned
+/// ([`empty_answer_after_body`]).
+fn is_empty_answer_head(status: reqwest::StatusCode, headers: &reqwest::header::HeaderMap) -> bool {
+    let mut lengths = headers.get_all(CONTENT_LENGTH).iter();
+    status == reqwest::StatusCode::OK
+        && headers.get_all(CONTENT_TYPE).iter().next().is_none()
+        && lengths
+            .next()
+            .is_some_and(|length| length.as_bytes() == b"0")
+        && lengths.next().is_none()
+}
+
+/// The empty answer only when its body was read to the end and held no byte. A body that could
+/// not be read (`None`), or one that held a byte, keeps the refusal it had before.
+fn empty_answer_after_body(body_bytes: Option<usize>) -> TallyTransportError {
+    match body_bytes {
+        Some(0) => TallyTransportError::EmptyAnswer,
+        Some(_) | None => CONTENT_TYPE_MISSING,
+    }
+}
+
+async fn read_empty_candidate(mut response: Response) -> TallyTransportError {
+    let mut body_bytes = 0_usize;
+    loop {
+        match response.chunk().await {
+            Ok(Some(chunk)) => body_bytes = body_bytes.saturating_add(chunk.len()),
+            Ok(None) => return empty_answer_after_body(Some(body_bytes)),
+            Err(_) => return empty_answer_after_body(None),
+        }
+    }
+}
+
 fn validate_response_head(
     response: &Response,
     max_bytes: usize,
     expected_encoding: ExpectedTallyTextEncoding,
-) -> Result<ValidatedResponseHead, TallyTransportError> {
+) -> Result<ResponseHead, TallyTransportError> {
     let status = response.status();
     if !status.is_success() {
         return Err(TallyTransportError::HttpStatus {
@@ -1286,19 +1344,22 @@ fn validate_response_head(
         });
     }
     let mut content_types = response.headers().get_all(CONTENT_TYPE).iter();
-    let content_type = content_types
+    let Some(content_type) = content_types
         .next()
         .and_then(|value| value.to_str().ok())
         .filter(|_| content_types.next().is_none())
-        .ok_or(TallyTransportError::InvalidEncoding {
-            code: "response_content_type_unsupported",
-        })?;
+    else {
+        if is_empty_answer_head(status, response.headers()) {
+            return Ok(ResponseHead::EmptyCandidate);
+        }
+        return Err(CONTENT_TYPE_MISSING);
+    };
     validate_tally_xml_response_content_type(content_type, expected_encoding)
         .map_err(map_decode_error)?;
-    Ok(ValidatedResponseHead {
+    Ok(ResponseHead::Typed(ValidatedResponseHead {
         http_status: status.as_u16(),
         content_type: content_type.to_owned(),
-    })
+    }))
 }
 
 async fn read_decoded_response(
@@ -1306,7 +1367,10 @@ async fn read_decoded_response(
     max_bytes: usize,
     expected_encoding: ExpectedTallyTextEncoding,
 ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-    let head = validate_response_head(&response, max_bytes, expected_encoding)?;
+    let head = match validate_response_head(&response, max_bytes, expected_encoding)? {
+        ResponseHead::Typed(head) => head,
+        ResponseHead::EmptyCandidate => return Err(read_empty_candidate(response).await),
+    };
     let mut decoder =
         TallyTextStreamDecoder::new_with_expected_encoding(max_bytes, expected_encoding);
     let mut encoded_bytes = 0_usize;

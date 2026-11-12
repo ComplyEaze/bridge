@@ -1214,6 +1214,9 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 Transport::InvalidEncoding {
                     code: code @ "response_content_type_unsupported",
                 } => Some(Unanswered(code)),
+                // The same missing type, on the one empty head a reader asks for by name
+                // (protocol reference §12a.27); any other reader reports it as before.
+                Transport::EmptyAnswer => Some(Unanswered("response_content_type_unsupported")),
                 Transport::InvalidEncoding { .. }
                 | Transport::PolicyInvalid { .. }
                 | Transport::ClientInitializationFailed
@@ -2065,6 +2068,22 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              is not promised to fit. On a very large book (a voucher history of about a million) \
              read one day per call, and a longer period a day at a time. For a period's totals, \
              use trial_balance instead of reading its vouchers.",
+        ),
+        // `open_bills` (#2377): Tally's bill report sent nothing for the party, which it does for
+        // a party it reports nothing for (protocol reference §12a.27). The ledger list decides
+        // which refusal, and neither is told as no open bills.
+        "party_bills_none_reported" => Some(
+            "The ledger list carries this party, bill-wise, with no balance at as_of, and \
+             Tally's bill report sent nothing for it. ComplyEaze Bridge does not state that the \
+             party has no open bills: a zero balance may still hold an open bill set against an \
+             on-account advance, and that answer is not measured. For the party's balance, read \
+             ledger_masters or trial_balance. The same call refuses again.",
+        ),
+        "party_bills_answer_missing" => Some(
+            "The ledger list shows a balance for this bill-wise party at as_of, but Tally's bill \
+             report sent nothing for it, which has not been seen on a party with a balance, so \
+             no bills were returned. For the party's balance, read ledger_masters or \
+             trial_balance. The same call refuses again.",
         ),
         // The `outstandings` party detail (#945) refuses, never cuts, an answer
         // over its row limit; each kind has its own code and its own remedy.

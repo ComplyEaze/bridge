@@ -117,7 +117,8 @@ pub(crate) const fn owes_drain(error: &TallyTransportError) -> bool {
             ..
         }
         | TallyTransportError::UnsupportedContentEncoding
-        | TallyTransportError::InvalidEncoding { .. } => true,
+        | TallyTransportError::InvalidEncoding { .. }
+        | TallyTransportError::EmptyAnswer => true,
         // Nothing reached Tally.
         TallyTransportError::EndpointInvalid { .. }
         | TallyTransportError::PolicyInvalid { .. }

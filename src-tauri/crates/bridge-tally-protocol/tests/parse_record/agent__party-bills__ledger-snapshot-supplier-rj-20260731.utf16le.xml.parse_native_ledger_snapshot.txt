@@ -1,0 +1,347 @@
+# fixture: tests/fixtures/agent/party-bills/ledger-snapshot-supplier-rj-20260731.utf16le.xml
+# parser: parse_native_ledger_snapshot
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "BRIDGE CGST 2.5%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE CGST 9%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Goods 18%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Output CGST XML",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Purchase Svc 5%",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Round Off",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE SGST 2.5%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE SGST 9%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Supplier RJ",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 4D 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 998313 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 998314 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 998315 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc INH2 5%",
+        parent: Some(
+            "BRIDGE Sales Sub",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc INH 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Walk-in",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+])

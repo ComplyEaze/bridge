@@ -1,0 +1,30 @@
+# fixture: tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml
+# parser: parse_import_evidence
+# source: captured
+Ok(ParsedImportEvidenceFields {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 0,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 1,
+        line_error_count: 1,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    response_sha256: "ba416d29eec0a2d066028e7fef8a6d27c326dcf1702eb3746119a365093d4b0e",
+    line_error_sha256: [
+        "2f2b8606ffe81f6d8debb49b81d517f6f7ef9bd9d26033a0d1a5f1cdf1f642f4",
+    ],
+})

@@ -92,9 +92,9 @@ use super::{
     mirror_unavailable_string_error, party_ledger_master_balance_basis,
     party_ledger_master_currency_admission_error, party_ledger_master_foreign_currency_error,
     party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
-    party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
-    reviewed_probe_commitment_sha256, sweep_failure_naming_identity, tally_command_error,
-    tally_runtime_command_error, untrusted_company_candidates,
+    party_ledger_master_withheld, persisted_tally_probe_result, portable_export_file_name,
+    reconcile_review_cleanup, reviewed_probe_commitment_sha256, sweep_failure_naming_identity,
+    tally_command_error, tally_runtime_command_error, untrusted_company_candidates,
     verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
     OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
     SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
@@ -997,6 +997,7 @@ fn post_commit_review_cleanup_failure_preserves_durable_success_truth() {
         observed_at_unix_ms: 1_000,
         company: PersistedTallyCompany {
             name: "Synthetic Company".to_string(),
+            shown_name: "Synthetic Company".to_string(),
             guid: Some("synthetic-guid".to_string()),
             company_number: Some("100001".to_string()),
             books_from_yyyymmdd: Some("20260401".to_string()),
@@ -1592,4 +1593,56 @@ async fn both_desktop_company_lists_admit_only_the_valid_company_at_selection() 
             assert_eq!(error.code, "company_name_invalid", "{case}, {path}");
         }
     }
+}
+
+/// #2462: every company a probe returns keeps its name byte for byte as Tally
+/// reported it, which the webview stores, compares and sends, and carries the
+/// shown form every screen draws: a zero-width space and a right-to-left
+/// override written as codes.
+#[test]
+fn a_probed_company_carries_its_shown_name_beside_the_raw_name() {
+    let raw = "Synthetic\u{200b}Tra\u{202e}ders";
+    let probe = TallyProbeResult {
+        connection: ConnectionStatus {
+            reachable: true,
+            compatible: true,
+            server_text: "Synthetic status".to_string(),
+            product: TallyProduct::Unknown,
+            error: None,
+        },
+        companies: vec![TallyCompany {
+            name: raw.to_string(),
+            guid: Some("synthetic-guid".to_string()),
+            company_number: Some("100001".to_string()),
+            books_from: Some("20260401".to_string()),
+        }],
+        profile: CapabilityProfile {
+            profile_version: 2,
+            product: "Unknown".to_string(),
+            release: None,
+            license_tier: None,
+            mode: None,
+            transports: BTreeMap::new(),
+            features: BTreeMap::new(),
+            packs: BTreeMap::new(),
+        },
+        passport_snapshot_id: None,
+    };
+    let result = persisted_tally_probe_result(
+        "review-2462".to_string(),
+        "http://127.0.0.1:9000".to_string(),
+        1_000,
+        probe,
+    )
+    .expect("probe result");
+
+    assert_eq!(result.companies.len(), 1);
+    assert_eq!(result.companies[0].name, raw);
+    assert_eq!(
+        result.companies[0].shown_name,
+        "Synthetic\\u{200b}Tra\\u{202e}ders"
+    );
+    let row = serde_json::to_value(&result.companies[0]).expect("company serializes");
+    assert_eq!(row["name"], raw);
+    assert_eq!(row["shown_name"], "Synthetic\\u{200b}Tra\\u{202e}ders");
 }

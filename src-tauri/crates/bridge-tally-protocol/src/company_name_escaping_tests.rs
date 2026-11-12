@@ -77,7 +77,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         ),
         (
             "native_outstandings::render_native_group_snapshot_request",
-            render_native_group_snapshot_request(NAME),
+            render_native_group_snapshot_request(&company),
         ),
         (
             "native_statement_reports::render_native_statement_request",

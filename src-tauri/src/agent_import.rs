@@ -1546,7 +1546,7 @@ impl Server {
             let mut group_evidence = None;
             let mut statement_warnings: Vec<Value> = Vec::new();
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
-                let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
+                let (groups, evidence) = self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
                 let observed = ObservedMasters::new(ledger_masters.catalog().parents(), groups);
                 let refusals =
@@ -1904,7 +1904,7 @@ impl Server {
             // stability requirement rather than trusting a single observation.
             if let Some(group_evidence) = group_evidence {
                 let (_, repeated_group_evidence) =
-                    self.read_group_collection(&identity, &company.name).await?;
+                    self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), repeated_group_evidence.clone());
                 if group_evidence.response_sha256 != repeated_group_evidence.response_sha256 {
                     return Err("import_groups_changed".to_string().into());
@@ -3125,10 +3125,12 @@ impl Server {
     pub(super) async fn read_group_collection(
         &self,
         identity: &super::VerifiedCompanyIdentity,
-        company_name: &str,
     ) -> Result<(Vec<bridge_tally_protocol::TallyNamedMaster>, Evidence), ToolFailure> {
         let (xml, evidence) = self
-            .post_read(identity, native_group_snapshot_read(company_name))
+            .post_read(
+                identity,
+                native_group_snapshot_read(identity.company_name()),
+            )
             .await?;
         let groups =
             parse_native_group_snapshot(&xml, identity.company_guid()).map_err(|error| {

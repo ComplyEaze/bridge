@@ -826,7 +826,9 @@ async fn voucher_types_send_the_masters_request_then_the_numbering_request_betwe
         NativeMasterKind::VoucherTypes,
         &name,
     ));
-    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     assert_ne!(masters, numbering);
     assert_eq!(observed.len(), VOUCHER_TYPES_SEQUENCE);
     let hash = |at: usize| observed[at].request_body_sha256.as_str();
@@ -847,7 +849,9 @@ async fn voucher_types_send_the_masters_request_then_the_numbering_request_betwe
 #[tokio::test]
 async fn every_other_kind_sends_no_numbering_request() {
     let name = identity().display_name().to_string();
-    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     for kind in NativeMasterKind::ALL {
         if kind == NativeMasterKind::VoucherTypes {
             continue;
@@ -972,7 +976,6 @@ async fn the_numbering_read_adds_its_own_evidence() {
 async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_request() {
     let masters = capture(NativeMasterKind::VoucherTypes);
     let numbering = numbering_for(&masters);
-    let name = identity().display_name().to_string();
     // A read that ends after the masters read: its evidence is the mode probe's
     // and the masters pair's (the premise breaks, and the closing extent is read).
     let (result, _) = run(
@@ -1004,7 +1007,9 @@ async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_req
     assert_ne!(with_numbering.request_sha256, masters_only.request_sha256);
     // The chain is `<earlier>:<next request>`: the numbering request's own hash,
     // the bytes `render_voucher_type_numbering_request` renders, is the next link.
-    let numbering_request = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering_request = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     assert_eq!(
         with_numbering.request_sha256,
         sha256_hex(format!("{}:{numbering_request}", masters_only.request_sha256).as_bytes())
@@ -1679,7 +1684,9 @@ async fn the_numbering_read_sends_the_masters_pair_then_the_numbering_pair_and_n
         NativeMasterKind::VoucherTypes,
         &name,
     ));
-    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     let posts = observed
         .iter()
         .filter(|request| request.method == "POST")

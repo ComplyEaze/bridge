@@ -93,9 +93,17 @@ fn party_ledger_commitment_hashes_the_three_encoded_builder_requests() {
     )
     .unwrap();
     let requests = [
-        super::render_party_ledger_master_request("Synthetic ₹ Books", &master),
-        super::render_native_ledger_snapshot_request("Synthetic ₹ Books", &balance),
-        super::render_native_group_snapshot_request("Synthetic ₹ Books"),
+        super::render_party_ledger_master_request(
+            &ValidatedCompanyName::new("Synthetic ₹ Books").unwrap(),
+            &master,
+        ),
+        super::render_native_ledger_snapshot_request(
+            &ValidatedCompanyName::new("Synthetic ₹ Books").unwrap(),
+            &balance,
+        ),
+        super::render_native_group_snapshot_request(
+            &ValidatedCompanyName::new("Synthetic ₹ Books").unwrap(),
+        ),
     ];
     let hashes = requests
         .iter()
@@ -126,6 +134,7 @@ use bridge_tally_core::{
 };
 use bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

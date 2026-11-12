@@ -1,0 +1,1755 @@
+{
+  "file": "src-tauri/src/agent_import_invoice_hsn.rs",
+  "base_commit": "103ebcbc",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again).",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2228,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_invoice_hsn.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|invoice|hsn/)'",
+      "time": "2026-11-11T14:25:54Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 238,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/hsn|invoice/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5079,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5079, for the twenty-two hand-written mutants the filtered run missed and the one the tool's run missed. Three of them (H68, H74, H81) first failed one test each, in tests that read no HSN/SAC path (a post run's master-mark check, and an outstandings read cut at a 300 ms deadline); both tests passed five runs of five alone on the unmutated tree, and the three were run again against every test and missed there, which is the verdict recorded",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5086,
+      "command": "as the whole_set run, for the twenty-three still missed there (twenty-two hand-written, one from the tool)",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 58,
+      "missed": 0,
+      "unviable": 7
+    },
+    "hand": {
+      "caught": 101,
+      "missed": 2,
+      "unviable": 0
+    },
+    "survived_at_base": {
+      "tool": 1,
+      "hand": 22
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 2
+    },
+    "accepted_not_equivalent": {
+      "tool": 0,
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "106:9 replace CompanyGst::from_text -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "107:13 delete match arm Some(\"Yes\") in CompanyGst::from_text": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::row_2162_gy_reads_the_company_gst_on_before_and_off_after",
+      "killer_at": "base"
+    },
+    "108:13 delete match arm Some(\"No\") in CompanyGst::from_text": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::row_2162_gy_reads_the_company_gst_on_before_and_off_after",
+      "killer_at": "base"
+    },
+    "143:5 replace is_date -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "143:5 replace is_date -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "150:5 replace in_force -> Option<&'a T> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "150:5 replace in_force -> Option<&'a T> with Some(Box::leak(Box::new(Default::default())))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type is generic and has no Default bound"
+    },
+    "150:37 delete ! in in_force": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "156:30 replace <= with > in in_force": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "158:64 replace == with != in in_force": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "160:9 delete match arm (Some((_, item)), None) in in_force": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "169:5 replace level_answer -> LevelAnswer with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "176:40 replace && with || in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "176:54 replace == with != in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "195:29 delete ! in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "201:28 replace match guard !code.is_empty() with true in level_answer": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_specifying_its_own_code_but_holding_none_is_refused",
+      "killer_at": "this_commit"
+    },
+    "201:28 replace match guard !code.is_empty() with false in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "203:28 replace match guard code.is_empty() && rows.len() == 1 with true in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "203:28 replace match guard code.is_empty() && rows.len() == 1 with false in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "201:28 delete ! in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "203:44 replace && with || in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "203:58 replace == with != in level_answer": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "212:5 replace measured_minimum_length -> Option<usize> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "212:5 replace measured_minimum_length -> Option<usize> with Some(0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "212:5 replace measured_minimum_length -> Option<usize> with Some(1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "212:45 replace != with == in measured_minimum_length": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "222:9 replace || with && in measured_minimum_length": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "221:32 replace != with == in measured_minimum_length": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "222:36 replace != with == in measured_minimum_length": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "241:5 replace resolve_hsn -> HsnStep with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "245:33 replace < with == in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "245:33 replace < with > in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "245:33 replace < with <= in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "266:60 replace < with == in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "266:60 replace < with > in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "266:60 replace < with <= in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_chain_is_followed_only_as_deep_as_measured",
+      "killer_at": "base"
+    },
+    "280:9 delete match arm LevelAnswer::Code(code) in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_answer_carries_the_company_code_and_its_settings",
+      "killer_at": "base"
+    },
+    "281:32 replace match guard company.rows.iter().flatten().all(|row| row.empty) with true in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "281:32 replace match guard company.rows.iter().flatten().all(|row| row.empty) with false in resolve_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "300:9 replace SupplyType::of -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "301:13 delete match arm Some(\"Goods\") in SupplyType::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_type_of_supply_is_read_from_the_labs_listing_and_never_fails_it",
+      "killer_at": "base"
+    },
+    "302:13 delete match arm Some(\"Services\") in SupplyType::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_type_of_supply_is_read_from_the_labs_listing_and_never_fails_it",
+      "killer_at": "base"
+    },
+    "333:9 replace HsnWarningCode::as_str -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone",
+      "killer_at": "base"
+    },
+    "333:9 replace HsnWarningCode::as_str -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone",
+      "killer_at": "base"
+    },
+    "367:5 replace hsn_warnings -> Vec<HsnWarning> with vec![]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "367:5 replace hsn_warnings -> Vec<HsnWarning> with vec![Default::default()]": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "367:20 delete ! in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "372:25 replace != with == in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "374:48 replace && with || in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "374:24 replace == with != in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warnings_follow_the_code_and_the_type_of_supply",
+      "killer_at": "base"
+    },
+    "374:51 delete ! in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "378:45 replace && with || in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "378:24 replace == with != in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "382:24 replace == with != in hsn_warnings": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_resolved_code_is_warned_about_and_an_unresolved_one_refused",
+      "killer_at": "base"
+    },
+    "403:5 replace hsn_rows -> Result<HsnRows, &'static str> with Ok(Default::default())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "413:30 delete ! in hsn_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "416:17 replace && with || in hsn_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "415:17 replace && with || in hsn_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "419:9 delete ! in hsn_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "431:5 replace parse_group_hsn -> Result<BTreeMap<String, HsnRows>, &'static str> with Ok(BTreeMap::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "431:5 replace parse_group_hsn -> Result<BTreeMap<String, HsnRows>, &'static str> with Ok(BTreeMap::from_iter([(String::new(), Default::default())]))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "431:5 replace parse_group_hsn -> Result<BTreeMap<String, HsnRows>, &'static str> with Ok(BTreeMap::from_iter([(\"xyzzy\".into(), Default::default())]))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "444:12 delete ! in parse_group_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "468:5 replace parse_company_hsn -> Result<CompanyHsn, &'static str> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "478:8 delete ! in parse_company_hsn": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "H01": {
+      "what": "SPECIFIED: another source text",
+      "edits": [
+        {
+          "from": "const SPECIFIED: &str = \"Specify Details Here\";",
+          "to": "const SPECIFIED: &str = \"Specify Details\";"
+        }
+      ],
+      "mutation": "e281428eb0996cf20e9491b7210c7b54",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H02": {
+      "what": "INHERITED: another source text",
+      "edits": [
+        {
+          "from": "const INHERITED: &str = \"As per Company/Group\";",
+          "to": "const INHERITED: &str = \"As per Company\";"
+        }
+      ],
+      "mutation": "c31ac25336604fdbae2594cf3abc30c3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H03": {
+      "what": "ROW_CHILDREN: APPLICABLEFROM dropped",
+      "edits": [
+        {
+          "from": "    \"APPLICABLEFROM\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "493033632155b463fa96f32a5fff9006",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_answer_carries_the_company_code_and_its_settings",
+      "killer_at": "base"
+    },
+    "H04": {
+      "what": "ROW_CHILDREN: HSN dropped",
+      "edits": [
+        {
+          "from": "    \"HSN\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "9c8dea51d9a4609c9880f69c01422671",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H05": {
+      "what": "ROW_CHILDREN: HSNCLASSIFICATIONNAME dropped",
+      "edits": [
+        {
+          "from": "    \"HSNCLASSIFICATIONNAME\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "9e642ab8d021b0a8ad3acf2cf96888fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_answer_carries_the_company_code_and_its_settings",
+      "killer_at": "base"
+    },
+    "H06": {
+      "what": "ROW_CHILDREN: HSNCODE dropped",
+      "edits": [
+        {
+          "from": "    \"HSNCODE\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "544bcddc158a3bddfbc479fe2ff43b7a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H07": {
+      "what": "ROW_CHILDREN: SRCOFHSNDETAILS dropped",
+      "edits": [
+        {
+          "from": "    \"SRCOFHSNDETAILS\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "f6823f7edeaacc6d583fd669ab538919",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H08": {
+      "what": "MAX_GROUP_DEPTH: three groups followed",
+      "edits": [
+        {
+          "from": "const MAX_GROUP_DEPTH: usize = 2;",
+          "to": "const MAX_GROUP_DEPTH: usize = 3;"
+        }
+      ],
+      "mutation": "1eaa17eee3e7f0e8f4e6d1ae5f2a7eb3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_chain_is_followed_only_as_deep_as_measured",
+      "killer_at": "base"
+    },
+    "H09": {
+      "what": "MAX_GROUP_DEPTH: one group followed",
+      "edits": [
+        {
+          "from": "const MAX_GROUP_DEPTH: usize = 2;",
+          "to": "const MAX_GROUP_DEPTH: usize = 1;"
+        }
+      ],
+      "mutation": "10434ac19281ae412ec705c3268a081c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_ledger_wins_then_the_nearest_group_then_the_company",
+      "killer_at": "base"
+    },
+    "H10": {
+      "what": "MEASURED_PRIORITY: another priority",
+      "edits": [
+        {
+          "from": "const MEASURED_PRIORITY: &str = \"Ledger\";",
+          "to": "const MEASURED_PRIORITY: &str = \"Group\";"
+        }
+      ],
+      "mutation": "492076d343ef6ac06c1042d2b29dc18a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "H11": {
+      "what": "MEASURED_SECTIONS: another text",
+      "edits": [
+        {
+          "from": "const MEASURED_SECTIONS: &str = \"All Sections\";",
+          "to": "const MEASURED_SECTIONS: &str = \"All\";"
+        }
+      ],
+      "mutation": "d7f228a3f48c3d9c2e7699adbd6a433d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "H12": {
+      "what": "UNRESOLVED: another code",
+      "edits": [
+        {
+          "from": "const UNRESOLVED: &str = \"invoice_sales_ledger_hsn_unresolved\";",
+          "to": "const UNRESOLVED: &str = \"invoice_sales_ledger_hsn_none\";"
+        }
+      ],
+      "mutation": "474d360159ebd6d8fda29bacab71e31c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::each_refusal_code_has_its_own_advice",
+      "killer_at": "this_commit"
+    },
+    "H13": {
+      "what": "NOT_MEASURED: another code",
+      "edits": [
+        {
+          "from": "    \"invoice_sales_ledger_hsn_source_not_measured\";",
+          "to": "    \"invoice_sales_ledger_hsn_not_measured\";"
+        }
+      ],
+      "mutation": "bf2619c1d4c3a084591a602035ed93f3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::the_gst_setting_refuses_by_itself_before_any_sales_line_is_judged",
+      "killer_at": "base"
+    },
+    "H14": {
+      "what": "CompanyGst::from_text: Yes read in another case",
+      "edits": [
+        {
+          "from": "Some(\"Yes\") => Self::On,",
+          "to": "Some(\"yes\") => Self::On,"
+        }
+      ],
+      "mutation": "37d46ab5c75feb51cb67c68f9a727a38",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::row_2162_gy_reads_the_company_gst_on_before_and_off_after",
+      "killer_at": "base"
+    },
+    "H15": {
+      "what": "CompanyGst::from_text: No read in another case",
+      "edits": [
+        {
+          "from": "Some(\"No\") => Self::Off,",
+          "to": "Some(\"no\") => Self::Off,"
+        }
+      ],
+      "mutation": "de26c3813b141db0b9fbfa9cae505072",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_gst_setting_is_on_only_for_yes_and_off_only_for_no",
+      "killer_at": "base"
+    },
+    "H16": {
+      "what": "CompanyGst::from_text: Yes read as Off",
+      "edits": [
+        {
+          "from": "Some(\"Yes\") => Self::On,",
+          "to": "Some(\"Yes\") => Self::Off,"
+        }
+      ],
+      "mutation": "173e170025499ac374a3c70e40e90164",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_gst_setting_is_on_only_for_yes_and_off_only_for_no",
+      "killer_at": "base"
+    },
+    "H17": {
+      "what": "in_force: an undated item is tolerated",
+      "edits": [
+        {
+          "from": "if dated.iter().any(|(date, _)| !date.is_some_and(is_date)) {",
+          "to": "if dated.iter().any(|(date, _)| date.is_some_and(|date| !is_date(date))) {"
+        }
+      ],
+      "mutation": "90c1bda479a47a02c32cd6e1399c3636",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_row_in_force_is_the_latest_not_after_the_date",
+      "killer_at": "base"
+    },
+    "H18": {
+      "what": "in_force: a date that is not a calendar day is compared as text",
+      "edits": [
+        {
+          "from": "if dated.iter().any(|(date, _)| !date.is_some_and(is_date)) {",
+          "to": "if dated.iter().any(|(date, _)| date.is_none()) {"
+        }
+      ],
+      "mutation": "6b8168da284981410232b10ec4af1ded",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "H19": {
+      "what": "in_force: the earliest date in force taken",
+      "edits": [
+        {
+          "from": "        .max()?;",
+          "to": "        .min()?;"
+        }
+      ],
+      "mutation": "8cca9b0b23679a85216db85d43792375",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H20": {
+      "what": "in_force: two items sharing the date in force, the first taken",
+      "edits": [
+        {
+          "from": "(Some((_, item)), None) => Some(item),",
+          "to": "(Some((_, item)), _) => Some(item),"
+        }
+      ],
+      "mutation": "9cc20ac801019324fa9e7ed8197a9cf1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "H21": {
+      "what": "level_answer: no rows read as no code",
+      "edits": [
+        {
+          "from": "    let Some(rows) = rows else {\n        return LevelAnswer::NotMeasured;\n    };",
+          "to": "    let Some(rows) = rows else {\n        return LevelAnswer::NoCode;\n    };"
+        }
+      ],
+      "mutation": "b0861eecb2c536a3f282c6b17809d832",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "H22": {
+      "what": "level_answer: several placeholders read as no code",
+      "edits": [
+        {
+          "from": "placeholder_measured && rows.len() == 1",
+          "to": "placeholder_measured"
+        }
+      ],
+      "mutation": "197d5173cb7573cac93065e64ecfc398",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_chain_is_followed_only_as_deep_as_measured",
+      "killer_at": "base"
+    },
+    "H23": {
+      "what": "level_answer: a placeholder read as no code where it was not measured",
+      "edits": [
+        {
+          "from": "placeholder_measured && rows.len() == 1",
+          "to": "rows.len() == 1"
+        }
+      ],
+      "mutation": "be6e30db45043393f7fbdae0c694a348",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "H24": {
+      "what": "level_answer: a placeholder beside real rows ignored",
+      "edits": [
+        {
+          "from": "    if rows.iter().any(|row| row.empty) {\n        return LevelAnswer::NotMeasured;\n    }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "ed0f800daf25178db4667def018b6a43",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "H25": {
+      "what": "level_answer: an empty classification name refuses",
+      "edits": [
+        {
+          "from": ".is_some_and(|name| !name.is_empty())",
+          "to": ".is_some()"
+        }
+      ],
+      "mutation": "fc6a39b97bee2180e189712b8c6660b4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "H26": {
+      "what": "level_answer: a classification not checked",
+      "edits": [
+        {
+          "from": "    if row\n        .classification\n        .as_deref()\n        .is_some_and(|name| !name.is_empty())\n    {\n        return LevelAnswer::NotMeasured;\n    }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "ef8a729e294a83fe13b9439410a5018f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "H27": {
+      "what": "level_answer: deferring read on a master with several rows",
+      "edits": [
+        {
+          "from": "Some(INHERITED) if code.is_empty() && rows.len() == 1 =>",
+          "to": "Some(INHERITED) if code.is_empty() =>"
+        }
+      ],
+      "mutation": "149bf35d69f14037131827cadde2a658",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H28": {
+      "what": "level_answer: a deferring row with a code read as no code",
+      "edits": [
+        {
+          "from": "Some(INHERITED) if code.is_empty() && rows.len() == 1 =>",
+          "to": "Some(INHERITED) if rows.len() == 1 =>"
+        }
+      ],
+      "mutation": "5c5ff0a9a495e9be73ecf86e55068449",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "H29": {
+      "what": "level_answer: the two source texts swapped",
+      "edits": [
+        {
+          "from": "Some(SPECIFIED) if !code.is_empty()",
+          "to": "Some(INHERITED) if !code.is_empty()"
+        },
+        {
+          "from": "Some(INHERITED) if code.is_empty()",
+          "to": "Some(SPECIFIED) if code.is_empty()"
+        }
+      ],
+      "mutation": "288c26bbfa52e476d853b11e9adf628c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "H30": {
+      "what": "measured_minimum_length: an absent classification setting admitted",
+      "edits": [
+        {
+          "from": "if company.classification_on.as_deref() != Some(\"No\") {",
+          "to": "if company.classification_on.as_deref() == Some(\"Yes\") {"
+        }
+      ],
+      "mutation": "d5e2079aa3bfa10f7b97c81410172c00",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "H31": {
+      "what": "measured_minimum_length: the priority not checked",
+      "edits": [
+        {
+          "from": "    if row.priority.as_deref() != Some(MEASURED_PRIORITY)\n        || row.sections",
+          "to": "    if row.sections"
+        }
+      ],
+      "mutation": "c3a2544d4b02114add7944fbe32a8253",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "H32": {
+      "what": "measured_minimum_length: the sections not checked",
+      "edits": [
+        {
+          "from": "\n        || row.sections.as_deref() != Some(MEASURED_SECTIONS)",
+          "to": ""
+        }
+      ],
+      "mutation": "f36916e120fac1a0ea7b8ffc07acb943",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "H33": {
+      "what": "measured_minimum_length: a length that is not a number read as zero",
+      "edits": [
+        {
+          "from": "row.code_length.as_deref()?.parse().ok()",
+          "to": "row.code_length.as_deref()?.parse().ok().or(Some(0))"
+        }
+      ],
+      "mutation": "b0f499191a34395233468a0bb183f5bb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "H34": {
+      "what": "resolve_hsn: the minimum length counted in bytes",
+      "edits": [
+        {
+          "from": "if code.chars().count() < minimum {",
+          "to": "if code.len() < minimum {"
+        }
+      ],
+      "mutation": "3f90ffd2f36f9374574d16be9df1a4c9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_minimum_length_counts_characters_not_bytes",
+      "killer_at": "this_commit"
+    },
+    "H35": {
+      "what": "resolve_hsn: a ledger read that failed read as no rows",
+      "edits": [
+        {
+          "from": "    let Ok(rows) = ledger else {\n        return HsnStep::Refused(NOT_MEASURED);\n    };",
+          "to": "    let rows = ledger.as_ref().unwrap_or(&None);"
+        }
+      ],
+      "mutation": "2f592b7727e606e91ae6f002d4a31178",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "H36": {
+      "what": "resolve_hsn: a ledger placeholder read as no code",
+      "edits": [
+        {
+          "from": "match level_answer(rows, as_of, false) {",
+          "to": "match level_answer(rows, as_of, true) {"
+        }
+      ],
+      "mutation": "a82344598a86f2d6cd361b6dae8fd332",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_shape_not_measured_is_refused_as_such",
+      "killer_at": "base"
+    },
+    "H37": {
+      "what": "resolve_hsn: a ledger's code reported as the company's",
+      "edits": [
+        {
+          "from": "return found(code, HsnLevel::Ledger),",
+          "to": "return found(code, HsnLevel::Company),"
+        }
+      ],
+      "mutation": "17c2b8ca9cdbcf2ddeeb249673386fa4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_code_shorter_than_the_company_minimum_is_refused",
+      "killer_at": "base"
+    },
+    "H38": {
+      "what": "resolve_hsn: no chain asks for the groups",
+      "edits": [
+        {
+          "from": "    let Some(chain) = chain else {\n        return HsnStep::Refused(NOT_MEASURED);\n    };",
+          "to": "    let Some(chain) = chain else {\n        return HsnStep::NeedsGroups;\n    };"
+        }
+      ],
+      "mutation": "686875b4ab1604542ee524c3a42c3f26",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_chain_is_followed_only_as_deep_as_measured",
+      "killer_at": "base"
+    },
+    "H39": {
+      "what": "resolve_hsn: a group missing from the listing skipped",
+      "edits": [
+        {
+          "from": ".filter(|_| depth < MAX_GROUP_DEPTH) else {\n            return HsnStep::Refused(NOT_MEASURED);\n        };",
+          "to": ".filter(|_| depth < MAX_GROUP_DEPTH) else {\n            continue;\n        };"
+        }
+      ],
+      "mutation": "d598cda31b0f93e5356b07f96b0288a0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_chain_is_followed_only_as_deep_as_measured",
+      "killer_at": "base"
+    },
+    "H40": {
+      "what": "resolve_hsn: the depth not bounded",
+      "edits": [
+        {
+          "from": ".filter(|_| depth < MAX_GROUP_DEPTH)",
+          "to": ""
+        }
+      ],
+      "mutation": "3a7a8d284716bf68699ab52c2863c7d6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_chain_is_followed_only_as_deep_as_measured",
+      "killer_at": "base"
+    },
+    "H41": {
+      "what": "resolve_hsn: a group placeholder not read as no code",
+      "edits": [
+        {
+          "from": "match level_answer(rows, as_of, true) {",
+          "to": "match level_answer(rows, as_of, false) {"
+        }
+      ],
+      "mutation": "88fb591212bdd306f98d1a6ecbcdc9a0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H42": {
+      "what": "resolve_hsn: a group's code named for the nearest group",
+      "edits": [
+        {
+          "from": "HsnLevel::Group(name.clone())",
+          "to": "HsnLevel::Group(chain[0].clone())"
+        }
+      ],
+      "mutation": "aae29bef80b60e0be8684607f70f9172",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_ledger_wins_then_the_nearest_group_then_the_company",
+      "killer_at": "base"
+    },
+    "H43": {
+      "what": "resolve_hsn: the chain walked farthest first",
+      "edits": [
+        {
+          "from": "chain.iter().enumerate()",
+          "to": "chain.iter().rev().enumerate()"
+        }
+      ],
+      "mutation": "0a26492d6b0040fbc13bd780d671cd0d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H44": {
+      "what": "resolve_hsn: the company placeholder not read as no code",
+      "edits": [
+        {
+          "from": "match level_answer(&company.rows, as_of, true) {",
+          "to": "match level_answer(&company.rows, as_of, false) {"
+        }
+      ],
+      "mutation": "c40dafd1c1df5a0ceaf29e871dccf9c2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H45": {
+      "what": "resolve_hsn: the company's code reported as the ledger's",
+      "edits": [
+        {
+          "from": "found(code, HsnLevel::Company),",
+          "to": "found(code, HsnLevel::Ledger),"
+        }
+      ],
+      "mutation": "09ce40e07e16ef7af6ad46d4a37ff352",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "H46": {
+      "what": "resolve_hsn: no code anywhere refused as not measured",
+      "edits": [
+        {
+          "from": "            HsnStep::Refused(UNRESOLVED)\n",
+          "to": "            HsnStep::Refused(NOT_MEASURED)\n"
+        }
+      ],
+      "mutation": "eb33337c61db17094ec3b950f62dec61",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H47": {
+      "what": "resolve_hsn: a company answer not measured refused as unresolved",
+      "edits": [
+        {
+          "from": "        _ => HsnStep::Refused(NOT_MEASURED),",
+          "to": "        _ => HsnStep::Refused(UNRESOLVED),"
+        }
+      ],
+      "mutation": "db432226773edb79ef22b486cfd54357",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_settings_gate_every_level",
+      "killer_at": "base"
+    },
+    "H48": {
+      "what": "SupplyType::of: Goods read in another case",
+      "edits": [
+        {
+          "from": "Some(\"Goods\") => Self::Goods,",
+          "to": "Some(\"goods\") => Self::Goods,"
+        }
+      ],
+      "mutation": "a34c1d47ebc8a2600fb4e6153ba3e030",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_type_of_supply_is_read_from_the_labs_listing_and_never_fails_it",
+      "killer_at": "base"
+    },
+    "H49": {
+      "what": "SupplyType::of: Services read in another case",
+      "edits": [
+        {
+          "from": "Some(\"Services\") => Self::Services,",
+          "to": "Some(\"services\") => Self::Services,"
+        }
+      ],
+      "mutation": "64ff25524f9c6c40f974af7f1983b65a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_type_of_supply_is_read_from_the_labs_listing_and_never_fails_it",
+      "killer_at": "base"
+    },
+    "H50": {
+      "what": "SupplyType::of: another element read",
+      "edits": [
+        {
+          "from": "master.text_of(\"GSTTYPEOFSUPPLY\")",
+          "to": "master.text_of(\"TYPEOFSUPPLY\")"
+        }
+      ],
+      "mutation": "7b09d04d735c4769134e5cec2139b1eb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_type_of_supply_is_read_from_the_labs_listing_and_never_fails_it",
+      "killer_at": "base"
+    },
+    "H51": {
+      "what": "SupplyType::of: Goods read as Services",
+      "edits": [
+        {
+          "from": "Some(\"Goods\") => Self::Goods,",
+          "to": "Some(\"Goods\") => Self::Services,"
+        }
+      ],
+      "mutation": "5fe77f57731a822db5fb7f20600f9fee",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_type_of_supply_is_read_from_the_labs_listing_and_never_fails_it",
+      "killer_at": "base"
+    },
+    "H52": {
+      "what": "as_str: NotDigits named otherwise",
+      "edits": [
+        {
+          "from": "Self::NotDigits => \"hsn_warning_not_digits\",",
+          "to": "Self::NotDigits => \"hsn_warning_not_digits_x\","
+        }
+      ],
+      "mutation": "9228c3a35e407fef3ac636f0ea83b4cb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H53": {
+      "what": "as_str: NotSixDigits named otherwise",
+      "edits": [
+        {
+          "from": "Self::NotSixDigits => \"hsn_warning_not_six_digits\",",
+          "to": "Self::NotSixDigits => \"hsn_warning_not_six_digits_x\","
+        }
+      ],
+      "mutation": "46fc63517da92a36f2c2038abafd937f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H54": {
+      "what": "as_str: NotASacForServices named otherwise",
+      "edits": [
+        {
+          "from": "Self::NotASacForServices => \"hsn_warning_not_a_sac_for_services\",",
+          "to": "Self::NotASacForServices => \"hsn_warning_not_a_sac_for_services_x\","
+        }
+      ],
+      "mutation": "876dd4dfeb8437e07d75e02d80af2a86",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H55": {
+      "what": "as_str: SacForGoods named otherwise",
+      "edits": [
+        {
+          "from": "Self::SacForGoods => \"hsn_warning_sac_for_goods\",",
+          "to": "Self::SacForGoods => \"hsn_warning_sac_for_goods_x\","
+        }
+      ],
+      "mutation": "3713da864a65817943af9f6a144e81eb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H56": {
+      "what": "as_str: TypeOfSupplyNotJudged named otherwise",
+      "edits": [
+        {
+          "from": "Self::TypeOfSupplyNotJudged => \"hsn_warning_type_of_supply_not_judged\",",
+          "to": "Self::TypeOfSupplyNotJudged => \"hsn_warning_type_of_supply_not_judged_x\","
+        }
+      ],
+      "mutation": "eb148355e90b8f96e284b3283079b40b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H57": {
+      "what": "HsnWarningCode serde: hsn_warning_not_digits renamed",
+      "edits": [
+        {
+          "from": "#[serde(rename = \"hsn_warning_not_digits\")]",
+          "to": "#[serde(rename = \"hsn_warning_not_digits_x\")]"
+        }
+      ],
+      "mutation": "d74054c32c685d8fb4c75c25720a87f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H58": {
+      "what": "HsnWarningCode serde: hsn_warning_not_six_digits renamed",
+      "edits": [
+        {
+          "from": "#[serde(rename = \"hsn_warning_not_six_digits\")]",
+          "to": "#[serde(rename = \"hsn_warning_not_six_digits_x\")]"
+        }
+      ],
+      "mutation": "7ddfa4ae4f794990d185a0a35f5b6b0e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H59": {
+      "what": "HsnWarningCode serde: hsn_warning_not_a_sac_for_services renamed",
+      "edits": [
+        {
+          "from": "#[serde(rename = \"hsn_warning_not_a_sac_for_services\")]",
+          "to": "#[serde(rename = \"hsn_warning_not_a_sac_for_services_x\")]"
+        }
+      ],
+      "mutation": "499173ba26508e5308bf3a05d89eaaac",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H60": {
+      "what": "HsnWarningCode serde: hsn_warning_sac_for_goods renamed",
+      "edits": [
+        {
+          "from": "#[serde(rename = \"hsn_warning_sac_for_goods\")]",
+          "to": "#[serde(rename = \"hsn_warning_sac_for_goods_x\")]"
+        }
+      ],
+      "mutation": "2a3291c1808ed4b8f820a286174d88cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H61": {
+      "what": "HsnWarningCode serde: hsn_warning_type_of_supply_not_judged renamed",
+      "edits": [
+        {
+          "from": "#[serde(rename = \"hsn_warning_type_of_supply_not_judged\")]",
+          "to": "#[serde(rename = \"hsn_warning_type_of_supply_not_judged_x\")]"
+        }
+      ],
+      "mutation": "5df56b927295a172198ae317ce06ad11",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_warning_code_is_saved_under_the_name_the_response_gives_it",
+      "killer_at": "base"
+    },
+    "H62": {
+      "what": "hsn_warnings: any numeric character read as a digit",
+      "edits": [
+        {
+          "from": "code.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "code.chars().all(char::is_numeric)"
+        }
+      ],
+      "mutation": "e3e26cf67569a7ea6e2f45a3abae812f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warning_rules_read_ascii_digits_and_the_two_digit_sac_chapter",
+      "killer_at": "this_commit"
+    },
+    "H63": {
+      "what": "hsn_warnings: one 9 makes a SAC",
+      "edits": [
+        {
+          "from": "let sac = code.starts_with(\"99\");",
+          "to": "let sac = code.starts_with('9');"
+        }
+      ],
+      "mutation": "b3423c7b42a313cecfa50724c7bf67c8",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warning_rules_read_ascii_digits_and_the_two_digit_sac_chapter",
+      "killer_at": "this_commit"
+    },
+    "H64": {
+      "what": "hsn_warnings: only a short code is not six digits",
+      "edits": [
+        {
+          "from": "(code.len() != 6, HsnWarningCode::NotSixDigits),",
+          "to": "(code.len() < 6, HsnWarningCode::NotSixDigits),"
+        }
+      ],
+      "mutation": "02b2c62ed9af30d4f6409165307c7e88",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warnings_follow_the_code_and_the_type_of_supply",
+      "killer_at": "base"
+    },
+    "H65": {
+      "what": "hsn_warnings: the services rule judged where supply is not judged",
+      "edits": [
+        {
+          "from": "supply == SupplyType::Services && !sac,",
+          "to": "supply != SupplyType::Goods && !sac,"
+        }
+      ],
+      "mutation": "04f7684710bb9a889b99bbb0c5ecc575",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warning_rules_read_ascii_digits_and_the_two_digit_sac_chapter",
+      "killer_at": "this_commit"
+    },
+    "H66": {
+      "what": "hsn_warnings: the goods rule judged where supply is not judged",
+      "edits": [
+        {
+          "from": "supply == SupplyType::Goods && sac,",
+          "to": "supply != SupplyType::Services && sac,"
+        }
+      ],
+      "mutation": "b872b1490de5689d58b1c3d9b1ed018d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warnings_follow_the_code_and_the_type_of_supply",
+      "killer_at": "base"
+    },
+    "H67": {
+      "what": "hsn_warnings: a code that is not digits judged on length too",
+      "edits": [
+        {
+          "from": "vec![HsnWarningCode::NotDigits]",
+          "to": "vec![HsnWarningCode::NotDigits, HsnWarningCode::NotSixDigits]"
+        }
+      ],
+      "mutation": "11a3686bdcb53834e8322f8ff4146db0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warnings_follow_the_code_and_the_type_of_supply",
+      "killer_at": "base"
+    },
+    "H68": {
+      "what": "hsn_warnings: characters counted in bytes",
+      "edits": [
+        {
+          "from": "characters: code.chars().count(),",
+          "to": "characters: code.len(),"
+        }
+      ],
+      "mutation": "4b58ce67842f491efa0b60fcd111db8c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warning_rules_read_ascii_digits_and_the_two_digit_sac_chapter",
+      "killer_at": "this_commit"
+    },
+    "H69": {
+      "what": "hsn_warnings: every warning's level the ledger",
+      "edits": [
+        {
+          "from": "level: level.clone(),",
+          "to": "level: HsnLevel::Ledger,"
+        }
+      ],
+      "mutation": "d151ba969290178344fc72e464d81dda",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warnings_follow_the_code_and_the_type_of_supply",
+      "killer_at": "base"
+    },
+    "H70": {
+      "what": "hsn_warnings: the code named as the ledger",
+      "edits": [
+        {
+          "from": "ledger: ledger.to_string(),",
+          "to": "ledger: code.to_string(),"
+        }
+      ],
+      "mutation": "3d33e606d9dc000b8c271cf65ad13a32",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_warnings_follow_the_code_and_the_type_of_supply",
+      "killer_at": "base"
+    },
+    "H71": {
+      "what": "hsn_rows: an unreadable date read as none",
+      "edits": [
+        {
+          "from": "applicable_from: details.text_of(\"APPLICABLEFROM\")?,\n            code:",
+          "to": "applicable_from: details.text_of(\"APPLICABLEFROM\").unwrap_or(None),\n            code:"
+        }
+      ],
+      "mutation": "5b1ccd41287007ebef75f8829d4f2df9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_row_is_read_whole_or_refused",
+      "killer_at": "this_commit"
+    },
+    "H72": {
+      "what": "hsn_rows: the code read from HSN",
+      "edits": [
+        {
+          "from": "code: details.text_of(\"HSNCODE\")?,",
+          "to": "code: details.text_of(\"HSN\")?,"
+        }
+      ],
+      "mutation": "dc9336f65f757514cefaddf285e6e7c4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H73": {
+      "what": "hsn_rows: the source read from another element",
+      "edits": [
+        {
+          "from": "source: details.text_of(\"SRCOFHSNDETAILS\")?,",
+          "to": "source: details.text_of(\"SRCOFHSN\")?,"
+        }
+      ],
+      "mutation": "f47df463e0d89f6bcb4ac4a58fc05245",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H74": {
+      "what": "hsn_rows: the classification read from another element",
+      "edits": [
+        {
+          "from": "classification: details.text_of(\"HSNCLASSIFICATIONNAME\")?,",
+          "to": "classification: details.text_of(\"HSNCLASSIFICATION\")?,"
+        }
+      ],
+      "mutation": "8690b92695873e09f09bfe1ecb1e1255",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_row_is_read_whole_or_refused",
+      "killer_at": "this_commit"
+    },
+    "H75": {
+      "what": "hsn_rows: a row is unmeasured only when every child is",
+      "edits": [
+        {
+          "from": ".any(|child| !ROW_CHILDREN.contains(&child.name.as_str())),",
+          "to": ".all(|child| !ROW_CHILDREN.contains(&child.name.as_str())),"
+        }
+      ],
+      "mutation": "0779836e0c9e5c66c3da527ceba63685",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H76": {
+      "what": "hsn_rows: a row with attributes read as empty",
+      "edits": [
+        {
+          "from": "empty: details.attributes.is_empty()\n                && details.children.is_empty()",
+          "to": "empty: details.children.is_empty()"
+        }
+      ],
+      "mutation": "d6e73859cd4fbe99c920b988b680060a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_row_is_read_whole_or_refused",
+      "killer_at": "this_commit"
+    },
+    "H77": {
+      "what": "hsn_rows: a row with children read as empty",
+      "edits": [
+        {
+          "from": "\n                && details.children.is_empty()",
+          "to": ""
+        }
+      ],
+      "mutation": "c51c6f9f80633f7fad9f09474f980b5c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H78": {
+      "what": "hsn_rows: a row with text read as empty",
+      "edits": [
+        {
+          "from": "\n                && clean(&details.text).is_empty()",
+          "to": ""
+        }
+      ],
+      "mutation": "919297e1291b1b8bb655428c18ff0b9c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_row_is_read_whole_or_refused",
+      "killer_at": "this_commit"
+    },
+    "H79": {
+      "what": "hsn_rows: whitespace text not read as empty",
+      "edits": [
+        {
+          "from": "clean(&details.text).is_empty()",
+          "to": "details.text.is_empty()"
+        }
+      ],
+      "mutation": "d45817a3226d7aab0bb98cf139d6a7c8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H80": {
+      "what": "hsn_rows: no rows read as an empty list",
+      "edits": [
+        {
+          "from": "Ok((!rows.is_empty()).then_some(rows))",
+          "to": "Ok(Some(rows))"
+        }
+      ],
+      "mutation": "8b65034a2c4a791a3ba65b153dada61b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_binds_names_and_refuses_a_listing_it_cannot_trust",
+      "killer_at": "base"
+    },
+    "H81": {
+      "what": "parse_group_hsn: another code for no collection",
+      "edits": [
+        {
+          "from": ".ok_or(\"invoice_read_collection_absent\")?;",
+          "to": ".ok_or(\"invoice_read_collection_missing\")?;"
+        }
+      ],
+      "mutation": "30264a94eb70a0c74408b7955782c922",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_reads_each_group_or_refuses_under_its_own_code",
+      "killer_at": "this_commit"
+    },
+    "H82": {
+      "what": "parse_group_hsn: another code for an empty listing",
+      "edits": [
+        {
+          "from": "return Err(\"invoice_group_hsn_listing_empty\");",
+          "to": "return Err(\"invoice_group_hsn_listing_none\");"
+        }
+      ],
+      "mutation": "1c612247e8498c715995ba11c1c57a41",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_binds_names_and_refuses_a_listing_it_cannot_trust",
+      "killer_at": "base"
+    },
+    "H83": {
+      "what": "parse_group_hsn: another code for a company mismatch",
+      "edits": [
+        {
+          "from": "return Err(\"invoice_group_hsn_company_mismatch\");",
+          "to": "return Err(\"invoice_group_hsn_company_other\");"
+        }
+      ],
+      "mutation": "cf9612d3028c9330c3cb36d9263c3149",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_binds_names_and_refuses_a_listing_it_cannot_trust",
+      "killer_at": "base"
+    },
+    "H84": {
+      "what": "parse_group_hsn: another code for an unnamed row",
+      "edits": [
+        {
+          "from": ".ok_or(\"invoice_group_hsn_row_unnamed\")?;",
+          "to": ".ok_or(\"invoice_group_hsn_row_nameless\")?;"
+        }
+      ],
+      "mutation": "3c661193f974be504488bfc540709472",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_reads_each_group_or_refuses_under_its_own_code",
+      "killer_at": "this_commit"
+    },
+    "H85": {
+      "what": "parse_group_hsn: another code for a repeated name",
+      "edits": [
+        {
+          "from": "return Err(\"invoice_group_hsn_name_repeated\");",
+          "to": "return Err(\"invoice_group_hsn_name_twice\");"
+        }
+      ],
+      "mutation": "e4adaff354df71f3b52e771ea30b5d16",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_binds_names_and_refuses_a_listing_it_cannot_trust",
+      "killer_at": "base"
+    },
+    "H86": {
+      "what": "parse_group_hsn: an empty listing accepted",
+      "edits": [
+        {
+          "from": "    if collection.all(\"GROUP\").next().is_none() {\n        return Err(\"invoice_group_hsn_listing_empty\");\n    }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "01b833ec4985864f452d76fdd7d263b7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_binds_names_and_refuses_a_listing_it_cannot_trust",
+      "killer_at": "base"
+    },
+    "H87": {
+      "what": "parse_group_hsn: a group GUID compared with its case",
+      "edits": [
+        {
+          "from": "if !bound.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)) {",
+          "to": "if !bound.is_some_and(|guid| guid == company_guid) {"
+        }
+      ],
+      "mutation": "532de40c5b50b924d31160857056fb48",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_reads_each_group_or_refuses_under_its_own_code",
+      "killer_at": "this_commit"
+    },
+    "H88": {
+      "what": "parse_group_hsn: a group with no GUID accepted",
+      "edits": [
+        {
+          "from": "if !bound.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)) {",
+          "to": "if !bound.is_none_or(|guid| guid.eq_ignore_ascii_case(company_guid)) {"
+        }
+      ],
+      "mutation": "3acd8da2b31c5d823176985f38f5cdf9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_reads_each_group_or_refuses_under_its_own_code",
+      "killer_at": "this_commit"
+    },
+    "H89": {
+      "what": "parse_group_hsn: the name read from another attribute",
+      "edits": [
+        {
+          "from": ".get(\"NAME\")",
+          "to": ".get(\"Name\")"
+        }
+      ],
+      "mutation": "e6a57826c711475f6c886d074a74b59b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed",
+      "killer_at": "base"
+    },
+    "H90": {
+      "what": "parse_group_hsn: a group whose rows cannot be read fails the listing",
+      "edits": [
+        {
+          "from": "hsn_rows(group).unwrap_or(None)",
+          "to": "hsn_rows(group)?"
+        }
+      ],
+      "mutation": "fb4e629813408c55987a35b763839440",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_reads_each_group_or_refuses_under_its_own_code",
+      "killer_at": "this_commit"
+    },
+    "H91": {
+      "what": "parse_group_hsn: a repeated name accepted, the later kept",
+      "edits": [
+        {
+          "from": "        if out.insert(name, hsn_rows(group).unwrap_or(None)).is_some() {\n            return Err(\"invoice_group_hsn_name_repeated\");\n        }",
+          "to": "        out.insert(name, hsn_rows(group).unwrap_or(None));"
+        }
+      ],
+      "mutation": "c3f7ed7abe13bede484581ae7ae05a94",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_group_parser_binds_names_and_refuses_a_listing_it_cannot_trust",
+      "killer_at": "base"
+    },
+    "H92": {
+      "what": "parse_company_hsn: another code for no company",
+      "edits": [
+        {
+          "from": "return Err(\"invoice_company_object_absent\");",
+          "to": "return Err(\"invoice_company_object_none\");"
+        }
+      ],
+      "mutation": "fd8cc7e112df23954c2566fd17371c64",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_is_one_company_bound_by_its_guid",
+      "killer_at": "this_commit"
+    },
+    "H93": {
+      "what": "parse_company_hsn: another code for a company mismatch",
+      "edits": [
+        {
+          "from": "return Err(\"invoice_company_object_mismatch\");",
+          "to": "return Err(\"invoice_company_object_other\");"
+        }
+      ],
+      "mutation": "7becc4740fb0be9a55ef0a18957d685a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_answer_carries_the_company_code_and_its_settings",
+      "killer_at": "base"
+    },
+    "H94": {
+      "what": "parse_company_hsn: a second company ignored",
+      "edits": [
+        {
+          "from": "let (Some(company), None) = (companies.next(), companies.next()) else {",
+          "to": "let (Some(company), _) = (companies.next(), companies.next()) else {"
+        }
+      ],
+      "mutation": "a2a568a6068ec9bfb6ea52fbcf97b619",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_is_one_company_bound_by_its_guid",
+      "killer_at": "this_commit"
+    },
+    "H95": {
+      "what": "parse_company_hsn: the GUID compared with its case",
+      "edits": [
+        {
+          "from": "if !guid.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)) {",
+          "to": "if !guid.is_some_and(|guid| guid == company_guid) {"
+        }
+      ],
+      "mutation": "36b174785738197a97db789590dcfc48",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_is_one_company_bound_by_its_guid",
+      "killer_at": "this_commit"
+    },
+    "H96": {
+      "what": "parse_company_hsn: a company with no GUID accepted",
+      "edits": [
+        {
+          "from": "if !guid.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)) {",
+          "to": "if !guid.is_none_or(|guid| guid.eq_ignore_ascii_case(company_guid)) {"
+        }
+      ],
+      "mutation": "18a87af1b59a04d689c9c669736b5a26",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_is_one_company_bound_by_its_guid",
+      "killer_at": "this_commit"
+    },
+    "H97": {
+      "what": "parse_company_hsn: a setting's date read from another element",
+      "edits": [
+        {
+          "from": "applicable_from: details.text_of(\"APPLICABLEFROM\")?,\n            priority:",
+          "to": "applicable_from: details.text_of(\"APPLICABLEFROMDATE\")?,\n            priority:"
+        }
+      ],
+      "mutation": "6f279b80e52428d5cc87e21b7eeeed8c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H98": {
+      "what": "parse_company_hsn: the priority read from another element",
+      "edits": [
+        {
+          "from": "priority: details.text_of(\"HSNSOURCEPRIORITY\")?,",
+          "to": "priority: details.text_of(\"HSNSOURCE\")?,"
+        }
+      ],
+      "mutation": "3200fe9b1c33b2404242317950114212",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_object_answer_carries_the_company_code_and_its_settings",
+      "killer_at": "base"
+    },
+    "H99": {
+      "what": "parse_company_hsn: the sections read from another element",
+      "edits": [
+        {
+          "from": "sections: details.text_of(\"HSNAPPLICABLESECTION\")?,",
+          "to": "sections: details.text_of(\"HSNSECTION\")?,"
+        }
+      ],
+      "mutation": "89cb159a12827584ee2bd163679d14cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H100": {
+      "what": "parse_company_hsn: the code length read from another element",
+      "edits": [
+        {
+          "from": "code_length: details.text_of(\"HSNCODELENGTH\")?,",
+          "to": "code_length: details.text_of(\"HSNLENGTH\")?,"
+        }
+      ],
+      "mutation": "972b917acd789afa64a9d2b4f9ddc4e1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H101": {
+      "what": "parse_company_hsn: company rows that cannot be read kept as none",
+      "edits": [
+        {
+          "from": "rows: hsn_rows(company)?,",
+          "to": "rows: hsn_rows(company).unwrap_or(None),"
+        }
+      ],
+      "mutation": "e0e231d07005d2cd147b18f9deecc4ef",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::the_company_row_is_read_whole_or_refused",
+      "killer_at": "this_commit"
+    },
+    "H102": {
+      "what": "parse_company_hsn: the classification setting read from another element",
+      "edits": [
+        {
+          "from": "classification_on: company.text_of(\"ISGSTCLASSIFON\")?,",
+          "to": "classification_on: company.text_of(\"ISGSTCLASSIF\")?,"
+        }
+      ],
+      "mutation": "0bb3f3d39aeff1e06198f07e82467845",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::a_row_with_an_unknown_element_or_no_content_is_flagged_so",
+      "killer_at": "base"
+    },
+    "H103": {
+      "what": "parse_company_hsn: the GST setting read from another element",
+      "edits": [
+        {
+          "from": "company.text_of(\"ISGSTON\")?",
+          "to": "company.text_of(\"ISGST\")?"
+        }
+      ],
+      "mutation": "d2d83bfde92cf3dde8b41129f1ae5c42",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::wire::hsn::tests::row_2162_gy_reads_the_company_gst_on_before_and_off_after",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "H24": {
+      "mutation": "ed0f800daf25178db4667def018b6a43",
+      "reason": "equivalent, unreachable: a row read as empty has no child, so hsn_rows gives it no date, and in_force refuses any list holding an undated item; a placeholder beside real rows therefore reaches NotMeasured through in_force whether or not this check is there. A change that lets an empty row carry a date, or lets in_force pass an undated item, reopens it"
+    },
+    "H35": {
+      "mutation": "2f592b7727e606e91ae6f002d4a31178",
+      "reason": "equivalent: a ledger whose read failed and a ledger with no rows give the same answer, as level_answer reads no rows as NotMeasured, which resolve_hsn refuses under the same code, invoice_sales_ledger_hsn_source_not_measured, before anything else is read. A change that gives a failed ledger read its own code, or reads no rows otherwise, reopens it"
+    }
+  }
+}

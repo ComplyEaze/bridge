@@ -21,7 +21,7 @@ type JournalDetails = {
 type JournalReview = {
   batchId: string;
   sha256: string;
-  company: { name: string; guid: string; companyNumber: string; booksFrom: string };
+  company: { name: string; shownName: string; guid: string; companyNumber: string; booksFrom: string };
   builtAt: string;
   dispatched: boolean;
   responseRecorded: boolean;
@@ -221,7 +221,7 @@ export function JournalPostingScreen({
           <section className="journal-primary-details" aria-labelledby="journal-details-heading">
             <h3 id="journal-details-heading">Journal</h3>
             <dl className="journal-review-details">
-              <div><dt>Company</dt><dd>{review.company.name}</dd></div>
+              <div><dt>Company</dt><dd>{review.company.shownName}</dd></div>
               <div><dt>Date</dt><dd>{displayJournalDate(review.details.date)}</dd></div>
               <div><dt>Reference</dt><dd>{review.details.reference || "None"}</dd></div>
               <div className="journal-narration"><dt>Narration</dt><dd>{review.details.narration || "None"}</dd></div>

@@ -5,8 +5,8 @@
 //! test-only seam, held open until a test answers it.
 use super::*;
 use crate::agent::agent_import::approval::{
-    ApprovalBinding, Begin, Joined, PostApprovals, PreviewForm, CALL_BUDGET, CALL_CEILING,
-    MAX_KEPT_REFUSALS, MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
+    ApprovalBinding, Begin, Joined, KeptRefusalCode, PostApprovals, PreviewForm, CALL_BUDGET,
+    CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
 use crate::agent::agent_protocol::{run_post, serve_stdio, Framer, ToolCallEnd};
 use crate::tally::agent_read_request::AgentReadRequest;
@@ -136,6 +136,16 @@ async fn a_click_between_calls_is_posted_by_the_next_call() {
 /// Answered only once a second call has taken the held dialog to wait on it,
 /// so the click lands inside that call's wait and never before it.
 async fn click_while_joined(server: &Server, batch_id: &str, scripted: &ScriptedApproval) {
+    answer_while_joined(server, batch_id, scripted, true).await;
+}
+
+/// `click_while_joined`, answered Yes or No.
+async fn answer_while_joined(
+    server: &Server,
+    batch_id: &str,
+    scripted: &ScriptedApproval,
+    approved: bool,
+) {
     tokio::time::timeout(Duration::from_secs(5), async {
         while !server.post_approvals.joined_for_test(batch_id) {
             tokio::time::sleep(Duration::from_millis(1)).await;
@@ -143,7 +153,7 @@ async fn click_while_joined(server: &Server, batch_id: &str, scripted: &Scripted
     })
     .await
     .expect("the second call joined the held dialog");
-    scripted.answer(true);
+    scripted.answer(approved);
 }
 
 /// A click that lands while a later call waits on the dialog is reported by
@@ -190,6 +200,33 @@ async fn a_click_during_a_joining_call_is_reported_and_posted_by_the_next() {
         &observed,
         post_at,
     );
+}
+
+/// A No given while a later call waits on the dialog is that call's own
+/// answer, not a kept one (#2516): it carries no `approval_answered_earlier`
+/// cause and no step, like a No given in the box a call opened itself. A
+/// waiting call's refusal is a plain code, so this pins the design.
+#[tokio::test]
+async fn a_decline_during_a_joining_call_carries_no_kept_cause() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+
+    let (declined, ()) = tokio::join!(
+        server.call_tool("post_import", args),
+        answer_while_joined(&server, &line.batch_id, &scripted, false)
+    );
+    let observed = sent(simulator);
+    let error = &result(&declined)["error"];
+    assert_eq!(error["code"], "import_approval_declined", "{declined}");
+    assert!(error.get("cause").is_none(), "{declined}");
+    assert!(error.get("next_step").is_none(), "{declined}");
+    assert_eq!(scripted.counts(), [1]);
+    assert_eq!(observed.len(), before_approval().len());
+    assert_eq!(intents(directory.path()), 0);
 }
 
 /// Answered in its call, but too late for the measured post to fit: the call
@@ -478,6 +515,26 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
     );
     assert_eq!(scripted.counts(), [1], "and was not asked again");
     assert_eq!(observed.len(), 2 * before_approval().len());
+    // #2516: only the kept No says it is one. The No given in its own call
+    // carries no cause and no step, and apart from the cause and step the two
+    // answers are byte-equal: same code, message and attempt_recorded.
+    let asked_error = &result(&declined)["error"];
+    assert!(asked_error.get("cause").is_none(), "{declined}");
+    assert!(asked_error.get("next_step").is_none(), "{declined}");
+    let mut kept_error = result(&again)["error"].clone();
+    assert_eq!(kept_error["cause"], "approval_answered_earlier", "{again}");
+    assert_eq!(
+        kept_error["next_step"].as_str(),
+        crate::agent::refusal_remediation("approval_answered_earlier"),
+        "{again}"
+    );
+    let kept = kept_error.as_object_mut().unwrap();
+    kept.remove("cause");
+    kept.remove("next_step");
+    assert_eq!(&kept_error, asked_error);
+    for field in ["attempt_recorded", "dispatch_response"] {
+        assert_eq!(result(&again)[field], result(&declined)[field], "{field}");
+    }
 }
 
 /// An approval's time runs from the click, not from whichever call collects
@@ -903,7 +960,7 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
     // Its own batch's next call reads why, and is not asked again.
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_unavailable"
+        Begin::Refused(code) if code.code() == "import_approval_unavailable"
     ));
 }
 
@@ -946,7 +1003,7 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
     );
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_declined"
+        Begin::Refused(code) if code.code() == "import_approval_declined"
     ));
     assert!(
         matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
@@ -965,6 +1022,42 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
         matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "nothing is left held"
     );
+}
+
+/// Every kept refusal, a timeout and an unanswered end as well as a No, keeps
+/// its own code and carries the kept cause, whose step both tools give (#2516).
+/// A plain code made into a failure carries no cause, as before. The kept
+/// timeout is pinned here only: no scripted dialog times out, and none was
+/// seen live.
+#[test]
+fn a_kept_refusal_keeps_its_code_and_carries_the_kept_cause() {
+    for code in [
+        "import_approval_declined",
+        "import_approval_timed_out",
+        "import_approval_unavailable",
+        "master_approval_declined",
+        "master_approval_timed_out",
+    ] {
+        let failure = crate::agent::ToolFailure::from(KeptRefusalCode::kept_for_test(code));
+        assert_eq!(failure.code, code);
+        assert_eq!(failure.cause, Some("approval_answered_earlier"), "{code}");
+        let step = crate::agent::remediation_for(code, failure.cause).unwrap();
+        assert_eq!(
+            Some(step),
+            crate::agent::refusal_remediation("approval_answered_earlier"),
+            "{code}"
+        );
+        assert!(step.contains("same batch_id"), "{step}");
+        // The ruling's two other claims: no box was shown in this call, and
+        // nothing was sent.
+        assert!(
+            step.starts_with("This call showed no approval box."),
+            "{step}"
+        );
+        assert!(step.contains("Nothing was sent."), "{step}");
+        let plain = crate::agent::ToolFailure::from(code.to_string());
+        assert_eq!(plain.cause, None, "{code}");
+    }
 }
 
 /// Kept refusals age out with the approval limit, and past the cap the oldest
@@ -1004,7 +1097,7 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     for kept in [batch(1), batch(MAX_KEPT_REFUSALS)] {
         assert!(matches!(
             approvals.begin(&kept),
-            Begin::Refused(code) if code == "import_approval_declined"
+            Begin::Refused(code) if code.code() == "import_approval_declined"
         ));
     }
 }
@@ -2922,7 +3015,7 @@ async fn revoke_unredeemed_takes_only_a_given_untaken_approval_of_its_batch() {
     approvals.revoke_unredeemed(&line.batch_id, "post_refused_before_intent");
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_declined"
+        Begin::Refused(code) if code.code() == "import_approval_declined"
     ));
 
     // An approval a call has taken is not withdrawn from under it.
@@ -4254,7 +4347,7 @@ async fn a_second_refusal_of_a_batch_replaces_the_first() {
     }
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_declined"
+        Begin::Refused(code) if code.code() == "import_approval_declined"
     ));
     assert!(
         matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
@@ -4298,7 +4391,7 @@ async fn a_refusal_past_its_time_pushes_no_live_one_out() {
     assert!(
         matches!(
             approvals.begin(&batch(0)),
-            Begin::Refused(code) if code == "import_approval_declined"
+            Begin::Refused(code) if code.code() == "import_approval_declined"
         ),
         "the oldest live refusal is still kept"
     );

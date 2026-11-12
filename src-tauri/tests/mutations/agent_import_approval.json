@@ -51,7 +51,7 @@
     },
     "equivalent": {
       "tool": 0,
-      "hand": 3
+      "hand": 4
     }
   },
   "tool_results": {
@@ -2454,7 +2454,7 @@
   "accepted_survivors": {
     "P032": {
       "mutation": "b80c0e44376733789c2cf553ab8064ea",
-      "reason": "not killed: the cap test counts to MAX_KEPT_REFUSALS itself, so a changed cap moves the test with it. The number is a size bound on memory, not a behaviour a test should pin as a literal"
+      "reason": "not killed: MAX_KEPT_REFUSALS bounds two things, the kept refusals (keep_refusal) and the batches whose listed box did not fit (note_listed_did_not_fit), so the mutant moves both. Every test that reaches either cap counts to MAX_KEPT_REFUSALS by name (kept_refusals_age_out_and_the_oldest_goes_past_the_cap for the refusals, a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered for the notes), so a changed cap moves the tests with it. Each number is a size bound on memory with no documented value, not a behaviour a test should pin as a literal"
     },
     "P036": {
       "mutation": "54f9b6a620df550c624f74a34e54499b",
@@ -2466,7 +2466,7 @@
     },
     "P085": {
       "mutation": "852fc775397aa8281f2bc50886db5867",
-      "reason": "not killed: a voucher-kind approved request held beside a master binding and a master held request must also send exactly the master request's bytes to pass held_matches_approved, and no test seam builds such an approval. The check is kept as the first, kind-only test of the same refusal"
+      "reason": "equivalent while voucher_count tells the kinds apart: an approved request's voucher_count is Some only for vouchers and None for masters, as the binding's is, so a request of the other kind than the fresh binding always fails request.voucher_count() != fresh.voucher_count() in the same condition, with the same code and note, in either direction. voucher_count carries the kind only incidentally (post_kind decides it), so a voucher_count that stops telling the kinds apart reopens it, and no test would then fail"
     },
     "P125": {
       "mutation": "e2f0aa8c0c7609feb13b5990420b0676",

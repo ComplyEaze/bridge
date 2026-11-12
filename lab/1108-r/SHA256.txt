@@ -1,14 +1,26 @@
-# sha256  bytes  file  (LAB-COMMON.md, check-request-ids.py, check_1108.py, .gitattributes and requests/* byte-equal to lab/1108-a2-partial-landing at 02b20332; batches/r0.json byte-equal to its batches/p2.json, r1.json and r2.json its three objects reordered; relay-keep.py and check-relay-keep.py made from its relay.py and check-relay.py)
+# sha256  bytes  file  (LAB-COMMON.md, check-request-ids.py, .gitattributes and requests/* byte-equal to lab/1108-a2-partial-landing at 02b20332; batches/r0.json byte-equal to its batches/p2.json, r1.json and r2.json its three objects reordered; relay-keep.py, check-relay-keep.py and check_1108.py made from its relay.py, check-relay.py and check_1108.py; helpers/ from A2 sitting 2's helpers as RUN-SHEET.md's The files lists)
 f50b500ac7ddb47b8fbf83724776360fd559a27996b047ed134226093f27014e  67  .gitattributes
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
-dba83c757893c50a394cec1259b01b1e8bcfb36985ea7051fca5121a37d4580c  26204  RUN-SHEET.md
+8e1a70dcd5839e3ff96b5fc00aca6d5d6082c7bdedc6801ded13fb49846526c6  33847  RUN-SHEET.md
 d87c28629ce5701317bf1bde79e183ab0b9404f36c5bae33ff9bcf3a28982e7d  690  batches/r0.json
 bb1a568c204f4bb74c1ffbfab8c7c27d38041f5724a601e9426523623d7cee90  690  batches/r1.json
 f79836aa915ed3a42c96e56a9e634139c4ab90275b70a9db8053ce9b23545fd2  690  batches/r2.json
-c5c98647f5c63964c61d62fa5b165eb26818b1530eb6911f3cb7d441ee325bce  4822  check-exchanges.py
+8d45af6d19f41b97ef286e7e13772af23645bf336e1e0b585ec12a0ced803d5d  7167  check-exchanges.py
 6f93e15a5aa2c3862ab4ec431d15cb728d59ceb6d3cdbb45a6da823bfe5fc60c  8748  check-relay-keep.py
 8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
-0898e7c15cfefb9a9ff14e3f1e07e5eea818e342afe75f43c14992fff9146436  5360  check_1108.py
+9e0a3cb8876332dafa92dd78619654b8dd89fc5579b4df676801c9e64b30b3c3  7165  check_1108.py
+f6babb05b0c395f30cda43013f4433432d09c6c411fa1801e79dc01ad70acd05  1247  helpers/args1108.py
+2143b91c20d2d73887965191667ac53f807020519726544065fb1deafb4b6ebd  1354  helpers/body.py
+550fc11f53a495c6a34a5b9ab6f17b4f4fe574bb778a7a023d44e02d9dc0bfb3  7322  helpers/box.ps1
+ee234e950f1b3d200079e2f8569dd423d56f744f42423bdca8ce15d9e084ea68  4137  helpers/boxcheck.py
+d72843b382d76371fd07c11efdafe2a1d031e5fd3e203b7baba3a5c7a1ef6c67  2770  helpers/call.py
+dce4983403c94e19899cc5c8e3fa45c0b467ed50bfce70f600ac0f1b1226e8f5  1073  helpers/cap.py
+1a326a4ccd5494842ebad1c243286ade4a9a4e75e45c3ddf9e93acbda531a655  1249  helpers/capwin2.ps1
+47c863836580af7ebc494464ebf677dba4d0d209bc5e879b4b118dc5d5d6c7ef  2444  helpers/chk.py
+51c2bb22bafd1b4c78a356b4ad8764f028814e073aa9626dae2b463b0db57411  537  helpers/front.ps1
+3c3a45045d126112fd3b1fef2bccf65266e79b64fd8048b5ccf7b7ed1c5a3739  6974  helpers/p1108s2.py
+9971d42c31c28051934184a8e0e595106801878504504c6a3aee4657bfd61bd5  3279  helpers/send.py
+e4f1b295459b76ba47a30968e29dc98263436c54422e939dfae3a0cc98f65416  1550  helpers/show.py
 ca2c0018e9f4ddb09d4abbeac869a076a4ca0760265db934f1bbceffb15c2117  10024  relay-keep.py
 7146a97fb35faeed0df69dc208f0999e4549433819030011f63fc7d1523585b2  1154  requests/flags.utf16le.xml
 6b8bda84c414413acccf231e0c295aa3a4aab9bb9d844b0bab9c1316684421f0  1124  requests/ledgers.utf16le.xml
@@ -18,4 +30,5 @@ a03151bf69b06e173ee49dbff63e355a5b5684796aee132f701bf2f76820c507  1822  requests
 0072f0ada6ca24e8855195545ad9e0cb7d2d0e52f44cfc8fcf7f9c65b2e9207d  1032  requests/w1-stock-ledger.utf16le.xml
 9bb8f7a4aad86679164beae28d69d3cba6738924c42030ef3490e57d79dfff6b  1012  requests/w2-capital-ledger.utf16le.xml
 a302d01d102239f4fe7cd9ecfcec0db97460bdb6a1a0afadf8fcad4d9be14929  1016  requests/w3-expense-ledger.utf16le.xml
-902ae1912fa4b0f04ab2b81471b914af54ea240d7ca1d77e9bb413fe6561af30  5374  test-exchanges.py
+2c353d23aec552a4030346453ab1b2819730f41afc362feef3eed66e71899819  4594  setup-r.py
+46f3a43151b5fc6f8df908d3331e4acc09a6a6460fe77ee64e4c35458b71cffe  7786  test-exchanges.py

@@ -1,12 +1,14 @@
 # Lab rows 1108-R0, R1 and R2: row P2 again with Bridge's own reads kept whole, then with its refused voucher first, then last, each through `post_import`. SYNTHETIC COMPANY ONLY. Not for merge.
 
-Part of #1108. Written 11 Nov 2026 from master de54a0f2. About 110 minutes. R0's EXPECT is row
+Part of #1108. Written 11 Nov 2026 from master de54a0f2, amended 12 Nov 2026 after an independent
+read (the build line, the helpers, the checkers, the keys). About 110 minutes. R0's EXPECT is row
 1108-A2's P2 as it ran (`lab/1108-a2-partial-landing-answers` at ebf70249; confidence: partial, one
 run). Where R1 and R2 go beyond it, the EXPECT is from reading the code (confidence: unverified)
 until this row runs. A different status is a result, and is recorded; only the STOP RULES stop the
 row.
 
-`SHA256.txt` lists every file here with its bytes; check it before step 0.
+`SHA256.txt` lists every file here with its bytes and sha256. Step 0 checks it first, by
+`setup-r.py`, before anything is sent or keyed: before LAB-COMMON C2's `GET /status` and m0.
 
 ## Why
 
@@ -53,9 +55,10 @@ Differences from LAB-COMMON, as A2 ran them (the stricter rule holds everywhere 
    counters for a post are recorded and checked against the EXPECT table, and they never stop the
    row by themselves.
 3. **Who answers the box.** The lab answers Bridge's approval box itself, by mouse on the box's own
-   button, through A2 sitting 2's helpers byte for byte (`p1108s2.py` sha256 59b4554f, with
-   `boxcheck.py` and `box.ps1` as A2's answers list them). The rule is A2's Difference 3 as the run
-   lead corrected it before A2's first write. Yes only if all of these hold:
+   button, through this sheet's `helpers/`: A2 sitting 2's `p1108s2.py` (sha256 59b4554f),
+   `boxcheck.py` and `box.ps1`, with only their folders changed, as The files lists them. The rule
+   is A2's Difference 3 as the run lead corrected it before A2's first write. Yes only if all of
+   these hold:
    - exactly one line of the box begins `Create `, and that whole line is
      `Create 3 vouchers in "BRIDGE STOCK CREATE LAB"` (`agent_import_post.rs:4058`);
    - the whole lines `Company GUID: <THE COMPANY's GUID>` and `Batch: <the batch id this build
@@ -65,12 +68,28 @@ Differences from LAB-COMMON, as A2 ran them (the stricter rule holds everywhere 
 
    `boxcheck.py` is given count `3` and total `66` for every row. Per-voucher lines are not checked;
    in R1 the stock leg's line comes first. A box that fails any of these: Decline, record its text
-   whole, and STOP. The helpers' row names are `r0`, `r1` and `r2`. A helper that must change for
-   them is a new file with its own sha256, written whole by an editor with no shell heredoc (A2
-   sitting 2, rule 1), and named in the notes.
+   whole, and STOP. The helpers' row names are `r0`, `r1` and `r2`. They run as `helpers/` holds
+   them, copied into the row folder by `setup-r.py`. A helper that differs from its `SHA256.txt`
+   line, or any change made to one at the lab, is a STOP.
 4. **Keys and processes.**
    - Keys are pressed in Tally only to load, back up, restore and shut THE COMPANY (C1, C5, C6,
-     C10). Menus are opened by mouse click.
+     C10). Menus are opened by mouse click. Each is made as A2 sitting 2 made it on TallyPrime
+     1.1.7.2 (its notes, 11 Nov), and the notes record each key and click as made:
+     - **Load** (C1): at Select Company, type `BRIDGE STOCK CREATE LAB` to filter. EXPECT one row;
+       press Enter.
+     - **Backup** (C5): click Data, then Backup & Restore, then Backup. The path field shows `C:\`:
+       press Backspace, choose Specify Path and type the step's folder. Type
+       `BRIDGE STOCK CREATE LAB` to filter; EXPECT one row; press Enter; click End of List; press
+       Enter. At `Accept ?` press `y`.
+     - **The backup's done message**: A2 saw none. Tally went back to the Gateway with no other
+       prompt, and the folder listing after (C5) is the proof. If a message that only says the
+       backup is done appears: screenshot it and press Enter once (C5's accept once; the key is
+       not yet observed: confidence unverified). Any other prompt: C7.
+     - **Restore** (C6): click Data, then Backup & Restore, then Restore. Restore Data Path is
+       Tally's data folder; choose Specify Path and type the backup's folder. EXPECT THE COMPANY
+       with its number and the backup's date and time; press Enter; click End of List; press
+       Enter. At `Accept ?` press `y`; at C6's folder-exists prompt choose Replace.
+     - **Shut** (C6, C10): click Company, then Shut; press Enter on the one row.
    - If the coordinator rules that another key must be pressed (C7), run `front.ps1` first so
      Tally is in front. Never press Escape on a master, voucher or configuration screen.
    - No process is ended. At the end of each row, the client closes `bridge_mcp`'s input and the
@@ -85,7 +104,7 @@ Differences from LAB-COMMON, as A2 ran them (the stricter rule holds everywhere 
    Never call again once an attempt is recorded.
 7. **Size bound** for every raw read: 200,000 bytes.
 8. **Python.** The lab PC's `python` is run for this sheet's `python3`, always with `-I`.
-9. **An import's body.** The relay keeps each answer with its HTTP head. `body.py` (A2's) writes
+9. **An import's body.** The relay keeps each answer with its HTTP head. `body.py` (`helpers/`) writes
    the body alone, after checking it against CONTENT-LENGTH, for `check_1108.py import`. The relay's
    own files are never changed.
 
@@ -93,12 +112,29 @@ Licensed mode only; Education mode = STOP.
 
 ## Build
 
-**BUILD: `<to fill>`.** The coordinator fills this line with the artifact, its digest and
-`bridge_mcp.exe`'s sha256, from the build of master de54a0f2. **While this line reads `<to fill>`:
-STOP. Nothing is sent, step 0 included.**
+**Build line:** CI run 43008730655 of `ci.yml` (`schedule`, every job succeeded) on master commit
+`de54a0f26e554f574727a0bc4914b0ad6ca88583`. That commit's `push` run, 43008194011, skipped both
+bundle jobs, so it holds no Windows bundle. Artifact id 13850870591
+(`unsigned-bundle-smoke-windows-latest`), 60,529,312 bytes, GitHub digest
+`sha256:6385ae8446950765e4dfacd49e97babdf82fefc19b336e5241578a007c9fd3fe`, expiry
+2026-11-18T11:13:57Z. Inside it, `bridge-tally.mcpb` has sha256
+`b291ea38de06c0a36f80b707d0e6cc3bb92a8b05a41c7707f8ecf6ebde3c9f3c` and `bridge_mcp.exe`
+(`bin/x86_64-pc-windows-msvc/` in it) has sha256
+`ce96a872d7e60021f1cdbe26fb0708be0bacabe6bb731e7541838f248f5e3f9d`. Every value is as GitHub
+reports it, and nothing was downloaded to fill this line: the runs and the artifact from the
+Actions API, and the two sha256s from the log of that run's job `Bundle smoke (windows-latest)`
+(job 130482763267), which prints `mcpb-smoke.json` whole. If the artifact has expired by the
+sitting: STOP; the build is not remade here.
 
-Check the artifact and its digest, and `bridge_mcp.exe` against `mcpb-smoke.json`, before the first
-call. Either differing is a STOP. Record the exe's sha256 before the first row and after the last.
+`mcpb-smoke.json` comes from the same job: its step runs `check_mcpb_bundle` on
+`bridge-tally.mcpb` and writes the file into `src-tauri/target/release/bundle/`, and the upload
+step puts that folder in the artifact. So the file is in the zip beside `bridge-tally.mcpb`. Its
+`archive_sha256` is the `.mcpb`'s and its `binary_sha256` is the `bridge_mcp.exe` the checker
+took from the `.mcpb`.
+
+At step 0, before the first call: the zip's sha256 must equal the digest, and `bridge-tally.mcpb`'s
+and `bridge_mcp.exe`'s must equal this line and `mcpb-smoke.json`. Any one differing is a STOP.
+Record the exe's sha256 before the first row and after the last.
 Every line number in this sheet is at de54a0f2.
 
 Each row starts its own `bridge_mcp` over stdio, through the relay, with:
@@ -110,11 +146,15 @@ Each row starts its own `bridge_mcp` over stdio, through the relay, with:
 - `BRIDGE_AGENT_REDACTION` unset, so Tally's `LINEERROR` text is kept in the answer (`agent.rs:487`).
 
 A row's data folder is its own so that no row's reads or verdicts lean on an earlier row's journal:
-after a restore, the book no longer holds the vouchers that journal names. That is the one launch
-difference from A2, whose P2 ran in the process and data folder that P1 had used.
+after a restore, the book no longer holds the vouchers that journal names. For the same reason each
+row's client runs in a folder of its own, `C:\bridge-lab\1108r\agent-run-rk`, which `setup-r.py`
+makes with an empty inbox: no row's client meets an earlier row's calls. Those are the two launch
+differences from A2, whose P2 ran in the process, data folder and client folder that P1 had used.
 
 The client is the lab's stdio client of 852-C1, as A2 ran it: no cancel, and no call limit under
-10 minutes.
+10 minutes. Each tool call is made from the row folder as
+`python -I -X utf8 call.py agent-run-rk <label> <tool> calls\<argument file>`, with the argument
+files `args1108.py` writes.
 
 ## The files
 
@@ -129,9 +169,15 @@ The client is the lab's stdio client of 852-C1, as A2 ran it: no cancel, and no 
   | R2 | `b1108-p2-1` | `b1108-p2-3` | `b1108-p2-2` |
 
   All are Journals dated 14-Apr-2025, as P2's were.
-- `check_1108.py` and `check-request-ids.py`: A2's, byte for byte. `check_1108.py`'s modes are
-  `marks`, `import`, `rows` and `diff BEFORE AFTER`. A read that failed prints `NOT READ` and exits
-  1; that is never "nothing" or "no change".
+- `check-request-ids.py`: A2's, byte for byte.
+- `check_1108.py`: A2's (sha256 0898e7c1), made to fail closed. Its modes are `marks`, `import`,
+  `rows` and `diff BEFORE AFTER`. An export answer must be an ENVELOPE with `HEADER/STATUS` 1 and
+  exactly one `BODY/DATA/COLLECTION`, and `marks` needs exactly one COMPANY row. An import answer
+  must be a RESPONSE holding every counter, as each import answer A2 kept is. An answer read but not
+  so prints `FAIL` and exits 1. A file that is missing, empty, of odd length or does not parse prints
+  `NOT READ` and exits 2. Neither is ever "nothing" or "no change". Run here on macOS on A2's kept
+  answers (a made-up GUID in place of `<company guid>`) and on copies each broken one way: 20 of 20
+  as expected, where A2's own fails 13.
 - `relay-keep.py`: A2's `relay.py` (sha256 80ffdb20) with one change. Every request and answer, not
   only an import's, is kept whole as `x-N.request` and `x-N.answer`, N counting every request it
   serves, from 1. An import is kept as `import-N` as well, as before. `relay.jsonl` gains `x` on
@@ -139,14 +185,39 @@ The client is the lab's stdio client of 852-C1, as A2 ran it: no cancel, and no 
 - `check-relay-keep.py`: A2's `check-relay.py` (sha256 9a806848) with its read check turned round
   (a read is kept whole) and four checks added for the `x-N` files. Run here on macOS before this
   sheet was sent: `0 failed` on `relay-keep.py` (24 checks), and 5 failed on A2's `relay.py`.
-- `check-exchanges.py RELAYDIR [FIRST LAST]`: checks a relay folder after a row. For every logged
-  exchange from FIRST to LAST, both `x-N` files must exist and each body's size and sha256 must
-  equal the log's. It lists each exchange's `TALLYREQUEST`, `TYPE` and `ID`, parsed from the
-  request's own HEADER, and ends `exchanges: ok N, FAIL 0` with exit 0, or exits 1. A folder or log
-  it cannot read prints `NOT READ`, never "0 exchanges".
-- `test-exchanges.py`: tests `check-exchanges.py` against folders `relay-keep.py` wrote, as written
-  as written, over a range, and in seven cases that must fail. `0 failed` (10 tests) here on macOS
-  before this sheet was sent.
+- `check-exchanges.py RELAYDIR [FIRST LAST]`: checks a relay folder after a row. A range that holds
+  no exchange (FIRST above LAST, or below 1) fails, never `ok 0`. For every logged exchange from
+  FIRST to LAST, both `x-N` files must exist and each body's size and sha256 must equal the log's.
+  Each request is read from its own bytes. A bodiless `GET /status`, Bridge's status probe (240 of
+  the 644 requests in A2 sitting 2's relay log), is listed as such. Any other must be a POST whose
+  HEADER parses, listed by its `TALLYREQUEST`, `TYPE` and `ID`; a HEADER that does not parse fails.
+  An import's `import-M` files must be byte-equal to its `x-N` files, and an `import-M` the log does
+  not name fails. It ends `exchanges: ok N, FAIL 0 (x-FIRST to x-LAST), imports K` with exit 0, or
+  exits 1. A folder or log it cannot read prints `NOT READ`, never "0 exchanges".
+- `test-exchanges.py`: tests `check-exchanges.py` on a folder `relay-keep.py` wrote from five
+  requests (three reads, a bodiless `GET /status` and an import): as written, over a range, and in
+  twelve cases that must fail. `0 failed` (17 tests) here on macOS before this sheet was sent; the
+  earlier `check-exchanges.py` fails 7 of them.
+- `helpers/`: the helpers A2 sitting 2 ran (its answers branch, `sitting-2/scripts/`), each rebuilt
+  to the sha256 A2 recorded, then changed only as below. Each file's first comment line says what
+  changed.
+  | File | A2's sha256 | Change |
+  |---|---|---|
+  | `p1108s2.py` | 59b4554f | the row folder; each row's client folder is its own `agent-run-rk`, not one `agent-run` |
+  | `args1108.py` | 0720ecb2 | the row folder; batches from `lab/1108-r/batches/` |
+  | `send.py` | f09dbccb | the row folder; the requests and `SHA256.txt` are this sheet's own, from `lab/1108-r/`; A2's `r2-sha.txt` branch is removed |
+  | `chk.py` | a34cc6ae | the row folder; `check_1108.py` from `lab/1108-r/`; its STOP line says `NOT READ` for exit 2 and `FAIL` for exit 1 |
+  | `boxcheck.py`, `cap.py`, `body.py` | 8c4df2bc, 20e3ce55, d0e09211 | the row folder only |
+  | `box.ps1`, `call.py`, `show.py`, `capwin2.ps1`, `front.ps1` | 550fc11f, d72843b3, e4f1b295, 1a326a4c, 51c2bb22 | none: byte for byte |
+
+  The row folder is `C:/bridge-lab/1108r`. The stdio client, `client.py` (1392-E's, sha256
+  0ed0bb03), stays on the lab PC, as for A2.
+- `setup-r.py`: makes the row folder `C:\bridge-lab\1108r` from this folder, as A2's `setup2.py`
+  made its own. It first checks every file here against `SHA256.txt`, and that no other file is
+  here, and makes nothing if one differs. It copies this folder whole to `lab\1108-r`, `helpers/`
+  into the row folder, THE COMPANY's `guid.txt` and `company-number.txt` from
+  `C:\bridge-lab\1108a2s2`, and the client into each row's own `agent-run-r0`, `-r1` and `-r2`.
+  It makes no data, relay or backup folder, and refuses a row folder that already exists.
 
 ## The code admits each trigger (de54a0f2)
 
@@ -163,20 +234,30 @@ The client is the lab's stdio client of 852-C1, as A2 ran it: no cancel, and no 
 ## Steps
 
 One at a time. Every answer goes to a file. A file with no answer is a failed step, not an empty one.
+Each raw request is sent from the row folder by `send.py <label> <request file>`, and each answer is
+read by `chk.py <name> <mode> <answer file>`, which runs `check_1108.py`.
 No step asks for a read of an empty day to be complete: the raw reads here are of the whole book.
 
-0. **LAB-COMMON step 0.**
-   - The Build line does not read `<to fill>`, else STOP.
-   - Load THE COMPANY alone.
-   - **m0**, marks: EXPECT one COMPANY row, with M 210 and no `ALTVCHID`. Any other value: record it
-     and STOP.
-   - Record TallyPrime's release and edition as the screen shows them.
-   - Check every file against `SHA256.txt`. Then run, keeping each whole output:
+0. **Before anything is sent or keyed**, in this order:
+   - **The build**, as the Build section says: the artifact not expired, the zip's sha256 equal to
+     the digest, and `bridge-tally.mcpb`'s and `bridge_mcp.exe`'s equal to the Build line and to
+     `mcpb-smoke.json`. Else STOP.
+   - **The files**: `python3 -I setup-r.py`, from this sheet's folder, keeping its whole output.
+     EXPECT `files: ok 33, FAIL 0` and `setup: ok`. Anything else: STOP.
+   - From the row folder's `lab\1108-r`, run, keeping each whole output:
      - `python3 -I check-request-ids.py requests`: EXPECT `census: ok 4, skipped 4, FAIL 0`;
      - `python3 -I check-relay-keep.py relay-keep.py`: EXPECT `0 failed`;
      - `python3 -I test-exchanges.py relay-keep.py check-exchanges.py`: EXPECT `0 failed`.
-   - Self-test `box.ps1` with the helper's own argument list (`p1108s2.py selftest`), as A2 sitting
-     2 did. EXPECT its watch start line, no box seen, exit 3 and no console output.
+   - From the row folder, `python -I -X utf8 args1108.py fixed`.
+   - Self-test `box.ps1` with the helper's own argument list
+     (`python -I -X utf8 p1108s2.py selftest selftest-r`), as A2 sitting 2 did. EXPECT its watch
+     start line, no box seen, exit 3 and no console output.
+
+   Then **LAB-COMMON step 0** (C2):
+   - Load THE COMPANY alone (Difference 4).
+   - **m0**, marks: EXPECT one COMPANY row, with M 210 and no `ALTVCHID`. Any other value: record it
+     and STOP.
+   - Record TallyPrime's release and edition as the screen shows them.
    - **Nothing listens on port 9003.** This read changes nothing:
      `netstat -ano -p tcp | findstr ":9003"`, with its whole output kept. EXPECT no line whose local
      address ends in `:9003`. Any such line, or a netstat that does not run: record it and STOP.
@@ -191,8 +272,9 @@ No step asks for a read of an empty day to be complete: the raw reads here are o
    - Every GUID must begin with THE COMPANY's, else STOP.
 
 2. **BK-0** (C5), before the item's first change, into the new empty folder
-   `C:\bridge-lab\1108r\backups\bk0\`. Record its name, bytes and sha256, then one `marks`. BK-0 is
-   the way back to the START book (step 8) and the fallback for a STOP.
+   `C:\bridge-lab\1108r\backups\bk0\`. Record its name, bytes and sha256, then one `marks`: EXPECT
+   V and M equal to m0's, else STOP (STOP RULES: a mark that moves across a backup). BK-0 is the way
+   back to the START book (step 8) and the fallback for a STOP.
 
 3. **W1, W2, then W3.** For each one:
    1. `marks` (C3);
@@ -204,7 +286,8 @@ No step asks for a read of an empty day to be complete: the raw reads here are o
    EXPECT `CREATED 1` and one row ADDED with the sent name and parent. Anything else: STOP, because
    every post needs all three.
 
-4. **S0, the seed.** Send it the same way, then `marks` and `vouchers`, and `diff` `vouchers`.
+4. **S0, the seed.** Send it the same way, then `marks` and `vouchers`. `diff` that `vouchers`
+   against step 1's START `vouchers`, the last `vouchers` read before it (step 3 reads only `ledgers`).
    - EXPECT `CREATED 1`, the COMPANY row now carrying an `ALTVCHID`, and one voucher ADDED:
      Cash Dr 200.00, A1 Capital Cr 200.00, 10-Apr-2025.
    - Record that ALTVCHID as **V0** and the master mark as **M1**. A2 read V0 1 and M1 213 in both
@@ -212,9 +295,11 @@ No step asks for a read of an empty day to be complete: the raw reads here are o
 
 5. **BK-R**, the row backup, by C5's procedure, into the new empty folder
    `C:\bridge-lab\1108r\backups\bkr\`. Record its name, bytes and sha256. Then send `marks`,
-   `ledgers` and `vouchers`: these are the **BASELINE**. EXPECT the COMPANY row with V0 and M1, the
-   ledgers of step 3's last read, and S0 as the only voucher. Each `diff` against step 4's last reads
-   shows no row ADDED, REMOVED or CHANGED, else STOP.
+   `ledgers` and `vouchers`: these are the **BASELINE**. EXPECT the COMPANY row with V0 and M1 (a
+   mark that moved across the backup is a STOP), the ledgers of step 3's last read, and S0 as the
+   only voucher. `diff` the BASELINE `ledgers` against step 3's `ledgers` after W3, and the BASELINE
+   `vouchers` against step 4's `vouchers` after S0: each shows no row ADDED, REMOVED or CHANGED,
+   else STOP.
 
 6. **The relay.** Start `python -I relay-keep.py 9003 9001 C:\bridge-lab\1108r\relay` in a
    background task of its own. It stays up for the whole item. It refuses a folder that is not
@@ -223,14 +308,15 @@ No step asks for a read of an empty day to be complete: the raw reads here are o
 7. **R0, R1, then R2.** For each row Rk, in that order:
    1. **xk-first**: the highest N among the relay folder's `x-N.request` files, 0 if none. Record it.
    2. A listing shows `C:\bridge-lab\1108r\agent-rk` absent. Start `bridge_mcp` as Build says, with
-      that folder.
+      that folder, and its client in `agent-run-rk`.
    3. `list_companies`: EXPECT THE COMPANY's GUID. `tally_status`, with no argument: record the
       release, licence and mode. `masters` with `kind=voucher_types`: record the Journal row's
       `series_numbering.method` and `sub_method`. EXPECT `automatic` and `auto_retain`. Any other:
       STOP; this row alters no type.
    4. **mk-start**, marks on 9001: EXPECT the COMPANY row's GUID, V and M equal to the BASELINE's.
       Anything else: STOP.
-   5. `build_import_xml` with `{"company_guid": <GUID>, "vouchers": <batches/rk.json>}`. Keep the
+   5. `build_import_xml` with `{"company_guid": <GUID>, "vouchers": <batches/rk.json>}`, from the
+      file `args1108.py build rk` writes (`calls\args-build-rk.json`). Keep the
       whole answer, and record the batch id, `voucher_count` (EXPECT 3) and every warning. A
       refusal: keep it and STOP.
    6. With the helper, `p1108s2.py rk <batch id> 3 66 <BASELINE vouchers answer>`: **mk-before**
@@ -250,14 +336,15 @@ No step asks for a read of an empty day to be complete: the raw reads here are o
       present.
    8. `check_1108.py rows` on that `vouchers` answer: record each ADDED voucher's GUID, MASTERID,
       ALTERID, VOUCHERNUMBER, amount and narration. Then `check_1108.py import` on the body of the
-      row's `import-N.answer` (Difference 9): its counters must agree with the post's
+      row's `import-N.answer`, as `body.py N` writes it (Difference 9): its counters must agree with
+      the post's
       `dispatch.response.outcome`.
    9. `egress_log`: the whole answer. Close the client, so `bridge_mcp` exits by itself; record its
       exit code.
    10. **xk-last**: the highest N, as in 7.1. Run
        `python3 -I check-exchanges.py C:\bridge-lab\1108r\relay <xk-first + 1> <xk-last>` and keep
-       its whole output. EXPECT exit 0, `FAIL 0`, and a count of `xk-last − xk-first`. A FAIL or
-       `NOT READ` is a pause (7.11).
+       its whole output. EXPECT exit 0, `FAIL 0`, a count of `xk-last − xk-first`, and `imports 1`.
+       A FAIL or `NOT READ` is a pause (7.11).
    11. Check the row's lines of the EXPECT table below. A counter, mark, status or check that
        differs: record it, and report to the coordinator before the restore. That is a pause, not a
        STOP.
@@ -287,7 +374,7 @@ statuses are from the post's answer and then `verify_import`. The ids are from `
 | Id | Row | Counter | Mark and ids | Status |
 |---|---|---|---|---|
 | E-R0 | R0 | CREATED 2, EXCEPTIONS 1, every other counter 0, LASTVCHID V0 + 2; one `LINEERROR` naming `A1 Closing Stock` (recorded only: no verdict reads it) | V = V0 + 2, M = M1; two vouchers ADDED against the BASELINE: `Row 1108-P2 first` 21.00, then `Row 1108-P2 third` 23.00, each MASTERID, ALTERID and VOUCHERNUMBER one and two above S0's, in that order (A2's P2: 2 and 3) | `b1108-p2-1` and `b1108-p2-3` read `matching_content_observed` with attribution `not_established`, in the post and in `verify_import`; **neither reads `posted_verified`**; `b1108-p2-2` reads `sent_not_attributed`, with the neutral next step for an unclean answer (`agent_import_verification.rs:1001`); `post_span_binding` refused with `span_counters_not_clean` (`agent_import_span_identity.rs:189`, `:210`); `error.code` `import_reconciliation_required` (`agent_import_post.rs:2318`); `response_state` `response_not_clean` (`:2353`) |
-| E-X | R0, R1, R2 | (none) | (none) | `check-exchanges.py` for the row: exit 0, `FAIL 0`, a count of `xk-last − xk-first`; the row's import is among them, and its `import-N` files are byte-equal to its `x-N` files |
+| E-X | R0, R1, R2 | (none) | (none) | `check-exchanges.py` for the row: exit 0, `FAIL 0`, a count of `xk-last − xk-first`, and `imports 1`: the row's one import, listed `(import-M, byte-equal)`, its `import-M` files checked byte-equal to its `x-N` files by `check-exchanges.py` itself |
 | E-R1 | R1 | as E-R0 | as E-R0: the voucher sent first takes no MASTERID, ALTERID or VOUCHERNUMBER | as E-R0, voucher by voucher by `bridge_txn_id` |
 | E-R2 | R2 | as E-R0 | as E-R0: the voucher sent last takes none | as E-R0, voucher by voucher by `bridge_txn_id` |
 | E-ORD | R1, R2 | (as E-R1, E-R2) | `check_1108.py diff` of R0's post `vouchers` answer against R1's, and against R2's, shows no row ADDED or REMOVED: the same two GUIDs, whatever the order sent. Each has the same MASTERID, ALTERID, VOUCHERNUMBER, DATE, NARRATION and entries as in R0. Any other field that differs is recorded by name: no earlier row created the same voucher twice, so which other fields stay equal is not known | (as E-R1, E-R2) |
@@ -298,9 +385,11 @@ refusal at the end changes LASTVCHID, is what those rows measure.
 
 ## STOP RULES
 
-- The Build line reading `<to fill>`.
-- A file that differs from `SHA256.txt`; `check-request-ids.py`, `check-relay-keep.py` or
-  `test-exchanges.py` not as step 0 EXPECTs; a `box.ps1` self-test not as EXPECTed.
+- An expired artifact; a zip, `bridge-tally.mcpb` or `bridge_mcp.exe` whose sha256 is not as the
+  Build line says; an exe sha256 that changes during the item.
+- A file that differs from `SHA256.txt`, or `setup-r.py` not ending `setup: ok`;
+  `check-request-ids.py`, `check-relay-keep.py` or `test-exchanges.py` not as step 0 EXPECTs; a
+  `box.ps1` self-test not as EXPECTed.
 - C7 and C8. Any dialog on Tally's screen after a write, a post or a restore: screenshot it, press
   no key, report.
 - A box the helper does not pass, or any decline.
@@ -309,8 +398,9 @@ refusal at the end changes LASTVCHID, is what those rows measure.
   answer that does not parse or lacks a counter.
 - A Journal type that is not `automatic` with `auto_retain`.
 - A marks answer with other than one COMPANY row; a GUID that does not begin with THE COMPANY's.
-- A mark that moves in a step that sends no write, no post and no restore; mk-start that differs
-  from the BASELINE.
+- A mark that moves in a step that sends no write, no post and no restore, a backup step included
+  (BK-0 and BK-R). LAB-COMMON C5 only records a mark that moves across a backup; this sheet is
+  stricter there, and the stricter rule holds. mk-start that differs from the BASELINE.
 - A row's data folder that is not absent before its row.
 - The reads after a restore that are not as its step EXPECTs.
 - Any call with no answer in 10 minutes.

@@ -1,0 +1,1089 @@
+{
+  "file": "src-tauri/src/agent_import_cash_bank.rs",
+  "base_commit": "a8864cc9",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again).",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2309,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_cash_bank.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|cash|bank/)'",
+      "time": "2026-11-11T07:53:36Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 634,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/bank|cash|contra|suspense|statement/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5065,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5065, for the thirty hand-written mutants the filtered run missed (the tool's run missed none); none was caught there",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5071,
+      "command": "as the whole_set run, for the thirty still missed there",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 31,
+      "missed": 0,
+      "unviable": 1
+    },
+    "hand": {
+      "caught": 63,
+      "missed": 1
+    },
+    "survived_at_base": {
+      "tool": 0,
+      "hand": 30
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 1
+    },
+    "accepted_not_equivalent": {
+      "tool": 0,
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "152:9 replace Admission::gap -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "152:9 replace Admission::gap -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "190:9 replace CashBankState::is_known_money -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "190:9 replace CashBankState::is_known_money -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "199:9 replace CashBankState::is_cash_in_hand -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "199:9 replace CashBankState::is_cash_in_hand -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_book_changed_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "205:9 replace CashBankState::is_suspense -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand",
+      "killer_at": "base"
+    },
+    "205:9 replace CashBankState::is_suspense -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build",
+      "killer_at": "base"
+    },
+    "206:51 replace == with != in CashBankState::is_suspense": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build",
+      "killer_at": "base"
+    },
+    "211:9 replace CashBankState::reserved_group -> Option<&str> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "211:9 replace CashBankState::reserved_group -> Option<&str> with Some(\"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "211:9 replace CashBankState::reserved_group -> Option<&str> with Some(\"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "222:9 replace CashBankState::state -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "222:9 replace CashBankState::state -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "231:9 replace CashBankState::detail -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_user_created_group_at_the_account_root_ends_the_walk_as_the_root",
+      "killer_at": "base"
+    },
+    "231:9 replace CashBankState::detail -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_user_created_group_at_the_account_root_ends_the_walk_as_the_root",
+      "killer_at": "base"
+    },
+    "286:9 replace LegRequirement::admits -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_out_of_money_is_refused_by_the_bank_gate_first",
+      "killer_at": "base"
+    },
+    "286:9 replace LegRequirement::admits -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval",
+      "killer_at": "base"
+    },
+    "299:9 replace LegRequirement::refusal -> Option<String> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "299:9 replace LegRequirement::refusal -> Option<String> with Some(String::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "299:9 replace LegRequirement::refusal -> Option<String> with Some(\"xyzzy\".into())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "304:35 replace match guard state.is_known_money() with true in LegRequirement::refusal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "304:35 replace match guard state.is_known_money() with false in LegRequirement::refusal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "349:9 replace ObservedMasters::classify -> CashBankState with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "375:21 replace match guard NON_MONEY_RESERVED_GROUPS .iter() .any(|candidate| normalize(candidate) == normalized) with true in ObservedMasters::classify": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitted",
+      "killer_at": "base"
+    },
+    "375:21 replace match guard NON_MONEY_RESERVED_GROUPS .iter() .any(|candidate| normalize(candidate) == normalized) with false in ObservedMasters::classify": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval",
+      "killer_at": "base"
+    },
+    "365:57 replace == with != in ObservedMasters::classify": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval",
+      "killer_at": "base"
+    },
+    "377:55 replace == with != in ObservedMasters::classify": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitted",
+      "killer_at": "base"
+    },
+    "400:5 replace reason -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_user_created_group_at_the_account_root_ends_the_walk_as_the_root",
+      "killer_at": "base"
+    },
+    "400:5 replace reason -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_user_created_group_at_the_account_root_ends_the_walk_as_the_root",
+      "killer_at": "base"
+    },
+    "422:5 replace normalize -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval",
+      "killer_at": "base"
+    },
+    "422:5 replace normalize -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "C01": {
+      "what": "money table: Bank Accounts not admitted",
+      "edits": [
+        {
+          "from": "(\"Bank Accounts\", Admission::Admitted),",
+          "to": "(\"Bank Accounts\", Admission::NoCapturedGroup),"
+        }
+      ],
+      "mutation": "356fea53a63fe03bb1a1dff8058c86bf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "C02": {
+      "what": "money table: Cash-in-Hand not admitted",
+      "edits": [
+        {
+          "from": "(\"Cash-in-Hand\", Admission::Admitted),",
+          "to": "(\"Cash-in-Hand\", Admission::NoCapturedGroup),"
+        }
+      ],
+      "mutation": "f83fb701f4185f07682f9b5ae284d03f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_book_changed_while_the_dialog_is_open_is_refused_after_the_answer",
+      "killer_at": "base"
+    },
+    "C03": {
+      "what": "money table: Bank OD A/c not admitted",
+      "edits": [
+        {
+          "from": "(\"Bank OD A/c\", Admission::Admitted),",
+          "to": "(\"Bank OD A/c\", Admission::NoCapturedGroup),"
+        }
+      ],
+      "mutation": "e4470d79d4a7a5e84f27d8ba269f0f84",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_captured_ledger_under_bank_od_is_established_as_bank",
+      "killer_at": "base"
+    },
+    "C04": {
+      "what": "money table: Bank OCC A/c admitted",
+      "edits": [
+        {
+          "from": "(\"Bank OCC A/c\", Admission::NoCapturedGroup),",
+          "to": "(\"Bank OCC A/c\", Admission::Admitted),"
+        }
+      ],
+      "mutation": "24c5659dabf294a9fad6e02d322f976f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "C05": {
+      "what": "money table: Bank OD A/c dropped",
+      "edits": [
+        {
+          "from": "    (\"Bank OD A/c\", Admission::Admitted),\n",
+          "to": ""
+        }
+      ],
+      "mutation": "d1f96fdce90d50ac85937c94709970f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_captured_ledger_under_bank_od_is_established_as_bank",
+      "killer_at": "base"
+    },
+    "C06": {
+      "what": "money table: Bank OCC A/c dropped",
+      "edits": [
+        {
+          "from": "    (\"Bank OCC A/c\", Admission::NoCapturedGroup),\n",
+          "to": ""
+        }
+      ],
+      "mutation": "e77b0a3f569dd0e4c22ca741712c7827",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "C07": {
+      "what": "non-money table: Branch / Divisions dropped",
+      "edits": [
+        {
+          "from": "    \"Branch / Divisions\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "d93701ca1ad1e6fa71d8d36c4e0175f8",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::every_captured_predefined_identity_is_classified",
+      "killer_at": "this_commit"
+    },
+    "C08": {
+      "what": "non-money table: Duties & Taxes dropped",
+      "edits": [
+        {
+          "from": "    \"Duties & Taxes\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "fb217cbe2d02b0aa384b0aa57758ad05",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::every_captured_predefined_identity_is_classified",
+      "killer_at": "this_commit"
+    },
+    "C09": {
+      "what": "non-money table: Misc. Expenses (ASSET) dropped",
+      "edits": [
+        {
+          "from": "    \"Misc. Expenses (ASSET)\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "ab753c3a756f5f4b4dd091bdb6a5cd6e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::every_captured_predefined_identity_is_classified",
+      "killer_at": "this_commit"
+    },
+    "C10": {
+      "what": "non-money table: Sundry Creditors dropped",
+      "edits": [
+        {
+          "from": "    \"Sundry Creditors\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "f3ddbdbb9bf8abdedd49a5980b1f5e15",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "C11": {
+      "what": "non-money table: Sundry Debtors dropped",
+      "edits": [
+        {
+          "from": "    \"Sundry Debtors\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "85091c61ddb61aa244821e26377a7824",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_counterparty_group_moved_under_bank_after_approval_is_refused_before_the_post",
+      "killer_at": "base"
+    },
+    "C12": {
+      "what": "non-money table: Suspense A/c dropped",
+      "edits": [
+        {
+          "from": "    \"Suspense A/c\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "7aabe544989c21eb756e218c08a48641",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build",
+      "killer_at": "base"
+    },
+    "C13": {
+      "what": "non-money table: Unsecured Loans dropped",
+      "edits": [
+        {
+          "from": "    \"Unsecured Loans\",\n",
+          "to": ""
+        }
+      ],
+      "mutation": "0812dcd0e2de81948418e14df0b2ba5e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::every_captured_predefined_identity_is_classified",
+      "killer_at": "this_commit"
+    },
+    "C14": {
+      "what": "is_known_money: unadmitted money is not money",
+      "edits": [
+        {
+          "from": "            Self::Established { .. } | Self::UnadmittedMoney { .. }\n",
+          "to": "            Self::Established { .. }\n"
+        }
+      ],
+      "mutation": "e13cc4ec3dc00aba85ed556610093783",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "C15": {
+      "what": "is_known_money: admitted money is not money",
+      "edits": [
+        {
+          "from": "            Self::Established { .. } | Self::UnadmittedMoney { .. }\n",
+          "to": "            Self::UnadmittedMoney { .. }\n"
+        }
+      ],
+      "mutation": "182a4c98f97a7ac218f2d873fd109622",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_payment_between_two_money_ledgers_is_refused_as_a_contra",
+      "killer_at": "base"
+    },
+    "C16": {
+      "what": "is_cash_in_hand: compares with Bank Accounts",
+      "edits": [
+        {
+          "from": "if *reserved_group == \"Cash-in-Hand\")",
+          "to": "if *reserved_group == \"Bank Accounts\")"
+        }
+      ],
+      "mutation": "3dac0682ffe0cd78d47b877335d6fbe4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_book_changed_while_the_dialog_is_open_is_refused_after_the_answer",
+      "killer_at": "base"
+    },
+    "C17": {
+      "what": "is_cash_in_hand: any money group counts",
+      "edits": [
+        {
+          "from": "matches!(self, Self::Established { reserved_group } if *reserved_group == \"Cash-in-Hand\")",
+          "to": "matches!(self, Self::Established { .. })"
+        }
+      ],
+      "mutation": "450cf9bf68cbd0bbdeb3d39f2db7abb2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "C18": {
+      "what": "is_suspense: compares without normalizing",
+      "edits": [
+        {
+          "from": ".is_some_and(|group| normalize(group) == normalize(\"Suspense A/c\"))",
+          "to": ".is_some_and(|group| group == \"Suspense A/c\")"
+        }
+      ],
+      "mutation": "441ae3879c92b44a55ec3aa059f74ffb",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    },
+    "C19": {
+      "what": "is_suspense: compares in lower case without trimming",
+      "edits": [
+        {
+          "from": ".is_some_and(|group| normalize(group) == normalize(\"Suspense A/c\"))",
+          "to": ".is_some_and(|group| group.to_ascii_lowercase() == normalize(\"Suspense A/c\"))"
+        }
+      ],
+      "mutation": "83907e98157b25b460b3302bad79cdc7",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    },
+    "C20": {
+      "what": "reserved_group: unadmitted money names no group",
+      "edits": [
+        {
+          "from": "            Self::Established { reserved_group } | Self::UnadmittedMoney { reserved_group, .. } => {\n                Some(reserved_group)\n            }\n",
+          "to": "            Self::Established { reserved_group } => Some(reserved_group),\n            Self::UnadmittedMoney { .. } => None,\n"
+        }
+      ],
+      "mutation": "3438eb6eb76815c377827d41f6d10451",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_state_names_its_reserved_group_in_its_detail",
+      "killer_at": "this_commit"
+    },
+    "C21": {
+      "what": "reserved_group: admitted money names no group",
+      "edits": [
+        {
+          "from": "            Self::Established { reserved_group } | Self::UnadmittedMoney { reserved_group, .. } => {\n                Some(reserved_group)\n            }\n",
+          "to": "            Self::UnadmittedMoney { reserved_group, .. } => Some(reserved_group),\n            Self::Established { .. } => None,\n"
+        }
+      ],
+      "mutation": "a8698a5258be3f944a94c5f9d14f7673",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "C22": {
+      "what": "reserved_group: another reserved group names none",
+      "edits": [
+        {
+          "from": "            Self::OtherReservedGroup { reserved_group } => Some(reserved_group),\n",
+          "to": "            Self::OtherReservedGroup { .. } => None,\n"
+        }
+      ],
+      "mutation": "f07e4011438744b116c0d50087a4402e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build",
+      "killer_at": "base"
+    },
+    "C23": {
+      "what": "state: unadmitted money labelled cash_bank",
+      "edits": [
+        {
+          "from": "Self::UnadmittedMoney { .. } => \"cash_bank_unadmitted\",",
+          "to": "Self::UnadmittedMoney { .. } => \"cash_bank\","
+        }
+      ],
+      "mutation": "99fcf16c278f1c64b4192b5a7f625bef",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "C24": {
+      "what": "state: another reserved group labelled not_established",
+      "edits": [
+        {
+          "from": "Self::OtherReservedGroup { .. } => \"not_cash_bank\",",
+          "to": "Self::OtherReservedGroup { .. } => \"not_established\","
+        }
+      ],
+      "mutation": "777a0045d9f090c9d3e25d882ace1d2f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_contra_leg_outside_cash_and_bank_is_refused_without_writing_a_file",
+      "killer_at": "base"
+    },
+    "C25": {
+      "what": "state: not established labelled not_cash_bank",
+      "edits": [
+        {
+          "from": "Self::NotEstablished { .. } => \"not_established\",",
+          "to": "Self::NotEstablished { .. } => \"not_cash_bank\","
+        }
+      ],
+      "mutation": "7e0966ddd1c4328c1de73a3f14d51a53",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "C26": {
+      "what": "state: admitted money labelled cash_bank_unadmitted",
+      "edits": [
+        {
+          "from": "Self::Established { .. } => \"cash_bank\",",
+          "to": "Self::Established { .. } => \"cash_bank_unadmitted\","
+        }
+      ],
+      "mutation": "a225907750d45ae38a5f106708246b14",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval",
+      "killer_at": "base"
+    },
+    "C27": {
+      "what": "detail: an admitted group is not named",
+      "edits": [
+        {
+          "from": "\"The ledger's group ancestry reaches the reserved {reserved_group} identity.\"",
+          "to": "\"The ledger's group ancestry reaches a reserved identity.\""
+        }
+      ],
+      "mutation": "629788946b4ca1bbb6ea7c56d0c62bdf",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_state_names_its_reserved_group_in_its_detail",
+      "killer_at": "this_commit"
+    },
+    "C28": {
+      "what": "detail: unadmitted money's gap is not given",
+      "edits": [
+        {
+          "from": "which holds money — but {gap}. ComplyEaze",
+          "to": "which holds money. ComplyEaze"
+        }
+      ],
+      "mutation": "250841753af269320dfc9639e6798f9d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_state_names_its_reserved_group_in_its_detail",
+      "killer_at": "this_commit"
+    },
+    "C29": {
+      "what": "detail: unadmitted money is not said to be refused on both sides",
+      "edits": [
+        {
+          "from": " ComplyEaze Bridge admits it on neither side of a voucher.",
+          "to": ""
+        }
+      ],
+      "mutation": "9637943fc0526857d8f0e99aa5a1260d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_state_names_its_reserved_group_in_its_detail",
+      "killer_at": "this_commit"
+    },
+    "C30": {
+      "what": "detail: unadmitted money's group is not named",
+      "edits": [
+        {
+          "from": "\"The ledger's group ancestry reaches the reserved {reserved_group} identity, which holds money",
+          "to": "\"The ledger's group ancestry reaches a reserved identity, which holds money"
+        }
+      ],
+      "mutation": "51ce9527949f46deb30b08114012c6d0",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_state_names_its_reserved_group_in_its_detail",
+      "killer_at": "this_commit"
+    },
+    "C31": {
+      "what": "detail: another reserved group is not named",
+      "edits": [
+        {
+          "from": "\"The ledger's group ancestry reaches the reserved {reserved_group} identity, which holds no cash",
+          "to": "\"The ledger's group ancestry reaches a reserved identity, which holds no cash"
+        }
+      ],
+      "mutation": "d1cfe248566cd77dce49fd0a8025b963",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_state_names_its_reserved_group_in_its_detail",
+      "killer_at": "this_commit"
+    },
+    "C32": {
+      "what": "detail: a reason not established is not given",
+      "edits": [
+        {
+          "from": "Self::NotEstablished { reason } => (*reason).to_string(),",
+          "to": "Self::NotEstablished { .. } => String::new(),"
+        }
+      ],
+      "mutation": "a5812d31126b3c3f6025e3586cd13172",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_user_created_group_at_the_account_root_ends_the_walk_as_the_root",
+      "killer_at": "base"
+    },
+    "C33": {
+      "what": "admits: a money leg admits unadmitted money",
+      "edits": [
+        {
+          "from": "Self::Money => matches!(state, CashBankState::Established { .. }),",
+          "to": "Self::Money => state.is_known_money(),"
+        }
+      ],
+      "mutation": "577717aecab3892ecc2954c552c37256",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "C34": {
+      "what": "admits: a counterparty leg admits an unclassified ledger",
+      "edits": [
+        {
+          "from": "Self::Counterparty => matches!(state, CashBankState::OtherReservedGroup { .. }),",
+          "to": "Self::Counterparty => !state.is_known_money(),"
+        }
+      ],
+      "mutation": "7c2e2a8672ab4689b60f29d8e27eb777",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_that_cannot_be_classified_is_refused",
+      "killer_at": "base"
+    },
+    "C35": {
+      "what": "admits: the two legs' requirements swapped",
+      "edits": [
+        {
+          "from": "Self::Money => matches!(state, CashBankState::Established { .. }),\n            Self::Counterparty => matches!(state, CashBankState::OtherReservedGroup { .. }),",
+          "to": "Self::Money => matches!(state, CashBankState::OtherReservedGroup { .. }),\n            Self::Counterparty => matches!(state, CashBankState::Established { .. }),"
+        }
+      ],
+      "mutation": "9581b57be3753d4af645eb08876c153d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_after_approval_is_refused_in_the_queue",
+      "killer_at": "base"
+    },
+    "C36": {
+      "what": "refusal: an admitted leg is refused as well",
+      "edits": [
+        {
+          "from": "        if self.admits(state) {\n            return None;\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "c0fe6a14422b292d42e3dffb610a7ee0",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_refusal_carries_the_detail_and_names_the_voucher_type",
+      "killer_at": "this_commit"
+    },
+    "C37": {
+      "what": "refusal: a money leg's refusal gives no detail",
+      "edits": [
+        {
+          "from": "            Self::Money => state.detail(),",
+          "to": "            Self::Money => String::new(),"
+        }
+      ],
+      "mutation": "ef91d360e036075f3b03c9fb6838251f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitted",
+      "killer_at": "base"
+    },
+    "C38": {
+      "what": "refusal: unadmitted money on the counterparty side is not called a Contra",
+      "edits": [
+        {
+          "from": "            Self::Counterparty if state.is_known_money() => format!(",
+          "to": "            Self::Counterparty if matches!(state, CashBankState::Established { .. }) => format!("
+        }
+      ],
+      "mutation": "990066f7b40655943edf176d09cfdd48",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "C39": {
+      "what": "refusal: the Contra advice names no voucher type",
+      "edits": [
+        {
+          "from": "\"{} Money on both sides of a {voucher_type} is a Contra; book it as one.\",",
+          "to": "\"{} Money on both sides is a Contra; book it as one.\","
+        }
+      ],
+      "mutation": "a14bbe7287e7ba4a74b6051872666d74",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_refusal_carries_the_detail_and_names_the_voucher_type",
+      "killer_at": "this_commit"
+    },
+    "C40": {
+      "what": "refusal: the Contra advice gives no detail",
+      "edits": [
+        {
+          "from": "\"{} Money on both sides of a {voucher_type} is a Contra; book it as one.\",\n                state.detail()\n",
+          "to": "\"{}Money on both sides of a {voucher_type} is a Contra; book it as one.\",\n                \"\"\n"
+        }
+      ],
+      "mutation": "f5142146587e1067ec515ee54d72a961",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_refusal_carries_the_detail_and_names_the_voucher_type",
+      "killer_at": "this_commit"
+    },
+    "C41": {
+      "what": "refusal: an unclassified counterparty's refusal gives no detail",
+      "edits": [
+        {
+          "from": "\"{} A {voucher_type} counterparty must be established as holding no money, and this one could not be classified either way.\",\n                state.detail()\n",
+          "to": "\"{}A {voucher_type} counterparty must be established as holding no money, and this one could not be classified either way.\",\n                \"\"\n"
+        }
+      ],
+      "mutation": "b660315ccc54c0f600aa4bf3f0e2b844",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitted",
+      "killer_at": "base"
+    },
+    "C42": {
+      "what": "refusal: an unclassified counterparty's refusal names no voucher type",
+      "edits": [
+        {
+          "from": "\"{} A {voucher_type} counterparty must be established",
+          "to": "\"{} A counterparty must be established"
+        }
+      ],
+      "mutation": "ce1687b922cfbd35a0150bd3c03042df",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_refusal_carries_the_detail_and_names_the_voucher_type",
+      "killer_at": "this_commit"
+    },
+    "C43": {
+      "what": "new: every ledger's parent is dropped",
+      "edits": [
+        {
+          "from": ".map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))",
+          "to": ".map(|(name, _parent)| (name.to_string(), None))"
+        }
+      ],
+      "mutation": "cb20d321b8a7de779d0351508e239432",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_cash_in_hand_ledger_moved_under_bank_after_approval_is_refused_in_the_queue",
+      "killer_at": "base"
+    },
+    "C44": {
+      "what": "new: ledger names are trimmed",
+      "edits": [
+        {
+          "from": ".map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))",
+          "to": ".map(|(name, parent)| (name.trim().to_string(), parent.map(str::to_string)))"
+        }
+      ],
+      "mutation": "ec9c807e76d730cfa219d32e7fe6b050",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_ledger_is_found_by_its_exact_catalogue_spelling",
+      "killer_at": "this_commit"
+    },
+    "C45": {
+      "what": "new: parents are trimmed",
+      "edits": [
+        {
+          "from": ".map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))",
+          "to": ".map(|(name, parent)| (name.to_string(), parent.map(|p| p.trim().to_string())))"
+        }
+      ],
+      "mutation": "42a341b88b0dcb758d5fe40b9ec59055",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_padded_parent_does_not_resolve_to_a_group_it_does_not_name",
+      "killer_at": "base"
+    },
+    "C46": {
+      "what": "classify: a ledger missing from the catalogue gives no reason",
+      "edits": [
+        {
+          "from": "reason: \"The observed ledger catalogue does not carry this ledger.\",",
+          "to": "reason: \"\","
+        }
+      ],
+      "mutation": "fa22a5f405bbc2f788fdd598514dc7ba",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_gap_in_a_ledgers_ancestry_gives_its_own_reason",
+      "killer_at": "this_commit"
+    },
+    "C47": {
+      "what": "classify: a ledger missing from the catalogue walks from no parent",
+      "edits": [
+        {
+          "from": "        let Some(parent) = self.ledger_parents.get(ledger) else {\n            return CashBankState::NotEstablished {\n                reason: \"The observed ledger catalogue does not carry this ledger.\",\n            };\n        };\n        let reserved = match self.groups.reserved_ancestor(parent.as_deref()) {",
+          "to": "        let parent = self.ledger_parents.get(ledger).cloned().flatten();\n        let reserved = match self.groups.reserved_ancestor(parent.as_deref()) {"
+        }
+      ],
+      "mutation": "c5286922e96cd4a3e319d82bbcdde6f4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_gap_in_a_ledgers_ancestry_gives_its_own_reason",
+      "killer_at": "this_commit"
+    },
+    "C48": {
+      "what": "classify: every ancestry gap gives the no-parent reason",
+      "edits": [
+        {
+          "from": "                    reason: reason(gap),",
+          "to": "                    reason: reason(AncestryGap::NoParent),"
+        }
+      ],
+      "mutation": "b8f1cd2cb09b3de1d27539ea0b2f3312",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_user_created_group_at_the_account_root_ends_the_walk_as_the_root",
+      "killer_at": "base"
+    },
+    "C49": {
+      "what": "classify: money identities compared without normalizing",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| *candidate == reserved)"
+        }
+      ],
+      "mutation": "d55319f4bd10c7d541dd273f26c11b72",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    },
+    "C50": {
+      "what": "classify: money identities compared in lower case without trimming",
+      "edits": [
+        {
+          "from": "let normalized = normalize(reserved);",
+          "to": "let normalized = reserved.to_ascii_lowercase();"
+        }
+      ],
+      "mutation": "e7af5244adfe0d7b746cc6027de6dfe6",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    },
+    "C51": {
+      "what": "classify: unadmitted money carries no gap",
+      "edits": [
+        {
+          "from": "                gap: admission.gap(),",
+          "to": "                gap: \"\","
+        }
+      ],
+      "mutation": "1bab60d513299a6fb66a9bdc0ece5aa9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_money_group_bridge_will_not_admit_is_still_money_on_the_counterparty_side",
+      "killer_at": "base"
+    },
+    "C52": {
+      "what": "classify: non-money identities compared without normalizing",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| *candidate == reserved) =>"
+        }
+      ],
+      "mutation": "42911bac7f34c1d64de4a6e4433196e5",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    },
+    "C53": {
+      "what": "classify: another reserved group keeps the normalized spelling",
+      "edits": [
+        {
+          "from": "                    reserved_group: reserved.to_string(),",
+          "to": "                    reserved_group: normalized.clone(),"
+        }
+      ],
+      "mutation": "577db8431331faf2f0d26ad74ab371da",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build",
+      "killer_at": "base"
+    },
+    "C54": {
+      "what": "classify: an identity neither table holds is taken as no money",
+      "edits": [
+        {
+          "from": "            None => CashBankState::NotEstablished {\n                reason: \"The group's reserved identity is one no captured response exhibits, so it establishes neither that the ledger holds money nor that it does not.\",\n            },",
+          "to": "            None => CashBankState::OtherReservedGroup {\n                reserved_group: reserved.to_string(),\n            },"
+        }
+      ],
+      "mutation": "065024edce55b725e3d34908909a750d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitted",
+      "killer_at": "base"
+    },
+    "C55": {
+      "what": "classify: an identity neither table holds gives no reason",
+      "edits": [
+        {
+          "from": "reason: \"The group's reserved identity is one no captured response exhibits, so it establishes neither that the ledger holds money nor that it does not.\",",
+          "to": "reason: \"\","
+        }
+      ],
+      "mutation": "38968dfb26b608289cc64c4537083a83",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitted",
+      "killer_at": "base"
+    },
+    "C56": {
+      "what": "reason: no parent gives the root reason",
+      "edits": [
+        {
+          "from": "AncestryGap::NoParent => \"Tally returned no parent group for this ledger.\",",
+          "to": "AncestryGap::NoParent => \"The ledger's group ancestry reaches the account root without a predefined group identity.\","
+        }
+      ],
+      "mutation": "c3e67dd1ff5139743aa2e611f312ccdd",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_gap_in_a_ledgers_ancestry_gives_its_own_reason",
+      "killer_at": "this_commit"
+    },
+    "C57": {
+      "what": "reason: ReachedRoot gives the no-parent reason",
+      "edits": [
+        {
+          "from": "AncestryGap::ReachedRoot => {\n            \"The ledger's group ancestry reaches the account root without a predefined group identity.\"\n        }",
+          "to": "AncestryGap::ReachedRoot => {\n            \"Tally returned no parent group for this ledger.\"\n        }"
+        }
+      ],
+      "mutation": "3971c9f286f55e045d610050d26d6ad7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_user_created_group_at_the_account_root_ends_the_walk_as_the_root",
+      "killer_at": "base"
+    },
+    "C58": {
+      "what": "reason: GroupAbsent gives the no-parent reason",
+      "edits": [
+        {
+          "from": "AncestryGap::GroupAbsent => {\n            \"A group in the ledger's ancestry is absent from the observed group collection.\"\n        }",
+          "to": "AncestryGap::GroupAbsent => {\n            \"Tally returned no parent group for this ledger.\"\n        }"
+        }
+      ],
+      "mutation": "de7c235738487f08354d8f9f3406d3cb",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_gap_in_a_ledgers_ancestry_gives_its_own_reason",
+      "killer_at": "this_commit"
+    },
+    "C59": {
+      "what": "reason: GroupNameRepeated gives the no-parent reason",
+      "edits": [
+        {
+          "from": "AncestryGap::GroupNameRepeated => {\n            \"The observed group collection repeated a group name in this ancestry.\"\n        }",
+          "to": "AncestryGap::GroupNameRepeated => {\n            \"Tally returned no parent group for this ledger.\"\n        }"
+        }
+      ],
+      "mutation": "c71b78db05357f7090547d3fe45c4b53",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_gap_in_a_ledgers_ancestry_gives_its_own_reason",
+      "killer_at": "this_commit"
+    },
+    "C60": {
+      "what": "reason: ReservedNameMissing gives the no-parent reason",
+      "edits": [
+        {
+          "from": "AncestryGap::ReservedNameMissing => {\n            \"A group in the ledger's ancestry omitted RESERVEDNAME, so its identity survives no rename.\"\n        }",
+          "to": "AncestryGap::ReservedNameMissing => {\n            \"Tally returned no parent group for this ledger.\"\n        }"
+        }
+      ],
+      "mutation": "b8828f570e9c296fa151b5c4a45a21a1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_gap_in_a_ledgers_ancestry_gives_its_own_reason",
+      "killer_at": "this_commit"
+    },
+    "C61": {
+      "what": "reason: Exhausted gives the no-parent reason",
+      "edits": [
+        {
+          "from": "AncestryGap::Exhausted => {\n            \"The ledger's group ancestry exceeded the observed group collection.\"\n        }",
+          "to": "AncestryGap::Exhausted => {\n            \"Tally returned no parent group for this ledger.\"\n        }"
+        }
+      ],
+      "mutation": "edd07095b876f95b646d3aecaa2925f6",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "C62": {
+      "what": "reason: Cycle gives the no-parent reason",
+      "edits": [
+        {
+          "from": "AncestryGap::Cycle => \"The observed group ancestry contains a cycle.\",",
+          "to": "AncestryGap::Cycle => \"Tally returned no parent group for this ledger.\","
+        }
+      ],
+      "mutation": "cfe74c9086593e1b0fd0c98814145fde",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::each_gap_in_a_ledgers_ancestry_gives_its_own_reason",
+      "killer_at": "this_commit"
+    },
+    "C63": {
+      "what": "normalize: does not trim",
+      "edits": [
+        {
+          "from": "value.trim().to_ascii_lowercase()",
+          "to": "value.to_ascii_lowercase()"
+        }
+      ],
+      "mutation": "e18856721dfe47bedfbdfbb1bfe40fdd",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    },
+    "C64": {
+      "what": "normalize: does not fold case",
+      "edits": [
+        {
+          "from": "value.trim().to_ascii_lowercase()",
+          "to": "value.trim().to_string()"
+        }
+      ],
+      "mutation": "4c1d9c09ca27236dfeaad0df31f9b795",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    }
+  },
+  "accepted_survivors": {
+    "C61": {
+      "mutation": "edd07095b876f95b646d3aecaa2925f6",
+      "reason": "equivalent, unreachable: GroupIndex::reserved_ancestor returns Exhausted only once its loop has run one hop more than the index holds group names. Each hop that goes on must find a group whose name it has not visited, so by then every name has been visited and the walk has already ended as GroupAbsent, Cycle or ReachedRoot; no input reaches the Exhausted arm of reason. A change to that walk that lets a hop go on without the visited check reopens it"
+    }
+  }
+}

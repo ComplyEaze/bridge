@@ -4212,3 +4212,221 @@ async fn a_skip_only_statement_waits_for_the_admission_lock_and_takes_no_amendme
         );
     }
 }
+
+// The tests below hold what the mutation record for `agent_import_cash_bank.rs`
+// found no test holding (#2058).
+
+/// Each gap in a ledger's ancestry gives its own reason, so the refusal says
+/// which fact is missing and not only that one is.
+#[test]
+fn each_gap_in_a_ledgers_ancestry_gives_its_own_reason() {
+    let groups = captured_groups();
+    let root = groups
+        .iter()
+        .find(|group| group.name == "Capital Account")
+        .and_then(|group| group.parent.nonempty_returned_text().map(str::to_string))
+        .expect("a captured top-level group names the reserved root");
+    let mut repeated = groups.clone();
+    repeated.push(TallyNamedMaster {
+        name: "Bank Accounts".into(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Current Assets".into()),
+        reserved_name: Some("Bank Accounts".into()),
+    });
+    let mut unattributed = groups.clone();
+    for row in &mut unattributed {
+        row.reserved_name = None;
+    }
+    let mut looping = groups.clone();
+    looping.push(TallyNamedMaster {
+        name: "Looping Group".into(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Looping Group".into()),
+        reserved_name: Some(String::new()),
+    });
+    for (ledgers, rows, reason) in [
+        (
+            vec![("Probe Ledger".to_string(), None)],
+            groups.clone(),
+            "Tally returned no parent group for this ledger.",
+        ),
+        (
+            under(&root),
+            groups.clone(),
+            "The ledger's group ancestry reaches the account root without a predefined group identity.",
+        ),
+        (
+            under("Imported Bank Group"),
+            groups.clone(),
+            "A group in the ledger's ancestry is absent from the observed group collection.",
+        ),
+        (
+            under("Bank Accounts"),
+            repeated,
+            "The observed group collection repeated a group name in this ancestry.",
+        ),
+        (
+            under("Bank Accounts"),
+            unattributed,
+            "A group in the ledger's ancestry omitted RESERVEDNAME, so its identity survives no rename.",
+        ),
+        (
+            under("Looping Group"),
+            looping,
+            "The observed group ancestry contains a cycle.",
+        ),
+        (
+            Vec::new(),
+            groups.clone(),
+            "The observed ledger catalogue does not carry this ledger.",
+        ),
+    ] {
+        assert_eq!(
+            observed(&ledgers, rows).classify("Probe Ledger"),
+            CashBankState::NotEstablished { reason }
+        );
+    }
+}
+
+/// The demo company's ledgers under a bank group, a money group Bridge does
+/// not admit, and a party group, for the detail and refusal tests below.
+fn detail_probes() -> ObservedMasters {
+    let mut groups = captured_demo_groups();
+    groups.push(TallyNamedMaster {
+        name: "Bank OCC A/c".into(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Loans (Liability)".into()),
+        reserved_name: Some("Bank OCC A/c".into()),
+    });
+    let ledgers = [
+        ("Bank Probe", "Bank Accounts"),
+        ("Credit Probe", "Bank OCC A/c"),
+        ("Party Probe", "Sundry Debtors"),
+    ]
+    .map(|(ledger, group)| (ledger.to_string(), Some(group.to_string())));
+    observed(&ledgers, groups)
+}
+
+/// Each state's detail names the reserved group the walk reached, and an
+/// unadmitted money group's detail also names the evidence it lacks and that
+/// neither side of a voucher admits it.
+#[test]
+fn each_state_names_its_reserved_group_in_its_detail() {
+    let masters = detail_probes();
+    assert_eq!(
+        masters.classify("Bank Probe").detail(),
+        "The ledger's group ancestry reaches the reserved Bank Accounts identity."
+    );
+    let credit = masters.classify("Credit Probe");
+    assert_eq!(
+        credit.detail(),
+        "The ledger's group ancestry reaches the reserved Bank OCC A/c identity, which holds money — but that identity has never appeared in a captured group set. ComplyEaze Bridge admits it on neither side of a voucher."
+    );
+    assert_eq!(credit.reserved_group(), Some("Bank OCC A/c"));
+    assert_eq!(
+        masters.classify("Party Probe").detail(),
+        "The ledger's group ancestry reaches the reserved Sundry Debtors identity, which holds no cash or bank balance."
+    );
+}
+
+/// An admitted leg has no refusal, and a refused counterparty's refusal is the
+/// ledger's detail followed by advice naming the voucher type.
+#[test]
+fn a_counterparty_refusal_carries_the_detail_and_names_the_voucher_type() {
+    let masters = detail_probes();
+    let bank = masters.classify("Bank Probe");
+    assert_eq!(LegRequirement::Money.refusal(&bank, "Receipt"), None);
+    assert_eq!(
+        LegRequirement::Counterparty.refusal(&bank, "Receipt"),
+        Some(format!(
+            "{} Money on both sides of a Receipt is a Contra; book it as one.",
+            bank.detail()
+        ))
+    );
+    let unknown =
+        observed(&under("Imported Bank Group"), captured_groups()).classify("Probe Ledger");
+    assert_eq!(
+        LegRequirement::Counterparty.refusal(&unknown, "Receipt"),
+        Some(format!(
+            "{} A Receipt counterparty must be established as holding no money, and this one could not be classified either way.",
+            unknown.detail()
+        ))
+    );
+}
+
+/// A reserved identity is matched whatever its case and surrounding spaces,
+/// as the two tables say they compare. Every captured `RESERVEDNAME` is in
+/// the tables' own spelling, so the other spellings here are synthetic.
+#[test]
+fn a_reserved_identity_matches_whatever_its_case_and_padding() {
+    let respelled = |identity: &str, spelling: &str| {
+        let mut groups = captured_demo_groups();
+        let group = groups
+            .iter_mut()
+            .find(|group| group.reserved_name.as_deref() == Some(identity))
+            .expect("a captured group carries the identity");
+        group.reserved_name = Some(spelling.to_string());
+        let name = group.name.clone();
+        observed(&under(&name), groups).classify("Probe Ledger")
+    };
+    for spelling in ["bank accounts", " Bank Accounts "] {
+        assert_eq!(
+            respelled("Bank Accounts", spelling),
+            CashBankState::Established {
+                reserved_group: "Bank Accounts"
+            },
+            "{spelling:?}"
+        );
+    }
+    for spelling in ["sundry debtors", " Sundry Debtors "] {
+        assert_eq!(
+            respelled("Sundry Debtors", spelling),
+            CashBankState::OtherReservedGroup {
+                reserved_group: spelling.into()
+            },
+            "{spelling:?}"
+        );
+    }
+    for spelling in ["suspense a/c", " Suspense A/c "] {
+        assert!(
+            respelled("Suspense A/c", spelling).is_suspense(),
+            "{spelling:?}"
+        );
+    }
+}
+
+/// Every predefined identity the demo company's captured groups carry is
+/// classified one way or the other: three as money Bridge admits, and the
+/// other 25 as holding none. None is left unknown.
+#[test]
+fn every_captured_predefined_identity_is_classified() {
+    let groups = captured_demo_groups();
+    let mut money = Vec::new();
+    let mut other = 0;
+    for group in groups.iter().filter(|group| {
+        group
+            .reserved_name
+            .as_deref()
+            .is_some_and(|name| !name.is_empty())
+    }) {
+        match observed(&under(&group.name), groups.clone()).classify("Probe Ledger") {
+            CashBankState::Established { reserved_group } => money.push(reserved_group),
+            CashBankState::OtherReservedGroup { .. } => other += 1,
+            state => panic!("{}: {state:?}", group.name),
+        }
+    }
+    money.sort_unstable();
+    assert_eq!(money, ["Bank Accounts", "Bank OD A/c", "Cash-in-Hand"]);
+    assert_eq!(other, 25);
+}
+
+/// A ledger is found by its exact catalogue spelling, spaces included.
+#[test]
+fn a_ledger_is_found_by_its_exact_catalogue_spelling() {
+    let ledgers = vec![("Cash ".to_string(), Some("Cash-in-Hand".to_string()))];
+    let masters = observed(&ledgers, captured_demo_groups());
+    assert_eq!(
+        masters.classify("Cash "),
+        CashBankState::Established {
+            reserved_group: "Cash-in-Hand"
+        }
+    );
+    assert_eq!(masters.classify("Cash").state(), "not_established");
+}

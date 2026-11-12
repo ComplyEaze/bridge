@@ -1,10 +1,10 @@
-# fixture: tests/fixtures/agent/partial-landing-one-refused-of-three.utf16le.xml
-# parser: parse_import_outcome
+# fixture: tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml
+# parser: parse_import_evidence
 # source: captured
-Ok(TallyImportOutcome {
+Ok(ParsedImportEvidenceFields {
     application_status: NotReported,
     counters: TallyImportResult {
-        created: 2,
+        created: 0,
         altered: 0,
         deleted: 0,
         ignored: 0,
@@ -23,14 +23,8 @@ Ok(TallyImportOutcome {
         },
     },
     exceptions_were_reported: true,
-    tally_line_errors: [
-        TallyLineError {
-            text: "Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!",
-            truncated: false,
-        },
+    response_sha256: "ba416d29eec0a2d066028e7fef8a6d27c326dcf1702eb3746119a365093d4b0e",
+    line_error_sha256: [
+        "2f2b8606ffe81f6d8debb49b81d517f6f7ef9bd9d26033a0d1a5f1cdf1f642f4",
     ],
-    tally_line_errors_omitted: 0,
-    last_vch_id: Some(
-        3,
-    ),
 })

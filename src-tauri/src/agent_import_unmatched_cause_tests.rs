@@ -428,11 +428,11 @@ fn a_later_verification_establishes_nothing_from_any_other_answer() {
 // bridge#1108, option A: a post that landed in part says how many of its
 // vouchers Tally reported as not created, and names none.
 
-/// Row P2 of the lab sitting (`partial-landing-1108.PROVENANCE.md`): three
+/// Row P2 of the lab sitting (`IMPORT_POST_PARTIAL_LANDING_CAPTURE_PROVENANCE.md`): three
 /// vouchers sent, the middle one refused (CREATED 2, EXCEPTIONS 1).
 fn landed_in_part_one_refused() -> TallyImportResult {
     counters(&utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/partial-landing-one-refused-of-three.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml"
     )))
 }
 
@@ -440,7 +440,7 @@ fn landed_in_part_one_refused() -> TallyImportResult {
 /// (CREATED 2, EXCEPTIONS 1).
 fn landed_in_part_twins() -> TallyImportResult {
     counters(&utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/partial-landing-twins-one-refused-of-three.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml"
     )))
 }
 

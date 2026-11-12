@@ -33,6 +33,7 @@ fn detail() -> InvoiceDetail {
         voucher_type_name: "Sales".to_string(),
         place_of_supply: RAJ.to_string(),
         round_off_ledger: None,
+        e_invoice: None,
         observed: None,
     }
 }
@@ -698,6 +699,17 @@ fn observed() -> InvoiceObserved {
     }
 }
 
+/// The e-invoice details row 2162-IRN9 imported and Tally stored as sent
+/// (`lab/2162-irn-import-answers` at 9cb3ebd0).
+fn irn9_e_invoice() -> EInvoiceDetails {
+    serde_json::from_value(serde_json::json!({
+        "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+        "ack_no": "445566",
+        "ack_date": "2025-04-03"
+    }))
+    .unwrap()
+}
+
 /// The bytes the renderer writes, pinned. The rehearsal of 7 Oct 2026 posted
 /// two invoices the renderer wrote in this shape and Tally took both (section
 /// 9.16). Their import files are not committed, so the bytes pinned here are
@@ -725,6 +737,25 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     assert!(
         !xml.contains("ALLLEDGERENTRIES"),
         "an invoice view silently drops ALLLEDGERENTRIES"
+    );
+    // An invoice with e-invoice details carries the three elements right after `ISINVOICE`, as
+    // row 2162-IRN9 imported them and Tally stored them as sent; nothing else moves.
+    let mut with_details = v.clone();
+    with_details.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice());
+    let detailed = render_sales_invoice_xml(
+        &with_details,
+        id,
+        "20260310",
+        "<NARRATION>Invoice 278</NARRATION>",
+        VoucherAction::Create,
+    )
+    .unwrap();
+    assert_eq!(
+        detailed,
+        xml.replace(
+            "<ISINVOICE>Yes</ISINVOICE>",
+            "<ISINVOICE>Yes</ISINVOICE><IRN>c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0</IRN><IRNACKNO>445566</IRNACKNO><IRNACKDATE>20250403</IRNACKDATE>"
+        )
     );
     // A party that is not bill-wise gets no New Ref; and an unobserved voucher does not render.
     let mut not_bill_wise = v.clone();
@@ -1257,7 +1288,28 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
         Box::new(|v| v.invoice.as_mut().unwrap().place_of_supply = "Haryana".into()),
         Box::new(|v| v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into())),
         Box::new(|v| v.invoice.as_mut().unwrap().observed = None),
+        Box::new(|v| v.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice())),
     ];
+    for (key, value) in [
+        (
+            "irn",
+            "d3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+        ),
+        ("ack_no", "445567"),
+        ("ack_date", "2025-04-04"),
+    ] {
+        let with_details = {
+            let mut v = base.clone();
+            v.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice());
+            v
+        };
+        let mut changed = with_details.clone();
+        let mut details = serde_json::to_value(irn9_e_invoice()).unwrap();
+        details[key] = serde_json::json!(value);
+        changed.invoice.as_mut().unwrap().e_invoice =
+            Some(serde_json::from_value(details).unwrap());
+        assert_ne!(digest(&with_details), digest(&changed), "{key}");
+    }
     for field in 0..8 {
         changes.push(Box::new(move |v| {
             let seen = v.invoice.as_mut().unwrap().observed.as_mut().unwrap();
@@ -3075,6 +3127,7 @@ fn pilot_invoice(
                 .iter()
                 .find(|(ledger, _)| *ledger == "BRIDGE Round Off")
                 .map(|(ledger, _)| ledger.to_string()),
+            e_invoice: None,
             observed: Some(InvoiceObserved {
                 voucher_type_guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce".to_string(),
                 party_gstin: None,

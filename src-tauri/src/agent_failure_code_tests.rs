@@ -285,3 +285,43 @@ fn the_census_reuse_code_is_pinned_once_and_is_the_string_a_caller_sees() {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'));
     }
 }
+
+/// [`EInvoiceReadbackCode`]'s variants beside their strings, as [`GST_UNCERTAIN`] pins its own.
+const E_INVOICE_READBACK: &[(EInvoiceReadbackCode, &str)] = &[
+    (
+        EInvoiceReadbackCode::ReadFailed,
+        "e_invoice_readback_failed",
+    ),
+    (
+        EInvoiceReadbackCode::Unreadable,
+        "e_invoice_readback_unreadable",
+    ),
+    (EInvoiceReadbackCode::NotFound, "e_invoice_not_found"),
+    (EInvoiceReadbackCode::NotUnique, "e_invoice_not_unique"),
+];
+
+/// The e-invoice read's codes: pinned once each in order, each its string, each of the receipt's
+/// shape and none shared with another declared code.
+#[test]
+fn every_e_invoice_readback_code_is_pinned_and_shaped() {
+    let pinned: Vec<EInvoiceReadbackCode> =
+        E_INVOICE_READBACK.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, EInvoiceReadbackCode::ALL);
+    let mut seen: std::collections::BTreeSet<&str> = GstUncertainCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect();
+    for (code, string) in E_INVOICE_READBACK {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()), "{string}");
+        assert!(
+            string
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+            "{string}"
+        );
+        assert!(seen.insert(string), "{string} is declared twice");
+    }
+}

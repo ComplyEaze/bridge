@@ -21,10 +21,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
+#[path = "agent_import_invoice_e_invoice.rs"]
+mod e_invoice;
 #[path = "agent_import_invoice_scope.rs"]
 mod scope;
 #[path = "agent_import_invoice_wire.rs"]
 mod wire;
+
+pub(in crate::agent) use e_invoice::EInvoiceDetails;
 
 #[cfg(test)]
 pub(super) use wire::HsnWarning;
@@ -55,6 +59,11 @@ pub(super) struct InvoiceDetail {
     /// The ledger carrying a round off, when the invoice total is rounded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) round_off_ledger: Option<String>,
+    /// The e-invoice details the portal already registered for this invoice, written into the
+    /// import as given; absent for an invoice that has none. A saved invoice without them
+    /// serialises exactly as before they existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) e_invoice: Option<EInvoiceDetails>,
     /// Filled by the build from what Tally returned; refused when supplied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) observed: Option<InvoiceObserved>,
@@ -1360,6 +1369,7 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
         voucher_type_name,
         place_of_supply,
         round_off_ledger,
+        e_invoice,
         observed,
     } = detail;
     field(voucher_type_name.as_bytes());
@@ -1370,6 +1380,14 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
             field(ledger.as_bytes());
         }
         None => field(b"0"),
+    }
+    // Nothing for an invoice without details, so its digest is the one it always was; the tag
+    // is one no field after it starts with (`observed` writes "0" or "1").
+    if let Some(details) = e_invoice {
+        field(b"e_invoice");
+        for value in details.digest_fields() {
+            field(value);
+        }
     }
     match observed {
         None => field(b"0"),
@@ -1850,7 +1868,55 @@ impl super::super::Server {
                 ));
             }
         }
+        if let Some(details) = voucher
+            .invoice
+            .as_ref()
+            .and_then(|detail| detail.e_invoice.as_ref())
+        {
+            // Without the GUID the details cannot be matched to a voucher: not found, never a pass.
+            let Some(guid) = guid.as_deref() else {
+                differences.push(
+                    crate::agent::failure_code::EInvoiceReadbackCode::NotFound
+                        .as_str()
+                        .to_string(),
+                );
+                return Ok((differences, alter_id, guid, lines, evidence));
+            };
+            let (found, read_evidence) = self
+                .read_back_e_invoice(identity, company, voucher, details, guid)
+                .await;
+            differences.extend(found);
+            if let Some(read_evidence) = read_evidence {
+                evidence = super::super::combine_evidence(evidence, read_evidence);
+            }
+        }
         Ok((differences, alter_id, guid, lines, evidence))
+    }
+
+    /// The e-invoice details of a posted invoice, read over its one date and found by the GUID
+    /// its read-back returned (#2162 item 9). The invoice read-back's own request does not name
+    /// the three elements, so the measured window read that does is sent instead of a new shape.
+    /// A failed or unreadable read is a difference, never a pass.
+    async fn read_back_e_invoice(
+        &self,
+        identity: &super::super::VerifiedCompanyIdentity,
+        company: &bridge_tally_protocol::TallyCompany,
+        voucher: &ImportVoucher,
+        details: &EInvoiceDetails,
+        guid: &str,
+    ) -> (Vec<String>, Option<super::super::Evidence>) {
+        use crate::agent::failure_code::EInvoiceReadbackCode;
+        let failed = |code: EInvoiceReadbackCode| vec![code.as_str().to_string()];
+        let Ok(request) = super::super::invoice_e_invoice_read(&company.name, &voucher.date) else {
+            return (failed(EInvoiceReadbackCode::ReadFailed), None);
+        };
+        let Ok((xml, evidence)) = self.post_read(identity, request).await else {
+            return (failed(EInvoiceReadbackCode::ReadFailed), None);
+        };
+        match e_invoice::read_rows(&xml, identity.company_guid()) {
+            Ok(rows) => (details.readback_differences(&rows, guid), Some(evidence)),
+            Err(_) => (failed(EInvoiceReadbackCode::Unreadable), Some(evidence)),
+        }
     }
 }
 
@@ -2871,8 +2937,13 @@ pub(super) fn render_sales_invoice_xml(
         .as_deref()
         .map(|gstin| format!("<PARTYGSTIN>{}</PARTYGSTIN>", xml_escape(gstin)))
         .unwrap_or_default();
+    let e_invoice = detail
+        .e_invoice
+        .as_ref()
+        .map(EInvoiceDetails::render)
+        .unwrap_or_default();
     Some(format!(
-        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"{action}\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{narration}{legs}</VOUCHER></TALLYMESSAGE>",
+        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"{action}\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{e_invoice}{narration}{legs}</VOUCHER></TALLYMESSAGE>",
         xml_escape(number),
         xml_escape(number),
         xml_escape(&observed.party_state),

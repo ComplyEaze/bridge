@@ -569,6 +569,13 @@ impl NamedVoucherFields {
         gst: VoucherGstFields::NotAsked,
     };
 
+    /// The e-invoice words alone: a `vouchers` call with `include_e_invoice` only (#1378), and an
+    /// invoice's e-invoice read after its post (#2162 item 9).
+    pub(super) const E_INVOICE_ONLY: Self = Self {
+        e_invoice: EInvoiceFields::Asked,
+        gst: VoucherGstFields::NotAsked,
+    };
+
     /// Whether the list names anything: a const `self != Self::NOT_ASKED`.
     pub(super) const fn names_any(self) -> bool {
         matches!(self.e_invoice, EInvoiceFields::Asked)
@@ -778,7 +785,8 @@ impl VoucherRow {
         }
     }
 
-    fn row(&self) -> &Value {
+    /// The row as read, or a withheld one as its [`WithheldVoucher::filter_view`], with no amount.
+    pub(super) fn row(&self) -> &Value {
         match self {
             Self::Read(row) => row,
             Self::Withheld(withheld) => &withheld.view,

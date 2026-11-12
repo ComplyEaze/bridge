@@ -1873,9 +1873,15 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// On 11 Nov 2026, merged with master at d69b2ea8, after #2407 and #2447 (170
 /// bytes to each list), they measured 214,469, 240,637, 243,146 and 248,523,
 /// leaving margins of 431, 263, 254 and 377.
+/// An invoice's e-invoice details (#2162 item 9) add the `e_invoice` object to the invoice
+/// schema: 609 bytes to each list. On 11 Nov 2026, merged with master at 7a3c9e49, they
+/// measured 215,078, 241,246, 243,755 and 249,132, each 609 over master's. Each budget went
+/// up by 609, so the margins stayed 431, 263, 254 and 377. Merged with master at d5b34fd1 the
+/// same day, they measured 214,931, 241,099, 243,608 and 248,985, leaving margins of 578, 410,
+/// 401 and 524.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [214_900, 240_900, 243_400, 248_900];
+const TOOL_LIST_BUDGETS: [usize; 4] = [215_509, 241_509, 244_009, 249_509];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

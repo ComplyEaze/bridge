@@ -1516,6 +1516,85 @@ fn the_picker_marks_only_a_company_whose_name_cannot_be_sent() {
     );
 }
 
+/// Both desktop company lists, the capability probe's and the interactive
+/// discovery's, read from Tally with a company whose name no read can carry
+/// beside one whose name it can (#2433). Each lists both, byte for byte. The
+/// discovery's candidates mark only the unsendable company, with its reason;
+/// the probe's list carries no mark. On each list, the selection check that
+/// saving a probed company and every read (`verify_observed_company_tuple`)
+/// use admits the valid company and refuses the unsendable one as
+/// `company_name_invalid`.
+#[tokio::test]
+async fn both_desktop_company_lists_admit_only_the_valid_company_at_selection() {
+    use crate::tally::connection::tests::{
+        fetch_companies_answering_the_company_list, probe_answering_the_company_list,
+        shape_lab_company_list_beside, SHAPE_LAB_COMPANY_NAME,
+    };
+    let long = "A".repeat(bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES + 1);
+    for (case, second, held, refusal) in [
+        (
+            "over the limit",
+            long.as_str(),
+            long.as_str(),
+            "company_name_length_not_established",
+        ),
+        (
+            "an edge tab",
+            "&#x9;LAB",
+            "\tLAB",
+            "company_name_control_character",
+        ),
+    ] {
+        let xml = shape_lab_company_list_beside(second);
+        for (path, companies) in [
+            (
+                "probe",
+                probe_answering_the_company_list(xml.clone())
+                    .await
+                    .companies,
+            ),
+            (
+                "discovery",
+                fetch_companies_answering_the_company_list(xml.clone()).await,
+            ),
+        ] {
+            assert_eq!(companies.len(), 2, "{case}, {path}: both list");
+            assert_eq!(companies[0].name, SHAPE_LAB_COMPANY_NAME);
+            assert_eq!(companies[1].name, held, "{case}, {path}: byte for byte");
+            if path == "discovery" {
+                let candidates = untrusted_company_candidates(companies.clone());
+                assert_eq!(candidates[0].name_refusal, None, "{case}");
+                assert_eq!(candidates[1].name, held, "{case}: byte for byte");
+                assert_eq!(candidates[1].name_refusal, Some(refusal), "{case}");
+            }
+
+            let select = |company: &TallyCompany| SelectedCompanyIdentity {
+                display_name: company.name.clone(),
+                company_guid: company.guid.clone().unwrap(),
+                company_number: company.company_number.clone().unwrap(),
+                books_from_yyyymmdd: company.books_from.clone().unwrap(),
+            };
+            let verified = verify_observed_company_tuple_from_companies(
+                &select(&companies[0]),
+                companies.clone(),
+            )
+            .unwrap_or_else(|error| {
+                panic!(
+                    "{case}, {path}: the valid company is selectable: {}",
+                    error.code
+                )
+            });
+            assert_eq!(verified.display_name(), SHAPE_LAB_COMPANY_NAME);
+            let error = verify_observed_company_tuple_from_companies(
+                &select(&companies[1]),
+                companies.clone(),
+            )
+            .expect_err("the unsendable company is refused at selection");
+            assert_eq!(error.code, "company_name_invalid", "{case}, {path}");
+        }
+    }
+}
+
 /// #2462: every company a probe returns keeps its name byte for byte as Tally
 /// reported it, which the webview stores, compares and sends, and carries the
 /// shown form every screen draws: a zero-width space and a right-to-left

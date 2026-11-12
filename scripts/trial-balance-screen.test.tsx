@@ -11,6 +11,7 @@ import { formatAmount, TrialBalanceScreen } from "../src/TrialBalanceScreen";
 
 const company = {
   name: "Synthetic Accounts",
+  shown_name: "Synthetic Accounts",
   guid: "00000000-0000-4000-8000-000000000001",
   company_number: "100001",
   books_from_yyyymmdd: "20260401",
@@ -293,7 +294,7 @@ test("drops a stale response after the report scope changes", async () => {
   await act(async () => root.render(<TrialBalanceScreen config={{ host: "127.0.0.1", port: 9000 }} company={company} liveReadNavigationLocked={false} liveReadSuppressed={false} onChangeSetup={() => {}} onTallyReadActivityChange={() => {}} />));
   await chooseEndDate(host);
   await act(async () => button(host, "Refresh report").click());
-  const changed = { ...company, guid: "00000000-0000-4000-8000-000000000002", name: "Other Accounts" };
+  const changed = { ...company, guid: "00000000-0000-4000-8000-000000000002", name: "Other Accounts", shown_name: "Other Accounts" };
   await act(async () => root.render(<TrialBalanceScreen config={{ host: "127.0.0.1", port: 9000 }} company={changed} liveReadNavigationLocked={false} liveReadSuppressed={false} onChangeSetup={() => {}} onTallyReadActivityChange={() => {}} />));
   await act(async () => { resolve(report); await pending; });
   expect(host.querySelector(".trial-balance-report")).toBeNull();
@@ -745,4 +746,30 @@ test("invalidates pending and queued discovery work on unmount", async () => {
   resolveDiscovery(parentDiscoveryFor(["Should not dispatch"]));
   await act(async () => { await pendingDiscovery; });
   expect(mocks.invoke.mock.calls.filter(([command]) => command === "list_tally_trial_balance_capture_parents")).toHaveLength(1);
+});
+
+// #2462: the report draws a verified company by the name the backend shows,
+// with a zero-width space and a right-to-left override as codes, and its read
+// still carries the name exactly as Tally reported it.
+test("draws the company's shown name and reads with its raw name", async () => {
+  const raw = "Synthetic\u200bTra\u202eders";
+  const shown = "Synthetic\\u{200b}Tra\\u{202e}ders";
+  const marked = { ...company, name: raw, shown_name: shown };
+  queueInvoke({ responses: [{ ...report, read: { ...report.read, company_name: raw } }] });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<TrialBalanceScreen config={{ host: "127.0.0.1", port: 9000 }} company={marked} liveReadNavigationLocked={false} liveReadSuppressed={false} onChangeSetup={() => {}} onTallyReadActivityChange={() => {}} />));
+  expect(host.querySelector(".trial-balance-hero .panel-description")?.textContent).toContain(`Native ledger totals for ${shown}.`);
+  await chooseEndDate(host);
+  await act(async () => button(host, "Refresh report").click());
+  await waitForParentDiscovery();
+  expect(host.querySelector(".trial-balance-meta span")?.textContent).toBe(shown);
+  expect(host.textContent).not.toContain(raw);
+  expect(mocks.invoke).toHaveBeenCalledWith("fetch_tally_trial_balance", {
+    request: expect.objectContaining({
+      selected_company: expect.objectContaining({ display_name: raw, company_guid: company.guid }),
+    }),
+  });
+  root.unmount();
 });

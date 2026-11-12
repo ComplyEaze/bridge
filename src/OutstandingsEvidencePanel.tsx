@@ -60,7 +60,7 @@ export function OutstandingsEvidencePanel({ entry }: Props) {
         <span>{evidence.state === "complete" ? "Complete result" : evidence.state === "partial" ? "Partial result" : evidence.title}</span>
       </div>
       <dl className="report-evidence-facts">
-        <div><dt>Company</dt><dd>{companyIdentityLabel(evidence.companyIdentity)}</dd></div>
+        <div><dt>Company</dt><dd>{companyIdentityLabel(evidence.companyIdentity, evidence.companyShownName)}</dd></div>
         <div><dt>Read recorded</dt><dd>{displayTime(evidence.syncedAt)}</dd></div>
         {evidence.state === "complete" ? (
           <>

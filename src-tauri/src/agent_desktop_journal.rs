@@ -9,6 +9,7 @@ use super::desktop_journal_review::{
 use super::post::{admit_saved_journal, admit_saved_journal_integrity, OnAccountMarks};
 use super::*;
 use crate::tally::{TallyConfig, TallyRuntime};
+use bridge_tally_protocol::xml_read_profiles::ShownCompanyName;
 use bridge_tally_transport::canonical_loopback_origin;
 use std::env;
 use std::path::PathBuf;
@@ -171,6 +172,7 @@ impl DesktopJournalService {
             batch_id: snapshot.batch.batch_id,
             sha256: snapshot.batch.sha256,
             company: DesktopJournalCompany {
+                shown_name: ShownCompanyName::of(&company.name).into_text(),
                 name: company.name,
                 guid: company.guid,
                 company_number: company.company_number,

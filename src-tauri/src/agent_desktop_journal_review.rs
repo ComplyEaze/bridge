@@ -11,6 +11,8 @@ const MAX_SELECTED_JOURNAL_BYTES: usize = 5_000_000;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DesktopJournalCompany {
     pub(crate) name: String,
+    /// `name` by the one company-name rule; the review draws only this (#2462).
+    pub(crate) shown_name: String,
     pub(crate) guid: String,
     pub(crate) company_number: String,
     pub(crate) books_from: String,

@@ -4684,6 +4684,31 @@ fn the_busy_tally_step_is_given_only_when_nothing_was_sent() {
     assert_eq!(not_known["next_step"], NEXT_SEND_NOT_KNOWN);
 }
 
+/// Only the kept cause puts its step before the master tool's own (#2516). A
+/// refusal with any other cause that has a step of its own keeps the master
+/// step, so a later cause cannot change a master answer's step.
+#[test]
+fn only_the_kept_cause_takes_the_place_of_the_master_step() {
+    let next_step = |cause: &'static str| {
+        let mut failure = ToolFailure::from("master_approval_declined".to_string());
+        failure.cause = Some(cause);
+        let outcome =
+            master_failure_outcome("bridge-batch", GUID, failure, empty_evidence(), Some(false));
+        outcome.payload["result"]["error"]["next_step"].clone()
+    };
+    // Any cause with a step of its own in `refusal_remediation`.
+    let other = "statement_trial_balance_row_inconsistent";
+    assert!(crate::agent::refusal_remediation(other).is_some());
+    assert_eq!(
+        next_step(other),
+        master_next_step("master_approval_declined").unwrap()
+    );
+    assert_eq!(
+        next_step(crate::agent::APPROVAL_ANSWERED_EARLIER),
+        crate::agent::refusal_remediation(crate::agent::APPROVAL_ANSWERED_EARLIER).unwrap()
+    );
+}
+
 /// `tools/call post_ledger_creates` runs the master post, not the voucher
 /// post: an unknown batch is answered by the master tool.
 #[tokio::test]

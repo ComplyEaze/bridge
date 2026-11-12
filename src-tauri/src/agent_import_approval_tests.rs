@@ -131,6 +131,16 @@ async fn a_click_between_calls_is_posted_by_the_next_call() {
 /// Answered only once a second call has taken the held dialog to wait on it,
 /// so the click lands inside that call's wait and never before it.
 async fn click_while_joined(server: &Server, batch_id: &str, scripted: &ScriptedApproval) {
+    answer_while_joined(server, batch_id, scripted, true).await;
+}
+
+/// `click_while_joined`, answered Yes or No.
+async fn answer_while_joined(
+    server: &Server,
+    batch_id: &str,
+    scripted: &ScriptedApproval,
+    approved: bool,
+) {
     tokio::time::timeout(Duration::from_secs(5), async {
         while !server.post_approvals.joined_for_test(batch_id) {
             tokio::time::sleep(Duration::from_millis(1)).await;
@@ -138,7 +148,7 @@ async fn click_while_joined(server: &Server, batch_id: &str, scripted: &Scripted
     })
     .await
     .expect("the second call joined the held dialog");
-    scripted.answer(true);
+    scripted.answer(approved);
 }
 
 /// A click that lands while a later call waits on the dialog is reported by
@@ -185,6 +195,33 @@ async fn a_click_during_a_joining_call_is_reported_and_posted_by_the_next() {
         &observed,
         post_at,
     );
+}
+
+/// A No given while a later call waits on the dialog is that call's own
+/// answer, not a kept one (#2516): it carries no `approval_answered_earlier`
+/// cause and no step, like a No given in the box a call opened itself. A
+/// waiting call's refusal is a plain code, so this pins the design.
+#[tokio::test]
+async fn a_decline_during_a_joining_call_carries_no_kept_cause() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+
+    let (declined, ()) = tokio::join!(
+        server.call_tool("post_import", args),
+        answer_while_joined(&server, &line.batch_id, &scripted, false)
+    );
+    let observed = sent(simulator);
+    let error = &result(&declined)["error"];
+    assert_eq!(error["code"], "import_approval_declined", "{declined}");
+    assert!(error.get("cause").is_none(), "{declined}");
+    assert!(error.get("next_step").is_none(), "{declined}");
+    assert_eq!(scripted.counts(), [1]);
+    assert_eq!(observed.len(), before_approval().len());
+    assert_eq!(intents(directory.path()), 0);
 }
 
 /// Answered in its call, but too late for the measured post to fit: the call
@@ -1006,6 +1043,10 @@ fn a_kept_refusal_keeps_its_code_and_carries_the_kept_cause() {
             "{code}"
         );
         assert!(step.contains("same batch_id"), "{step}");
+        // The ruling's two other claims: no box was shown in this call, and
+        // nothing was sent.
+        assert!(step.starts_with("This call showed no approval box."), "{step}");
+        assert!(step.contains("Nothing was sent."), "{step}");
         let plain = crate::agent::ToolFailure::from(code.to_string());
         assert_eq!(plain.cause, None, "{code}");
     }

@@ -896,7 +896,7 @@ fn the_build_asks_the_stop_under_its_lock_before_it_writes_a_file() {
         .find(".import_invoice_stop_while_admitted(&payload.company_guid)")
         .expect("the build asks the stop");
     let invoice_only = build[..asked]
-        .rfind("voucher.voucher_type.is_invoice()")
+        .rfind("voucher.voucher_type.invoice_class().is_some()")
         .expect("and only for an invoice batch");
     let refused = build
         .find("\"invoice_company_stopped\"")
@@ -992,7 +992,7 @@ fn an_invoice_without_a_native_post_route_is_refused_before_a_read_and_before_a_
         .expect("posting off refuses an invoice");
     // Only an invoice: the guard is on the voucher type, in front of the setting.
     let invoice_only = build[..off]
-        .rfind(".any(|voucher| voucher.voucher_type.is_invoice())")
+        .rfind(".any(|voucher| voucher.voucher_type.invoice_class().is_some())")
         .expect("and only for an invoice");
     let refused = build[off..]
         .find("INVOICE_POST_NOT_ENABLED")

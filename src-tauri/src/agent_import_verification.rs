@@ -216,7 +216,8 @@ pub(super) fn folded_number(number: &str) -> Option<String> {
 fn invoice_number(voucher: &ImportVoucher) -> Option<String> {
     voucher
         .voucher_type
-        .is_invoice()
+        .invoice_class()
+        .is_some()
         .then(|| voucher.voucher_number.as_deref().and_then(folded_number))
         .flatten()
 }
@@ -965,7 +966,7 @@ pub(super) fn invoice_readback_due<'a>(
 ) -> Option<(&'a ImportVoucher, Value)> {
     let voucher = vouchers
         .iter()
-        .find(|voucher| voucher.voucher_type.is_invoice())?;
+        .find(|voucher| voucher.voucher_type.invoice_class().is_some())?;
     let matched = result["vouchers"]
         .as_array()?
         .iter()

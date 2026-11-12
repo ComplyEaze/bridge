@@ -5,12 +5,13 @@ use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 /// How many Sales-class rows a window answer holds, as the control's miss
 /// reports them.
 fn sales_count(xml: &str) -> Result<usize, &'static str> {
-    control_miss(xml, None).map(|miss| miss.sales_rows)
+    control_miss(xml, InvoiceClass::Sales, None).map(|miss| miss.sales_rows)
 }
 
 /// Whether a Sales-class holder of `number` carries an IRN.
 fn holder_has_irn(xml: &str, number: &str) -> Result<bool, &'static str> {
-    number_holding(xml, number).map(|holding| holding == NumberHolding::Held { with_irn: true })
+    number_holding(xml, InvoiceClass::Sales, number)
+        .map(|holding| holding == NumberHolding::Held { with_irn: true })
 }
 
 /// The shape of the lab's voucher-type collection (measured 6 Oct 2026): a
@@ -57,7 +58,7 @@ fn the_cmpinfo_counter_is_not_a_row_and_each_type_is_read_with_its_series() {
 #[test]
 fn a_named_type_resolves_by_its_parent_chain_and_its_series_not_by_its_name() {
     let types = parse_voucher_types(&types_xml("")).unwrap();
-    let resolve = |name| resolve_voucher_type(&types, name, "Sales");
+    let resolve = |name| resolve_voucher_type(&types, name, ReservedVoucherClass::Sales);
     assert_eq!(
         resolve("Sales Acc"),
         Ok(ResolvedVoucherType {
@@ -87,7 +88,7 @@ fn a_named_type_resolves_by_its_parent_chain_and_its_series_not_by_its_name() {
         let row = format!("<VOUCHERTYPE NAME=\"{name}\" RESERVEDNAME=\"\"><GUID>d0-0c</GUID><PARENT>Sales</PARENT><VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD>{guard}</VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>");
         let types = parse_voucher_types(&types_xml(&row)).unwrap();
         assert_eq!(
-            resolve_voucher_type(&types, name, "Sales"),
+            resolve_voucher_type(&types, name, ReservedVoucherClass::Sales),
             Err("invoice_voucher_type_duplicates_allowed"),
             "{name}"
         );
@@ -98,7 +99,7 @@ fn a_named_type_resolves_by_its_parent_chain_and_its_series_not_by_its_name() {
     );
     assert_eq!(resolve("Sales Acx"), Err("invoice_voucher_type_not_found"));
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Acc", "Purchase"),
+        resolve_voucher_type(&types, "Sales Acc", ReservedVoucherClass::Purchase),
         Err("invoice_voucher_type_wrong_class")
     );
 }
@@ -108,19 +109,19 @@ fn a_name_two_types_carry_and_a_broken_chain_are_refused() {
     let twin = "<VOUCHERTYPE NAME=\"Sales Acc\" RESERVEDNAME=\"\"><GUID>7717-07</GUID><PARENT>Sales</PARENT><VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>";
     let types = parse_voucher_types(&types_xml(twin)).unwrap();
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Acc", "Sales"),
+        resolve_voucher_type(&types, "Sales Acc", ReservedVoucherClass::Sales),
         Err("invoice_voucher_type_name_ambiguous")
     );
     let orphan = "<VOUCHERTYPE NAME=\"Orphan\" RESERVEDNAME=\"\"><GUID>0f-08</GUID><PARENT>Nowhere</PARENT><VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>";
     let types = parse_voucher_types(&types_xml(orphan)).unwrap();
     assert_eq!(
-        resolve_voucher_type(&types, "Orphan", "Sales"),
+        resolve_voucher_type(&types, "Orphan", ReservedVoucherClass::Sales),
         Err("invoice_voucher_type_parent_missing")
     );
     let cycle = "<VOUCHERTYPE NAME=\"C1\" RESERVEDNAME=\"\"><GUID>c1-09</GUID><PARENT>C2</PARENT><VOUCHERNUMBERSERIES.LIST><NAME>D</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE><VOUCHERTYPE NAME=\"C2\" RESERVEDNAME=\"\"><GUID>c2-0a</GUID><PARENT>C1</PARENT><VOUCHERNUMBERSERIES.LIST><NAME>D</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>";
     let types = parse_voucher_types(&types_xml(cycle)).unwrap();
     assert_eq!(
-        resolve_voucher_type(&types, "C1", "Sales"),
+        resolve_voucher_type(&types, "C1", ReservedVoucherClass::Sales),
         Err("invoice_voucher_type_chain_cycles")
     );
 }
@@ -190,11 +191,11 @@ fn a_type_whose_guid_cannot_go_into_the_read_back_formula_is_refused_at_the_buil
     let odd = "<VOUCHERTYPE NAME=\"Sales Odd\" RESERVEDNAME=\"\"><GUID>not \"hex\"</GUID><PARENT>Sales</PARENT><VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>";
     let types = parse_voucher_types(&types_xml(odd)).unwrap();
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Odd", "Sales"),
+        resolve_voucher_type(&types, "Sales Odd", ReservedVoucherClass::Sales),
         Err("invoice_voucher_type_guid_unusable")
     );
     // Another type's odd GUID does not stop the named one.
-    assert!(resolve_voucher_type(&types, "Sales Acc", "Sales").is_ok());
+    assert!(resolve_voucher_type(&types, "Sales Acc", ReservedVoucherClass::Sales).is_ok());
 }
 
 fn number(text: &str) -> InvoiceNumber {
@@ -238,11 +239,16 @@ fn the_window_read_is_the_one_the_lab_sent_for_each_month_and_for_a_year() {
     ];
     assert_eq!(months.len(), sent.len());
     for ((from, to), sha256) in months.iter().zip(sent) {
-        let rendered = render_invoice_window_numbers_request("BRIDGE CORPUS DENSE", (from, to));
+        let rendered = render_invoice_window_numbers_request(
+            "BRIDGE CORPUS DENSE",
+            InvoiceClass::Sales,
+            (from, to),
+        );
         assert_eq!(sent_sha256(&rendered), sha256, "{}", from.as_str());
     }
     let year = render_invoice_window_numbers_request(
         "BRIDGE PILOT LAB",
+        InvoiceClass::Sales,
         (&date("20260401"), &date("20270331")),
     );
     assert_eq!(
@@ -299,7 +305,8 @@ fn the_m1_requests_are_the_ones_the_renderer_writes() {
         let months = calendar_months(&date(from), &date(to)).unwrap();
         assert_eq!(months.len(), sent.len());
         for ((from, to), sha256) in months.iter().zip(sent) {
-            let rendered = render_invoice_window_numbers_request(company, (from, to));
+            let rendered =
+                render_invoice_window_numbers_request(company, InvoiceClass::Sales, (from, to));
             assert_eq!(
                 sent_sha256(&rendered),
                 sha256,
@@ -472,7 +479,7 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         months
     };
     let judge = |month: String, posted: Option<&str>| {
-        number_after_post_difference(&year(month), "9", posted)
+        number_after_post_difference(&year(month), InvoiceClass::Sales, "9", posted)
     };
     let posted = Some("BRIDGE Sales");
     assert_eq!(judge(wrap(&row("BRIDGE Sales", "Yes")), posted), None);
@@ -521,13 +528,13 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
     let mut two_months = year(wrap(&row("BRIDGE Sales", "Yes")));
     two_months[7] = wrap(&row("BRIDGE Sales", "Yes"));
     assert_eq!(
-        number_after_post_difference(&two_months, "9", posted),
+        number_after_post_difference(&two_months, InvoiceClass::Sales, "9", posted),
         Some("invoice_number_not_unique".to_string())
     );
     let mut elsewhere = year(wrap(&row("BRIDGE Sales", "Yes")));
     elsewhere[11] = wrap(&row("Sales", "Yes"));
     assert_eq!(
-        number_after_post_difference(&elsewhere, "9", posted),
+        number_after_post_difference(&elsewhere, InvoiceClass::Sales, "9", posted),
         Some("invoice_number_in_another_type: Sales".to_string())
     );
     // The reads that miss the invoice the read-back found are never a pass.
@@ -536,7 +543,7 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         Some("invoice_number_read_missed_invoice".to_string())
     );
     assert_eq!(
-        number_after_post_difference(&[], "9", posted),
+        number_after_post_difference(&[], InvoiceClass::Sales, "9", posted),
         Some("invoice_number_read_missed_invoice".to_string())
     );
     assert_eq!(
@@ -558,7 +565,7 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
     let mut unread = year(wrap(&row("BRIDGE Sales", "Yes")));
     unread[6] = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER></ENVELOPE>".to_string();
     assert_eq!(
-        number_after_post_difference(&unread, "9", posted),
+        number_after_post_difference(&unread, InvoiceClass::Sales, "9", posted),
         Some("invoice_read_collection_absent".to_string())
     );
     // Tally's answers to the build's class-wide number read for
@@ -568,12 +575,12 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
     let number = "BP/26-27/0010";
     let held = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml"));
     assert_eq!(
-        number_after_post_difference(&year(held.clone()), number, posted),
+        number_after_post_difference(&year(held.clone()), InvoiceClass::Sales, number, posted),
         None
     );
     // As the build counts it, `bp/26-27/10` is the same number.
     assert_eq!(
-        number_after_post_difference(&year(held), "bp/26-27/10", posted),
+        number_after_post_difference(&year(held), InvoiceClass::Sales, "bp/26-27/10", posted),
         None
     );
     let two_types = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml"));
@@ -582,7 +589,12 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         ("BRIDGE Sales Keyed", "BRIDGE Sales"),
     ] {
         assert_eq!(
-            number_after_post_difference(&year(two_types.clone()), number, Some(posted)),
+            number_after_post_difference(
+                &year(two_types.clone()),
+                InvoiceClass::Sales,
+                number,
+                Some(posted)
+            ),
             Some(format!("invoice_number_in_another_type: {other}")),
             "{posted}"
         );
@@ -592,7 +604,12 @@ fn after_the_post_the_number_is_held_by_one_sales_voucher_of_the_posted_type_onl
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
     ));
     assert_eq!(
-        number_after_post_difference(&year(beside_payment), "1", Some("Sales")),
+        number_after_post_difference(
+            &year(beside_payment),
+            InvoiceClass::Sales,
+            "1",
+            Some("Sales")
+        ),
         None
     );
 }
@@ -665,7 +682,11 @@ fn a_window_answer_holds_a_number_its_sales_rows_fold_to() {
         "BP/026-027/00001",
         " BP/26-27/01 ",
     ] {
-        assert_eq!(number_holding(&in_use, number), held, "{number}");
+        assert_eq!(
+            number_holding(&in_use, InvoiceClass::Sales, number),
+            held,
+            "{number}"
+        );
     }
     for number in [
         "BP/26-27/0010",
@@ -675,7 +696,7 @@ fn a_window_answer_holds_a_number_its_sales_rows_fold_to() {
         "",
     ] {
         assert_eq!(
-            number_holding(&in_use, number),
+            number_holding(&in_use, InvoiceClass::Sales, number),
             Ok(NumberHolding::Unheld),
             "{number}"
         );
@@ -687,14 +708,17 @@ fn a_window_answer_holds_a_number_its_sales_rows_fold_to() {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml"
     ));
     assert_eq!(
-        number_holding(&with, "001"),
+        number_holding(&with, InvoiceClass::Sales, "001"),
         Ok(NumberHolding::Held { with_irn: true })
     );
-    assert_eq!(number_holding(&without, "2"), held);
+    assert_eq!(number_holding(&without, InvoiceClass::Sales, "2"), held);
     let empty = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"
     ));
-    assert_eq!(number_holding(&empty, "1"), Ok(NumberHolding::Unheld));
+    assert_eq!(
+        number_holding(&empty, InvoiceClass::Sales, "1"),
+        Ok(NumberHolding::Unheld)
+    );
 }
 
 /// The fold ignores case and the leading zeros of each digit run, keeps one
@@ -733,20 +757,20 @@ fn any_holder_with_an_irn_decides_and_an_unread_class_is_an_error() {
     let irn = "<IRN>abc</IRN>";
     let both = row("A/07", "Yes", irn) + &row("a/7", "Yes", "") + &row("A/7", "No", irn);
     assert_eq!(
-        number_holding(&wrap(&both), "A/0007"),
+        number_holding(&wrap(&both), InvoiceClass::Sales, "A/0007"),
         Ok(NumberHolding::Held { with_irn: true })
     );
     let reversed = row("a/7", "Yes", "") + &row("A/07", "Yes", irn);
     assert_eq!(
-        number_holding(&wrap(&reversed), "A/7"),
+        number_holding(&wrap(&reversed), InvoiceClass::Sales, "A/7"),
         Ok(NumberHolding::Held { with_irn: true })
     );
     assert_eq!(
-        number_holding(&wrap(&row("A/7", "No", irn)), "A/7"),
+        number_holding(&wrap(&row("A/7", "No", irn)), InvoiceClass::Sales, "A/7"),
         Ok(NumberHolding::Unheld)
     );
     assert_eq!(
-        number_holding(&wrap(&row("B/1", "Maybe", "")), "A/7"),
+        number_holding(&wrap(&row("B/1", "Maybe", "")), InvoiceClass::Sales, "A/7"),
         Err("invoice_number_class_unread")
     );
 }
@@ -1074,7 +1098,7 @@ fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic
     let types = parse_voucher_types(&xml).unwrap();
     assert_eq!(types.len(), 25);
     assert_eq!(
-        resolve_voucher_type(&types, "BRIDGE Sales", "Sales"),
+        resolve_voucher_type(&types, "BRIDGE Sales", ReservedVoucherClass::Sales),
         Ok(ResolvedVoucherType {
             guid: format!("{}-000000ce", pilot_lab_guid()),
             class: "Sales".into(),
@@ -1094,15 +1118,15 @@ fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic
         )]
     );
     assert_eq!(
-        resolve_voucher_type(&types, "Sales", "Sales"),
+        resolve_voucher_type(&types, "Sales", ReservedVoucherClass::Sales),
         Err("invoice_voucher_type_numbering_not_manual")
     );
     assert_eq!(
-        resolve_voucher_type(&types, "BRIDGE Sales", "Purchase"),
+        resolve_voucher_type(&types, "BRIDGE Sales", ReservedVoucherClass::Purchase),
         Err("invoice_voucher_type_wrong_class")
     );
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Acc", "Sales"),
+        resolve_voucher_type(&types, "Sales Acc", ReservedVoucherClass::Sales),
         Err("invoice_voucher_type_not_found")
     );
 }
@@ -1165,7 +1189,7 @@ fn a_control_miss_counts_the_sales_rows_and_finds_the_controls_guid() {
     let absent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"));
     let guid = format!("{}-00000001", pilot_lab_guid());
     assert_eq!(
-        control_miss(&known, Some(&guid.to_uppercase())),
+        control_miss(&known, InvoiceClass::Sales, Some(&guid.to_uppercase())),
         Ok(ControlMiss {
             sales_rows: 1,
             guid: Some(GuidSeen::Seen {
@@ -1177,14 +1201,14 @@ fn a_control_miss_counts_the_sales_rows_and_finds_the_controls_guid() {
     );
     let other = format!("{}-00000002", pilot_lab_guid());
     assert_eq!(
-        control_miss(&known, Some(&other)),
+        control_miss(&known, InvoiceClass::Sales, Some(&other)),
         Ok(ControlMiss {
             sales_rows: 1,
             guid: Some(GuidSeen::NotSeen),
         })
     );
     assert_eq!(
-        control_miss(&absent, Some(&guid)),
+        control_miss(&absent, InvoiceClass::Sales, Some(&guid)),
         Ok(ControlMiss {
             sales_rows: 0,
             guid: Some(GuidSeen::NotSeen),
@@ -1192,7 +1216,7 @@ fn a_control_miss_counts_the_sales_rows_and_finds_the_controls_guid() {
     );
     // No GUID recorded for the control: the answer is still counted.
     assert_eq!(
-        control_miss(&known, None),
+        control_miss(&known, InvoiceClass::Sales, None),
         Ok(ControlMiss {
             sales_rows: 1,
             guid: None,
@@ -1205,6 +1229,7 @@ fn a_control_miss_counts_the_sales_rows_and_finds_the_controls_guid() {
                 "<BRIDGEVCHISSALES TYPE=\"Logical\">Yes</BRIDGEVCHISSALES>",
                 ""
             ),
+            InvoiceClass::Sales,
             Some(&guid)
         ),
         Err("invoice_number_class_unread")
@@ -1219,21 +1244,21 @@ fn the_control_row_is_the_known_invoice_with_its_date_and_class() {
     let known = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"));
     let absent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"));
     assert_eq!(
-        control_row_found(&known, "BP/26-27/0001", "20260801"),
+        control_row_found(&known, InvoiceClass::Sales, "BP/26-27/0001", "20260801"),
         Ok(true)
     );
     // A read that returns no row is never a control.
     assert_eq!(
-        control_row_found(&absent, "BP/26-27/0001", "20260801"),
+        control_row_found(&absent, InvoiceClass::Sales, "BP/26-27/0001", "20260801"),
         Ok(false)
     );
     // The number on another date; another number.
     assert_eq!(
-        control_row_found(&known, "BP/26-27/0001", "20260802"),
+        control_row_found(&known, InvoiceClass::Sales, "BP/26-27/0001", "20260802"),
         Ok(false)
     );
     assert_eq!(
-        control_row_found(&known, "BP/26-27/0002", "20260801"),
+        control_row_found(&known, InvoiceClass::Sales, "BP/26-27/0002", "20260801"),
         Ok(false)
     );
     // A row of the number that is not Sales class is not the control (the
@@ -1245,6 +1270,7 @@ fn the_control_row_is_the_known_invoice_with_its_date_and_class() {
                 "<BRIDGEVCHISSALES TYPE=\"Logical\">Yes</BRIDGEVCHISSALES>",
                 "<BRIDGEVCHISSALES TYPE=\"Logical\">No</BRIDGEVCHISSALES>"
             ),
+            InvoiceClass::Sales,
             "BP/26-27/0001",
             "20260801"
         ),
@@ -1254,6 +1280,7 @@ fn the_control_row_is_the_known_invoice_with_its_date_and_class() {
     assert_eq!(
         control_row_found(
             "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA></DATA></ENVELOPE>",
+            InvoiceClass::Sales,
             "BP/26-27/0001",
             "20260801"
         ),

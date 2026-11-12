@@ -2911,6 +2911,7 @@ fn the_lab_month_reads_are_the_sent_ones_and_the_derived_august_drops_one_row() 
     for (from, to, pinned, _) in lab_number_months() {
         let rendered = invoice::render_invoice_window_numbers_request(
             "BRIDGE PILOT LAB",
+            InvoiceClass::Sales,
             (&stored_date(from), &stored_date(to)),
         );
         let sent = [0xFF, 0xFE]

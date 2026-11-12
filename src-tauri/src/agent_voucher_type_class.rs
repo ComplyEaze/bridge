@@ -63,7 +63,7 @@ impl ReservedVoucherClass {
         }
     }
 
-    const fn function(self) -> &'static str {
+    pub(super) const fn function(self) -> &'static str {
         match self {
             Self::Sales => "$$IsSales",
             Self::Purchase => "$$IsPurchase",

@@ -1086,7 +1086,7 @@ enum InvoiceFigures {
 }
 
 fn invoice_figures(voucher: &ImportVoucher) -> InvoiceFigures {
-    if !voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_none() {
         return InvoiceFigures::NotInvoice;
     }
     InvoiceFigures::Of((
@@ -1224,7 +1224,7 @@ pub(super) fn invoice_number_control(
                     batch
                         .vouchers
                         .iter()
-                        .filter(|voucher| voucher.voucher_type.is_invoice())
+                        .filter(|voucher| voucher.voucher_type.invoice_class().is_some())
                         .filter_map(|voucher| {
                             let date = voucher.date.as_str().to_string();
                             Some((date, voucher.voucher_number.clone()?))
@@ -1326,7 +1326,7 @@ pub(super) fn invoice_stops(
                 && batch
                     .vouchers
                     .iter()
-                    .any(|voucher| voucher.voucher_type.is_invoice())
+                    .any(|voucher| voucher.voucher_type.invoice_class().is_some())
             {
                 holds_invoice.insert(batch.batch_id.clone());
             } else {

@@ -1045,7 +1045,10 @@ fn a_kept_refusal_keeps_its_code_and_carries_the_kept_cause() {
         assert!(step.contains("same batch_id"), "{step}");
         // The ruling's two other claims: no box was shown in this call, and
         // nothing was sent.
-        assert!(step.starts_with("This call showed no approval box."), "{step}");
+        assert!(
+            step.starts_with("This call showed no approval box."),
+            "{step}"
+        );
         assert!(step.contains("Nothing was sent."), "{step}");
         let plain = crate::agent::ToolFailure::from(code.to_string());
         assert_eq!(plain.cause, None, "{code}");

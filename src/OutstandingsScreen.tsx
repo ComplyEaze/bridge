@@ -156,6 +156,8 @@ export type OutstandingsEvidence =
   | {
       state: "complete";
       companyIdentity: CompanyIdentityKey;
+      /** The company's shown name, for the Company line only (#2462); never part of the key. */
+      companyShownName: string;
       syncedAt: number;
       asOfYyyymmdd: string;
       ageingAnchor: OutstandingsAgeingAnchor;
@@ -171,6 +173,7 @@ export type OutstandingsEvidence =
   | {
       state: "partial";
       companyIdentity: CompanyIdentityKey;
+      companyShownName: string;
       syncedAt: number;
       reasonCode: string;
       requestedAsOfYyyymmdd?: string;
@@ -182,6 +185,7 @@ export type OutstandingsEvidence =
   | {
       state: "withheld";
       companyIdentity: CompanyIdentityKey;
+      companyShownName: string;
       syncedAt: number;
       title: string;
       message: string;
@@ -331,12 +335,13 @@ export function OutstandingsScreen({
     : null;
   const outstandingsUnavailable = partialState?.retryable === false;
   const tallyReadAttempted = result?.state === "partial" && partialState?.tallyReadAttempted;
-  const reportEvidence: OutstandingsEvidence | null = loading || !result || !currentCompanyIdentity
+  const reportEvidence: OutstandingsEvidence | null = loading || !result || !currentCompanyIdentity || !company
     ? null
     : inrCompleteResult
       ? {
           state: "complete",
           companyIdentity: currentCompanyIdentity,
+          companyShownName: company.shown_name,
           syncedAt: inrCompleteResult.synced_at_unix_ms,
           asOfYyyymmdd: inrCompleteResult.report.as_of_yyyymmdd,
           ageingAnchor: inrCompleteResult.ageing_anchor,
@@ -354,6 +359,7 @@ export function OutstandingsScreen({
       ? {
           state: "partial",
           companyIdentity: currentCompanyIdentity,
+          companyShownName: company.shown_name,
           syncedAt: result.synced_at_unix_ms,
           reasonCode: result.reason_code,
           requestedAsOfYyyymmdd: result.requested_as_of_yyyymmdd,
@@ -365,6 +371,7 @@ export function OutstandingsScreen({
       : {
           state: "withheld",
           companyIdentity: currentCompanyIdentity,
+          companyShownName: company.shown_name,
           syncedAt: result.synced_at_unix_ms,
           ...UNSUPPORTED_CURRENCY_WITHHELD,
         };

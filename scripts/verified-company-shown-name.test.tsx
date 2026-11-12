@@ -140,3 +140,65 @@ test("a verified company is drawn by its shown name on setup and a report, and e
   ]);
   expect(root.textContent).not.toContain(raw);
 });
+
+test("a saved company is drawn by its shown name on Companies and in its local evidence", async () => {
+  const saved = {
+    ...company,
+    canonical_endpoint: origin,
+    guid_observed: true,
+    mirror_company_id: "company-2462",
+  };
+  const run = {
+    run_id: "run-2462", phase: "completed", requires_resume: false,
+    resume_available: false, mirror_company_id: saved.mirror_company_id,
+    pack_id: "core_accounting", requested_from_yyyymmdd: "20260401",
+    requested_to_yyyymmdd: "20260401", active_window_id: null,
+    completed_windows: 1, total_windows: 1, verification: null,
+    proof_id: null, proof_sha256: null, gap_codes: [], warning_codes: [], failure_code: null,
+  };
+  mocks.invoke.mockImplementation((command: string) => {
+    if (command === "desktop_terms_status") return Promise.resolve({ terms_version: "2026-10.1", state: "accepted", accepted: true });
+    if (command === "tally_persisted_company_profiles") {
+      return Promise.resolve({ profiles: [saved], total_profiles: 1, limit: 100, truncated: false });
+    }
+    if (command === "tally_recent_snapshot_runs") return Promise.resolve([run]);
+    if (command === "tally_snapshot_status") return Promise.resolve({ ...run });
+    if (command === "tally_write_fixture_enrollment_status") {
+      return Promise.resolve({ fixture_state: "not_enrolled", candidate_gate: "not_enrolled", write_capability: "unknown" });
+    }
+    return Promise.resolve([]);
+  });
+  const root = document.createElement("div");
+  root.id = "root";
+  document.body.append(root);
+  await act(async () => { await import("../src/main.tsx"); });
+
+  // Choosing the saved client from the switcher opens it on Companies, since
+  // no endpoint has been checked in this session.
+  await act(async () => { button(root, "Switch client").click(); });
+  const options = [...root.querySelectorAll<HTMLElement>('[aria-label="Available clients"] button')];
+  expect(options).toHaveLength(1);
+  await act(async () => { options[0].click(); });
+  const details = [...root.querySelectorAll<HTMLElement>(".company-connection-details > div")]
+    .find((row) => row.querySelector("dt")?.textContent === "Selected company");
+  expect(details?.querySelector("dd")?.textContent).toBe(shown);
+  const evidenceDescription = [...root.querySelectorAll<HTMLElement>("p.panel-description")]
+    .filter((paragraph) => paragraph.textContent?.startsWith("Inspect "));
+  expect(evidenceDescription).toHaveLength(1);
+  expect(evidenceDescription[0].textContent)
+    .toBe(`Inspect ${shown}’s local proof ledger, durable runs, and redacted proof exports without contacting Tally.`);
+  expect(root.textContent).not.toContain(raw);
+
+  // Its local evidence (a drawer outside the app root) names it by the same
+  // form, in the recent runs and in the saved-companies list.
+  await act(async () => { button(root, "Open local evidence").click(); });
+  const drawer = document.body.querySelector<HTMLElement>(".evidence-drawer-content");
+  expect(drawer).not.toBeNull();
+  expect(drawer!.querySelector('[aria-label="Recent durable Core Accounting runs"] caption')?.textContent)
+    .toBe(`Showing up to 10 of 1 loaded runs for ${shown}`);
+  await act(async () => { button(drawer!, "Change saved company").click(); });
+  const savedList = drawer!.querySelector<HTMLElement>('[aria-label="Saved companies"]');
+  expect(savedList).not.toBeNull();
+  expect([...savedList!.querySelectorAll("button > span")].map((span) => span.textContent)).toEqual([shown]);
+  expect(document.body.textContent).not.toContain(raw);
+});

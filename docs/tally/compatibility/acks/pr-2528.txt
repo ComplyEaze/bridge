@@ -9,7 +9,9 @@ src/AllClientsScreen.tsx
 src/JournalPostingScreen.tsx
 src/LedgerEntriesScreen.tsx
 src/MirrorProofScreen.tsx
+src/OutstandingsEvidencePanel.tsx
 src/OutstandingsScreen.tsx
 src/TrialBalanceScreen.tsx
+src/company-identity.ts
 src/main.tsx
 reviewer: lamemustafa

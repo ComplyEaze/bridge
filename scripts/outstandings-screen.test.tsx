@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 
 import { OutstandingsExportNotice, OutstandingsScreen } from "../src/OutstandingsScreen";
+import { OutstandingsEvidencePanel } from "../src/OutstandingsEvidencePanel";
+import type { EvidenceDrawerEntry } from "../src/evidence-drawer-entry";
 
 const config = { host: "127.0.0.1", port: 9000 };
 const company = {
@@ -295,6 +297,52 @@ test("statement controls appear only with the source Bridge holds", async () => 
     host.remove();
     mocks.invoke.mockReset();
   }
+});
+
+// #2462: once a read is loaded, the heading and the evidence drawer's Company
+// line draw the shown name; the read itself asks for the raw name.
+test("a loaded read and its evidence draw the shown name, and the read sends the raw one", async () => {
+  const raw = "Synthetic\u200bTra\u202eders";
+  const shown = "Synthetic\\u{200b}Tra\\u{202e}ders";
+  mocks.invoke.mockImplementation((command: string) => {
+    if (command === "detect_tally_base_currency") {
+      return Promise.resolve({ is_inr: true, mailing_name: "Indian Rupee", currency_count: 1 });
+    }
+    if (command === "fetch_tally_outstandings") return Promise.resolve(completeResult());
+    return Promise.resolve(null);
+  });
+  const opened: EvidenceDrawerEntry[] = [];
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(
+    <OutstandingsScreen
+      {...defaultProps()}
+      company={{ ...company, name: raw, shown_name: shown }}
+      onOpenEvidence={(entry) => { opened.push(entry); }}
+    />,
+  ));
+  await flush();
+
+  const fetches = mocks.invoke.mock.calls.filter(([command]) => command === "fetch_tally_outstandings");
+  expect(fetches).toHaveLength(1);
+  expect(JSON.stringify(fetches[0][1])).toContain(JSON.stringify(raw));
+  expect(host.querySelector(".outstandings-heading h2")?.textContent).toBe(shown);
+  expect(host.textContent).not.toContain(raw);
+
+  await act(async () => host.querySelector<HTMLButtonElement>(".outstandings-evidence-link")?.click());
+  expect(opened).toHaveLength(1);
+  expect(opened[0].kind).toBe("report-bound");
+  const drawer = document.createElement("div");
+  document.body.append(drawer);
+  const drawerRoot = createRoot(drawer);
+  await act(async () => drawerRoot.render(<OutstandingsEvidencePanel entry={opened[0]} />));
+  const facts = [...drawer.querySelectorAll(".report-evidence-facts > div")];
+  const companyLine = facts.find((fact) => fact.querySelector("dt")?.textContent === "Company");
+  expect(companyLine?.querySelector("dd")?.textContent?.split(" · ")[0]).toBe(shown);
+  expect(drawer.textContent).not.toContain(raw);
+  drawerRoot.unmount();
+  root.unmount();
 });
 
 // bridge#903: the ledger-master export carries the screen's As of date only

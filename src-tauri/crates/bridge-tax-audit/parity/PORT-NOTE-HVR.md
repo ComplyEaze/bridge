@@ -82,9 +82,11 @@ threshold` for bank:
    The two counts always add up to the old count.
 3. A (party, day) finding whose row is in `line_below` (the same as `below` above) keeps its id,
    clause tags, limits, asks, facts and confidence exactly as before; only its title is replaced by
-   `{Mode} {moved} one party on {date}: the party's side is at or over the {limit_name}, but the {mode} {verb} on these vouchers is below it`
-   (`{Mode}` capitalised, `{date}` ISO), and for the unidentified-party row "one party" then becomes
-   "one unidentified party", as before.
+   `{lead} {to_from} one party on {date}: the party's side is at or over the {limit_name}, but the {mode} {verb} on these vouchers is below it`
+   (`{date}` ISO). `{lead}` is "Cash received" or "Cash paid" on a cash row, and "Received into the
+   bank" or "Paid from the bank" on a bank row, since the bank does not act (#772); `{to_from}` is
+   "from" or "to". The unidentified-party row instead opens `{lead} on {date} on vouchers that do not
+   name the {payer|payee}: ` and says the payers' or payees' side is at or over the limit.
 
 The tags stay on purpose: one person can hold several ledgers, and whether the person's cash that
 day reaches the limit is for the CA to judge.

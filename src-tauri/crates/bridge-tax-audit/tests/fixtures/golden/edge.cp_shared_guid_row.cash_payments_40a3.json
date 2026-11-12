@@ -394,8 +394,8 @@
       "id": "cash_payments_40a3.s40a3_row_amount_2025-06-04_2f04f463",
       "value": 25000000,
       "unit": "paise",
-      "definition_sha256_16": "ad7734b96eb8356a",
-      "definition_text": "Cash paid to one payee ledger (tag 2f04f463) on 2025-06-04, summed across every population voucher that day.",
+      "definition_sha256_16": "9f2cb1f102c57879",
+      "definition_text": "Debits to one payee ledger (tag 2f04f463) on 2025-06-04, on population vouchers with a cash payment, summed: the debits, not the cash paid.",
       "evidence": [
         {
           "kind": "voucher",
@@ -451,8 +451,8 @@
       "id": "cash_payments_40a3.s40a3_row_amount_2025-06-09_4e1f330d",
       "value": 1100000,
       "unit": "paise",
-      "definition_sha256_16": "83602ab26c0106a8",
-      "definition_text": "Cash paid to one payee ledger (tag 4e1f330d) on 2025-06-09, summed across every population voucher that day.",
+      "definition_sha256_16": "0d06bb4de7957f5d",
+      "definition_text": "Debits to one payee ledger (tag 4e1f330d) on 2025-06-09, on population vouchers with a cash payment, summed: the debits, not the cash paid.",
       "evidence": [
         {
           "kind": "voucher",
@@ -681,8 +681,8 @@
           "label": "Payment P2 on 2025-06-04"
         }
       ],
-      "title_sha256_16": "9bade472206991a9",
-      "title_text": "Cash paid to one payee over the s.40A(3) daily limit on 2025-06-04",
+      "title_sha256_16": "4ab7a5158d80bbbe",
+      "title_text": "Debits to one payee ledger on vouchers with a cash payment total over the s.40A(3) daily limit on 2025-06-04: the cash paid is not shown",
       "limits_sha256_16": "b7a8d59cd2c8f86c",
       "limits_text": [
         "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",
@@ -819,8 +819,8 @@
           "label": "Payment  on 2025-06-09"
         }
       ],
-      "title_sha256_16": "c84d2abc3e1a12ee",
-      "title_text": "Cash paid to one payee over the s.40A(3) daily limit on 2025-06-09",
+      "title_sha256_16": "c9acc758e05aa82b",
+      "title_text": "Debits to one payee ledger on vouchers with a cash payment total over the s.40A(3) daily limit on 2025-06-09: the cash paid is not shown",
       "limits_sha256_16": "b7a8d59cd2c8f86c",
       "limits_text": [
         "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",

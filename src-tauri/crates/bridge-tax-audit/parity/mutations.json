@@ -5236,8 +5236,8 @@
   "by": "reviewer-opus",
   "what": "the proven-under title names cash whatever the row's mode",
   "file": "src/high_value_register.rs",
-  "from": "                            capitalize(mode_name)\n                        );\n                    }\n                    if unnamed {",
-  "to": "                            capitalize(\"cash\")\n                        );\n                    }\n                    if unnamed {"
+  "from": "            (false, Direction::Payment) => (\"Paid from the bank\", \"to\"),",
+  "to": "            (false, Direction::Payment) => (\"Cash paid\", \"to\"),"
  },
  {
   "id": "E3A-01",
@@ -7916,7 +7916,7 @@
   "by": "author",
   "what": "a limb (b) row cites the unlabelled bucket, not the printed names",
   "file": "src/high_value_register.rs",
-  "from": "            evidence.push(party_ref(ledger, data));\n            r.findings.push(Finding {\n                id: format!(\"{TEST_ID}/single_transaction/{rid}\"),",
+  "from": "            evidence.push(party_ref(ledger, data, UNIDENTIFIED_PARTY));\n            r.findings.push(Finding {\n                id: format!(\"{TEST_ID}/single_transaction/{rid}\"),",
   "to": "            evidence.push(EvidenceRef::with_label(\"row\", UNIDENTIFIED_PARTY_ROW, UNIDENTIFIED_PARTY));\n            r.findings.push(Finding {\n                id: format!(\"{TEST_ID}/single_transaction/{rid}\"),"
  },
  {
@@ -7924,7 +7924,7 @@
   "by": "author",
   "what": "the day row cites the unlabelled bucket, not the printed names",
   "file": "src/high_value_register.rs",
-  "from": "                    evidence.push(party_ref(ledger, data));\n                    let mut facts",
+  "from": "                    evidence.push(party_ref(ledger, data, bucket));\n                    let mut facts",
   "to": "                    evidence.push(EvidenceRef::with_label(\"row\", UNIDENTIFIED_PARTY_ROW, UNIDENTIFIED_PARTY));\n                    let mut facts"
  },
  {
@@ -7972,8 +7972,8 @@
   "by": "author",
   "what": "an unnamed payment row is worded as received",
   "file": "src/high_value_register.rs",
-  "from": "                        let did = if direction == Direction::Receipt {\n                            \"received\"",
-  "to": "                        let did = if direction != Direction::Receipt {\n                            \"received\""
+  "from": "            (true, Direction::Payment) => (\"Cash paid\", \"to\"),",
+  "to": "            (true, Direction::Payment) => (\"Cash received\", \"to\"),"
  },
  {
   "id": "HV-20",
@@ -8012,24 +8012,24 @@
   "by": "author",
   "what": "an unnamed row keeps the one-party ask",
   "file": "src/high_value_register.rs",
-  "from": "ask.retain(|a| {",
-  "to": "ask.retain(|a| {\n                            true ||"
+  "from": "ask.retain(|a| a != ASK_RECEIPT_ONE_PARTY",
+  "to": "ask.retain(|a| true || a != ASK_RECEIPT_ONE_PARTY"
  },
  {
   "id": "HV-25",
   "by": "author",
   "what": "an unnamed row keeps the old-ask for a payment (only the receipt ask is dropped)",
   "file": "src/high_value_register.rs",
-  "from": "                            a != \"Confirm whether this receipt is genuinely from one party.\"\n                                && a != \"Confirm whether this payment is genuinely to one party.\"",
-  "to": "                            a != \"Confirm whether this receipt is genuinely from one party.\""
+  "from": "a != ASK_RECEIPT_ONE_PARTY && a != ASK_PAYMENT_ONE_PARTY);",
+  "to": "a != ASK_RECEIPT_ONE_PARTY);"
  },
  {
   "id": "HV-26",
   "by": "author",
-  "what": "an unnamed row's ask names the limit as the vouching threshold regardless of mode",
+  "what": "an unnamed row's ask asks whether one person reached the limit whatever the row's mode (#772: re-pointed, as only the cash ask now names a limit)",
   "file": "src/high_value_register.rs",
-  "from": "                            \"Who {act} on each of these vouchers, and did any one person reach the \\\n                             {over_what} this day?",
-  "to": "                            \"Who {act} on each of these vouchers, and did any one person reach the \\\n                             s.269ST(a) limit this day?"
+  "from": "ask.push(if is_cash {",
+  "to": "ask.push(if true {"
  },
  {
   "id": "HV-27",
@@ -14542,6 +14542,54 @@
   "file": "src/cash_payments_40a3.rs",
   "from": "} else if proven_under {\n                format!(\n                    \"Paid to one party",
   "to": "} else if false {\n                format!(\n                    \"Paid to one party"
+ },
+ {
+  "id": "L772-5",
+  "by": "author",
+  "what": "#772: a named s.40A(3) row's amount is defined as cash paid again",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                \"Debits to one payee ledger (tag {h}) on {}, on population vouchers with a cash \\\npayment, summed: the debits, not the cash paid.\",",
+  "to": "                \"Cash paid to one payee ledger (tag {h}) on {}, summed across every \\\npopulation voucher that day.\","
+ },
+ {
+  "id": "L772-6",
+  "by": "author",
+  "what": "#772: a named s.40A(3) row's title calls its debits cash paid to one payee again",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                    \"Debits to one payee ledger on vouchers with a cash payment total over the \\\ns.40A(3) daily limit on {}: the cash paid is not shown\",",
+  "to": "                    \"Cash paid to one payee over the s.40A(3) daily limit on {}\","
+ },
+ {
+  "id": "L772-7",
+  "by": "author",
+  "what": "#772: a bank receipt row's title says the bank received the money again",
+  "file": "src/high_value_register.rs",
+  "from": "            (false, Direction::Receipt) => (\"Received into the bank\", \"from\"),",
+  "to": "            (false, Direction::Receipt) => (\"Bank received\", \"from\"),"
+ },
+ {
+  "id": "L772-8",
+  "by": "author",
+  "what": "#772: a bank row with no party ledger says whether one person reached the vouching threshold is not known",
+  "file": "src/high_value_register.rs",
+  "from": "} else if is_cash {\n                            format!(\n                                \"{opening}the total",
+  "to": "} else if true {\n                            format!(\n                                \"{opening}the total"
+ },
+ {
+  "id": "L772-9",
+  "by": "author",
+  "what": "#772: a bank row with no party ledger is labelled with the cash leg's wording",
+  "file": "src/high_value_register.rs",
+  "from": "let bucket = if is_cash {",
+  "to": "let bucket = if true {"
+ },
+ {
+  "id": "L772-10",
+  "by": "author",
+  "what": "#772: a limb (b) row with no party ledger defines its amount as one party ledger's",
+  "file": "src/high_value_register.rs",
+  "from": "let definition = if ledger.as_str() == UNIDENTIFIED_PARTY {",
+  "to": "let definition = if false {"
  },
  {
   "id": "C16-01",

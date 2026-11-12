@@ -133,7 +133,7 @@ fn approved_import(companies: &str, date: &str) -> ApprovedImport {
     .expect("static catalog read is admitted");
     let currency_request = AgentReadRequest::parse(
         bridge_tally_protocol::native_outstandings::render_company_currency_request(
-            identity.display_name(),
+            identity.company_name(),
         ),
     )
     .expect("currency read is admitted");

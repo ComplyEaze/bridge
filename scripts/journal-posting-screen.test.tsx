@@ -16,6 +16,7 @@ const review = {
   sha256: "a".repeat(64),
   company: {
     name: "Synthetic Accounts",
+    shownName: "Synthetic Accounts",
     guid: "00000000-0000-4000-8000-000000000002",
     companyNumber: "100001",
     booksFrom: "20260401",
@@ -404,4 +405,34 @@ test("marks an entry sent as On Account and shows its note only when sent (#1234
   expect(pinned, "MARKED_REVIEW_DETAILS_SENT was not found in the Rust test file").not.toBeNull();
   const sent = JSON.parse(pinned![1]);
   expect(await cells(sent)).toEqual({ marks: ["On Account", null], note: true });
+});
+
+// #2462: the review draws the company by the name the backend shows, with a
+// zero-width space and a right-to-left override as codes; posting identifies
+// the saved batch and company exactly as before.
+test("draws the review's company by its shown name", async () => {
+  const raw = "Synthetic\u200bTra\u202eders";
+  const shown = "Synthetic\\u{200b}Tra\\u{202e}ders";
+  mocks.invoke.mockResolvedValueOnce({ ...review, company: { ...review.company, name: raw, shownName: shown } });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => {
+    root.render(<JournalPostingScreen config={config} />);
+  });
+  await act(async () => {
+    button(host, "Choose Journal file").click();
+  });
+  const companyRow = [...host.querySelectorAll(".journal-review-details div")].find((row) => row.querySelector("dt")?.textContent === "Company");
+  expect(companyRow?.querySelector("dd")?.textContent).toBe(shown);
+  expect(host.textContent).not.toContain(raw);
+
+  mocks.invoke.mockResolvedValueOnce({ batchId: review.batchId, result: { result: { dispatch: { state: "not_dispatched" }, attempt_recorded: false } } });
+  await act(async () => {
+    button(host, "Post Journal").click();
+  });
+  expect(mocks.invoke).toHaveBeenLastCalledWith("desktop_post_reviewed_journal", {
+    request: { batchId: review.batchId, sha256: review.sha256, companyGuid: review.company.guid, config },
+  });
+  root.unmount();
 });

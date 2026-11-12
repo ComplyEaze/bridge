@@ -3909,7 +3909,15 @@ Tally reported the voucher as not created when it was sent, and to look for it
 in Tally before entering it by hand; the status and the batch's state are the
 same. A partly created batch is never read as not created: a
 count does not say which voucher Tally rejected, and two vouchers of one batch
-with the same content defeat matching by content. A binding refusal is final: an
+with the same content defeat matching by content. When the post's own answer
+reported every counter, at least one created and one exception, nothing else
+counted and a total equal to the vouchers sent, and the company's voucher mark
+moved by what Tally reported creating (read on both sides of the post, or the
+post's recorded verdict for a later check), the `next_step` of each voucher the
+check cannot find adds that Tally's answer reported that many of the vouchers
+sent as not created and that ComplyEaze Bridge cannot say which: the count is
+all that is claimed, no voucher is named, and the status stays
+`sent_not_attributed` (bridge#1108). A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays

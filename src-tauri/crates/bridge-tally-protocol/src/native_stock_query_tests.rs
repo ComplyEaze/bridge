@@ -165,7 +165,7 @@ const BUILDER_REQUESTS: &[(&str, &str, &str, &str)] = &[
 fn every_captured_request_is_the_builders_bytes() {
     for &(file, item, from, to) in BUILDER_REQUESTS {
         let rendered = render_stock_query_request(
-            LAB,
+            &ValidatedCompanyName::new(LAB).unwrap(),
             &MeasuredItemName::new(item).unwrap(),
             &period(from, to),
         );
@@ -183,7 +183,7 @@ fn every_captured_request_is_the_builders_bytes() {
 fn the_bare_capture_is_the_envelope_without_the_item() {
     let bare = crate::native_statement_reports::render_report_envelope(
         "Stock Query",
-        LAB,
+        &ValidatedCompanyName::new(LAB).unwrap(),
         &period("20250401", "20260331"),
         "",
     );
@@ -796,7 +796,7 @@ fn a_quote_raw_or_escaped_selects_the_same_item() {
             capture(&format!("{escaped}.answer.utf16le.xml"))
         );
         let rendered = crate::encode_tally_xml_request_utf16le(&render_stock_query_request(
-            LAB,
+            &ValidatedCompanyName::new(LAB).unwrap(),
             &MeasuredItemName::new(item).unwrap(),
             &period("20250401", "20260331"),
         ));

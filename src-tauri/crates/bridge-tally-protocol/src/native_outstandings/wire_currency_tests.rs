@@ -1,6 +1,7 @@
 use super::*;
 use crate::native_outstandings::model::identify_base_master;
 use crate::native_outstandings::render_company_currency_request;
+use crate::xml_read_profiles::ValidatedCompanyName;
 
 const MODERN_LIVE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -473,7 +474,8 @@ fn originalname_is_refused_when_duplicated_or_malformed_and_kept_when_empty() {
 /// first consumer does (TALLY_PROTOCOL_REFERENCE §9.10a.2).
 #[test]
 fn the_currency_request_does_not_fetch_originalname_yet() {
-    let request = render_company_currency_request("Synthetic Company");
+    let request =
+        render_company_currency_request(&ValidatedCompanyName::new("Synthetic Company").unwrap());
     assert!(request.contains("<FETCH>NAME, MAILINGNAME, DECIMALPLACES</FETCH>"));
     assert!(!request.contains("ORIGINALNAME"));
 }

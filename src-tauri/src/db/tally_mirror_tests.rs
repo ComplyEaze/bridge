@@ -3373,6 +3373,44 @@ async fn persisted_profiles_only_return_observed_stable_company_pins() {
     assert_eq!(profile.canonical_endpoint, "http://127.0.0.1:9000");
 }
 
+/// #2462: a saved company keeps its name exactly as Tally reported it, which is
+/// what the webview stores, compares and sends, and carries the shown form the
+/// screens draw: a zero-width space and a right-to-left override as codes.
+#[tokio::test]
+async fn a_saved_profile_carries_its_shown_name_beside_the_raw_name() {
+    let (repository, snapshot, _) = seeded_repository().await;
+    let raw = "Synthetic\u{200b}Tra\u{202e}ders";
+    sqlx::query(
+        "INSERT INTO tally_companies(\
+           id, endpoint_id, display_name, company_guid, remote_id, master_id, \
+           fallback_fingerprint, identity_confidence, first_observed_at_unix_ms, \
+           last_observed_at_unix_ms, company_number, books_from_yyyymmdd\
+         ) VALUES (?1, ?2, ?3, ?4, NULL, NULL, NULL, 'observed', 3000, 3000, '100002', '20260401')",
+    )
+    .bind("synthetic-shown-name-company")
+    .bind(&snapshot.endpoint_id)
+    .bind(raw)
+    .bind("synthetic-shown-name-guid")
+    .execute(&repository.pool)
+    .await
+    .expect("seed synthetic profile");
+
+    let page = repository
+        .persisted_company_profiles()
+        .await
+        .expect("load persisted profiles");
+    let profile = page
+        .profiles
+        .iter()
+        .find(|profile| profile.mirror_company_id == "synthetic-shown-name-company")
+        .expect("seeded profile");
+    assert_eq!(profile.name, raw);
+    assert_eq!(profile.shown_name, "Synthetic\\u{200b}Tra\\u{202e}ders");
+    let row = serde_json::to_value(profile).expect("profile serializes");
+    assert_eq!(row["name"], raw);
+    assert_eq!(row["shown_name"], "Synthetic\\u{200b}Tra\\u{202e}ders");
+}
+
 #[tokio::test]
 async fn client_label_migration_profiles_include_unpaged_and_suppressed_history() {
     let (repository, snapshot, _) = seeded_repository().await;

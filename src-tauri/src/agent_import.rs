@@ -1546,7 +1546,7 @@ impl Server {
             let mut group_evidence = None;
             let mut statement_warnings: Vec<Value> = Vec::new();
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
-                let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
+                let (groups, evidence) = self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
                 let observed = ObservedMasters::new(ledger_masters.catalog().parents(), groups);
                 let refusals =
@@ -1904,7 +1904,7 @@ impl Server {
             // stability requirement rather than trusting a single observation.
             if let Some(group_evidence) = group_evidence {
                 let (_, repeated_group_evidence) =
-                    self.read_group_collection(&identity, &company.name).await?;
+                    self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), repeated_group_evidence.clone());
                 if group_evidence.response_sha256 != repeated_group_evidence.response_sha256 {
                     return Err("import_groups_changed".to_string().into());
@@ -2727,18 +2727,21 @@ impl Server {
                     .as_ref()
                     .and_then(|response| response.outcome.as_ref())
                     .map(|outcome| outcome.counters());
+                let measured_step =
+                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
+                let mut step_matched = false;
                 let cause = if current_dispatch {
                     verification::unmatched_cause(
                         answer,
                         line.vouchers.len(),
                         verification::unmatched_count(&result),
-                        verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark),
+                        measured_step,
                     )
                 } else {
                     // The post's own verdict on its voucher step, for a batch.
                     // Read only where it decides, and never a way for this
                     // check to fail: no record reads as not matched.
-                    let step_matched = answer.is_some()
+                    step_matched = answer.is_some()
                         && line.vouchers.len() > 1
                         && self
                             .imports_dir()
@@ -2760,14 +2763,37 @@ impl Server {
                         // it) makes an edit in Tally no likelier than a
                         // voucher Tally did not create, so its line drops the
                         // edit example (bridge#1108). With no answer on
-                        // record, or a clean one, the line is unchanged.
+                        // record, or a clean one, the line is unchanged. When
+                        // the answer is the captured shape of a post that
+                        // landed in part, the line also says how many
+                        // vouchers Tally reported as not created and that
+                        // which ones is not known: no row is named.
                         let unclean = dispatch_response.as_ref().is_some_and(|response| {
                             !post::import_outcome_is_clean(
                                 response.outcome.as_ref(),
                                 line.vouchers.len(),
                             )
                         });
-                        if unclean {
+                        let not_created = answer.and_then(|counters| {
+                            verification::reported_not_created_count(
+                                counters,
+                                line.vouchers.len(),
+                                |created| {
+                                    if current_dispatch {
+                                        measured_step == Some(created)
+                                    } else {
+                                        step_matched
+                                    }
+                                },
+                            )
+                        });
+                        if let (true, Some(not_created)) = (unclean, not_created) {
+                            verification::mark_sent_not_attributed_after_partly_created_answer(
+                                &mut result,
+                                not_created,
+                                line.vouchers.len(),
+                            )
+                        } else if unclean {
                             verification::mark_sent_not_attributed_after_unclean_answer(&mut result)
                         } else {
                             verification::mark_sent_not_attributed(&mut result)
@@ -3125,10 +3151,12 @@ impl Server {
     pub(super) async fn read_group_collection(
         &self,
         identity: &super::VerifiedCompanyIdentity,
-        company_name: &str,
     ) -> Result<(Vec<bridge_tally_protocol::TallyNamedMaster>, Evidence), ToolFailure> {
         let (xml, evidence) = self
-            .post_read(identity, native_group_snapshot_read(company_name))
+            .post_read(
+                identity,
+                native_group_snapshot_read(identity.company_name()),
+            )
             .await?;
         let groups =
             parse_native_group_snapshot(&xml, identity.company_guid()).map_err(|error| {

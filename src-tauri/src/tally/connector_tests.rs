@@ -144,19 +144,26 @@ fn captured_wr2_native_core_window_builds_without_report_field_amounts() {
         "../../crates/bridge-tally-protocol/tests/fixtures/native/vouchers_native_wr2.xml"
     );
 
-    let voucher_type_request = render_native_voucher_type_export_request(COMPANY);
+    let voucher_type_request =
+        render_native_voucher_type_export_request(&ValidatedCompanyName::new(COMPANY).unwrap());
     assert!(voucher_type_request.contains("<TYPE>Collection</TYPE>"));
     assert!(voucher_type_request.contains("<ID>List of VoucherTypes</ID>"));
     assert!(voucher_type_request.contains("<FETCH>NAME, PARENT, GUID, MASTERID, ALTERID</FETCH>"));
-    assert!(render_native_group_snapshot_request(COMPANY)
-        .contains("<FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME</FETCH>"));
+    assert!(
+        render_native_group_snapshot_request(&ValidatedCompanyName::new(COMPANY).unwrap())
+            .contains("<FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME</FETCH>")
+    );
     assert!(!voucher_type_request.contains("<REPORT>"));
     let probe_from = TallyDate::parse("20260401").unwrap();
     let probe_to = TallyDate::parse("20260930").unwrap();
-    assert!(
-        render_native_voucher_export_request(COMPANY, &probe_from, &probe_to)
-            .contains("ALLLEDGERENTRIES.LEDGERNAME, ALLLEDGERENTRIES.AMOUNT, ALLLEDGERENTRIES.ISDEEMEDPOSITIVE")
-    );
+    assert!(render_native_voucher_export_request(
+        &ValidatedCompanyName::new(COMPANY).unwrap(),
+        &probe_from,
+        &probe_to
+    )
+    .contains(
+        "ALLLEDGERENTRIES.LEDGERNAME, ALLLEDGERENTRIES.AMOUNT, ALLLEDGERENTRIES.ISDEEMEDPOSITIVE"
+    ));
 
     let context = RequestContext {
         run_id: "wr2-native-core-window".to_string(),

@@ -7,6 +7,7 @@
 //! of that book was captured), then edits those rows.
 use super::*;
 use crate::native_masters::MASTERS_ASSUMED_NAME_CHARS;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use sha2::{Digest, Sha256};
 
 const COMPANY: &str = "Bridge Lab Win Numbering";
@@ -99,7 +100,8 @@ fn edited(from: &str, to: &str) -> String {
 
 #[test]
 fn the_request_is_byte_for_byte_the_one_sent_live() {
-    let rendered = render_voucher_type_numbering_request(COMPANY);
+    let rendered =
+        render_voucher_type_numbering_request(&ValidatedCompanyName::new(COMPANY).unwrap());
     let mut wire = vec![0xFF, 0xFE];
     wire.extend(rendered.encode_utf16().flat_map(u16::to_le_bytes));
     assert_eq!(wire, request_bytes());
@@ -117,7 +119,9 @@ fn the_request_is_byte_for_byte_the_one_sent_live() {
 fn the_request_of_the_second_book_is_byte_for_byte_the_one_sent_live() {
     // The same renderer with the second book's name: the two answers of
     // 13 October 2026 committed here answer the product's own request.
-    let rendered = render_voucher_type_numbering_request("BRIDGE MANUAL NUMBERING LAB 2");
+    let rendered = render_voucher_type_numbering_request(
+        &ValidatedCompanyName::new("BRIDGE MANUAL NUMBERING LAB 2").unwrap(),
+    );
     let mut wire = vec![0xFF, 0xFE];
     wire.extend(rendered.encode_utf16().flat_map(u16::to_le_bytes));
     assert_eq!(

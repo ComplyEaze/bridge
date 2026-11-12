@@ -19,6 +19,7 @@
 //! the figures to the vouchers: the rows are returned as Tally printed them.
 //! The Journal Register answers another shape (a count of vouchers in the
 //! debit column, no closing column) and is not read here.
+use crate::xml_read_profiles::ValidatedCompanyName;
 use serde::Serialize;
 use std::fmt;
 
@@ -59,7 +60,7 @@ impl From<MonthRegisterKind> for BuiltInReport {
 /// window, for the named company. No TDL.
 pub fn render_native_month_register_request(
     kind: MonthRegisterKind,
-    company: &str,
+    company: &ValidatedCompanyName,
     window: &WholeMonthWindow,
 ) -> String {
     render_built_in_report_request(kind.into(), company, window.period())

@@ -1,0 +1,2476 @@
+{
+  "file": "src-tauri/src/agent_import_approval.rs",
+  "base_commit": "de54a0f2",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again). The tool's survivors were run again by cargo-mutants itself, selected by an exact --re of their names.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2207,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_approval.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv/)'",
+      "time": "2026-11-11T13:33:09Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 2207,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/import|numbering|post|approv/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5079,
+      "command": "cargo build --locked -p bridge-approval-standin --example approval_standin, then every bridge test (-E 'all()'): for the tool's 9 missed mutants as the tool run with --timeout 1800 and an exact --re of their names, after the unmutated tree passed all 5079, and for the 31 hand-written ones the filtered run missed, as the hand run; none was caught there",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 2222,
+      "command": "cargo build --locked -p bridge-approval-standin --example approval_standin, then under -E 'test(/import|numbering|post|approv/)': the tool's 9 as the tool run with --timeout 1800 and an exact --re of their names, after the unmutated tree passed all 2222, and the 31 hand-written ones as the hand run; then for the 5 still missed, every bridge test (-E 'all()', 5094 run), where none was caught",
+      "time": "2026-11-12T12:14:14Z",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 108,
+      "missed": 0,
+      "unviable": 40
+    },
+    "hand": {
+      "caught": 123,
+      "missed": 5
+    },
+    "survived_at_base": {
+      "tool": 9,
+      "hand": 31
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 4
+    }
+  },
+  "tool_results": {
+    "79:5 replace fits_within -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::the_next_step_of_an_approved_answer_names_the_master_tool",
+      "killer_at": "base"
+    },
+    "79:5 replace fits_within -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "80:9 replace && with || in fits_within": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::the_next_step_of_an_approved_answer_names_the_master_tool",
+      "killer_at": "base"
+    },
+    "79:14 replace <= with > in fits_within": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "82:40 replace <= with > in fits_within": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "90:5 replace fits_with -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::the_next_step_of_an_approved_answer_names_the_master_tool",
+      "killer_at": "base"
+    },
+    "90:5 replace fits_with -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "98:66 replace * with +": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::the_agent_preview_says_when_the_post_happens",
+      "killer_at": "base"
+    },
+    "98:66 replace * with /": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "113:5 replace call_withdrawn -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "113:5 replace call_withdrawn -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_not_held_for_a_withdrawn_call",
+      "killer_at": "base"
+    },
+    "192:9 replace ApprovalBinding::masters -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ApprovalBinding: std::default::Default` is not satisfied"
+    },
+    "211:9 replace ApprovalBinding::kind -> PostKind with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `PostKind: std::default::Default` is not satisfied"
+    },
+    "219:9 replace ApprovalBinding::voucher_count -> Option<usize> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_gone_from_the_journal_under_the_lock_is_refused_by_name",
+      "killer_at": "base"
+    },
+    "219:9 replace ApprovalBinding::voucher_count -> Option<usize> with Some(0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "219:9 replace ApprovalBinding::voucher_count -> Option<usize> with Some(1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "236:9 replace HeldRequest::kind -> PostKind with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `PostKind: std::default::Default` is not satisfied"
+    },
+    "245:9 replace <impl From<NativePostRequest> for HeldRequest>::from -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `HeldRequest: std::default::Default` is not satisfied"
+    },
+    "251:9 replace <impl From<MasterPostRequest> for HeldRequest>::from -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `HeldRequest: std::default::Default` is not satisfied"
+    },
+    "327:9 replace Redemption<'_>::id -> Uuid with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "333:9 replace <impl Drop for Redemption<'_>>::drop with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_corrupt_journal_at_the_check_before_the_dialog_is_skipped_and_the_lock_stops_the_post",
+      "killer_at": "base"
+    },
+    "341:5 replace held_kind -> Option<PostKind> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::an_approval_given_earlier_is_withdrawn_when_the_name_is_held_at_the_redeeming_call",
+      "killer_at": "base"
+    },
+    "341:5 replace held_kind -> Option<PostKind> with Some(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `PostKind: std::default::Default` is not satisfied"
+    },
+    "351:5 replace refusal_of -> Option<(String, Answered)> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_dialog_that_ended_unanswered_does_not_block_another_batch",
+      "killer_at": "base"
+    },
+    "351:5 replace refusal_of -> Option<(String, Answered)> with Some((String::new(), Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `approved_import::Answered: std::default::Default` is not satisfied"
+    },
+    "351:5 replace refusal_of -> Option<(String, Answered)> with Some((\"xyzzy\".into(), Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `approved_import::Answered: std::default::Default` is not satisfied"
+    },
+    "352:9 delete match arm Held::Pending{dialog:Some(dialog), ..} in refusal_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_dialog_that_ended_unanswered_does_not_block_another_batch",
+      "killer_at": "base"
+    },
+    "425:9 replace PostApprovals::redeem_fits_in_call -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "425:9 replace PostApprovals::redeem_fits_in_call -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "443:9 replace PostApprovals::fits_in_call -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::the_next_step_of_an_approved_answer_names_the_master_tool",
+      "killer_at": "base"
+    },
+    "443:9 replace PostApprovals::fits_in_call -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::new()": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::from_iter([None])": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::new(None)": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::from(None)": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::from_iter([Some((String::new(), Default::default()))])": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::new(Some((String::new(), Default::default())))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::from(Some((String::new(), Default::default())))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::from_iter([Some((\"xyzzy\".into(), Default::default()))])": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::new(Some((\"xyzzy\".into(), Default::default())))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "483:9 replace PostApprovals::slot -> std::sync::MutexGuard<'_, Option<(String, Held)>> with MutexGuard::from(Some((\"xyzzy\".into(), Default::default())))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "489:9 replace PostApprovals::refusals -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> with MutexGuard::new()": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "489:9 replace PostApprovals::refusals -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> with MutexGuard::from_iter([VecDeque::new()])": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "489:9 replace PostApprovals::refusals -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> with MutexGuard::new(VecDeque::new())": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "489:9 replace PostApprovals::refusals -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> with MutexGuard::from(VecDeque::new())": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "489:9 replace PostApprovals::refusals -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> with MutexGuard::from_iter([VecDeque::from_iter([Default::default()])])": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "489:9 replace PostApprovals::refusals -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> with MutexGuard::new(VecDeque::from_iter([Default::default()]))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "489:9 replace PostApprovals::refusals -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> with MutexGuard::from(VecDeque::from_iter([Default::default()]))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "495:32 delete ! in PostApprovals::refusals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again",
+      "killer_at": "base"
+    },
+    "503:9 replace PostApprovals::listed_did_not_fit -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> with MutexGuard::new()": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "503:9 replace PostApprovals::listed_did_not_fit -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> with MutexGuard::from_iter([VecDeque::new()])": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "503:9 replace PostApprovals::listed_did_not_fit -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> with MutexGuard::new(VecDeque::new())": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "503:9 replace PostApprovals::listed_did_not_fit -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> with MutexGuard::from(VecDeque::new())": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "503:9 replace PostApprovals::listed_did_not_fit -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> with MutexGuard::from_iter([VecDeque::from_iter([Default::default()])])": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "503:9 replace PostApprovals::listed_did_not_fit -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> with MutexGuard::new(VecDeque::from_iter([Default::default()]))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "503:9 replace PostApprovals::listed_did_not_fit -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> with MutexGuard::from(VecDeque::from_iter([Default::default()]))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot find type `MutexGuard` in this scope"
+    },
+    "507:29 delete ! in PostApprovals::listed_did_not_fit": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call",
+      "killer_at": "base"
+    },
+    "515:9 replace PostApprovals::note_listed_did_not_fit -> Box<dyn FnOnce()+Send> with Box::new(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot call associated function on trait without specifying the corresponding `impl` type"
+    },
+    "521:47 replace != with == in PostApprovals::note_listed_did_not_fit": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "530:31 replace > with == in PostApprovals::note_listed_did_not_fit": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "530:31 replace > with < in PostApprovals::note_listed_did_not_fit": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call (timed out)",
+      "killer_at": "base"
+    },
+    "530:31 replace > with >= in PostApprovals::note_listed_did_not_fit": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "540:9 replace PostApprovals::keep_refusal with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again",
+      "killer_at": "base"
+    },
+    "541:46 replace != with == in PostApprovals::keep_refusal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::kept_refusals_age_out_and_the_oldest_goes_past_the_cap",
+      "killer_at": "base"
+    },
+    "550:30 replace > with == in PostApprovals::keep_refusal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::kept_refusals_age_out_and_the_oldest_goes_past_the_cap",
+      "killer_at": "base"
+    },
+    "550:30 replace > with < in PostApprovals::keep_refusal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again (timed out)",
+      "killer_at": "base"
+    },
+    "550:30 replace > with >= in PostApprovals::keep_refusal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::kept_refusals_age_out_and_the_oldest_goes_past_the_cap",
+      "killer_at": "base"
+    },
+    "557:9 replace PostApprovals::take_refusal -> Option<String> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again",
+      "killer_at": "base"
+    },
+    "557:9 replace PostApprovals::take_refusal -> Option<String> with Some(String::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "557:9 replace PostApprovals::take_refusal -> Option<String> with Some(\"xyzzy\".into())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "558:64 replace == with != in PostApprovals::take_refusal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again",
+      "killer_at": "base"
+    },
+    "563:9 replace PostApprovals::expired -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_wire_lock_records_nothing_and_sends_nothing",
+      "killer_at": "base"
+    },
+    "563:9 replace PostApprovals::expired -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "569:9 replace PostApprovals::remaining -> Duration with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "579:9 replace PostApprovals::approval_remaining -> Option<Duration> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_reports_the_time_left_since_its_click",
+      "killer_at": "base"
+    },
+    "579:9 replace PostApprovals::approval_remaining -> Option<Duration> with Some(Default::default())": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_past_its_time_on_either_clock_and_not_for_a_click_dated_ahead",
+      "killer_at": "this_commit"
+    },
+    "580:68 replace match guard held_batch == batch_id with true in PostApprovals::approval_remaining": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::another_batchs_approval_is_never_this_batchs_time_or_use",
+      "killer_at": "this_commit"
+    },
+    "580:68 replace match guard held_batch == batch_id with false in PostApprovals::approval_remaining": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_reports_the_time_left_since_its_click",
+      "killer_at": "base"
+    },
+    "580:79 replace == with != in PostApprovals::approval_remaining": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_reports_the_time_left_since_its_click",
+      "killer_at": "base"
+    },
+    "613:9 replace PostApprovals::begin_redeem -> Result<PreviewForm, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `PreviewForm: std::default::Default` is not satisfied"
+    },
+    "624:67 replace match guard held_batch == batch_id with true in PostApprovals::begin_redeem": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval",
+      "killer_at": "base"
+    },
+    "624:67 replace match guard held_batch == batch_id with false in PostApprovals::begin_redeem": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "627:59 replace match guard held_batch == batch_id with true in PostApprovals::begin_redeem": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::another_batchs_approval_is_never_this_batchs_time_or_use",
+      "killer_at": "this_commit"
+    },
+    "627:59 replace match guard held_batch == batch_id with false in PostApprovals::begin_redeem": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval",
+      "killer_at": "base"
+    },
+    "624:78 replace == with != in PostApprovals::begin_redeem": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "627:70 replace == with != in PostApprovals::begin_redeem": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval",
+      "killer_at": "base"
+    },
+    "637:9 replace PostApprovals::form_to_ask -> PreviewForm with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `PreviewForm: std::default::Default` is not satisfied"
+    },
+    "640:39 replace == with != in PostApprovals::form_to_ask": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call",
+      "killer_at": "base"
+    },
+    "649:9 replace PostApprovals::begin -> Begin with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `Begin: std::default::Default` is not satisfied"
+    },
+    "659:24 replace != with == in PostApprovals::begin": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "677:9 replace PostApprovals::settle with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_dialog_that_ended_unanswered_does_not_block_another_batch",
+      "killer_at": "base"
+    },
+    "684:13 delete match arm Some((_, Held::Pending{dialog:Some(dialog), ..},)) in PostApprovals::settle": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_left_past_its_time_is_asked_again",
+      "killer_at": "base"
+    },
+    "693:13 delete match arm Some((_, Held::Approved{answered, ..})) in PostApprovals::settle": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_expired_approval_lapses_with_a_note",
+      "killer_at": "base"
+    },
+    "712:9 replace PostApprovals::hold_pending -> Result<(), String> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "740:9 replace PostApprovals::settle_join -> Joined with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `Joined: std::default::Default` is not satisfied"
+    },
+    "745:24 replace != with == in PostApprovals::settle_join": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "783:9 replace PostApprovals::hold_approved -> Result<(), String> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_call_for_a_batch_the_masters_journal_lacks_leaves_the_approval_slot_alone",
+      "killer_at": "base"
+    },
+    "807:9 replace PostApprovals::take_for_dispatch -> Result<(Redemption<'_>, ApprovedImport, HeldRequest), String> with Ok((Default::default(), Default::default(), Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `Redemption<'_>: std::default::Default` is not satisfied"
+    },
+    "827:19 replace match guard held_batch == batch_id with true in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::another_batchs_approval_is_never_this_batchs_time_or_use",
+      "killer_at": "this_commit"
+    },
+    "827:19 replace match guard held_batch == batch_id with false in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_wire_lock_records_nothing_and_sends_nothing",
+      "killer_at": "base"
+    },
+    "827:30 replace == with != in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_wire_lock_records_nothing_and_sends_nothing",
+      "killer_at": "base"
+    },
+    "838:21 replace || with && in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "837:21 replace || with && in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "836:21 replace || with && in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_held_approval_whose_parts_disagree_on_kind_is_refused",
+      "killer_at": "base"
+    },
+    "835:21 replace || with && in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_held_approval_whose_parts_disagree_on_kind_is_refused",
+      "killer_at": "base"
+    },
+    "834:21 replace || with && in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "endpoint_wire::tests::a_post_cut_by_one_client_holds_the_next_post_of_another",
+      "killer_at": "base"
+    },
+    "833:35 replace != with == in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "834:44 replace != with == in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "835:36 replace != with == in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "836:24 delete ! in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "837:32 replace != with == in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "838:48 replace != with == in PostApprovals::take_for_dispatch": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_wire_lock_records_nothing_and_sends_nothing",
+      "killer_at": "base"
+    },
+    "875:9 replace PostApprovals::spend -> Result<(), UnderLockRefusal> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval",
+      "killer_at": "base"
+    },
+    "878:20 replace match guard held_batch == batch_id && *id == approval with true in PostApprovals::spend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::before_dispatch_refusals_record_nothing",
+      "killer_at": "base"
+    },
+    "878:20 replace match guard held_batch == batch_id && *id == approval with false in PostApprovals::spend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "878:43 replace && with || in PostApprovals::spend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::before_dispatch_refusals_record_nothing",
+      "killer_at": "base"
+    },
+    "878:31 replace == with != in PostApprovals::spend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "878:50 replace == with != in PostApprovals::spend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "889:9 replace PostApprovals::release_unspent with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_corrupt_journal_at_the_check_before_the_dialog_is_skipped_and_the_lock_stops_the_post",
+      "killer_at": "base"
+    },
+    "891:39 replace && with || in PostApprovals::release_unspent": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_stale_redemption_releases_nothing_of_a_newer_one",
+      "killer_at": "this_commit"
+    },
+    "891:27 replace == with != in PostApprovals::release_unspent": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_corrupt_journal_at_the_check_before_the_dialog_is_skipped_and_the_lock_stops_the_post",
+      "killer_at": "base"
+    },
+    "891:46 replace == with != in PostApprovals::release_unspent": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_corrupt_journal_at_the_check_before_the_dialog_is_skipped_and_the_lock_stops_the_post",
+      "killer_at": "base"
+    },
+    "902:9 replace PostApprovals::revoke with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "912:9 replace PostApprovals::revoke_of with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "914:36 replace && with || in PostApprovals::revoke_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "914:24 replace == with != in PostApprovals::revoke_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::withdrawing_a_post_of_one_kind_leaves_the_other_kinds_approval",
+      "killer_at": "base"
+    },
+    "914:79 replace != with == in PostApprovals::revoke_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "918:53 replace != with == in PostApprovals::revoke_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it",
+      "killer_at": "base"
+    },
+    "920:42 replace != with == in PostApprovals::revoke_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "923:55 replace == with != in PostApprovals::revoke_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "933:9 replace PostApprovals::revoke_unredeemed with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_lost_between_the_passes_does_not_strand_its_approval",
+      "killer_at": "base"
+    },
+    "944:9 replace PostApprovals::revoke_unredeemed_of with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::an_approval_given_earlier_is_withdrawn_when_the_name_is_held_at_the_redeeming_call",
+      "killer_at": "base"
+    },
+    "949:11 replace || with && in PostApprovals::revoke_unredeemed_of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::an_approval_given_earlier_is_withdrawn_when_the_name_is_held_at_the_redeeming_call",
+      "killer_at": "base"
+    },
+    "965:9 replace PostApprovals::lapse_note -> Option<Value> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_aim_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "965:9 replace PostApprovals::lapse_note -> Option<Value> with Some(Default::default())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::an_approved_post_sends_exactly_the_bytes_its_intent_recorded",
+      "killer_at": "base"
+    },
+    "967:40 replace + with - in PostApprovals::lapse_note": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_read_up_to_its_cap_and_refused_past_it",
+      "killer_at": "this_commit"
+    },
+    "967:40 replace + with * in PostApprovals::lapse_note": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_read_up_to_its_cap_and_refused_past_it",
+      "killer_at": "this_commit"
+    },
+    "970:31 replace > with == in PostApprovals::lapse_note": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_read_up_to_its_cap_and_refused_past_it",
+      "killer_at": "this_commit"
+    },
+    "970:31 replace > with < in PostApprovals::lapse_note": {
+      "verdict": "unviable",
+      "reason": "does not compile: `<` is interpreted as a start of generic arguments for `u64`, not a comparison"
+    },
+    "970:31 replace > with >= in PostApprovals::lapse_note": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_read_up_to_its_cap_and_refused_past_it",
+      "killer_at": "this_commit"
+    },
+    "979:9 replace PostApprovals::lapse with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "994:9 replace PostApprovals::lapse_note_path -> Option<PathBuf> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_binding_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "994:9 replace PostApprovals::lapse_note_path -> Option<PathBuf> with Some(Default::default())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_aim_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "1006:9 replace PostApprovals::write_lapse_note with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_binding_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "1026:9 replace <impl Drop for PostApprovals>::drop with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_does_not_survive_its_process",
+      "killer_at": "base"
+    },
+    "1036:5 replace held_matches_approved -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_held_approval_whose_parts_disagree_on_kind_is_refused",
+      "killer_at": "base"
+    },
+    "1036:5 replace held_matches_approved -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "1048:5 replace approved -> Held with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `approval::Held: std::default::Default` is not satisfied"
+    }
+  },
+  "hand_mutations": {
+    "P001": {
+      "what": "ApprovalBinding::new: ledger GUIDs are bound with their case",
+      "edits": [
+        {
+          "from": "(name.to_string(), guid.to_ascii_lowercase())",
+          "to": "(name.to_string(), guid.to_string())"
+        }
+      ],
+      "mutation": "c22926d9b5cb3c3d997727b96a903957",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_binding_reads_ledger_guids_in_either_case",
+      "killer_at": "this_commit"
+    },
+    "P002": {
+      "what": "ApprovalBinding::new: no ledger is bound",
+      "edits": [
+        {
+          "from": "(name.to_string(), guid.to_ascii_lowercase()))\n                    .collect(),",
+          "to": "(name.to_string(), guid.to_ascii_lowercase()))\n                    .take(0)\n                    .collect(),"
+        }
+      ],
+      "mutation": "71de04b861cec2814bae49961c049d9e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P003": {
+      "what": "ApprovalBinding::new: the batch digest is not bound",
+      "edits": [
+        {
+          "from": "batch_sha256: line.sha256.clone(),",
+          "to": "batch_sha256: String::new(),"
+        }
+      ],
+      "mutation": "7d627314406ef509f99daf69538d1a26",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P004": {
+      "what": "ApprovalBinding::new: the endpoint is not bound",
+      "edits": [
+        {
+          "from": "endpoint_origin: line.endpoint_origin.clone(),",
+          "to": "endpoint_origin: None,"
+        }
+      ],
+      "mutation": "6f49ebde6e57a7d48bc9d197d0aadbc5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P005": {
+      "what": "ApprovalBinding::new: the preview shown is not bound",
+      "edits": [
+        {
+          "from": "preview_sha256: sha256_hex(preview.as_bytes()),\n            subject: BindingSubject::Vouchers {",
+          "to": "preview_sha256: String::new(),\n            subject: BindingSubject::Vouchers {"
+        }
+      ],
+      "mutation": "228305b5f936f1da7762c0fb16171b74",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P006": {
+      "what": "ApprovalBinding::new: the company is not bound",
+      "edits": [
+        {
+          "from": "company: line.company.clone(),",
+          "to": "company: None,"
+        }
+      ],
+      "mutation": "05c48b6c02b25e31e29f1737d447fbda",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P007": {
+      "what": "ApprovalBinding::new: the voucher count is not bound",
+      "edits": [
+        {
+          "from": "voucher_count: line.vouchers.len(),",
+          "to": "voucher_count: 0,"
+        }
+      ],
+      "mutation": "186b240365c9dfeed0b65b476faa8659",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_changed_while_approval_is_pending_is_refused_by_name",
+      "killer_at": "base"
+    },
+    "P008": {
+      "what": "ApprovalBinding::masters: a master binding is of the totals form",
+      "edits": [
+        {
+          "from": "form: PreviewForm::Listed,\n            batch_sha256: batch_sha256.to_string(),",
+          "to": "form: PreviewForm::TotalsOnly,\n            batch_sha256: batch_sha256.to_string(),"
+        }
+      ],
+      "mutation": "3d57c84933d6ab4aebf6d50c89f018ac",
+      "verdict": "caught",
+      "killer": "only_the_approvals_holder_makes_the_totals_form",
+      "killer_at": "base"
+    },
+    "P009": {
+      "what": "ApprovalBinding::masters: the batch digest is not bound",
+      "edits": [
+        {
+          "from": "batch_sha256: batch_sha256.to_string(),",
+          "to": "batch_sha256: String::new(),"
+        }
+      ],
+      "mutation": "8cf39c30d5533d26ef0c8bb448b3213e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_master_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P010": {
+      "what": "ApprovalBinding::masters: the endpoint is not bound",
+      "edits": [
+        {
+          "from": "endpoint_origin: Some(endpoint_origin.to_string()),",
+          "to": "endpoint_origin: None,"
+        }
+      ],
+      "mutation": "c9edb9bbf8ca8d74a9261909a2843f19",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_master_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P011": {
+      "what": "ApprovalBinding::masters: the preview shown is not bound",
+      "edits": [
+        {
+          "from": "preview_sha256: sha256_hex(preview.as_bytes()),\n            subject: BindingSubject::Masters {",
+          "to": "preview_sha256: String::new(),\n            subject: BindingSubject::Masters {"
+        }
+      ],
+      "mutation": "7ccdd3dff37e88398fa349fecad32dc2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_master_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P012": {
+      "what": "ApprovalBinding::masters: the company name is not bound",
+      "edits": [
+        {
+          "from": "name: company.display_name().to_string(),",
+          "to": "name: String::new(),"
+        }
+      ],
+      "mutation": "773b422e8bb0a5b990d221f3a4e531d0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_master_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P013": {
+      "what": "ApprovalBinding::masters: the company GUID is not bound",
+      "edits": [
+        {
+          "from": "guid: company.company_guid().to_string(),",
+          "to": "guid: String::new(),"
+        }
+      ],
+      "mutation": "ae7db24b37e68870f025b63dc54d1486",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_master_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P014": {
+      "what": "ApprovalBinding::masters: the company number is not bound",
+      "edits": [
+        {
+          "from": "company_number: company.company_number().to_string(),",
+          "to": "company_number: String::new(),"
+        }
+      ],
+      "mutation": "ca606f608f9fbdc910f65e4717080219",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_master_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P015": {
+      "what": "ApprovalBinding::masters: the books-from date is not bound",
+      "edits": [
+        {
+          "from": "books_from: company.books_from_yyyymmdd().to_string(),",
+          "to": "books_from: String::new(),"
+        }
+      ],
+      "mutation": "c3733ab9877c77f26afb9acf863fa452",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_month_read_that_fails_after_a_clean_read_back_ends_the_invoice_divergent",
+      "killer_at": "base"
+    },
+    "P016": {
+      "what": "ApprovalBinding::voucher_count: a master binding counts zero vouchers",
+      "edits": [
+        {
+          "from": "BindingSubject::Masters { .. } => None,",
+          "to": "BindingSubject::Masters { .. } => Some(0),"
+        }
+      ],
+      "mutation": "e6581021d6c143d9130079932c0780d6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "P017": {
+      "what": "fits_within: the measured cost is not added",
+      "edits": [
+        {
+          "from": ".checked_add(measured)",
+          "to": ".checked_add(Duration::ZERO)"
+        }
+      ],
+      "mutation": "11918da35bef8902bfe1a8a9e6d93555",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::the_next_step_of_an_approved_answer_names_the_master_tool",
+      "killer_at": "base"
+    },
+    "P018": {
+      "what": "fits_within: a batch of exactly the measured size does not fit",
+      "edits": [
+        {
+          "from": "vouchers <= measured_vouchers",
+          "to": "vouchers < measured_vouchers"
+        }
+      ],
+      "mutation": "aab1f5f7abebecf962ffa80c8f0319af",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "P019": {
+      "what": "fits_within: a total of exactly the ceiling does not fit",
+      "edits": [
+        {
+          "from": "total <= CALL_CEILING",
+          "to": "total < CALL_CEILING"
+        }
+      ],
+      "mutation": "5d2d4ee0aa45f02da894837a1474bdcf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "P020": {
+      "what": "fits_with: a post is limited to the redeem's measured size",
+      "edits": [
+        {
+          "from": "fits_within(measured, MEASURED_POST_VOUCHERS, elapsed, vouchers)",
+          "to": "fits_within(measured, MEASURED_REDEEM_VOUCHERS, elapsed, vouchers)"
+        }
+      ],
+      "mutation": "708ad35ab7f29f4ad5599bbe3d06e5b1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_posted_in_its_call_only_while_the_measured_post_fits",
+      "killer_at": "base"
+    },
+    "P021": {
+      "what": "redeem_fits_in_call: a redeem is costed as a post",
+      "edits": [
+        {
+          "from": "self.measured_redeem,\n            MEASURED_REDEEM_VOUCHERS,",
+          "to": "self.measured_post,\n            MEASURED_REDEEM_VOUCHERS,"
+        }
+      ],
+      "mutation": "7472cc60f33fbee6918d092cf85ce32a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "P022": {
+      "what": "redeem_fits_in_call: a redeem is limited to the post's measured size",
+      "edits": [
+        {
+          "from": "self.measured_redeem,\n            MEASURED_REDEEM_VOUCHERS,",
+          "to": "self.measured_redeem,\n            MEASURED_POST_VOUCHERS,"
+        }
+      ],
+      "mutation": "bf9bd5b3e0ea016af4033bdb9b0a7e92",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "P023": {
+      "what": "fits_in_call: a post is costed as a redeem",
+      "edits": [
+        {
+          "from": "fits_with(self.measured_post, elapsed, vouchers)",
+          "to": "fits_with(self.measured_redeem, elapsed, vouchers)"
+        }
+      ],
+      "mutation": "8b658185dc0bac8689e2dbe3b148edff",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::the_next_step_of_an_approved_answer_names_the_master_tool",
+      "killer_at": "base"
+    },
+    "P024": {
+      "what": "CALL_CEILING: 60 s",
+      "edits": [
+        {
+          "from": "CALL_CEILING: Duration = Duration::from_secs(45);",
+          "to": "CALL_CEILING: Duration = Duration::from_secs(60);"
+        }
+      ],
+      "mutation": "697dc8de75aa191b5695c4571a2d5e0b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "P025": {
+      "what": "MEASURED_POST: a tenth",
+      "edits": [
+        {
+          "from": "Duration::from_millis(20_950);",
+          "to": "Duration::from_millis(2_095);"
+        }
+      ],
+      "mutation": "d8ea0e07807debbe83425f10c8c6244e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_posted_in_its_call_only_while_the_measured_post_fits",
+      "killer_at": "base"
+    },
+    "P026": {
+      "what": "MEASURED_POST_VOUCHERS: 2000",
+      "edits": [
+        {
+          "from": "MEASURED_POST_VOUCHERS: usize = 200;",
+          "to": "MEASURED_POST_VOUCHERS: usize = 2000;"
+        }
+      ],
+      "mutation": "44758811ef737d0b4095396fc9c17265",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_posted_in_its_call_only_while_the_measured_post_fits",
+      "killer_at": "base"
+    },
+    "P027": {
+      "what": "MEASURED_REDEEM: a tenth",
+      "edits": [
+        {
+          "from": "Duration::from_millis(18_090);",
+          "to": "Duration::from_millis(1_809);"
+        }
+      ],
+      "mutation": "e1e6647a4446e66b578413f38e5faa32",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "P028": {
+      "what": "MEASURED_REDEEM_VOUCHERS: 500",
+      "edits": [
+        {
+          "from": "MEASURED_REDEEM_VOUCHERS: usize = 50;",
+          "to": "MEASURED_REDEEM_VOUCHERS: usize = 500;"
+        }
+      ],
+      "mutation": "9b5ab7f054ad5f0b0faf5e10420bd594",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits",
+      "killer_at": "base"
+    },
+    "P029": {
+      "what": "APPROVAL_TTL: 30 minutes",
+      "edits": [
+        {
+          "from": "Duration::from_secs(15 * 60);",
+          "to": "Duration::from_secs(30 * 60);"
+        }
+      ],
+      "mutation": "f62ccec1f23184fc9ec25c977c262904",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::the_agent_preview_says_when_the_post_happens",
+      "killer_at": "base"
+    },
+    "P030": {
+      "what": "RETRY_AFTER: 1 s",
+      "edits": [
+        {
+          "from": "RETRY_AFTER: Duration = Duration::from_secs(15);",
+          "to": "RETRY_AFTER: Duration = Duration::from_secs(1);"
+        }
+      ],
+      "mutation": "2767d1ac912324a92b7c293c4c87391e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_lost_between_the_passes_does_not_strand_its_approval",
+      "killer_at": "base"
+    },
+    "P031": {
+      "what": "MAX_LAPSE_NOTE_BYTES: 64",
+      "edits": [
+        {
+          "from": "MAX_LAPSE_NOTE_BYTES: u64 = 4_096;",
+          "to": "MAX_LAPSE_NOTE_BYTES: u64 = 64;"
+        }
+      ],
+      "mutation": "d00c8f7c7ff3fe3e67e38927b335585e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_aim_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "P032": {
+      "what": "MAX_KEPT_REFUSALS: 33",
+      "edits": [
+        {
+          "from": "MAX_KEPT_REFUSALS: usize = 32;",
+          "to": "MAX_KEPT_REFUSALS: usize = 33;"
+        }
+      ],
+      "mutation": "b80c0e44376733789c2cf553ab8064ea",
+      "verdict": "missed"
+    },
+    "P033": {
+      "what": "call_withdrawn: a call outside any tool call counts as withdrawn",
+      "edits": [
+        {
+          "from": ".unwrap_or(false)",
+          "to": ".unwrap_or(true)"
+        }
+      ],
+      "mutation": "fd881e846540644f25acfecadef48225",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "P034": {
+      "what": "Redemption::drop: the lapse note gives another reason",
+      "edits": [
+        {
+          "from": "\"post_refused_before_intent\"",
+          "to": "\"approval_expired\""
+        }
+      ],
+      "mutation": "736f62fd582f68c76d4e0cd43fcbdb27",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_aim_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "P035": {
+      "what": "held_kind: a taken approval counts as a voucher post",
+      "edits": [
+        {
+          "from": "Held::Redeeming { .. } => None,\n    }\n}",
+          "to": "Held::Redeeming { .. } => Some(PostKind::Vouchers),\n    }\n}"
+        }
+      ],
+      "mutation": "7082b28d58869a8e42b5cb9c904b04e9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_taken_approval_is_withdrawn_by_a_revocation_of_either_kind",
+      "killer_at": "this_commit"
+    },
+    "P036": {
+      "what": "refusal_of: an unanswered end counts as approved",
+      "edits": [
+        {
+          "from": ".unwrap_or_else(|| Answered {\n                approved: false,",
+          "to": ".unwrap_or_else(|| Answered {\n                approved: true,"
+        }
+      ],
+      "mutation": "54f9b6a620df550c624f74a34e54499b",
+      "verdict": "missed"
+    },
+    "P037": {
+      "what": "refusal_of: an unanswered end is dated at the epoch, so it is already past its time",
+      "edits": [
+        {
+          "from": "at_wall: SystemTime::now(),\n            });\n            (code, answered)",
+          "to": "at_wall: SystemTime::UNIX_EPOCH,\n            });\n            (code, answered)"
+        }
+      ],
+      "mutation": "6ba8b6960198cbd3037ac0dc585de292",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_dialog_that_ended_unanswered_does_not_block_another_batch",
+      "killer_at": "base"
+    },
+    "P038": {
+      "what": "refusal_of: a click's own time is not used",
+      "edits": [
+        {
+          "from": "let answered = dialog.answered().unwrap_or_else(",
+          "to": "let answered = None::<Answered>.unwrap_or_else("
+        }
+      ],
+      "mutation": "4bcb64b112c903f59c917ffe21398dd9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::kept_refusals_age_out_and_the_oldest_goes_past_the_cap",
+      "killer_at": "base"
+    },
+    "P039": {
+      "what": "refusals: refusals past their time are kept",
+      "edits": [
+        {
+          "from": "refusals.retain(|kept| !self.expired(&kept.answered));",
+          "to": "refusals.retain(|_| true);"
+        }
+      ],
+      "mutation": "6786ace695c1c02744452286c9d5666a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::kept_refusals_age_out_and_the_oldest_goes_past_the_cap",
+      "killer_at": "base"
+    },
+    "P040": {
+      "what": "listed_did_not_fit: facts past their time are kept",
+      "edits": [
+        {
+          "from": "facts.retain(|fact| !self.expired(&fact.seen));",
+          "to": "facts.retain(|_| true);"
+        }
+      ],
+      "mutation": "2dc0c78d197ecd715a4c41abafed86a2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "P041": {
+      "what": "note_listed_did_not_fit: an earlier note of the batch is kept beside the new one",
+      "edits": [
+        {
+          "from": "facts.retain(|fact| fact.batch_id != batch_id);",
+          "to": "facts.retain(|_| true);"
+        }
+      ],
+      "mutation": "258c0a818d4f5f036291f88ccb7b8b6a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "P042": {
+      "what": "note_listed_did_not_fit: past the cap the newest note is dropped",
+      "edits": [
+        {
+          "from": "facts.pop_front();",
+          "to": "facts.pop_back();"
+        }
+      ],
+      "mutation": "6465c0ef0ee6884f68de012214a12496",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "P043": {
+      "what": "note_listed_did_not_fit: a note is dated at the epoch, so it is already past its time",
+      "edits": [
+        {
+          "from": "approved: false,\n                    at: std::time::Instant::now(),\n                    at_wall: SystemTime::now(),",
+          "to": "approved: false,\n                    at: std::time::Instant::now(),\n                    at_wall: SystemTime::UNIX_EPOCH,"
+        }
+      ],
+      "mutation": "596379e0d4d77070ce26a746a1c12613",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call",
+      "killer_at": "base"
+    },
+    "P044": {
+      "what": "keep_refusal: an earlier refusal of the batch is kept beside the new one",
+      "edits": [
+        {
+          "from": "refusals.retain(|kept| kept.batch_id != batch_id);\n        if self.expired(&answered) {",
+          "to": "refusals.retain(|_| true);\n        if self.expired(&answered) {"
+        }
+      ],
+      "mutation": "4a47fd9ae58c4c08ddb2c268934a377b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_second_refusal_of_a_batch_replaces_the_first",
+      "killer_at": "this_commit"
+    },
+    "P045": {
+      "what": "keep_refusal: a refusal past its time is kept",
+      "edits": [
+        {
+          "from": "if self.expired(&answered) {\n            return;\n        }",
+          "to": "if false {\n            return;\n        }"
+        }
+      ],
+      "mutation": "6d256b87c5ecf46316600065161fb263",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_refusal_past_its_time_pushes_no_live_one_out",
+      "killer_at": "this_commit"
+    },
+    "P046": {
+      "what": "keep_refusal: past the cap the newest refusal is dropped",
+      "edits": [
+        {
+          "from": "refusals.pop_front();",
+          "to": "refusals.pop_back();"
+        }
+      ],
+      "mutation": "09c808fb33de311e1f0e926ebae98c50",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::kept_refusals_age_out_and_the_oldest_goes_past_the_cap",
+      "killer_at": "base"
+    },
+    "P047": {
+      "what": "take_refusal: a refusal is returned without being removed",
+      "edits": [
+        {
+          "from": "refusals.remove(at).map(|kept| kept.code)",
+          "to": "refusals.get(at).map(|kept| kept.code.clone())"
+        }
+      ],
+      "mutation": "ceb5ab42928c3e72174558b1cf34e66f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it",
+      "killer_at": "base"
+    },
+    "P048": {
+      "what": "remaining: the wall clock is not read",
+      "edits": [
+        {
+          "from": "let age = answered.at.elapsed().max(wall_age);",
+          "to": "let age = answered.at.elapsed();"
+        }
+      ],
+      "mutation": "b0ad2fd6bae3dff33c0fa1b5a709d41e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_past_its_time_on_either_clock_and_not_for_a_click_dated_ahead",
+      "killer_at": "this_commit"
+    },
+    "P049": {
+      "what": "remaining: the monotonic clock is not read",
+      "edits": [
+        {
+          "from": "let age = answered.at.elapsed().max(wall_age);",
+          "to": "let age = wall_age;"
+        }
+      ],
+      "mutation": "8001f18f151fb72c6b355da218168706",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_past_its_time_on_either_clock_and_not_for_a_click_dated_ahead",
+      "killer_at": "this_commit"
+    },
+    "P050": {
+      "what": "remaining: a click dated after now counts as past its time",
+      "edits": [
+        {
+          "from": ".unwrap_or(Duration::ZERO);",
+          "to": ".unwrap_or(Duration::MAX);"
+        }
+      ],
+      "mutation": "3a738d4b7eed7fc8ba254cf14131279e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_past_its_time_on_either_clock_and_not_for_a_click_dated_ahead",
+      "killer_at": "this_commit"
+    },
+    "P051": {
+      "what": "remaining: the holder's own time limit is not used",
+      "edits": [
+        {
+          "from": "self.ttl.saturating_sub(age)",
+          "to": "APPROVAL_TTL.saturating_sub(age)"
+        }
+      ],
+      "mutation": "2b8aac2f483cff1dd4604ab5f2160c0c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "P052": {
+      "what": "begin_redeem: an expired approval refuses as revoked",
+      "edits": [
+        {
+          "from": "self.settle(&mut slot);\n        if expired {\n            return Err(\"import_approval_expired\".into());\n        }\n        match slot.as_ref() {",
+          "to": "self.settle(&mut slot);\n        if expired {\n            return Err(\"import_approval_revoked\".into());\n        }\n        match slot.as_ref() {"
+        }
+      ],
+      "mutation": "7f3d57ba6c5afa14cc2419e69d68dda7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval",
+      "killer_at": "base"
+    },
+    "P053": {
+      "what": "begin_redeem: the expiry is not checked before settling",
+      "edits": [
+        {
+          "from": "self.settle(&mut slot);\n        if expired {\n            return Err(\"import_approval_expired\".into());\n        }\n        match slot.as_ref() {",
+          "to": "self.settle(&mut slot);\n        if false {\n            return Err(\"import_approval_expired\".into());\n        }\n        match slot.as_ref() {"
+        }
+      ],
+      "mutation": "7390977378e699341075735794e8ee28",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval",
+      "killer_at": "base"
+    },
+    "P054": {
+      "what": "begin_redeem: nothing is settled",
+      "edits": [
+        {
+          "from": "let mut slot = self.slot();\n        let expired = matches!(\n            slot.as_ref(),\n            Some((held_batch, Held::Approved { answered, .. }))\n                if held_batch == batch_id && self.expired(answered)\n        );\n        self.settle(&mut slot);\n        if expired {\n            return Err(\"import_approval_expired\".into());\n        }\n        match slot.as_ref() {",
+          "to": "let slot = self.slot();\n        let expired = matches!(\n            slot.as_ref(),\n            Some((held_batch, Held::Approved { answered, .. }))\n                if held_batch == batch_id && self.expired(answered)\n        );\n        if expired {\n            return Err(\"import_approval_expired\".into());\n        }\n        match slot.as_ref() {"
+        }
+      ],
+      "mutation": "e8087036ff9fb31f186541494b22ee8a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_late_redeem_lets_the_approval_go_with_its_note_at_once",
+      "killer_at": "this_commit"
+    },
+    "P055": {
+      "what": "begin_redeem: a taken approval refuses as revoked",
+      "edits": [
+        {
+          "from": "Err(\"import_approval_in_use\".into())\n            }\n            _ => Err(\"import_approval_revoked\".into()),",
+          "to": "Err(\"import_approval_revoked\".into())\n            }\n            _ => Err(\"import_approval_revoked\".into()),"
+        }
+      ],
+      "mutation": "39140eaf3dc5c5def72612460d09cd1d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval",
+      "killer_at": "base"
+    },
+    "P056": {
+      "what": "begin_redeem: the approval's form is not used",
+      "edits": [
+        {
+          "from": "Ok(binding.form)",
+          "to": "Ok(PreviewForm::Listed)"
+        }
+      ],
+      "mutation": "800231e6a1becba602d2a79e3518e65e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call",
+      "killer_at": "base"
+    },
+    "P057": {
+      "what": "form_to_ask: a noted batch is asked in the listed form",
+      "edits": [
+        {
+          "from": "PreviewForm::TotalsOnly\n        } else {",
+          "to": "PreviewForm::Listed\n        } else {"
+        }
+      ],
+      "mutation": "0785361b234bf35cf6c0413e30f0cf15",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call",
+      "killer_at": "base"
+    },
+    "P058": {
+      "what": "begin: a refusal is taken before the slot is settled",
+      "edits": [
+        {
+          "from": "let mut slot = self.slot();\n        self.settle(&mut slot);\n        // A No",
+          "to": "let mut slot = self.slot();\n        // A No"
+        },
+        {
+          "from": "return Begin::Refused(code);\n        }\n        let Some(",
+          "to": "return Begin::Refused(code);\n        }\n        self.settle(&mut slot);\n        let Some("
+        }
+      ],
+      "mutation": "618c8d98c21471b8ba370e91d612b52c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again",
+      "killer_at": "base"
+    },
+    "P059": {
+      "what": "begin: nothing is settled",
+      "edits": [
+        {
+          "from": "let mut slot = self.slot();\n        self.settle(&mut slot);\n        // A No",
+          "to": "let mut slot = self.slot();\n        // A No"
+        }
+      ],
+      "mutation": "b196db0f80b0dbd7992d1c119827a1c9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_dialog_that_ended_unanswered_does_not_block_another_batch",
+      "killer_at": "base"
+    },
+    "P060": {
+      "what": "begin: a kept refusal is dropped and the person asked again",
+      "edits": [
+        {
+          "from": "if let Some(code) = self.take_refusal(batch_id) {\n            return Begin::Refused(code);",
+          "to": "if let Some(_code) = self.take_refusal(batch_id) {\n            return Begin::Ask(self.form_to_ask(batch_id));"
+        }
+      ],
+      "mutation": "3b3ce31745f658544bb25bfcc873adbb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again",
+      "killer_at": "base"
+    },
+    "P061": {
+      "what": "begin: another batch's hold refuses as in use",
+      "edits": [
+        {
+          "from": "return Begin::Busy(\"post_approval_busy\");",
+          "to": "return Begin::Busy(\"import_approval_in_use\");"
+        }
+      ],
+      "mutation": "de0fa78891e1b00af65ec8fb6f476122",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::another_batch_is_refused_while_one_waits_for_its_person",
+      "killer_at": "base"
+    },
+    "P062": {
+      "what": "begin: a taken approval refuses as busy",
+      "edits": [
+        {
+          "from": "Held::Redeeming { .. } => Begin::Busy(\"import_approval_in_use\"),",
+          "to": "Held::Redeeming { .. } => Begin::Busy(\"post_approval_busy\"),"
+        }
+      ],
+      "mutation": "321f234f08ef3edd75447263a68d73c3",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::begin_names_a_taken_approval_in_use_and_a_joined_dialog_waiting",
+      "killer_at": "this_commit"
+    },
+    "P063": {
+      "what": "begin: a dialog another call waits on refuses as busy",
+      "edits": [
+        {
+          "from": "None => Begin::Waiting,",
+          "to": "None => Begin::Busy(\"post_approval_busy\"),"
+        }
+      ],
+      "mutation": "e74a877a26479d7d8577b0bad2f5cc0e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::begin_names_a_taken_approval_in_use_and_a_joined_dialog_waiting",
+      "killer_at": "this_commit"
+    },
+    "P064": {
+      "what": "begin: a held approval is redeemed in the listed form",
+      "edits": [
+        {
+          "from": "Held::Approved { binding, .. } => Begin::Redeem(binding.form),",
+          "to": "Held::Approved { .. } => Begin::Redeem(PreviewForm::Listed),"
+        }
+      ],
+      "mutation": "52c655619fc2a4fe53f818cdda348821",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_totals_approval_held_for_the_next_call_is_redeemed_as_totals",
+      "killer_at": "base"
+    },
+    "P065": {
+      "what": "begin: an ask is always in the listed form",
+      "edits": [
+        {
+          "from": "return Begin::Ask(self.form_to_ask(batch_id));",
+          "to": "return Begin::Ask(PreviewForm::Listed);"
+        }
+      ],
+      "mutation": "cec115fe843915eee031a01c7083ded0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call",
+      "killer_at": "base"
+    },
+    "P066": {
+      "what": "settle: a refusal's code is not kept",
+      "edits": [
+        {
+          "from": "self.keep_refusal(batch_id, code, answered);",
+          "to": "let _ = (batch_id, code, answered);"
+        }
+      ],
+      "mutation": "970e61797a92554619ad5cbf21a94336",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_decline_between_calls_is_returned_to_the_next_call_not_asked_again",
+      "killer_at": "base"
+    },
+    "P067": {
+      "what": "settle: an answered dialog past its time is not let go",
+      "edits": [
+        {
+          "from": ".is_some_and(|answered| self.expired(&answered)),",
+          "to": ".is_some_and(|_| false),"
+        }
+      ],
+      "mutation": "120226521be215bad41aa25cbc0c5cf4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_left_past_its_time_is_asked_again",
+      "killer_at": "base"
+    },
+    "P068": {
+      "what": "settle: an approval past its time is not let go",
+      "edits": [
+        {
+          "from": "Some((_, Held::Approved { answered, .. })) => self.expired(answered),",
+          "to": "Some((_, Held::Approved { .. })) => false,"
+        }
+      ],
+      "mutation": "5b9645e861c4dce1a25f9082745e7409",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_expired_approval_lapses_with_a_note",
+      "killer_at": "base"
+    },
+    "P069": {
+      "what": "settle: an expired approval's note gives another reason",
+      "edits": [
+        {
+          "from": "self.lapse(&batch_id, held, \"approval_expired\");",
+          "to": "self.lapse(&batch_id, held, \"approval_binding_changed\");"
+        }
+      ],
+      "mutation": "6fb2dfd64c08954a07f00f28e1fb1712",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_expired_approval_lapses_with_a_note",
+      "killer_at": "base"
+    },
+    "P070": {
+      "what": "hold_pending: a withdrawn call's dialog is held",
+      "edits": [
+        {
+          "from": "if call_withdrawn() {\n            return Err(\"request_cancelled\".into());\n        }\n        if slot.is_some() {\n            // Dropping",
+          "to": "if false {\n            return Err(\"request_cancelled\".into());\n        }\n        if slot.is_some() {\n            // Dropping"
+        }
+      ],
+      "mutation": "5b579ea5813edb019ec37d28a3281a49",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::nothing_is_held_for_a_withdrawn_call",
+      "killer_at": "base"
+    },
+    "P071": {
+      "what": "hold_pending: a second dialog replaces the one held",
+      "edits": [
+        {
+          "from": "if slot.is_some() {\n            // Dropping",
+          "to": "if false {\n            // Dropping"
+        }
+      ],
+      "mutation": "6da39d2a7f0e41d7a67bcf4d6f6fb817",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_second_hold_is_refused_and_the_first_stays",
+      "killer_at": "this_commit"
+    },
+    "P072": {
+      "what": "hold_pending: the dialog is not kept in the slot",
+      "edits": [
+        {
+          "from": "dialog: Some(dialog),\n                held: held.into(),",
+          "to": "dialog: { drop(dialog); None },\n                held: held.into(),"
+        }
+      ],
+      "mutation": "08a86747c9ba1ce9b93f63fa0032f3ff",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "P073": {
+      "what": "hold_pending: the dialog is held under no batch",
+      "edits": [
+        {
+          "from": "batch_id.to_string(),\n            Held::Pending {",
+          "to": "String::new(),\n            Held::Pending {"
+        }
+      ],
+      "mutation": "c21fdd1c723b0c1e3851e98b2ee5346b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "P074": {
+      "what": "settle_join: a revoked wait refuses as in use",
+      "edits": [
+        {
+          "from": "// Revoked while this call waited: whatever was answered is dropped.\n            return Joined::Refused(\"import_approval_revoked\".into());",
+          "to": "// Revoked while this call waited: whatever was answered is dropped.\n            return Joined::Refused(\"import_approval_in_use\".into());"
+        }
+      ],
+      "mutation": "8ee330ffd982ae9ee77f6728237acf6d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_answer_revoked_before_its_redemption_is_never_spent",
+      "killer_at": "base"
+    },
+    "P075": {
+      "what": "settle_join: a dialog still open is not put back",
+      "edits": [
+        {
+          "from": "*dialog = Some(open);",
+          "to": "drop(open);"
+        }
+      ],
+      "mutation": "22d6e3dfe775eeb85c32afeb33dd191a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_second_call_joins_the_open_dialog_and_a_decline_ends_it",
+      "killer_at": "base"
+    },
+    "P076": {
+      "what": "settle_join: a refused dialog stays in the slot",
+      "edits": [
+        {
+          "from": "Ok((Err(code), _)) => {\n                *slot = None;",
+          "to": "Ok((Err(code), _)) => {\n                let _ = &slot;"
+        }
+      ],
+      "mutation": "2cecfc40fcab6e9400b74248052420de",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_dialog_that_ends_refused_or_too_late_is_let_go",
+      "killer_at": "this_commit"
+    },
+    "P077": {
+      "what": "settle_join: an approval answered past its time is kept",
+      "edits": [
+        {
+          "from": "if self.expired(&answered) {\n                    self.lapse(batch_id, held, \"approval_expired\");",
+          "to": "if false {\n                    self.lapse(batch_id, held, \"approval_expired\");"
+        }
+      ],
+      "mutation": "8e664da113da922763c76671ffaae815",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_dialog_that_ends_refused_or_too_late_is_let_go",
+      "killer_at": "this_commit"
+    },
+    "P078": {
+      "what": "settle_join: an approval answered past its time refuses as revoked",
+      "edits": [
+        {
+          "from": "return Joined::Refused(\"import_approval_expired\".into());",
+          "to": "return Joined::Refused(\"import_approval_revoked\".into());"
+        }
+      ],
+      "mutation": "9728ae514eb98eccf53830fcb8d526e7",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_dialog_that_ends_refused_or_too_late_is_let_go",
+      "killer_at": "this_commit"
+    },
+    "P079": {
+      "what": "settle_join: an expired approval's note gives another reason",
+      "edits": [
+        {
+          "from": "self.lapse(batch_id, held, \"approval_expired\");",
+          "to": "self.lapse(batch_id, held, \"approval_binding_changed\");"
+        }
+      ],
+      "mutation": "37c3f2fbe5c78ae4eda4fbeaf1ce989e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_joined_dialog_that_ends_refused_or_too_late_is_let_go",
+      "killer_at": "this_commit"
+    },
+    "P080": {
+      "what": "settle_join: the approval is held under no batch",
+      "edits": [
+        {
+          "from": "*slot = Some((batch_id.to_string(), held));\n                Joined::Approved",
+          "to": "*slot = Some((String::new(), held));\n                Joined::Approved"
+        }
+      ],
+      "mutation": "772557020243930031516b0aecdbb1a2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides",
+      "killer_at": "base"
+    },
+    "P081": {
+      "what": "hold_approved: a withdrawn call's approval is held",
+      "edits": [
+        {
+          "from": "if call_withdrawn() {\n            return Err(\"request_cancelled\".into());\n        }\n        if slot.is_some() {\n            return Err(\"post_approval_busy\".into());",
+          "to": "if false {\n            return Err(\"request_cancelled\".into());\n        }\n        if slot.is_some() {\n            return Err(\"post_approval_busy\".into());"
+        }
+      ],
+      "mutation": "e7f1700fe1464e3b20d5503395522529",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_not_held_for_a_withdrawn_call",
+      "killer_at": "base"
+    },
+    "P082": {
+      "what": "hold_approved: an approval replaces what is held",
+      "edits": [
+        {
+          "from": "if slot.is_some() {\n            return Err(\"post_approval_busy\".into());\n        }\n        *slot = Some((\n            batch_id.to_string(),\n            approved(",
+          "to": "if false {\n            return Err(\"post_approval_busy\".into());\n        }\n        *slot = Some((\n            batch_id.to_string(),\n            approved("
+        }
+      ],
+      "mutation": "3f72ae2f26ff926aa84a898af34e09bc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_master_approval_shares_the_one_slot_and_dies_with_its_process",
+      "killer_at": "base"
+    },
+    "P083": {
+      "what": "take_for_dispatch: an expired approval refuses as revoked",
+      "edits": [
+        {
+          "from": "self.settle(&mut slot);\n        if expired {\n            return Err(\"import_approval_expired\".into());\n        }\n        match slot.take() {",
+          "to": "self.settle(&mut slot);\n        if expired {\n            return Err(\"import_approval_revoked\".into());\n        }\n        match slot.take() {"
+        }
+      ],
+      "mutation": "dcf15de32faed4a650752ada137e2a46",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_expired_approval_lapses_with_a_note",
+      "killer_at": "base"
+    },
+    "P084": {
+      "what": "take_for_dispatch: the binding's kind is not checked",
+      "edits": [
+        {
+          "from": "if binding.kind() != wanted\n",
+          "to": "if false\n"
+        }
+      ],
+      "mutation": "0b0e54cba814840e0fbe68195e60400f",
+      "verdict": "missed"
+    },
+    "P085": {
+      "what": "take_for_dispatch: the approved request's kind is not checked",
+      "edits": [
+        {
+          "from": "|| request.post_kind() != wanted\n",
+          "to": "|| false\n"
+        }
+      ],
+      "mutation": "852fc775397aa8281f2bc50886db5867",
+      "verdict": "missed"
+    },
+    "P086": {
+      "what": "take_for_dispatch: the held request's kind is not checked",
+      "edits": [
+        {
+          "from": "|| held.kind() != wanted\n",
+          "to": "|| false\n"
+        }
+      ],
+      "mutation": "b4d0b2bb3ec1cd0aed55e64d6c757df0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_held_approval_whose_parts_disagree_on_kind_is_refused",
+      "killer_at": "base"
+    },
+    "P087": {
+      "what": "take_for_dispatch: the held master request is not compared with the approved bytes",
+      "edits": [
+        {
+          "from": "|| !held_matches_approved(&held, &request)\n",
+          "to": "|| false\n"
+        }
+      ],
+      "mutation": "101e36f3d425fa5e382662498628cf6a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::a_held_approval_whose_parts_disagree_on_kind_is_refused",
+      "killer_at": "base"
+    },
+    "P088": {
+      "what": "take_for_dispatch: the binding is not compared",
+      "edits": [
+        {
+          "from": "|| binding != *fresh\n",
+          "to": "|| false\n"
+        }
+      ],
+      "mutation": "13ac4dfc4fa857e9aad996960797fde0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P089": {
+      "what": "take_for_dispatch: the voucher count is not compared",
+      "edits": [
+        {
+          "from": "|| request.voucher_count() != fresh.voucher_count()\n",
+          "to": "|| false\n"
+        }
+      ],
+      "mutation": "bd5aa47205dae1c55049f01f127d16d2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P090": {
+      "what": "take_for_dispatch: a changed binding's note gives another reason",
+      "edits": [
+        {
+          "from": "self.write_lapse_note(batch_id, answered, \"approval_binding_changed\");",
+          "to": "self.write_lapse_note(batch_id, answered, \"approval_expired\");"
+        }
+      ],
+      "mutation": "c95dc640f012a7315e23ceacb2505225",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P091": {
+      "what": "take_for_dispatch: a changed binding leaves no note",
+      "edits": [
+        {
+          "from": "self.write_lapse_note(batch_id, answered, \"approval_binding_changed\");",
+          "to": "let _ = answered;"
+        }
+      ],
+      "mutation": "fc91d685bcce8f588cbbeb9915ae4417",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P092": {
+      "what": "take_for_dispatch: a changed binding refuses as revoked",
+      "edits": [
+        {
+          "from": "return Err(\"import_approval_binding_changed\".into());",
+          "to": "return Err(\"import_approval_revoked\".into());"
+        }
+      ],
+      "mutation": "6126f28760c4640bca2b4655ecf3deed",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P093": {
+      "what": "take_for_dispatch: the taken approval is held under another id",
+      "edits": [
+        {
+          "from": "Held::Redeeming { id, answered }));",
+          "to": "Held::Redeeming { id: Uuid::new_v4(), answered }));"
+        }
+      ],
+      "mutation": "d419bb9e72a862e63f7a7c3524ef3259",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error",
+      "killer_at": "base"
+    },
+    "P094": {
+      "what": "take_for_dispatch: the redemption carries another id",
+      "edits": [
+        {
+          "from": "batch_id: batch_id.to_string(),\n                        id,",
+          "to": "batch_id: batch_id.to_string(),\n                        id: Uuid::new_v4(),"
+        }
+      ],
+      "mutation": "2b902d90516a7d174e29e0d5c4243fdf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict",
+      "killer_at": "base"
+    },
+    "P095": {
+      "what": "take_for_dispatch: an approval another call took refuses as revoked",
+      "edits": [
+        {
+          "from": "\"import_approval_in_use\"\n                } else {",
+          "to": "\"import_approval_revoked\"\n                } else {"
+        }
+      ],
+      "mutation": "83a9d3aab8ecf3865d01cab88e31714d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_spent_once_and_never_after_a_revocation",
+      "killer_at": "base"
+    },
+    "P096": {
+      "what": "take_for_dispatch: what else is held is dropped",
+      "edits": [
+        {
+          "from": "*slot = other;",
+          "to": "drop(other);"
+        }
+      ],
+      "mutation": "521d5d7cb13fbc06b2582551bf83b562",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_is_spent_once_and_never_after_a_revocation",
+      "killer_at": "base"
+    },
+    "P097": {
+      "what": "spend: the approval is not cleared, so it can be spent again",
+      "edits": [
+        {
+          "from": "*slot = None;\n                Ok(())",
+          "to": "Ok(())"
+        }
+      ],
+      "mutation": "a08c475722571480a6930770e8a15a90",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval",
+      "killer_at": "base"
+    },
+    "P098": {
+      "what": "spend: a refused spend gives another refusal",
+      "edits": [
+        {
+          "from": "_ => Err(UnderLockRefusal::ApprovalRevoked),",
+          "to": "_ => Err(UnderLockRefusal::BatchChanged),"
+        }
+      ],
+      "mutation": "09af8f365f60a49fd4eda326c249a078",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::before_dispatch_refusals_record_nothing",
+      "killer_at": "base"
+    },
+    "P099": {
+      "what": "release_unspent: the taken approval stays taken",
+      "edits": [
+        {
+          "from": "let answered = *answered;\n                *slot = None;",
+          "to": "let answered = *answered;"
+        }
+      ],
+      "mutation": "87b9208734c9c0d3d5929eb699dec619",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_tools::tests::a_corrupt_journal_at_the_check_before_the_dialog_is_skipped_and_the_lock_stops_the_post",
+      "killer_at": "base"
+    },
+    "P100": {
+      "what": "release_unspent: no note is left",
+      "edits": [
+        {
+          "from": "self.write_lapse_note(batch_id, answered, reason);\n            }\n        }\n    }",
+          "to": "let _ = (answered, reason);\n            }\n        }\n    }"
+        }
+      ],
+      "mutation": "42f3cc633f5ed4fa74a7f82f2d00d241",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_aim_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "P101": {
+      "what": "release_unspent: the note gives a fixed reason",
+      "edits": [
+        {
+          "from": "self.write_lapse_note(batch_id, answered, reason);\n            }\n        }\n    }",
+          "to": "self.write_lapse_note(batch_id, answered, \"approval_expired\");\n            }\n        }\n    }"
+        }
+      ],
+      "mutation": "722b5005edfc2311460b69d25bc2ca63",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_aim_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "P102": {
+      "what": "revoke: a voucher withdrawal withdraws a master post",
+      "edits": [
+        {
+          "from": "self.revoke_of(PostKind::Vouchers, batch_id, reason);",
+          "to": "self.revoke_of(PostKind::Masters, batch_id, reason);"
+        }
+      ],
+      "mutation": "822bbcfd2bde3c1ab394245d41c74cf9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "P103": {
+      "what": "revoke_of: an approval of the other kind is withdrawn",
+      "edits": [
+        {
+          "from": "held_batch == batch_id && held_kind(held).is_some_and(|held| held != kind)",
+          "to": "false && held_kind(held).is_some_and(|held| held != kind)"
+        }
+      ],
+      "mutation": "7c81b84594adcce7d0861775805a8748",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::withdrawing_a_post_of_one_kind_leaves_the_other_kinds_approval",
+      "killer_at": "base"
+    },
+    "P104": {
+      "what": "revoke_of: a taken approval is treated as the other kind and kept",
+      "edits": [
+        {
+          "from": ".is_some_and(|held| held != kind)",
+          "to": ".is_none_or(|held| held != kind)"
+        }
+      ],
+      "mutation": "e56b957eb956d28fb9c8f08839fa77b8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other",
+      "killer_at": "base"
+    },
+    "P105": {
+      "what": "revoke_of: an unread refusal is kept",
+      "edits": [
+        {
+          "from": "self.refusals().retain(|kept| kept.batch_id != batch_id);",
+          "to": "drop(self.refusals());"
+        }
+      ],
+      "mutation": "be804cbd243f14aed26debe57a393a1a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it",
+      "killer_at": "base"
+    },
+    "P106": {
+      "what": "revoke_of: a noted listed-did-not-fit is kept",
+      "edits": [
+        {
+          "from": "self.listed_did_not_fit()\n            .retain(|fact| fact.batch_id != batch_id);",
+          "to": "drop(self.listed_did_not_fit());"
+        }
+      ],
+      "mutation": "f4a75e63c85a11726e9f659c9e56bbfc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered",
+      "killer_at": "base"
+    },
+    "P107": {
+      "what": "revoke_of: the withdrawn hold leaves no note",
+      "edits": [
+        {
+          "from": "if let Some((_, held)) = slot.take() {\n                self.lapse(batch_id, held, reason);\n            }\n        }\n    }\n\n    /// [`Self::revoke_unredeemed_of`]",
+          "to": "if let Some((_, held)) = slot.take() {\n                drop(held);\n            }\n        }\n    }\n\n    /// [`Self::revoke_unredeemed_of`]"
+        }
+      ],
+      "mutation": "8033b607f7b68d29850d15df112f2162",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted",
+      "killer_at": "base"
+    },
+    "P108": {
+      "what": "revoke_unredeemed: a voucher withdrawal withdraws a master post",
+      "edits": [
+        {
+          "from": "self.revoke_unredeemed_of(PostKind::Vouchers, batch_id, reason);",
+          "to": "self.revoke_unredeemed_of(PostKind::Masters, batch_id, reason);"
+        }
+      ],
+      "mutation": "ed81cbf5cfce8f930956fe04ee91a520",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_lost_between_the_passes_does_not_strand_its_approval",
+      "killer_at": "base"
+    },
+    "P109": {
+      "what": "revoke_unredeemed_of: a collected approval of the other kind is withdrawn",
+      "edits": [
+        {
+          "from": "if held_batch == batch_id && held_kind(held) == Some(kind)\n        ) || matches!(",
+          "to": "if held_batch == batch_id\n        ) || matches!("
+        }
+      ],
+      "mutation": "f123bac26e9af211988e46742f967d50",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::masters::withdrawing_a_post_of_one_kind_leaves_the_other_kinds_approval",
+      "killer_at": "base"
+    },
+    "P110": {
+      "what": "revoke_unredeemed_of: a clicked dialog of the other kind is withdrawn",
+      "edits": [
+        {
+          "from": "&& held_kind(held) == Some(kind)\n                    && dialog.answered()",
+          "to": "&& dialog.answered()"
+        }
+      ],
+      "mutation": "9294756f8ebe003ff266a97c6a1719e3",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_clicked_dialog_is_not_withdrawn_as_the_other_kind",
+      "killer_at": "this_commit"
+    },
+    "P111": {
+      "what": "revoke_unredeemed_of: a declined dialog is withdrawn",
+      "edits": [
+        {
+          "from": ".is_some_and(|answered| answered.approved)",
+          "to": ".is_some()"
+        }
+      ],
+      "mutation": "7a5cc28b18b48c55e1f83eee4846d28e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::revoke_unredeemed_takes_only_a_given_untaken_approval_of_its_batch",
+      "killer_at": "base"
+    },
+    "P112": {
+      "what": "revoke_unredeemed_of: an open dialog is withdrawn",
+      "edits": [
+        {
+          "from": ".is_some_and(|answered| answered.approved)",
+          "to": ".is_none_or(|answered| answered.approved)"
+        }
+      ],
+      "mutation": "f2c937a19b495a4fbde979531f22c179",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::revoke_unredeemed_takes_only_a_given_untaken_approval_of_its_batch",
+      "killer_at": "base"
+    },
+    "P113": {
+      "what": "revoke_unredeemed_of: the withdrawn approval leaves no note",
+      "edits": [
+        {
+          "from": "if let Some((_, held)) = slot.take() {\n                self.lapse(batch_id, held, reason);\n            }\n        }\n    }\n\n    /// The last approval",
+          "to": "if let Some((_, held)) = slot.take() {\n                drop(held);\n            }\n        }\n    }\n\n    /// The last approval"
+        }
+      ],
+      "mutation": "ce5dcc6115a292c13d2dc056611913ad",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_lost_between_the_passes_does_not_strand_its_approval",
+      "killer_at": "base"
+    },
+    "P114": {
+      "what": "lapse_note: a note over the size bound is read",
+      "edits": [
+        {
+          "from": "if bytes.len() as u64 > MAX_LAPSE_NOTE_BYTES {\n            return None;",
+          "to": "if false {\n            return None;"
+        }
+      ],
+      "mutation": "24e42d292b5786517168d7cbdc9637be",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_read_up_to_its_cap_and_refused_past_it",
+      "killer_at": "this_commit"
+    },
+    "P115": {
+      "what": "lapse: a declined dialog leaves a note",
+      "edits": [
+        {
+          "from": ".filter(|answered| answered.approved)",
+          "to": ""
+        }
+      ],
+      "mutation": "8887f252a730688771879cc4624dc468",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_declined_dialog_withdrawn_leaves_no_note",
+      "killer_at": "this_commit"
+    },
+    "P116": {
+      "what": "lapse: a taken approval leaves no note",
+      "edits": [
+        {
+          "from": "Held::Approved { answered, .. } | Held::Redeeming { answered, .. } => Some(*answered),",
+          "to": "Held::Approved { answered, .. } => Some(*answered),\n            Held::Redeeming { .. } => None,"
+        }
+      ],
+      "mutation": "535a2654b698e082ae9ef03e60f3f7f5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other",
+      "killer_at": "base"
+    },
+    "P117": {
+      "what": "lapse_note_path: a batch id without the bridge- prefix gets a note",
+      "edits": [
+        {
+          "from": ".strip_prefix(\"bridge-\")\n            .and_then",
+          "to": ".strip_prefix(\"bridge-\")\n            .or(Some(batch_id))\n            .and_then"
+        }
+      ],
+      "mutation": "1d93e7a436708e68c277dde05be9aa90",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_named_by_the_parsed_id_and_holds_the_click",
+      "killer_at": "this_commit"
+    },
+    "P118": {
+      "what": "lapse_note_path: the file name is another",
+      "edits": [
+        {
+          "from": "\"bridge-{uuid}.approval_lapse.json\"",
+          "to": "\"bridge-{uuid}.lapse.json\""
+        }
+      ],
+      "mutation": "2fd401dc5adabb455d5fa589c43ea651",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_named_by_the_parsed_id_and_holds_the_click",
+      "killer_at": "this_commit"
+    },
+    "P119": {
+      "what": "lapse_note_path: the file is named by the batch id as given, not the parsed id",
+      "edits": [
+        {
+          "from": "format!(\"bridge-{uuid}.approval_lapse.json\")",
+          "to": "format!(\"{batch_id}.approval_lapse.json\")"
+        }
+      ],
+      "mutation": "3e339ba3daee7d8b0fc693899d067aa8",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_named_by_the_parsed_id_and_holds_the_click",
+      "killer_at": "this_commit"
+    },
+    "P120": {
+      "what": "write_lapse_note: the state is another",
+      "edits": [
+        {
+          "from": "\"state\": \"approval_lapsed_unposted\",",
+          "to": "\"state\": \"approval_lapsed\","
+        }
+      ],
+      "mutation": "ca364ea725c6091c5ea1a472d87b0f4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_expired_approval_lapses_with_a_note",
+      "killer_at": "base"
+    },
+    "P121": {
+      "what": "write_lapse_note: the note says it is redeemable",
+      "edits": [
+        {
+          "from": "\"redeemable\": false,",
+          "to": "\"redeemable\": true,"
+        }
+      ],
+      "mutation": "f84f21781b8ea92189688c2818741e04",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_redemption_for_anything_else_is_refused_and_lapses",
+      "killer_at": "base"
+    },
+    "P122": {
+      "what": "write_lapse_note: the reason is fixed",
+      "edits": [
+        {
+          "from": "\"reason\": reason,",
+          "to": "\"reason\": \"approval_expired\","
+        }
+      ],
+      "mutation": "9b80ec0027b0a99c7b1bbcf407a9a446",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_busy_wire_lock_at_the_queues_binding_marks_read_refuses_before_the_intent",
+      "killer_at": "base"
+    },
+    "P123": {
+      "what": "write_lapse_note: the approval time is the lapse time",
+      "edits": [
+        {
+          "from": "DateTime::<Utc>::from(answered.at_wall)",
+          "to": "DateTime::<Utc>::from(SystemTime::now())"
+        }
+      ],
+      "mutation": "712368742fac2e11d1d11995f49d097b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_named_by_the_parsed_id_and_holds_the_click",
+      "killer_at": "this_commit"
+    },
+    "P124": {
+      "what": "write_lapse_note: the batch id is not written",
+      "edits": [
+        {
+          "from": "\"batch_id\": batch_id,",
+          "to": "\"batch_id\": \"\","
+        }
+      ],
+      "mutation": "db4ce649dd11be6cfdbae77b5f42531d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_lapse_note_is_named_by_the_parsed_id_and_holds_the_click",
+      "killer_at": "this_commit"
+    },
+    "P125": {
+      "what": "write_lapse_note: a note is written where no imports folder exists",
+      "edits": [
+        {
+          "from": "if self.imports.is_dir() {",
+          "to": "if true {"
+        }
+      ],
+      "mutation": "e2f0aa8c0c7609feb13b5990420b0676",
+      "verdict": "missed"
+    },
+    "P126": {
+      "what": "PostApprovals::drop: the note gives another reason",
+      "edits": [
+        {
+          "from": "\"process_ended\"",
+          "to": "\"approval_expired\""
+        }
+      ],
+      "mutation": "8974b78f789b671cfd237ebffbbb9712",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::an_approval_does_not_survive_its_process",
+      "killer_at": "base"
+    },
+    "P127": {
+      "what": "held_matches_approved: a voucher request never matches",
+      "edits": [
+        {
+          "from": "HeldRequest::Vouchers(_) => true,",
+          "to": "HeldRequest::Vouchers(_) => false,"
+        }
+      ],
+      "mutation": "9ca713a377ac57eb41bb2d574d135ace",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_attempted_while_approval_is_pending_is_refused_by_name",
+      "killer_at": "base"
+    },
+    "P128": {
+      "what": "approved: every approval has the nil id",
+      "edits": [
+        {
+          "from": "id: Uuid::new_v4(),\n        request: Box::new(request),",
+          "to": "id: Uuid::nil(),\n        request: Box::new(request),"
+        }
+      ],
+      "mutation": "5504955659057f469b195cf930ee7881",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_stale_redemption_releases_nothing_of_a_newer_one",
+      "killer_at": "this_commit"
+    }
+  },
+  "accepted_survivors": {
+    "P032": {
+      "mutation": "b80c0e44376733789c2cf553ab8064ea",
+      "reason": "not killed: MAX_KEPT_REFUSALS bounds two things, the kept refusals (keep_refusal) and the batches whose listed box did not fit (note_listed_did_not_fit), so the mutant moves both. Every test that reaches either cap counts to MAX_KEPT_REFUSALS by name (kept_refusals_age_out_and_the_oldest_goes_past_the_cap for the refusals, a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered for the notes), so a changed cap moves the tests with it. Each number is a size bound on memory with no documented value, not a behaviour a test should pin as a literal"
+    },
+    "P036": {
+      "mutation": "54f9b6a620df550c624f74a34e54499b",
+      "reason": "equivalent: a kept refusal's Answered is read only by expired(), which reads its two times, never approved; the flag set here is written and never read"
+    },
+    "P084": {
+      "mutation": "0b0e54cba814840e0fbe68195e60400f",
+      "reason": "equivalent while the binding is compared whole: a held binding of another kind than the fresh one differs from it in its subject, so binding != *fresh refuses the same redemption with the same code and note"
+    },
+    "P085": {
+      "mutation": "852fc775397aa8281f2bc50886db5867",
+      "reason": "equivalent while voucher_count tells the kinds apart: an approved request's voucher_count is Some only for vouchers and None for masters, as the binding's is, so a request of the other kind than the fresh binding always fails request.voucher_count() != fresh.voucher_count() in the same condition, with the same code and note, in either direction. voucher_count carries the kind only incidentally (post_kind decides it), so a voucher_count that stops telling the kinds apart reopens it, and no test would then fail"
+    },
+    "P125": {
+      "mutation": "e2f0aa8c0c7609feb13b5990420b0676",
+      "reason": "equivalent: write_private_file creates no folder, so where the imports folder is missing the open fails and no note is written, as when the check skips the write"
+    }
+  }
+}

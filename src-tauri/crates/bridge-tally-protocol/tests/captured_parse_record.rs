@@ -1183,6 +1183,42 @@ const ROWS: &[Row] = &[
         parse: |_, text| untyped(parse_import_outcome(text)),
     },
     Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/post-span-import-response.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",
@@ -1214,6 +1250,12 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/single-import-missing-ledger.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/single-import-stock-in-hand-journal.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",
         parse: |_, text| untyped(parse_import_outcome(text)),

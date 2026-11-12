@@ -171,7 +171,7 @@ fn query_request(item: &str) -> String {
     )
     .unwrap();
     render_stock_query_request(
-        identity().display_name(),
+        identity().company_name(),
         &MeasuredItemName::new(item).unwrap(),
         &period,
     )

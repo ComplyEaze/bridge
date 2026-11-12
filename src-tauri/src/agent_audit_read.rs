@@ -484,7 +484,7 @@ async fn collect_parts(
         runtime,
         config,
         identity,
-        native_group_snapshot_read(name).into_xml(),
+        native_group_snapshot_read(&company).into_xml(),
     )
     .await?;
     parts.push(single("groups", "groups", "groups.xml", None, groups));
@@ -517,7 +517,7 @@ async fn collect_parts(
         runtime,
         config,
         identity,
-        voucher_type_catalogue_read(name).into_xml(),
+        voucher_type_catalogue_read(&company).into_xml(),
     )
     .await?;
     parts.push(single(

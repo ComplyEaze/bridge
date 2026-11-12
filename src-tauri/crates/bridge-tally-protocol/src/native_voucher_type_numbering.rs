@@ -57,7 +57,9 @@ pub const VOUCHER_TYPE_NUMBERING_FETCH: &str = "NAME, PARENT, GUID, MASTERID, AL
 /// Renders the voucher-type export with the numbering fields added: the
 /// production builder's request with only its `FETCH` list replaced, byte for
 /// byte the request that was sent live for the committed capture.
-pub fn render_voucher_type_numbering_request(company: &str) -> String {
+pub fn render_voucher_type_numbering_request(
+    company: &crate::xml_read_profiles::ValidatedCompanyName,
+) -> String {
     render_native_voucher_type_export_request(company).replacen(
         "<FETCH>NAME, PARENT, GUID, MASTERID, ALTERID</FETCH>",
         &format!("<FETCH>{VOUCHER_TYPE_NUMBERING_FETCH}</FETCH>"),

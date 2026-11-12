@@ -965,7 +965,7 @@
       "killer_at": "base"
     },
     "S43": {
-      "what": "given always (then_some replaced by Some)",
+      "what": "given always (then_some followed by .or(Some(CONCURRENT_CHANGE_LINE)))",
       "applied_to": "src-tauri/src/agent_import_span_identity.rs",
       "edits": [
         {
@@ -5481,7 +5481,7 @@
     },
     "S107": {
       "mutation": "c2ea42810f69d5f8ec898299df00edff",
-      "reason": "not killed, and not equivalent: counters.created as usize != count differs from usize::try_from(counters.created).ok() != Some(count) only where usize is narrower than 64 bits (a created count of 2^32 + count reads as count there), and every host used here has a 64-bit usize. a_created_count_above_the_batch_refuses_as_one_below_does asserts that refusal and passes on a 64-bit host with either spelling; a 32-bit run would kill it"
+      "reason": "not killed, and not equivalent: counters.created as usize != count differs from usize::try_from(counters.created).ok() != Some(count) only where usize is narrower than 64 bits (a created count of 2^32 + count reads as count there), and every host used here has a 64-bit usize. a_created_count_above_the_batch_refuses_as_one_below_does asserts that refusal and passes on a 64-bit host with either spelling; a 32-bit run would kill it, by reading (no 32-bit run was made)"
     },
     "S159": {
       "mutation": "3f0b80a3de3bb158c6a6939c89f7507e",

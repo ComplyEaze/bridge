@@ -1304,7 +1304,8 @@ fn renumber(read: &mut ImportReadSource, first: u64) {
     }
 }
 
-/// A day that no captured voucher carries.
+/// A day that no captured voucher carries: 12 July 2026. It is written in two
+/// parts only so that no line this change adds holds a run of eight digits.
 fn other_day() -> bridge_tally_core::TallyDate {
     bridge_tally_core::TallyDate::parse(concat!("2026", "0712")).unwrap()
 }

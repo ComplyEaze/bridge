@@ -1,0 +1,3 @@
+(cut: 2 of 336 lines kept, the port-9001 LISTENING lines)
+  TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       23160
+  TCP    [::]:9001              [::]:0                 LISTENING       23160

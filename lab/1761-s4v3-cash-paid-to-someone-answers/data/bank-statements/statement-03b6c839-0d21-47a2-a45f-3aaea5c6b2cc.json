@@ -1,0 +1,153 @@
+{
+  "account_last4": "4321",
+  "bank": "csv_bank_a",
+  "bank_ledger": "BRIDGE Bank A",
+  "controls": {
+    "closing_balance": "35000.00",
+    "opening_balance": "50000.00",
+    "total_credits": null,
+    "total_debits": null
+  },
+  "controls_source": "prior_statement",
+  "coverage": null,
+  "created_at": "2026-11-12T06:10:59.385Z",
+  "proposals_id": "statement-03b6c839-0d21-47a2-a45f-3aaea5c6b2cc",
+  "records": [
+    {
+      "amount": "12000.00",
+      "bridge_txn_id": "st-20250408-be621b1463b52f1b",
+      "cash_answer": "paid_to_someone",
+      "cash_movement": "withdrawal",
+      "date": "2025-04-08",
+      "direction": "outflow",
+      "disposition": {
+        "voucher": "Contra"
+      },
+      "instrument": null,
+      "ledger": "Cash",
+      "paid_to": {
+        "bridge_txn_id": "st-20250408-be621b1463b52f1b-cash",
+        "ledger": "BRIDGE Contractor A",
+        "over_cash_limit": true
+      },
+      "party": "ATM CASH WITHDRAWAL",
+      "reference": null,
+      "reversed_same_day": false,
+      "row": 1,
+      "suspense": false
+    },
+    {
+      "amount": "3000.00",
+      "bridge_txn_id": "st-20250409-ef7d14f34a7b0412",
+      "cash_answer": "paid_to_someone",
+      "cash_movement": "withdrawal",
+      "date": "2025-04-09",
+      "direction": "outflow",
+      "disposition": {
+        "voucher": "Contra"
+      },
+      "instrument": null,
+      "ledger": "Cash",
+      "paid_to": {
+        "bridge_txn_id": "st-20250409-ef7d14f34a7b0412-cash",
+        "ledger": "BRIDGE Wages",
+        "over_cash_limit": false
+      },
+      "party": "ATM CASH WITHDRAWAL",
+      "reference": null,
+      "reversed_same_day": false,
+      "row": 2,
+      "suspense": false
+    }
+  ],
+  "schema": "bridge.bank_statement.proposals.v2",
+  "statement_sha256": "ebca906726de102cb23dcf15767de2cee5bba0ff4c401debd6e7b9fb3bf776ff",
+  "suspense_ledger": "BRIDGE Suspense",
+  "vouchers": [
+    {
+      "bridge_txn_id": "st-20250408-be621b1463b52f1b",
+      "date": "2025-04-08",
+      "entries": [
+        {
+          "amount": "12000.00",
+          "ledger": "Cash",
+          "side": "Dr"
+        },
+        {
+          "amount": "12000.00",
+          "ledger": "BRIDGE Bank A",
+          "side": "Cr"
+        }
+      ],
+      "narration": "to Cash | Lab CSV 4321 | 08-Apr-2025",
+      "voucher_type": "Contra"
+    },
+    {
+      "bridge_txn_id": "st-20250408-be621b1463b52f1b-cash",
+      "date": "2025-04-08",
+      "entries": [
+        {
+          "amount": "12000.00",
+          "ledger": "BRIDGE Contractor A",
+          "side": "Dr"
+        },
+        {
+          "amount": "12000.00",
+          "ledger": "Cash",
+          "side": "Cr"
+        }
+      ],
+      "narration": "Cash paid to BRIDGE Contractor A from Cash | withdrawn | Lab CSV 4321 | 08-Apr-2025 | Bridge: cash to one payee in a day over 10000; check s.40A(3)",
+      "voucher_type": "Payment"
+    },
+    {
+      "bridge_txn_id": "st-20250409-ef7d14f34a7b0412",
+      "date": "2025-04-09",
+      "entries": [
+        {
+          "amount": "3000.00",
+          "ledger": "Cash",
+          "side": "Dr"
+        },
+        {
+          "amount": "3000.00",
+          "ledger": "BRIDGE Bank A",
+          "side": "Cr"
+        }
+      ],
+      "narration": "to Cash | Lab CSV 4321 | 09-Apr-2025",
+      "voucher_type": "Contra"
+    },
+    {
+      "bridge_txn_id": "st-20250409-ef7d14f34a7b0412-cash",
+      "date": "2025-04-09",
+      "entries": [
+        {
+          "amount": "3000.00",
+          "ledger": "BRIDGE Wages",
+          "side": "Dr"
+        },
+        {
+          "amount": "3000.00",
+          "ledger": "Cash",
+          "side": "Cr"
+        }
+      ],
+      "narration": "Cash paid to BRIDGE Wages from Cash | withdrawn | Lab CSV 4321 | 09-Apr-2025",
+      "voucher_type": "Payment"
+    }
+  ],
+  "window": {
+    "first_row_date": "2025-04-08",
+    "last_row_date": "2025-04-09",
+    "tie_out": {
+      "basis": "statement_rows_by_value_date",
+      "closing_balance": "35000.00",
+      "first_date": "2025-04-08",
+      "last_date": "2025-04-09",
+      "opening_balance": "50000.00",
+      "state": "established"
+    },
+    "whole_statement": true
+  }
+}

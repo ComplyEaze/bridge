@@ -787,6 +787,105 @@ async fn discover_companies_fails_closed_without_a_guid() {
     assert_eq!(methods, ["POST"]);
 }
 
+/// Snapshot discovery lists a company whose name no read can carry beside one
+/// whose name it can (#2433), each name byte for byte. Each listed company is
+/// then selected. The valid one verifies its identity against the company
+/// list the snapshot probe reads; the other's snapshot probe is refused with
+/// the name's own code. Before #2445, a name over the limit refused the whole
+/// discovery as `application_response_rejected`, because the transport's own
+/// check re-parses the list, and a name with an edge tab was listed with the
+/// tab trimmed off.
+#[tokio::test]
+async fn discover_companies_lists_an_unsendable_company_beside_a_valid_one() {
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let valid = crate::tally::connection::tests::SHAPE_LAB_COMPANY_NAME;
+    let long = "A".repeat(bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES + 1);
+    for (case, second, held) in [
+        ("over the limit", long.as_str(), long.as_str()),
+        ("an edge tab", "&#x9;LAB", "\tLAB"),
+    ] {
+        let xml = crate::tally::connection::tests::shape_lab_company_list_beside(second);
+        // Discovery, the valid company's snapshot read and the other's probe.
+        let (address, server) = spawn_method_routed_server(vec![xml.clone(); 3]).await;
+        let config = TallyConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        };
+        let connector_for = |company: CompanyRef| {
+            let context = RequestContext {
+                run_id: "run-discover-unsendable-company".to_string(),
+                company: company.clone(),
+                pack: CapabilityPackId::CoreAccounting,
+                schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
+                window: ReadWindow {
+                    from_yyyymmdd: "20260701".to_string(),
+                    to_yyyymmdd: "20260701".to_string(),
+                },
+                query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
+                filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
+            };
+            RuntimeTallyConnector::new(TallyRuntime::default(), config.clone(), company, context)
+                .unwrap()
+        };
+        let unselected = CompanyRef {
+            identity: company_source_identity(
+                &format!("tally_xml_http:http://{address}"),
+                "synthetic-company-guid",
+                "100001",
+                "Synthetic Company",
+                "20260401",
+            ),
+            display_name: "Synthetic Company".to_string(),
+        };
+
+        let discovered = connector_for(unselected)
+            .discover_companies()
+            .await
+            .expect("an unsendable name keeps the discovery");
+        assert_eq!(
+            discovered
+                .iter()
+                .map(|company| company.display_name.as_str())
+                .collect::<Vec<_>>(),
+            [valid, held],
+            "{case}: both companies list, held byte for byte"
+        );
+
+        let mut discovered = discovered.into_iter();
+        // The valid company: its identity against the list the snapshot probe
+        // reads, short of the profile check and the core window read the probe
+        // goes on to.
+        let connector = connector_for(discovered.next().unwrap());
+        let (_, read) = connector
+            .runtime
+            .snapshot_probe_with_observation(config.clone(), &connector.company.display_name)
+            .await
+            .expect("the snapshot probe reads the company list");
+        assert_eq!(read.companies.len(), 2, "{case}");
+        let verified = connector
+            .verify_snapshot_identity_from_companies(&read.companies)
+            .expect("the valid company is selectable");
+        assert_eq!(verified.display_name(), valid);
+        // The other company: its snapshot probe stops at its identity.
+        let error = connector_for(discovered.next().unwrap())
+            .probe()
+            .await
+            .expect_err("the unsendable company is refused at its identity");
+        assert!(
+            matches!(
+                &error,
+                TallyError::Protocol { code } if code == "company_name_invalid"
+            ),
+            "{case}: unexpected error: {error:?}"
+        );
+        assert_eq!(
+            server.await.expect("join routed Tally server"),
+            ["POST", "GET", "POST", "GET", "POST"],
+            "{case}"
+        );
+    }
+}
+
 /// A negative mutation of a captured V2 response keeps the identity intact
 /// while removing only the selected company's master witness. Equal paired
 /// responses must still fail with the missing-witness error.

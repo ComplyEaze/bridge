@@ -392,7 +392,9 @@ async fn receipt_of_run(replay: &Replay) -> Value {
 }
 
 /// Every string of a receipt is a field name, a released field's path, a code,
-/// a hash, the receipt's own id and time, or the company's GUID: lower-case
+/// a hash, the receipt's own id and time, the company's GUID, or a fixed word
+/// (the record type, the tool, the redaction preset, a send's kind and
+/// outcome): lower-case
 /// letters, digits and `_ . [ ] : -` only, so no name as the books write it,
 /// with its capitals and spaces, fits. A lower-case name would, so the callers
 /// also look for the book's names. The error code, which may be one of the
@@ -432,10 +434,12 @@ fn names_in(receipt: &Value, names: &[String]) -> Vec<String> {
 }
 
 /// bridge#697 (#1145 item 9): the receipt of a completed run names the figure
-/// and finding id fields it released and carries none of the evidence the crate
-/// cited for them: no ledger, stock item, PAN, payee or config ref id, no ref
-/// label, and no subject or detail of a failed book check. The control is the
-/// crate's own dump of the same book, which cites ledgers by name.
+/// and finding id fields it released, never their values, and carries none of
+/// the evidence the crate cited for them: no ref id, no ref label, and no
+/// subject or detail of a failed book check. The control is the crate's own
+/// dump of the same book, which cites ledgers by name (`cash_44ab` cites
+/// `ledger` and `rule` refs only; a stock item, PAN, payee or config ref is
+/// kept out by the receipt recording paths, not values).
 #[tokio::test]
 async fn a_completed_runs_receipt_holds_no_ref_id_or_label_and_no_name_of_the_book() {
     let (audit, _) = super::super::audit_read::tests::read_replay(&Replay::small()).await;
@@ -478,6 +482,8 @@ async fn a_completed_runs_receipt_holds_no_ref_id_or_label_and_no_name_of_the_bo
         cited.iter().any(|text| text == "Cash"),
         "the dump cites no ledger by name"
     );
+    // The finder finds them where they are.
+    assert!(names_in(&dump, &cited).contains(&"Cash".to_string()));
 
     let receipt = receipt_of_run(&Replay::small()).await;
     assert_eq!(receipt["tool"], "audit_test_run");
@@ -495,7 +501,7 @@ async fn a_completed_runs_receipt_holds_no_ref_id_or_label_and_no_name_of_the_bo
     }
     // The crate's evidence, labels and failed checks' subjects and details are
     // not released, so no path of the result names them. (The top-level
-    // `evidence` is the call's own request and response hashes.)
+    // `evidence` is the call's own record: hashes, size, state and time.)
     for path in fields.iter().filter(|path| path.starts_with("result.")) {
         for dropped in ["evidence", "label", "subject", "detail"] {
             assert!(!path.contains(dropped), "{path}");

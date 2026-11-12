@@ -37,6 +37,7 @@ type Props = {
   config: { host: string; port: number };
   company?: {
     name: string;
+    shown_name: string;
     guid: string;
     company_number: string;
     books_from_yyyymmdd: string;
@@ -495,7 +496,7 @@ export function OutstandingsScreen({
     if (currencyCheck.state === "checking" || currencyCheck.state === "idle" || currencyCheck.state === "ready") {
       return (
         <section className="panel wide outstandings-empty">
-          <h2>Opening {company.name}</h2>
+          <h2>Opening {company.shown_name}</h2>
           <p>Reading the company&rsquo;s base currency from Tally.</p>
         </section>
       );
@@ -613,7 +614,7 @@ export function OutstandingsScreen({
     <section className="outstandings-screen" aria-busy={loading}>
       <div className="outstandings-heading">
         <div>
-          <h2>{company.name}</h2>
+          <h2>{company.shown_name}</h2>
           <p>
             {result
               ? result.state === "complete"

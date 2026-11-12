@@ -13,6 +13,7 @@ import { OutstandingsExportNotice, OutstandingsScreen } from "../src/Outstanding
 const config = { host: "127.0.0.1", port: 9000 };
 const company = {
   name: "Synthetic Accounts",
+  shown_name: "Synthetic Accounts",
   guid: "00000000-0000-0000-0000-000000000000",
   company_number: "100001",
   books_from_yyyymmdd: "20260401",

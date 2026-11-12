@@ -1,0 +1,15 @@
+package.json
+scripts/ledger-entries-screen.test.tsx
+scripts/trial-balance-screen.test.tsx
+scripts/ux1-shell.test.mjs
+src-tauri/src/agent_desktop_journal.rs
+src-tauri/src/commands.rs
+src-tauri/src/db/tally_mirror.rs
+src/AllClientsScreen.tsx
+src/JournalPostingScreen.tsx
+src/LedgerEntriesScreen.tsx
+src/MirrorProofScreen.tsx
+src/OutstandingsScreen.tsx
+src/TrialBalanceScreen.tsx
+src/main.tsx
+reviewer: lamemustafa

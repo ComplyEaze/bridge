@@ -15,6 +15,7 @@ import { LedgerEntriesScreen } from "../src/LedgerEntriesScreen";
 
 const company = {
   name: "Synthetic company",
+  shown_name: "Synthetic company",
   guid: "11111111-1111-1111-1111-111111111111",
   company_number: "100001",
   books_from_yyyymmdd: "20250401",

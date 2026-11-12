@@ -20,6 +20,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::{ExactDecimal, TallyDate};
+use bridge_tally_protocol::outstandings_shared::bill_allocation_without_type_is_placeholder;
 use serde_json::Value;
 
 use crate::error::{AuditError, Result};
@@ -191,6 +192,135 @@ impl Default for Voucher {
     }
 }
 
+/// One `BILLALLOCATIONS.LIST` row of a voucher: the bill a ledger entry's amount, or part of it,
+/// is set against (#681).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BillAllocation {
+    /// LEDGERNAME of the entry the row sits under.
+    pub ledger: String,
+    pub bill: Bill,
+    /// AMOUNT in paise, debit positive, as a ledger line's.
+    pub amount_paise: i64,
+}
+
+/// A bill allocation's type and the bill it names. The types are the four the app's own bill
+/// trail reads; an On Account row names no bill, so it has no name to hold.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Bill {
+    NewRef(String),
+    AgstRef(String),
+    Advance(String),
+    OnAccount,
+}
+
+/// The read's bill allocations. Whether the read carries them is part of the value, so a read
+/// that did not ask for them is never taken for vouchers that have none (read format 1.2).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum BillAllocations {
+    /// Not every vouchers part says its request asked for them (`bill_allocations`, read format
+    /// 1.2), or the book was not built from a read. Nothing is known of any
+    /// voucher's bills.
+    #[default]
+    NotRead,
+    /// Every vouchers part asked, and every row read. By voucher GUID, each voucher's rows in
+    /// entry order; a voucher not listed has none.
+    Read(BTreeMap<String, Vec<BillAllocation>>),
+    /// Every vouchers part asked, but a row did not read. No allocation of the read is used; the
+    /// rest of the book is unaffected.
+    Unreadable(BillRowRefusal),
+}
+
+/// The first bill allocation row that did not read, and where it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BillRowRefusal {
+    pub part: String,
+    pub voucher_guid: String,
+    pub ledger: String,
+    pub fault: BillRowFault,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BillRowFault {
+    /// No BILLTYPE on a row that carries a name or an amount. A narrower request can drop the
+    /// type (protocol reference §8.2a), and a guessed type would invent an allocation.
+    Untyped,
+    /// A BILLTYPE that is not New Ref, Agst Ref, Advance or On Account.
+    UnknownType,
+    /// A New Ref, Agst Ref or Advance row that names no bill.
+    Unnamed,
+    /// An On Account row that names a bill.
+    NamedOnAccount,
+    /// A typed row with no AMOUNT: an absent amount is not zero.
+    NoAmount,
+    /// An AMOUNT that is not a plain decimal, a foreign-currency amount among them.
+    AmountUnreadable,
+}
+
+/// A vouchers part's bill allocations, added to `found` by voucher GUID, or the first row that
+/// does not read. A row with no type, no name and no amount is Tally's empty placeholder and is
+/// passed over, by the shared placeholder rule; unlike that rule, an untyped row with an amount
+/// is refused, because this read cannot tell a placeholder from an allocation that lost its type
+/// (§8.2a).
+fn part_bill_allocations(
+    root: &Element,
+    part: &str,
+    found: &mut BTreeMap<String, Vec<BillAllocation>>,
+) -> std::result::Result<(), BillRowRefusal> {
+    for v in root.descendants_named("VOUCHER") {
+        if v.attr("REMOTEID").is_none_or(str::is_empty) && v.child("GUID").is_none() {
+            continue; // the template row, as in `load_vouchers`
+        }
+        let guid = match v.child_text("GUID") {
+            "" => v.attr("REMOTEID").unwrap_or_default(),
+            guid => guid,
+        };
+        let mut rows = Vec::new();
+        for entry in v.children_named("ALLLEDGERENTRIES.LIST") {
+            let ledger = entry.child_text("LEDGERNAME");
+            for row in entry.children_named("BILLALLOCATIONS.LIST") {
+                let refuse = |fault| BillRowRefusal {
+                    part: part.to_string(),
+                    voucher_guid: guid.to_string(),
+                    ledger: ledger.to_string(),
+                    fault,
+                };
+                let (name, amount) = (row.child_text("NAME"), row.child_text("AMOUNT"));
+                let named = |bill: fn(String) -> Bill| {
+                    (!name.is_empty())
+                        .then(|| bill(name.to_string()))
+                        .ok_or_else(|| refuse(BillRowFault::Unnamed))
+                };
+                let bill = match row.child_text("BILLTYPE") {
+                    "" if amount.is_empty()
+                        && bill_allocation_without_type_is_placeholder(Some(name)) =>
+                    {
+                        continue
+                    }
+                    "" => return Err(refuse(BillRowFault::Untyped)),
+                    "New Ref" => named(Bill::NewRef)?,
+                    "Agst Ref" => named(Bill::AgstRef)?,
+                    "Advance" => named(Bill::Advance)?,
+                    "On Account" if name.is_empty() => Bill::OnAccount,
+                    "On Account" => return Err(refuse(BillRowFault::NamedOnAccount)),
+                    _ => return Err(refuse(BillRowFault::UnknownType)),
+                };
+                let amount_paise = flip(amount, part)
+                    .map_err(|_| refuse(BillRowFault::AmountUnreadable))?
+                    .ok_or_else(|| refuse(BillRowFault::NoAmount))?;
+                rows.push(BillAllocation {
+                    ledger: ledger.to_string(),
+                    bill,
+                    amount_paise,
+                });
+            }
+        }
+        if !rows.is_empty() {
+            found.insert(guid.to_string(), rows);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct TbRow {
     pub opening_paise: i64,
@@ -264,6 +394,8 @@ pub struct Book {
     /// The closing stock a ledger-wise trial balance leaves out (`financial_statements`), read
     /// once here from the Stock Summary dated the trial balance's last day.
     pub closing_stock: ClosingStock,
+    /// The vouchers' bill allocations, when the read asked for them (#681). No tax-audit rule uses them yet.
+    pub bill_allocations: BillAllocations,
 }
 
 /// Opening stock as of the trial balance's first day. Tally holds it on the stock items, never
@@ -1235,13 +1367,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
 
     let after_voucher_high_water = read.after.as_ref().and_then(|a| a.alter_voucher_id);
     let mut parts: Vec<(&str, Vec<Voucher>)> = Vec::new(); // each vouchers part's name and vouchers
+    let bills_asked = read.voucher_parts().iter().all(|vp| vp.bill_allocations);
+    let mut bills = Ok(BTreeMap::new());
     for vp in read.voucher_parts() {
-        let parsed = load_vouchers(
-            &xml::read(&vp.content, &vp.id)?,
-            &vp.id,
-            &base,
-            side.as_ref(),
-        )?;
+        let root = xml::read(&vp.content, &vp.id)?;
+        let parsed = load_vouchers(&root, &vp.id, &base, side.as_ref())?;
         let w = window_of(vp);
         let outside: Vec<&Voucher> = parsed
             .vouchers
@@ -1289,6 +1419,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
                     vp.id, vp.stored_name, vp.name
                 ),
             ));
+        }
+        if bills_asked {
+            bills = bills.and_then(|mut found| {
+                part_bill_allocations(&root, &vp.id, &mut found).map(|()| found)
+            });
         }
         parts.push((vp.name.as_str(), parsed.vouchers));
     }
@@ -1368,6 +1503,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         }),
         opening_stock,
         closing_stock,
+        bill_allocations: match (bills_asked, bills) {
+            (false, _) => BillAllocations::NotRead,
+            (true, Ok(found)) => BillAllocations::Read(found),
+            (true, Err(refusal)) => BillAllocations::Unreadable(refusal),
+        },
     })
 }
 
@@ -2122,6 +2262,7 @@ mod tests {
                 "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
             )
             .into_bytes(),
+            bill_allocations: false,
         }
     }
 
@@ -2141,6 +2282,7 @@ mod tests {
                 "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
             )
             .into_bytes(),
+            bill_allocations: false,
         }
     }
 
@@ -2476,5 +2618,145 @@ mod tests {
         ));
         assert_eq!(s.gross_profit, None);
         assert_eq!(s.net_profit, None);
+    }
+
+    /// The audit read's own vouchers request, answered live by the invented pilot-lab company (see
+    /// that folder's PROVENANCE.md): 167 allocation rows under 168 entries, of which 165 are empty.
+    const PILOT_LAB_VOUCHERS: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml"
+    );
+
+    fn bills_of(
+        xml: &str,
+    ) -> std::result::Result<BTreeMap<String, Vec<BillAllocation>>, BillRowRefusal> {
+        let root = crate::xml::read(xml.as_bytes(), "vouchers-x").unwrap();
+        let mut found = BTreeMap::new();
+        part_bill_allocations(&root, "vouchers-x", &mut found).map(|()| found)
+    }
+
+    /// One voucher with one entry holding `rows`.
+    fn bill_entry(rows: &str) -> String {
+        format!(
+            "<ENVELOPE><BODY><DATA><COLLECTION><VOUCHER><GUID>g-1</GUID>\
+             <ALLLEDGERENTRIES.LIST><LEDGERNAME>Supplier</LEDGERNAME><AMOUNT>10.00</AMOUNT>\
+             {rows}</ALLLEDGERENTRIES.LIST></VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+        )
+    }
+
+    fn bill_row(name: &str, kind: &str, amount: &str) -> String {
+        format!(
+            "<BILLALLOCATIONS.LIST><NAME>{name}</NAME><BILLTYPE>{kind}</BILLTYPE>\
+             <AMOUNT>{amount}</AMOUNT></BILLALLOCATIONS.LIST>"
+        )
+    }
+
+    /// #681: the captured answer gives exactly its two typed rows, debit positive, and passes over
+    /// its 165 empty ones.
+    #[test]
+    fn the_pilot_lab_capture_reads_its_two_bill_allocations() {
+        let root = crate::xml::read(PILOT_LAB_VOUCHERS, "vouchers-pilot").unwrap();
+        let mut found = BTreeMap::new();
+        part_bill_allocations(&root, "vouchers-pilot", &mut found).unwrap();
+        let supplier = |bill| {
+            vec![BillAllocation {
+                ledger: "BRIDGE Supplier RJ".to_string(),
+                bill,
+                amount_paise: -105_000,
+            }]
+        };
+        let expected = BTreeMap::from([
+            (
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000017".to_string(),
+                supplier(Bill::NewRef("SUP/0001".to_string())),
+            ),
+            (
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000018".to_string(),
+                supplier(Bill::AgstRef("SUP/0001".to_string())),
+            ),
+        ]);
+        assert_eq!(found, expected);
+    }
+
+    #[test]
+    fn each_bill_type_reads_and_an_empty_row_is_passed_over() {
+        let rows = [
+            "<BILLALLOCATIONS.LIST>  </BILLALLOCATIONS.LIST>".to_string(),
+            "<BILLALLOCATIONS.LIST><NAME> </NAME><BILLTYPE></BILLTYPE><AMOUNT></AMOUNT></BILLALLOCATIONS.LIST>".to_string(),
+            bill_row("B/1", "New Ref", "4.00"),
+            bill_row("B/0", "Agst Ref", "-1.00"),
+            bill_row("B/2", "Advance", "2.00"),
+            bill_row("", "On Account", "5.00"),
+        ]
+        .concat();
+        let found = bills_of(&bill_entry(&rows)).unwrap();
+        let bills: Vec<(Bill, i64)> = found["g-1"]
+            .iter()
+            .map(|a| (a.bill.clone(), a.amount_paise))
+            .collect();
+        assert_eq!(
+            bills,
+            [
+                (Bill::NewRef("B/1".to_string()), -400),
+                (Bill::AgstRef("B/0".to_string()), 100),
+                (Bill::Advance("B/2".to_string()), -200),
+                (Bill::OnAccount, -500),
+            ]
+        );
+        assert!(found["g-1"].iter().all(|a| a.ledger == "Supplier"));
+        // A voucher whose rows are all empty is not listed: it has none.
+        assert_eq!(
+            bills_of(&bill_entry("<BILLALLOCATIONS.LIST/>")),
+            Ok(BTreeMap::new())
+        );
+    }
+
+    /// #681 step 3: a row that does not read is refused with where it is and why, never skipped
+    /// or guessed; an untyped row that carries an amount is not taken for a placeholder.
+    #[test]
+    fn a_bill_row_that_does_not_read_is_refused_by_its_fault() {
+        let fault = |rows: &str| bills_of(&bill_entry(rows)).unwrap_err().fault;
+        assert_eq!(
+            fault("<BILLALLOCATIONS.LIST><AMOUNT>10.00</AMOUNT></BILLALLOCATIONS.LIST>"),
+            BillRowFault::Untyped
+        );
+        assert_eq!(fault(&bill_row("B/1", "", "")), BillRowFault::Untyped);
+        assert_eq!(
+            fault(&bill_row("B/1", "Against", "1.00")),
+            BillRowFault::UnknownType
+        );
+        for kind in ["New Ref", "Agst Ref", "Advance"] {
+            assert_eq!(
+                fault(&bill_row("", kind, "1.00")),
+                BillRowFault::Unnamed,
+                "{kind}"
+            );
+        }
+        assert_eq!(
+            fault(&bill_row("B/1", "On Account", "1.00")),
+            BillRowFault::NamedOnAccount
+        );
+        assert_eq!(
+            fault(&bill_row("B/1", "New Ref", "")),
+            BillRowFault::NoAmount
+        );
+        assert_eq!(
+            fault(&bill_row("B/1", "New Ref", "$5.00 @ \u{20b9} 83.00/$")),
+            BillRowFault::AmountUnreadable
+        );
+        let refusal = bills_of(&bill_entry(&format!(
+            "{}{}",
+            bill_row("B/1", "New Ref", "1.00"),
+            bill_row("B/2", "New Ref", "")
+        )))
+        .unwrap_err();
+        assert_eq!(
+            refusal,
+            BillRowRefusal {
+                part: "vouchers-x".to_string(),
+                voucher_guid: "g-1".to_string(),
+                ledger: "Supplier".to_string(),
+                fault: BillRowFault::NoAmount,
+            }
+        );
     }
 }

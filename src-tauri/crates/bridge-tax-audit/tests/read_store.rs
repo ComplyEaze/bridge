@@ -380,3 +380,99 @@ fn a_read_with_integrated_inventory_carries_its_closing_stock() {
         ClosingStock::Unknown(ClosingStockUnknown::NotRead)
     );
 }
+
+/// #681, read format 1.2: a read whose vouchers parts all say they asked for bill allocations
+/// carries them, a voucher with none included; a read that does not say so is not read as one
+/// whose vouchers have none, and neither is a read that asked in one part only. A row that does
+/// not read leaves the allocations unreadable and the rest of the book as it was.
+#[test]
+fn a_read_carries_bill_allocations_only_when_every_vouchers_part_asked_for_them() {
+    use bridge_tax_audit::book::{load_book, Bill, BillAllocations, BillRowFault};
+    let mut store = MemoryStore::synthetic();
+    let ask = |store: &mut MemoryStore, ids: &[&str]| {
+        let mut manifest = store.manifest();
+        for id in ids {
+            part_mut(&mut manifest, id)["bill_allocations"] = json!(true);
+        }
+        store.set_manifest(&manifest);
+    };
+    let bills = |store: &MemoryStore| {
+        load_book(&open(store).unwrap(), "Invented")
+            .unwrap()
+            .bill_allocations
+    };
+    assert_eq!(bills(&store), BillAllocations::NotRead);
+    ask(&mut store, &["vouchers-2025-04-01"]);
+    assert_eq!(bills(&store), BillAllocations::NotRead);
+    ask(&mut store, &["vouchers-2025-10-01"]);
+    assert_eq!(bills(&store), BillAllocations::Read(BTreeMap::new()));
+
+    let first = "<AMOUNT TYPE=\"Amount\">-42000.00</AMOUNT>";
+    let with_row = |row: &str| {
+        let part = String::from_utf8(store.blobs["parts/vouchers_h1.xml"].clone()).unwrap();
+        assert_eq!(part.matches(first).count(), 1);
+        part.replacen(first, &format!("{first}{row}"), 1)
+            .into_bytes()
+    };
+    let typed = with_row(
+        "<BILLALLOCATIONS.LIST><NAME>CS/1</NAME><BILLTYPE>New Ref</BILLTYPE>\
+         <AMOUNT>-42000.00</AMOUNT></BILLALLOCATIONS.LIST>",
+    );
+    let untyped =
+        with_row("<BILLALLOCATIONS.LIST><AMOUNT>-42000.00</AMOUNT></BILLALLOCATIONS.LIST>");
+    replace_part(
+        &mut store,
+        "vouchers-2025-04-01",
+        "parts/vouchers_h1.xml",
+        typed,
+    );
+    let BillAllocations::Read(found) = bills(&store) else {
+        panic!("the allocations did not read");
+    };
+    let row = &found["6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-00000001"];
+    assert_eq!(found.len(), 1);
+    assert_eq!(
+        (row[0].ledger.as_str(), &row[0].bill, row[0].amount_paise),
+        ("Cash", &Bill::NewRef("CS/1".to_string()), 4_200_000)
+    );
+
+    let plain = load_book(&open(&MemoryStore::synthetic()).unwrap(), "Invented").unwrap();
+    replace_part(
+        &mut store,
+        "vouchers-2025-04-01",
+        "parts/vouchers_h1.xml",
+        untyped,
+    );
+    let book = load_book(&open(&store).unwrap(), "Invented").unwrap();
+    let BillAllocations::Unreadable(refusal) = &book.bill_allocations else {
+        panic!("an untyped row with an amount was read");
+    };
+    assert_eq!(refusal.fault, BillRowFault::Untyped);
+    assert_eq!(refusal.part, "vouchers-2025-04-01");
+    let lines = |book: &bridge_tax_audit::book::Book| -> Vec<(String, Vec<(String, i64)>)> {
+        book.vouchers
+            .iter()
+            .map(|v| {
+                let lines = v.lines.iter().map(|l| (l.ledger.clone(), l.amount_paise));
+                (v.guid.clone(), lines.collect())
+            })
+            .collect()
+    };
+    assert_eq!(lines(&book), lines(&plain));
+}
+
+/// The flag is true or false, and only a vouchers part carries it.
+#[test]
+fn a_bill_allocations_flag_that_is_not_a_vouchers_boolean_is_refused() {
+    for (id, value) in [
+        ("vouchers-2025-04-01", json!("yes")),
+        ("vouchers-2025-04-01", Value::Null),
+        ("ledgers", json!(true)),
+    ] {
+        let mut store = MemoryStore::synthetic();
+        let mut manifest = store.manifest();
+        part_mut(&mut manifest, id)["bill_allocations"] = value;
+        store.set_manifest(&manifest);
+        assert_eq!(code(open(&store)), "C1-schema", "{id}");
+    }
+}

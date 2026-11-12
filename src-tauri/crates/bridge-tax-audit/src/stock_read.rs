@@ -307,6 +307,7 @@ mod tests {
                 "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
             )
             .into_bytes(),
+            bill_allocations: false,
         }
     }
 

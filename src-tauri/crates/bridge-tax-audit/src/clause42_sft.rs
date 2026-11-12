@@ -204,6 +204,7 @@ mod tests {
             currency_read: false,
             opening_stock: crate::book::OpeningStock::NotApplicable,
             closing_stock: crate::book::ClosingStock::NotApplicable,
+            bill_allocations: crate::book::BillAllocations::NotRead,
             vouchers,
             tb: BTreeMap::new(),
         }

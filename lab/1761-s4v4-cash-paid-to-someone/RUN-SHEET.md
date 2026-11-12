@@ -74,7 +74,7 @@ RC COMMIT: de54a0f26e554f574727a0bc4914b0ad6ca88583  CI RUN: the Bridge CI `merg
 
 **While any field of this line reads `<to fill>`: STOP. This row does not run.** Before the first call, hash the exe that will run and compare it with the line; any other hash = STOP. Record the version the tool reports.
 
-Run it as the lab runs a staged exe over stdio, ONE launch from step 0 to the close, never relaunched in between. Environment:
+Run it as the lab runs a staged exe over stdio, ONE launch from step 0 to the close, never relaunched in between, except the one reads-only relaunch step 4.3 names after a process exit. Environment:
 - `BRIDGE_TALLY_HOST=127.0.0.1` and `BRIDGE_TALLY_PORT=9001`;
 - ONE new empty `BRIDGE_AGENT_DATA_DIR`, `C:\bridge-lab\1761-s4v4\data\`;
 - `BRIDGE_TERMS_ACCEPTED=true`, the person responsible for the lab accepting the Terms of Use;
@@ -195,7 +195,7 @@ The book: unchanged.
 
 ## Step 4: the approved post (C)
 **[OWNER]-at-PC HOLD and the grant, before 4.1.** Step 4 starts only when the run coordinator records [OWNER]'s word that they are at the lab PC. The grant is asked inside the hold, at step 4.0.
-- Until then, call nothing and press nothing. C is built and not sent, and the book is as after step 3.
+- Until then, call nothing except step 4.0's computer-use `request_access`, and press nothing. C is built and not sent, and the book is as after step 3.
 - **The hold lasts at most 60 minutes**, counted from step 3.2's answer. Past it, or sooner if [OWNER] cannot come, the run coordinator decides between waiting longer in this launch and step 6, the restore. Until that word, nothing is called and nothing is keyed.
 - The approval's own expiry (`approval.expires_in_s`) counts from the click, which comes after the hold. No expiry of a built batch is known to this sheet, so a wait is not expected to change C.
 - C is never sent in another launch.
@@ -215,7 +215,7 @@ The book: unchanged.
    Record every answer whole.
 3. **A window that closes before [OWNER] answers it.** [OWNER] reports what was seen and when; nothing is pressed.
    - With the process still running, the next `post_import`, made when item 2 times it, is the read: `import_approval_timed_out` goes on as below. Any other refusal is recorded whole, then STOP. No call is added to check.
-   - With the process gone (the window closes with it): STOP. Record the time, the exit code and the last lines of its error output, and take a screenshot of the whole screen. Nothing is called in that launch again, C is never sent in another, and no batch is built again. On the run coordinator's word, ONE new launch, once in the sitting, with a new empty data folder, `C:\bridge-lab\1761-s4v4\data-reads\`. Before it, hash the exe again: a sha256 other than step 0.1's = STOP, and no launch. It reads MARKS once and `vouchers` for 2025-04-08 to 2025-04-09 once, with the GUID of step 0.3, and calls nothing else: no `post_import` and no `build_import_xml` (that folder holds no batch, so it cannot post C). A `post_import` after a relaunch is a STOP. V equal to V4a is the proof that nothing was sent, as below. Then step 6, on the run coordinator's word.
+   - With the process gone (the window closes with it): STOP. Record the time, the exit code and the last lines of its error output, and take a screenshot of the whole screen. Nothing is called in that launch again, C is never sent in another, and no batch is built again. On the run coordinator's word, ONE new launch, once in the sitting, with a new empty data folder, `C:\bridge-lab\1761-s4v4\data-reads\`. Before it, hash the exe again: a sha256 other than step 0.1's = STOP, and no launch. It is made with `BRIDGE_AGENT_ENABLE_WRITES` absent, and the answers record that. With the GUID of step 0.3 it reads MARKS once and `vouchers` for 2025-04-08 to 2025-04-09 once; it stays up for step 6 and carries that step's reads (6.2 MARKS, 6.3 `list_companies` and `vouchers` for 2025-04-01, 6.4 `vouchers`), and calls nothing else: no `post_import` and no `build_import_xml` (that folder holds no batch, so it cannot post C). A `post_import` after a relaunch is a STOP. V equal to V4a is the proof that nothing was sent, as below. Then step 6, on the run coordinator's word.
 
    If an answer reads `import_approval_timed_out`: record it whole, read MARKS and `vouchers` for 2025-04-08 to 2025-04-09 once each, and STOP. That `vouchers` read covers two days that hold no voucher if nothing was posted, so its completeness is recorded, not required: on 0.7.0 it may read partial (row 2507-T). C is not called again without the run coordinator's word, and only if the answer read `attempt_recorded` false and V = V4a: those two are the proof that nothing was sent. The `vouchers` read listing no voucher only corroborates them; a partial, empty answer proves nothing alone.
 4. EXPECT, in the answer of the call that sent the post:
@@ -275,7 +275,7 @@ The book: as at BK1, the masters and the seed.
 - Steps 4 and 5: plus the four vouchers of C.
 - Step 6: as at BK1, the masters and the seed.
 
-STOP RULES: C7 and C8; any dialog before a call; an approval window other than step 4's; a mark that moves outside the step that changes it (step 0's item 7 is the only step before step 4 that may move V); any answer outside the stated shape; a `post_import` without step 4.0's grant approved, or in any launch but the first. Step 4.4's HOLD wins over that last rule: an answer step 4.4 names as a HOLD is a HOLD, not a STOP.
+STOP RULES: C7 and C8; any dialog before a call, except step 4.0's grant dialog, whose text is recorded; an approval window other than step 4's; a mark that moves outside the step that changes it (before step 4, only step 0's item 4, the restore, which EXPECTs V null, and its item 7 may move V); any answer outside the stated shape; a `post_import` without step 4.0's grant approved, or in any launch but the first. Step 4.4's HOLD wins over that last rule: an answer step 4.4 names as a HOLD is a HOLD, not a STOP.
 
 ## Close and evidence
 - **C10:** Shut Company; leave no company loaded. THE COMPANY stays on the lab PC, as at BK1: it is synthetic.

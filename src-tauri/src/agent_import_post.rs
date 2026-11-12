@@ -2313,8 +2313,18 @@ pub(super) fn attach_next_step(
     }
 }
 
-fn mark_reconciliation_required(payload: &mut Value) {
+/// Where to look when no answer to the post was kept (bridge#852). The call that
+/// sent the batch keeps a receipt with the trail of its sends
+/// (`request_trail::RequestTrail`); the batch's own record holds no duration
+/// and no ending, so it points there and promises nothing: a process that ended
+/// before the receipt was written leaves none.
+pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. If a receipt of the post_import call that sent it was kept, egress_log returns it: its request_trail lists the last 32 sends of that call with held_ms, how long the send held the endpoint, and its outcome, the post's among them. A missing receipt may mean the process ended before it was written. Either way, reconcile this original batch without resending it.";
+
+fn mark_reconciliation_required(payload: &mut Value, response: Option<&ledger::DispatchResponse>) {
     payload["result"]["error"] = json!({"code":"import_reconciliation_required", "message":"The saved attempt has not been confirmed as the intended new voucher. Reconcile this original batch without resending it."});
+    if response.is_none() {
+        payload["result"]["error"]["next_step"] = json!(RESPONSE_MISSING_NEXT_STEP);
+    }
 }
 
 /// A clean response creates exactly the batch's `voucher_count` vouchers and
@@ -2372,7 +2382,7 @@ pub(super) fn finalize_previous_attempt_reconciliation(
         "response": response,
     });
     if !name_verified {
-        mark_reconciliation_required(payload);
+        mark_reconciliation_required(payload, response);
     } else if let Some((code, message)) = doubt {
         payload["result"]["error"] = json!({"code": code, "message": message});
     }
@@ -2479,7 +2489,7 @@ pub(super) fn finalize_current_dispatch(
         "resent":false, "automatic_retry":false
     });
     if !clean || !verified {
-        mark_reconciliation_required(payload);
+        mark_reconciliation_required(payload, response);
     } else if let Some((code, message)) = masters_doubt {
         payload["result"]["error"] = json!({"code": code, "message": message});
     }

@@ -1,0 +1,1 @@
+- `verify_import` and `post_import` now add a next step to the reconciliation-required error of a batch with no record of Tally's answer to its post: read the receipt of the `post_import` call that sent it with `egress_log`, if one was kept, for the `held_ms` and outcome of its last 32 sends; a missing receipt may mean the process ended before it was written (part of #852).

@@ -366,6 +366,52 @@ fn exact_readback_requires_a_clean_persisted_response_to_reconcile() {
     }
 }
 
+/// A batch with no response record points at the receipt of the call that sent
+/// it, and says what its absence means (bridge#852); a batch whose answer is on
+/// record gets no such step.
+#[test]
+fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
+    let clean = dispatch_response("success", 1, 0);
+    let altered = dispatch_response("success", 0, 1);
+    let unverified = || json!({"result": {"counts": {"posted_verified": 0}, "duplicates": []}});
+    for (response, pointed) in [(None, true), (Some(&altered), false), (Some(&clean), false)] {
+        let mut previous = unverified();
+        finalize_previous_attempt_reconciliation(&mut previous, response, None, 1);
+        let mut current = unverified();
+        finalize_current_dispatch(&mut current, response, None, 1);
+        for payload in [previous, current] {
+            let error = &payload["result"]["error"];
+            assert_eq!(error["code"], "import_reconciliation_required");
+            if pointed {
+                assert_eq!(error["next_step"], RESPONSE_MISSING_NEXT_STEP);
+            } else {
+                assert!(error.get("next_step").is_none());
+            }
+        }
+    }
+    let step = RESPONSE_MISSING_NEXT_STEP;
+    // The receipt is offered only as one that may have been kept, with the tool
+    // that returns it and the two fields it holds.
+    for part in [
+        "If a receipt of the post_import call",
+        "egress_log",
+        "request_trail",
+        "held_ms",
+        "outcome",
+        "A missing receipt may mean the process ended before it was written.",
+        "without resending it",
+    ] {
+        assert!(step.contains(part), "{part}");
+    }
+    // It promises no receipt and no cause, and reasons about neither.
+    // The cap the text names is the trail's own.
+    let cap = format!("the last {} sends", crate::request_trail::TRAIL_LAST);
+    assert!(step.contains(&cap), "{cap}");
+    for word in ["always", "will be", "because", "caused"] {
+        assert!(!step.contains(word), "{word}");
+    }
+}
+
 #[test]
 fn recovery_failure_retains_the_saved_dispatch_response() {
     let response = dispatch_response("success", 1, 0);

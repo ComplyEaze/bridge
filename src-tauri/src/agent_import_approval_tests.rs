@@ -4347,7 +4347,7 @@ async fn a_second_refusal_of_a_batch_replaces_the_first() {
     }
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_declined"
+        Begin::Refused(code) if code.code() == "import_approval_declined"
     ));
     assert!(
         matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
@@ -4391,7 +4391,7 @@ async fn a_refusal_past_its_time_pushes_no_live_one_out() {
     assert!(
         matches!(
             approvals.begin(&batch(0)),
-            Begin::Refused(code) if code == "import_approval_declined"
+            Begin::Refused(code) if code.code() == "import_approval_declined"
         ),
         "the oldest live refusal is still kept"
     );

@@ -1148,3 +1148,116 @@ fn the_real_record_write_reports_failure_when_its_directory_cannot_be_synced() {
     assert_eq!(write_record_once(&path, b"whole"), Err(RecordOnce::Failed));
     assert_eq!(fs::read(&path).unwrap(), b"whole");
 }
+
+// The tests below hold what the mutation record for this module found no test
+// holding (#2058).
+
+/// A marker name whose state cannot be read refuses, as one that stands does:
+/// only a name known to hold nothing is passed. A path under a file reads as
+/// not a directory on Unix; Windows reports it as a path not found.
+#[cfg(unix)]
+#[test]
+fn a_marker_name_whose_state_cannot_be_read_refuses() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path().join("imports");
+    fs::write(&imports, b"not a folder").unwrap();
+    assert_eq!(
+        require_settled(&imports),
+        Err("proof_publication_recovery_required".into())
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_at_a_marker_name_refuses_even_when_it_leads_nowhere() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    std::os::unix::fs::symlink(imports.join("gone"), imports.join(TRANSACTION)).unwrap();
+    assert_eq!(
+        require_settled(imports),
+        Err("proof_publication_recovery_required".into())
+    );
+    assert!(fs::symlink_metadata(imports.join(TRANSACTION)).is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_transaction_folder_is_open_to_its_owner_alone() {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join(BUILD_TRANSACTION);
+    create_transaction(&folder).unwrap();
+    assert_eq!(
+        fs::metadata(&folder).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+}
+
+/// A folder the failed removal took with it is gone, which is what the
+/// removal was for.
+#[test]
+fn a_folder_gone_when_the_removal_fails_counts_as_removed() {
+    let directory = tempfile::tempdir().unwrap();
+    let folder = directory.path().join("transaction");
+    fs::create_dir(&folder).unwrap();
+    assert_eq!(
+        clear_transaction(&folder, |folder: &Path| {
+            fs::remove_dir(folder).unwrap();
+            Err(std::io::Error::from_raw_os_error(32))
+        }),
+        Ok(())
+    );
+}
+
+/// A build that finds its marker already there publishes nothing and leaves
+/// the marker as it was: what it holds is another publication's.
+#[test]
+fn a_build_finding_its_marker_already_there_refuses_and_leaves_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path().join("imports");
+    fs::create_dir(&imports).unwrap();
+    let marker = imports.join(BUILD_TRANSACTION);
+    fs::create_dir(&marker).unwrap();
+    fs::write(marker.join("update.json"), b"earlier").unwrap();
+    let result = persist_build_with_stage(
+        &imports,
+        &line(),
+        b"<next/>",
+        || Ok(()),
+        write_private,
+        clear_transaction_folder,
+    );
+    assert_eq!(result, Err("import_publication_recovery_required".into()));
+    assert_eq!(fs::read(marker.join("update.json")).unwrap(), b"earlier");
+    assert!(!imports.join("batch-proof.xml").exists());
+}
+
+/// A failed append whose marker could not be removed reports the recovery,
+/// not the append's own error: the marker still blocks admission.
+#[test]
+fn a_failed_proof_append_whose_marker_stays_reports_the_recovery() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let result = publish_proofs_syncing(
+        imports,
+        &line(),
+        b"JSON",
+        b"Markdown",
+        |_| Err("import_ledger_append_failed".into()),
+        |_| Ok(()),
+        (sync_directory, |_: &Path| Err("os error 32".into())),
+    );
+    assert_eq!(result, Err("proof_publication_recovery_required".into()));
+    assert!(imports.join(TRANSACTION).join("update.json").is_file());
+}
+
+/// A proof file that cannot be created at all is a write failure, never read
+/// as a proof already saved.
+#[test]
+fn a_proof_file_that_cannot_be_created_is_a_write_failure() {
+    let directory = tempfile::tempdir().unwrap();
+    assert_eq!(
+        write_new_file(&directory.path().join("missing").join("proof.json"), b"{}"),
+        Err("import_file_write_failed".into())
+    );
+}

@@ -400,7 +400,11 @@ async fn the_request_on_the_wire_is_the_negative_stock_of_this_company_and_windo
         TallyDate::parse("20270331").unwrap(),
     )
     .unwrap();
-    let request = render_native_negative_stock_request("Bridge Ageing Lab", &period);
+    let request = render_native_negative_stock_request(
+        &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new("Bridge Ageing Lab")
+            .unwrap(),
+        &period,
+    );
     assert!(request.contains("<ID>Negative Stock</ID>"), "{request}");
     let mut body = vec![0xFF, 0xFE];
     body.extend(request.encode_utf16().flat_map(u16::to_le_bytes));

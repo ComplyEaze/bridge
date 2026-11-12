@@ -1,0 +1,134 @@
+# fixture: agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml
+# parser: parse_agent_rows_withholding_reading_gst(EINVOICE_LAB, e-invoice asked)
+# source: captured
+Ok([
+    Read(
+        Object {
+            "alter_id": Number(1),
+            "amounts": Array [
+                Object {
+                    "amount": String("-1180.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("Yes"),
+                    "ledger": String("BRIDGE IRN Customer"),
+                },
+                Object {
+                    "amount": String("1000.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("No"),
+                    "ledger": String("BRIDGE IRN Sales"),
+                },
+                Object {
+                    "amount": String("180.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("No"),
+                    "ledger": String("BRIDGE IRN IGST"),
+                },
+            ],
+            "cancelled": Bool(false),
+            "date": String("20250403"),
+            "e_invoice": Object {
+                "ack_date": Object {
+                    "state": String("present"),
+                    "value": String("20250403"),
+                },
+                "ack_no": Object {
+                    "state": String("present"),
+                    "value": String("112233"),
+                },
+                "irn": Object {
+                    "state": String("present"),
+                    "value": String("a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8"),
+                },
+            },
+            "guid": String("eb2f5190-292e-4ed8-bfd3-eace839fe699-00000001"),
+            "is_invoice": Bool(true),
+            "master_id": String("1"),
+            "narration": String(""),
+            "optional": Bool(false),
+            "party": String("BRIDGE IRN Customer"),
+            "party_gstin": String("29ZZZZZ0000Z1ZM"),
+            "post_dated": Bool(false),
+            "voucher_number": String("1"),
+            "voucher_type": String("Sales"),
+        },
+    ),
+    Read(
+        Object {
+            "alter_id": Number(2),
+            "amounts": Array [
+                Object {
+                    "amount": String("-1180.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("Yes"),
+                    "ledger": String("BRIDGE IRN Customer"),
+                },
+                Object {
+                    "amount": String("1000.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("No"),
+                    "ledger": String("BRIDGE IRN Sales"),
+                },
+                Object {
+                    "amount": String("180.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("No"),
+                    "ledger": String("BRIDGE IRN IGST"),
+                },
+            ],
+            "cancelled": Bool(false),
+            "date": String("20250403"),
+            "e_invoice": Object {
+                "ack_date": Object {
+                    "state": String("absent"),
+                },
+                "ack_no": Object {
+                    "state": String("absent"),
+                },
+                "irn": Object {
+                    "state": String("absent"),
+                },
+            },
+            "guid": String("eb2f5190-292e-4ed8-bfd3-eace839fe699-00000002"),
+            "is_invoice": Bool(true),
+            "master_id": String("2"),
+            "narration": String(""),
+            "optional": Bool(false),
+            "party": String("BRIDGE IRN Customer"),
+            "party_gstin": String("29ZZZZZ0000Z1ZM"),
+            "post_dated": Bool(false),
+            "voucher_number": String("2"),
+            "voucher_type": String("Sales"),
+        },
+    ),
+    Read(
+        Object {
+            "alter_id": Number(3),
+            "amounts": Array [
+                Object {
+                    "amount": String("-50.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("Yes"),
+                    "ledger": String("BRIDGE IRN Customer"),
+                },
+                Object {
+                    "amount": String("50.00"),
+                    "bill_allocations": Array [],
+                    "is_deemed_positive": String("No"),
+                    "ledger": String("Cash"),
+                },
+            ],
+            "cancelled": Bool(false),
+            "date": String("20250403"),
+            "guid": String("eb2f5190-292e-4ed8-bfd3-eace839fe699-00000003"),
+            "is_invoice": Bool(false),
+            "master_id": String("3"),
+            "narration": String("1378 read row set-up"),
+            "optional": Bool(false),
+            "party": String("BRIDGE IRN Customer"),
+            "post_dated": Bool(false),
+            "voucher_number": String("1"),
+            "voucher_type": String("Payment"),
+        },
+    ),
+])

@@ -488,6 +488,77 @@ fn find_readback_row_matches_the_9_4d_fold() {
     assert!(find_readback_row(&rows, "an entirely different name").is_none());
 }
 
+/// #2499: the pre-check matches on master's name index keys, so a name that
+/// differs from an existing row's by a comma or one space, which the gateway
+/// took as an alteration of that row (lab row 2480-SK, one synthetic book), is
+/// refused, not read as absent.
+#[test]
+fn find_target_row_refuses_a_name_whose_key_a_row_shares() {
+    let shares = |names: &[&str], name: &str| {
+        let rows: Vec<_> = names.iter().map(|n| row(&[("NAME", n)])).collect();
+        let index = index_target_rows(&rows, MasterKind::Ledger).unwrap();
+        match find_target_row(&rows, &index, name) {
+            TargetRow::SharesKey(other) => other,
+            other => panic!("{name:?} was not refused: {other:?}"),
+        }
+    };
+    assert_eq!(
+        shares(&["BRIDGE Sk Ak Am"], "BRIDGE Sk Ak, Am"),
+        "BRIDGE Sk Ak Am"
+    );
+    assert_eq!(
+        shares(&["BRIDGE Sk Bk, Bm"], "BRIDGE Sk Bk Bm"),
+        "BRIDGE Sk Bk, Bm"
+    );
+    assert_eq!(
+        shares(&["BRIDGE Sk EkEm"], "BRIDGE Sk Ek Em"),
+        "BRIDGE Sk EkEm"
+    );
+    // A same-name row beside one that only shares a key is still refused.
+    assert_eq!(
+        shares(&["BRIDGE Sk Ak Am", "BRIDGE Sk Ak, Am"], "BRIDGE Sk Ak Am"),
+        "BRIDGE Sk Ak, Am"
+    );
+}
+
+#[test]
+fn find_target_row_keeps_the_first_same_name_row_and_reads_absence() {
+    let rows = vec![
+        row(&[("NAME", "BRIDGE Sk Zk Zm")]),
+        row(&[("NAME", "BRIDGE Sk Ak Am"), ("PARENT", "Sundry Debtors")]),
+        row(&[("NAME", "bridge sk ak am"), ("PARENT", "Sundry Creditors")]),
+    ];
+    let index = index_target_rows(&rows, MasterKind::Ledger).unwrap();
+    match find_target_row(&rows, &index, "BRIDGE SK AK AM") {
+        TargetRow::Same(found) => assert!(std::ptr::eq(found, &rows[1])),
+        other => panic!("the same-name row was not found: {other:?}"),
+    }
+    assert!(matches!(
+        find_target_row(&rows, &index, "BRIDGE Sk Ck Cm"),
+        TargetRow::Absent
+    ));
+    assert!(matches!(
+        find_target_row(&rows, &index, "  "),
+        TargetRow::Blank
+    ));
+}
+
+#[test]
+fn index_target_rows_fails_closed_on_a_row_without_a_name() {
+    for rows in [
+        vec![
+            row(&[("NAME", "BRIDGE Sk Ak Am")]),
+            row(&[("PARENT", "Primary")]),
+        ],
+        vec![row(&[("NAME", " ")])],
+    ] {
+        assert!(matches!(
+            index_target_rows(&rows, MasterKind::Group),
+            Err(MasterNameIndexError::BlankName { .. })
+        ));
+    }
+}
+
 #[test]
 fn diff_ledger_flags_a_wrong_opening_balance() {
     let l = BookLedger {
@@ -2110,7 +2181,7 @@ async fn the_opening_bills_refusal_runs_before_the_first_request() {
     let expected = LabMastersRefusal::OpeningBillsUnsupported {
         ledgers: vec!["Lab Party P1".into()],
     };
-    assert_eq!(refusal.code, expected.code());
+    assert_eq!(refusal.code, expected.code().as_str());
     assert_eq!(simulator.received(), 0);
     let log =
         fs::read_to_string(directory.path().join("lab/lab-precheck-collisions.jsonl")).unwrap();
@@ -2401,7 +2472,11 @@ fn a_group_under_the_root_is_refused_before_anything_is_sent() {
         };
         let refusal = refuse_unsendable_masters(&masters)
             .expect_err("a root group is refused, whatever its spelling");
-        assert_eq!(refusal.code(), "lab_root_parent_unmeasured", "{parent}");
+        assert_eq!(
+            refusal.code().as_str(),
+            "lab_root_parent_unmeasured",
+            "{parent}"
+        );
         assert_eq!(
             refusal.logged_entries(),
             vec!["Group:Lab Group R:root_parent"]
@@ -2897,4 +2972,131 @@ fn a_root_book_entry_is_compared_by_the_read_back_and_the_resume_check_of_every_
             }
         }
     }
+}
+
+/// UTF-16LE fixture bytes, with or without a byte-order mark, as text.
+fn utf16le_text(raw: &[u8]) -> String {
+    let raw = raw.strip_prefix(&[0xff, 0xfe]).unwrap_or(raw);
+    String::from_utf16(
+        &raw.chunks_exact(2)
+            .map(|b| u16::from_le_bytes([b[0], b[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// #2499 at the call site: after admission, a lab book naming a ledger one
+/// comma, or one removed space, away from a target ledger is refused by the
+/// pre-check with the declared `lab_master_name_shares_a_key`, its log entry
+/// naming both spellings, and no request but exports is sent. The target's
+/// ledgers are a captured collection answer (`masters-lab.PROVENANCE.md`,
+/// baseline), which holds `MLab Space Target`; the shapes are row 2480-SK's.
+/// The lab guards cannot be met in a test (they read the process environment
+/// and need port 9001), so the test starts after them, at
+/// `import_admitted_masters`, whose write batches each admit the target again.
+#[tokio::test]
+async fn the_pre_check_refuses_a_comma_or_a_removed_space_before_any_write() {
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    let companies = utf16le_text(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let ledgers = utf16le_text(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml"
+    ));
+    let status = || ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let company_list = || {
+        ScenarioPlan::new(Fixture::SyntheticXml(companies.clone()))
+            .with_encoding(WireEncoding::Utf16Le)
+    };
+    let ledger_list = || {
+        ScenarioPlan::new(Fixture::SyntheticXml(ledgers.clone()))
+            .with_encoding(WireEncoding::Utf16Le)
+    };
+    let mut plans = Vec::new();
+    for _ in 0..2 {
+        plans.extend([company_list(), status()]);
+    }
+    plans.extend([status(), company_list(), company_list()]);
+    for _ in 0..2 {
+        plans.extend([ledger_list(), status()]);
+    }
+    plans.extend([company_list(), status(), company_list()]);
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let run = async {
+        let (_company, identity, evidence) = server.verified_company(guid).await?;
+        let masters: BookMasters = serde_json::from_value(json!({"ledgers": [
+            {"name": "MLab Space, Target", "parent": "Sundry Debtors"},
+            {"name": "MLab SpaceTarget", "parent": "Sundry Debtors"}
+        ]}))
+        .unwrap();
+        import_admitted_masters(&server, masters, guid, identity, evidence).await
+    };
+    let refusal = match run.await {
+        Ok(_) => panic!("a name one comma or one space away from a target ledger was not refused"),
+        Err(failure) => failure,
+    };
+    assert_eq!(refusal.code, LabMastersCode::NameSharesKey.as_str());
+    let log =
+        fs::read_to_string(directory.path().join("lab/lab-precheck-collisions.jsonl")).unwrap();
+    let records: Vec<Value> = log
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(records.len(), 1);
+    assert_eq!(
+        records[0]["collisions"],
+        json!([
+            "Ledger:MLab Space, Target:shares_a_key_with:MLab Space Target",
+            "Ledger:MLab SpaceTarget:shares_a_key_with:MLab Space Target"
+        ])
+    );
+    // Every request that names a kind was an export: the identity's reads and
+    // the pre-check's, and nothing after them. Each body is decoded as its
+    // own content type says, and the pre-check's read is found in two of
+    // them, so the check reads the bodies it means to.
+    let requests = simulator.finish().unwrap();
+    assert_eq!(requests.len(), expected);
+    let bodies: Vec<String> = requests
+        .iter()
+        .map(|request| {
+            if request.request_content_type_is_tally_xml_utf16 {
+                utf16le_text(&request.request_body)
+            } else {
+                String::from_utf8(request.request_body.clone()).unwrap()
+            }
+        })
+        .collect();
+    for body in &bodies {
+        if let Some((_, rest)) = body.split_once("<TALLYREQUEST>") {
+            let (kind, _) = rest.split_once("</TALLYREQUEST>").unwrap();
+            assert!(kind.trim().eq_ignore_ascii_case("export"), "{body}");
+        }
+    }
+    assert_eq!(
+        bodies
+            .iter()
+            .filter(|body| body.contains("<ID>Bridge Lab Write Ledgers</ID>"))
+            .count(),
+        2,
+        "the pre-check's ledger read, sent as a pair"
+    );
 }

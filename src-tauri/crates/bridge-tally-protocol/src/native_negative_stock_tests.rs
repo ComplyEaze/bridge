@@ -83,7 +83,10 @@ fn the_request_is_byte_equal_to_its_committed_capture() {
     )
     .unwrap();
     assert_eq!(
-        render_native_negative_stock_request("BRIDGE SHAPE LAB", &period),
+        render_native_negative_stock_request(
+            &ValidatedCompanyName::new("BRIDGE SHAPE LAB").unwrap(),
+            &period
+        ),
         decode_xml_bytes(REQUEST).unwrap()
     );
 }
@@ -137,7 +140,7 @@ fn request_for(company: &str, from: &str, to: &str) -> String {
         TallyDate::parse(to).unwrap(),
     )
     .unwrap();
-    render_native_negative_stock_request(company, &period)
+    render_native_negative_stock_request(&ValidatedCompanyName::new(company).unwrap(), &period)
 }
 
 #[test]

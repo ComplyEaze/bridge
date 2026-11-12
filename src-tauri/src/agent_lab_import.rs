@@ -51,8 +51,12 @@
 //!   written as is the one measured exception (bridge#974): see
 //!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
+use super::failure_code::{LabMastersCode, ReadCode};
 use super::*;
 use bridge_tally_core::master_binding::canonical_master_key;
+use bridge_tally_core::master_name_index::{
+    IndexedMaster, MasterKind as IndexKind, MasterNameIndex, MasterNameIndexError,
+};
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::is_tally_reserved_root;
@@ -439,6 +443,83 @@ fn find_readback_row<'a>(
     let key = canonical_master_key(name);
     rows.iter()
         .find(|row| canonical_master_key(row.get("NAME").map(String::as_str).unwrap_or("")) == key)
+}
+
+/// What the pre-check found for one requested name among the rows read for
+/// its kind.
+#[derive(Debug)]
+enum TargetRow<'a> {
+    /// No row shares any of the name index's keys with the name.
+    Absent,
+    /// The first row whose name has the requested name's canonical key; every
+    /// row that shares a key with the name has that canonical key too.
+    Same(&'a BTreeMap<String, String>),
+    /// A row whose name has another canonical key shares one of the index's
+    /// keys with the requested name, so Tally may take the Create as an
+    /// alteration of that row (§9.4; a removed space, §9.4d; a comma, lab row
+    /// 2480-SK on #2480). Holds the row's name. The call is refused with
+    /// [`LabMastersRefusal::NameSharesKey`].
+    SharesKey(String),
+    /// The requested name is blank, so it names no master to look for.
+    Blank,
+}
+
+/// Indexes the rows read for one kind on the keys master's own name index
+/// matches (`MasterNameIndex::collisions`). Each row's `NAME` is its one name,
+/// as these reads fetch no alias, and its position in `rows` is its identity,
+/// so the check does not depend on which fields a kind's rows carry. Fails
+/// closed on a row with no `NAME` or a blank one.
+fn index_target_rows(
+    rows: &[BTreeMap<String, String>],
+    kind: MasterKind,
+) -> Result<MasterNameIndex, MasterNameIndexError> {
+    let index_kind = match kind {
+        MasterKind::Ledger => IndexKind::Ledger,
+        _ => IndexKind::Group,
+    };
+    MasterNameIndex::new(
+        rows.iter()
+            .enumerate()
+            .map(|(position, row)| IndexedMaster {
+                kind: index_kind,
+                guid: position.to_string(),
+                alter_id: 0,
+                names: vec![row.get("NAME").cloned().unwrap_or_default()],
+            })
+            .collect(),
+    )
+}
+
+/// Finds the row of `rows` a requested name would reach, on every key of
+/// `index` (built from `rows` by [`index_target_rows`]), not on the canonical
+/// key alone.
+fn find_target_row<'a>(
+    rows: &'a [BTreeMap<String, String>],
+    index: &MasterNameIndex,
+    name: &str,
+) -> TargetRow<'a> {
+    // `collisions` refuses only a blank candidate.
+    let Ok(collisions) = index.collisions(name) else {
+        return TargetRow::Blank;
+    };
+    let key = canonical_master_key(name);
+    if let Some(other) = collisions
+        .iter()
+        .find(|collision| canonical_master_key(&collision.name) != key)
+    {
+        return TargetRow::SharesKey(other.name.clone());
+    }
+    match collisions.first() {
+        None => TargetRow::Absent,
+        Some(first) => TargetRow::Same(
+            first
+                .guid
+                .parse::<usize>()
+                .ok()
+                .and_then(|position| rows.get(position))
+                .expect("the index holds the positions of these rows"),
+        ),
+    }
 }
 
 /// The raw control character behind Tally's `&#4;`, as a book value may
@@ -1055,13 +1136,27 @@ enum LabMastersRefusal {
     /// refused for a godown and a stock item (bridge#974), and no root form
     /// has been measured for a Group, so none is sent.
     RootParentUnmeasured { groups: Vec<String> },
+    /// The requested names that share a key of master's name index with a
+    /// target master of their kind whose name has another canonical key (see
+    /// [`TargetRow::SharesKey`]), found by the pre-check's reads, each with
+    /// that master's name (#2499).
+    NameSharesKey { names: Vec<SharedKeyName> },
+}
+
+/// A requested name and the target master's name it shares a key with.
+#[derive(Debug, PartialEq, Eq)]
+struct SharedKeyName {
+    kind: MasterKind,
+    requested: String,
+    existing: String,
 }
 
 impl LabMastersRefusal {
-    fn code(&self) -> &'static str {
+    fn code(&self) -> LabMastersCode {
         match self {
-            Self::OpeningBillsUnsupported { .. } => "lab_opening_bills_unsupported",
-            Self::RootParentUnmeasured { .. } => "lab_root_parent_unmeasured",
+            Self::OpeningBillsUnsupported { .. } => LabMastersCode::OpeningBillsUnsupported,
+            Self::RootParentUnmeasured { .. } => LabMastersCode::RootParentUnmeasured,
+            Self::NameSharesKey { .. } => LabMastersCode::NameSharesKey,
         }
     }
 
@@ -1076,6 +1171,17 @@ impl LabMastersRefusal {
             Self::RootParentUnmeasured { groups } => groups
                 .iter()
                 .map(|name| format!("Group:{name}:root_parent"))
+                .collect(),
+            Self::NameSharesKey { names } => names
+                .iter()
+                .map(|shared| {
+                    format!(
+                        "{}:{}:shares_a_key_with:{}",
+                        shared.kind.tally_type(),
+                        shared.requested,
+                        shared.existing
+                    )
+                })
                 .collect(),
         }
     }
@@ -1134,16 +1240,29 @@ pub(in crate::agent) async fn lab_import_masters(
     // Before the first request: a refused book costs Tally nothing.
     if let Err(refusal) = refuse_unsendable_masters(&masters) {
         persist_lab_precheck_collisions(server, &refusal.logged_entries());
-        return Err(ToolFailure::from(refusal.code().to_string()));
+        return Err(ToolFailure::from(refusal.code()));
     }
     let guid = required_string(args, "company_guid")?;
 
-    let (_company, identity, mut evidence) = admit_lab_target(server).await?;
+    let (_company, identity, evidence) = admit_lab_target(server).await?;
     if !identity_matches_requested_guid(&identity, guid) {
         return Err(ToolFailure::from("lab_target_company_mismatch".to_string())
             .with_prior_evidence(evidence));
     }
+    import_admitted_masters(server, masters, guid, identity, evidence).await
+}
 
+/// `lab_import_masters` after the lab guards have admitted the target: the
+/// pre-check's reads, then the writes. Every write batch admits the target
+/// again (`admit_lab_target`), so only the pre-check's reads run on this
+/// admission alone.
+async fn import_admitted_masters(
+    server: &Server,
+    masters: BookMasters,
+    guid: &str,
+    identity: VerifiedCompanyIdentity,
+    mut evidence: Evidence,
+) -> Result<ToolOutcome, ToolFailure> {
     // ---- Create-overwrite pre-check (§9.4): refuse before any write if the
     // target already carries a same-name master under ANY kind requested --
     // except a Tally *default* (ledger `Cash`/`Profit & Loss A/c`, or any
@@ -1155,6 +1274,7 @@ pub(in crate::agent) async fn lab_import_masters(
     // its only differences from the book are in writable fields (parent
     // matches) -- see `reconcile_ledger_alters` below.
     let mut collisions: Vec<String> = Vec::new();
+    let mut shared_keys: Vec<SharedKeyName> = Vec::new();
     let mut default_ledger_alters: Vec<(BookLedger, BTreeMap<String, String>)> = Vec::new();
     // Ordinary (non-default) pre-existing ledgers whose PARENT matches the
     // book but some other writable field does not -- reconciled via the same
@@ -1186,6 +1306,9 @@ pub(in crate::agent) async fn lab_import_masters(
         evidence = combine_evidence(evidence.clone(), read_evidence);
         let rows = parse_lab_master_rows(&xml, kind.tally_type())
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+        let index = index_target_rows(&rows, kind).map_err(|_| {
+            ToolFailure::from(ReadCode::ReadProtocolInvalid).with_prior_evidence(evidence.clone())
+        })?;
         for name in &requested {
             if kind == MasterKind::Group && book_names_reserved_root(name) {
                 // A requested Group named as Tally's own reserved-primary
@@ -1199,8 +1322,24 @@ pub(in crate::agent) async fn lab_import_masters(
                 collisions.push(format!("{}:{name}:reserved_root", kind.tally_type()));
                 continue;
             }
-            let Some(existing) = find_readback_row(&rows, name) else {
-                continue;
+            let existing = match find_target_row(&rows, &index, name) {
+                TargetRow::Absent => continue,
+                TargetRow::Same(existing) => existing,
+                TargetRow::SharesKey(existing) => {
+                    // Tally may resolve the Create to `existing` and alter it
+                    // with no error (see `TargetRow::SharesKey`), so refuse
+                    // before any write.
+                    shared_keys.push(SharedKeyName {
+                        kind,
+                        requested: name.clone(),
+                        existing,
+                    });
+                    continue;
+                }
+                TargetRow::Blank => {
+                    collisions.push(format!("{}:{name}:blank_name", kind.tally_type()));
+                    continue;
+                }
             };
             match kind {
                 MasterKind::Ledger => {
@@ -1276,6 +1415,12 @@ pub(in crate::agent) async fn lab_import_masters(
             collisions.push(format!("{}:{name}", kind.tally_type()));
         }
     }
+    if !shared_keys.is_empty() {
+        let refusal = LabMastersRefusal::NameSharesKey { names: shared_keys };
+        collisions.extend(refusal.logged_entries());
+        persist_lab_precheck_collisions(server, &collisions);
+        return Err(ToolFailure::from(refusal.code()).with_prior_evidence(evidence));
+    }
     if !collisions.is_empty() {
         persist_lab_precheck_collisions(server, &collisions);
         return Err(ToolFailure::from("lab_master_already_exists".to_string())
@@ -1341,7 +1486,7 @@ pub(in crate::agent) async fn lab_import_masters(
             let chunk_masters = chunked_masters(&creatable, kind, chunk_start, MAX_MASTER_BATCH);
             let chunk_len = kind.count(&chunk_masters);
             let xml = render_master_batch_xml(identity.display_name(), kind, &chunk_masters)
-                .map_err(|refusal| ToolFailure::from(refusal.code().to_string()))?;
+                .map_err(|refusal| ToolFailure::from(refusal.code()))?;
             let (response, post_evidence) =
                 post_lab_batch(server, &identity, "lab_import_masters.write", xml).await?;
             evidence = combine_evidence(evidence.clone(), post_evidence);

@@ -3443,10 +3443,8 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // was seen not to hold when the box opened seconds after the
                 // last input went to Tally. With MB_SYSTEMMODAL added the box
                 // held it in one lab run on Windows 10, where Tally still took a
-                // click and a key while the box was open (#1780). That run did
-                // not test what else a system-modal box changes: the taskbar
-                // showed no task buttons while it was open, cause not tested
-                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // click and a key while the box was open (#1780). It is also
+                // owned by `guarded`'s hidden topmost
                 // window, the other way a stand-in box was seen to stay on top
                 // (#1780); an owned box has no taskbar button. When Windows lets it,
                 // MB_SETFOREGROUND also gives the box the foreground, so a key

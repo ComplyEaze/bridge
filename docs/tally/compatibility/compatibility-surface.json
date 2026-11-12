@@ -772,6 +772,10 @@
       "path": "src-tauri/src/reports/statements.rs"
     },
     {
+      "path": "src-tauri/src/reports/statements_opening_stock_tests.rs",
+      "reason": "holds the tests that decide when Profit and Loss and Balance Sheet use Tally's opening and closing stock, so weakening one changes what the statements tools report"
+    },
+    {
       "path": "src-tauri/src/reports/statements_tests.rs"
     },
     {

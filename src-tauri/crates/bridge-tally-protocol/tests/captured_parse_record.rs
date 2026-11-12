@@ -1218,6 +1218,12 @@ const ROWS: &[Row] = &[
         parser: "parse_import_outcome",
         parse: |_, text| untyped(parse_import_outcome(text)),
     },
+    Row {
+        fixture: "tests/fixtures/agent/single-import-stock-in-hand-journal.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
     // The master-fields lab's create and alter answers (native/PROVENANCE.md, §9.4a): import
     // responses, read by production's parse_import_outcome; no test parses them.
     Row {
@@ -4675,6 +4681,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

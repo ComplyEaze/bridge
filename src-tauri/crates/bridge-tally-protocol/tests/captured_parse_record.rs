@@ -1213,6 +1213,18 @@ const ROWS: &[Row] = &[
         parse: |_, text| untyped(parse_import_outcome(text)),
     },
     Row {
+        fixture: "tests/fixtures/agent/partial-landing-one-refused-of-three.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/partial-landing-twins-one-refused-of-three.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/single-import-missing-ledger.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",

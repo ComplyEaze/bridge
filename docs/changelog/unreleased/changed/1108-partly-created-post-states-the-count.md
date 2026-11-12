@@ -1,0 +1,1 @@
+- When Tally's answer to a batch post reported some of its vouchers as created and some as not created, a voucher the check cannot find now says how many vouchers Tally reported as not created and that ComplyEaze Bridge cannot say which; the voucher is still shown as sent but not matched, and none is called not posted (#1108).

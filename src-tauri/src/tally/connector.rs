@@ -178,7 +178,7 @@ impl RuntimeTallyConnector {
         {
             return Err(invalid_data("company_identity_mismatch"));
         }
-        let company_name = identity.display_name().to_owned();
+        let company_name = identity.company_name();
         let expected_guid = identity.company_guid().to_owned();
         // Native Collection exports deliberately carry no company GUID. Bind
         // the group rows out-of-band: each extent response is GUID-verified,
@@ -188,7 +188,7 @@ impl RuntimeTallyConnector {
         // display and has been observed dropping their sign, so it cannot be
         // a trustworthy company-authentication channel for a money path.
         let opening_extent = self.read_pinned_company_book_extent(identity).await?;
-        let native_group_request = render_native_group_snapshot_request(&company_name);
+        let native_group_request = render_native_group_snapshot_request(company_name);
         let first_group_xml = self
             .post_xml_validated(SealedReadRequest::export(native_group_request.clone()), {
                 let validation_guid = expected_guid.clone();
@@ -227,7 +227,7 @@ impl RuntimeTallyConnector {
         )
         .map_err(|_| invalid_data("master_ledger_export_period_not_supported"))?;
         let native_ledger_request =
-            render_native_ledger_export_request(&company_name, &ledger_period);
+            render_native_ledger_export_request(company_name, &ledger_period);
         let validation_guid = expected_guid.clone();
         let first_ledger_xml = self
             .post_xml_validated(
@@ -260,7 +260,7 @@ impl RuntimeTallyConnector {
         let validation_guid = expected_guid.clone();
         let voucher_type_xml = self
             .post_xml_validated(
-                SealedReadRequest::export(render_native_voucher_type_export_request(&company_name)),
+                SealedReadRequest::export(render_native_voucher_type_export_request(company_name)),
                 move |xml| {
                     parse_native_voucher_type_source_records_with_evidence(xml, &validation_guid)
                         .is_ok()
@@ -289,7 +289,7 @@ impl RuntimeTallyConnector {
         let voucher_xml = self
             .post_xml_validated(
                 SealedReadRequest::export(render_native_voucher_export_request(
-                    &company_name,
+                    company_name,
                     &voucher_window_from,
                     &voucher_window_to,
                 )),

@@ -66,12 +66,17 @@ fn party_ledger_master_request_fetches_tax_type_and_gst_duty_head() {
     )
     .unwrap();
 
-    let request = render_party_ledger_master_request("BRIDGE GST RECON LAB", &period);
+    let request = render_party_ledger_master_request(
+        &ValidatedCompanyName::new("BRIDGE GST RECON LAB").unwrap(),
+        &period,
+    );
     assert!(request.contains("TAXTYPE, GSTDUTYHEAD"));
     assert!(request.contains(", LEDGSTREGDETAILS.LIST</FETCH>"));
     // The read that also names the dated mailing details (`include_mailing_details`, the workbook).
-    let with_mailing =
-        render_party_ledger_master_request_with_mailing_details("BRIDGE GST RECON LAB", &period);
+    let with_mailing = render_party_ledger_master_request_with_mailing_details(
+        &ValidatedCompanyName::new("BRIDGE GST RECON LAB").unwrap(),
+        &period,
+    );
     assert!(with_mailing.contains(", LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>"));
 }
 
@@ -319,7 +324,13 @@ fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
     )
     .unwrap();
     assert_eq!(
-        sha256_hex(render_party_ledger_master_request("BRIDGE GST RECON LAB", &period).as_bytes()),
+        sha256_hex(
+            render_party_ledger_master_request(
+                &ValidatedCompanyName::new("BRIDGE GST RECON LAB").unwrap(),
+                &period
+            )
+            .as_bytes()
+        ),
         "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
         "the fixture answers exactly the request ledger_masters sends"
     );
@@ -418,7 +429,13 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     )
     .unwrap();
     assert_eq!(
-        sha256_hex(render_party_ledger_master_request("BRIDGE READS LAB", &period).as_bytes()),
+        sha256_hex(
+            render_party_ledger_master_request(
+                &ValidatedCompanyName::new("BRIDGE READS LAB").unwrap(),
+                &period
+            )
+            .as_bytes()
+        ),
         "c2f9f8e9fefab44077b222402254a2be3dfd9a9690d4e577efbae99d531c819c",
         "the fixture answers exactly the request ledger_masters sends"
     );
@@ -5332,18 +5349,24 @@ mod through_the_tool {
         fn master_reads_sent(observed: &[ObservedRequest], parts: &[ParentPart]) -> usize {
             let period = harness_period();
             let mut requests = vec![
-                render_party_ledger_master_request(HARNESS_COMPANY, &period),
-                render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period),
+                render_party_ledger_master_request(
+                    &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                    &period,
+                ),
+                render_party_ledger_master_request_with_gst_details(
+                    &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                    &period,
+                ),
             ];
             for part in parts {
                 requests.push(render_party_ledger_master_request_for_parents(
-                    HARNESS_COMPANY,
+                    &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                     &period,
                     part,
                 ));
                 requests.push(
                     render_party_ledger_master_request_for_parents_with_gst_details(
-                        HARNESS_COMPANY,
+                        &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                         &period,
                         part,
                     ),
@@ -5413,7 +5436,10 @@ mod through_the_tool {
                 assert_eq!(
                     sent(
                         &observed,
-                        &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                        &render_party_ledger_master_request(
+                            &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                            &period
+                        )
                     ),
                     2,
                     "the production compliance request, read as a pair: {flag:?}"
@@ -5422,7 +5448,7 @@ mod through_the_tool {
                     sent(
                         &observed,
                         &render_party_ledger_master_request_with_gst_details(
-                            HARNESS_COMPANY,
+                            &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                             &period
                         )
                     ),
@@ -5466,7 +5492,10 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period)
+                    &render_party_ledger_master_request_with_gst_details(
+                        &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                        &period
+                    )
                 ),
                 2,
                 "the extended compliance request, read as a pair"
@@ -5474,7 +5503,10 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                    &render_party_ledger_master_request(
+                        &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                        &period
+                    )
                 ),
                 0,
                 "the production request is not also sent"
@@ -5943,7 +5975,10 @@ mod through_the_tool {
                 assert_eq!(
                     sent(
                         &observed,
-                        &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                        &render_party_ledger_master_request(
+                            &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                            &period
+                        )
                     ),
                     2,
                     "the production request, read as a pair: {flag:?}"
@@ -5952,7 +5987,7 @@ mod through_the_tool {
                     sent(
                         &observed,
                         &render_party_ledger_master_request_with_mailing_details(
-                            HARNESS_COMPANY,
+                            &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                             &period
                         )
                     ),
@@ -5981,7 +6016,7 @@ mod through_the_tool {
                 sent(
                     &observed,
                     &render_party_ledger_master_request_with_mailing_details(
-                        HARNESS_COMPANY,
+                        &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                         &period
                     )
                 ),
@@ -6173,7 +6208,10 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                    &render_party_ledger_master_request(
+                        &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                        &period
+                    )
                 ),
                 2
             );
@@ -6198,7 +6236,7 @@ mod through_the_tool {
                     sent(
                         &observed,
                         &render_party_ledger_master_request_for_parents_with_gst_details(
-                            HARNESS_COMPANY,
+                            &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                             &period,
                             part
                         )
@@ -6210,7 +6248,7 @@ mod through_the_tool {
                     sent(
                         &observed,
                         &render_party_ledger_master_request_for_parents(
-                            HARNESS_COMPANY,
+                            &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                             &period,
                             part
                         )
@@ -6242,7 +6280,10 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period)
+                    &render_party_ledger_master_request_with_gst_details(
+                        &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                        &period
+                    )
                 ),
                 2
             );
@@ -6290,7 +6331,10 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period)
+                    &render_party_ledger_master_request_with_gst_details(
+                        &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
+                        &period
+                    )
                 ),
                 2
             );
@@ -6356,7 +6400,7 @@ mod through_the_tool {
                     sent(
                         &observed,
                         &render_party_ledger_master_request_for_parents_with_gst_details(
-                            HARNESS_COMPANY,
+                            &ValidatedCompanyName::new(HARNESS_COMPANY).unwrap(),
                             &period,
                             part
                         )

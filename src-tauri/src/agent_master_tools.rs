@@ -539,7 +539,10 @@ impl Server {
             .await?;
         accumulated = combine_evidence(accumulated, evidence);
         let (groups, evidence) = self
-            .post_read(&identity, native_group_snapshot_read(&company.name))
+            .post_read(
+                &identity,
+                native_group_snapshot_read(identity.company_name()),
+            )
             .await?;
         accumulated = combine_evidence(accumulated, evidence);
         require_licensed_mode(profile)?;
@@ -733,7 +736,7 @@ impl Server {
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             let (groups, evidence) = self
-                .post_read(&identity, native_group_snapshot_read(&company.name))
+                .post_read(&identity, native_group_snapshot_read(identity.company_name()))
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             require_licensed_mode(profile)?;

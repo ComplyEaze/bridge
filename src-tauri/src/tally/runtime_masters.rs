@@ -293,7 +293,7 @@ async fn read_series_numbering(
     rows: Vec<NativeMasterRow>,
     evidence: &mut RuntimeReadEvidence,
 ) -> anyhow::Result<Result<Vec<(NativeMasterRow, VoucherTypeNumbering)>, MastersReadError>> {
-    let request = render_voucher_type_numbering_request(identity.display_name());
+    let request = render_voucher_type_numbering_request(identity.company_name());
     let (xml, bytes, hash) = client
         .fetch_native_report_paired(request.clone())
         .await?
@@ -428,7 +428,7 @@ impl TallyRuntime {
                         // size admission of its own.
                         MastersKind::Groups => {
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let (xml, bytes, hash) = client
                                 .fetch_native_report_paired(request.clone())
                                 .await?

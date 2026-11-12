@@ -104,7 +104,9 @@ fn the_requests_sent_in_the_lab_are_the_ones_bridge_renders() {
         include_bytes!("fixtures/agent/masters-lab-ledger-index.request.utf16le.xml")
     );
     assert_eq!(
-        encode_tally_xml_request_utf16le(&render_native_group_snapshot_request(COMPANY)),
+        encode_tally_xml_request_utf16le(&render_native_group_snapshot_request(
+            &ValidatedCompanyName::new(COMPANY).unwrap()
+        )),
         include_bytes!("fixtures/agent/masters-lab-groups.request.utf16le.xml")
     );
 }

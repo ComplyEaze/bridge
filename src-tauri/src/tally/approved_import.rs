@@ -321,7 +321,7 @@ impl MasterAdmission {
             )?,
             group_index_request: AgentReadRequest::parse(
                 bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
-                    company.display_name(),
+                    company.company_name(),
                 ),
             )?,
             company: company.clone(),

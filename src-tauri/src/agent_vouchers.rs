@@ -847,7 +847,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             // confident zero from an unknown name (bridge#664).
             if let (VoucherTypeSelector::Name(name), true) = (selector, selection.rows.is_empty()) {
                 let (book, catalogue_evidence) =
-                    server.read_voucher_type_catalogue(&identity, &company.name).await?;
+                    server.read_voucher_type_catalogue(&identity).await?;
                 accumulate_evidence(&mut accumulated, catalogue_evidence);
                 if let Some(nearest) = unknown_voucher_type(name, &book) {
                     let mut failure = ToolFailure::from("unknown_voucher_type".to_string());
@@ -1135,7 +1135,7 @@ impl Server {
                 parents
             }
         };
-        let (groups, group_evidence) = self.read_group_collection(identity, company).await?;
+        let (groups, group_evidence) = self.read_group_collection(identity).await?;
         accumulate_evidence(accumulated, group_evidence);
         Ok(Placements::build(
             parents
@@ -1150,10 +1150,12 @@ impl Server {
     async fn read_voucher_type_catalogue(
         &self,
         identity: &VerifiedCompanyIdentity,
-        company: &str,
     ) -> Result<(Vec<BookVoucherType>, Evidence), ToolFailure> {
         let (xml, evidence) = self
-            .post_read(identity, voucher_type_catalogue_read(company))
+            .post_read(
+                identity,
+                voucher_type_catalogue_read(identity.company_name()),
+            )
             .await?;
         let parsed = bridge_tally_protocol::parse_native_voucher_type_source_records_with_evidence(
             &xml,

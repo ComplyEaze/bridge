@@ -413,7 +413,7 @@ impl TallyRuntime {
                         return Err(TrialBalanceReadError::BeforeBooks.into());
                     }
 
-                    let currency_request = render_company_currency_request(identity.display_name());
+                    let currency_request = render_company_currency_request(identity.company_name());
                     let (currency_xml, bytes, hash) = client
                         .fetch_native_report_paired(currency_request.clone())
                         .await?
@@ -508,7 +508,7 @@ impl TallyRuntime {
                                 return Err(anyhow::anyhow!("cash_flow_window_not_built"));
                             };
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let (xml, bytes, hash) = client
                                 .fetch_native_report_paired(request.clone())
                                 .await?
@@ -548,7 +548,7 @@ impl TallyRuntime {
                         }
                         TrialBalanceExtras::Statement(kind, today) => {
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let (xml, bytes, hash) = client
                                 .fetch_native_report_paired(request.clone())
                                 .await?

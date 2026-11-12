@@ -12,7 +12,7 @@ use bridge_tally_primitives::TallyDate;
 use crate::ledger_guid_part::LedgerGuidPart;
 use crate::outstandings_shared::DateBoundaryProfile;
 use crate::parent_partition::{ParentPart, PartFormula};
-use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
+use crate::xml_read_profiles::ValidatedCompanyName;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeBillsReportKind {
@@ -130,12 +130,11 @@ impl NativeBillsReportKind {
 /// Receivable/Payable `Data` report.
 pub fn render_native_bills_request(
     kind: NativeBillsReportKind,
-    company: &str,
+    company: &ValidatedCompanyName,
     from: &TallyDate,
     to: &TallyDate,
 ) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>"#,
@@ -173,7 +172,7 @@ pub fn render_native_bills_request(
 /// (An earlier revision of this function omitted the period and appeared
 /// correct precisely because it was only exercised at the current date.)
 pub fn render_native_ledger_snapshot_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_native_ledger_snapshot(company, period, parent_filter_parts(None))
@@ -183,7 +182,7 @@ pub fn render_native_ledger_snapshot_request(
 /// parents (bridge#679). Rows are byte-identical to the unfiltered read's rows
 /// for those parents (TALLY_PROTOCOL_REFERENCE section 11e).
 pub fn render_native_ledger_snapshot_request_for_parents(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
     part: &ParentPart,
 ) -> String {
@@ -193,7 +192,7 @@ pub fn render_native_ledger_snapshot_request_for_parents(
 /// The same snapshot restricted to the ledgers one [`LedgerGuidPart`] names
 /// (#1331).
 pub fn render_native_ledger_snapshot_request_for_ledgers(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
     part: &LedgerGuidPart,
 ) -> String {
@@ -201,12 +200,11 @@ pub fn render_native_ledger_snapshot_request_for_ledgers(
 }
 
 fn render_native_ledger_snapshot(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
     (formula, filters): (String, String),
 ) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>"#,
@@ -268,7 +266,7 @@ fn filter_parts(formulas: &[PartFormula]) -> (String, String) {
 /// supply a `NativeLedgerExportPeriod`, which binds the validated book extent
 /// to the endpoint compatibility profile before any ledger request is sent.
 pub fn render_native_ledger_export_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
 ) -> String {
     render_native_ledger_collection_request(
@@ -284,7 +282,7 @@ pub fn render_native_ledger_export_request(
 /// workbook and compliance readers. Sensitive master values are fetched here;
 /// ordinary ledger readers use `render_native_ledger_export_request`.
 pub fn render_party_ledger_master_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
 ) -> String {
     render_party_ledger_master(company, period, parent_filter_parts(None), false, "")
@@ -297,7 +295,7 @@ pub fn render_party_ledger_master_request(
 /// own size estimate; the readers that never use the mailing details keep
 /// [`render_party_ledger_master_request`].
 pub fn render_party_ledger_master_request_with_mailing_details(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
 ) -> String {
     render_party_ledger_master(company, period, parent_filter_parts(None), true, "")
@@ -317,7 +315,7 @@ const GST_DETAILS_FETCH_SUFFIX: &str =
 /// details; the production compliance request
 /// ([`render_party_ledger_master_request`]) is unchanged.
 pub fn render_party_ledger_master_request_with_gst_details(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
 ) -> String {
     render_party_ledger_master(
@@ -332,7 +330,7 @@ pub fn render_party_ledger_master_request_with_gst_details(
 /// The compliance master read restricted to the ledgers under one
 /// [`ParentPart`]'s parents (bridge#679).
 pub fn render_party_ledger_master_request_for_parents(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
@@ -342,7 +340,7 @@ pub fn render_party_ledger_master_request_for_parents(
 /// The compliance master read restricted to the ledgers one [`LedgerGuidPart`]
 /// names (#1331).
 pub fn render_party_ledger_master_request_for_ledgers(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
     part: &LedgerGuidPart,
 ) -> String {
@@ -353,7 +351,7 @@ pub fn render_party_ledger_master_request_for_ledgers(
 /// as [`render_party_ledger_master_request_with_mailing_details`] does for a
 /// whole read.
 pub fn render_party_ledger_master_request_for_parents_with_mailing_details(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
@@ -365,7 +363,7 @@ pub fn render_party_ledger_master_request_for_parents_with_mailing_details(
 /// part of a book read with its GST details. The suffix is the only difference
 /// from the production parent-part request.
 pub fn render_party_ledger_master_request_for_parents_with_gst_details(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
@@ -379,7 +377,7 @@ pub fn render_party_ledger_master_request_for_parents_with_gst_details(
 }
 
 fn render_party_ledger_master(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
     filter: (String, String),
     mailing_details: bool,
@@ -397,7 +395,7 @@ fn render_party_ledger_master(
 }
 
 fn render_native_ledger_collection_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerExportPeriod,
     fetch: &str,
     include_response_company_guid: bool,
@@ -408,8 +406,7 @@ fn render_native_ledger_collection_request(
     } else {
         ""
     };
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>"#,
@@ -426,12 +423,9 @@ fn render_native_ledger_collection_request(
 
 /// Renders a native `List of VoucherTypes` collection. The identity fields are
 /// master data, so no period variables are applied.
-pub fn render_native_voucher_type_export_request(company: &str) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
+pub fn render_native_voucher_type_export_request(company: &ValidatedCompanyName) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of VoucherTypes</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="List of VoucherTypes" ISMODIFY="Yes"><TYPE>VoucherType</TYPE><FETCH>NAME, PARENT, GUID, MASTERID, ALTERID</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
     )
@@ -487,12 +481,11 @@ const VOUCHER_WINDOW_FILTER_NAME: &str = "BridgeVoucherWindowFilter";
 /// `SVFROMDATE`/`SVTODATE` remain ordinary XML character content, where
 /// `TallyDate`'s digit-only contents are trivially safe either way.
 pub fn render_native_voucher_export_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     from: &TallyDate,
     to: &TallyDate,
 ) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>"#,
@@ -527,12 +520,9 @@ pub fn render_native_voucher_export_request(
 /// family: it defines no report/form/part/line/field stack and invokes no TDL
 /// function. Paired byte-identical reads plus the enclosing book-extent
 /// bracket establish completeness for this snapshot.
-pub fn render_native_group_snapshot_request(company: &str) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
+pub fn render_native_group_snapshot_request(company: &ValidatedCompanyName) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Groups</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="List of Groups" ISMODIFY="Yes"><FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
     )
@@ -548,7 +538,7 @@ pub fn render_native_group_snapshot_request(company: &str) -> String {
 ///   `ORIGINALNAME`; only the outstandings reads, which identify a base among
 ///   several masters, send [`render_company_currency_request_with_originalname`]
 ///   (bridge#551, TALLY_PROTOCOL_REFERENCE §9.10a.2).
-pub fn render_company_currency_request(company: &str) -> String {
+pub fn render_company_currency_request(company: &ValidatedCompanyName) -> String {
     render_currency_collection(company, "NAME, MAILINGNAME, DECIMALPLACES")
 }
 
@@ -558,16 +548,13 @@ pub fn render_company_currency_request(company: &str) -> String {
 /// which identify a base among several masters, and only after the plain
 /// read found several (bridge#551). Measured on licensed TallyPrime 7.1 only;
 /// how another release answers the field is unmeasured.
-pub fn render_company_currency_request_with_originalname(company: &str) -> String {
+pub fn render_company_currency_request_with_originalname(company: &ValidatedCompanyName) -> String {
     render_currency_collection(company, "NAME, MAILINGNAME, DECIMALPLACES, ORIGINALNAME")
 }
 
-fn render_currency_collection(company: &str, fetch: &str) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
+fn render_currency_collection(company: &ValidatedCompanyName, fetch: &str) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyCurrencies</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="BridgeCompanyCurrencies" ISMODIFY="No"><TYPE>Currency</TYPE><FETCH>{fetch}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
     )
@@ -581,12 +568,9 @@ fn render_currency_collection(company: &str, fetch: &str) -> String {
 ///   picks the row by GUID ([`super::parse_company_currency_name`]).
 /// - Sent only when a company defines more than one Currency master
 ///   (bridge#551).
-pub fn render_company_base_currency_request(company: &str) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
+pub fn render_company_base_currency_request(company: &ValidatedCompanyName) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyBaseCurrency</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="BridgeCompanyBaseCurrency" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>NAME, GUID, CURRENCYNAME</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
     )

@@ -33,7 +33,7 @@ The edge books are written by hand in a small generator, as data, then read by b
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `cp_unnamed.json` | 7,978 | `f099436d35a0469c76a478708dcd0fe6fe0b09ee339426d0ea710276bc96ea8c` | `edge-books/cp_unnamed.json` |
-| `edge.cp_unnamed.cash_payments_40a3.json` | 69,446 | `9b2b87a88249c6226f22bcc102ae06ec3fa7822794f3926ff195bc7b1d41c895` | `golden/edge.cp_unnamed.cash_payments_40a3.json` |
+| `edge.cp_unnamed.cash_payments_40a3.json` | 69,648 | `3a4f6830e7e33b736b1368b65ec8385e1edcce0a60a006f2329995a0e43a239a` | `golden/edge.cp_unnamed.cash_payments_40a3.json` |
 | `cp_loans.json` | 7,004 | `a25a79803ea038dc52fdfae10a8f0346ff594eb96bf795dbe7fce5aef7f09cb2` | `edge-books/cp_loans.json` |
 | `edge.cp_loans.cash_payments_40a3.json` | 49,367 | `f552e24d20df272ca6fcac77af3a0a1e028489d3ab2c933b0d78c3c654764157` | `golden/edge.cp_loans.cash_payments_40a3.json` |
 | `cp_loan_blank.json` | 1,290 | `b75ad26a2b52a035cf118704cc3194f8c56fe656e9eadd60e11b730747e01f04` | `edge-books/cp_loan_blank.json` |
@@ -50,3 +50,13 @@ existing output to be a declared difference that names the invented book which e
 - **Why it was not regenerated.** `parity/python_golden.py` takes the reference engine's directory, which is not in this repository, and the reference still gives the old texts (inferred from this golden, not measured), so a regeneration would bring it back.
 - **What a local parity run shows.** A run of `cash_payments_40a3` on a real book holding such a row reports its `title_sha256_16` and its amount's `definition_sha256_16` as differences, and a run on any book the two counts' `definition_sha256_16`. These are this declared difference, not a regression.
 - **Where it is declared.** The divergence registry of #1809 is not on master. When it is, this difference belongs there, with the goldens back at the reference's bytes.
+
+## Declared behaviour difference: a named s.40A(3) row says it sums the debits
+
+12 November 2026, #772. `docs/tax-audit/parity-spec-v1.md` section 12 requires every change to an
+existing output to be a declared difference that names the invented book which exercises it.
+
+- **What differs.** A s.40A(3) row sums the payee ledger's debits on the day's vouchers that pay cash, not the cash those vouchers pay: a debit of Rs 30,000 paid Rs 6,000 in cash and Rs 24,000 by bank counts in full. A row on a Purchase or expense ledger already said so. A row on any other ledger (a named payee) said "Cash paid to one payee", in its title and in its amount's definition. Its title now says the debits to one payee ledger on vouchers with a cash payment total over the daily limit and that the cash paid is not shown, and its definition says the figure is the debits, not the cash paid. The row, its figures' values, its evidence, its limits and its asks are as before. The compared fields are `title_sha256_16` and `definition_sha256_16` (parity-spec section 3). Comparing the vouchers' own cash line, as the high-value register does, stays open on #772, and so do the definitions of `s40a3_payee_days_any_amount_total` and `s40a3_excluded_total_*`, which still call the same debits cash paid.
+- **The book.** The invented book is the unit-test book of `src/cash_payments_40a3.rs`. The test `cash_payments_40a3::tests::a_named_s40a3_row_says_it_sums_the_debits_not_the_cash` builds the Rs 30,000 row above on a Sundry Creditors ledger and asserts its amount, its title whole and its definition.
+- **The goldens.** Every named s.40A(3) row in `golden/synthetic.cash_payments_40a3.json` (seven), `golden/edge.cp_unnamed.cash_payments_40a3.json` (two) and `golden/edge.cp_shared_guid_row.cash_payments_40a3.json` (two) carries the new title, the new amount definition and their hashes, recomputed with the hash `canonical.rs` uses. Nothing else in them changed. Their byte rows in `PROVENANCE.md`, here and in `shared-guid-rows-1195.md` are updated in place.
+- **Why it was not regenerated, and what a local parity run shows.** As for the difference above: the reference still gives the old texts (inferred from the goldens, not measured), so a local parity run of `cash_payments_40a3` on a real book with a named s.40A(3) row reports that row's `title_sha256_16` and its amount's `definition_sha256_16` as differences. These are this declared difference, not a regression.

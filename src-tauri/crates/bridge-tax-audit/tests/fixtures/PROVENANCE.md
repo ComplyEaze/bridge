@@ -505,7 +505,7 @@ existing output to be a declared difference that names the invented book which e
 | Fixture | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `synthetic.cash_44ab.json` | 5,880 | `94d58bcf9a18413ef024eed4537c18e41aed5eeb7fb6ddc964d193ea6e1abe5a` | `golden/synthetic.cash_44ab.json` |
-| `synthetic.cash_payments_40a3.json` | 74,254 | `daab4d0487cf8b42c5758c3b7f29960f829da5a096dde5ed041805aba93ca1e7` | `golden/synthetic.cash_payments_40a3.json` |
+| `synthetic.cash_payments_40a3.json` | 74,961 | `477c8cca27d3f3fc409b8e060e5473755824546c5399c669a671605fdeb67dc9` | `golden/synthetic.cash_payments_40a3.json` |
 | `synthetic.depreciation.json` | 28,219 | `251b34d0491e392b640ffb3df997027704e747868cbd79b6bd6dd3d2ef4a245d` | `golden/synthetic.depreciation.json` |
 | `synthetic.financial_statements.json` | 16,960 | `ca8c28addb75d267bac434ef7d7e7a070a479cdcd4bbf97fb245201056a22b58` | `golden/synthetic.financial_statements.json` |
 | `synthetic.financial_statements.noreport.json` | 15,893 | `5d6dcd510628850aac9b0ea0b4a97bd7c7fa46e2f4df81d2f0af62122d8011af` | `golden/synthetic.financial_statements.noreport.json` |

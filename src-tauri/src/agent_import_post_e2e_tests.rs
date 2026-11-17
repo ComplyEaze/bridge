@@ -6397,6 +6397,18 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
         "sent_not_attributed",
         "{posted}"
     );
+    // It says how many vouchers Tally reported as not created, and that which
+    // one is not known; it does not say this voucher was one of them.
+    assert_eq!(
+        voucher("partial-2")["next_step"],
+        partly_created_next_step().as_str(),
+        "{posted}"
+    );
+    assert_eq!(
+        result["counts"].get("tally_reported_not_created"),
+        None,
+        "{posted}"
+    );
     // The headline counts them voucher by voucher: matching content is not
     // confirmation, so none of the three is confirmed.
     assert_batch_counts(
@@ -6412,9 +6424,11 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     );
     // Tally's own answer reported an exception, so the line does not suggest
     // an edit in Tally, and names no cause (bridge#1108).
-    assert_eq!(
-        voucher("partial-2")["next_step"],
-        "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again.",
+    assert!(
+        voucher("partial-2")["next_step"]
+            .as_str()
+            .unwrap()
+            .starts_with("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again."),
         "{posted}"
     );
     let verdicts = String::from_utf8(journal(directory.path()))
@@ -6676,17 +6690,33 @@ async fn a_batch_rejected_whole_with_no_step_record_is_not_described_by_a_later_
 
 /// A batch that landed partly, checked again later: the voucher that is not
 /// found keeps the line that says to check in Tally, without the edit example
-/// (the saved answer was not clean). A count does not say which voucher Tally
-/// rejected.
+/// (the saved answer was not clean), and adds how many vouchers Tally's answer
+/// reported as not created. A count does not say which voucher Tally rejected,
+/// so the line says it cannot, and the voucher stays `sent_not_attributed`.
 #[tokio::test]
-async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
+async fn a_partly_created_batch_verified_later_adds_the_count_to_the_earlier_line() {
     let later =
         batch_posted_then_verified_later(created_two_of_three(), 12, partial_window()).await;
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 1, "{later}");
+    assert_eq!(
+        result["counts"].get("tally_reported_not_created"),
+        None,
+        "{later}"
+    );
     let (steps, _) = later_next_steps(&later);
-    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
-    assert_eq!(steps, [unclean], "{later}");
+    assert_eq!(steps, [partly_created_next_step()], "{later}");
+}
+
+/// The next step of the one voucher of the partial batch that is not found: the
+/// line after an answer that was not clean, then the count Tally reported
+/// (one of three) and that which voucher it was is not known.
+fn partly_created_next_step() -> String {
+    format!(
+        "{} {}",
+        super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP,
+        super::super::verification::partly_created_sentence(1, 3)
+    )
 }
 
 /// The same answer with the voucher mark moved by one across the post: Tally

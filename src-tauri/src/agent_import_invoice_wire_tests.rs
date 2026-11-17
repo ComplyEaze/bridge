@@ -1,5 +1,6 @@
 use super::*;
 use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 
 /// How many Sales-class rows a window answer holds, as the control's miss
 /// reports them.
@@ -1759,7 +1760,7 @@ fn the_group_hsn_request_is_the_answered_listing_with_the_hsn_rows() {
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
     assert_eq!(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
-            "BRIDGE PILOT LAB"
+            &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap()
         )
         .replace(
             "RESERVEDNAME</FETCH>",

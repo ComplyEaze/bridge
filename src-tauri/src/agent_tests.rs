@@ -1935,7 +1935,8 @@ fn ledger_movement_opening_export_is_pinned_to_admitted_books_from() {
         last_voucher.clone(),
     )
     .expect("an admitted BOOKSFROM period");
-    let request = render_native_ledger_export_request("Book", &matching);
+    let request =
+        render_native_ledger_export_request(&ValidatedCompanyName::new("Book").unwrap(), &matching);
     assert!(request.contains("<SVFROMDATE TYPE=\"Date\">20260401</SVFROMDATE>"));
 
     assert_eq!(

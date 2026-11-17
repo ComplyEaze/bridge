@@ -1537,3 +1537,678 @@ async fn a_build_names_the_rows_ledgers_from_its_catalogue_for_the_days_it_reads
         section["day_reads"]
     );
 }
+
+// ---- the budget, to the byte ------------------------------------------------------------
+
+/// A budget that holds the frame and exactly the first `k` rows lists those `k`
+/// rows, and one byte fewer lists one row fewer: the comma after a row is paid
+/// for, a row that fits to the byte is listed, and the frame's own margin is
+/// not given to the rows.
+#[test]
+fn a_budget_that_holds_the_frame_and_exactly_k_rows_lists_k_rows() {
+    const ROWS: usize = 5;
+    let summary = many_open(ROWS);
+    let everything = summary.render(usize::MAX);
+    // the frame as `render` pays for it: no row listed, every row counted as left out
+    let mut frame = everything.clone();
+    frame["open"] = json!([]);
+    frame["open_omitted"] = json!(ROWS);
+    let frame_len = frame.to_string().len() + OPEN_OMITTED_STEP.len() + 32;
+    let costs: Vec<usize> = everything["open"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row.to_string().len() + 1)
+        .collect();
+    let listed = |available: usize| summary.render(available)["open"].as_array().unwrap().len();
+    for kept in 1..=ROWS {
+        let exact = frame_len + costs[..kept].iter().sum::<usize>();
+        assert_eq!(listed(exact), kept, "{kept} rows in {exact}");
+        assert_eq!(
+            listed(exact - 1),
+            kept - 1,
+            "{kept} rows in {exact} less one"
+        );
+    }
+}
+
+// ---- the codes and the words a refusal keeps ----------------------------------------------
+
+#[test]
+fn the_codes_a_transfer_check_refuses_a_send_with_are_these_six() {
+    assert_eq!(
+        SEND_REFUSALS,
+        [
+            "skip_row_already_posted",
+            "withdraw_skip_invalid",
+            "withdraw_skip_paired",
+            "skip_row_paired_elsewhere",
+            "transfer_double_booked",
+            "transfer_view_not_established",
+        ]
+    );
+}
+
+fn assert_clauses(text: &str, clauses: &[&str]) {
+    for clause in clauses {
+        assert!(text.contains(clause), "{clause}: {text}");
+    }
+}
+
+/// What each refusal of a build tells the person to do, and not to do.
+#[test]
+fn a_refused_build_keeps_what_it_tells_the_person_to_do() {
+    assert_clauses(
+        SKIP_ROW_ALREADY_POSTED_NEXT_STEP,
+        &[
+            "Do not skip the rows listed in skipped_rows.",
+            "run verify_import on it",
+        ],
+    );
+    assert_clauses(
+        SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP,
+        &[
+            "Do not post these rows.",
+            "never name a row on their behalf",
+        ],
+    );
+    assert_clauses(
+        WITHDRAW_SKIP_INVALID_NEXT_STEP,
+        &["Build again with withdraw_skips naming only rows that are both, or without it."],
+    );
+    assert_clauses(
+        TRANSFER_DOUBLE_BOOKED_NEXT_STEP,
+        &["Do not build this Contra: run verify_import on the other batch"],
+    );
+    assert_clauses(
+        TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP,
+        &["otherwise report it with the error named here, and do not build this statement again until it is fixed."],
+    );
+    assert_clauses(
+        TRANSFER_REFUSED_MESSAGE,
+        &["Asking for approval again refuses the same way."],
+    );
+    assert_clauses(
+        TRANSFER_VIEW_REFUSED_MESSAGE,
+        &["Building it again meets the same record: report it, or send with the later release that wrote it."],
+    );
+}
+
+/// What each refusal of a send says of the batch, in the words the send has of
+/// its own: the wording is the step's, not an empty or a stray one.
+#[test]
+fn a_refusal_at_send_keeps_what_it_tells_the_person_to_do() {
+    for (reason, clauses) in [
+        (
+            "skip_row_already_posted",
+            &[
+                "This batch skips a row that is already a voucher of a batch of this company",
+                "run verify_import on it",
+                "Then parse the statement again with the rows listed in skipped_rows not skipped",
+            ][..],
+        ),
+        (
+            "skip_row_paired_elsewhere",
+            &[
+                "This batch posts a row that a statement of this company skipped",
+                "Parse the statement again with those rows mapped skip",
+                "never name a row on their behalf",
+            ][..],
+        ),
+        (
+            "withdraw_skip_invalid",
+            &["Name in withdraw_skips only rows that are both, or none."][..],
+        ),
+        (
+            "transfer_double_booked",
+            &[
+                "Sending both books it twice.",
+                "Run verify_import on the other batch",
+            ][..],
+        ),
+    ] {
+        assert_clauses(send_wording(reason).expect(reason), clauses);
+        let refusal = TransferRefusal {
+            reason,
+            detail: json!({}),
+            next_step: String::new(),
+        };
+        let step = refusal.for_send().into_parts().2;
+        assert_clauses(&step, clauses);
+    }
+    for reason in [
+        "withdraw_skip_paired",
+        "transfer_view_not_established",
+        "withdraw_skip_carried",
+        "other",
+    ] {
+        assert_eq!(send_wording(reason), None, "{reason}");
+    }
+}
+
+/// The closing instruction of the steps that end one.
+#[test]
+fn the_steps_of_the_states_keep_their_closing_instructions() {
+    assert_clauses(
+        OpenState::NotEstablished.step(),
+        &["If a batch without statement records already carries this transfer, keep the skip."],
+    );
+    assert_clauses(
+        OpenState::DoubleBooked.step(),
+        &["Two statements each booked this transfer as a Contra. No step"],
+    );
+    assert!(OpenState::PostedAgainstSkip
+        .step()
+        .ends_with("no step inside ComplyEaze Bridge clears the row. Tell the person."));
+    assert_clauses(
+        OpenState::HeldElsewhere.step(),
+        &["Verify that batch. The skip is retired once"],
+    );
+    assert_clauses(
+        RESTORED_NOTE,
+        &["do not name it in withdraw_skips, and do not build or amend its rows."],
+    );
+}
+
+/// A refusal's outcome names the company it was judged for, and carries the
+/// refusal's reason, detail and step.
+#[test]
+fn a_refusal_outcome_names_the_company_it_was_judged_for() {
+    let company = bridge_tally_protocol::TallyCompany {
+        name: "Synthetic Co".into(),
+        guid: Some("company-guid".into()),
+        company_number: None,
+        books_from: None,
+    };
+    let refusal = TransferRefusal {
+        reason: "withdraw_skip_invalid",
+        detail: json!({"invalid_rows": ["st-1"]}),
+        next_step: "step".into(),
+    };
+    let outcome = refusal.outcome(&company, &local_evidence("call"), "company-guid");
+    assert_eq!(outcome.company_guid.as_deref(), Some("company-guid"));
+    assert!(!outcome.truncated);
+    let result = &outcome.payload["result"];
+    assert_eq!(result["state"], "refused");
+    assert_eq!(result["reason"], "withdraw_skip_invalid");
+    assert_eq!(result["invalid_rows"], json!(["st-1"]));
+    assert_eq!(result["next_step"], "step");
+}
+
+// ---- the checks over a journal on disk -------------------------------------------------------
+
+use statement_facts::{ContraRow, RowDirection, SkipRow};
+
+const FX_ENDPOINT: &str = "http://127.0.0.1:9001";
+const FX_BANK_ONE: &str = "guid-bank-one";
+const FX_BANK_TWO: &str = "guid-bank-two";
+const FX_BANK_THREE: &str = "guid-bank-three";
+const FX_NAME_ONE: &str = "Bank One";
+const FX_NAME_TWO: &str = "Bank Two";
+const FX_NAME_THREE: &str = "Bank Three";
+
+fn fx_guid(n: u128) -> String {
+    uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | n).to_string()
+}
+
+fn fx_company() -> String {
+    fx_guid(0xc1)
+}
+
+/// A statement row id.
+fn fx_row(n: u32) -> String {
+    format!("st-20260901-{n:016x}")
+}
+
+fn fx_batch_id(n: u32) -> String {
+    format!("bridge-{}", fx_guid(u128::from(n)))
+}
+
+fn fx_reference(n: u64) -> String {
+    p6(n, 12)
+}
+
+fn fx_voucher(txn: &str, kind: &str, day: &str, to: &str, from: &str) -> Value {
+    json!({
+        "bridge_txn_id": txn, "date": day, "voucher_type": kind,
+        "entries": [
+            {"ledger": to, "amount": "500.00", "side": "Dr"},
+            {"ledger": from, "amount": "500.00", "side": "Cr"},
+        ],
+    })
+}
+
+/// A Contra into `to` from `from` on 1 September.
+fn fx_contra(txn: &str, to: &str, from: &str) -> Value {
+    fx_voucher(txn, "Contra", "20260901", to, from)
+}
+
+fn fx_facts(bank: &str) -> StatementFacts {
+    StatementFacts {
+        bank_ledger_guid: bank.into(),
+        coverage: None,
+        contra_rows: Vec::new(),
+        skip_rows: Vec::new(),
+    }
+}
+
+trait FxFacts {
+    fn contra(self, txn: &str, reference: Option<&str>) -> Self;
+    fn skip(self, txn: &str, other: &str) -> Self;
+    fn window(self, from: &str, to: &str) -> Self;
+}
+
+impl FxFacts for StatementFacts {
+    fn contra(mut self, txn: &str, reference: Option<&str>) -> Self {
+        self.contra_rows.push(ContraRow {
+            bridge_txn_id: txn.into(),
+            reference: reference.map(str::to_string),
+            instrument: None,
+            reversed_same_day: false,
+        });
+        self
+    }
+    /// An outflow of 500.00 on 1 September, skipped as carried by `other`'s Contra.
+    fn skip(mut self, txn: &str, other: &str) -> Self {
+        self.skip_rows.push(SkipRow {
+            bridge_txn_id: txn.into(),
+            date: date("20260901"),
+            amount: "500.00".into(),
+            direction: RowDirection::Outflow,
+            other_ledger_guid: other.into(),
+            reference: None,
+            instrument: None,
+            reversed_same_day: false,
+        });
+        self
+    }
+    fn window(mut self, from: &str, to: &str) -> Self {
+        self.coverage = Some(statement_facts::StatementWindow {
+            from: date(from),
+            to: date(to),
+        });
+        self
+    }
+}
+
+/// A saved batch, built at the second its id says: a larger id is built later.
+struct FxBatch {
+    id: u32,
+    amends: Option<u32>,
+    vouchers: Vec<Value>,
+    statement: Option<StatementFacts>,
+    withdrawn: Vec<String>,
+    status: &'static str,
+}
+
+fn fx_batch(id: u32) -> FxBatch {
+    FxBatch {
+        id,
+        amends: None,
+        vouchers: Vec::new(),
+        statement: None,
+        withdrawn: Vec::new(),
+        status: "built",
+    }
+}
+
+impl FxBatch {
+    fn voucher(mut self, voucher: Value) -> Self {
+        self.vouchers.push(voucher);
+        self
+    }
+    fn facts(mut self, facts: StatementFacts) -> Self {
+        self.statement = Some(facts);
+        self
+    }
+    fn amends(mut self, id: u32) -> Self {
+        self.amends = Some(id);
+        self
+    }
+    fn withdrew(mut self, row: &str) -> Self {
+        self.withdrawn.push(row.into());
+        self
+    }
+    fn found(mut self) -> Self {
+        self.status = "posted_verified";
+        self
+    }
+    fn line(&self) -> ImportLedgerLine {
+        let txn_ids: Vec<String> = self
+            .vouchers
+            .iter()
+            .map(|voucher| voucher["bridge_txn_id"].as_str().unwrap().to_string())
+            .collect();
+        let mut line: ImportLedgerLine = serde_json::from_value(json!({
+            "batch_id": fx_batch_id(self.id), "identity_scheme": "batch_v1",
+            "company_guid": fx_company(),
+            "txn_ids": txn_ids, "date_from": "20260901", "date_to": "20260901",
+            "sha256": sha256_hex(fx_batch_id(self.id).as_bytes()),
+            "built_at": format!("2026-09-01T10:00:{:02}Z", self.id % 60),
+            "status": self.status,
+            "pre_import_mark": {"kind": "company_high_water", "value": 1, "master_value": 1},
+            "vouchers": self.vouchers,
+        }))
+        .unwrap();
+        line.amends_batch_id = self.amends.map(fx_batch_id);
+        line.endpoint_origin = Some(FX_ENDPOINT.to_string());
+        line.binding = LedgerBinding::bound(Some(vec![
+            BoundLedger {
+                name: FX_NAME_ONE.into(),
+                guid: FX_BANK_ONE.into(),
+            },
+            BoundLedger {
+                name: FX_NAME_TWO.into(),
+                guid: FX_BANK_TWO.into(),
+            },
+            BoundLedger {
+                name: FX_NAME_THREE.into(),
+                guid: FX_BANK_THREE.into(),
+            },
+        ]));
+        line.statement = self
+            .statement
+            .as_ref()
+            .map(statement_facts::statement_record);
+        line.withdrawn_skips = (!self.withdrawn.is_empty()).then(|| self.withdrawn.clone());
+        line
+    }
+}
+
+/// A server over a data directory holding these batches as its journal.
+fn fx_server(directory: &Path, batches: &[&FxBatch]) -> Server {
+    let server = Server::new(crate::agent::Settings {
+        endpoint: bridge_tally_transport::TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.into(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    for batch in batches {
+        server.append_import_ledger(&batch.line()).unwrap();
+    }
+    server
+}
+
+/// The refusal a saved batch meets at send, with the reason and what it lists.
+fn fx_refusal_at_send(server: &Server, line: &ImportLedgerLine) -> (&'static str, Value, String) {
+    let _lock = server.lock_import_admission_shared().unwrap();
+    server
+        .transfers_refusal_for_send_while_admitted(line)
+        .unwrap()
+        .expect("refused at send")
+        .into_parts()
+}
+
+/// The Contra that Bank Two's statement booked, and the one Bank One's statement
+/// booked for the same transfer, with equal references.
+fn fx_double_booking() -> (FxBatch, FxBatch) {
+    let reference = fx_reference(1);
+    let first = fx_batch(1)
+        .voucher(fx_contra(&fx_row(1), FX_NAME_TWO, FX_NAME_ONE))
+        .facts(fx_facts(FX_BANK_TWO).contra(&fx_row(1), Some(&reference)))
+        .found();
+    let second = fx_batch(2)
+        .voucher(fx_contra(&fx_row(2), FX_NAME_TWO, FX_NAME_ONE))
+        .facts(fx_facts(FX_BANK_ONE).contra(&fx_row(2), Some(&reference)));
+    (first, second)
+}
+
+/// A batch booking a transfer another batch booked is refused when it is sent,
+/// in the words of a send, naming the other batch; and so whatever case the
+/// company's GUID is written in.
+#[test]
+fn a_saved_batch_booking_a_booked_transfer_is_refused_at_send_in_the_words_of_a_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let (first, second) = fx_double_booking();
+    let server = fx_server(directory.path(), &[&first, &second]);
+    for company in [fx_company(), fx_company().to_uppercase()] {
+        let mut line = second.line();
+        line.company_guid = company;
+        let (reason, detail, step) = fx_refusal_at_send(&server, &line);
+        assert_eq!(reason, "transfer_double_booked");
+        assert_eq!(detail, json!({"other_batch_id": fx_batch_id(1)}));
+        assert!(step.starts_with(NOTHING_SENT), "{step}");
+        assert!(step.ends_with(SEND_ENDING), "{step}");
+    }
+}
+
+/// A batch that books a transfer once passes at send: two Contras between the
+/// same ledgers with different references are not a double booking.
+#[test]
+fn a_saved_batch_that_books_a_transfer_once_passes_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let first = fx_batch(1)
+        .voucher(fx_contra(&fx_row(1), FX_NAME_TWO, FX_NAME_ONE))
+        .facts(fx_facts(FX_BANK_TWO).contra(&fx_row(1), Some(&fx_reference(1))))
+        .found();
+    let second = fx_batch(2)
+        .voucher(fx_contra(&fx_row(2), FX_NAME_TWO, FX_NAME_ONE))
+        .facts(fx_facts(FX_BANK_ONE).contra(&fx_row(2), Some(&fx_reference(2))));
+    let server = fx_server(directory.path(), &[&first, &second]);
+    let _lock = server.lock_import_admission_shared().unwrap();
+    let refusal = server
+        .transfers_refusal_for_send_while_admitted(&second.line())
+        .unwrap();
+    assert!(
+        refusal.is_none(),
+        "{:?}",
+        refusal.map(|refusal| refusal.reason())
+    );
+}
+
+/// The section of a verification reads the same for a company GUID in either case.
+#[test]
+fn the_verification_section_reads_the_same_for_a_company_in_upper_case() {
+    let directory = tempfile::tempdir().unwrap();
+    let skipping = fx_batch(1).facts(fx_facts(FX_BANK_ONE).skip(&fx_row(1), FX_BANK_TWO));
+    let server = fx_server(directory.path(), &[&skipping]);
+    let lower = server.transfers_for_verification(&fx_company(), 0);
+    assert_eq!(lower["state"], "computed", "{lower}");
+    assert_eq!(lower["open"].as_array().unwrap().len(), 1, "{lower}");
+    assert_eq!(
+        server.transfers_for_verification(&fx_company().to_uppercase(), 0),
+        lower
+    );
+}
+
+/// A row posted by a batch that is sent, or found, cannot be skipped by a batch
+/// that carries a statement, whatever else the batch holds.
+#[test]
+fn a_batch_carrying_only_a_statement_that_skips_a_posted_row_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let posted = fx_batch(1)
+        .voucher(fx_voucher(
+            &fx_row(1),
+            "Payment",
+            "20260901",
+            "Expense",
+            FX_NAME_ONE,
+        ))
+        .found();
+    let skipping = fx_batch(2).facts(fx_facts(FX_BANK_ONE).skip(&fx_row(1), FX_BANK_TWO));
+    let server = fx_server(directory.path(), &[&posted, &skipping]);
+    let (reason, detail, _) = fx_refusal_at_send(&server, &skipping.line());
+    assert_eq!(reason, "skip_row_already_posted");
+    assert_eq!(detail["blocking_batch_id"], fx_batch_id(1));
+    assert_eq!(detail["skipped_rows"], json!([fx_row(1)]));
+}
+
+/// An amendment cannot skip a row its own lineage built.
+#[test]
+fn an_amendment_that_skips_a_row_its_own_lineage_built_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let built = fx_batch(1).voucher(fx_voucher(
+        &fx_row(1),
+        "Payment",
+        "20260901",
+        "Expense",
+        FX_NAME_ONE,
+    ));
+    let amending = fx_batch(2)
+        .amends(1)
+        .voucher(fx_voucher(
+            &fx_row(2),
+            "Payment",
+            "20260901",
+            "Expense",
+            FX_NAME_ONE,
+        ))
+        .facts(fx_facts(FX_BANK_ONE).skip(&fx_row(1), FX_BANK_TWO));
+    let server = fx_server(directory.path(), &[&built, &amending]);
+    let (reason, detail, _) = fx_refusal_at_send(&server, &amending.line());
+    assert_eq!(reason, "skip_row_already_posted");
+    assert_eq!(detail["blocking_batch_id"], fx_batch_id(1));
+}
+
+fn fx_not_established(error: &TransferFactsError) -> Value {
+    json!({"error": error.variant(), "check": error.check(), "record_id": error.record_id()})
+}
+
+/// A statement that cannot be read back is a view that is not established, at send.
+#[test]
+fn a_saved_statement_that_cannot_be_read_back_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = fx_server(directory.path(), &[]);
+    let mut line = fx_batch(2).line();
+    line.statement = Some(json!({"unexpected": true}));
+    let error = TransferFactsError::Facts {
+        source_id: line.batch_id.clone(),
+        error: FactsError::Unparsable,
+    };
+    let (reason, detail, step) = fx_refusal_at_send(&server, &line);
+    assert_eq!(reason, "transfer_view_not_established");
+    assert_eq!(detail, fx_not_established(&error));
+    assert!(step.starts_with(NOTHING_SENT), "{step}");
+}
+
+/// Facts that fail the check only once the batch is read as the newest record
+/// leave the view not established: the batch needs the view, so it is refused.
+#[test]
+fn a_batch_whose_own_facts_fail_the_check_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = fx_server(directory.path(), &[]);
+    let line = fx_batch(2).facts(fx_facts("")).line();
+    let error = TransferFactsError::Facts {
+        source_id: line.batch_id.clone(),
+        error: FactsError::EmptyLedgerGuid,
+    };
+    let (reason, detail, _) = fx_refusal_at_send(&server, &line);
+    assert_eq!(reason, "transfer_view_not_established");
+    assert_eq!(detail, fx_not_established(&error));
+}
+
+/// A withdrawal is judged by the time the batch was built; a time that cannot
+/// be read leaves the view not established.
+#[test]
+fn a_withdrawal_whose_batch_has_no_readable_build_time_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let skipping = fx_batch(1)
+        .facts(fx_facts(FX_BANK_ONE).skip(&fx_row(1), FX_BANK_TWO))
+        .found();
+    let server = fx_server(directory.path(), &[&skipping]);
+    let mut line = fx_batch(2)
+        .voucher(fx_voucher(
+            &fx_row(1),
+            "Payment",
+            "20260901",
+            "Expense",
+            FX_NAME_ONE,
+        ))
+        .withdrew(&fx_row(1))
+        .line();
+    // built after the skip, as a withdrawal is: this passes
+    {
+        let _lock = server.lock_import_admission_shared().unwrap();
+        assert!(server
+            .transfers_refusal_for_send_while_admitted(&line)
+            .unwrap()
+            .is_none());
+    }
+    line.built_at = "not a time".into();
+    let (reason, detail, _) = fx_refusal_at_send(&server, &line);
+    assert_eq!(reason, "transfer_view_not_established");
+    assert_eq!(detail["error"], "built_at_unparsable");
+}
+
+/// A row skipped under two keys: the withdrawal does not count while any of the
+/// skips was recorded after the batch was built.
+#[test]
+fn a_withdrawal_older_than_one_of_two_skips_of_the_row_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let older = fx_batch(1)
+        .facts(fx_facts(FX_BANK_ONE).skip(&fx_row(1), FX_BANK_TWO))
+        .found();
+    let withdrawing = fx_batch(2)
+        .voucher(fx_voucher(
+            &fx_row(1),
+            "Payment",
+            "20260901",
+            "Expense",
+            FX_NAME_ONE,
+        ))
+        .withdrew(&fx_row(1));
+    let newer = fx_batch(3)
+        .facts(fx_facts(FX_BANK_THREE).skip(&fx_row(1), FX_BANK_TWO))
+        .found();
+    let server = fx_server(directory.path(), &[&older, &withdrawing, &newer]);
+    let (reason, detail, _) = fx_refusal_at_send(&server, &withdrawing.line());
+    assert_eq!(reason, "skip_row_paired_elsewhere");
+    assert_eq!(detail["skipped_rows"], json!([fx_row(1)]));
+}
+
+/// A skip file that cannot be opened is `import_ledger_unavailable`.
+#[test]
+fn a_skip_file_that_cannot_be_opened_is_named_import_ledger_unavailable() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::create_dir(directory.path().join(statement_facts::SKIPS_FILE)).unwrap();
+    let server = fx_server(directory.path(), &[]);
+    assert_eq!(
+        server.skip_file_while_admitted().err().as_deref(),
+        Some("import_ledger_unavailable")
+    );
+}
+
+/// A Contra one day from a skipped row, with no reference on either, does not
+/// pair with it: the view takes only the same printed day (`TRANSFER_K_DAYS`).
+#[test]
+fn a_contra_a_day_from_a_skipped_row_is_not_its_pair() {
+    let directory = tempfile::tempdir().unwrap();
+    let skipping = fx_batch(1)
+        .facts(
+            fx_facts(FX_BANK_ONE)
+                .window("20260901", "20260930")
+                .skip(&fx_row(1), FX_BANK_TWO),
+        )
+        .found();
+    let booking = fx_batch(2)
+        .voucher(fx_voucher(
+            &fx_row(2),
+            "Contra",
+            "20260902",
+            FX_NAME_TWO,
+            FX_NAME_ONE,
+        ))
+        .facts(
+            fx_facts(FX_BANK_TWO)
+                .window("20260901", "20260930")
+                .contra(&fx_row(2), None),
+        )
+        .found();
+    let server = fx_server(directory.path(), &[&skipping, &booking]);
+    let section = server.transfers_for_verification(&fx_company(), 0);
+    assert_eq!(section["state"], "computed", "{section}");
+    assert_eq!(section["skips_paired"], 0, "{section}");
+    assert_eq!(
+        section["open"],
+        json!([{"bridge_txn_id": fx_row(1), "date": "20260901", "state": "tally_unchecked"}]),
+        "{section}"
+    );
+}

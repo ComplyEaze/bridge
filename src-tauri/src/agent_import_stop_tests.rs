@@ -474,6 +474,14 @@ fn an_unattributed_invoice_after_an_unclean_answer_drops_the_edit_example() {
             verification::mark_sent_not_attributed_after_unclean_answer as fn(&mut Value),
             "not established: no voucher matching this invoice was found, and one may be in the book",
         ),
+        // A post that landed in part adds a count after that step: the words
+        // are the same, and name no count.
+        (
+            (|result| {
+                verification::mark_sent_not_attributed_after_partly_created_answer(result, 1, 3)
+            }) as fn(&mut Value),
+            "not established: no voucher matching this invoice was found, and one may be in the book",
+        ),
         (verification::mark_sent_not_attributed, NOT_ATTRIBUTED),
         (verification::mark_sent_after_reported_not_created, NOT_ATTRIBUTED),
     ] {

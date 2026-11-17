@@ -120,7 +120,11 @@ fn the_renderer_emits_exactly_the_captured_requests() {
         (NativeStatementKind::ProfitAndLoss, PL_FY_REQUEST),
     ] {
         assert_eq!(
-            render_native_statement_request(kind, "BRIDGE READS LAB", &period),
+            render_native_statement_request(
+                kind,
+                &ValidatedCompanyName::new("BRIDGE READS LAB").unwrap(),
+                &period
+            ),
             text(captured)
         );
     }

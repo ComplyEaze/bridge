@@ -1119,10 +1119,10 @@ function App() {
       const identityDiscriminator = clientIdentityDiscriminator(company);
       return {
         key: tallyCompanyKey(company),
-        name: company.name,
+        name: company.shown_name,
         summaryDiscriminator,
         identityDiscriminator,
-        searchText: `${company.name} ${identityDiscriminator}`,
+        searchText: `${company.shown_name} ${identityDiscriminator}`,
         state: company.mirror_company_id
           ? liveCompanyKeys.includes(tallyCompanyKey(company))
             && company.canonical_endpoint === currentProbeCanonicalOrigin
@@ -1363,7 +1363,7 @@ function App() {
           <section className="company-context-bar" aria-label="Selected Tally company context">
             <div>
               <span>Selected company</span>
-              <strong>{selectedCompanyRecord?.name ?? "None selected"}</strong>
+              <strong>{selectedCompanyRecord?.shown_name ?? "None selected"}</strong>
             </div>
             <div>
               <span>Identity confidence</span>
@@ -1582,6 +1582,7 @@ function App() {
             config={config}
             company={selectedCompanyReady && selectedCompanyRecord?.guid && selectedCompanyRecord.company_number && selectedCompanyRecord.books_from_yyyymmdd && selectedCompanyRecord.canonical_endpoint ? {
               name: selectedCompanyRecord.name,
+              shown_name: selectedCompanyRecord.shown_name,
               guid: selectedCompanyRecord.guid,
               company_number: selectedCompanyRecord.company_number,
               books_from_yyyymmdd: selectedCompanyRecord.books_from_yyyymmdd,
@@ -1608,6 +1609,7 @@ function App() {
               config={config}
               company={selectedCompanyReady && selectedCompanyRecord?.guid && selectedCompanyRecord.company_number && selectedCompanyRecord.books_from_yyyymmdd && selectedCompanyRecord.canonical_endpoint ? {
                 name: selectedCompanyRecord.name,
+                shown_name: selectedCompanyRecord.shown_name,
                 guid: selectedCompanyRecord.guid,
                 company_number: selectedCompanyRecord.company_number,
                 books_from_yyyymmdd: selectedCompanyRecord.books_from_yyyymmdd,
@@ -1628,6 +1630,7 @@ function App() {
               config={config}
               company={selectedCompanyReady && selectedCompanyRecord?.guid && selectedCompanyRecord.company_number && selectedCompanyRecord.books_from_yyyymmdd && selectedCompanyRecord.canonical_endpoint ? {
                 name: selectedCompanyRecord.name,
+                shown_name: selectedCompanyRecord.shown_name,
                 guid: selectedCompanyRecord.guid,
                 company_number: selectedCompanyRecord.company_number,
                 books_from_yyyymmdd: selectedCompanyRecord.books_from_yyyymmdd,
@@ -1659,7 +1662,7 @@ function App() {
               <dl className="company-connection-details">
                 <div><dt>Endpoint</dt><dd>{config.host}:{config.port}</dd></div>
                 <div><dt>Connection</dt><dd>{status ? (status.reachable ? "Reachable" : "Not reachable") : "Not checked"}</dd></div>
-                <div><dt>Selected company</dt><dd>{selectedCompanyRecord?.name ?? "None selected"}</dd></div>
+                <div><dt>Selected company</dt><dd>{selectedCompanyRecord?.shown_name ?? "None selected"}</dd></div>
               </dl>
             </section>
 
@@ -1670,7 +1673,7 @@ function App() {
             {selectedCompanyRecord?.mirror_company_id && (
               <section className="panel wide offline-evidence-entry" aria-labelledby="offline-evidence-heading">
                 <h2 id="offline-evidence-heading">Review saved local evidence</h2>
-                <p className="panel-description">Inspect {selectedCompanyRecord.name}&rsquo;s local proof ledger, durable runs, and redacted proof exports without contacting Tally.</p>
+                <p className="panel-description">Inspect {selectedCompanyRecord.shown_name}&rsquo;s local proof ledger, durable runs, and redacted proof exports without contacting Tally.</p>
                 <button className="secondary-action" type="button" onClick={(event) => openEvidenceDrawer({ kind: "local-only" }, event.currentTarget)}>Open local evidence</button>
               </section>
             )}
@@ -1708,7 +1711,7 @@ function App() {
                             }}
                           >
                             <Building2 size={20} />
-                            <span>{company.name}</span>
+                            <span>{company.shown_name}</span>
                             <small>{current ? "Open in Tally" : "Not open now"}</small>
                           </button>
                         );
@@ -1763,7 +1766,7 @@ function App() {
                   )}
                   {selectedCompanyReady && (
                     <>
-                      <p className="setup-complete" role="status"><Check size={18} /> {selectedCompanyRecord?.name} is ready.</p>
+                      <p className="setup-complete" role="status"><Check size={18} /> {selectedCompanyRecord?.shown_name} is ready.</p>
                       <button className="primary" type="button" onClick={() => setView("outstandings")} disabled={childTallyReadCount > 0} aria-describedby={childTallyReadCount > 0 ? "active-tally-read-note" : undefined}>Open Overview</button>
                     </>
                   )}
@@ -1855,7 +1858,7 @@ function App() {
                       return (
                         <button className="company-option" type="button" key={key} onClick={() => selectSavedCompany(key)} disabled={savedCompanySelectionLocked}>
                           <Building2 size={20} />
-                          <span>{company.name}</span>
+                          <span>{company.shown_name}</span>
                           <small>Saved locally</small>
                         </button>
                       );

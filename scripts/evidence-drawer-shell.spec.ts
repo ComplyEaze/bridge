@@ -2,6 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 const savedCompany = {
   name: "Focus Test Company",
+  // The backend sends every saved company with its shown name (#2462); for a
+  // name with no invisible or control character it is the name itself.
+  shown_name: "Focus Test Company",
   guid: "01234567-89ab-cdef-0123-456789abcdef",
   company_number: "1",
   books_from_yyyymmdd: "20240401",

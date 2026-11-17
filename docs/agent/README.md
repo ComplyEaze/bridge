@@ -2027,7 +2027,7 @@ no estimate for a larger or a smaller window.
   130 s and 240 s were not tried, and the call's other reads are not in the figures; and whether progress would extend the limit is not
   answered; protocol reference 11f); on Windows the chat tab cut a 60 s call at about
   60 s with no cancel logged by the server, and the Code tab cut a 90 s call at 60.0 s and sent a
-  cancel (one run each, 5 Nov, #2119 row H; a call just under 60 s was not tried
+  cancel (one run of each kind on each tab, 5 Nov, #2119 row H, not yet in the protocol reference; a call just under 60 s was not tried
   on either tab); Claude Code
   completed a 150 s call under its defaults (CLI 2.1.285: one silent run and one with
   progress; Code tab 2.1.284: one silent run), and a 60 s per-server timeout set on a
@@ -2108,7 +2108,7 @@ Not covered: the data parts (they need the census), the wider read an empty wind
 `ledger_movement` (it pays its own census on a large book), the second window read of `ledger_movement`
 (it sends no census),
 `outstandings` and `voucher_presence`. No window is judged against a Windows host's limit: `host_limits`
-names what was measured there, one run on each tab.
+names what was measured there, one run of each kind on each tab.
 
 ### Search and summaries in `vouchers` (#1230)
 

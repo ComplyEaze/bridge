@@ -710,6 +710,28 @@ pub(super) fn verify_batch_as(
     )
 }
 
+/// What a confirmed Sales invoice row says about e-invoicing. It states only
+/// what was sent: nothing here reads whether e-invoicing applies to the company
+/// or the customer, or whether the voucher holds an IRN in Tally (#2162).
+pub(super) const NO_E_INVOICE_DETAILS_NOTE: &str = "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act in Tally; ComplyEaze Bridge does not generate one.";
+
+/// Which e-invoice details a post carried for an invoice. The row's note
+/// depends on this value, not on the voucher type: a post that carries
+/// details gets its own variant and no note.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum EInvoiceDetailsSent {
+    None,
+}
+
+impl EInvoiceDetailsSent {
+    fn result(self) -> Value {
+        match self {
+            Self::None => json!({"details_sent":self,"note":NO_E_INVOICE_DETAILS_NOTE}),
+        }
+    }
+}
+
 /// The status of a voucher attributed to `matched` by an identity (its
 /// narration tag, or the GUID its own POST was bound to), counted in `counts`.
 fn attributed_status(
@@ -740,7 +762,11 @@ fn attributed_status(
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true, narration),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
     } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
         count("posted_verified");
-        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+        let mut row = json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id});
+        if expected.voucher_type == VoucherType::Sales {
+            row["e_invoice"] = EInvoiceDetailsSent::None.result();
+        }
+        row
     } else if diffs.is_empty() {
         count("posted_not_effective");
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_optional","voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
@@ -935,6 +961,9 @@ pub(super) fn mark_invoice_readback(
                 voucher["invoice_lines"] = json!(lines);
             }
             if !differences.is_empty() {
+                if let Some(fields) = voucher.as_object_mut() {
+                    fields.remove("e_invoice");
+                }
                 voucher["status"] = json!("posted_divergent");
                 voucher["diffs"] = json!([{ "invoice_fields": differences }]);
                 voucher["next_step"] = json!(INVOICE_DIVERGENT_NEXT_STEP);

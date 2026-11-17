@@ -4439,6 +4439,12 @@ gives a next step where there is one: only five statuses (`bound_not_in_window`,
 file imported by hand and a refusal before anything was sent carry none, because the batch can still be
 posted.
 
+A `posted_verified` Sales invoice row of `post_import` or `verify_import` also carries `e_invoice`, with
+`details_sent` `none` and a `note`. The note says that the post carried no e-invoice details, so it supplied
+no IRN, and that where e-invoicing applies to the company and customer, generating the IRN is the CA's act
+in Tally. ComplyEaze Bridge does not read whether e-invoicing applies, so the note is worded for either case.
+No other row carries the field, and a row that stops reading `posted_verified` loses it.
+
 ## Protocol and migration notes
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported

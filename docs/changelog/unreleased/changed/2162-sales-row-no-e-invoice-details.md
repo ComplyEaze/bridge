@@ -1,0 +1,1 @@
+- A confirmed Sales invoice row from `post_import` or `verify_import` now says that the post carried no e-invoice details and that, where e-invoicing applies to the company and customer, generating the IRN is the CA's act in Tally (#2162).

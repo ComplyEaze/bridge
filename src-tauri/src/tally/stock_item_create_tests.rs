@@ -9,6 +9,9 @@ use bridge_tally_protocol::{decode_tally_xml_response_bytes_limited, ExpectedTal
 const COMPANY: &str = "BRIDGE STOCK CREATE LAB";
 const COMPANY_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
 const SIBLING_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-000000d0";
+// The two created items, as the captures hold them.
+const PLAIN_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-000000d1";
+const MARKED_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-000000d2";
 const BEFORE: &[u8] = include_bytes!(
     "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml"
 );
@@ -122,26 +125,16 @@ fn a_created_item_is_absent_before_and_taken_after() {
     assert!(std::ptr::eq(absent.catalogue(), &before));
 
     let marked = catalogue(&decode(MARKED));
-    let guid = &marked
-        .items()
-        .iter()
-        .find(|item| item.name == "SC Copied Marked")
-        .expect("the marked capture holds the created item")
-        .guid;
     assert_eq!(
         marked.name_absent(&name("SC Copied Marked")).unwrap_err(),
-        taken(guid, Via::Name, "SC Copied Marked")
+        taken(MARKED_GUID, Via::Name, "SC Copied Marked")
     );
 
     let plain = catalogue(&decode(PLAIN));
-    assert!(matches!(
-        plain.name_absent(&name("SC Copied Goods")),
-        Err(ItemNameNotAbsent::Taken(NameCollision {
-            kind: MasterKind::StockItem,
-            via: Via::Name,
-            ..
-        }))
-    ));
+    assert_eq!(
+        plain.name_absent(&name("SC Copied Goods")).unwrap_err(),
+        taken(PLAIN_GUID, Via::Name, "SC Copied Goods")
+    );
 }
 
 #[test]
@@ -188,6 +181,21 @@ fn a_read_that_cannot_show_every_name_gives_no_catalogue() {
         )
         .unwrap_err(),
         StockItemCatalogueError::NoItems
+    );
+    // A language name of one no-break space passes the parser, which trims
+    // ASCII only, and is refused by the index. An edit, not a captured state.
+    let xml = decode(BEFORE);
+    assert_eq!(xml.matches("<NAME>SC Sibling Goods</NAME>").count(), 1);
+    assert_eq!(
+        StockItemCatalogue::from_candidate_read(
+            &company(),
+            &xml.replacen("<NAME>SC Sibling Goods</NAME>", "<NAME>\u{a0}</NAME>", 1)
+        )
+        .unwrap_err(),
+        StockItemCatalogueError::Index(MasterNameIndexError::BlankName {
+            master: 0,
+            position: 0
+        })
     );
     let foreign =
         VerifiedCompanyIdentity::test_fixture(COMPANY, "3a6bd6e1-b835-4bff-89dd-8a6af138c346");

@@ -1,18 +1,25 @@
-//! The first step of creating one stock item (#1381): the book's stock items,
-//! read once, and the proof that a proposed name is none of them.
+//! The first step of creating one stock item (#1381): the stock items of one
+//! answer to the candidate read, and the proof that a proposed name is none of
+//! them.
 //!
-//! A Create for a name Tally takes for an existing item alters that item and
-//! replaces its GST and HSN details. Case and inner spacing were measured to
-//! fold, one run each (the measurement comment on #1381). Hyphen, slash,
-//! removed spaces, full stops and aliases were not measured for items, so
-//! every fold of the ledger index is refused, as the safe answer.
+//! A Create for a name an item already holds does not fail. For an exact name
+//! Tally answered ALTERED and replaced that item's GST and HSN details (one
+//! run, PARTIAL). A name that differs only by case, or by a doubled space,
+//! resolved to the existing item the same way (one run each; what became of
+//! its GST details was not recorded). Hyphen, slash, removed spaces, full
+//! stops and aliases were not measured for items, so every fold of the ledger
+//! index is refused, as the safe answer. See
+//! `TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md` §12a.13.
 //!
 //! The tests read the captures in
 //! `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/`; see their
 //! `PROVENANCE.md` (PARTIAL: one book, one release, one sitting).
 //!
-//! The company is bound by its GUID on every row. The read is not yet sized
-//! before it is sent; the caller that sends it is a later pull request.
+//! The company is bound by its GUID on every row. The proof holds for the
+//! answer it was built from, and nothing here shows that answer is the whole
+//! book. Before any caller acts on a name shown absent, the answer must come
+//! from the one request builder, be admitted by size, and agree with the
+//! company's stock item count (§12a.13). That caller is a later pull request.
 
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -27,8 +34,9 @@ use bridge_tally_protocol::stock_item_candidate::{
     parse_candidate_stock_items, CandidateStockItem,
 };
 
-/// Every stock item of one verified company, from one candidate read, with
-/// its names indexed.
+/// The stock items of one answer to the candidate read, each bound to one
+/// verified company, with their names indexed. It does not show that the
+/// answer is the whole book (see the module doc).
 #[derive(Debug)]
 pub(crate) struct StockItemCatalogue {
     items: Vec<CandidateStockItem>,
@@ -58,7 +66,8 @@ pub(crate) enum ItemNameNotAbsent {
     Unchecked(MasterNameIndexError),
 }
 
-/// A name no item of the catalogue it borrows can be taken for.
+/// A name no item of the catalogue it borrows can be taken for. It says
+/// nothing of an item the catalogue's answer did not hold.
 #[derive(Debug)]
 pub(crate) struct ItemNameAbsent<'a> {
     catalogue: &'a StockItemCatalogue,

@@ -15790,5 +15790,117 @@
   "file": "src/rules.rs",
   "from": "                meta_date(\"previous_year_start\")?,\n",
   "to": "                meta_date(\"previous_year_end\")?,\n"
+ },
+ {
+  "id": "BA-01",
+  "by": "author",
+  "what": "bills: an untyped row with an amount passed over as a placeholder",
+  "file": "src/book.rs",
+  "from": "\"\" if amount.is_empty()\n                        && bill_allocation_without_type_is_placeholder",
+  "to": "\"\" if bill_allocation_without_type_is_placeholder"
+ },
+ {
+  "id": "BA-02",
+  "by": "author",
+  "what": "bills: an untyped row with a name passed over as a placeholder",
+  "file": "src/book.rs",
+  "from": "\n                        && bill_allocation_without_type_is_placeholder(Some(name)) =>",
+  "to": "\n                        =>"
+ },
+ {
+  "id": "BA-03",
+  "by": "author",
+  "what": "bills: read when any vouchers part asked",
+  "file": "src/book.rs",
+  "from": ".all(|vp| vp.bill_allocations)",
+  "to": ".any(|vp| vp.bill_allocations)"
+ },
+ {
+  "id": "BA-04",
+  "by": "author",
+  "what": "bills: amount kept credit positive",
+  "file": "src/book.rs",
+  "from": "let amount_paise = flip(amount, part)",
+  "to": "let amount_paise = paise(amount, part)"
+ },
+ {
+  "id": "BA-05",
+  "by": "author",
+  "what": "bills: an On Account row that names a bill read",
+  "file": "src/book.rs",
+  "from": "\"On Account\" if name.is_empty() => Bill::OnAccount,",
+  "to": "\"On Account\" if true => Bill::OnAccount,"
+ },
+ {
+  "id": "BA-06",
+  "by": "author",
+  "what": "bills: a bill with no name read",
+  "file": "src/book.rs",
+  "from": "(!name.is_empty())\n",
+  "to": "(!name.is_empty() || true)\n"
+ },
+ {
+  "id": "BA-07",
+  "by": "author",
+  "what": "bills: an unknown bill type read as New Ref",
+  "file": "src/book.rs",
+  "from": "_ => return Err(refuse(BillRowFault::UnknownType)),",
+  "to": "_ => named(Bill::NewRef)?,"
+ },
+ {
+  "id": "BA-08",
+  "by": "author",
+  "what": "bills: a voucher with none listed",
+  "file": "src/book.rs",
+  "from": "        if !rows.is_empty() {\n            found.insert",
+  "to": "        if true {\n            found.insert"
+ },
+ {
+  "id": "BA-09",
+  "by": "author",
+  "what": "bills: a row that does not read leaves them not read",
+  "file": "src/book.rs",
+  "from": "(true, Err(refusal)) => BillAllocations::Unreadable(refusal),",
+  "to": "(true, Err(_)) => BillAllocations::NotRead,"
+ },
+ {
+  "id": "BA-10",
+  "by": "author",
+  "what": "bills: no part's rows read when asked",
+  "file": "src/book.rs",
+  "from": "        if bills_asked {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "BA-11",
+  "by": "author",
+  "what": "bills: an absent amount read as zero",
+  "file": "src/book.rs",
+  "from": ".ok_or_else(|| refuse(BillRowFault::NoAmount))?;",
+  "to": ".unwrap_or(0);"
+ },
+ {
+  "id": "BA-12",
+  "by": "author",
+  "what": "bills: an amount that is not a decimal read as absent",
+  "file": "src/book.rs",
+  "from": ".map_err(|_| refuse(BillRowFault::AmountUnreadable))?",
+  "to": ".unwrap_or(None)"
+ },
+ {
+  "id": "BA-13",
+  "by": "author",
+  "what": "read: bill_allocations honoured on any part",
+  "file": "src/read.rs",
+  "from": "Some(Value::Bool(asked)) if kind == \"vouchers\" => *asked,",
+  "to": "Some(Value::Bool(asked)) => *asked,"
+ },
+ {
+  "id": "BA-14",
+  "by": "author",
+  "what": "read: a null bill_allocations taken as false",
+  "file": "src/read.rs",
+  "from": "        None => false,\n        Some(Value::Bool(asked))",
+  "to": "        None | Some(Value::Null) => false,\n        Some(Value::Bool(asked))"
  }
 ]

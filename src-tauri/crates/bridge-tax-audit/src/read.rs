@@ -116,6 +116,9 @@ pub struct Part {
     pub response_sha256: String,
     /// The verified decoded content.
     pub content: Vec<u8>,
+    /// A vouchers part's `bill_allocations` (format 1.2): whether its request asked for each
+    /// entry's bill allocations. `false` when the manifest does not say.
+    pub bill_allocations: bool,
 }
 
 #[derive(Debug)]
@@ -473,6 +476,15 @@ fn declared_part(value: &Value, index: usize) -> Result<DeclaredPart> {
             .collect::<Result<_>>()?,
         Some(_) => return Err(schema(format!("{at}/derived_from: not an array"))),
     };
+    let bill_allocations = match map.get("bill_allocations") {
+        None => false,
+        Some(Value::Bool(asked)) if kind == "vouchers" => *asked,
+        Some(_) => {
+            return Err(schema(format!(
+                "{at}/bill_allocations: true or false, on a vouchers part only"
+            )))
+        }
+    };
     let stored_name = response
         .path
         .rsplit('/')
@@ -492,6 +504,7 @@ fn declared_part(value: &Value, index: usize) -> Result<DeclaredPart> {
             stored_name,
             response_sha256: response.sha256.clone(),
             content: Vec::new(),
+            bill_allocations,
         },
         response,
         request,

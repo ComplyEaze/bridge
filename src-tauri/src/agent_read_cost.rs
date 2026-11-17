@@ -5,7 +5,8 @@
 //! census reads and about 170 s, and an assistant that reads a month day by day pays that
 //! census thirty times. This block says, from the call's own timings alone, what
 //! the window read did, what is certain of its cost, and whether it fitted under
-//! the one host limit that has been measured. It makes no estimate beyond what the
+//! the 240 s limit measured on Claude Desktop's chat app on macOS (the limits measured
+//! on Windows are named beside it and not judged). It makes no estimate beyond what the
 //! call showed: a larger or a smaller window is not extrapolated from one book's
 //! two measurements. It adds no request and decides nothing: it refuses nothing
 //! and changes no completeness proof.

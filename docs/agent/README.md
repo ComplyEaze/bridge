@@ -1979,7 +1979,8 @@ no estimate for a larger or a smaller window.
   took at least (N - 1) x 0.5 s in gaps. It is time between reads, not time spent
   sleeping (the gate sleeps only what is left of the half second after Bridge's own
   work). It is rounded down.
-- `host_240` says how this window sat against the one measured host limit:
+- `host_240` says how this window sat against the 240 s limit of Claude Desktop's chat app on macOS
+  (it does not judge a window against the Windows limits that `host_limits` names):
   `window_fits` with `vouchers_that_fitted` (what this window carried; it claims
   nothing about a larger or a smaller window, since fewer vouchers are not cheaper:
   a window with no voucher is read twice), `window_too_long` (this window did not
@@ -1987,7 +1988,7 @@ no estimate for a larger or a smaller window.
   shorter window saves only the time of its vouchers and how short is enough is not
   established), or `not_established` (no voucher was read, whatever the time: such a window is read
   twice, the second read wider (with its own census on a large book; a small book's
-  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
+  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop's chat app on macOS is cancelled and
   its result never arrives, so `window_too_long` is seen on another host.
 - A read that **stopped** (a refusal) states the floor and no verdict: a request
   that failed or hung is not what a window costs.
@@ -2076,7 +2077,8 @@ ends).
 Not covered: the data parts (they need the census), the wider read an empty window gets in `vouchers` and in
 `ledger_movement` (it pays its own census on a large book), the second window read of `ledger_movement`
 (it sends no census),
-`outstandings` and `voucher_presence`. Windows hosts are not measured.
+`outstandings` and `voucher_presence`. No window is judged against a Windows host's limit: `host_limits`
+names what was measured there, one run on each tab.
 
 ### Search and summaries in `vouchers` (#1230)
 

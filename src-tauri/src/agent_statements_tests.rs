@@ -119,6 +119,23 @@ fn plans_of(
     profit_and_loss: String,
     inventory_flags: Option<String>,
 ) -> Vec<ScenarioPlan> {
+    plans_on(
+        extents(),
+        report,
+        balance_sheet,
+        profit_and_loss,
+        inventory_flags,
+    )
+}
+
+/// [`plans_of`] with the book extent, read before and after the sources, given as text.
+fn plans_on(
+    extent: String,
+    report: String,
+    balance_sheet: String,
+    profit_and_loss: String,
+    inventory_flags: Option<String>,
+) -> Vec<ScenarioPlan> {
     let companies = xml(companies());
     let currency = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
@@ -126,7 +143,7 @@ fn plans_of(
     let mut plans = Vec::new();
     pair(&mut plans, companies.clone());
     plans.extend([status(), companies.clone(), companies.clone()]);
-    pair(&mut plans, xml(extents()));
+    pair(&mut plans, xml(extent.clone()));
     pair(&mut plans, xml(currency));
     pair(&mut plans, xml(report));
     pair(&mut plans, xml(groups()));
@@ -135,7 +152,7 @@ fn plans_of(
     if let Some(flags) = inventory_flags {
         pair(&mut plans, xml(flags));
     }
-    pair(&mut plans, xml(extents()));
+    pair(&mut plans, xml(extent));
     plans.extend([companies.clone(), status(), companies]);
     plans
 }
@@ -676,6 +693,98 @@ async fn opening_stock_over_1_april_to_a_month_end_reads_the_stock_summary_and_r
         result["closing_stock"]["why"],
         "stock_summary_row_without_value"
     );
+}
+
+/// The captured extents with this company's master mark moved from the captured 224 to `mark`.
+fn extents_at_mark(mark: u64) -> String {
+    let extent = extents();
+    let at = extent.find(GUID).unwrap();
+    let start = extent[..at].rfind("<COMPANY ").unwrap();
+    let end = at + extent[at..].find("</COMPANY>").unwrap();
+    let captured = "<ALTMSTID TYPE=\"Number\"> 224</ALTMSTID>";
+    assert_eq!(extent[start..end].matches(captured).count(), 1);
+    format!(
+        "{}{}{}",
+        &extent[..start],
+        extent[start..end].replace(
+            captured,
+            &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>")
+        ),
+        &extent[end..]
+    )
+}
+
+/// #692's oversized read on a statement. Rule 2's Stock Summary is read under `stock_summary`'s
+/// single-read admission: at the largest mark it admits (874) the report is read, and its row
+/// without a value declines Tally's closing stock figure (as the test above does at the captured
+/// mark); one past it, no Stock Summary request is sent and the figure is declined as
+/// `stock_summary_too_large`. Every other read is the same.
+#[tokio::test]
+async fn opening_stock_on_a_book_past_the_single_read_mark_sends_no_stock_summary_and_says_why() {
+    let report = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r3-w2-stock-summary.utf16le.xml"
+    ));
+    for tool in ["profit_and_loss", "balance_sheet"] {
+        for (mark, read, why) in [
+            (874, true, "stock_summary_row_without_value"),
+            (875, false, "stock_summary_too_large"),
+        ] {
+            let mut plans = plans_on(
+                extents_at_mark(mark),
+                known_lab_report(),
+                stock_balance_sheet(),
+                opening_stock_profit_and_loss(),
+                Some(inventory_flags("Yes")),
+            );
+            if read {
+                // After the flags, before the closing extent (four plans) and the identity
+                // bracket (three).
+                let at = plans.len() - 7;
+                let mut summary = Vec::new();
+                pair(&mut summary, xml(report.clone()));
+                plans.splice(at..at, summary);
+            }
+            let (response, sent, expected) =
+                call_over(tool, plans, Redaction::None, ("2026-04-01", "2026-08-31")).await;
+            let result = result(&response);
+            assert_eq!(sent, expected, "{tool} at {mark}");
+            assert_eq!(result["state"], "not_established", "{tool} at {mark}");
+            assert_eq!(
+                result["closing_stock"]["state"], "declined",
+                "{tool} at {mark}"
+            );
+            assert_eq!(result["closing_stock"]["why"], why, "{tool} at {mark}");
+        }
+    }
+}
+
+/// #692's foreign-currency book: a company with more than one currency master is refused on both
+/// statements with the currency read's own code, before its Trial Balance, group tree or either
+/// statement is requested. The currency answer is the captured several-currency book's.
+#[tokio::test]
+async fn a_several_currency_book_is_refused_before_the_trial_balance_on_both_statements() {
+    let currencies = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+    ));
+    for tool in ["profit_and_loss", "balance_sheet"] {
+        let companies = xml(companies());
+        let mut plans = Vec::new();
+        pair(&mut plans, companies.clone());
+        plans.extend([status(), companies.clone(), companies]);
+        pair(&mut plans, xml(extents()));
+        pair(&mut plans, xml(currencies.clone()));
+        let (response, sent, expected) = call(tool, plans).await;
+        assert_eq!(sent, expected, "{tool}");
+        assert_eq!(response["isError"], true, "{response}");
+        assert_eq!(
+            response["structuredContent"]["result"]["error"],
+            json!({
+                "code": "company_base_currency_undetermined",
+                "message": "ComplyEaze Bridge refused this operation.",
+            }),
+            "{response}"
+        );
+    }
 }
 
 fn unreadable_profit_and_loss() -> String {

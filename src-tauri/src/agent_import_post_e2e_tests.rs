@@ -7852,8 +7852,8 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
     assert_eq!(result["alter_id_delta"]["after_seen"], 17);
     assert_eq!(result["vouchers"][0]["status"], "posted_verified");
     assert_eq!(
-        result["vouchers"][0]["e_invoice"],
-        json!({"details_sent":"none","note":crate::agent::agent_import::verification::NO_E_INVOICE_DETAILS_NOTE})
+        result["vouchers"][0]["e_invoice_sent"],
+        json!({"details":"none","note":crate::agent::agent_import::verification::NO_E_INVOICE_DETAILS_NOTE})
     );
     assert_eq!(result["vouchers"][0]["alter_id"], 17);
     assert_eq!(result["vouchers"][0]["voucher_number"], "BP/26-27/0010");

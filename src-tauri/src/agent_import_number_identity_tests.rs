@@ -534,19 +534,36 @@ fn verified_post(line: &ImportLedgerLine, observed: ReadVoucher) -> Value {
 }
 
 #[test]
-fn a_posted_verified_sales_invoice_carries_the_e_invoice_note() {
+fn a_posted_verified_sales_invoice_carries_the_e_invoice_sent_note() {
     let result = verified_post(
         &invoice_batch("INV/26-27/002"),
         row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
     );
     assert_eq!(
-        result["vouchers"][0]["e_invoice"],
-        json!({"details_sent":"none","note":"ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act in Tally; ComplyEaze Bridge does not generate one."})
+        result["vouchers"][0]["e_invoice_sent"],
+        json!({"details":"none","note":"ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act; ComplyEaze Bridge does not generate one."})
     );
 }
 
 #[test]
-fn a_posted_verified_batch_without_sales_has_no_e_invoice_field() {
+fn a_sales_invoice_without_native_dispatch_has_no_e_invoice_sent_field() {
+    let result = verified_post(
+        &invoice_batch("INV/26-27/002"),
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    let mut found_not_sent = result.clone();
+    verification::mark_found_not_sent(&mut found_not_sent);
+    assert!(found_not_sent["vouchers"][0]
+        .get("e_invoice_sent")
+        .is_none());
+
+    let mut partly_found = result;
+    verification::mark_verification_names(&mut partly_found);
+    assert!(partly_found["vouchers"][0].get("e_invoice_sent").is_none());
+}
+
+#[test]
+fn a_posted_verified_batch_without_sales_has_no_e_invoice_sent_field() {
     let result = verified_post(
         &payment_batch("Rent", "500.00"),
         row(0x31, "Payment", Some("7"), PAYMENT),
@@ -555,11 +572,11 @@ fn a_posted_verified_batch_without_sales_has_no_e_invoice_field() {
         .as_array()
         .unwrap()
         .iter()
-        .all(|row| { row["status"] == "posted_verified" && row.get("e_invoice").is_none() }));
+        .all(|row| { row["status"] == "posted_verified" && row.get("e_invoice_sent").is_none() }));
 }
 
 #[test]
-fn a_sales_row_that_is_not_posted_verified_has_no_e_invoice_field() {
+fn a_sales_row_that_is_not_posted_verified_has_no_e_invoice_sent_field() {
     // A Sales invoice seen in Tally but not attributed to this post.
     let unattributed = before_a_post(
         "INV/26-27/002",
@@ -575,7 +592,7 @@ fn a_sales_row_that_is_not_posted_verified_has_no_e_invoice_field() {
         unattributed["vouchers"][0]["status"],
         "matching_content_observed"
     );
-    assert!(unattributed["vouchers"][0].get("e_invoice").is_none());
+    assert!(unattributed["vouchers"][0].get("e_invoice_sent").is_none());
 
     // A confirmed invoice whose later read-back differs loses the field.
 
@@ -590,11 +607,11 @@ fn a_sales_row_that_is_not_posted_verified_has_no_e_invoice_field() {
         &[],
     );
     assert_eq!(downgraded["vouchers"][0]["status"], "posted_divergent");
-    assert!(downgraded["vouchers"][0].get("e_invoice").is_none());
+    assert!(downgraded["vouchers"][0].get("e_invoice_sent").is_none());
 }
 
 #[test]
-fn the_e_invoice_note_has_no_threshold_date_or_tally_listing_claim() {
+fn the_e_invoice_sent_note_has_no_threshold_date_or_tally_listing_claim() {
     let note = verification::NO_E_INVOICE_DETAILS_NOTE;
     assert!(!note.chars().any(|character| character.is_ascii_digit()));
     let lower = note.to_ascii_lowercase();

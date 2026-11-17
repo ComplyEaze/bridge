@@ -139,13 +139,13 @@ async function publishedReleases(fetchText) {
   if (!Array.isArray(answer)) throw unreadableRelease("the body is not a list");
 
   return answer.flatMap((release, index) => {
-    if (release === null || typeof release !== "object" || Array.isArray(release) || typeof release.tag_name !== "string" || release.tag_name.length === 0 || typeof release.draft !== "boolean" || typeof release.prerelease !== "boolean") {
+    if (release === null || typeof release !== "object" || typeof release.tag_name !== "string" || release.tag_name.length === 0 || typeof release.draft !== "boolean" || typeof release.prerelease !== "boolean") {
       throw unreadableRelease(`entry ${index} has no readable tag, draft flag or pre-release flag`);
     }
     // A draft has no publication time and cannot be the newest published release.
     if (release.draft) return [];
     const publishedAt = typeof release.published_at === "string" ? Date.parse(release.published_at) : NaN;
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(release.published_at) || !Number.isFinite(publishedAt) || `${new Date(publishedAt).toISOString().slice(0, 19)}Z` !== release.published_at) {
+    if (!Number.isFinite(publishedAt) || `${new Date(publishedAt).toISOString().slice(0, 19)}Z` !== release.published_at) {
       throw unreadableRelease(`${release.tag_name} has no readable publication time`);
     }
     return [{ tag: release.tag_name, prerelease: release.prerelease, publishedAt, date: new Date(publishedAt + INDIA_OFFSET_MS).toISOString().slice(0, 10) }];

@@ -811,11 +811,17 @@ pub(super) fn mark_book_rolled_back(result: &mut Value) {
 /// journal of another computer, would not hold a post made elsewhere or since.
 pub(super) const NOT_SENT_BY_BRIDGE_SUMMARY: &str = "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status.";
 
+fn dispatch_state_is_sent(state: Option<&str>) -> bool {
+    matches!(
+        state,
+        Some("posted_verified")
+            | Some("reconciliation_required")
+            | Some("previous_attempt_reconciled")
+    )
+}
+
 fn remove_e_invoice_sent_without_native_dispatch(result: &mut Value) {
-    if matches!(
-        result["dispatch"]["state"].as_str(),
-        Some(state) if state != "not_dispatched"
-    ) {
+    if dispatch_state_is_sent(result["dispatch"]["state"].as_str()) {
         return;
     }
     if let Some(vouchers) = result["vouchers"].as_array_mut() {

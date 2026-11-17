@@ -578,6 +578,7 @@ fn a_sales_invoice_without_native_dispatch_has_no_e_invoice_sent_field() {
     );
     let mut found_not_sent = result.clone();
     verification::mark_found_not_sent(&mut found_not_sent);
+    verification::mark_verification_names(&mut found_not_sent);
     assert!(found_not_sent["vouchers"][0]
         .get("e_invoice_sent")
         .is_none());
@@ -585,6 +586,39 @@ fn a_sales_invoice_without_native_dispatch_has_no_e_invoice_sent_field() {
     let mut partly_found = result;
     verification::mark_verification_names(&mut partly_found);
     assert!(partly_found["vouchers"][0].get("e_invoice_sent").is_none());
+}
+
+#[test]
+fn e_invoice_sent_requires_a_named_sent_dispatch_state() {
+    let result = verified_post(
+        &invoice_batch("INV/26-27/002"),
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    for state in [
+        "posted_verified",
+        "reconciliation_required",
+        "previous_attempt_reconciled",
+    ] {
+        let mut dispatched = result.clone();
+        dispatched["dispatch"] = json!({"state": state});
+        verification::mark_verification_names(&mut dispatched);
+        assert!(
+            dispatched["vouchers"][0].get("e_invoice_sent").is_some(),
+            "{state}"
+        );
+    }
+    for state in ["not_dispatched", "some_later_state"] {
+        let mut not_sent = result.clone();
+        not_sent["dispatch"] = json!({"state": state});
+        verification::mark_verification_names(&mut not_sent);
+        assert!(
+            not_sent["vouchers"][0].get("e_invoice_sent").is_none(),
+            "{state}"
+        );
+    }
+    let mut no_dispatch = result;
+    verification::mark_verification_names(&mut no_dispatch);
+    assert!(no_dispatch["vouchers"][0].get("e_invoice_sent").is_none());
 }
 
 #[test]

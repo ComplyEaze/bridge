@@ -30,3 +30,6 @@ Not measured: other releases, the multi-user edition, a Services or non-taxable 
 | `stock-create-lab-plain-create.request.utf16le.xml` | 3,646 | `8f1e50a6f4a996adf951b6b30cee4f0b1366e9925f6bc3e6f016ecb2d8b28f93` | R1 `requests/b1-create`: the plain-form create, as sent |
 | `stock-create-lab-marked-create.request.utf16le.xml` | 3,674 | `6961f4754673d5359c7bf597dd272e11c28b64cbe74f9e27064875f1709c526c` | R1 `requests/b2-create`: the marked-form create, as sent |
 | `stock-create-lab-create-answer.utf16le.xml` | 538 | `1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010` | R1 `a-b1`, byte-equal to `a-b2`: the import answer to each create, CREATED 1, every other counter 0 |
+| `stock-create-lab-items.request.utf16le.xml` | 1,330 | `581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1` | R1 `requests/a1-candidate-items`: the candidate stock-item read, as sent for `a-a1`, `a-a1b1`, `a-a1b2` and `a-a1c`; UTF-16LE with a byte order mark |
+
+The request was copied byte for byte from `lab/1381-r1/requests/a1-candidate-items.utf16le.xml` on `lab/1381-r1-sheet` at c76e23d6, with no byte replaced. `lab/1381-r1-answers` at 7bda13fc, `evidence/send-log.txt`, records it by size and sha256 as the request of those four steps. Its fetch list names all four added fields, although `LANGUAGENAME.LIST` came back from the shipped read too.

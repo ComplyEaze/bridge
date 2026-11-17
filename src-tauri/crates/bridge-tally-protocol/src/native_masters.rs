@@ -266,7 +266,7 @@ pub fn render_native_masters_request(kind: NativeMasterKind, company: &str) -> S
 }
 
 /// The stock-items request with only the fetch list changed (#1381).
-/// Measured once, sent from a file to one synthetic book (PARTIAL):
+/// Measured in one sitting, sent from a file to one synthetic book (PARTIAL):
 /// `tests/fixtures/agent/stock-create-lab/PROVENANCE.md`.
 /// No build has sent it, so nothing outside tests calls it yet.
 pub fn render_candidate_stock_items_request(company: &ValidatedCompanyName) -> String {

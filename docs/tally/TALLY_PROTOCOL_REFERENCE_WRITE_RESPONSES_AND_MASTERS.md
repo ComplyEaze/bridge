@@ -137,12 +137,13 @@ before approval passed it. Tally refused it in the answer, with one `LINEERROR` 
 
 So `EXCEPTIONS` counted the refused voucher for this cause too. Each request, as Bridge rendered it,
 and each answer is preserved byte for byte as a test fixture (`import_post_partial_landing_*`).
-Bridge's own span, mark and verification reads of these posts were not kept as bytes and are not
-committed.
+Bridge's own span, mark and verification reads of these 2026-11-11 posts were not kept as bytes and
+are not committed.
 
 **Refused voucher first, and last, of three Journals: PARTIAL, one run each.** The second-of-three
-post was run again, and then with the refused voucher first and with it last, on a synthetic book
-with accounts integrated with inventory (rows R0, R1 and R2 of #1108).
+post was run again, and then with the refused voucher first and with it last, on 2026-11-12
+(TallyPrime 7.2, single-user edition, a synthetic book with accounts integrated with inventory; rows
+R0, R1 and R2 of #1108).
 
 - In all three the import answer is byte-identical to the second-of-three answer above:
   `CREATED 2, EXCEPTIONS 1`, `LASTVCHID` 3.

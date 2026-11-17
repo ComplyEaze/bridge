@@ -10,4 +10,8 @@
   planned date was not. No refusal changes: a withdrawal is judged the same for both states. `verify_import`'s section
   reads no date and stays as it was. Measured by replaying one synthetic book's captured reads (TallyPrime 7.2): its
   catalogue, 3 to 6 April 2026 and ten days between 12 and 29 April 2026, with a voucher keyed on a bank and cash, a Contra between the banks on
-  the next day, and a transfer through a clearing ledger (#1392).
+  the next day, and a transfer through a clearing ledger (#1392). It was then run once on a live TallyPrime 7.2, on one synthetic
+  company, through a parsed bank statement: a row skipped as recorded from the other account's statement read `not_found`,
+  with its three days read whole and no entry on the other ledger, and read `tally_unchecked`, never paired, once a Contra
+  was keyed in Tally on its day. A row paired by its reference, or by its date, with a Contra posted from the other
+  account's statement has not been run live.

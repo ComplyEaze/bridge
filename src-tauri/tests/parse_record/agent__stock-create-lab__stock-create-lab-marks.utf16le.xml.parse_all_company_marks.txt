@@ -1,0 +1,11 @@
+# fixture: agent/stock-create-lab/stock-create-lab-marks.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE STOCK CREATE LAB",
+        guid: "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1",
+        vouchers: 0,
+        masters: 210,
+    },
+])

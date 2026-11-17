@@ -82,7 +82,7 @@ impl TallyRuntime {
                             .map_err(PartyBillsReadError::Period)?;
 
                     let request =
-                        render_native_ledger_snapshot_request(identity.display_name(), &period);
+                        render_native_ledger_snapshot_request(identity.company_name(), &period);
                     let (xml, bytes, hash) = client
                         .fetch_native_report_paired(request.clone())
                         .await?

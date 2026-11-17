@@ -617,7 +617,7 @@ fn built_requests() -> Vec<(String, String)> {
     );
     row(
         "render_native_stock_summary_request".into(),
-        render_native_stock_summary_request(COMPANY, &snapshot),
+        render_native_stock_summary_request(&company, &snapshot),
     );
     row(
         "render_company_features_request".into(),
@@ -651,7 +651,7 @@ fn built_requests() -> Vec<(String, String)> {
         };
         row(
             format!("render_native_statement_request/{name}"),
-            render_native_statement_request(kind, COMPANY, &snapshot),
+            render_native_statement_request(kind, &company, &snapshot),
         );
     }
     // Each public report builder below (statement, stock summary, funds and
@@ -672,25 +672,25 @@ fn built_requests() -> Vec<(String, String)> {
     ) {
         row(
             format!("render_built_in_report_request/{report:?}"),
-            render_built_in_report_request(report, COMPANY, &snapshot),
+            render_built_in_report_request(report, &company, &snapshot),
         );
     }
     // The same request as `render_native_stock_summary_exploded_request` below.
     row(
         "render_exploded_stock_summary_request".into(),
-        render_exploded_stock_summary_request(COMPANY, &snapshot),
+        render_exploded_stock_summary_request(&company, &snapshot),
     );
     row(
         "render_stock_query_request".into(),
-        render_stock_query_request(COMPANY, &item, &snapshot),
+        render_stock_query_request(&company, &item, &snapshot),
     );
     row(
         "render_native_funds_flow_request".into(),
-        render_native_funds_flow_request(COMPANY, &months),
+        render_native_funds_flow_request(&company, &months),
     );
     row(
         "render_native_cash_flow_request".into(),
-        render_native_cash_flow_request(COMPANY, &months),
+        render_native_cash_flow_request(&company, &months),
     );
     for kind in every!(MonthRegisterKind: Sales, Purchase) {
         let name = match kind {
@@ -699,24 +699,24 @@ fn built_requests() -> Vec<(String, String)> {
         };
         row(
             format!("render_native_month_register_request/{name}"),
-            render_native_month_register_request(kind, COMPANY, &months),
+            render_native_month_register_request(kind, &company, &months),
         );
     }
     row(
         "render_native_negative_ledgers_request".into(),
-        render_native_negative_ledgers_request(COMPANY, &snapshot),
+        render_native_negative_ledgers_request(&company, &snapshot),
     );
     row(
         "render_native_godown_summary_request".into(),
-        render_native_godown_summary_request(COMPANY, &snapshot),
+        render_native_godown_summary_request(&company, &snapshot),
     );
     row(
         "render_native_stock_summary_exploded_request".into(),
-        render_native_stock_summary_exploded_request(COMPANY, &snapshot),
+        render_native_stock_summary_exploded_request(&company, &snapshot),
     );
     row(
         "render_native_negative_stock_request".into(),
-        render_native_negative_stock_request(COMPANY, &snapshot),
+        render_native_negative_stock_request(&company, &snapshot),
     );
 
     row(
@@ -735,82 +735,84 @@ fn built_requests() -> Vec<(String, String)> {
         };
         row(
             format!("render_native_bills_request/{name}"),
-            render_native_bills_request(kind, COMPANY, &from, &to),
+            render_native_bills_request(kind, &company, &from, &to),
         );
     }
     row(
         "render_native_ledger_snapshot_request".into(),
-        render_native_ledger_snapshot_request(COMPANY, &snapshot),
+        render_native_ledger_snapshot_request(&company, &snapshot),
     );
     row(
         "render_native_ledger_snapshot_request_for_parents".into(),
-        render_native_ledger_snapshot_request_for_parents(COMPANY, &snapshot, &parents),
+        render_native_ledger_snapshot_request_for_parents(&company, &snapshot, &parents),
     );
     row(
         "render_native_ledger_snapshot_request_for_ledgers".into(),
-        render_native_ledger_snapshot_request_for_ledgers(COMPANY, &snapshot, &ledgers),
+        render_native_ledger_snapshot_request_for_ledgers(&company, &snapshot, &ledgers),
     );
     row(
         "render_native_ledger_export_request".into(),
-        render_native_ledger_export_request(COMPANY, &export),
+        render_native_ledger_export_request(&company, &export),
     );
     row(
         "render_party_ledger_master_request".into(),
-        render_party_ledger_master_request(COMPANY, &export),
+        render_party_ledger_master_request(&company, &export),
     );
     row(
         "render_party_ledger_master_request_with_mailing_details".into(),
-        render_party_ledger_master_request_with_mailing_details(COMPANY, &export),
+        render_party_ledger_master_request_with_mailing_details(&company, &export),
     );
     row(
         "render_party_ledger_master_request_with_gst_details".into(),
-        render_party_ledger_master_request_with_gst_details(COMPANY, &export),
+        render_party_ledger_master_request_with_gst_details(&company, &export),
     );
     row(
         "render_party_ledger_master_request_for_parents".into(),
-        render_party_ledger_master_request_for_parents(COMPANY, &export, &parents),
+        render_party_ledger_master_request_for_parents(&company, &export, &parents),
     );
     row(
         "render_party_ledger_master_request_for_ledgers".into(),
-        render_party_ledger_master_request_for_ledgers(COMPANY, &export, &ledgers),
+        render_party_ledger_master_request_for_ledgers(&company, &export, &ledgers),
     );
     row(
         "render_party_ledger_master_request_for_parents_with_mailing_details".into(),
         render_party_ledger_master_request_for_parents_with_mailing_details(
-            COMPANY, &export, &parents,
+            &company, &export, &parents,
         ),
     );
     row(
         "render_party_ledger_master_request_for_parents_with_gst_details".into(),
-        render_party_ledger_master_request_for_parents_with_gst_details(COMPANY, &export, &parents),
+        render_party_ledger_master_request_for_parents_with_gst_details(
+            &company, &export, &parents,
+        ),
     );
     row(
         "render_native_voucher_type_export_request".into(),
-        render_native_voucher_type_export_request(COMPANY),
+        render_native_voucher_type_export_request(&company),
     );
     row(
         "render_voucher_type_numbering_request".into(),
-        render_voucher_type_numbering_request(COMPANY),
+        render_voucher_type_numbering_request(&company),
     );
     row(
         "render_native_voucher_export_request".into(),
-        render_native_voucher_export_request(COMPANY, &from, &to),
+        render_native_voucher_export_request(&company, &from, &to),
     );
     row(
         "render_native_group_snapshot_request".into(),
-        render_native_group_snapshot_request(COMPANY),
+        render_native_group_snapshot_request(&company),
     );
     row(
         "render_company_currency_request".into(),
-        render_company_currency_request(COMPANY),
+        render_company_currency_request(&company),
     );
     row(
         "render_company_currency_request_with_originalname".into(),
-        render_company_currency_request_with_originalname(COMPANY),
+        render_company_currency_request_with_originalname(&company),
     );
     row(
         "render_company_base_currency_request".into(),
-        render_company_base_currency_request(COMPANY),
+        render_company_base_currency_request(&company),
     );
 
     let mut hashed: Vec<(String, String)> = rows

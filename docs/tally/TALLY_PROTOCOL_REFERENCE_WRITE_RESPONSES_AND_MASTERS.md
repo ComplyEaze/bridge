@@ -103,8 +103,21 @@ preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the sam
 So in these runs `EXCEPTIONS` counted rejected vouchers, not missing ledgers, and the `LINEERROR`
 never identified every rejected voucher. The first and third answers are preserved byte for byte as
 test fixtures (`batch-import-all-missing-ledgers`,
-`batch-import-two-missing-ledgers-in-one-voucher`). Not measured: any other cause of rejection, Gold
-and Education.
+`batch-import-two-missing-ledgers-in-one-voucher`). Not measured here: other editions, and Education
+mode. A second cause of rejection is measured below.
+
+**Another cause of rejection — PARTIAL, one run** (2026-11-05, TallyPrime 7.2, licensed, one synthetic
+company with inventory integrated). A Journal with one line on a ledger under Stock-in-Hand, which
+ComplyEaze Bridge's own checks admit, was sent once: `CREATED 0, EXCEPTIONS 1`, every other counter 0,
+and a `LINEERROR` reading "Cannot use '<ledger>': Ledger under Stock-in-Hand!" placed ahead of the
+counters. The lab read, in the same sitting and without committing the answers, that the voucher mark did
+not move, that no voucher was added and that no dialog showed. A Journal with a
+line on the Cash ledger, sent the same way, was stored (`CREATED 1`). So `EXCEPTIONS` again counted
+the rejected voucher, here for a cause other than a missing ledger, and the `LINEERROR` again named
+a ledger, not a voucher. The answer is preserved byte for byte as a test fixture
+(`single-import-stock-in-hand-journal`). Not measured: the same line through `post_import`, in a
+batch or beside twins; a book not integrated with inventory; a Bank ledger on a Journal; Payment,
+Receipt or Contra; TallyPrime 7.1.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 

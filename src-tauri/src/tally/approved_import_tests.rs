@@ -1,5 +1,6 @@
 use super::*;
 use crate::tally::ledger_create_item::LedgerCreateItem;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 
 // The production constructor of the masters kind is `confirm_masters`, which
 // asks the person first. This module also builds one without a dialog, from the
@@ -260,7 +261,7 @@ fn a_master_posts_index_reads_are_the_ledger_catalogue_and_group_snapshot_for_it
     assert_eq!(
         masters.group_index_request().into_xml(),
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
-            MASTERS_LAB
+            &ValidatedCompanyName::new(MASTERS_LAB).unwrap()
         )
     );
     assert_ne!(

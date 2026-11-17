@@ -1075,8 +1075,7 @@ impl Server {
                 invoice_plan = Some(plan);
             }
             let group_collection_request = if renders_bank_shape(&payload.vouchers) {
-                let (groups, evidence) =
-                    self.read_group_collection(&identity, &company.name).await?;
+                let (groups, evidence) = self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
                 let observed =
                     ObservedMasters::new(catalogue_identities.catalog().parents(), groups);
@@ -1111,7 +1110,7 @@ impl Server {
                 }
                 Some(
                     crate::tally::agent_read_request::AgentReadRequest::parse(
-                        native_group_snapshot_read(&company.name).into_xml(),
+                        native_group_snapshot_read(identity.company_name()).into_xml(),
                     )
                     .map_err(|error| error.to_string())?,
                 )
@@ -1132,7 +1131,7 @@ impl Server {
             // Read before approval, so a refused book is never asked about, and
             // sent with the approval so the queue reads it again.
             let (currencies, evidence) = self
-                .post_read(&identity, company_currency_read(&company.name))
+                .post_read(&identity, company_currency_read(identity.company_name()))
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             admit_post_currency(&currencies).map_err(|refusal| {
@@ -1140,7 +1139,7 @@ impl Server {
                 ToolFailure::from(refusal.to_string())
             })?;
             let currency_request = crate::tally::agent_read_request::AgentReadRequest::parse(
-                company_currency_read(&company.name).into_xml(),
+                company_currency_read(identity.company_name()).into_xml(),
             )
             .map_err(|error| error.to_string())?;
             let mode = self.qualified_import_profile().await?;

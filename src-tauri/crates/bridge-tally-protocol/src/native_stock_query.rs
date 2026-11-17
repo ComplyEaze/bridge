@@ -14,6 +14,7 @@ use crate::native_statement_reports::render_report_envelope;
 use crate::native_stock_summary::{quantity, NativeStockQuantity};
 use crate::standard_ledger_catalog::unsafe_display_character;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use crate::xml_text::escape_text as xml_escape;
 use quick_xml::{events::Event, Reader};
 use serde::Serialize;
@@ -145,7 +146,7 @@ impl MeasuredItemName {
 /// The Stock Query request for one item over `period`: the built-in report envelope with the
 /// report `Stock Query` and one more static variable, `STOCKITEMNAME`, after the period's.
 pub fn render_stock_query_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     item: &MeasuredItemName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {

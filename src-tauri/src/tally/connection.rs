@@ -2357,16 +2357,16 @@ impl TallyClient {
                 Some(counted) => asked.resolved_for_count(counted, master_mark),
                 None => read,
             };
-            let group_request = render_native_group_snapshot_request(identity.display_name());
+            let group_request = render_native_group_snapshot_request(identity.company_name());
             let part_requests = |read: ComplianceRead| match (&partition, ledgers) {
                 (_, Some(part)) => vec![(
                     render_party_ledger_master_request_for_ledgers(
-                        identity.display_name(),
+                        identity.company_name(),
                         &master_period,
                         part,
                     ),
                     render_native_ledger_snapshot_request_for_ledgers(
-                        identity.display_name(),
+                        identity.company_name(),
                         &balance_period,
                         part,
                     ),
@@ -2375,25 +2375,25 @@ impl TallyClient {
                     match read {
                         ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                             render_party_ledger_master_request(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                         ComplianceRead::WithMailingDetails
                         | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                             render_party_ledger_master_request_with_mailing_details(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                         ComplianceRead::WithGstDetails => {
                             render_party_ledger_master_request_with_gst_details(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                     },
-                    render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
+                    render_native_ledger_snapshot_request(identity.company_name(), &balance_period),
                 )],
                 (Some(partition), None) => partition
                     .parts()
@@ -2403,7 +2403,7 @@ impl TallyClient {
                             match read {
                                 ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                                     render_party_ledger_master_request_for_parents(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
@@ -2411,21 +2411,21 @@ impl TallyClient {
                                 ComplianceRead::WithMailingDetails
                                 | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                                     render_party_ledger_master_request_for_parents_with_mailing_details(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
                                 }
                                 ComplianceRead::WithGstDetails => {
                                     render_party_ledger_master_request_for_parents_with_gst_details(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
                                 }
                             },
                             render_native_ledger_snapshot_request_for_parents(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &balance_period,
                                 part,
                             ),

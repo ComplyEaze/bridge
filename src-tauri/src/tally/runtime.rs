@@ -981,7 +981,7 @@ pub(crate) async fn read_classified_currency(
         ))
     };
     let (body, read) = paired_read(
-        render_company_currency_request(identity.display_name()),
+        render_company_currency_request(identity.company_name()),
         PairedReadValidationError::CurrencyMaster,
     )
     .await?;
@@ -1015,7 +1015,7 @@ pub(crate) async fn identify_base_among_several(
     };
     let (with_original_names, company_currency_name) = {
         let (body, read) = paired_read(
-            render_company_currency_request_with_originalname(identity.display_name()),
+            render_company_currency_request_with_originalname(identity.company_name()),
             PairedReadValidationError::CurrencyMaster,
         )
         .await?;
@@ -1029,7 +1029,7 @@ pub(crate) async fn identify_base_among_several(
             ));
         }
         let (body, read) = paired_read(
-            render_company_base_currency_request(identity.display_name()),
+            render_company_base_currency_request(identity.company_name()),
             PairedReadValidationError::CompanyCurrencyName,
         )
         .await?;
@@ -3141,7 +3141,7 @@ impl TallyRuntime {
                         // before any ledger request (bridge#714). A foreign
                         // ledger's non-zero bare opening is UNOBSERVED; the
                         // captured book's dollar openings are 0.00.
-                        let request = render_company_currency_request(identity.display_name());
+                        let request = render_company_currency_request(identity.company_name());
                         let (body, encoded_bytes, encoded_sha256) = client
                             .fetch_native_report_paired(request.clone())
                             .await?
@@ -3173,7 +3173,7 @@ impl TallyRuntime {
                         )
                         .map_err(OpeningBoundaryObservationError::Period)?;
                         let request =
-                            render_native_ledger_export_request(identity.display_name(), &period);
+                            render_native_ledger_export_request(identity.company_name(), &period);
                         let paired = client.fetch_native_report_paired(request.clone()).await?;
                         let (body, encoded_bytes, encoded_sha256) = paired
                             .require_stable(PairedReadValidationError::NativeLedgerCollection)?;
@@ -3186,7 +3186,7 @@ impl TallyRuntime {
                             admit_native_ledger_opening_rows(&body, identity.company_guid())?;
                         let groups = if read_groups {
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let paired = client.fetch_native_report_paired(request.clone()).await?;
                             let (body, encoded_bytes, encoded_sha256) = paired
                                 .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
@@ -4145,8 +4145,14 @@ impl TallyRuntime {
                         }
                     };
                     let mut total_bytes = 0usize;
-                    let read =
-                        |kind| render_native_bills_request(kind, company, &books_from, &as_of);
+                    let read = |kind| {
+                        render_native_bills_request(
+                            kind,
+                            identity.company_name(),
+                            &books_from,
+                            &as_of,
+                        )
+                    };
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
                         .fetch_native_report_paired(receivable_request.clone())
@@ -4177,7 +4183,8 @@ impl TallyRuntime {
                     // subgroup. The native group snapshot resolves it all the
                     // way to Sundry Debtors/Creditors without importing the
                     // legacy custom-TDL profile.
-                    let group_request = render_native_group_snapshot_request(company);
+                    let group_request =
+                        render_native_group_snapshot_request(identity.company_name());
                     let groups = client
                         .fetch_native_report_paired(group_request.clone())
                         .await?;
@@ -4228,8 +4235,10 @@ impl TallyRuntime {
                         encoded_bytes,
                     ));
 
-                    let ledger_request =
-                        render_native_ledger_snapshot_request(company, &snapshot_period);
+                    let ledger_request = render_native_ledger_snapshot_request(
+                        identity.company_name(),
+                        &snapshot_period,
+                    );
                     let ledgers = client
                         .fetch_native_report_paired(ledger_request.clone())
                         .await?;
@@ -4474,7 +4483,7 @@ impl TallyRuntime {
                     // Pin identity first: a currency read against the wrong
                     // company is worse than none.
                     let extent = client.fetch_company_book_extent(&identity).await?;
-                    let request = render_company_currency_request(identity.display_name());
+                    let request = render_company_currency_request(identity.company_name());
                     let body = client.fetch_native_report_paired(request.clone()).await?;
                     let (body, encoded_bytes, encoded_sha256) =
                         body.require_stable(PairedReadValidationError::CurrencyMaster)?;

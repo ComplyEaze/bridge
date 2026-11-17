@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_core::{ExactDecimal, PackSchemaVersion, TallyDate};
+use bridge_tally_protocol::xml_read_profiles::ShownCompanyName;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -392,6 +393,9 @@ pub struct SnapshotSourcePin {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PersistedCompanyProfile {
     pub name: String,
+    /// `name` by the one company-name rule, computed on read and never stored;
+    /// the webview draws only this (#2462).
+    pub shown_name: String,
     pub guid: String,
     pub company_number: String,
     pub books_from_yyyymmdd: String,
@@ -3652,6 +3656,7 @@ fn persisted_company_profile_from_row(
     let books_from_yyyymmdd: String = row.try_get("books_from_yyyymmdd")?;
     let name: String = row.try_get("display_name")?;
     Ok(PersistedCompanyProfile {
+        shown_name: ShownCompanyName::of(&name).into_text(),
         name: name.clone(),
         guid: company_guid.clone(),
         company_number: company_number.clone(),

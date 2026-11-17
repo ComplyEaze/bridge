@@ -273,7 +273,7 @@ fn block(cost: Cost, ended: Ended, window_reads: u64) -> Option<Value> {
 pub(super) fn host_limits() -> Value {
     json!([
         {"host": "claude_desktop_chat_macos", "seconds": 240, "basis": "measured_twice_one_build_silent_calls"},
-        {"host": "claude_desktop_chat_windows", "seconds": 60, "basis": "cut_a_60s_call_at_about_60s_no_cancel_sent_one_run_each_shorter_calls_unmeasured"},
+        {"host": "claude_desktop_chat_windows", "seconds": 60, "basis": "cut_a_60s_call_at_about_60s_no_cancel_logged_one_run_each_shorter_calls_unmeasured"},
         {"host": "claude_desktop_code_tab_windows", "seconds": 60, "basis": "cut_a_90s_call_at_60s_cancel_sent_one_run_each_settings_not_recorded"},
         {"host": "claude_code", "seconds": null, "basis": "default_completed_150s_two_builds_configured_60s_cut_at_60s_earlier_60s_unexplained"},
     ])

@@ -2026,7 +2026,7 @@ no estimate for a larger or a smaller window.
   cancelled a silent 250 s call at 240 s in two runs on one build (calls between
   130 s and 240 s were not tried, and the call's other reads are not in the figures; and whether progress would extend the limit is not
   answered; protocol reference 11f); on Windows the chat tab cut a 60 s call at about
-  60 s with no cancel sent, and the Code tab cut a 90 s call at 60.0 s and sent a
+  60 s with no cancel logged by the server, and the Code tab cut a 90 s call at 60.0 s and sent a
   cancel (one run each, 5 Nov, #2119 row H; a call just under 60 s was not tried
   on either tab); Claude Code
   completed a 150 s call under its defaults (CLI 2.1.285: one silent run and one with

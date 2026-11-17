@@ -62,6 +62,7 @@ pub mod native_voucher_type_numbering;
 pub mod outstandings_shared;
 pub mod parent_partition;
 mod standard_ledger_catalog;
+pub mod stock_item_candidate;
 mod stock_tax_details;
 mod text_encoding;
 mod tolerant_xml;

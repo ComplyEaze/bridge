@@ -854,6 +854,10 @@ It checks every file first and writes none if one fails. Then:
    the next publication, so dispatch it once after the post-release pull request
    merges.
 
+   After publication and these edits, run `node scripts/release-text-agreement.mjs --published mcp-vX.Y.Z`
+   by hand. It checks the spans and registry file against the newest non-draft GitHub release and its
+   publication date in India time; it is not wired into a workflow.
+
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.
 

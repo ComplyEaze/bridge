@@ -115,11 +115,11 @@ not move, that no voucher was added and that no dialog showed. A Journal with a
 line on the Cash ledger, sent the same way, was stored (`CREATED 1`). So `EXCEPTIONS` again counted
 the rejected voucher, here for a cause other than a missing ledger, and the `LINEERROR` again named
 a ledger, not a voucher. The answer is preserved byte for byte as a test fixture
-(`single-import-stock-in-hand-journal`). Not measured: the same line through `post_import`, in a
-batch or beside twins; a book not integrated with inventory; a Bank ledger on a Journal; Payment,
-Receipt or Contra; TallyPrime 7.1.
+(`single-import-stock-in-hand-journal`). Not measured in that run: a book not integrated with
+inventory; a Bank ledger on a Journal; Payment, Receipt or Contra; TallyPrime 7.1. The same line
+through `post_import`, alone, in a batch and between twins, is measured next.
 
-**Through `post_import`, with a second cause — PARTIAL, one run each** (TallyPrime 7.2, single-user
+**The same cause through `post_import` — PARTIAL, one run each** (TallyPrime 7.2, single-user
 edition, a synthetic company with accounts integrated with inventory, a master build reporting
 0.7.0, 2026-11-11; bridge#1108).
 
@@ -140,7 +140,7 @@ and each answer is preserved byte for byte as a test fixture (`import_post_parti
 Bridge's own span, mark and verification reads of these posts were not kept as bytes and are not
 committed.
 
-Not measured through `post_import`: a refused voucher first or last, two refusals, a refusal of
+Not measured in these runs: a refused voucher first or last of several, two refusals, a refusal of
 one of two identical vouchers, another release, and a multi-user edition.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**

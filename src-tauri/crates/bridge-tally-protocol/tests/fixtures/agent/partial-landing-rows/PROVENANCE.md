@@ -10,7 +10,7 @@ The source is the lab answers branch `lab/1108-r-rows-answers` at `1300c41e`: fi
 
 The requests are BOM-prefixed UTF-16LE. The answers are BOM-less UTF-16LE.
 
-The pushed lab copies replace the company GUID by a placeholder. The GUID was put back, as UTF-16LE, in every place the placeholder stands (1 place in each marks answer, 6 in each verification-after answer, none in the other files), and the HTTP head was removed. No other byte differs from the capture: the lab recorded the original size and sha256 of each answer, and the restored bytes with their HTTP head reproduce them.
+The pushed lab copies replace the company GUID by a placeholder. The GUID was put back, as UTF-16LE, in every place the placeholder stands (1 place in each marks answer, 6 in each verification-after answer, none in the other files), and the HTTP head was removed from every file, requests and answers alike. No other byte differs from the capture. For the six answers that held a placeholder the lab recorded the original size and sha256, and the restored bytes with their HTTP head reproduce them. The other seven files are the pushed copies, which the lab's hash list covers, less their HTTP head.
 
 | file | bytes | sha256 | lab file |
 | --- | ---: | --- | --- |

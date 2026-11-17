@@ -1328,13 +1328,6 @@ fn partial_landing_rows_parse_their_captured_marks_and_vouchers() {
             assert_eq!(row["voucher_type"], "Journal", "{name}");
             assert_eq!(row["date"], "20250414", "{name}");
             assert_eq!(row["narration"], narration, "{name}");
-            assert!(
-                !row["narration"]
-                    .as_str()
-                    .expect("narration text")
-                    .contains("stock leg"),
-                "{name}"
-            );
         }
     }
 }

@@ -264,6 +264,12 @@ test("registry JSON that cannot be parsed is a typed unreadable-input error", as
   assert.equal(error.code, "registry_unreadable");
 });
 
+test("the command agrees from the files on disk and prints the tag and its India-time date", async (t) => {
+  const root = await publishedRoot(t);
+  const line = await run(["--published", TAG], { root, fetchText: releasesAnswer([githubRelease()]) });
+  assert.equal(line, `README.md, SECURITY.md and registry/server.json agree with ${TAG} (published 2026-10-08 in India time)`);
+});
+
 test("the hand command rejects usage mistakes before asking GitHub", async () => {
   const never = async () => { throw new Error("no network in this test"); };
   for (const args of [[], ["--published"], ["--published", "--unknown"], ["--unknown"], ["--published", TAG, "extra"]]) {

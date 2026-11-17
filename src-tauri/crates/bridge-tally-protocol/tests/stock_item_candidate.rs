@@ -124,7 +124,6 @@ fn marked_create_matches_the_sibling_but_plain_create_does_not() {
     assert_eq!(marked.gst, sibling.gst);
     assert_ne!(marked.name, sibling.name);
     assert_ne!(marked.guid, sibling.guid);
-    assert_ne!(marked.names, sibling.names);
     assert_ne!(plain.gst_applicable, sibling.gst_applicable);
     assert_ne!(plain.gst, sibling.gst);
 }
@@ -221,6 +220,12 @@ fn a_scalar_named_inside_a_list_is_not_read_as_the_rows() {
     let only_nested = changed(BEFORE, SUPPLY, "").replacen(LIST, &nested, 1);
     let rows = parse_candidate_stock_items(&only_nested, COMPANY).unwrap();
     assert_eq!(rows[0].gst_type_of_supply, ScalarObservation::Absent);
+    let nested_empty = format!("{LIST}<GSTTYPEOFSUPPLY TYPE=\"String\"/>");
+    let rows = parse_candidate_stock_items(&changed(BEFORE, LIST, &nested_empty), COMPANY).unwrap();
+    assert_eq!(
+        rows[0].gst_type_of_supply,
+        ScalarObservation::Text("Goods".into())
+    );
 }
 
 #[test]

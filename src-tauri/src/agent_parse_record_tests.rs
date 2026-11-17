@@ -267,6 +267,22 @@ fn rows() -> Vec<Row> {
         STOCK_CREATE_LAB
     ));
     rows.extend(high_water_rows!(
+        "agent/partial-landing-rows/partial-landing-r0-marks-before.utf16le.xml",
+        STOCK_CREATE_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/partial-landing-rows/partial-landing-r0-marks-after.utf16le.xml",
+        STOCK_CREATE_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/partial-landing-rows/partial-landing-r1-r2-marks-before.utf16le.xml",
+        STOCK_CREATE_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/partial-landing-rows/partial-landing-r1-r2-marks-after.utf16le.xml",
+        STOCK_CREATE_LAB
+    ));
+    rows.extend(high_water_rows!(
         "agent/d3-cancelled-company-high-water.utf16le.xml",
         IMPORT_LAB
     ));
@@ -603,6 +619,26 @@ fn rows() -> Vec<Row> {
         "agent/amend-now-wa1-import-verification.utf16le.xml",
         "parse_import_verification_rows(IMPORT_LAB)",
         |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/partial-landing-rows/partial-landing-r0-verification-before.utf16le.xml",
+        "parse_import_verification_rows(STOCK_CREATE_LAB)",
+        |_, t| verification(t, STOCK_CREATE_LAB)
+    ));
+    rows.push(row!(
+        "agent/partial-landing-rows/partial-landing-r0-verification-after.utf16le.xml",
+        "parse_import_verification_rows(STOCK_CREATE_LAB)",
+        |_, t| verification(t, STOCK_CREATE_LAB)
+    ));
+    rows.push(row!(
+        "agent/partial-landing-rows/partial-landing-r1-r2-verification-before.utf16le.xml",
+        "parse_import_verification_rows(STOCK_CREATE_LAB)",
+        |_, t| verification(t, STOCK_CREATE_LAB)
+    ));
+    rows.push(row!(
+        "agent/partial-landing-rows/partial-landing-r1-r2-verification-after.utf16le.xml",
+        "parse_import_verification_rows(STOCK_CREATE_LAB)",
+        |_, t| verification(t, STOCK_CREATE_LAB)
     ));
     rows.push(row!(
         "agent/review-lab-batch-import-verification.utf16le.xml",
@@ -1221,4 +1257,84 @@ fn codes_the_class_and_the_cap_are_exact() {
         first_difference(&"y".repeat(200), "z"),
         format!(r#"line 1: want "{}" / got "z""#, "y".repeat(160))
     );
+}
+
+/// The partial-landing captures keep the marks and the two created vouchers literal.
+#[test]
+fn partial_landing_rows_parse_their_captured_marks_and_vouchers() {
+    let read = |name: &str| {
+        decoded(
+            &fs::read(fixtures_dir().join("agent/partial-landing-rows").join(name))
+                .expect("captured partial-landing fixture"),
+        )
+    };
+    for name in [
+        "partial-landing-r0-marks-before.utf16le.xml",
+        "partial-landing-r1-r2-marks-before.utf16le.xml",
+    ] {
+        let text = read(name);
+        assert_eq!(
+            parse_company_marks(&text, STOCK_CREATE_LAB),
+            Ok((1, 213)),
+            "{name}"
+        );
+        assert_eq!(
+            parse_company_high_water(&text, STOCK_CREATE_LAB),
+            Ok(serde_json::json!({"altvchid": 1, "altmstid": 213})),
+            "{name}"
+        );
+    }
+    for name in [
+        "partial-landing-r0-marks-after.utf16le.xml",
+        "partial-landing-r1-r2-marks-after.utf16le.xml",
+    ] {
+        let text = read(name);
+        assert_eq!(
+            parse_company_marks(&text, STOCK_CREATE_LAB),
+            Ok((3, 213)),
+            "{name}"
+        );
+        assert_eq!(
+            parse_company_high_water(&text, STOCK_CREATE_LAB),
+            Ok(serde_json::json!({"altvchid": 3, "altmstid": 213})),
+            "{name}"
+        );
+    }
+    for name in [
+        "partial-landing-r0-verification-before.utf16le.xml",
+        "partial-landing-r1-r2-verification-before.utf16le.xml",
+    ] {
+        assert_eq!(
+            parse_import_verification_rows(&read(name), STOCK_CREATE_LAB),
+            Ok(Vec::new()),
+            "{name}"
+        );
+    }
+    for name in [
+        "partial-landing-r0-verification-after.utf16le.xml",
+        "partial-landing-r1-r2-verification-after.utf16le.xml",
+    ] {
+        let rows = parse_import_verification_rows(&read(name), STOCK_CREATE_LAB)
+            .expect("captured verification parses");
+        assert_eq!(rows.len(), 2, "{name}");
+        let expected = [
+            ("2", 2, "2", "Row 1108-P2 first"),
+            ("3", 3, "3", "Row 1108-P2 third"),
+        ];
+        for (row, (master_id, alter_id, voucher_number, narration)) in rows.iter().zip(expected) {
+            assert_eq!(row["master_id"], master_id, "{name}");
+            assert_eq!(row["alter_id"], alter_id, "{name}");
+            assert_eq!(row["voucher_number"], voucher_number, "{name}");
+            assert_eq!(row["voucher_type"], "Journal", "{name}");
+            assert_eq!(row["date"], "20250414", "{name}");
+            assert_eq!(row["narration"], narration, "{name}");
+            assert!(
+                !row["narration"]
+                    .as_str()
+                    .expect("narration text")
+                    .contains("stock leg"),
+                "{name}"
+            );
+        }
+    }
 }

@@ -40,6 +40,8 @@ use crate::master_binding::{absence_key, canonical_master_key, letters_and_digit
 pub enum MasterKind {
     Ledger,
     Group,
+    /// A stock item. It is indexed with other stock items only (#1381).
+    StockItem,
 }
 
 /// How a colliding name belongs to its master.

@@ -169,14 +169,17 @@ const commandRefusal = (args, options) => refusal(() => run(args, options));
 
 test("the hand command uses the publication calendar date in India time", async () => {
   const rows = [
-    ["mcp-v0.4.0", "2026-10-01T18:55:38Z", "2 October 2026"],
-    [TAG, PUBLISHED_AT, PUBLISHED_DATE],
+    ["mcp-v0.4.0", "2026-10-01T18:55:38Z", "2 October 2026", "2026-10-02"],
+    [TAG, PUBLISHED_AT, PUBLISHED_DATE, "2026-10-08"],
+    // The two sides of midnight in India: 18:29:59Z is 23:59:59 there, and one second later is the next day.
+    ["mcp-v0.4.1", "2026-10-01T18:29:59Z", "1 October 2026", "2026-10-01"],
+    ["mcp-v0.4.2", "2026-10-01T18:30:00Z", "2 October 2026", "2026-10-02"],
   ];
-  for (const [tag, publishedAt, date] of rows) {
+  for (const [tag, publishedAt, date, isoDate] of rows) {
     const text = publishedText({ readmeTag: tag, securityTag: tag, registryVersion: tag.slice("mcp-v".length), readmeDate: date, securityDate: date });
     const release = await checkPublished(text, tag, releasesAnswer([githubRelease(tag, publishedAt)]));
     assert.equal(release.tag, tag);
-    assert.equal(release.date, new Date(Date.parse(publishedAt) + (5 * 60 + 30) * 60_000).toISOString().slice(0, 10));
+    assert.equal(release.date, isoDate);
   }
 });
 
@@ -264,7 +267,7 @@ test("registry JSON that cannot be parsed is a typed unreadable-input error", as
   assert.equal(error.code, "registry_unreadable");
 });
 
-test("the command agrees from the files on disk and prints the tag and its India-time date", async (t) => {
+test("the command agrees from the files on disk and prints the tag and its publication date", async (t) => {
   const root = await publishedRoot(t);
   const line = await run(["--published", TAG], { root, fetchText: releasesAnswer([githubRelease()]) });
   assert.equal(line, `README.md, SECURITY.md and registry/server.json agree with ${TAG} (published 2026-10-08 in India time)`);

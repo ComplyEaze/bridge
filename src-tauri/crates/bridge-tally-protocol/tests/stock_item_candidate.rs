@@ -173,7 +173,7 @@ fn absent_empty_and_whitespace_units_stay_distinct() {
 }
 
 #[test]
-fn malformed_candidate_fields_return_the_existing_typed_errors() {
+fn malformed_candidate_fields_return_typed_errors() {
     const SUPPLY: &str = "<GSTTYPEOFSUPPLY TYPE=\"String\">Goods</GSTTYPEOFSUPPLY>";
     assert_eq!(
         parse_candidate_stock_items(
@@ -206,4 +206,60 @@ fn malformed_candidate_fields_return_the_existing_typed_errors() {
         parse_candidate_stock_items(&decode(BEFORE), SHIPPED_COMPANY),
         Err(NativeMastersError::RowGuidForeign)
     );
+}
+
+#[test]
+fn a_scalar_named_inside_a_list_is_not_read_as_the_rows() {
+    const SUPPLY: &str = "<GSTTYPEOFSUPPLY TYPE=\"String\">Goods</GSTTYPEOFSUPPLY>";
+    const LIST: &str = "<LANGUAGENAME.LIST>";
+    let nested = format!("{LIST}<GSTTYPEOFSUPPLY TYPE=\"String\">Services</GSTTYPEOFSUPPLY>");
+    let rows = parse_candidate_stock_items(&changed(BEFORE, LIST, &nested), COMPANY).unwrap();
+    assert_eq!(
+        rows[0].gst_type_of_supply,
+        ScalarObservation::Text("Goods".into())
+    );
+    let only_nested = changed(BEFORE, SUPPLY, "").replacen(LIST, &nested, 1);
+    let rows = parse_candidate_stock_items(&only_nested, COMPANY).unwrap();
+    assert_eq!(rows[0].gst_type_of_supply, ScalarObservation::Absent);
+}
+
+#[test]
+fn a_self_closing_or_blank_language_name_is_refused() {
+    const NAME: &str = "<NAME>SC Sibling Goods</NAME>";
+    for blank in ["<NAME/>", "<NAME>  </NAME>"] {
+        assert_eq!(
+            parse_candidate_stock_items(&changed(BEFORE, NAME, blank), COMPANY),
+            Err(NativeMastersError::Malformed("masters_name_entry_empty"))
+        );
+    }
+}
+
+#[test]
+fn names_from_two_language_lists_are_kept_in_document_order() {
+    const END: &str = "</LANGUAGENAME.LIST>";
+    let second = format!(
+        "{END}<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"><NAME>SC Second Language</NAME></NAME.LIST>{END}"
+    );
+    let rows = parse_candidate_stock_items(&changed(BEFORE, END, &second), COMPANY).unwrap();
+    assert_eq!(rows[0].names, ["SC Sibling Goods", "SC Second Language"]);
+}
+
+#[test]
+fn a_scalar_that_is_not_plain_text_is_refused() {
+    const UNIT: &str = "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>";
+    for (bad, error) in [
+        (
+            "<BASEUNITS TYPE=\"String\"><![CDATA[Nos]]></BASEUNITS>",
+            "masters_scalar_not_text_only",
+        ),
+        (
+            "<BASEUNITS TYPE=\"String\">&bogus;</BASEUNITS>",
+            "masters_xml_invalid_escape",
+        ),
+    ] {
+        assert_eq!(
+            parse_candidate_stock_items(&changed(BEFORE, UNIT, bad), COMPANY),
+            Err(NativeMastersError::Malformed(error))
+        );
+    }
 }

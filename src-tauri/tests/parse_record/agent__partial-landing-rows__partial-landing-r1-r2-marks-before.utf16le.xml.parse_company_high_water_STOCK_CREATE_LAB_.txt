@@ -1,0 +1,7 @@
+# fixture: agent/partial-landing-rows/partial-landing-r1-r2-marks-before.utf16le.xml
+# parser: parse_company_high_water(STOCK_CREATE_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(213),
+    "altvchid": Number(1),
+})

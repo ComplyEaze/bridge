@@ -4300,6 +4300,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-after.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-after.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
         "tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml",
         APP_HIGH_WATER,
     ),
@@ -4624,6 +4640,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-after.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-after.utf16le.xml",
         APP_VERIFICATION,
     ),
     (

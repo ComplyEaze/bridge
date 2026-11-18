@@ -5,7 +5,7 @@
 )]
 use super::*;
 use bridge_tally_protocol::native_outstandings::parse_native_ledger_snapshot;
-use bridge_tally_transport::TallyTransportError;
+use bridge_tally_transport::{DrainPolicy, TallyTransportError};
 use std::collections::VecDeque;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -77,10 +77,19 @@ async fn next_request(socket: &mut tokio::net::TcpStream) -> Option<Vec<u8>> {
     Some(request)
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct RequestCounts {
+    posts: usize,
+    status_checks: usize,
+}
+
 /// Answers each request in turn with the next `(method, answer)`, after checking its method,
-/// keeping a connection open across answers that keep it alive, as Tally's do. Returns how many
-/// answers were sent.
-fn serve(answers: Vec<(&'static str, Vec<u8>)>) -> (TallyClient, tokio::task::JoinHandle<usize>) {
+/// keeping a connection open across answers that keep it alive, as Tally's do. Returns the
+/// requests received by kind.
+fn serve_with_wire(
+    answers: Vec<(&'static str, Vec<u8>)>,
+    wire: crate::endpoint_wire::WireGateConfig,
+) -> (TallyClient, tokio::task::JoinHandle<RequestCounts>) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
     let address = listener.local_addr().unwrap();
@@ -88,9 +97,20 @@ fn serve(answers: Vec<(&'static str, Vec<u8>)>) -> (TallyClient, tokio::task::Jo
     let mut answers = VecDeque::from(answers);
     let server = tokio::spawn(async move {
         let mut sent = 0;
+        let mut counts = RequestCounts {
+            posts: 0,
+            status_checks: 0,
+        };
         while !answers.is_empty() {
             let (mut socket, _) = listener.accept().await.unwrap();
             while let Some(request) = next_request(&mut socket).await {
+                if request.starts_with(b"POST / ") {
+                    counts.posts += 1;
+                } else if request.starts_with(b"GET /status ") {
+                    counts.status_checks += 1;
+                } else {
+                    panic!("a request of an unknown kind");
+                }
                 let (method, answer) = answers.pop_front().expect("no request past the plan");
                 assert!(
                     request.starts_with(method.as_bytes()),
@@ -108,13 +128,26 @@ fn serve(answers: Vec<(&'static str, Vec<u8>)>) -> (TallyClient, tokio::task::Jo
                 }
             }
         }
-        sent
+        counts
     });
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
+    let client = TallyClient::with_wire(
+        TallyConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        },
+        &wire,
+    )
     .unwrap();
+    (client, server)
+}
+
+fn serve(answers: Vec<(&'static str, Vec<u8>)>) -> (TallyClient, tokio::task::JoinHandle<usize>) {
+    let (client, server) =
+        serve_with_wire(answers, crate::endpoint_wire::WireGateConfig::default());
+    let server = tokio::spawn(async move {
+        let counts = server.await.unwrap();
+        counts.posts + counts.status_checks
+    });
     (client, server)
 }
 
@@ -209,6 +242,39 @@ async fn the_party_bills_pair_admits_the_empty_answer_twice() {
         .fetch_party_bills_paired(outstandings_request())
         .await;
     assert_eq!(server.await.unwrap(), 4);
+    let (body, bytes, hash) = read.unwrap();
+    assert_eq!(body, PartyBillsAnswerBody::Empty);
+    assert_eq!(bytes, 0);
+    assert_eq!(
+        hash,
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+}
+
+/// The empty answer was read whole, so the measured policy adds no drain before the second post.
+#[tokio::test]
+async fn an_empty_party_bills_answer_owes_no_drain_under_the_measured_policy() {
+    let (client, server) = serve_with_wire(
+        vec![
+            ("POST", EMPTY_HEAD.to_vec()),
+            ("GET", status_answer()),
+            ("POST", EMPTY_HEAD.to_vec()),
+            ("GET", status_answer()),
+        ],
+        crate::endpoint_wire::WireGateConfig::default().with_drain(DrainPolicy::MEASURED),
+    );
+    let read = client
+        .fetch_party_bills_paired(outstandings_request())
+        .await;
+    // Two POSTs are the pair's report sends; two GET /status requests are its own checks after
+    // them. Any drain probe would add to the second count before the second POST.
+    assert_eq!(
+        server.await.unwrap(),
+        RequestCounts {
+            posts: 2,
+            status_checks: 2,
+        }
+    );
     let (body, bytes, hash) = read.unwrap();
     assert_eq!(body, PartyBillsAnswerBody::Empty);
     assert_eq!(bytes, 0);

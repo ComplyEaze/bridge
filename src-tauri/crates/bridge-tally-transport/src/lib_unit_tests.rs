@@ -130,7 +130,7 @@ fn every_transport_error_is_classed_for_the_drain() {
         ),
         (E::UnsupportedContentEncoding, true),
         (E::InvalidEncoding { code: "x" }, true),
-        (E::EmptyAnswer, true),
+        (E::EmptyAnswer, false),
         (E::EndpointInvalid { code: "x" }, false),
         (E::PolicyInvalid { code: "x" }, false),
         (E::ClientInitializationFailed, false),
@@ -146,6 +146,13 @@ fn every_transport_error_is_classed_for_the_drain() {
     ] {
         assert_eq!(drain::owes_drain(&error), owes, "{error:?}");
     }
+}
+
+#[test]
+fn an_empty_answer_owes_no_drain_while_an_invalid_encoding_does() {
+    use TallyTransportError as E;
+    assert!(!drain::owes_drain(&E::EmptyAnswer));
+    assert!(drain::owes_drain(&E::InvalidEncoding { code: "x" }));
 }
 
 /// #2377: the empty answer's head is exactly the one the lab captured (protocol reference

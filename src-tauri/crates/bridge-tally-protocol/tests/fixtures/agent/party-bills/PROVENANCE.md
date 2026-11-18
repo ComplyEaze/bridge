@@ -9,7 +9,8 @@ are synthetic. Part A only read; Part B made its parties and bills behind a back
 - Part A: evidence branch `lab/2377-l-answers` at `a2be6d96` (its `SHA256.txt` lists each file with the same hash).
 - Part B: evidence branch `lab/2377-b-answers` at `44e44b28`.
 - Row 2377-NB: evidence branch `lab/2377-nb-answers` at `61a5c1bf`, on another synthetic company, `BRIDGE PILOT LAB`,
-  loaded alone on TallyPrime 7.2, 9 Nov 2026, reads only. Its bill-wise payable party `BRIDGE Supplier RJ` to
+  loaded alone on TallyPrime 7.2, 9 Nov 2026 UTC, 10 Nov in India, reads only. Its bill-wise payable party
+  `BRIDGE Supplier RJ` to
   31 July 2026, before its first entry, answered no bytes twice, with headers byte-equal to
   `ledger-outstandings-unknown-party.headers.txt`, and the snapshot to the same date carries the party, bill-wise, with
   an empty `CLOSINGBALANCE` (`ledger-snapshot-supplier-rj-20260731.utf16le.xml`). That snapshot request was
@@ -28,8 +29,8 @@ Tests: `src/native_outstandings/party_bills_tests.rs` parses each answer and tie
 record keeps what each parser returns.
 
 Confidence, with the markers of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`: PARTIAL for every finding here. Each was
-observed live, with request and answer captured, but on two synthetic books and one release, in sittings on 8 and
-9 Nov 2026; Bridge's own transport did not send these requests.
+observed live, with request and answer captured, but on two synthetic books and one release, in sittings on 8 Nov
+2026 and on 9 Nov 2026 UTC, 10 Nov in India; Bridge's own transport did not send these requests.
 
 Protocol behaviour these captures record, for the declared reference part (P9), each PARTIAL on the scope above. The
 answer to a `LedgerName` no ledger carries (`ledger-outstandings-unknown-party.*`) is recorded in §12a.27 of
@@ -41,7 +42,8 @@ answer to a `LedgerName` no ledger carries (`ledger-outstandings-unknown-party.*
   (`ledger-outstandings-two-on-account.utf16le.xml`).
 
 Not established: Bridge's own transport against a live Tally for this report (curl sent it); a payable party with
-a non-empty answer; a party with bill-wise off; a foreign-currency ledger; a real bill whose reference is the text
+a non-empty answer captured in this folder (§12a.27 records one on another book); a party with bill-wise off; a
+foreign-currency ledger; a real bill whose reference is the text
 `On Account`; a party with entries and no open bills (row 2377-NB above and §12a.27 record one with no entry by its
 date); other releases, editions, a client book.
 

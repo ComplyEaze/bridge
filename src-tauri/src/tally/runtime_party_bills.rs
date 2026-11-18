@@ -7,9 +7,9 @@
 //! ([`PartyBillsAnswer::tie`](bridge_tally_protocol::native_outstandings::PartyBillsAnswer::tie)).
 //!
 //! Tally answers a party it reports nothing for with no body at all, the same for a name no
-//! ledger carries and for a bill-wise party with no balance at the date (protocol reference
-//! §12a.27). The answer cannot tell those apart, so the snapshot does, and neither is told as
-//! "no open bills".
+//! ledger carries and for a bill-wise party with an empty ledger-list closing at the date
+//! (protocol reference §12a.27). The answer cannot tell those apart, so the snapshot does, and
+//! neither is told as "no open bills".
 use super::*;
 use crate::tally::connection::PartyBillsAnswerBody;
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;

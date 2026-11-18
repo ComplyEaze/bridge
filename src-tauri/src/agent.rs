@@ -2073,15 +2073,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // a party it reports nothing for (protocol reference §12a.27). The ledger list decides
         // which refusal, and neither is told as no open bills.
         "party_bills_none_reported" => Some(
-            "The ledger list carries this party, bill-wise, with no balance at as_of, and \
+            "The ledger list carries this party, bill-wise, with an empty closing at as_of, and \
              Tally's bill report sent nothing for it. ComplyEaze Bridge does not state that the \
              party has no open bills: a zero balance may still hold an open bill set against an \
              on-account advance, and that answer is not measured. For the party's balance, read \
              ledger_masters or trial_balance. The same call refuses again.",
         ),
         "party_bills_answer_missing" => Some(
-            "The ledger list shows a balance for this bill-wise party at as_of, but Tally's bill \
-             report sent nothing for it, which has not been seen on a party with a balance, so \
+            "The ledger list carries a closing figure for this bill-wise party at as_of, but \
+             Tally's bill report sent nothing for it, which has not been seen on a party with a \
+             closing figure, so \
              no bills were returned. For the party's balance, read ledger_masters or \
              trial_balance. The same call refuses again.",
         ),

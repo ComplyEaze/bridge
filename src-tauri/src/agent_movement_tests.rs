@@ -100,6 +100,51 @@ fn an_unreadable_movement_row_refuses_by_the_movement_read_code() {
     );
 }
 
+/// The voucher read refuses a company name a request cannot carry on its first line, before it
+/// sends anything: the endpoint is a simulator that must receive no request. The name here holds
+/// a line break. Whether a name Tally itself sends can reach this guard is not traced.
+#[tokio::test]
+async fn the_voucher_read_refuses_an_invalid_company_name_by_the_company_code_and_sends_nothing() {
+    use tally_protocol_simulator::{Fixture, ProductStatus, ScenarioPlan, SequenceSimulator};
+    let simulator = SequenceSimulator::spawn(vec![ScenarioPlan::new(Fixture::ProductStatus(
+        ProductStatus::TallyPrime,
+    ))])
+    .unwrap();
+    let address = simulator.address();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let identity = VerifiedCompanyIdentity::test_fixture("Lab", crate::synthetic_guid(1));
+    let date = bridge_tally_core::TallyDate::parse("20260901").unwrap();
+    let result = server
+        .read_movement_vouchers(
+            &identity,
+            "invalid\ncompany",
+            WindowScope::Book,
+            (date.clone(), date),
+            WindowPlanSource::Estimate { known_marks: None },
+            None,
+        )
+        .await;
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some(CompanyReadCode::NameInvalid.as_str().to_string())
+    );
+    assert_eq!(simulator.received(), 0, "no request reached the endpoint");
+}
+
 /// Renamed rather than relabelled: this used to assert the window was refused.
 /// A Stock Journal legitimately carries no accounting entries, so refusing lost
 /// the whole window over a voucher that is exactly right -- five of twelve

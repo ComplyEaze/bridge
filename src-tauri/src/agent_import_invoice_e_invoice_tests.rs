@@ -59,10 +59,12 @@ fn each_value_outside_its_form_is_refused() {
     ] {
         assert!(with("irn", json!(irn)).is_err(), "{irn}");
     }
-    for ack_no in ["", "12a", "123456789012345678901", " 445566", "4455-66"] {
+    // Twenty digits are the longest accepted; twenty-one are refused.
+    let (twenty, twenty_one) = ("1".repeat(20), "1".repeat(21));
+    for ack_no in ["", "12a", twenty_one.as_str(), " 445566", "4455-66"] {
         assert!(with("ack_no", json!(ack_no)).is_err(), "{ack_no}");
     }
-    assert!(with("ack_no", json!("12345678901234567890")).is_ok());
+    assert!(with("ack_no", json!(twenty)).is_ok());
     for ack_date in [
         "20250403",
         "2025-4-3",
@@ -91,7 +93,7 @@ fn the_review_lines_show_every_detail() {
     // The longest acknowledgement, a 20-digit number, is 49 characters: with the longer bill
     // allocation (46) and two spaces, the dialog's line is 97, inside its 100.
     let longest = parsed(json!({
-        "irn": IRN9_IRN, "ack_no": "12345678901234567890", "ack_date": "2025-04-03"
+        "irn": IRN9_IRN, "ack_no": "1".repeat(20), "ack_date": "2025-04-03"
     }))
     .expect("parses")
     .review_lines();

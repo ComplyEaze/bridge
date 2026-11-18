@@ -137,6 +137,16 @@ fn a_figure_with_more_than_two_places_keeps_every_digit() {
     assert_eq!(BankSide::from_printed("2.500").unwrap().text(), "2.50");
 }
 
+#[test]
+fn valid_amounts_whose_sum_exceeds_the_decimal_limit_are_refused() {
+    let largest = BankSide::from_printed(&"9".repeat(256)).unwrap();
+    let one = BankSide::from_printed("1").unwrap();
+    assert_eq!(
+        largest.plus(&one),
+        Err(TieOutCode::ArithmeticOutOfRange.into())
+    );
+}
+
 // ---- the three figures ------------------------------------------------------
 
 #[test]
@@ -680,6 +690,14 @@ fn the_dates_read_are_the_first_row_the_day_after_the_last_and_the_first_again()
     assert_eq!(dates(date(2028, 2, 1), date(2028, 2, 28))[1], "20280229");
     assert_eq!(dates(date(2028, 2, 1), date(2028, 2, 29))[1], "20280301");
     assert_eq!(dates(date(2027, 2, 1), date(2027, 2, 28))[1], "20270301");
+}
+
+#[test]
+fn the_last_supported_tally_date_is_refused_as_an_invalid_date() {
+    assert_eq!(
+        read_dates(date(9999, 12, 31), date(9999, 12, 31)),
+        Err(ReadCode::InvalidDate.into())
+    );
 }
 
 // ---- what a read can fail to show --------------------------------------------

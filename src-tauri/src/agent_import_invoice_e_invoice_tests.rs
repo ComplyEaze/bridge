@@ -203,6 +203,75 @@ fn each_element_read_back_otherwise_is_a_difference() {
     );
 }
 
+/// Sales `1`'s three details as the captured answer holds them: element, row key, text.
+const KEYED_TEXT: [(&str, &str, &str); 3] = [
+    (
+        "IRN",
+        "irn",
+        "a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8",
+    ),
+    ("IRNACKNO", "ack_no", "112233"),
+    ("IRNACKDATE", "ack_date", "20250403"),
+];
+
+/// The captured answer with one space put before and one after the text of one element of
+/// Sales `1`. Tally's own answer holds no such spaces; this is the case the comparison must not
+/// pass.
+fn captured_answer_padding(element: &str, text: &str) -> String {
+    let xml = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml"
+    ));
+    let plain = format!(">{text}</{element}>");
+    assert_eq!(xml.matches(&plain).count(), 1);
+    xml.replacen(&plain, &format!("> {text} </{element}>"), 1)
+}
+
+/// Spaces returned around any of the three values are part of the value the read-back compares.
+#[test]
+fn spaces_around_each_returned_detail_are_a_difference() {
+    let differences = KEYED_TEXT.map(|(element, _, text)| {
+        let padded = captured_answer_padding(element, text);
+        let rows = super::read_rows(&padded, "eb2f5190-292e-4ed8-bfd3-eace839fe699")
+            .expect("the padded answer parses");
+        keyed().readback_differences(&rows, SALES_1)
+    });
+    assert_eq!(
+        differences,
+        [
+            vec!["IRN".to_string()],
+            vec!["IRNACKNO".to_string()],
+            vec!["IRNACKDATE".to_string()]
+        ]
+    );
+}
+
+/// The `vouchers` tool's parse of the same padded answers is unchanged: it returns each value
+/// without the spaces, as it did before the read-back kept them.
+#[test]
+fn the_vouchers_tool_still_returns_each_padded_detail_without_its_spaces() {
+    for (element, key, text) in KEYED_TEXT {
+        let padded = captured_answer_padding(element, text);
+        let rows = crate::agent::parse_agent_rows_withholding_reading_gst(
+            &padded,
+            "eb2f5190-292e-4ed8-bfd3-eace839fe699",
+            crate::agent::GstDetailsShown::Withheld,
+            crate::agent::NamedVoucherFields::E_INVOICE_ONLY,
+            crate::agent::StockLines::NotAsked,
+        )
+        .expect("the padded answer parses");
+        let sales_1 = rows
+            .iter()
+            .map(|row| row.row())
+            .find(|row| row["guid"] == SALES_1)
+            .expect("Sales 1");
+        assert_eq!(
+            sales_1["e_invoice"][key],
+            json!({"state": "present", "value": text}),
+            "{element}"
+        );
+    }
+}
+
 /// An element Tally sent empty, as on the invoice without details, is never equal to a value sent.
 #[test]
 fn an_empty_element_is_a_difference() {

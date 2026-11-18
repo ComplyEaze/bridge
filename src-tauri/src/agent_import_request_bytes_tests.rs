@@ -372,12 +372,27 @@ fn built_requests() -> Vec<(String, String)> {
     // `plain/plain/no_classes` reaches the same request as the
     // `render_agent_vouchers_in_span/span` row, and `plain/plain/classes` the
     // same as `render_agent_class_vouchers_in_span/span`: different entry points.
-    for e_invoice in every!(EInvoiceFields: NotAsked, Asked) {
+    for e_invoice in every!(EInvoiceFields: NotAsked, Asked, AskedAsReturned) {
         for gst in every!(VoucherGstFields: NotAsked, Asked) {
             for classes in [false, true] {
                 let e = match e_invoice {
                     EInvoiceFields::NotAsked => "plain",
                     EInvoiceFields::Asked => "e_invoice",
+                    // Only how the answer is parsed differs: the request is the `Asked` one.
+                    EInvoiceFields::AskedAsReturned => {
+                        let render = |e_invoice| {
+                            render_agent_named_vouchers_in_span(
+                                COMPANY,
+                                &from,
+                                &to,
+                                span,
+                                NamedVoucherFields { e_invoice, gst },
+                                classes,
+                            )
+                        };
+                        assert_eq!(render(e_invoice), render(EInvoiceFields::Asked));
+                        continue;
+                    }
                 };
                 let g = match gst {
                     VoucherGstFields::NotAsked => "plain",

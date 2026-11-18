@@ -174,7 +174,7 @@ pub(super) fn read_rows(xml: &str, company_guid: &str) -> Result<Vec<Value>, Str
         xml,
         company_guid,
         crate::agent::GstDetailsShown::Withheld,
-        crate::agent::NamedVoucherFields::E_INVOICE_ONLY,
+        crate::agent::NamedVoucherFields::E_INVOICE_AS_RETURNED,
         crate::agent::StockLines::NotAsked,
     )?
     .iter()

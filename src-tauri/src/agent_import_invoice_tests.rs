@@ -999,6 +999,154 @@ fn observed_voucher() -> ImportVoucher {
     v
 }
 
+/// The invoice read-back sends the e-invoice read for a saved invoice with details, and an IRN
+/// that answer changes is a difference returned by the read-back itself.
+#[tokio::test]
+async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_back() {
+    use bridge_tally_transport::TallyEndpointConfig;
+    use tally_protocol_simulator::{
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+
+    let company_list = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"
+    ));
+    let guid = pilot_lab_guid();
+    let e_invoice_answer = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml"
+    ))
+    .replace("eb2f5190-292e-4ed8-bfd3-eace839fe699", &guid)
+    .replace(
+        &format!("<GUID>{guid}-00000001</GUID>"),
+        &format!("<GUID>{guid}-0000000b</GUID>"),
+    )
+    .replace(
+        "<IRN TYPE=\"String\">a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8</IRN>",
+        "<IRN TYPE=\"String\">c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0</IRN>",
+    );
+    let answer = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body))
+            .with_encoding(WireEncoding::Utf16LeNoBom)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let order = concat!(
+        "eMsMseeRsRse",
+        "e1s1see2s2see3s3see4s4seeUsUsee6s6see7s7see8s8se",
+        "e9s9seexsxseeysyseezszse",
+        "eDsDse"
+    );
+    let months = crate::agent::agent_import::tests::lab_number_months();
+    let mut plans = order
+        .chars()
+        .map(|kind| match kind {
+            'e' => answer(company_list.clone()),
+            's' => ScenarioPlan::new(Fixture::ProductStatus(
+                tally_protocol_simulator::ProductStatus::TallyPrime,
+            ))
+            .with_framing(ResponseFraming::ContentLength),
+            'M' => answer(utf16le(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"
+            ))),
+            'R' => answer(utf16le(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
+            ))),
+            'D' => answer(e_invoice_answer.clone()),
+            month => {
+                let index = if month == 'U' {
+                    4
+                } else {
+                    "123456789xyz".find(month).expect("a month letter")
+                };
+                answer(utf16le(months[index].3))
+            }
+        })
+        .collect::<Vec<_>>();
+    plans.push(answer(company_list.clone()));
+    let simulator = SequenceSimulator::spawn(plans).expect("the scripted read-back starts");
+    let directory = tempfile::tempdir().expect("a temporary data directory");
+    let server = super::super::super::Server::new(super::super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::super::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let companies = bridge_tally_protocol::parse_companies_from_collection(&company_list)
+        .expect("the captured company list parses");
+    let company = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(guid.as_str()))
+        .expect("the pilot company")
+        .clone();
+    let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
+        company.name.clone(),
+        crate::tally::test_company_guid(&guid),
+        company.company_number.clone().unwrap(),
+        company.books_from.clone().unwrap(),
+        &companies,
+    )
+    .expect("the captured company identity verifies");
+    let saved: ImportVoucher = serde_json::from_value(json!({
+        "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":"BP/26-27/0010",
+        "invoice":{
+            "voucher_type_name":"BRIDGE Sales", "place_of_supply":"Rajasthan", "round_off_ledger":"BRIDGE Round Off",
+            "observed":{
+                "voucher_type_guid":format!("{guid}-000000ce"), "party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer", "party_bill_wise":false,
+                "company_state":"Rajasthan", "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]
+            },
+            "e_invoice":{
+                "irn":"a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8",
+                "ack_no":"112233", "ack_date":"2025-04-03"
+            }
+        },
+        "entries":[
+            {"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"},
+            {"ledger":"BRIDGE Svc 998313 5%","amount":"600.40","side":"Cr"},
+            {"ledger":"BRIDGE Svc 998314 5%","amount":"400.40","side":"Cr"},
+            {"ledger":"BRIDGE CGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE SGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE Round Off","amount":"0.16","side":"Cr"}
+        ]
+    }))
+    .expect("the saved invoice parses");
+
+    let (differences, ..) = server
+        .read_back_sales_invoice(&identity, &company, &saved)
+        .await
+        .expect("a read-back after a post is never an error");
+    assert_eq!(differences, ["IRN"]);
+
+    simulator.cancel();
+    let requests = simulator
+        .finish()
+        .expect("the scripted read-back finishes")
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .collect::<Vec<_>>();
+    assert_eq!(requests.len(), order.len());
+    // The e-invoice read is sent where the script answers it, over the invoice's one date, and
+    // no other request of the read-back names the three elements.
+    let names_the_details = requests
+        .iter()
+        .map(|request| {
+            let body = utf16le(&request.request_body);
+            body.contains(",IRN,IRNACKNO,IRNACKDATE</FETCH>")
+                && body.contains("<SVFROMDATE TYPE=\"Date\">20260801</SVFROMDATE>")
+                && body.contains("<SVTODATE TYPE=\"Date\">20260801</SVTODATE>")
+        })
+        .collect::<Vec<_>>();
+    let scripted = order.chars().map(|kind| kind == 'D').collect::<Vec<_>>();
+    assert_eq!(names_the_details, scripted);
+}
+
 fn differences(v: &ImportVoucher, xml: &str) -> Vec<String> {
     match wire::parse_invoice_readback(xml).unwrap() {
         wire::Readback::One(read) => invoice_readback_differences(v, &read, "20260310"),

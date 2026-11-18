@@ -187,7 +187,7 @@ pub(super) fn render_agent_named_vouchers_in_span(
     classes: bool,
 ) -> Result<String, String> {
     let mut fetch = AGENT_VOUCHER_FETCH.to_string();
-    if fields.e_invoice == EInvoiceFields::Asked {
+    if fields.e_invoice.asked() {
         fetch.push_str(AGENT_VOUCHER_E_INVOICE_WORDS);
     }
     if fields.gst == VoucherGstFields::Asked {

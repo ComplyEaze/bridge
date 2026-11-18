@@ -199,7 +199,7 @@ fn masters_identity() -> VerifiedCompanyIdentity {
 
 fn masters_item(name: &str) -> LedgerCreateItem {
     LedgerCreateItem::new(
-        super::super::ledger_create_item::MasterName::new(name).unwrap(),
+        super::super::master_name::MasterName::new(name).unwrap(),
         super::super::ledger_create_item::AdmittedLedgerKind::Suspense,
     )
 }

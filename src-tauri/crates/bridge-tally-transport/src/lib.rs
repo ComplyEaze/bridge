@@ -1279,14 +1279,15 @@ const CONTENT_TYPE_MISSING: TallyTransportError = TallyTransportError::InvalidEn
 };
 
 /// Whether a head with no usable `Content-Type` is the empty answer's (protocol reference
-/// §12a.27): status exactly 200, no `Content-Type` header at all, and exactly one
-/// `Content-Length` whose value is the single byte `0`. The content encoding is checked before
-/// this, as for every head. The body is still read before anything is returned
-/// ([`empty_answer_after_body`]).
+/// §12a.27): status exactly 200, no `Content-Type` header at all, no `Transfer-Encoding` header
+/// at all, and exactly one `Content-Length` whose value is the single byte `0`. The content
+/// encoding is checked before this, as for every head. The body is still read before anything is
+/// returned ([`empty_answer_after_body`]).
 fn is_empty_answer_head(status: reqwest::StatusCode, headers: &reqwest::header::HeaderMap) -> bool {
     let mut lengths = headers.get_all(CONTENT_LENGTH).iter();
     status == reqwest::StatusCode::OK
         && headers.get_all(CONTENT_TYPE).iter().next().is_none()
+        && !headers.contains_key(reqwest::header::TRANSFER_ENCODING)
         && lengths
             .next()
             .is_some_and(|length| length.as_bytes() == b"0")

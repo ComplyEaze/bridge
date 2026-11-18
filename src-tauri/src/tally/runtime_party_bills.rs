@@ -39,8 +39,9 @@ pub(crate) enum PartyBillsReadError {
     #[error("party_not_billwise")]
     NotBillWise,
     /// The report sent nothing for a bill-wise party whose snapshot closing is empty. Whether it
-    /// has open bills is not established: a zero balance may still hold an open bill against an
-    /// on-account advance (protocol reference §12a.27).
+    /// has open bills is not established: an empty closing is not established to be zero, and even
+    /// a zero balance may hold an open bill set against an on-account advance (protocol reference
+    /// §12a.27).
     #[error("party_bills_none_reported")]
     NoneReported,
     /// The report sent nothing for a bill-wise party whose snapshot shows a closing: not measured.

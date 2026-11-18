@@ -14,6 +14,9 @@ const FIXTURES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/"
 );
+const PILOT_COMPANIES: &str = "../pilot-lab/pilot-lab-company-extent.utf16le.xml";
+const PILOT_EXTENT: &str = "../pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml";
+const SUPPLIER_SNAPSHOT: &str = "ledger-snapshot-supplier-rj-20260731.utf16le.xml";
 
 /// The head and (empty) body Tally sent for a party it reported nothing for, byte for byte.
 const EMPTY_HEAD: &[u8] = include_bytes!(
@@ -89,7 +92,11 @@ struct RequestCounts {
 fn serve_with_wire(
     answers: Vec<(&'static str, Vec<u8>)>,
     wire: crate::endpoint_wire::WireGateConfig,
-) -> (TallyClient, tokio::task::JoinHandle<RequestCounts>) {
+) -> (
+    TallyClient,
+    TallyConfig,
+    tokio::task::JoinHandle<RequestCounts>,
+) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
     let address = listener.local_addr().unwrap();
@@ -130,25 +137,38 @@ fn serve_with_wire(
         }
         counts
     });
-    let client = TallyClient::with_wire(
-        TallyConfig {
-            host: address.ip().to_string(),
-            port: address.port(),
-        },
-        &wire,
-    )
-    .unwrap();
-    (client, server)
+    let config = TallyConfig {
+        host: address.ip().to_string(),
+        port: address.port(),
+    };
+    let client = TallyClient::with_wire(config.clone(), &wire).unwrap();
+    (client, config, server)
 }
 
 fn serve(answers: Vec<(&'static str, Vec<u8>)>) -> (TallyClient, tokio::task::JoinHandle<usize>) {
-    let (client, server) =
+    let (client, _, server) =
         serve_with_wire(answers, crate::endpoint_wire::WireGateConfig::default());
     let server = tokio::spawn(async move {
         let counts = server.await.unwrap();
         counts.posts + counts.status_checks
     });
     (client, server)
+}
+
+fn pilot_identity() -> VerifiedCompanyIdentity {
+    let companies = parse_companies_from_collection(&fixture_text(PILOT_COMPANIES)).unwrap();
+    let company = companies
+        .iter()
+        .find(|company| company.name == "BRIDGE PILOT LAB")
+        .unwrap();
+    VerifiedCompanyIdentity::from_observed_companies(
+        company.name.clone(),
+        crate::tally::test_company_guid(company.guid.as_deref().unwrap()),
+        company.company_number.clone().unwrap(),
+        company.books_from.clone().unwrap(),
+        &companies,
+    )
+    .unwrap()
 }
 
 fn outstandings_request() -> String {
@@ -251,10 +271,71 @@ async fn the_party_bills_pair_admits_the_empty_answer_twice() {
     );
 }
 
+/// The runtime's own call, not only its pair and tie separately, maps the empty pair to the
+/// snapshot's typed refusal. The closing extent is read first, as for every answer, and the
+/// refusal comes before the closing identity bracket.
+#[tokio::test]
+async fn the_runtime_read_refuses_two_empty_bills_answers_as_none_reported() {
+    let companies = report_answer(PILOT_COMPANIES);
+    let extent = report_answer(PILOT_EXTENT);
+    let snapshot = report_answer(SUPPLIER_SNAPSHOT);
+    let (_client, config, server) = serve_with_wire(
+        vec![
+            ("GET", status_answer()),
+            ("POST", companies.clone()),
+            ("POST", companies),
+            ("POST", extent.clone()),
+            ("GET", status_answer()),
+            ("POST", extent.clone()),
+            ("GET", status_answer()),
+            ("POST", snapshot.clone()),
+            ("GET", status_answer()),
+            ("POST", snapshot),
+            ("GET", status_answer()),
+            ("POST", EMPTY_HEAD.to_vec()),
+            ("GET", status_answer()),
+            ("POST", EMPTY_HEAD.to_vec()),
+            ("GET", status_answer()),
+            ("POST", extent.clone()),
+            ("GET", status_answer()),
+            ("POST", extent),
+            ("GET", status_answer()),
+        ],
+        crate::endpoint_wire::WireGateConfig::default(),
+    );
+    let Err(error) = TallyRuntime::default()
+        .fetch_party_bills(
+            config,
+            &pilot_identity(),
+            LedgerScopeName::new("BRIDGE Supplier RJ").unwrap(),
+            TallyDate::parse("20260731").unwrap(),
+        )
+        .await
+    else {
+        panic!("two empty bills answers do not establish that there are no open bills");
+    };
+    assert!(
+        matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<PartyBillsReadError>()),
+            Some(PartyBillsReadError::NoneReported)
+        ),
+        "{error:#}"
+    );
+    assert_eq!(
+        server.await.unwrap(),
+        RequestCounts {
+            posts: 10,
+            status_checks: 9,
+        }
+    );
+}
+
 /// The empty answer was read whole, so the measured policy adds no drain before the second post.
 #[tokio::test]
 async fn an_empty_party_bills_answer_owes_no_drain_under_the_measured_policy() {
-    let (client, server) = serve_with_wire(
+    let (client, _, server) = serve_with_wire(
         vec![
             ("POST", EMPTY_HEAD.to_vec()),
             ("GET", status_answer()),

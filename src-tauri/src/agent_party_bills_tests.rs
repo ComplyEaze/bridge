@@ -88,6 +88,21 @@ fn the_empty_answer_s_transport_refusal_is_the_read_s_failure() {
 }
 
 #[test]
+fn the_none_reported_next_step_does_not_treat_an_empty_closing_as_zero() {
+    assert_eq!(
+        crate::agent::remediation_for("party_bills_read_failed", Some("party_bills_none_reported")),
+        Some(
+            "The ledger list carries this party, bill-wise, with an empty closing at as_of, and \
+             Tally's bill report sent nothing for it. ComplyEaze Bridge does not state that the \
+             party has no open bills: an empty closing is not established to be zero, and even a \
+             zero balance may hold an open bill set against an on-account advance; that answer is \
+             not measured. For the party's balance, read ledger_masters or trial_balance. The same \
+             call refuses again."
+        )
+    );
+}
+
+#[test]
 fn a_name_the_scope_type_refuses_is_refused_before_anything_is_sent() {
     for party in ["L5 Trail ", " L5 Trail", "L5  Trail", "L5 Amp & Co", ""] {
         let Err(failure) = admitted_party(party) else {

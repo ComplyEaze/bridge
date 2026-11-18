@@ -13,7 +13,8 @@
   (`party_name_not_admitted`). The company's marks are read before and after, and must be unchanged. Measured with
   curl on TallyPrime 7.2 on two synthetic books: a receivable party at two dates, parties with one bill each, and
   `BRIDGE Supplier RJ` on `BRIDGE PILOT LAB` at 31 July 2026 answering empty, its ledger bill-wise with an empty
-  closing; Bridge's own build has not yet been run against a live Tally. Not measured: a payable party with a
-  non-empty answer, a party with bill-wise off, a foreign-currency ledger, a party with entries and no open bills.
+  closing; its non-empty control on that book at 4 August 2026 carried one bill whose closing tied to the ledger
+  closing. Bridge's own build has not yet been run against a live Tally. Not measured: a party with bill-wise off,
+  a foreign-currency ledger, a party with entries and no open bills.
   Until that last answer is measured, an answer with no rows refuses (`party_bills_no_rows_not_established`). The
   answer carries `ledger_match`, which says when the party asked for was bound by case or spacing.

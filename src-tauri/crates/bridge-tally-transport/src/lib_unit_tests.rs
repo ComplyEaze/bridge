@@ -159,7 +159,7 @@ fn an_empty_answer_owes_no_drain_while_an_invalid_encoding_does() {
 /// §12a.27), and each of its conditions, missed alone, leaves the head refused as before.
 #[test]
 fn only_the_captured_empty_head_can_be_the_empty_answer() {
-    use reqwest::header::{HeaderMap, HeaderValue, CONNECTION};
+    use reqwest::header::{HeaderMap, HeaderValue, CONNECTION, TRANSFER_ENCODING};
     use reqwest::StatusCode;
     fn head(lengths: &[&'static str], content_type: Option<&'static str>) -> HeaderMap {
         let mut headers = HeaderMap::new();
@@ -215,6 +215,16 @@ fn only_the_captured_empty_head_can_be_the_empty_answer() {
             "{lengths:?}"
         );
     }
+    // No Transfer-Encoding, whatever its value: the body is not framed as the captured head's was.
+    let transfer_codings = ["chunked", "identity", ""].map(|transfer_encoding| {
+        let mut headers = head(&["0"], None);
+        headers.insert(
+            TRANSFER_ENCODING,
+            HeaderValue::from_static(transfer_encoding),
+        );
+        is_empty_answer_head(StatusCode::OK, &headers)
+    });
+    assert_eq!(transfer_codings, [false, false, false]);
 }
 
 /// #2377: the empty answer is told only after its body was read to the end with no byte. A body

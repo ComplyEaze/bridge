@@ -2,8 +2,8 @@
 //! [`TallyTransportError::EmptyAnswer`] on both readers; a head that misses one of its conditions
 //! keeps the typed refusal it had before, so a transport failure never passes as the answer.
 //!
-//! The byte condition cannot be missed over HTTP: `Content-Length: 0` frames the body at zero,
-//! and anything after it is the next response. It is pinned in the crate's unit tests.
+//! `Content-Length: 0` frames the body at zero only when no transfer coding supersedes it.
+//! The head's byte conditions are pinned in the crate's unit tests.
 #![allow(
     clippy::disallowed_methods,
     reason = "test double: a local socket serving one captured or edited response head"
@@ -96,6 +96,19 @@ async fn the_captured_empty_head_is_the_empty_answer() {
             Err(TallyTransportError::EmptyAnswer),
             Err(TallyTransportError::EmptyAnswer)
         ]
+    );
+}
+
+#[tokio::test]
+async fn a_chunked_empty_body_with_a_transfer_coding_keeps_its_refusal() {
+    let mut response = edited(
+        "CONTENT-LENGTH: 0\r\n",
+        "TRANSFER-ENCODING: chunked\r\nCONTENT-LENGTH: 0\r\n",
+    );
+    response.extend_from_slice(b"0\r\n\r\n");
+    assert_eq!(
+        both_readers(&response).await,
+        [Err(CONTENT_TYPE_MISSING), Err(CONTENT_TYPE_MISSING)]
     );
 }
 

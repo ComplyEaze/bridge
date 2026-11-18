@@ -389,16 +389,28 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
             }
         }
     }
+    let verified = || json!({"result": {"counts": {"posted_verified": 1}, "duplicates": []}});
+    let mut previous = verified();
+    finalize_previous_attempt_reconciliation(&mut previous, None, None, 1);
+    let mut current = verified();
+    finalize_current_dispatch(&mut current, None, None, 1);
+    for payload in [previous, current] {
+        let result = &payload["result"];
+        assert_eq!(result["dispatch"]["state"], "reconciliation_required");
+        assert_eq!(result["error"]["code"], "import_reconciliation_required");
+        assert_eq!(result["error"]["next_step"], RESPONSE_MISSING_NEXT_STEP);
+    }
     let step = RESPONSE_MISSING_NEXT_STEP;
-    // The receipt is offered only as one that may have been kept, with the tool
-    // that returns it and the two fields it holds.
+    // The log returns only recent receipts, with the trail's two fields named.
     for part in [
-        "If a receipt of the post_import call",
-        "egress_log",
+        "egress_log returns the most recent receipts",
+        "This batch's post_import receipt is there only if recent enough",
         "request_trail",
         "held_ms",
+        "how long each send held the endpoint",
         "outcome",
-        "A missing receipt may mean the process ended before it was written.",
+        "A receipt not returned may be older than egress_log reads",
+        "or may never have been written: the process may have ended first",
         "without resending it",
     ] {
         assert!(step.contains(part), "{part}");

@@ -2314,12 +2314,13 @@ pub(super) fn attach_next_step(
     }
 }
 
-/// Where to look when no answer to the post was kept (bridge#852). The call that
-/// sent the batch keeps a receipt with the trail of its sends
-/// (`request_trail::RequestTrail`); the batch's own record holds no duration
-/// and no ending, so it points there and promises nothing: a process that ended
-/// before the receipt was written leaves none.
-pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. If a receipt of the post_import call that sent it was kept, egress_log returns it: its request_trail lists the last 32 sends of that call with held_ms, how long the send held the endpoint, and its outcome, the post's among them. A missing receipt may mean the process ended before it was written. Either way, reconcile this original batch without resending it.";
+/// Where to look when no answer to the post was kept (bridge#852). `egress_log`
+/// returns the most recent receipts; the sending `post_import` call's receipt is
+/// there only if recent enough. Its trail (`request_trail::RequestTrail`) holds
+/// the send durations and outcomes the batch record lacks. A receipt not returned
+/// may be older than the read window, or may never have been written: the process
+/// may have ended first.
+pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. egress_log returns the most recent receipts. This batch's post_import receipt is there only if recent enough. Its request_trail lists the last 32 sends with held_ms, how long each send held the endpoint, and its outcome, the post's among them. A receipt not returned may be older than egress_log reads, or may never have been written: the process may have ended first. Reconcile this original batch without resending it.";
 
 fn mark_reconciliation_required(payload: &mut Value, response: Option<&ledger::DispatchResponse>) {
     payload["result"]["error"] = json!({"code":"import_reconciliation_required", "message":"The saved attempt has not been confirmed as the intended new voucher. Reconcile this original batch without resending it."});

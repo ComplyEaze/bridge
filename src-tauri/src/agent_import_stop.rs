@@ -18,11 +18,12 @@
 //! this read; only a cancelled call is refused, since no one is there to
 //! answer the dialog.
 //!
-//! The check under the lock before the record compares the batch's sha256 and
-//! the stop, not the verification's generation: a read that changes while the
-//! dialog is open makes only the dialog's words stale. The stop lives in this
-//! data folder's journal; another install posting into the same company is not
-//! stopped by it.
+//! The check under the lock before the record compares the batch's latest
+//! record, its sha256 and the stop. Any record of the batch while the dialog
+//! is open refuses the release, a verification that leaves the stop standing
+//! included: a stop that lifted and came back is another stop than the one
+//! shown. The stop lives in this data folder's journal; another install
+//! posting into the same company is not stopped by it.
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount};
 
@@ -111,10 +112,15 @@ impl Seen {
                 Self::Found(why("found in Tally, optional"))
             }
             // After an answer that was not clean the verification drops the
-            // edit example, by the next step it writes; so do these words.
+            // edit example, by the next step it writes; so do these words. A
+            // post that landed in part adds a count after that step, so the
+            // step is read by its start.
             ("sent_not_attributed", _)
-                if row["next_step"]
-                    == super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP =>
+                if row["next_step"].as_str().is_some_and(|step| {
+                    step.starts_with(
+                        super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP,
+                    )
+                }) =>
             {
                 Self::NotEstablished(why(
                     "not established: no voucher matching this invoice was found, and one may be in the book",

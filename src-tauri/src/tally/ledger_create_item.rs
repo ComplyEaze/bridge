@@ -22,8 +22,9 @@
 //!
 //! The master tools build it (`agent_master_tools.rs`); nothing else does.
 
+use super::master_name::MasterName;
 use super::VerifiedCompanyIdentity;
-use bridge_tally_core::master_binding::{MasterNameKeys, MAX_NAME_CHARS};
+use bridge_tally_core::master_binding::MasterNameKeys;
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::ledger_create::LedgerCreate;
 use bridge_tally_protocol::{sha256_hex, GstDutyHead};
@@ -32,55 +33,6 @@ use bridge_tally_protocol::{sha256_hex, GstDutyHead};
 /// a sent value (a lab-created master read back with the head as sent); the
 /// others wait for a lab read-back and are added here, one at a time, after it.
 const ADMITTED_DUTY_HEADS: &[GstDutyHead] = &[GstDutyHead::SgstUtgst];
-
-/// A ledger name Bridge will send. See the module doc for why non-ASCII is
-/// refused.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct MasterName(String);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MasterNameError {
-    Empty,
-    NonAscii,
-    ControlCharacter,
-    SurroundingWhitespace,
-    RepeatedSpaces,
-    TooLong,
-}
-
-impl MasterName {
-    /// Refuses, in order: an empty name, any non-ASCII character, any ASCII
-    /// control character (0x00-0x1F, 0x7F), leading or trailing whitespace, a
-    /// run of two or more spaces, and a name over
-    /// `bridge_tally_core::master_binding::MAX_NAME_CHARS`. That cap is the
-    /// existing master-name bound for pathological input, not a measured Tally
-    /// limit.
-    pub(crate) fn new(value: &str) -> Result<Self, MasterNameError> {
-        if value.is_empty() {
-            return Err(MasterNameError::Empty);
-        }
-        if !value.is_ascii() {
-            return Err(MasterNameError::NonAscii);
-        }
-        if value.bytes().any(|b| b.is_ascii_control()) {
-            return Err(MasterNameError::ControlCharacter);
-        }
-        if value.starts_with(' ') || value.ends_with(' ') {
-            return Err(MasterNameError::SurroundingWhitespace);
-        }
-        if value.contains("  ") {
-            return Err(MasterNameError::RepeatedSpaces);
-        }
-        if value.len() > MAX_NAME_CHARS {
-            return Err(MasterNameError::TooLong);
-        }
-        Ok(Self(value.to_string()))
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
-}
 
 /// A GSTIN whose shape and check character both verify: two digits, five
 /// capital letters, four digits, a capital letter, a letter or digit, `Z`, then

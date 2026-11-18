@@ -12,7 +12,7 @@ use super::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
     },
     tdl_engine,
-    validators::{normalize_company_guid, normalize_company_name},
+    validators::{normalize_company_guid, validate_company_name},
     xml_parser::{self, TallyCompany},
     VerifiedCompanyIdentity,
 };
@@ -196,8 +196,9 @@ pub(crate) enum MailingReadDecision {
     /// reference §8.4, lab row 2214).
     ContinueOnceDrained,
     /// The read ran out of time, or past the cap without Tally declaring it, so
-    /// Tally may still be working on it, and no such cut of a mailing read has
-    /// been seen live: the export fails, and nothing is sent again.
+    /// Tally may still be working on it: the export fails, and nothing is sent
+    /// again. A mailing read cut at the time limit has been seen live, owing
+    /// the drain (protocol reference §8.4).
     Refuse,
 }
 
@@ -2172,7 +2173,7 @@ impl TallyClient {
         &self,
         candidate_name: &str,
     ) -> anyhow::Result<TallyCompany> {
-        let candidate_name = normalize_company_name(candidate_name)
+        validate_company_name(candidate_name)
             .map_err(|_| anyhow::anyhow!("Tally direct company candidate was invalid"))?;
         let discovered = self.fetch_companies().await?;
         let candidates = discovered
@@ -2400,16 +2401,16 @@ impl TallyClient {
                 Some(counted) => asked.resolved_for_count(counted, master_mark),
                 None => read,
             };
-            let group_request = render_native_group_snapshot_request(identity.display_name());
+            let group_request = render_native_group_snapshot_request(identity.company_name());
             let part_requests = |read: ComplianceRead| match (&partition, ledgers) {
                 (_, Some(part)) => vec![(
                     render_party_ledger_master_request_for_ledgers(
-                        identity.display_name(),
+                        identity.company_name(),
                         &master_period,
                         part,
                     ),
                     render_native_ledger_snapshot_request_for_ledgers(
-                        identity.display_name(),
+                        identity.company_name(),
                         &balance_period,
                         part,
                     ),
@@ -2418,25 +2419,25 @@ impl TallyClient {
                     match read {
                         ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                             render_party_ledger_master_request(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                         ComplianceRead::WithMailingDetails
                         | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                             render_party_ledger_master_request_with_mailing_details(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                         ComplianceRead::WithGstDetails => {
                             render_party_ledger_master_request_with_gst_details(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                     },
-                    render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
+                    render_native_ledger_snapshot_request(identity.company_name(), &balance_period),
                 )],
                 (Some(partition), None) => partition
                     .parts()
@@ -2446,7 +2447,7 @@ impl TallyClient {
                             match read {
                                 ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                                     render_party_ledger_master_request_for_parents(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
@@ -2454,21 +2455,21 @@ impl TallyClient {
                                 ComplianceRead::WithMailingDetails
                                 | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                                     render_party_ledger_master_request_for_parents_with_mailing_details(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
                                 }
                                 ComplianceRead::WithGstDetails => {
                                     render_party_ledger_master_request_for_parents_with_gst_details(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
                                 }
                             },
                             render_native_ledger_snapshot_request_for_parents(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &balance_period,
                                 part,
                             ),
@@ -3429,11 +3430,14 @@ fn party_ledger_master_closing_period(
     NativeLedgerSnapshotPeriod::new(boundary_profile, books_from, closing_boundary)
 }
 
+/// The name is kept exactly as Tally reported it and is not checked here: a
+/// company whose name a request cannot carry still lists, and its reads
+/// refuse through `validate_company_name` (#2433).
 fn normalize_discovered_companies(companies: Vec<TallyCompany>) -> Result<Vec<TallyCompany>, ()> {
     companies
         .into_iter()
         .map(|company| {
-            let name = normalize_company_name(&company.name).map_err(|_| ())?;
+            let name = company.name;
             let guid = company
                 .guid
                 .as_deref()

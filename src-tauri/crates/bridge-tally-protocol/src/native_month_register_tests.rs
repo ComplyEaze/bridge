@@ -73,7 +73,11 @@ fn each_request_is_byte_equal_to_the_one_the_lab_sent() {
         (MonthRegisterKind::Purchase, PURCHASE_REQUEST),
     ] {
         assert_eq!(
-            render_native_month_register_request(kind, "BRIDGE PILOT LAB", &year()),
+            render_native_month_register_request(
+                kind,
+                &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
+                &year()
+            ),
             decode_xml_bytes(request).unwrap(),
             "{kind:?}"
         );

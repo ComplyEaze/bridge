@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { formatCommandErrorMessage } from "./tally-command-error";
 
-type Company = { name: string; guid: string; company_number: string; books_from_yyyymmdd: string; canonical_origin: string };
+type Company = { name: string; shown_name: string; guid: string; company_number: string; books_from_yyyymmdd: string; canonical_origin: string };
 type Entry = { ledger: string; amount: string; is_deemed_positive: "Yes" | "No"; polarity_disagrees_with_amount?: boolean };
 
 // The side comes from the amount's own sign, never from is_deemed_positive. That
@@ -21,7 +21,7 @@ type Voucher = { date: string; voucher_number?: string | null; voucher_type: str
 type ReadEvidence = { state: "complete" | "partial"; reason_code?: string | null; read_at?: string | null; duration_ms?: number | null; bytes: number };
 type Result = { state: "complete" | "partial"; reason?: string | null; items: Voucher[]; offset: number; total: number; profile: string };
 type Response = { company: unknown; read_at: string; evidence: ReadEvidence; truncated: boolean; result: Result };
-type ObservationScope = { companyName: string; ledger: string; from: string; to: string };
+type ObservationScope = { companyShownName: string; ledger: string; from: string; to: string };
 
 export function LedgerEntriesScreen({ config, company, locked, onReadActivity }: {
   config: { host: string; port: number }; company?: Company; locked: boolean; onReadActivity: (delta: 1 | -1) => void;
@@ -58,7 +58,7 @@ export function LedgerEntriesScreen({ config, company, locked, onReadActivity }:
       }});
       if (version === requestVersion.current && submittedScope === latestScope.current) {
         setResponse(next);
-        setObservationScope({ companyName: company.name, ledger: ledger.trim(), from, to });
+        setObservationScope({ companyShownName: company.shown_name, ledger: ledger.trim(), from, to });
       }
     } catch (cause) {
       if (version === requestVersion.current && submittedScope === latestScope.current) setError(operatorMessage(cause));
@@ -79,7 +79,7 @@ export function LedgerEntriesScreen({ config, company, locked, onReadActivity }:
     </form>
     {error && <p className="ledger-investigation-error" role="alert">{error}</p>}
     {result && <>
-      <p className="ledger-investigation-provenance">Observed {formatObservedAt(response.read_at)} for {observationScope?.companyName}; requested ledger {observationScope?.ledger}, {formatDateInput(observationScope?.from)} to {formatDateInput(observationScope?.to)}.</p>
+      <p className="ledger-investigation-provenance">Observed {formatObservedAt(response.read_at)} for {observationScope?.companyShownName}; requested ledger {observationScope?.ledger}, {formatDateInput(observationScope?.from)} to {formatDateInput(observationScope?.to)}.</p>
       <p className="ledger-investigation-scope" role="status">{result.total === 0 ? "This observation contained no matching vouchers; it does not establish source completeness." : `${result.total} matching voucher${result.total === 1 ? "" : "s"} observed in this response.`}{response?.evidence.state === "partial" ? ` Source evidence is partial${response.evidence.reason_code ? ` (${response.evidence.reason_code})` : ""}.` : ""}</p>
       {result.total > 0 && result.items.length === 0 && <p>This observation has no entries at this offset. Start again from the first entries.</p>}
       {result.items.length > 0 && <div className="ledger-entry-list">{result.items.map((voucher, index) => <details key={voucher.guid ?? `${voucher.date}-${voucher.voucher_number ?? index}`}><summary><span>{formatDate(voucher.date)}</span><strong>{voucher.voucher_type}{voucher.voucher_number ? ` · ${voucher.voucher_number}` : ""}</strong><span>{voucher.party ?? "No party"}</span></summary><div className="ledger-entry-detail">{voucher.narration && <p>{voucher.narration}</p>}<p className="ledger-entry-lines-heading">Voucher entries and counterpart lines</p><dl>{voucher.amounts.map((entry, entryIndex) => <div key={`${entry.ledger}-${entryIndex}`}><dt>{entry.ledger}</dt><dd>{entry.amount} · {entrySide(entry)}{entry.polarity_disagrees_with_amount && <span className="ledger-entry-note" title="Tally's ISDEEMEDPOSITIVE flag disagrees with the amount's sign on this entry. The amount is authoritative."> · flag disagrees</span>}</dd></div>)}</dl>{(voucher.cancelled || voucher.optional) && <p>Accounting state: {[voucher.cancelled && "cancelled", voucher.optional && "optional"].filter(Boolean).join(" and ")}.</p>}</div></details>)}</div>}

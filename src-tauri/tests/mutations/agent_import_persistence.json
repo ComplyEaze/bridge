@@ -1,0 +1,1078 @@
+{
+  "file": "src-tauri/src/agent_import_persistence.rs",
+  "base_commit": "7a3c9e49",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS: code compiled only off Unix was not measured by any run here. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again). A tool mutant that survived was run again in the whole_set and survivors_again runs as the same edit written as text, under the id named in its run's command.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2193,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_persistence.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|persist/)'",
+      "time": "2026-11-11T04:36:14Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 440,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/persistence|ack|master_ledger|stop/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5044,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5044, for the tool's six missed mutants (T1 is 36:27, T2 37:29, T3 40:31, T4 42:37, T5 77:23 and T6 263:23) and the eleven hand-written ones the filtered run missed; none was caught there",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5051,
+      "command": "as the whole_set run, for the seventeen still missed there",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 32,
+      "missed": 3,
+      "unviable": 4
+    },
+    "hand": {
+      "caught": 57,
+      "missed": 4
+    },
+    "survived_at_base": {
+      "tool": 6,
+      "hand": 11
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 0
+    },
+    "accepted_not_equivalent": {
+      "tool": 3,
+      "hand": 4
+    }
+  },
+  "tool_results": {
+    "12:5 replace create_transaction -> std::io::Result<()> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks",
+      "killer_at": "base"
+    },
+    "30:5 replace require_settled -> Result<(), String> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_stays_built_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "36:27 replace match guard error.kind() == std::io::ErrorKind::NotFound with true in require_settled": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_marker_name_whose_state_cannot_be_read_refuses",
+      "killer_at": "this_commit"
+    },
+    "36:27 replace match guard error.kind() == std::io::ErrorKind::NotFound with false in require_settled": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_naming_a_ledger_that_ends_in_a_line_break_is_refused_on_the_desktop",
+      "killer_at": "base"
+    },
+    "37:29 replace match guard metadata.is_dir() with true in require_settled": {
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "37:29 replace match guard metadata.is_dir() with false in require_settled": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_stays_built_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "36:40 replace == with != in require_settled": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_naming_a_ledger_that_ends_in_a_line_break_is_refused_on_the_desktop",
+      "killer_at": "base"
+    },
+    "40:31 replace match guard error.kind() == std::io::ErrorKind::NotFound with true in require_settled": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks",
+      "killer_at": "base"
+    },
+    "40:31 replace match guard error.kind() == std::io::ErrorKind::NotFound with false in require_settled": {
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "40:44 replace == with != in require_settled": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks",
+      "killer_at": "base"
+    },
+    "42:37 replace != with == in require_settled": {
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "56:5 replace os_cause -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "56:5 replace os_cause -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "70:5 replace clear_transaction -> Result<(), String> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "77:23 replace match guard retry.kind() == std::io::ErrorKind::NotFound with true in clear_transaction": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "77:23 replace match guard retry.kind() == std::io::ErrorKind::NotFound with false in clear_transaction": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_folder_gone_when_the_removal_fails_counts_as_removed",
+      "killer_at": "this_commit"
+    },
+    "77:36 replace == with != in clear_transaction": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "83:5 replace clear_transaction_folder -> Result<(), String> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "102:5 replace persist_build -> Result<Persisted, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "120:5 replace persist_build_with_stage -> Result<Persisted, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "143:23 replace match guard error == \"import_ledger_rollback_failed\" with true in persist_build_with_stage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_rolled_back_build_whose_folder_stays_keeps_its_recovery_id_and_settles_once_empty",
+      "killer_at": "base"
+    },
+    "143:23 replace match guard error == \"import_ledger_rollback_failed\" with false in persist_build_with_stage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::uncertain_build_retains_xml_journal_and_exact_recovery_error",
+      "killer_at": "base"
+    },
+    "143:29 replace == with != in persist_build_with_stage": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_rolled_back_build_whose_folder_stays_keeps_its_recovery_id_and_settles_once_empty",
+      "killer_at": "base"
+    },
+    "184:5 replace publish_proofs -> Result<ledger::ProofName, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "209:5 replace publish_proofs_syncing -> Result<ledger::ProofName, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "238:23 replace match guard error == \"import_ledger_rollback_failed\" with true in publish_proofs_syncing": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "238:23 replace match guard error == \"import_ledger_rollback_failed\" with false in publish_proofs_syncing": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::an_append_of_unknown_outcome_keeps_its_marker_and_blocks_import_admission",
+      "killer_at": "base"
+    },
+    "238:29 replace == with != in publish_proofs_syncing": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "258:5 replace write_new_file -> Result<(), String> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "263:23 replace match guard error.kind() == std::io::ErrorKind::AlreadyExists with true in write_new_file": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_proof_file_that_cannot_be_created_is_a_write_failure",
+      "killer_at": "this_commit"
+    },
+    "263:23 replace match guard error.kind() == std::io::ErrorKind::AlreadyExists with false in write_new_file": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "263:36 replace == with != in write_new_file": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "264:29 replace match guard existing == bytes with true in write_new_file": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "264:29 replace match guard existing == bytes with false in write_new_file": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "264:38 replace == with != in write_new_file": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "291:5 replace write_record_once -> Result<(), RecordOnce> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded",
+      "killer_at": "base"
+    },
+    "300:5 replace write_record_once_syncing -> Result<(), RecordOnce> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded",
+      "killer_at": "base"
+    },
+    "313:33 replace == with != in write_record_once_syncing": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded",
+      "killer_at": "base"
+    },
+    "325:5 replace sync_directory -> std::io::Result<()> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_directory_that_cannot_be_opened_reports_its_error",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "H01": {
+      "what": "create_transaction: a folder already there is accepted",
+      "edits": [
+        {
+          "from": "builder.recursive(false);",
+          "to": "builder.recursive(true);"
+        }
+      ],
+      "mutation": "8edbd7c8ab66fd46010455d928ce127a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::an_older_builds_interrupted_publication_still_blocks_and_is_never_touched",
+      "killer_at": "base"
+    },
+    "H02": {
+      "what": "create_transaction: the folder is readable by others",
+      "edits": [
+        {
+          "from": "builder.mode(0o700);",
+          "to": "builder.mode(0o755);"
+        }
+      ],
+      "mutation": "827d28da34fe520e44a330a5622133c9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_transaction_folder_is_open_to_its_owner_alone",
+      "killer_at": "this_commit"
+    },
+    "H03": {
+      "what": "require_settled: the build's marker is not checked",
+      "edits": [
+        {
+          "from": "        (TRANSACTION, \"proof_publication_recovery_required\"),\n        (BUILD_TRANSACTION, \"import_publication_recovery_required\"),\n",
+          "to": "        (TRANSACTION, \"proof_publication_recovery_required\"),\n"
+        }
+      ],
+      "mutation": "b1f4aa6d2f6ddd0bbce3d2537fbd5f84",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_stays_built_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "H04": {
+      "what": "require_settled: the proof marker is not checked",
+      "edits": [
+        {
+          "from": "        (TRANSACTION, \"proof_publication_recovery_required\"),\n        (BUILD_TRANSACTION, \"import_publication_recovery_required\"),\n",
+          "to": "        (BUILD_TRANSACTION, \"import_publication_recovery_required\"),\n"
+        }
+      ],
+      "mutation": "e4428085a2226c070b29f5a675ca4916",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_whole_proof_record_stays_published_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "H05": {
+      "what": "require_settled: the proof marker refuses with the build's code",
+      "edits": [
+        {
+          "from": "(TRANSACTION, \"proof_publication_recovery_required\"),",
+          "to": "(TRANSACTION, \"import_publication_recovery_required\"),"
+        }
+      ],
+      "mutation": "324de40f9e29dbf7894c8b6abd7f56d2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::admission_clears_only_an_empty_transaction_folder",
+      "killer_at": "base"
+    },
+    "H06": {
+      "what": "require_settled: the build's marker refuses with the proof code",
+      "edits": [
+        {
+          "from": "(BUILD_TRANSACTION, \"import_publication_recovery_required\"),",
+          "to": "(BUILD_TRANSACTION, \"proof_publication_recovery_required\"),"
+        }
+      ],
+      "mutation": "59ab0704fb995bbbe6c77ecb8e8f31b7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks",
+      "killer_at": "base"
+    },
+    "H07": {
+      "what": "require_settled: a link at the marker's name is followed",
+      "edits": [
+        {
+          "from": "match fs::symlink_metadata(&path) {",
+          "to": "match fs::metadata(&path) {"
+        }
+      ],
+      "mutation": "140061d1b8f666e2757e2a8dbbe0a726",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_link_at_a_marker_name_refuses_even_when_it_leads_nowhere",
+      "killer_at": "this_commit"
+    },
+    "H08": {
+      "what": "require_settled: a marker holding anything is removed with its contents",
+      "edits": [
+        {
+          "from": "Ok(metadata) if metadata.is_dir() => match fs::remove_dir(&path) {",
+          "to": "Ok(metadata) if metadata.is_dir() => match fs::remove_dir_all(&path) {"
+        }
+      ],
+      "mutation": "3cc6571b2ba15cfae981ec2c8762e932",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks",
+      "killer_at": "base"
+    },
+    "H09": {
+      "what": "require_settled: a marker another holder removed first refuses",
+      "edits": [
+        {
+          "from": "                Ok(()) => {}\n                // Another shared holder removed it first.\n                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}\n",
+          "to": "                Ok(()) => {}\n"
+        }
+      ],
+      "mutation": "fceecc8d19a116ac020ac5e3f4b9cb86",
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "H10": {
+      "what": "require_settled: a marker that could not be removed refuses nothing",
+      "edits": [
+        {
+          "from": "                    return Err(error_code.into());\n                }\n            },",
+          "to": "                }\n            },"
+        }
+      ],
+      "mutation": "7e837700ff613fce2db54c60acf713cd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks",
+      "killer_at": "base"
+    },
+    "H11": {
+      "what": "require_settled: something other than a folder at the marker's name refuses nothing",
+      "edits": [
+        {
+          "from": "            _ => return Err(error_code.into()),",
+          "to": "            _ => {}"
+        }
+      ],
+      "mutation": "320b6df73d0a68e89d8e4e7f3cb47616",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::admission_clears_only_an_empty_transaction_folder",
+      "killer_at": "base"
+    },
+    "H12": {
+      "what": "os_cause: an OS error is named by its kind, not its number",
+      "edits": [
+        {
+          "from": "Some(code) => format!(\"os error {code}\"),",
+          "to": "Some(_) => format!(\"{:?}\", error.kind()),"
+        }
+      ],
+      "mutation": "df89080cca3b77afcf1f2c4d27c2526d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "H13": {
+      "what": "os_cause: an error with no number is named by its text",
+      "edits": [
+        {
+          "from": "None => format!(\"{:?}\", error.kind()),",
+          "to": "None => error.to_string(),"
+        }
+      ],
+      "mutation": "357ea869927dcebd1acb52be940b95f6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::os_cause_names_the_number_or_the_kind_and_no_text",
+      "killer_at": "base"
+    },
+    "H14": {
+      "what": "clear_transaction: no plain rmdir follows a failed removal",
+      "edits": [
+        {
+          "from": "    match fs::remove_dir(path) {\n        Ok(()) => Ok(()),\n        Err(retry) if retry.kind() == std::io::ErrorKind::NotFound => Ok(()),\n        Err(_) => Err(cause),\n    }",
+          "to": "    Err(cause)"
+        }
+      ],
+      "mutation": "6bf537c98664f694860a250ed8b922f0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "H15": {
+      "what": "clear_transaction: the retry removes the folder with its contents",
+      "edits": [
+        {
+          "from": "    match fs::remove_dir(path) {\n        Ok(()) => Ok(()),",
+          "to": "    match fs::remove_dir_all(path) {\n        Ok(()) => Ok(()),"
+        }
+      ],
+      "mutation": "ad76567328c4d46a197e6a9bea0378f7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "H16": {
+      "what": "clear_transaction: a folder gone by the retry is reported as left",
+      "edits": [
+        {
+          "from": "        Err(retry) if retry.kind() == std::io::ErrorKind::NotFound => Ok(()),\n",
+          "to": ""
+        }
+      ],
+      "mutation": "be39d0b620d26491e3ab228c3e194674",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_folder_gone_when_the_removal_fails_counts_as_removed",
+      "killer_at": "this_commit"
+    },
+    "H17": {
+      "what": "clear_transaction: the error kept is the retry's, not the first",
+      "edits": [
+        {
+          "from": "        Err(_) => Err(cause),",
+          "to": "        Err(retry) => Err(os_cause(&retry)),"
+        }
+      ],
+      "mutation": "27b2470520dd8ce8138e97978578ed79",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_plain_rmdir_follows_a_failed_removal_and_only_an_empty_folder_goes",
+      "killer_at": "base"
+    },
+    "H18": {
+      "what": "clear_transaction_folder: the folder is removed only when empty",
+      "edits": [
+        {
+          "from": "clear_transaction(path, |path| fs::remove_dir_all(path))",
+          "to": "clear_transaction(path, |path| fs::remove_dir(path))"
+        }
+      ],
+      "mutation": "f790c9d4f975cc1219bb885427fe0a77",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_stays_built_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "H19": {
+      "what": "persist_build: a build marker already there is accepted",
+      "edits": [
+        {
+          "from": "    create_transaction(&transaction)\n        .map_err(|_| \"import_publication_recovery_required\".to_string())?;\n    let publication",
+          "to": "    let _ = create_transaction(&transaction);\n    let publication"
+        }
+      ],
+      "mutation": "3fafb9c15a2d19e1ff36b100ecfef441",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_build_finding_its_marker_already_there_refuses_and_leaves_it",
+      "killer_at": "this_commit"
+    },
+    "H20": {
+      "what": "persist_build: a build marker already there refuses with the proof code",
+      "edits": [
+        {
+          "from": "    create_transaction(&transaction)\n        .map_err(|_| \"import_publication_recovery_required\".to_string())?;\n    let publication",
+          "to": "    create_transaction(&transaction)\n        .map_err(|_| \"proof_publication_recovery_required\".to_string())?;\n    let publication"
+        }
+      ],
+      "mutation": "59ee2d2e34548bea0faa71c30511e1ce",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_build_finding_its_marker_already_there_refuses_and_leaves_it",
+      "killer_at": "this_commit"
+    },
+    "H21": {
+      "what": "persist_build: the batch record is not written into the marker",
+      "edits": [
+        {
+          "from": "        write_private(\n            &transaction.join(\"update.json\"),\n            &serde_json::to_vec_pretty(line)\n                .map_err(|_| \"import_ledger_serialization_failed\".to_string())?,\n        )?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "73eea9a310b313fab9675735fe03019d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_stays_built_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "H22": {
+      "what": "persist_build: the XML is staged at its importable name",
+      "edits": [
+        {
+          "from": "        stage_xml(&staged_xml, xml)?;\n        fs::rename(&staged_xml, &path)",
+          "to": "        stage_xml(&path, xml)?;\n        fs::rename(&path, &path)"
+        }
+      ],
+      "mutation": "18afa2c50fb74ef9ec8b779049d36f34",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::partial_xml_stage_keeps_a_journal_and_never_exposes_the_importable_name",
+      "killer_at": "base"
+    },
+    "H23": {
+      "what": "persist_build: a failed publication is an error, not incomplete",
+      "edits": [
+        {
+          "from": "        return Ok(Persisted::Incomplete(error));",
+          "to": "        return Err(error);"
+        }
+      ],
+      "mutation": "d02b5e4de9d20046707dd250de85a890",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::partial_xml_stage_keeps_a_journal_and_never_exposes_the_importable_name",
+      "killer_at": "base"
+    },
+    "H24": {
+      "what": "persist_build: a failed rollback is handled as any failed append",
+      "edits": [
+        {
+          "from": "        Err(error) if error == \"import_ledger_rollback_failed\" => Ok(Persisted::Incomplete(error)),\n",
+          "to": ""
+        }
+      ],
+      "mutation": "f6591300c4f8013eb33b381272327b4a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::uncertain_build_retains_xml_journal_and_exact_recovery_error",
+      "killer_at": "base"
+    },
+    "H25": {
+      "what": "persist_build: a failed rollback reports the recovery code, not its own",
+      "edits": [
+        {
+          "from": "Err(error) if error == \"import_ledger_rollback_failed\" => Ok(Persisted::Incomplete(error)),",
+          "to": "Err(error) if error == \"import_ledger_rollback_failed\" => Ok(recovery()),"
+        }
+      ],
+      "mutation": "edf3047e7952c9051ae568074183aa2e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::uncertain_build_retains_xml_journal_and_exact_recovery_error",
+      "killer_at": "base"
+    },
+    "H26": {
+      "what": "persist_build: an XML that could not be removed after a failed append is passed over",
+      "edits": [
+        {
+          "from": "            if fs::remove_file(&path).is_err() {\n                return Ok(recovery());\n            }\n",
+          "to": "            let _ = fs::remove_file(&path);\n"
+        }
+      ],
+      "mutation": "f206cdbde99fb266be41c1e1fc9e6b56",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::failed_xml_cleanup_retains_its_journal_and_recovery_id",
+      "killer_at": "base"
+    },
+    "H27": {
+      "what": "persist_build: the XML is not removed after a failed append",
+      "edits": [
+        {
+          "from": "            if fs::remove_file(&path).is_err() {\n                return Ok(recovery());\n            }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "4da241dca682a1a7a47139f14239f05f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_rolled_back_build_whose_folder_stays_keeps_its_recovery_id_and_settles_once_empty",
+      "killer_at": "base"
+    },
+    "H28": {
+      "what": "persist_build: a marker that stays after a failed append is passed over",
+      "edits": [
+        {
+          "from": "                Err(_) => Ok(recovery()),",
+          "to": "                Err(_) => Err(error),"
+        }
+      ],
+      "mutation": "f1eaedd24583ad4111f531e2900cc1e0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_rolled_back_build_whose_folder_stays_keeps_its_recovery_id_and_settles_once_empty",
+      "killer_at": "base"
+    },
+    "H29": {
+      "what": "persist_build: a failed append rolled back whole is reported incomplete",
+      "edits": [
+        {
+          "from": "                Ok(()) => Err(error),",
+          "to": "                Ok(()) => Ok(Persisted::Incomplete(error)),"
+        }
+      ],
+      "mutation": "3f2b3f245e923daa0fcc943277b076fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::confirmed_build_rollback_removes_only_the_uncommitted_batch",
+      "killer_at": "base"
+    },
+    "H30": {
+      "what": "persist_build: a built batch never says why its folder stays",
+      "edits": [
+        {
+          "from": "            folder_left: clear(&transaction).err(),",
+          "to": "            folder_left: {\n                let _ = clear(&transaction);\n                None\n            },"
+        }
+      ],
+      "mutation": "2c4f867eb153f10a24cdb2cdd492be64",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_stays_built_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "H31": {
+      "what": "persist_build: a built batch's folder is not removed",
+      "edits": [
+        {
+          "from": "            folder_left: clear(&transaction).err(),",
+          "to": "            folder_left: None,"
+        }
+      ],
+      "mutation": "5d5b218f78aefc1e185c4bfa1bc5950f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_committed_build_with_its_record_still_in_the_folder_stays_built_and_blocks",
+      "killer_at": "base"
+    },
+    "H32": {
+      "what": "persist_build: the recovery takes another code",
+      "edits": [
+        {
+          "from": "Persisted::Incomplete(\"import_publication_recovery_required\".into())",
+          "to": "Persisted::Incomplete(\"import_file_write_failed\".into())"
+        }
+      ],
+      "mutation": "0b93dbe55016d700007c8ccbf36de1f9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_rolled_back_build_whose_folder_stays_keeps_its_recovery_id_and_settles_once_empty",
+      "killer_at": "base"
+    },
+    "H33": {
+      "what": "publish_proofs: no step before the JSON",
+      "edits": [
+        {
+          "from": "    before(PublicationStep::WriteJson)?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "8dce218b0bd06558091d08fca244741e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H34": {
+      "what": "publish_proofs: no step before the Markdown",
+      "edits": [
+        {
+          "from": "    before(PublicationStep::WriteMarkdown)?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "7fcd747129b835bd38a814859881de15",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H35": {
+      "what": "publish_proofs: the step before the Markdown is named as the JSON",
+      "edits": [
+        {
+          "from": "    before(PublicationStep::WriteMarkdown)?;\n",
+          "to": "    before(PublicationStep::WriteJson)?;\n"
+        }
+      ],
+      "mutation": "edce8cdea0da52846e98df428c5cf4b2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H36": {
+      "what": "publish_proofs: no step before the marker",
+      "edits": [
+        {
+          "from": "    before(PublicationStep::MarkAppend)?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "ffd43b9bcd5c5793daa840e599b2eb7b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H37": {
+      "what": "publish_proofs: no step before the append",
+      "edits": [
+        {
+          "from": "        before(PublicationStep::AppendStatus)?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "6866695586b2de70af9589bceca0b6f1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H38": {
+      "what": "publish_proofs: the Markdown is written to the JSON's name",
+      "edits": [
+        {
+          "from": "        &imports.join(name.markdown_file(&update.batch_id)),",
+          "to": "        &imports.join(name.json_file(&update.batch_id)),"
+        }
+      ],
+      "mutation": "107ab53d203b36b82976278be5bbf9bb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H39": {
+      "what": "publish_proofs: a failed directory sync is passed over",
+      "edits": [
+        {
+          "from": "    sync(imports).map_err(|_| \"import_file_write_failed\".to_string())?;",
+          "to": "    let _ = sync(imports);"
+        }
+      ],
+      "mutation": "11e5fe966bbd9a7d6c0599d770d42e9d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_pair_whose_directory_cannot_be_synced_is_refused_before_any_record_names_it",
+      "killer_at": "base"
+    },
+    "H40": {
+      "what": "publish_proofs: a failed directory sync takes another code",
+      "edits": [
+        {
+          "from": "    sync(imports).map_err(|_| \"import_file_write_failed\".to_string())?;",
+          "to": "    sync(imports).map_err(|_| \"proof_publication_failed\".to_string())?;"
+        }
+      ],
+      "mutation": "793d9ccbfc11e9f8ad88086aa4f8837d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_pair_whose_directory_cannot_be_synced_is_refused_before_any_record_names_it",
+      "killer_at": "base"
+    },
+    "H41": {
+      "what": "publish_proofs: the record names a pair other than the one written",
+      "edits": [
+        {
+          "from": "let record = ledger::StatusRecord::verified(update, name.clone());",
+          "to": "let record = ledger::StatusRecord::verified(update, ledger::ProofName::of(markdown, Utc::now()));"
+        }
+      ],
+      "mutation": "e24f069d470d83cf7593ca2a1c4bf4b8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_stop_at_any_step_keeps_every_earlier_file_and_blocks_only_inside_the_append",
+      "killer_at": "base"
+    },
+    "H42": {
+      "what": "publish_proofs: a proof marker already there is accepted",
+      "edits": [
+        {
+          "from": "    create_transaction(&transaction)\n        .map_err(|_| \"proof_publication_recovery_required\".to_string())?;\n    let appended",
+          "to": "    let _ = create_transaction(&transaction);\n    let appended"
+        }
+      ],
+      "mutation": "c1fd8945fde703483908b2fc18a695df",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::an_older_builds_interrupted_publication_still_blocks_and_is_never_touched",
+      "killer_at": "base"
+    },
+    "H43": {
+      "what": "publish_proofs: a proof marker already there refuses with the build's code",
+      "edits": [
+        {
+          "from": "    create_transaction(&transaction)\n        .map_err(|_| \"proof_publication_recovery_required\".to_string())?;\n    let appended",
+          "to": "    create_transaction(&transaction)\n        .map_err(|_| \"import_publication_recovery_required\".to_string())?;\n    let appended"
+        }
+      ],
+      "mutation": "6b51a74ee2ed597a122882ac5ccd6dbd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::an_older_builds_interrupted_publication_still_blocks_and_is_never_touched",
+      "killer_at": "base"
+    },
+    "H44": {
+      "what": "publish_proofs: the status record is not written into the marker",
+      "edits": [
+        {
+          "from": "        write_private(\n            &transaction.join(\"update.json\"),\n            &serde_json::to_vec_pretty(&record)\n                .map_err(|_| \"proof_serialization_failed\".to_string())?,\n        )?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "1105b1d389f3754795e04fb91b7b6be0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_whole_proof_record_stays_published_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "H45": {
+      "what": "publish_proofs: a failed rollback reports the append's own error",
+      "edits": [
+        {
+          "from": "            Err(\"proof_publication_rollback_failed\".into())",
+          "to": "            Err(error)"
+        }
+      ],
+      "mutation": "b0bea7b1ef34687e8ddffbe09a8e2e0a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::an_append_of_unknown_outcome_keeps_its_marker_and_blocks_import_admission",
+      "killer_at": "base"
+    },
+    "H46": {
+      "what": "publish_proofs: a failed rollback clears the marker",
+      "edits": [
+        {
+          "from": "            Err(\"proof_publication_rollback_failed\".into())\n        }",
+          "to": "            let _ = clear(&transaction);\n            Err(\"proof_publication_rollback_failed\".into())\n        }"
+        }
+      ],
+      "mutation": "6ad1e11c12b756595d1fcf1acbc84a3b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::an_append_of_unknown_outcome_keeps_its_marker_and_blocks_import_admission",
+      "killer_at": "base"
+    },
+    "H47": {
+      "what": "publish_proofs: a failed append keeps its marker",
+      "edits": [
+        {
+          "from": "            clear(&transaction).map_err(|_| \"proof_publication_recovery_required\".to_string())?;\n            Err(error)",
+          "to": "            Err(error)"
+        }
+      ],
+      "mutation": "7195e2d53742d39c3b088aa806131d2f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H48": {
+      "what": "publish_proofs: a marker that stays after a failed append is passed over",
+      "edits": [
+        {
+          "from": "            clear(&transaction).map_err(|_| \"proof_publication_recovery_required\".to_string())?;\n            Err(error)",
+          "to": "            let _ = clear(&transaction);\n            Err(error)"
+        }
+      ],
+      "mutation": "5b3f0804a8a30a466046dda46fe1c992",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_failed_proof_append_whose_marker_stays_reports_the_recovery",
+      "killer_at": "this_commit"
+    },
+    "H49": {
+      "what": "publish_proofs: a whole record whose marker stays is reported as failed",
+      "edits": [
+        {
+          "from": "            let _ = clear(&transaction);\n            Ok(name)",
+          "to": "            clear(&transaction)?;\n            Ok(name)"
+        }
+      ],
+      "mutation": "41be455433a47ab720c72704affb0f41",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_whole_proof_record_stays_published_when_its_folder_cannot_be_removed",
+      "killer_at": "base"
+    },
+    "H50": {
+      "what": "publish_proofs: the marker is not removed after a whole record",
+      "edits": [
+        {
+          "from": "            let _ = clear(&transaction);\n            Ok(name)",
+          "to": "            Ok(name)"
+        }
+      ],
+      "mutation": "ca776e94e358290bbf0e6bd361fd6b26",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing",
+      "killer_at": "base"
+    },
+    "H51": {
+      "what": "write_new_file: the same bytes already there are refused",
+      "edits": [
+        {
+          "from": "Ok(existing) if existing == bytes => Ok(()),",
+          "to": "Ok(existing) if existing == bytes && existing.is_empty() => Ok(()),"
+        }
+      ],
+      "mutation": "bb362b6e54fb8646ab192c8a674521dc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "H52": {
+      "what": "write_new_file: any file already there is accepted",
+      "edits": [
+        {
+          "from": "Ok(existing) if existing == bytes => Ok(()),",
+          "to": "Ok(_) => Ok(()),"
+        }
+      ],
+      "mutation": "1ca9cc1789f4d63723d56ff7806a8be3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "H53": {
+      "what": "write_new_file: another file already there takes the write-failure code",
+      "edits": [
+        {
+          "from": "            _ => Err(\"proof_publication_failed\".into()),",
+          "to": "            _ => Err(\"import_file_write_failed\".into()),"
+        }
+      ],
+      "mutation": "0e7579195e9055d0d2c6047cec9ad870",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_proof_name_never_takes_a_file_already_there",
+      "killer_at": "base"
+    },
+    "H54": {
+      "what": "write_new_file: a file that cannot be created takes the publication-failure code",
+      "edits": [
+        {
+          "from": "        Err(_) => Err(\"import_file_write_failed\".into()),\n    }\n}\n\n/// Why a record",
+          "to": "        Err(_) => Err(\"proof_publication_failed\".into()),\n    }\n}\n\n/// Why a record"
+        }
+      ],
+      "mutation": "d086525f1928e14f175303714c73f547",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::persistence::tests::a_proof_file_that_cannot_be_created_is_a_write_failure",
+      "killer_at": "this_commit"
+    },
+    "H55": {
+      "what": "write_record_once: a stage that did not write is left",
+      "edits": [
+        {
+          "from": "    if write_private(&staged, bytes).is_err() {\n        let _ = fs::remove_file(&staged);\n",
+          "to": "    if write_private(&staged, bytes).is_err() {\n"
+        }
+      ],
+      "mutation": "1ea7a10b85ada6277d1cb51c3a10eff7",
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "H56": {
+      "what": "write_record_once: the record replaces one already there",
+      "edits": [
+        {
+          "from": "match crate::local_files::file::rename_new(&staged, path) {",
+          "to": "match fs::rename(&staged, path) {"
+        }
+      ],
+      "mutation": "299b8bb8d031d90ee2c69c30055cd3cb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded",
+      "killer_at": "base"
+    },
+    "H57": {
+      "what": "write_record_once: a failed directory sync is passed over",
+      "edits": [
+        {
+          "from": "            sync(path.parent().unwrap_or(path)).map_err(|_| RecordOnce::Failed)",
+          "to": "            let _ = sync(path.parent().unwrap_or(path));\n            Ok(())"
+        }
+      ],
+      "mutation": "709548b81f4f563d8ebf67a27b0b9840",
+      "verdict": "caught",
+      "killer": "agent::agent_import::persistence::tests::a_record_placed_whole_but_not_known_durable_reports_failure_and_a_retry_finds_it",
+      "killer_at": "base"
+    },
+    "H58": {
+      "what": "write_record_once: a stage that was not placed is left",
+      "edits": [
+        {
+          "from": "        Err(error) => {\n            let _ = fs::remove_file(&staged);\n",
+          "to": "        Err(error) => {\n"
+        }
+      ],
+      "mutation": "d3f54b46ea9ee19fd140bf886791e62c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_ledger::tests::the_pre_image_is_sorted_lower_case_and_round_trips_through_its_sidecar",
+      "killer_at": "base"
+    },
+    "H59": {
+      "what": "write_record_once: a record already there is reported as a failure",
+      "edits": [
+        {
+          "from": "                RecordOnce::Exists\n            } else {",
+          "to": "                RecordOnce::Failed\n            } else {"
+        }
+      ],
+      "mutation": "3344a35e72cb9bb591caf09d324b429e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded",
+      "killer_at": "base"
+    },
+    "H60": {
+      "what": "write_record_once: any failed rename is reported as a record already there",
+      "edits": [
+        {
+          "from": "            } else {\n                RecordOnce::Failed\n            })",
+          "to": "            } else {\n                RecordOnce::Exists\n            })"
+        }
+      ],
+      "mutation": "8aba3e86fb509fb5a2fef72d3fb6cd03",
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "H61": {
+      "what": "sync_directory: off Unix it fails",
+      "edits": [
+        {
+          "from": "        let _ = directory;\n        Ok(())",
+          "to": "        let _ = directory;\n        Err(std::io::Error::from(std::io::ErrorKind::Unsupported))"
+        }
+      ],
+      "mutation": "c66e58d895e93bc18aecfe38ca31caa5",
+      "verdict": "missed",
+      "equivalent": false
+    }
+  },
+  "accepted_survivors": {
+    "37:29 replace match guard metadata.is_dir() with true in require_settled": {
+      "reason": "not killed, and not equivalent: with the guard true, anything at the marker name that is not a folder reaches fs::remove_dir, which fails on it, and the inner arm refuses with the same code. What differs is a line on stderr naming the OS error by its number, and no test reads stderr"
+    },
+    "40:31 replace match guard error.kind() == std::io::ErrorKind::NotFound with false in require_settled": {
+      "reason": "not killed, and not equivalent: the arm runs only when another holder of the shared admission lock removes the empty folder between this holder's symlink_metadata and its remove_dir. Under this mutant that holder refuses although the folder is gone, and the next admission passes. No test can place that interleaving: require_settled has no seam between the two calls"
+    },
+    "42:37 replace != with == in require_settled": {
+      "reason": "not killed, and not equivalent: only which failed removals write a line to stderr changes (a folder still holding something, instead of every other cause); the refusal is the same, and no test reads stderr"
+    },
+    "H09": {
+      "mutation": "fceecc8d19a116ac020ac5e3f4b9cb86",
+      "reason": "not killed, and not equivalent: the arm runs only when another holder of the shared admission lock removes the empty folder between this holder's symlink_metadata and its remove_dir. Under this mutant that holder refuses although the folder is gone, and the next admission passes. No test can place that interleaving: require_settled has no seam between the two calls"
+    },
+    "H55": {
+      "mutation": "1ea7a10b85ada6277d1cb51c3a10eff7",
+      "reason": "not killed, and not equivalent: a stage is left only when write_private fails after creating it, as a write or sync failing part-way on a full disk does. A stage that could not be created leaves nothing to remove, and no test can make the write fail after the create"
+    },
+    "H60": {
+      "mutation": "8aba3e86fb509fb5a2fef72d3fb6cd03",
+      "reason": "not killed, and not equivalent: the rename into the record's own directory fails for a cause other than an existing name only where the stage write into that directory would have failed first (a missing or unwritable directory), or on an I/O error no test can bring about. Under this mutant such a failure is reported as a record already there"
+    },
+    "H61": {
+      "mutation": "c66e58d895e93bc18aecfe38ca31caa5",
+      "reason": "not killed here, and not equivalent: the branch is compiled only off Unix, and every run of this record was on macOS. On Windows a failing sync_directory refuses each append that syncs the directory of an empty or new import journal (agent_import.rs passes persistence::sync_directory to that append), and each proof pair and once-written record, so the Windows native job's tests that append there would fail under it. No mutation run was made on Windows, so the verdict stays the one measured here"
+    }
+  }
+}

@@ -83,6 +83,32 @@ pub(in crate::agent::agent_import) struct CompanyHsn {
     pub(in crate::agent::agent_import) settings: Vec<CompanyGstRow>,
     /// `ISGSTCLASSIFON`.
     pub(in crate::agent::agent_import) classification_on: Option<String>,
+    /// `ISGSTON`.
+    pub(in crate::agent::agent_import) gst: CompanyGst,
+}
+
+/// The company's own GST setting, as the company object's `ISGSTON` states
+/// it (protocol reference §12a.19, row 2162-GY, PARTIAL): turned off, this
+/// element read `No` where the tax units read as before, so the tax units
+/// alone do not tell the build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::agent::agent_import) enum CompanyGst {
+    /// `Yes`, after the edge's trimming (`text_of`).
+    On,
+    /// `No`, after the same trimming.
+    Off,
+    /// Absent, empty, or any other text: no state Tally was seen to send.
+    Unstated,
+}
+
+impl CompanyGst {
+    fn from_text(text: Option<&str>) -> Self {
+        match text {
+            Some("Yes") => Self::On,
+            Some("No") => Self::Off,
+            _ => Self::Unstated,
+        }
+    }
 }
 
 /// Where a resolved code came from.
@@ -432,8 +458,9 @@ pub(in crate::agent::agent_import) fn parse_group_hsn(
 
 /// The company object (`TYPE` Object, `SUBTYPE` Company, every field): its
 /// one `COMPANY` must carry the verified company's GUID. Only the HSN/SAC
-/// rows and settings are kept; the rest of the object (the company's own
-/// contact and tax identifiers among it) is dropped with the answer.
+/// rows and settings, and the GST setting, are kept; the rest of the object
+/// (the company's own contact and tax identifiers among it) is dropped with
+/// the answer.
 pub(in crate::agent::agent_import) fn parse_company_hsn(
     xml: &str,
     company_guid: &str,
@@ -464,6 +491,7 @@ pub(in crate::agent::agent_import) fn parse_company_hsn(
         rows: hsn_rows(company)?,
         settings,
         classification_on: company.text_of("ISGSTCLASSIFON")?,
+        gst: CompanyGst::from_text(company.text_of("ISGSTON")?.as_deref()),
     })
 }
 

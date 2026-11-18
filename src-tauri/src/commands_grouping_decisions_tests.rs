@@ -102,3 +102,28 @@ fn each_store_failure_has_its_own_code() {
         "grouping_store_failed"
     );
 }
+
+#[test]
+fn the_register_view_shows_a_stored_company_name_by_the_one_rule() {
+    // #2449: the stored name keeps a zero-width space as given; the view writes it as its code.
+    let stored = "Synthetic\u{200b}Traders";
+    let record = GroupingEventRecord {
+        sequence: 1,
+        id: crate::db::grouping_decisions::GroupingEventId::parse(&uuid::Uuid::nil().to_string())
+            .expect("synthetic id"),
+        event: RecordedEvent::Review {
+            target: crate::db::grouping_decisions::GroupingEventId::parse(
+                &uuid::Uuid::nil().to_string(),
+            )
+            .expect("synthetic target"),
+        },
+        company_display_name: stored.to_string(),
+        year: FinancialYear::beginning_in(2025),
+        ledger: LedgerGuid::new("synthetic-ledger").expect("synthetic ledger"),
+        ledger_name: "Synthetic Ledger".to_string(),
+        declared_by: DeclaredPerson::new("Synthetic Preparer").expect("synthetic person"),
+        recorded_at_unix_ms: 0,
+    };
+    let view = serde_json::to_value(event_view(record)).expect("view serializes");
+    assert_eq!(view["company_display_name"], "Synthetic\\u{200b}Traders");
+}

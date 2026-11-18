@@ -1966,6 +1966,90 @@ async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
     assert_eq!(saved.cash_in_hand_ledgers, Some(Vec::new()));
 }
 
+/// #1761: cash withdrawn and paid straight to someone builds as the row's
+/// Contra into cash and a cash Payment to the payee, in one batch. Both cash
+/// legs and the payee are checked against the book's groups and the cash
+/// ledger is recorded for both vouchers; only the Contra, which has the bank
+/// leg, is a Contra row of the statement's facts. `WR2 Sales` stands in for the
+/// bank, moved under Bank Accounts for this test only, as above.
+#[tokio::test]
+async fn cash_paid_to_someone_builds_its_contra_and_its_cash_payment_in_one_batch() {
+    let plans = bank_build_plans()
+        .into_iter()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                    let moved = body.replace(
+                        "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                        "<PARENT TYPE=\"String\">Bank Accounts</PARENT>",
+                    );
+                    assert_ne!(&moved, body, "the rewrite must apply");
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let payee = "Bridge Nested Debtor WR4";
+    let vouchers = json!([
+        {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Contra",
+         "entries":[{"ledger":"Cash","amount":"12.50","side":"Dr"},
+                    {"ledger":"WR2 Sales","amount":"12.50","side":"Cr"}]},
+        {"bridge_txn_id":"txn-001-cash","date":"2026-09-01","voucher_type":"Payment",
+         "entries":[{"ledger":payee,"amount":"12.50","side":"Dr"},
+                    {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]);
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v2",
+        "proposals_id": proposals_id,
+        "bank_ledger": "WR2 Sales",
+        "coverage": null,
+        "vouchers": vouchers,
+        "records": [{
+            "row": 1, "disposition": {"voucher": "Contra"}, "party": "ATM CASH WITHDRAWAL",
+            "ledger": "Cash", "suspense": false, "bridge_txn_id": "txn-001",
+            "cash_movement": "withdrawal", "cash_answer": "paid_to_someone",
+            "paid_to": {"ledger": payee, "bridge_txn_id": "txn-001-cash", "over_cash_limit": false},
+            "direction": "outflow", "reversed_same_day": false
+        }],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.path().join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    let args = json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)});
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 2, "{response}");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    assert_eq!(
+        serde_json::to_value(&saved.cash_in_hand_ledgers).unwrap(),
+        json!([{"bridge_txn_id":"txn-001","ledger":"Cash"},
+               {"bridge_txn_id":"txn-001-cash","ledger":"Cash"}])
+    );
+    let facts: super::statement_facts::StatementFacts =
+        serde_json::from_value(saved.statement.clone().expect("a version 2 file's facts")).unwrap();
+    assert_eq!(
+        facts
+            .contra_rows
+            .iter()
+            .map(|row| row.bridge_txn_id.as_str())
+            .collect::<Vec<_>>(),
+        ["txn-001"]
+    );
+    simulator.finish().expect("requests");
+}
+
 /// A deposit from the cash box, through the build, on a book of `balance` as
 /// Tally signs it. `WR2 Sales` is rewritten under Bank Accounts for the test.
 async fn deposit_build(balance: &str, built: bool) -> (Server, Value, tempfile::TempDir) {

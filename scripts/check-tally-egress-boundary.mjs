@@ -452,7 +452,10 @@ for (const path of tracked) {
 // A build script can set a cfg or an environment variable for the crate it builds. Each tracked one
 // under src-tauri is pinned by digest (one statement today); a new one is refused until it is added.
 const BUILD_SCRIPT_DIGESTS = new Map([
-  ["src-tauri/build.rs", "487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f"],
+  // build.rs sets one environment variable for rustc, BRIDGE_RELEASE_DATE (a date string from
+  // release-date.txt, read by env! at src-tauri/src/agent.rs as a constant), and no cfg: it changes
+  // no code path the census compiles (#2391).
+  ["src-tauri/build.rs", "6788eabf5d5b5aaf3537c4aec3feb2a9b9d2905677bf3d6b2d85a8d184030494"],
 ]);
 for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && /(?:^|\/)build\.rs$/.test(name))) {
   const digest = createHash("sha256").update(readFileSync(`${root}${path}`)).digest("hex");

@@ -54,8 +54,9 @@ use crate::tally::approved_import::{
 };
 use crate::tally::ledger_create_item::{
     AdmittedDutyHead, AdmittedLedgerKind, GstinError, LedgerCreateBatch, LedgerCreateBatchError,
-    LedgerCreateItem, MasterName, MasterNameError, PartySide, VerifiedGstin,
+    LedgerCreateItem, PartySide, VerifiedGstin,
 };
+use crate::tally::master_name::{MasterName, MasterNameError};
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 
@@ -539,7 +540,10 @@ impl Server {
             .await?;
         accumulated = combine_evidence(accumulated, evidence);
         let (groups, evidence) = self
-            .post_read(&identity, native_group_snapshot_read(&company.name))
+            .post_read(
+                &identity,
+                native_group_snapshot_read(identity.company_name()),
+            )
             .await?;
         accumulated = combine_evidence(accumulated, evidence);
         require_licensed_mode(profile)?;
@@ -733,7 +737,7 @@ impl Server {
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             let (groups, evidence) = self
-                .post_read(&identity, native_group_snapshot_read(&company.name))
+                .post_read(&identity, native_group_snapshot_read(identity.company_name()))
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             require_licensed_mode(profile)?;
@@ -1596,11 +1600,20 @@ fn master_failure_outcome(
     }
     match attempted {
         Some(false) => {
-            if let Some(next_step) = master_next_step(&failure.code).or_else(|| {
-                failure
-                    .unanswered
-                    .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
-            }) {
+            // A kept refusal's step (#2516) comes first: the code's own step
+            // reads as if this call's box had been answered.
+            let kept = failure
+                .cause
+                .filter(|cause| *cause == crate::agent::APPROVAL_ANSWERED_EARLIER)
+                .and_then(crate::agent::refusal_remediation);
+            if let Some(next_step) =
+                kept.or_else(|| master_next_step(&failure.code))
+                    .or_else(|| {
+                        failure
+                            .unanswered
+                            .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
+                    })
+            {
                 error["next_step"] = json!(next_step);
             }
         }

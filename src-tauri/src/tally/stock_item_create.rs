@@ -21,12 +21,17 @@
 //! come from the one request builder, be admitted by size, and agree with the
 //! company's stock item count (§12a.13). That caller is a later pull request.
 //!
-//! `SiblingGst` carries one named item's six complete source fields;
-//! `GoodsSibling` admits only the Goods, Taxable and marked Applicable case
-//! that a later copy can use without supplying an unmeasured default. A copy
-//! sent without Tally's mark on three of its values was stored without its GST
-//! applicability and rates, and no counter showed it (one run, PARTIAL;
-//! §12a.13).
+//! `SiblingGst` is the one item that holds a given name exactly, as its row name
+//! or a name entry, with its six source fields present as read. `GoodsSibling`
+//! is a `SiblingGst` whose type of supply is Goods, whose every dated entry is
+//! Taxable and whose applicability is the marked Applicable. Neither is yet a
+//! copy that may be sent. A copy sent without Tally's mark on three of its
+//! values was stored without its GST applicability and rates, and no counter
+//! showed it (one run, PARTIAL; §12a.13). One shape was measured, and these two
+//! types do not examine the rates, the sources, the state names, the valuation
+//! types, the ineligible-ITC flag, the number of dated entries or state rows, or
+//! a parent at the root. The type that holds a copy to send must admit the
+//! measured shape only.
 
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -181,16 +186,21 @@ pub(crate) enum SiblingField {
 pub(crate) enum SiblingRefusal {
     /// No item answers to the name.
     NotFound,
-    /// This many items answer to the name: more than one by its exact spelling, or more
-    /// than one by a fold when none has it exactly.
+    /// More than one item holds the name exactly; this many.
     Ambiguous { items: usize },
+    /// No item holds the name exactly, and this many items answer to it by a
+    /// fold of the name index. Those folds exist to refuse a proposed name, and
+    /// one keeps only letters and digits, so a fold never names a sibling.
+    OnlyByFold { items: usize },
     /// The first field that is absent or empty, or whose list holds content the parser does not model.
     Incomplete(SiblingField),
     /// The index could not check the name.
     Unchecked(MasterNameIndexError),
 }
 
-/// The six fields of the one item the person named, each present as read, so that none is a default Tally would fill in.
+/// The six source fields of the one item that holds the name exactly, each
+/// present and not blank as read. Presence only: the rates, the sources, the
+/// state names, the valuation types and the ineligible-ITC flag are not examined.
 #[derive(Debug)]
 pub(crate) struct SiblingGst<'a> {
     catalogue: &'a StockItemCatalogue,
@@ -208,7 +218,8 @@ fn non_blank(text: &Option<String>) -> bool {
 }
 
 impl<'a> SiblingGst<'a> {
-    /// Finds one exact name or alias before trying the index's folds, then reads all six fields.
+    /// Finds the one item that holds the name exactly, as its row name or a name
+    /// entry, then requires all six fields. A name that only folds to an item is refused.
     pub(crate) fn named(
         catalogue: &'a StockItemCatalogue,
         name: &MasterName,
@@ -233,15 +244,10 @@ impl<'a> SiblingGst<'a> {
                         guids.push(collision.guid.as_str());
                     }
                 }
-                match guids.as_slice() {
-                    [] => return Err(SiblingRefusal::NotFound),
-                    [guid] => catalogue
-                        .items
-                        .iter()
-                        .find(|item| item.guid == *guid)
-                        .ok_or(SiblingRefusal::NotFound)?,
-                    _ => return Err(SiblingRefusal::Ambiguous { items: guids.len() }),
+                if guids.is_empty() {
+                    return Err(SiblingRefusal::NotFound);
                 }
+                return Err(SiblingRefusal::OnlyByFold { items: guids.len() });
             }
             _ => return Err(SiblingRefusal::Ambiguous { items: exact.len() }),
         };
@@ -365,14 +371,17 @@ pub(crate) enum NotGoodsSibling {
     GstNotApplicable,
 }
 
-/// A sibling the first create may copy: Goods, Taxable on every dated entry, and GST applicable. A Services or exempt item is not measured.
+/// A sibling whose three deciding values are those of the measured copy: Goods,
+/// Taxable on every dated entry, and the marked Applicable. The rest of its
+/// shape is not checked here; see the module doc.
 #[derive(Debug)]
 pub(crate) struct GoodsSibling<'a> {
     sibling: SiblingGst<'a>,
 }
 
 impl<'a> GoodsSibling<'a> {
-    /// Admits only the exact Goods, Taxable and marked Applicable values measured for copying.
+    /// Admits only the exact Goods, Taxable and marked Applicable values, and
+    /// checks nothing else.
     pub(crate) fn from_sibling(sibling: SiblingGst<'a>) -> Result<Self, NotGoodsSibling> {
         if sibling.supply() != GOODS {
             return Err(NotGoodsSibling::NotGoods);

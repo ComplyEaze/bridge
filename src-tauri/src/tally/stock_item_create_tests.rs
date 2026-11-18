@@ -318,9 +318,9 @@ fn the_named_sibling_carries_its_six_fields_as_read() {
 }
 
 #[test]
-fn a_sibling_is_found_by_its_exact_name_its_alias_or_a_fold() {
+fn a_sibling_is_found_by_its_exact_name_or_its_alias_and_never_by_a_fold() {
     let aliased = catalogue(&decode(ALIAS));
-    for value in ["SC Sibling Alias", "sc sibling goods", "SC Sibling Goods."] {
+    for value in ["SC Sibling Goods", "SC Sibling Alias"] {
         assert_eq!(
             sibling(&aliased, value).expect("a sibling answers").guid(),
             SIBLING_GUID
@@ -332,6 +332,17 @@ fn a_sibling_is_found_by_its_exact_name_its_alias_or_a_fold() {
             .guid(),
         MARKED_GUID
     );
+    for value in [
+        "sc sibling goods",
+        "SC Sibling Goods.",
+        "SC_Sibling_Goods",
+        "SCSiblingGoods",
+    ] {
+        assert_eq!(
+            sibling(&aliased, value).unwrap_err(),
+            SiblingRefusal::OnlyByFold { items: 1 }
+        );
+    }
 }
 
 #[test]
@@ -385,7 +396,7 @@ fn a_name_no_item_answers_to_is_not_found() {
 }
 
 #[test]
-fn a_fold_two_items_share_is_ambiguous_but_an_exact_name_is_not() {
+fn a_fold_two_items_share_is_refused_with_their_count_but_an_exact_name_is_not() {
     // Each edit substitutes arbitrary text and is not a captured state.
     let xml = edited(
         &decode(MARKED),
@@ -401,7 +412,7 @@ fn a_fold_two_items_share_is_ambiguous_but_an_exact_name_is_not() {
     let marked = catalogue(&xml);
     assert_eq!(
         sibling(&marked, "sc sibling goods").unwrap_err(),
-        SiblingRefusal::Ambiguous { items: 2 }
+        SiblingRefusal::OnlyByFold { items: 2 }
     );
     assert_eq!(
         sibling(&marked, "SC Sibling Goods")
@@ -547,6 +558,64 @@ fn each_gst_and_hsn_sub_field_is_required() {
 }
 
 #[test]
+fn a_blank_gst_or_hsn_sub_field_is_refused_like_a_missing_one() {
+    let cases = [
+        (
+            "<TAXABILITY TYPE=\"String\">Taxable</TAXABILITY>",
+            "Taxable",
+            SiblingField::GstDetails,
+        ),
+        (
+            "<SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS>",
+            "Specify Details Here",
+            SiblingField::GstDetails,
+        ),
+        (
+            "<STATENAME TYPE=\"String\">&#4; Any</STATENAME>",
+            "&#4; Any",
+            SiblingField::GstDetails,
+        ),
+        (
+            "<GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD>",
+            "IGST",
+            SiblingField::GstDetails,
+        ),
+        (
+            "<GSTRATEVALUATIONTYPE TYPE=\"String\">&#4; Not Applicable</GSTRATEVALUATIONTYPE>",
+            "&#4; Not Applicable",
+            SiblingField::GstDetails,
+        ),
+        (
+            "<HSNCODE TYPE=\"String\">39239090</HSNCODE>",
+            "39239090",
+            SiblingField::HsnDetails,
+        ),
+        (
+            "<HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN>",
+            "Plastic Articles for Conveyance",
+            SiblingField::HsnDetails,
+        ),
+        (
+            "<SRCOFHSNDETAILS TYPE=\"String\">Specify Details Here</SRCOFHSNDETAILS>",
+            "Specify Details Here",
+            SiblingField::HsnDetails,
+        ),
+    ];
+    for (from, text, field) in cases {
+        for blank in ["", "   "] {
+            // These edits substitute arbitrary text, not captured states.
+            let to = from.replacen(text, blank, 1);
+            let xml = edited(&decode(BEFORE), from, &to);
+            let before = catalogue(&xml);
+            assert_eq!(
+                sibling(&before, "SC Sibling Goods").unwrap_err(),
+                SiblingRefusal::Incomplete(field)
+            );
+        }
+    }
+}
+
+#[test]
 fn a_gst_entry_needs_a_state_row_and_a_state_row_needs_a_rate_row() {
     // Both cases edit a capture with arbitrary text, not a captured state.
     let xml = cut(
@@ -576,7 +645,43 @@ fn a_gst_entry_needs_a_state_row_and_a_state_row_needs_a_rate_row() {
 }
 
 #[test]
-fn one_item_reached_twice_by_a_fold_is_one_sibling() {
+fn a_list_present_with_no_entry_is_refused() {
+    // Both edits empty a captured list by hand; neither is a captured state.
+    let mut xml = decode(BEFORE);
+    let opening = "<GSTDETAILS.LIST>";
+    let closing = "</GSTDETAILS.LIST>";
+    let start = xml.find(opening).expect("the GST list occurs") + opening.len();
+    let end = xml.find(closing).expect("the GST list closes");
+    xml.replace_range(start..end, "");
+    let before = catalogue(&xml);
+    assert_eq!(
+        before.items()[0].gst,
+        GstDetailsObservation::Entries { entries: vec![] }
+    );
+    assert_eq!(
+        sibling(&before, "SC Sibling Goods").unwrap_err(),
+        SiblingRefusal::Incomplete(SiblingField::GstDetails)
+    );
+
+    let mut xml = decode(BEFORE);
+    let opening = "<HSNDETAILS.LIST>";
+    let closing = "</HSNDETAILS.LIST>";
+    let start = xml.find(opening).expect("the HSN list occurs") + opening.len();
+    let end = xml.find(closing).expect("the HSN list closes");
+    xml.replace_range(start..end, "");
+    let before = catalogue(&xml);
+    assert_eq!(
+        before.items()[0].hsn,
+        HsnDetailsObservation::Entries { entries: vec![] }
+    );
+    assert_eq!(
+        sibling(&before, "SC Sibling Goods").unwrap_err(),
+        SiblingRefusal::Incomplete(SiblingField::HsnDetails)
+    );
+}
+
+#[test]
+fn one_item_reached_twice_by_a_fold_is_counted_once() {
     // This edit substitutes arbitrary text and is not a captured state.
     let xml = edited(
         &decode(ALIAS),
@@ -585,10 +690,8 @@ fn one_item_reached_twice_by_a_fold_is_one_sibling() {
     );
     let aliased = catalogue(&xml);
     assert_eq!(
-        sibling(&aliased, "sc sibling goods")
-            .expect("two folds of one item are one sibling")
-            .guid(),
-        SIBLING_GUID
+        sibling(&aliased, "sc sibling goods").unwrap_err(),
+        SiblingRefusal::OnlyByFold { items: 1 }
     );
     assert_eq!(
         sibling(&aliased, "SC-Sibling Goods")

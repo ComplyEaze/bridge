@@ -3556,6 +3556,8 @@ fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id()
         vec!["alter_id"]
     );
     // The control: a field the read-back compares, changed on the re-saved bytes, reads divergent.
+    // The capture predates the two registration fields (#2464), inserted here as `pilot_differences`
+    // inserts them.
     let reference = "<REFERENCE TYPE=\"String\">BP/26-27/0057</REFERENCE>";
     assert_eq!(after_xml.matches(reference).count(), 1);
     let changed = after_xml.replacen(
@@ -3564,7 +3566,7 @@ fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id()
         1,
     );
     assert_eq!(
-        invoice_readback_differences(&built, &read_one(&changed), "20260801"),
+        invoice_readback_differences(&built, &read_one(&with_registration(&changed)), "20260801"),
         vec!["REFERENCE"]
     );
     // And a leg: one sales leg's amount, changed by a paisa.
@@ -3572,7 +3574,11 @@ fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id()
     assert_eq!(after_xml.matches(amount).count(), 1);
     let leg_changed = after_xml.replacen(amount, "<AMOUNT>600.41</AMOUNT>", 1);
     assert_eq!(
-        invoice_readback_differences(&built, &read_one(&leg_changed), "20260801"),
+        invoice_readback_differences(
+            &built,
+            &read_one(&with_registration(&leg_changed)),
+            "20260801"
+        ),
         vec!["legs"]
     );
 }

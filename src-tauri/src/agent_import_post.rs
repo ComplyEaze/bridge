@@ -2317,10 +2317,11 @@ pub(super) fn attach_next_step(
 /// Where to look when no answer to the post was kept (bridge#852). `egress_log`
 /// returns the most recent receipts; the sending `post_import` call's receipt is
 /// there only if recent enough. Its trail (`request_trail::RequestTrail`) holds
-/// the send durations and outcomes the batch record lacks. A receipt not returned
-/// may be older than the read window, or may never have been written: the process
-/// may have ended first.
-pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. egress_log returns the most recent receipts. This batch's post_import receipt is there only if recent enough. Its request_trail lists the last 32 sends with held_ms, how long each send held the endpoint, and its outcome, the post's among them. A receipt not returned may be older than egress_log reads, or may never have been written: the process may have ended first. Reconcile this original batch without resending it.";
+/// the send durations and outcomes the batch record lacks, but no field identifies
+/// the import send. A later tool re-check leaves its own receipt and read-only
+/// trail. A receipt not returned may be older than the read window, or may never
+/// have been written: the process may have ended first.
+pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. egress_log returns the most recent receipts. The sending post_import call's receipt is there only if recent enough. Its request_trail lists the last 32 sends with held_ms, how long each send held the endpoint, and its outcome, but does not mark which send was the post. A later post_import or verify_import tool call on this batch does not post it again and also leaves a receipt; its request_trail lists only that call's reads. A receipt not returned may be older than egress_log reads, or may never have been written: the process may have ended first. Reconcile this original batch without resending it.";
 
 fn mark_reconciliation_required(payload: &mut Value, response: Option<&ledger::DispatchResponse>) {
     payload["result"]["error"] = json!({"code":"import_reconciliation_required", "message":"The saved attempt has not been confirmed as the intended new voucher. Reconcile this original batch without resending it."});

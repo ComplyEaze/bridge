@@ -404,17 +404,21 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     // The log returns only recent receipts, with the trail's two fields named.
     for part in [
         "egress_log returns the most recent receipts",
-        "This batch's post_import receipt is there only if recent enough",
+        "The sending post_import call's receipt is there only if recent enough",
         "request_trail",
         "held_ms",
         "how long each send held the endpoint",
         "outcome",
+        "but does not mark which send was the post",
+        "A later post_import or verify_import tool call on this batch does not post it again and also leaves a receipt",
+        "its request_trail lists only that call's reads",
         "A receipt not returned may be older than egress_log reads",
         "or may never have been written: the process may have ended first",
         "without resending it",
     ] {
         assert!(step.contains(part), "{part}");
     }
+    assert!(!step.contains("the post's among them"));
     // It promises no receipt and no cause, and reasons about neither.
     // The cap the text names is the trail's own.
     let cap = format!("the last {} sends", crate::request_trail::TRAIL_LAST);

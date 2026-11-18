@@ -2,7 +2,7 @@
 //! See `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/PROVENANCE.md`.
 
 use super::*;
-use crate::tally::ledger_create_item::MasterNameError;
+use crate::tally::master_name::MasterNameError;
 use bridge_tally_core::master_name_index::Via;
 use bridge_tally_protocol::gst_details::GstRate;
 use bridge_tally_protocol::{decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding};

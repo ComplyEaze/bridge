@@ -3114,9 +3114,9 @@ mod masters {
     use crate::agent::agent_import::master_post::MasterPostRequest;
     use crate::tally::approved_import::PostKind;
     use crate::tally::ledger_create_item::{
-        AdmittedDutyHead, AdmittedLedgerKind, LedgerCreateItem, MasterName, PartySide,
-        VerifiedGstin,
+        AdmittedDutyHead, AdmittedLedgerKind, LedgerCreateItem, PartySide, VerifiedGstin,
     };
+    use crate::tally::master_name::MasterName;
     use crate::tally::VerifiedCompanyIdentity;
     use bridge_tally_protocol::GstDutyHead;
 

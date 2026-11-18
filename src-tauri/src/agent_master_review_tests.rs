@@ -2,8 +2,9 @@
 //! refused, and every limit a refusal, never a cut.
 use super::*;
 use crate::tally::ledger_create_item::{
-    AdmittedDutyHead, AdmittedLedgerKind, MasterName, PartySide, VerifiedGstin,
+    AdmittedDutyHead, AdmittedLedgerKind, PartySide, VerifiedGstin,
 };
+use crate::tally::master_name::MasterName;
 use bridge_tally_protocol::GstDutyHead;
 
 /// The preview of a batch of `item` alone: the one-ledger text, through the

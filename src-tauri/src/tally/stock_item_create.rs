@@ -36,7 +36,7 @@
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
 
-use super::ledger_create_item::MasterName;
+use super::master_name::MasterName;
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError, NameCollision,

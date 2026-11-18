@@ -578,7 +578,8 @@ impl LegItems {
     fn read(entry: &Row) -> Result<Self, &'static str> {
         let path = |tag: &str| format!("{ITEM}{tag}");
         // An item is counted by any of the three elements every line carries,
-        // present with text or empty; a whitespace-only list holds none of them.
+        // present with text or empty. Content with none of them is unmodelled;
+        // a whitespace-only list alone holds no item.
         let count = ["STOCKITEMNAME", "ISDEEMEDPOSITIVE", "AMOUNT"]
             .iter()
             .map(|tag| {
@@ -591,6 +592,11 @@ impl LegItems {
             return Ok(Self::Several);
         }
         if count == 0 {
+            let has_content = entry.fields.iter().any(|(path, _)| path.starts_with(ITEM))
+                || entry.empties.iter().any(|path| path.starts_with(ITEM));
+            if has_content {
+                return Err("invoice_read_malformed");
+            }
             return Ok(Self::None);
         }
         let batch = |tag: &str| {

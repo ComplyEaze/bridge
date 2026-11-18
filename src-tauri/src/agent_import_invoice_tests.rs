@@ -3372,9 +3372,29 @@ fn an_item_line_reads_back_under_its_leg_with_the_items_hsn() {
     );
 }
 
+/// DERIVED, not Tally's bytes: the committed clean read-back of
+/// `BP/26-27/0010`, with only this batch-only inventory list added under its
+/// first sales leg, whose own resolved ledger HSN/SAC is left in place.
+#[test]
+fn an_inventory_list_with_only_unmodelled_content_is_not_clean() {
+    let allocation = "<INVENTORYALLOCATIONS.LIST><BATCHALLOCATIONS.LIST>\
+         <GODOWNNAME>Main Location</GODOWNNAME><BATCHNAME>Primary Batch</BATCHNAME>\
+         <AMOUNT>600.40</AMOUNT></BATCHALLOCATIONS.LIST></INVENTORYALLOCATIONS.LIST>";
+    let xml = utf16le(STATUS_INCLUDED);
+    assert_eq!(hsn_outcome(&pilot_0010(), &xml).0, Vec::<String>::new());
+    let leg = leg_of(&xml, SVC_998313);
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    let xml = xml.replacen(leg, &edited, 1);
+    let differences = hsn_outcome(&pilot_0010(), &xml).0;
+    assert_eq!(differences, ["invoice_readback_unreadable"]);
+}
+
 /// DERIVED, each from the item line above edited in one place: a rate, an
-/// amount that is not the leg's, no batch allocation, two items under one
-/// leg, and a whitespace-only list, which holds no item.
+/// amount that is not the leg's, no batch allocation, a smaller, larger or
+/// unparsable batch amount, two items under one leg, and a whitespace-only
+/// list, which holds no item.
 #[test]
 fn an_item_line_off_the_measured_form_is_named() {
     let measured = item_allocation(SVC_998313, "600.40");
@@ -3397,6 +3417,19 @@ fn an_item_line_off_the_measured_form_is_named() {
         differences(&edit(&measured[batch_start..batch_end], "")),
         ["invoice_line_item_not_sent", "invoice_line_item_batch"]
     );
+    let batch_amount = |amount: &str| {
+        edit(
+            "<AMOUNT>600.40</AMOUNT><ACTUALQTY/><BILLEDQTY/></BATCHALLOCATIONS.LIST>",
+            &format!("<AMOUNT>{amount}</AMOUNT><ACTUALQTY/><BILLEDQTY/></BATCHALLOCATIONS.LIST>"),
+        )
+    };
+    for amount in ["600.00", "600.80", "not-a-number"] {
+        assert_eq!(
+            differences(&batch_amount(amount)),
+            ["invoice_line_item_not_sent", "invoice_line_item_batch"],
+            "{amount}"
+        );
+    }
     let two = as_item_line(&measured.repeat(2));
     assert_eq!(read_leg(&two, SVC_998313).items, wire::LegItems::Several);
     assert_eq!(

@@ -59,9 +59,9 @@ fn a_number_is_folded_to_upper_case_with_one_separator_and_refused_only_when_emp
 #[test]
 fn the_gstr1_shape_is_reported_never_required() {
     assert!(reference("INV/25-26/0001").fits_gstr1());
-    assert!(reference("1234567890123456").fits_gstr1());
+    assert!(reference("INV/25-26/000001").fits_gstr1());
     assert!(
-        !reference("12345678901234567").fits_gstr1(),
+        !reference("INV/25-26/0000001").fits_gstr1(),
         "seventeen characters"
     );
     assert!(!reference("INV 12").fits_gstr1(), "a space");

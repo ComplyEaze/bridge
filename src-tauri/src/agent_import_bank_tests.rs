@@ -4334,6 +4334,10 @@ fn a_counterparty_refusal_carries_the_detail_and_names_the_voucher_type() {
     let bank = masters.classify("Bank Probe");
     assert_eq!(LegRequirement::Money.refusal(&bank, "Receipt"), None);
     assert_eq!(
+        LegRequirement::Counterparty.refusal(&masters.classify("Party Probe"), "Receipt"),
+        None
+    );
+    assert_eq!(
         LegRequirement::Counterparty.refusal(&bank, "Receipt"),
         Some(format!(
             "{} Money on both sides of a Receipt is a Contra; book it as one.",
@@ -4392,9 +4396,9 @@ fn a_reserved_identity_matches_whatever_its_case_and_padding() {
     }
 }
 
-/// Every predefined identity the demo company's captured groups carry is
-/// classified one way or the other: three as money Bridge admits, and the
-/// other 25 as holding none. None is left unknown.
+/// The production table classifies every captured predefined identity: three
+/// as money Bridge admits and the other 25 as not a money group. None is left
+/// unknown.
 #[test]
 fn every_captured_predefined_identity_is_classified() {
     let groups = captured_demo_groups();
@@ -4420,10 +4424,19 @@ fn every_captured_predefined_identity_is_classified() {
 /// A ledger is found by its exact catalogue spelling, spaces included.
 #[test]
 fn a_ledger_is_found_by_its_exact_catalogue_spelling() {
-    let ledgers = vec![("Cash ".to_string(), Some("Cash-in-Hand".to_string()))];
+    let ledgers = vec![
+        ("Cash ".to_string(), Some("Cash-in-Hand".to_string())),
+        (" Cash".to_string(), Some("Cash-in-Hand".to_string())),
+    ];
     let masters = observed(&ledgers, captured_demo_groups());
     assert_eq!(
         masters.classify("Cash "),
+        CashBankState::Established {
+            reserved_group: "Cash-in-Hand"
+        }
+    );
+    assert_eq!(
+        masters.classify(" Cash"),
         CashBankState::Established {
             reserved_group: "Cash-in-Hand"
         }

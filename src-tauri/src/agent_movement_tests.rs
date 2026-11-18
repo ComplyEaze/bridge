@@ -89,6 +89,62 @@ fn movement_uses_observed_period_opening_without_inferring_account_classificatio
     }
 }
 
+/// A row the voucher source returned that does not read as a movement voucher refuses the
+/// window by the movement's own read code.
+#[test]
+fn an_unreadable_movement_row_refuses_by_the_movement_read_code() {
+    let result = parse_movement_rows(vec![json!("20260901")], "20260901", "20260902");
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some(MovementCode::ReadFailed.as_str().to_string())
+    );
+}
+
+/// The voucher read refuses a company name a request cannot carry on its first line, before it
+/// sends anything: the endpoint is a simulator that must receive no request. The name here holds
+/// a line break. Whether a name Tally itself sends can reach this guard is not traced.
+#[tokio::test]
+async fn the_voucher_read_refuses_an_invalid_company_name_by_the_company_code_and_sends_nothing() {
+    use tally_protocol_simulator::{Fixture, ProductStatus, ScenarioPlan, SequenceSimulator};
+    let simulator = SequenceSimulator::spawn(vec![ScenarioPlan::new(Fixture::ProductStatus(
+        ProductStatus::TallyPrime,
+    ))])
+    .unwrap();
+    let address = simulator.address();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let identity = VerifiedCompanyIdentity::test_fixture("Lab", crate::synthetic_guid(1));
+    let date = bridge_tally_core::TallyDate::parse("20260901").unwrap();
+    let result = server
+        .read_movement_vouchers(
+            &identity,
+            "invalid\ncompany",
+            WindowScope::Book,
+            (date.clone(), date),
+            WindowPlanSource::Estimate { known_marks: None },
+            None,
+        )
+        .await;
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some(CompanyReadCode::NameInvalid.as_str().to_string())
+    );
+    assert_eq!(simulator.received(), 0, "no request reached the endpoint");
+}
+
 /// Renamed rather than relabelled: this used to assert the window was refused.
 /// A Stock Journal legitimately carries no accounting entries, so refusing lost
 /// the whole window over a voucher that is exactly right -- five of twelve
@@ -129,7 +185,10 @@ fn an_unbalanced_voucher_is_still_refused() {
         "20260901",
         "20260902",
     );
-    assert_eq!(result.err(), Some("voucher_entries_unbalanced".into()));
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some("voucher_entries_unbalanced".into())
+    );
 }
 
 #[test]
@@ -161,6 +220,7 @@ fn movement_balance_is_exact_per_active_voucher() {
     assert_eq!(
         parse_movement_rows(scaled, "20260801", "20260802")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some("voucher_entries_unbalanced")
     );
@@ -171,6 +231,7 @@ fn movement_balance_is_exact_per_active_voucher() {
     assert_eq!(
         parse_movement_rows(offsetting, "20260801", "20260802")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some("voucher_entries_unbalanced")
     );
@@ -180,6 +241,7 @@ fn movement_balance_is_exact_per_active_voucher() {
         assert_eq!(
             parse_movement_rows(omitted.clone(), "20260801", "20260802")
                 .err()
+                .map(|failure| failure.code)
                 .as_deref(),
             Some("voucher_entries_unbalanced")
         );
@@ -214,11 +276,11 @@ fn movement_snapshot_rejects_renames_even_when_the_selected_name_returns() {
     let renamed = vec![ledger("New Cash"), ledger("Sales")];
     assert_eq!(
         validate_movement_snapshot(&opening, &renamed, &vouchers("New Cash")),
-        Err("ledger_snapshot_drifted".into())
+        Err(ReadCode::LedgerSnapshotDrifted.into())
     );
     assert_eq!(
         validate_movement_snapshot(&opening, &opening, &vouchers("New Cash")),
-        Err("ledger_snapshot_drifted".into())
+        Err(ReadCode::LedgerSnapshotDrifted.into())
     );
     // Known entries outside the selected Cash ledger remain admissible.
     assert_eq!(
@@ -229,7 +291,7 @@ fn movement_snapshot_rejects_renames_even_when_the_selected_name_returns() {
     changed_opening[0].opening_balance = Some("1".into());
     assert_eq!(
         validate_movement_snapshot(&opening, &changed_opening, &vouchers("Cash")),
-        Err("ledger_snapshot_drifted".into())
+        Err(ReadCode::LedgerSnapshotDrifted.into())
     );
 }
 
@@ -436,6 +498,7 @@ fn a_ledger_scoped_row_without_a_line_on_the_ledger_refuses_the_read() {
             "20250531"
         )
         .err()
+        .map(|failure| failure.code)
         .as_deref(),
         Some(LEDGER_SCOPE_ROW_WITHOUT_LINE)
     );
@@ -455,6 +518,7 @@ fn a_ledger_scoped_row_with_no_entries_at_all_is_refused_too() {
     assert_eq!(
         parse_scoped_movement_rows(rows, WindowScope::Ledger(&party), "20250501", "20250531")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some(LEDGER_SCOPE_ROW_WITHOUT_LINE)
     );

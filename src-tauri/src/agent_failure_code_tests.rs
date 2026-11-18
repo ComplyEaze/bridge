@@ -17,11 +17,6 @@ const GST_UNCERTAIN: &[(GstUncertainCode, &str)] = &[
     ),
 ];
 
-const BANK_STATEMENT_IMPORT: &[(BankStatementImportCode, &str)] = &[(
-    BankStatementImportCode::ProposalsFileInvalid,
-    "proposals_file_invalid",
-)];
-
 const READ: &[(ReadCode, &str)] = &[
     (ReadCode::InvalidDateRange, "invalid_date_range"),
     (ReadCode::ReadProtocolInvalid, "agent_read_protocol_invalid"),
@@ -30,6 +25,21 @@ const READ: &[(ReadCode, &str)] = &[
     (ReadCode::WindowNotHonoured, "window_not_honoured"),
     (ReadCode::CurrentDateInvalid, "current_date_invalid"),
     (ReadCode::InvalidAsOf, "invalid_as_of"),
+    (
+        ReadCode::CompanyIdentityIncomplete,
+        "company_identity_incomplete",
+    ),
+    (ReadCode::InvalidDate, "invalid_date"),
+    (
+        ReadCode::VoucherEntriesUnbalanced,
+        "voucher_entries_unbalanced",
+    ),
+];
+
+const PROPOSALS: &[(ProposalsCode, &str)] = &[
+    (ProposalsCode::FileInvalid, "proposals_file_invalid"),
+    (ProposalsCode::IdRequired, "proposals_id_required"),
+    (ProposalsCode::VouchersRequired, "vouchers_required"),
 ];
 
 const GST_STATUS: &[(GstStatusCode, &str)] = &[
@@ -110,6 +120,47 @@ const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
     ),
 ];
 
+const MOVEMENT: &[(MovementCode, &str)] = &[
+    (
+        MovementCode::VoucherSnapshotDrifted,
+        "voucher_snapshot_drifted",
+    ),
+    (
+        MovementCode::OpeningBalanceNotObserved,
+        "opening_balance_not_observed",
+    ),
+    (MovementCode::ReadFailed, "ledger_movement_read_failed"),
+];
+
+const PRESENCE: &[(PresenceCode, &str)] = &[
+    (
+        PresenceCode::LedgerCatalogueIncomplete,
+        "ledger_catalogue_incomplete",
+    ),
+    (
+        PresenceCode::NumberingMethodDiffers,
+        "presence_numbering_method_differs_from_book",
+    ),
+    (PresenceCode::NumberingRequired, "numbering_required"),
+    (
+        PresenceCode::ImportIdentityIncomplete,
+        "presence_import_identity_incomplete",
+    ),
+];
+
+const TIE_OUT: &[(TieOutCode, &str)] = &[
+    (
+        TieOutCode::ArithmeticOutOfRange,
+        "tie_out_arithmetic_out_of_range",
+    ),
+    (TieOutCode::LedgerOpeningInvalid, "ledger_opening_invalid"),
+    (TieOutCode::LedgerOpeningMissing, "ledger_opening_missing"),
+    (
+        TieOutCode::LedgerNameDuplicated,
+        "ledger_name_duplicated_in_catalogue",
+    ),
+];
+
 /// Every pin of every enum, as the failure code its variant makes, beside the pinned string.
 fn pinned() -> Vec<(FailureCode, &'static str)> {
     fn of<C: Copy + Into<FailureCode>>(
@@ -121,13 +172,16 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     }
     let pins = [
         of(GST_UNCERTAIN),
-        of(BANK_STATEMENT_IMPORT),
         of(READ),
+        of(PROPOSALS),
         of(GST_STATUS),
         of(GST_BY_LEDGER),
         of(REGISTER),
         of(OUTSTANDINGS),
         of(INVOICE_NUMBER_AFTER_POST),
+        of(MOVEMENT),
+        of(PRESENCE),
+        of(TIE_OUT),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -142,13 +196,16 @@ fn declared() -> Vec<FailureCode> {
     }
     let codes = [
         of(GstUncertainCode::ALL),
-        of(BankStatementImportCode::ALL),
         of(ReadCode::ALL),
+        of(ProposalsCode::ALL),
         of(GstStatusCode::ALL),
         of(GstByLedgerCode::ALL),
         of(RegisterCode::ALL),
         of(OutstandingsCode::ALL),
         of(InvoiceNumberAfterPostCode::ALL),
+        of(MovementCode::ALL),
+        of(PresenceCode::ALL),
+        of(TieOutCode::ALL),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -164,10 +221,6 @@ fn every_variant_has_one_pinned_string() {
         pins.iter().map(|(code, _)| *code).collect()
     }
     assert_eq!(variants(GST_UNCERTAIN), GstUncertainCode::ALL);
-    assert_eq!(
-        variants(BANK_STATEMENT_IMPORT),
-        BankStatementImportCode::ALL
-    );
     assert_eq!(variants(READ), ReadCode::ALL);
     assert_eq!(variants(GST_STATUS), GstStatusCode::ALL);
     assert_eq!(variants(GST_BY_LEDGER), GstByLedgerCode::ALL);
@@ -177,6 +230,10 @@ fn every_variant_has_one_pinned_string() {
         variants(INVOICE_NUMBER_AFTER_POST),
         InvoiceNumberAfterPostCode::ALL
     );
+    assert_eq!(variants(PROPOSALS), ProposalsCode::ALL);
+    assert_eq!(variants(MOVEMENT), MovementCode::ALL);
+    assert_eq!(variants(PRESENCE), PresenceCode::ALL);
+    assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -204,7 +261,6 @@ where
 #[test]
 fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(GST_UNCERTAIN, GstUncertainCode::as_str);
-    check_pins(BANK_STATEMENT_IMPORT, BankStatementImportCode::as_str);
     check_pins(READ, ReadCode::as_str);
     check_pins(GST_STATUS, GstStatusCode::as_str);
     check_pins(GST_BY_LEDGER, GstByLedgerCode::as_str);
@@ -214,6 +270,10 @@ fn each_declared_code_is_the_string_its_site_wrote() {
         INVOICE_NUMBER_AFTER_POST,
         InvoiceNumberAfterPostCode::as_str,
     );
+    check_pins(PROPOSALS, ProposalsCode::as_str);
+    check_pins(MOVEMENT, MovementCode::as_str);
+    check_pins(PRESENCE, PresenceCode::as_str);
+    check_pins(TIE_OUT, TieOutCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
@@ -235,9 +295,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 27;
+    let expected = 43;
     #[cfg(feature = "lab-writes")]
-    let expected = 30;
+    let expected = 46;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

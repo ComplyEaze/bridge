@@ -37,6 +37,7 @@ fn movement_native_parser_rejects_missing_flags_and_out_of_window_cancelled_rows
     assert_eq!(
         parse_movement_vouchers(&cancelled, "20260902", "20260902", "voucher")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some("window_not_honoured")
     );

@@ -1006,6 +1006,8 @@ fn the_registration_tally_filed_the_invoice_under_is_read_back() {
         xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>"),
         xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"> </GSTREGISTRATION>"),
         xml.replace(&gstin, "<CMPGSTIN/>"),
+        xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>")
+            .replace(&gstin, "<CMPGSTIN/>"),
     ] {
         assert_eq!(
             differences(&v, &missing),
@@ -1042,7 +1044,10 @@ fn the_registration_tally_filed_the_invoice_under_is_read_back() {
     assert!(differences(&maharashtra, &xml).contains(&"invoice_registration_differs".to_string()));
     // A repeated field fails the whole read, as any repeated field does.
     let twice = xml.replace(&gstin, &format!("{gstin}{gstin}"));
-    assert!(wire::parse_invoice_readback(&twice).is_err());
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
 }
 
 #[test]

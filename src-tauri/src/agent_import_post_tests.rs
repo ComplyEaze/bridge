@@ -5984,7 +5984,7 @@ fn the_voucher_recheck_given_a_masters_admission_refuses_and_aims_nothing() {
     let error = recheck_voucher_queue(
         QueuedAdmission::Masters {
             batch: &crate::tally::ledger_create_item::LedgerCreateItem::new(
-                crate::tally::ledger_create_item::MasterName::new("Some Party").unwrap(),
+                crate::tally::master_name::MasterName::new("Some Party").unwrap(),
                 crate::tally::ledger_create_item::AdmittedLedgerKind::Suspense,
             )
             .into(),

@@ -14,17 +14,20 @@
 //!   they are different invoices.
 //! - A match that rests on a financial year taken from a voucher date (no invoice date in the
 //!   books), on a document type that is not known, or on a loose form of the number, is never
-//!   more than [`InvoiceMatch::PossiblyBooked`], which only a person may release. A loose form
-//!   counts only with a second signal: the same invoice date or the same invoice value.
+//!   more than [`InvoiceMatch::PossiblyBooked`], which only a person may release; the same applies
+//!   to a match that only folding `-` and `/` together made. A loose form counts only with a
+//!   second signal: the same invoice date or the same invoice value.
 //! - A financial year written into a number (`2025-26`, `25/26`, `FY26`, a leading or trailing
 //!   `2025`) is left out of the loose form and the serial, so a copy keyed without it, or with the
 //!   year written another way, is still found.
 //! - A number with no digit but zero (`NA`, `Cash`, `0`) is a placeholder, not a supplier's
-//!   number: it is never [`InvoiceMatch::Booked`], and matches only as a loose form does.
-//! - The characters folded (separators, characters that draw nothing, digits other than ASCII)
-//!   are closed lists: Devanagari and full-width digits only, and the dashes and slashes named
-//!   in `SEPARATORS`. Anything else is kept as it is, so a number differing only there is
-//!   not found as the same.
+//!   number: it is never [`InvoiceMatch::Booked`], and matches only as a loose form does. A number
+//!   whose only digits are of another script (Gujarati, Bengali, Tamil, Arabic-Indic) has no ASCII
+//!   digit and so is treated as a placeholder.
+//! - The characters folded (separators, characters that draw nothing, and the listed digits and
+//!   Latin letters) are closed lists: Devanagari and full-width digits, full-width Latin letters,
+//!   and the dashes and slashes named in `SEPARATORS`. Anything else is kept as it is, so a number
+//!   differing only there is not found as the same.
 use crate::{ExactDecimal, TallyDate};
 
 /// The separators a supplier writes between the parts of a number, folded to one form: the ASCII
@@ -62,7 +65,11 @@ impl SupplierInvoiceRef {
     pub fn parse(raw: &str) -> Result<Self, SupplierInvoiceRefError> {
         let mut exact = String::new();
         let mut pending_separator = false;
-        for ch in raw.chars().filter(|ch| !is_invisible(*ch)).map(ascii_digit) {
+        for ch in raw
+            .chars()
+            .filter(|ch| !is_invisible(*ch))
+            .map(ascii_character)
+        {
             if ch.is_whitespace() || SEPARATORS.contains(&ch) {
                 pending_separator = !exact.is_empty();
                 continue;
@@ -82,7 +89,7 @@ impl SupplierInvoiceRef {
         let strict = raw
             .chars()
             .filter(|ch| !is_invisible(*ch))
-            .map(ascii_digit)
+            .map(ascii_character)
             .filter_map(|ch| match ch {
                 '-' | '\u{2010}'..='\u{2014}' | '\u{2212}' | '\u{FF0D}' => Some('-'),
                 '/' | '\u{FF0F}' => Some('/'),
@@ -213,14 +220,17 @@ fn is_invisible(ch: char) -> bool {
     )
 }
 
-/// A Devanagari or full-width digit as its ASCII digit; any other character as it is.
-fn ascii_digit(ch: char) -> char {
-    let zero = match ch {
-        '\u{0966}'..='\u{096F}' => 0x0966,
-        '\u{FF10}'..='\u{FF19}' => 0xFF10,
+/// A Devanagari or full-width digit, or a full-width Latin letter, as its ASCII counterpart;
+/// any other character as it is.
+fn ascii_character(ch: char) -> char {
+    let (zero, ascii_zero) = match ch {
+        '\u{0966}'..='\u{096F}' => (0x0966, b'0'),
+        '\u{FF10}'..='\u{FF19}' => (0xFF10, b'0'),
+        '\u{FF21}'..='\u{FF3A}' => (0xFF21, b'A'),
+        '\u{FF41}'..='\u{FF5A}' => (0xFF41, b'a'),
         _ => return ch,
     };
-    char::from(b'0' + (u32::from(ch) - zero) as u8)
+    char::from(ascii_zero + (u32::from(ch) - zero) as u8)
 }
 
 /// The exact form without separators, each run of digits without its leading zeros (`0` for a
@@ -294,8 +304,8 @@ pub enum SupplierDocument {
     DebitNote,
 }
 
-/// A purchase about to be posted: its supplier invoice date is required (rule 46(c)); a purchase
-/// without one is not a tax invoice and is refused before this type is built.
+/// A purchase about to be posted: its supplier invoice date is required (rule 46(c)); this type
+/// cannot be built without one.
 #[derive(Debug, Clone)]
 pub struct IncomingInvoice {
     pub reference: SupplierInvoiceRef,
@@ -318,8 +328,10 @@ pub struct BookedInvoice {
 
 impl BookedInvoice {
     /// The financial years the copy can belong to. From the invoice date, one. From the voucher
-    /// date, also the year before when the voucher falls between April and November (an invoice
-    /// of the previous year can still be booked until 30 November, s.16(4)).
+    /// date, also the year before when the voucher falls between April and November: credit on an
+    /// invoice of the previous year can be taken until 30 November at the latest (s.16(4)). So a
+    /// copy with no invoice date and a voucher dated December to March is taken as its own year
+    /// only, and a copy booked later than that is not found by this fallback.
     fn financial_years(&self) -> (Vec<FinancialYear>, bool) {
         match &self.invoice_date {
             Some(date) => (vec![FinancialYear::of(date)], false),

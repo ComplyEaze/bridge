@@ -22,7 +22,8 @@
 //! company's stock item count (§12a.13). That caller is a later pull request.
 //!
 //! `SiblingGst` is the one item that holds a given name exactly, as its row name
-//! or a name entry, with its six source fields present as read. `GoodsSibling`
+//! or a name entry, with its six source fields present as read. A field of only
+//! white space counts as missing. `GoodsSibling`
 //! is a `SiblingGst` whose type of supply is Goods, whose every dated entry is
 //! Taxable and whose applicability is the marked Applicable. Neither is yet a
 //! copy that may be sent. A copy sent without Tally's mark on three of its
@@ -199,7 +200,8 @@ pub(crate) enum SiblingRefusal {
 }
 
 /// The six source fields of the one item that holds the name exactly, each
-/// present and not blank as read. Presence only: the rates, the sources, the
+/// present and not blank as read. A field of only white space counts as missing.
+/// Presence only: the rates, the sources, the
 /// state names, the valuation types and the ineligible-ITC flag are not examined.
 #[derive(Debug)]
 pub(crate) struct SiblingGst<'a> {
@@ -214,7 +216,11 @@ pub(crate) struct SiblingGst<'a> {
 }
 
 fn non_blank(text: &Option<String>) -> bool {
-    text.as_deref().is_some_and(|text| !text.trim().is_empty())
+    text.as_deref().is_some_and(non_blank_text)
+}
+
+fn non_blank_text(text: &str) -> bool {
+    !text.trim().is_empty()
 }
 
 impl<'a> SiblingGst<'a> {
@@ -252,20 +258,23 @@ impl<'a> SiblingGst<'a> {
             _ => return Err(SiblingRefusal::Ambiguous { items: exact.len() }),
         };
         let parent = match &item.parent {
-            // The parser gives no parent for a blank one, so `Some` is never blank here.
+            // The parser gives no parent for one that is empty after `str::trim`
+            // (`native_masters.rs`), so `Some` is never blank here.
             Some(parent) => parent.as_str(),
             _ => return Err(SiblingRefusal::Incomplete(SiblingField::Parent)),
         };
         let unit = match &item.base_units {
-            ScalarObservation::Text(unit) => unit.as_str(),
+            ScalarObservation::Text(unit) if non_blank_text(unit) => unit.as_str(),
             _ => return Err(SiblingRefusal::Incomplete(SiblingField::Unit)),
         };
         let applicability = match &item.gst_applicable {
-            ScalarObservation::Text(applicability) => applicability.as_str(),
+            ScalarObservation::Text(applicability) if non_blank_text(applicability) => {
+                applicability.as_str()
+            }
             _ => return Err(SiblingRefusal::Incomplete(SiblingField::Applicability)),
         };
         let supply = match &item.gst_type_of_supply {
-            ScalarObservation::Text(supply) => supply.as_str(),
+            ScalarObservation::Text(supply) if non_blank_text(supply) => supply.as_str(),
             _ => return Err(SiblingRefusal::Incomplete(SiblingField::TypeOfSupply)),
         };
         let gst = match &item.gst {

@@ -558,6 +558,62 @@ fn each_gst_and_hsn_sub_field_is_required() {
 }
 
 #[test]
+fn a_scalar_field_of_only_white_space_is_refused_like_a_missing_one() {
+    let cases = [
+        (
+            "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>",
+            "Nos",
+            SiblingField::Unit,
+        ),
+        (
+            "<GSTAPPLICABLE TYPE=\"String\">&#4; Applicable</GSTAPPLICABLE>",
+            "&#4; Applicable",
+            SiblingField::Applicability,
+        ),
+        (
+            "<GSTTYPEOFSUPPLY TYPE=\"String\">Goods</GSTTYPEOFSUPPLY>",
+            "Goods",
+            SiblingField::TypeOfSupply,
+        ),
+        (
+            "<PARENT TYPE=\"String\">SC Goods Group</PARENT>",
+            "SC Goods Group",
+            SiblingField::Parent,
+        ),
+    ];
+    for (from, text, field) in cases {
+        // Each case is a hand edit, not a captured state. A parent of only
+        // white space is given as no parent by the parser, before `named`.
+        let to = from.replacen(text, "&#160;", 1);
+        let xml = edited(&decode(BEFORE), from, &to);
+        let before = catalogue(&xml);
+        assert_eq!(
+            sibling(&before, "SC Sibling Goods").unwrap_err(),
+            SiblingRefusal::Incomplete(field)
+        );
+    }
+}
+
+#[test]
+fn a_padded_unit_and_parent_are_handed_back_exactly_as_read() {
+    // Both hand edits add padding and are not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>",
+        "<BASEUNITS TYPE=\"String\"> Nos </BASEUNITS>",
+    );
+    let xml = edited(
+        &xml,
+        "<PARENT TYPE=\"String\">SC Goods Group</PARENT>",
+        "<PARENT TYPE=\"String\"> SC Goods Group </PARENT>",
+    );
+    let before = catalogue(&xml);
+    let item = sibling(&before, "SC Sibling Goods").expect("padding is not blank");
+    assert_eq!(item.unit().as_bytes(), b" Nos ");
+    assert_eq!(item.parent().as_bytes(), b" SC Goods Group ");
+}
+
+#[test]
 fn a_blank_gst_or_hsn_sub_field_is_refused_like_a_missing_one() {
     let cases = [
         (

@@ -1,0 +1,1 @@
+{"tool": "parse_bank_statement_csv", "arguments": {"statement_path": "<LAB_DIR>/statement.csv", "controls_source": "prior_statement", "opening_balance": "50,000.00", "closing_balance": "35,000.00", "account_label": "Lab CSV 4321", "bank_ledger": "BRIDGE Bank A", "suspense_ledger": "BRIDGE Suspense"}}

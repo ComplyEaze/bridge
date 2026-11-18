@@ -1,0 +1,14 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. Each is the Tally window (PrintWindow).
+shots/c10-window.png: 72933 B, sha256 acc2cec8345d704022abd2303c64247f9ccd67e5e0bdd4155fd001dfbcb972fb
+shots/s0-10-backup-screen.png: 70665 B, sha256 74e9cd88593209af9f7aab140b57938b08d078eeddd69b7717a0c8bae4d79f70
+shots/s0-4-after-restore-gateway.png: 44810 B, sha256 61110fa7188c3f7e46262c69b68167c0e153dbb0255bed08c4d4ae6ef7be2881
+shots/s0-4-restore-screen.png: 40486 B, sha256 a16ad8e32088366fd4974784f10fc9b2af256be1499f4724e7049339378b8e41
+shots/s0-7-after-ctrlq-gateway.png: 44820 B, sha256 e385753b301fd685e5715f472a6559350954519b837163278006d5c17e8e2670
+shots/s0-7-gateway-after-seed.png: 44386 B, sha256 48d4c74275a86128764ff78bbc375318eebaa9585bb445a2af46b3a5e6672899
+shots/s0-7-seed-before-accept.png: 27548 B, sha256 b57a3b9a98a1db8c51c3ace56932d35793c39b97ca2a795eb22dcf824711c08b
+shots/s0-7-stop-spelling-error.png: 25724 B, sha256 d4a93cc31185a1d5e2674ede77860e4cb014ff9a8ac3e9b9995f1a77f325f63c
+shots/s0-7-voucher-opened.png: 30448 B, sha256 7f276511d7e51e526e0ce8aae14bc7c4eb067a1cb4bf5933a28355e36c842ed4
+shots/s0-window.png: 44373 B, sha256 ea592ec8111bb21c3f0ae5c33b1b9d75eda626a399572b2fb62c08039c5e78b8
+shots/s4-after-post.png: 43340 B, sha256 2830f4e0145fa36e5184bbee083509cb47c37bca95499d66ff0bc44a6f66e75d
+shots/s6-1-restore-screen.png: 40629 B, sha256 efee448c4cc65a16e12235c67b36a2392c04797f5899b6647e8530a34dc14e16
+shots/s6-after-restore-gateway.png: 44373 B, sha256 ea592ec8111bb21c3f0ae5c33b1b9d75eda626a399572b2fb62c08039c5e78b8

@@ -1,0 +1,4 @@
+2026-11-18T07:25:33.522Z listing start: every 0.25 s for 240 s; listing only (no click, key, focus or capture)
+2026-11-18T07:25:43.147Z LISTED 0x810710 title 'ComplyEaze Bridge — post 4 vouchers?' class #32770 pid 14268 process bridge_mcp.exe path <BUILD_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent pid 13672; rect 688,171,1252,935; topmost 1
+2026-11-18T07:26:31.320Z NO LONGER LISTED 0x810710
+2026-11-18T07:29:33.627Z listing end

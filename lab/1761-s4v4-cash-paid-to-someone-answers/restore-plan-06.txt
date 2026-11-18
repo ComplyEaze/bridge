@@ -1,0 +1,11 @@
+Row 1761-S4 v4 step 6.1 (C6) restore plan: this row's BK1 (the masters and the seed)
+Source folder: <LAB_DIR>\backups\BK1 (one file)
+File: TDBK1800_<company number>.001
+Bytes: 25675
+sha256: 79be45dd05c25c1eeb16b94f4a9dc76de4e1dbc78f03a48b48909f16db26a9c0
+Backup written: 2026-11-18 12:48 local (the Restore list must show this date and time)
+Company: BRIDGE CASHPAY LAB, number <company number>
+Restore Data Path: <Tally data folder> (Tally data folder)
+Source: Specify Path = the source folder above; select BRIDGE CASHPAY LAB only
+Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace ..." = Replace
+EXPECT after: MARKS first: M 214, V 1, reused false (M0b and V0b)

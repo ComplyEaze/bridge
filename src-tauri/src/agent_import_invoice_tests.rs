@@ -1048,9 +1048,10 @@ async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_b
             'M' => answer(utf16le(include_bytes!(
                 "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"
             ))),
-            'R' => answer(utf16le(include_bytes!(
+            // Captured before the read-back fetched the registration, which `with_registration` adds.
+            'R' => answer(with_registration(&utf16le(include_bytes!(
                 "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
-            ))),
+            )))),
             'D' => answer(e_invoice_answer.clone()),
             month => {
                 let index = if month == 'U' {

@@ -743,8 +743,8 @@ pub(super) fn control_row_found(
 /// `pilot-lab-invoice-readback-post-dated` fixtures). `GSTREGISTRATION` and
 /// `CMPGSTIN` came last, on 10 Nov 2026, when the lab answered this request for
 /// `BP/26-27/0010` with the two names Tally's own read of that voucher holds,
-/// and nothing else in the answer moved (row 2464-GN, `lab/2464-gn-answers`;
-/// that answer holds a GSTIN, so it is not committed). The fetched
+/// and nothing else in the answer moved (§9.16, "The company registration in the
+/// read-back"; that answer holds a GSTIN, so it is not committed). The fetched
 /// `GSTREGISTRATION` carries `TYPE="String"`, which `rows` does not keep, as
 /// it keeps no attribute of any fetched field.
 pub(in crate::agent) fn render_invoice_readback_request(

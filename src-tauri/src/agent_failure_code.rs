@@ -69,6 +69,17 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The differences an invoice's read-back names for the company registration Tally filed it
+    /// under (#2464).
+    pub(crate) enum InvoiceRegistrationCode {
+        /// The registration's name or its GSTIN did not come back, or came back empty.
+        Missing = "invoice_registration_missing",
+        /// The GSTIN is not a valid GSTIN of the company's state the build recorded.
+        Differs = "invoice_registration_differs",
+    }
+}
+
+failure_codes! {
     /// The differences of the number's month reads sent again after a clean read-back (#2162). Each
     /// is a read-back difference, so `posted_verified` is never given; `InAnotherType` is followed
     /// in the difference by the names of the Sales types that hold the number.

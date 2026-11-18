@@ -5,7 +5,8 @@
 //! (the 9 Oct set, the company object `O` of 12 Oct and the ledger catalogue of
 //! 21 Oct), except the rates read `Q`, which is DERIVED: the lab's 21 Oct answer
 //! to the read restricted to the invoice ledgers' parents, cut to the invoice's
-//! ledgers (below).
+//! ledgers (below). The read-back `R` is also DERIVED: its registration name and
+//! GSTIN are inserted by `with_registration` and are not part of the capture.
 //!
 //! - The admission: the company list, the marks, the book extent, the
 //!   currencies, the ledger compliance listing, the paired listing, the
@@ -256,7 +257,14 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'U' => super::lab_number_months()[4].3,
         other => panic!("unknown kind {other}"),
     };
-    answer(utf16(bytes))
+    // DERIVED for the read-back: answered before the request fetched the
+    // registration (see `with_registration`).
+    match letter {
+        'R' => answer(crate::agent::agent_import::invoice::with_registration(
+            &utf16(bytes),
+        )),
+        _ => answer(utf16(bytes)),
+    }
 }
 
 /// The ledger catalogue the build reads, as the pilot lab answered it on
@@ -1130,10 +1138,12 @@ const READBACK_THEN_NUMBER_ORDER: &str = concat!(
     "e9s9seexsxseeysyseezszse"
 );
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
-/// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
-/// line's HSN/SAC and `ISPOSTDATED` (`R-0010.xml` of the 2162-S1 sheet, the
-/// request the code sends; the lab answered it on 3 Nov 2026).
-const LAB_R12_SHA256: &str = "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21";
+/// The read-back of `BP/26-27/0010` with the GSTR-1 status fields, each line's
+/// HSN/SAC, `ISPOSTDATED`, and the registration's `GSTREGISTRATION` and
+/// `CMPGSTIN` (`RC-0010.xml` of the 2464-GN sheet, the request the code sends:
+/// the 2162-S1 sheet's `R-0010.xml` with the last two names added; the lab
+/// answered it on 10 Nov 2026).
+const LAB_R12_SHA256: &str = "bd9717c7830df5217a21ef3d8f4fb1ffb1bc0bc150a7d66dc5cefe12ebe852b5";
 
 /// The posted invoice the pilot lab's book took, as the build saved it.
 fn pilot_saved(number: &str, observed: bool) -> ImportVoucher {

@@ -180,7 +180,7 @@ const TABLE: &[(&str, &str)] = &[
     ),
     (
         "render_invoice_readback_request",
-        "56a684c7e091a04d0596a82d85d85732ef313c027743f5d330ebb0aea2b9cfdd",
+        "aa8ebaaf2d0f229bea484c67eb68135afc98c77fe587d9fb2a16a4172cb479cc",
     ),
     (
         "render_company_registration_request",

@@ -37,17 +37,20 @@ pub(super) struct Row {
     /// Each direct child whose tag ends in `.LIST`, as its own row (its fields
     /// are relative to it): the ledger entries of a voucher.
     pub(super) lists: Vec<(String, Row)>,
-    /// In a list's row, the path of each element that came back with no text
-    /// (`<GSTHSNNAME/>`): present, unlike an element that did not come back.
+    /// The path of each element that came back with no text (`<GSTHSNNAME/>`):
+    /// present, unlike an element that did not come back.
     pub(super) empties: Vec<String>,
 }
 
 impl Row {
-    /// The one value at `path`, `Ok(None)` when absent, an error when repeated.
+    /// The one value at `path`, `Ok(None)` when absent or empty, an error when repeated.
     pub(super) fn one(&self, path: &str) -> Result<Option<&str>, &'static str> {
         let mut found = self.fields.iter().filter(|(key, _)| key == path);
         let first = found.next().map(|(_, value)| value.as_str());
-        if found.next().is_some() {
+        let occurrences = usize::from(first.is_some())
+            + found.count()
+            + self.empties.iter().filter(|key| *key == path).count();
+        if occurrences > 1 {
             return Err("invoice_read_field_repeated");
         }
         Ok(first)
@@ -196,6 +199,8 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                         let value = text.trim();
                         if !value.is_empty() {
                             current.fields.push((relative, value.to_string()));
+                        } else if leaf && list_depth.is_none() {
+                            current.empties.push(relative);
                         }
                     }
                 }
@@ -208,6 +213,15 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                 if let (Some(_), Some(list)) = (row_depth, list_depth) {
                     sub.empties.push(
                         path[list + 1..]
+                            .iter()
+                            .cloned()
+                            .chain(std::iter::once(empty.name().as_ref().to_string()))
+                            .collect::<Vec<_>>()
+                            .join("/"),
+                    );
+                } else if let Some(depth) = row_depth {
+                    current.empties.push(
+                        path[depth + 1..]
                             .iter()
                             .cloned()
                             .chain(std::iter::once(empty.name().as_ref().to_string()))
@@ -726,7 +740,13 @@ pub(super) fn control_row_found(
 /// (7 Oct 2026, §9.16): every field below came back. The four GSTR-1 status
 /// fields were added on 10 Oct 2026 and `ISPOSTDATED` after them on 3 Nov 2026,
 /// each time when the lab answered this request byte for byte (§9.16; the
-/// `pilot-lab-invoice-readback-post-dated` fixtures).
+/// `pilot-lab-invoice-readback-post-dated` fixtures). `GSTREGISTRATION` and
+/// `CMPGSTIN` came last, on 10 Nov 2026, when the lab answered this request for
+/// `BP/26-27/0010` with the two names Tally's own read of that voucher holds,
+/// and nothing else in the answer moved (row 2464-GN, `lab/2464-gn-answers`;
+/// that answer holds a GSTIN, so it is not committed). The fetched
+/// `GSTREGISTRATION` carries `TYPE="String"`, which `rows` does not keep, as
+/// it keeps no attribute of any fetched field.
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
     type_guid: &VoucherTypeGuid,
@@ -743,7 +763,7 @@ pub(in crate::agent) fn render_invoice_readback_request(
         ),
     );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN, ISPOSTDATED</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN, ISPOSTDATED, GSTREGISTRATION, CMPGSTIN</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -902,6 +922,8 @@ pub(super) fn readback_fields(voucher: &Row) -> Result<BTreeMap<String, String>,
         "VCHGSTSTATUSISEXCLUDED",
         "ISGSTOVERRIDDEN",
         "ISPOSTDATED",
+        "GSTREGISTRATION",
+        "CMPGSTIN",
     ] {
         if let Some(value) = voucher.one(key)? {
             fields.insert(key.to_string(), value.to_string());
@@ -1129,7 +1151,8 @@ fn render_ledger_rates(
 
 /// One element of an answer with its attributes, text and children, kept
 /// whole so a field that is present but empty stays different from one that is
-/// absent (`rows` drops empty leaves; the rate rows depend on the difference).
+/// absent (`rows` keeps empty leaves on their containing row; the rate rows
+/// depend on the difference).
 #[derive(Debug, Default)]
 struct Node {
     name: String,

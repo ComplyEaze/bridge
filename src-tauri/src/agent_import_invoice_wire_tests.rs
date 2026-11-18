@@ -806,6 +806,25 @@ fn only_a_sales_holder_with_an_irn_says_the_number_carries_one() {
 }
 
 #[test]
+fn an_empty_field_inside_a_list_is_recorded_only_on_the_list_row() {
+    for empty in [
+        "<GSTHSNNAME TYPE=\"String\"/>",
+        "<GSTHSNNAME TYPE=\"String\"></GSTHSNNAME>",
+    ] {
+        let xml = format!(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION><VOUCHER><ALLLEDGERENTRIES.LIST>{empty}</ALLLEDGERENTRIES.LIST></VOUCHER></COLLECTION></DATA></ENVELOPE>"
+        );
+        let voucher = rows(&xml, "VOUCHER").unwrap().remove(0);
+        let [(tag, list)] = voucher.lists.as_slice() else {
+            panic!("one ledger entry list: {voucher:?}");
+        };
+        assert_eq!(tag, "ALLLEDGERENTRIES.LIST");
+        assert_eq!(list.empties, ["GSTHSNNAME"], "{empty}");
+        assert_eq!(voucher.empties, Vec::<String>::new(), "{empty}");
+    }
+}
+
+#[test]
 fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     let guid = &format!("{}-00000193", sentinel_uuid(0x5));
     let (from, to) = (date("20250401"), date("20260331"));
@@ -1723,11 +1742,13 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
     );
 }
 
-/// The read-back request with the four GSTR-1 status fields and `ISPOSTDATED`
-/// is, byte for byte, the one the lab answered for `BP/26-27/0010` on 3 Nov 2026
-/// (the file begins with the byte order mark the request is sent with): the 10 Oct
-/// request with that one word added. For `BP/26-27/0021` it is that file with the
-/// number changed.
+/// The read-back request is, byte for byte, the one the lab answered for
+/// `BP/26-27/0010` on 10 Nov 2026 (row 2464-GN's `RC-0010.xml`, by its SHA-256;
+/// the file begins with the byte order mark the request is sent with): the 3 Nov
+/// request with `GSTREGISTRATION` and `CMPGSTIN` added at the end of its fetch
+/// list. Without those two names it is the 3 Nov request, which has the four
+/// GSTR-1 status fields and `ISPOSTDATED`: the 10 Oct request with that one word
+/// added. For `BP/26-27/0021` that is the 3 Nov file with the number changed.
 #[test]
 fn the_status_read_back_request_is_the_one_the_lab_answered() {
     let type_guid =
@@ -1743,6 +1764,29 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
         [0xFF, 0xFE]
             .into_iter()
             .chain(rendered.encode_utf16().flat_map(u16::to_le_bytes))
+            .collect::<Vec<u8>>()
+    };
+    assert_eq!(
+        crate::agent::sha256_hex(&sent("BP/26-27/0010")),
+        "bd9717c7830df5217a21ef3d8f4fb1ffb1bc0bc150a7d66dc5cefe12ebe852b5"
+    );
+    let added = ", GSTREGISTRATION, CMPGSTIN</FETCH>";
+    let sent = |text: &str| {
+        let rendered = render_invoice_readback_request(
+            "BRIDGE PILOT LAB",
+            &type_guid,
+            &number(text),
+            (&from, &to),
+        );
+        assert_eq!(rendered.matches(added).count(), 1);
+        [0xFF, 0xFE]
+            .into_iter()
+            .chain(
+                rendered
+                    .replace(added, "</FETCH>")
+                    .encode_utf16()
+                    .flat_map(u16::to_le_bytes),
+            )
             .collect::<Vec<u8>>()
     };
     let answered: &[u8] = include_bytes!(

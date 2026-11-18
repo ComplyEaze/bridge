@@ -596,8 +596,8 @@ pub(super) fn control_miss(
     Ok(ControlMiss { sales_rows, guid })
 }
 
-/// A window read's verdict on one invoice number: whether a Sales-class row of
-/// the window holds a number that folds to it (case and the leading zeros of
+/// A window read's verdict on one invoice number: whether a row of the invoice's
+/// class in the window holds a number that folds to it (case and the leading zeros of
 /// each digit run ignored, `folded_number`), and if so whether one such holder
 /// carries an IRN. The window read returns every voucher of its window, so the
 /// program, not Tally's filter, makes the comparison (row 2162-S4: Tally's
@@ -631,7 +631,7 @@ pub(super) fn number_holding(
 
 /// The number's month reads sent again after a post (#2162): the posted
 /// invoice, found by the read-back in `posted_type`, must be the only
-/// Sales-class voucher of its financial year whose number folds to its own,
+/// voucher of the invoice's class in its financial year whose number folds to its own,
 /// compared as the build compares it (`number_holding`). The read-back filters
 /// on the posted type's GUID, so a Sales voucher of another type holding the
 /// number is seen only here. `months` are the answers of every month of the
@@ -696,7 +696,7 @@ pub(super) fn number_after_post_difference(
 }
 
 /// Whether the number read for a known invoice (the control) found it: a row
-/// carrying exactly that number and that date, read as Sales class. Any other
+/// carrying exactly that number and that date, read as the invoice's class. Any other
 /// row is not the control, and a row whose class cannot be read is an error,
 /// as for the read it controls.
 pub(super) fn control_row_found(

@@ -30,10 +30,16 @@ mod wire;
 pub(super) use wire::HsnWarning;
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
-    render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request_for_ledgers,
+    render_company_registration_request, render_group_hsn_request, render_invoice_readback_request,
+    render_invoice_window_numbers_request, render_ledger_rates_request_for_ledgers,
     render_voucher_types_request, VoucherTypeGuid,
 };
+// Retired from the build (#2162 item 11), and kept for the tests that pin its
+// bytes: the request-byte table of #2417 imports it from here. Until that
+// table lands nothing on this path uses it, hence the allow.
+#[cfg(test)]
+#[allow(unused_imports)]
+pub(in crate::agent) use wire::render_invoice_number_request;
 
 /// What an invoice voucher carries besides its entries.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -188,6 +194,40 @@ pub(super) enum RefusalDetail {
     /// A count, a state, a voucher type, an invoice number or a batch id:
     /// never a ledger.
     Value(String),
+    /// `invoice_number_control_missing`: the control's batch (the detail a
+    /// caller reads), and what the answer that should have shown it held
+    /// instead (#2162 item 13), so the cause stays measurable.
+    ControlMissing(Box<ControlMissing>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ControlMissing {
+    pub(super) batch_id: String,
+    pub(super) number: String,
+    pub(super) date: String,
+    miss: wire::ControlMiss,
+}
+
+impl ControlMissing {
+    fn to_json(&self) -> serde_json::Value {
+        let guid = match &self.miss.guid {
+            None => serde_json::json!("not_recorded"),
+            Some(wire::GuidSeen::NotSeen) => serde_json::json!("not_seen"),
+            Some(wire::GuidSeen::Seen {
+                number,
+                date,
+                voucher_type,
+            }) => serde_json::json!({
+                "seen_as": {"voucher_number": number, "date": date, "voucher_type": voucher_type}
+            }),
+        };
+        serde_json::json!({
+            "voucher_number": self.number,
+            "date": self.date,
+            "sales_rows_in_answer": self.miss.sales_rows,
+            "guid_in_answer": guid,
+        })
+    }
 }
 
 impl InvoiceRefusal {
@@ -201,8 +241,12 @@ impl InvoiceRefusal {
                 serde_json::json!(super::super::party_name(name.as_str()))
             }
             RefusalDetail::Value(text) => serde_json::json!(text),
+            RefusalDetail::ControlMissing(missing) => serde_json::json!(missing.batch_id),
         };
         let mut value = serde_json::json!({"code": self.code, "detail": detail});
+        if let RefusalDetail::ControlMissing(missing) = &self.detail {
+            value["control"] = missing.to_json();
+        }
         if let Some(remediation) = super::super::refusal_remediation(self.code) {
             value["remediation"] = serde_json::json!(remediation);
         }
@@ -594,7 +638,7 @@ pub(super) fn refuse_supplied_observed<D: super::PayloadDate>(
 pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(), String> {
     if vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice())
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
     {
         return Err("invoice_amendment_not_supported".to_string());
     }
@@ -604,7 +648,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
 pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
-    if !voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_none() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
             None => Ok(()),
@@ -1107,7 +1151,7 @@ impl super::super::Server {
         let Some(voucher) = line
             .vouchers
             .iter()
-            .find(|voucher| voucher.voucher_type.is_invoice())
+            .find(|voucher| voucher.voucher_type.invoice_class().is_some())
         else {
             return Ok(None);
         };
@@ -1138,7 +1182,7 @@ pub(super) fn queued_invoice_for<'a>(
 > {
     let invoiced = vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice());
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some());
     match (invoiced, invoice, control, vouchers) {
         (false, None, None, _) => Ok(None),
         (true, Some(queued), Some(control), [voucher]) => Ok(Some((voucher, queued, control))),
@@ -1737,7 +1781,8 @@ impl super::super::Server {
             return only("invoice_readback_book_too_large", mark_evidence);
         }
         let date = voucher.date.as_str();
-        let (Some(year), Some(type_guid), Some(number)) = (
+        let (Some(class), Some(year), Some(type_guid), Some(number)) = (
+            voucher.voucher_type.invoice_class(),
             financial_year_window(date),
             VoucherTypeGuid::parse(&observed.voucher_type_guid),
             voucher
@@ -1756,9 +1801,58 @@ impl super::super::Server {
         let Ok((xml, evidence)) = self.post_read(identity, request).await else {
             return only("invoice_readback_failed", mark_evidence);
         };
-        let evidence = super::super::combine_evidence(mark_evidence, evidence);
-        let (differences, alter_id, guid, lines) =
-            readback_outcome(wire::parse_invoice_readback(&xml), voucher, date);
+        let mut evidence = super::super::combine_evidence(mark_evidence, evidence);
+        let parsed = wire::parse_invoice_readback(&xml);
+        let posted_type = match &parsed {
+            Ok(wire::Readback::One(read)) => read.fields.get("VOUCHERTYPENAME").cloned(),
+            _ => None,
+        };
+        let (mut differences, alter_id, guid, lines) = readback_outcome(parsed, voucher, date);
+        // The read-back finds the invoice in its own type only, so a Sales
+        // voucher of another type holding the number is seen only by the
+        // number's month reads the build sends, sent again here for every
+        // month of the invoice's financial year (#2162). A month that fails
+        // ends the reads, and the post is not verified.
+        if differences.is_empty() {
+            let mut answers = Vec::new();
+            let mut failed = false;
+            match wire::calendar_months(&year.0, &year.1) {
+                Some(months) => {
+                    for month in &months {
+                        let request = super::super::invoice_window_numbers_read(
+                            &company.name,
+                            class,
+                            (&month.0, &month.1),
+                        );
+                        match self.post_read(identity, request).await {
+                            Ok((month_xml, month_evidence)) => {
+                                evidence = super::super::combine_evidence(evidence, month_evidence);
+                                answers.push(month_xml);
+                            }
+                            Err(_) => {
+                                failed = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                None => failed = true,
+            }
+            if failed {
+                differences.push(
+                    crate::agent::failure_code::InvoiceNumberAfterPostCode::ReadFailed
+                        .as_str()
+                        .to_owned(),
+                );
+            } else {
+                differences.extend(wire::number_after_post_difference(
+                    &answers,
+                    class,
+                    number.as_str(),
+                    posted_type.as_deref(),
+                ));
+            }
+        }
         Ok((differences, alter_id, guid, lines, evidence))
     }
 }
@@ -1866,9 +1960,7 @@ pub(super) fn party_bill_wise_in(
 /// of the customer's bills.
 pub(super) fn new_ref_party(voucher: &ImportVoucher) -> Option<&str> {
     // Only an invoice has one, whatever detail another voucher may carry.
-    if !voucher.voucher_type.is_invoice() {
-        return None;
-    }
+    voucher.voucher_type.invoice_class()?;
     let detail = voucher.invoice.as_ref()?;
     if !detail.observed.as_ref()?.party_bill_wise {
         return None;
@@ -1885,6 +1977,14 @@ pub(super) fn party_entry(voucher: &ImportVoucher) -> Option<&ImportEntry> {
         .entries
         .iter()
         .find(|entry| entry.side == EntrySide::Dr && Some(entry.ledger.as_str()) != round_off)
+}
+
+/// The index of the month among `months` whose first and last day hold a
+/// YYYYMMDD date, if one does.
+fn month_holding(months: &[(TallyDate, TallyDate)], date: &str) -> Option<usize> {
+    months
+        .iter()
+        .position(|(first, last)| first.as_str() <= date && date <= last.as_str())
 }
 
 /// The financial year (1 April to 31 March) a YYYYMMDD date falls in, as the
@@ -1956,7 +2056,11 @@ pub(super) enum Need {
     Listing,
     Rates,
     VoucherTypes,
-    Number,
+    /// The read of the month at this index of the invoice's financial year
+    /// (`wire::calendar_months`), in order from April (#2162 item 11).
+    Number(usize),
+    /// The read of the control's month, when the control is dated outside the
+    /// invoice's financial year.
     NumberControl,
     Registration,
     /// The company object, for the HSN/SAC check (asked once the classification
@@ -2010,12 +2114,12 @@ fn admitted(
 /// mark. A voucher mark Tally did not give never admits.
 fn size_gate(marks: &str, company_guid: &str) -> Result<super::PreImportMark, Verdict> {
     let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
-    // The duplicate-number read and the read-back each walk the book's
-    // vouchers (a formula decides the rows, so Tally evaluates every
-    // voucher): at the build, at both re-reads (a redeemed approval repeats
-    // them), in the endpoint queue, after the post and at every later
-    // verification. The voucher mark
-    // bounds that walk.
+    // The duplicate number's month reads walk the book's vouchers (a formula
+    // decides the rows, so Tally evaluates every voucher) at the build, at
+    // both re-reads (a redeemed approval repeats them) and in the endpoint
+    // queue; after the post and at every later verification the read-back
+    // walks them, and so do the month reads again when the read-back is
+    // clean. The voucher mark bounds that walk.
     if let Some(refusal) = voucher_mark_refusal(mark.value) {
         return Err(refusing(refusal));
     }
@@ -2095,12 +2199,11 @@ impl InvoiceJudge<'_> {
                 admitted(super::super::invoice_company_registration_read(company))
             }
             Need::GroupHsn => admitted(super::super::invoice_group_hsn_read(company)),
-            Need::CompanyHsn => {
+            Need::CompanyHsn => Ok(
                 crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn(
                     self.identity,
-                )
-                .map_err(|error| Verdict::Failed(error.to_string()))
-            }
+                ),
+            ),
             Need::Rates => {
                 let scope = self.scope()?;
                 let window = self.year()?;
@@ -2110,15 +2213,18 @@ impl InvoiceJudge<'_> {
                     scope.part(),
                 ))
             }
-            Need::Number => {
-                let year = self.year()?;
-                let supplied = self.voucher.voucher_number.as_deref().unwrap_or_default();
-                let number = InvoiceNumber::parse(supplied)
-                    .ok_or_else(|| refusing(refuse_value("invoice_number_invalid", supplied)))?;
-                admitted(super::super::invoice_number_read(
+            Need::Number(index) => {
+                // The month read carries no number, but a number outside the
+                // invoice alphabet is refused before any read of it.
+                self.number()?;
+                let months = self.months()?;
+                let month = months
+                    .get(index)
+                    .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))?;
+                admitted(super::super::invoice_window_numbers_read(
                     company,
-                    &number,
-                    (&year.0, &year.1),
+                    self.class()?,
+                    (&month.0, &month.1),
                 ))
             }
             Need::NumberControl => match self.number_control_request()? {
@@ -2129,23 +2235,56 @@ impl InvoiceJudge<'_> {
         }
     }
 
-    /// The read of the invoice the journal offers as the number's control, or
-    /// none when it offers none.
+    /// The invoice's class, from its voucher type. A judge is made only for
+    /// an invoice, so `None` is a plan that cannot be (#2346).
+    fn class(&self) -> Result<super::InvoiceClass, Verdict> {
+        self.voucher
+            .voucher_type
+            .invoice_class()
+            .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))
+    }
+
+    /// The invoice's number, parsed once: the month reads compare it after
+    /// they return, so an absent or out-of-alphabet number is refused here,
+    /// never folded to nothing and judged unheld.
+    fn number(&self) -> Result<InvoiceNumber, Verdict> {
+        let supplied = self.voucher.voucher_number.as_deref().unwrap_or_default();
+        InvoiceNumber::parse(supplied)
+            .ok_or_else(|| refusing(refuse_value("invoice_number_invalid", supplied)))
+    }
+
+    /// The calendar months of the invoice's financial year, each as its first
+    /// and last day: the windows of the number's reads.
+    fn months(&self) -> Result<Vec<(TallyDate, TallyDate)>, Verdict> {
+        let year = self.year()?;
+        wire::calendar_months(&year.0, &year.1)
+            .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))
+    }
+
+    /// The read of the month of the invoice the journal offers as the
+    /// number's control, when that invoice is dated outside the invoice's
+    /// financial year. None when the journal offers none, or when the control
+    /// is dated inside that year: it is then checked in that month's answer.
     fn number_control_request(
         &self,
     ) -> Result<Option<crate::tally::agent_read_request::AgentReadRequest>, Verdict> {
         let super::ledger::NumberControl::Known { number, date, .. } = self.control else {
             return Ok(None);
         };
-        let (Some(window), Some(number)) =
-            (financial_year_window(date), InvoiceNumber::parse(number))
-        else {
-            return Err(unusable("invoice_number_control_unreadable"));
-        };
-        admitted(super::super::invoice_number_read(
+        let unreadable = || unusable("invoice_number_control_unreadable");
+        let window = financial_year_window(date).ok_or_else(unreadable)?;
+        InvoiceNumber::parse(number).ok_or_else(unreadable)?;
+        if month_holding(&self.months()?, date).is_some() {
+            return Ok(None);
+        }
+        let months = wire::calendar_months(&window.0, &window.1).ok_or_else(unreadable)?;
+        let month = month_holding(&months, date)
+            .map(|index| &months[index])
+            .ok_or_else(unreadable)?;
+        admitted(super::super::invoice_window_numbers_read(
             self.identity.display_name(),
-            &number,
-            (&window.0, &window.1),
+            self.class()?,
+            (&month.0, &month.1),
         ))
         .map(Some)
     }
@@ -2163,7 +2302,9 @@ impl InvoiceJudge<'_> {
             rates: self.request(Need::Rates)?,
             ledger_parents: self.scope()?.parents(),
             voucher_types: self.request(Need::VoucherTypes)?,
-            number: self.request(Need::Number)?,
+            number: (0..self.months()?.len())
+                .map(|index| self.request(Need::Number(index)))
+                .collect::<Result<_, _>>()?,
             number_control: self.number_control_request()?,
             registration: self.request(Need::Registration)?,
             company_hsn: self.request(Need::CompanyHsn)?,
@@ -2277,26 +2418,37 @@ impl InvoiceJudge<'_> {
         };
         let types = wire::parse_voucher_types(types_body)
             .map_err(|code| Verdict::Failed(code.to_string()))?;
-        let resolved = wire::resolve_voucher_type(&types, &type_name, "Sales")
+        let class = self.class()?;
+        let resolved = wire::resolve_voucher_type(&types, &type_name, class.reserved())
             .map_err(|code| refusing(refuse_value(code, &type_name)))?;
 
-        // 3b. The number must not already be in use in this type and year.
-        let number = voucher.voucher_number.clone().unwrap_or_default();
-        let Some(number_body) = answers.number.as_deref() else {
-            return Err(Verdict::Need(Need::Number));
-        };
-        if wire::count_sales_vouchers(number_body)
-            .map_err(|code| Verdict::Failed(code.to_string()))?
-            != 0
-        {
-            let code = if wire::sales_holder_has_irn(number_body)
-                .map_err(|code| Verdict::Failed(code.to_string()))?
+        // 3b. The number must not already be in use on a Sales-class voucher
+        // of the invoice's financial year, compared as the leading-zero rule
+        // folds it (#2162 item 11, decided 4 November 2026). Each month's
+        // answer is judged as it arrives; the first that holds the number
+        // refuses, with the IRN of the holders that month shows.
+        let number = self.number()?;
+        let number = number.as_str();
+        let months = self.months()?;
+        for body in &answers.number {
+            if let wire::NumberHolding::Held { with_irn } =
+                wire::number_holding(body, class, number)
+                    .map_err(|code| Verdict::Failed(code.to_string()))?
             {
-                "invoice_number_already_used_with_irn"
-            } else {
-                "invoice_number_already_used"
-            };
-            return Err(refusing(refuse_value(code, &number)));
+                let code = if with_irn {
+                    "invoice_number_already_used_with_irn"
+                } else {
+                    "invoice_number_already_used"
+                };
+                return Err(refusing(refuse_value(code, number)));
+            }
+        }
+        match answers.number.len().cmp(&months.len()) {
+            std::cmp::Ordering::Less => {
+                return Err(Verdict::Need(Need::Number(answers.number.len())));
+            }
+            std::cmp::Ordering::Greater => return Err(unusable("invoice_read_plan_inconsistent")),
+            std::cmp::Ordering::Equal => {}
         }
         // 3c. "No voucher carries this number" is believed only beside a
         // control: the same read for an invoice this company is known to hold
@@ -2308,17 +2460,31 @@ impl InvoiceJudge<'_> {
                 batch_id,
                 number: known,
                 date,
+                guid,
             } => {
-                let Some(control_body) = answers.number_control.as_deref() else {
-                    return Err(Verdict::Need(Need::NumberControl));
+                // A control dated inside the year is looked for in its month's
+                // answer; one dated outside it in its own month's read.
+                let control_body = match month_holding(&months, date) {
+                    Some(index) => answers.number[index].as_str(),
+                    None => match answers.number_control.as_deref() {
+                        Some(body) => body,
+                        None => return Err(Verdict::Need(Need::NumberControl)),
+                    },
                 };
-                if !wire::control_row_found(control_body, known, date)
+                if !wire::control_row_found(control_body, class, known, date)
                     .map_err(|code| Verdict::Failed(code.to_string()))?
                 {
-                    return Err(refusing(refuse_value(
-                        "invoice_number_control_missing",
-                        batch_id,
-                    )));
+                    let miss = wire::control_miss(control_body, class, guid.as_deref())
+                        .map_err(|code| Verdict::Failed(code.to_string()))?;
+                    return Err(refusing(InvoiceRefusal {
+                        code: "invoice_number_control_missing",
+                        detail: RefusalDetail::ControlMissing(Box::new(ControlMissing {
+                            batch_id: batch_id.clone(),
+                            number: known.clone(),
+                            date: date.clone(),
+                            miss,
+                        })),
+                    }));
                 }
                 NumberAbsence::Controlled
             }
@@ -2368,8 +2534,9 @@ impl InvoiceJudge<'_> {
         // far: a code is fixed in Tally and the rest by the caller, and an
         // invoice refused above costs these reads nothing. The company object
         // is read for every admitted invoice, because its settings decide
-        // whether the measured order holds at any level; the groups only when
-        // a sales ledger's own row defers.
+        // whether the measured order holds at any level, and it alone says
+        // whether the company's GST is on; the groups only when a sales
+        // ledger's own row defers.
         let (hsn_refusals, hsn_warnings) =
             self.sales_hsn_refusals(&sales_ledgers, &facts, &as_of, answers)?;
         if !hsn_refusals.is_empty() {
@@ -2388,7 +2555,8 @@ impl InvoiceJudge<'_> {
     /// One refusal per sales ledger (the classification's sales lines) whose
     /// HSN/SAC does not resolve on the invoice date, and the warnings on the
     /// codes that do, in ledger-name order; or the next answer the check
-    /// needs.
+    /// needs. A company object whose GST setting is not on refuses the
+    /// invoice first, by itself.
     fn sales_hsn_refusals(
         &self,
         sales_ledgers: &[String],
@@ -2407,6 +2575,15 @@ impl InvoiceJudge<'_> {
         };
         let company = wire::parse_company_hsn(company_body, self.identity.company_guid())
             .map_err(|code| Verdict::Failed(code.to_string()))?;
+        // A tax invoice needs the company's GST on. Off, or not stated, the
+        // invoice is refused whatever its lines resolve to.
+        match company.gst {
+            wire::CompanyGst::On => {}
+            wire::CompanyGst::Off => return Err(refusing(refuse("invoice_company_gst_off"))),
+            wire::CompanyGst::Unstated => {
+                return Err(refusing(refuse("invoice_company_gst_unstated")))
+            }
+        }
         // The build reads the groups only when a sales ledger's own row defers
         // to them. The queue's `read_invoice_plan` always reads them, and an
         // answer that is present is always parsed here, needed or not: a groups
@@ -2568,16 +2745,20 @@ impl super::super::Server {
                     Need::CompanyHsn
                     | Need::Rates
                     | Need::VoucherTypes
-                    | Need::Number
+                    | Need::Number(_)
                     | Need::NumberControl
                     | Need::GroupHsn
                     | Need::Registration => {
                         let request = judge.request(need).map_err(admission_of)?;
                         let (xml, read, _) = self.post_admitted_read(identity, request).await?;
+                        if matches!(need, Need::Number(_)) {
+                            answers.number.push(xml);
+                            note(&mut evidence, read);
+                            continue;
+                        }
                         let slot = match need {
                             Need::Rates => &mut answers.rates,
                             Need::VoucherTypes => &mut answers.voucher_types,
-                            Need::Number => &mut answers.number,
                             Need::NumberControl => &mut answers.number_control,
                             Need::CompanyHsn => &mut answers.company_hsn,
                             Need::GroupHsn => &mut answers.group_hsn,

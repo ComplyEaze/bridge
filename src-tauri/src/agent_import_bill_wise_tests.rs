@@ -1060,3 +1060,132 @@ fn live_a_batch_naming_a_bill_wise_and_a_plain_ledger_has_one_party() {
     assert_eq!(parties.len(), 1);
     assert_eq!(parties[0].ledger, LIVE_PARTY);
 }
+
+// The tests below hold what the mutation record for `agent_import_bill_wise.rs`
+// found no test holding (#2058).
+
+/// A party whose header takes exactly the budget is shown with no row and
+/// every row counted as omitted: the header's own bytes come out of the budget
+/// its rows share.
+#[test]
+fn a_header_that_takes_the_whole_budget_is_shown_with_every_row_omitted() {
+    let big = big_party("Party A", 3);
+    let unapproved = vec![(&big, "d".repeat(64))];
+    let (all, _) = refused_parties_json(&unapproved, 1 << 20);
+    let mut header = all[0].clone();
+    header["rows"] = json!([]);
+    header["rows_omitted"] = json!(3);
+    let cost = serde_json::to_string(&header).unwrap().len();
+    let (shown, omitted) = refused_parties_json(&unapproved, cost);
+    assert_eq!(omitted, 0);
+    assert_eq!(shown.len(), 1);
+    assert_eq!(shown[0]["rows"], json!([]));
+    assert_eq!(shown[0]["rows_omitted"], 3);
+}
+
+/// A refused row lists each of its entries with its own side.
+#[test]
+fn a_refused_rows_entries_keep_their_sides() {
+    let mixed = party(
+        "Party A",
+        vec![row(
+            "txn-1",
+            VoucherType::Journal,
+            &[(EntrySide::Dr, "5.00"), (EntrySide::Cr, "2.00")],
+        )],
+    );
+    let unapproved = vec![(&mixed, "d".repeat(64))];
+    let (shown, _) = refused_parties_json(&unapproved, 1 << 20);
+    assert_eq!(
+        shown[0]["rows"][0]["entries"],
+        json!([{"side": "Dr", "amount": "5.00"}, {"side": "Cr", "amount": "2.00"}])
+    );
+}
+
+/// A narration that reads "absent" is a different batch from one with no
+/// narration: a present field carries its own marker.
+#[test]
+fn a_narration_spelled_absent_is_not_an_absent_narration() {
+    let mut spelled = batch();
+    spelled[0].narration = Some("absent".into());
+    assert_ne!(
+        batch_content_digest(&batch()),
+        batch_content_digest(&spelled)
+    );
+}
+
+/// An approval saved on a batch is read back only in its own shape.
+#[test]
+fn a_saved_approval_with_an_unknown_field_is_refused() {
+    let digest = "a".repeat(64);
+    assert!(serde_json::from_value::<OnAccountApproved>(
+        json!({"ledger": "Party A", "party_digest": digest})
+    )
+    .is_ok());
+    assert!(serde_json::from_value::<OnAccountApproved>(
+        json!({"ledger": "Party A", "party_digest": digest, "approved_by": "someone"})
+    )
+    .is_err());
+}
+
+/// A Sales invoice whose party Tally read as bill-wise, so its party carries
+/// a New Ref.
+fn invoice_voucher() -> ImportVoucher {
+    let mut sale = voucher(
+        "txn-inv",
+        VoucherType::Sales,
+        vec![
+            entry("Party A", EntrySide::Dr, "118.00"),
+            entry("Sales", EntrySide::Cr, "100.00"),
+            entry("Output CGST", EntrySide::Cr, "9.00"),
+            entry("Output SGST", EntrySide::Cr, "9.00"),
+        ],
+    );
+    sale.invoice = Some(super::super::invoice::InvoiceDetail {
+        voucher_type_name: "Sales".into(),
+        place_of_supply: "Rajasthan".into(),
+        round_off_ledger: None,
+        observed: Some(super::super::invoice::InvoiceObserved {
+            voucher_type_guid: "type-guid".into(),
+            party_gstin: None,
+            party_state: "Rajasthan".into(),
+            party_registration_type: "Unregistered".into(),
+            party_bill_wise: true,
+            company_state: "Rajasthan".into(),
+            sales_ledgers: vec!["Sales".into()],
+            hsn_warnings: Vec::new(),
+        }),
+    });
+    sale
+}
+
+/// Pinned: an invoice's detail is bound under its own marker, so a change to
+/// that encoding moves this value and a reader of the diff must look.
+#[test]
+fn the_batch_digest_of_an_invoice_is_pinned() {
+    assert_eq!(
+        hex(&batch_content_digest(&[invoice_voucher()])),
+        "28a09c39599773a6624d86f3c8cbcbf4d752b9db9c666d89efa4a10dc167f807"
+    );
+}
+
+/// An invoice's party carries a New Ref, so it is not an On Account party even
+/// on a bill-wise ledger; the same ledger on a Journal is one.
+#[test]
+fn an_invoices_new_ref_party_is_no_on_account_party() {
+    let all = ["Party A", "Sales", "Output CGST", "Output SGST"];
+    let bill_wise = observed(&all, &["Party A"]);
+    assert_eq!(
+        bill_wise_parties(&[invoice_voucher()], &bill_wise),
+        Vec::new()
+    );
+    let journal = voucher(
+        "txn-j",
+        VoucherType::Journal,
+        vec![
+            entry("Party A", EntrySide::Dr, "5.00"),
+            entry("Sales", EntrySide::Cr, "5.00"),
+        ],
+    );
+    assert_eq!(bill_wise_parties(&[journal], &bill_wise).len(), 1);
+}

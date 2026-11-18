@@ -89,7 +89,7 @@ impl TallyRuntime {
 
                     let request = render_native_month_register_request(
                         kind,
-                        identity.display_name(),
+                        identity.company_name(),
                         &window,
                     );
                     let (xml, bytes, hash) = client

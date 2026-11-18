@@ -22,11 +22,10 @@ Confidence, with the markers of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`: PARTIA
 observed live, with request and answer captured, but on one synthetic book, one release and one edition, in two
 sittings on one day; Bridge's own transport did not send these requests.
 
-Protocol behaviour these captures record, for the declared reference part (P9). Each is PARTIAL on the scope above, and
-none is yet in a declared part of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`, which is a pinned file and is changed in a
-pull request of its own:
-- `Ledger Outstandings` with a `LedgerName` no ledger carries answers HTTP 200, `RESPSTATUS: 1`, `CONTENT-LENGTH: 0`,
-  no `Content-Type` and no body, twice, with a healthy `/status` between (`ledger-outstandings-unknown-party.*`).
+Protocol behaviour these captures record, for the declared reference part (P9), each PARTIAL on the scope above. The
+answer to a `LedgerName` no ledger carries (`ledger-outstandings-unknown-party.*`) is recorded in §12a.27 of
+`docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md`. These two are not yet in a declared part of
+`docs/tally/TALLY_PROTOCOL_REFERENCE.md`, which is a pinned file and is changed in a pull request of its own:
 - A ledger made with a trailing space in its name is held without it, and the `List of Ledgers` snapshot names it so
   (`ledger-snapshot-trailing-space.utf16le.xml`).
 - Of two On Account rows on one party, the second leaves `BILLDUE` and `BILLOVERDUE` empty
@@ -34,7 +33,7 @@ pull request of its own:
 
 Not established: Bridge's own transport against a live Tally for this report (curl sent it); a payable party; a party
 with bill-wise off; a foreign-currency ledger; a real bill whose reference is the text `On Account`; a party with no
-open bills; other releases, editions, a client book.
+open bills (§12a.27 records one on another book); other releases, editions, a client book.
 
 | Fixture | Bytes | SHA-256 | Source (lab file) | What it is |
 | --- | ---: | --- | --- | --- |

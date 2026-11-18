@@ -126,7 +126,7 @@ fn property_names(schema: &Value, names: &mut std::collections::BTreeSet<String>
 /// in capitals. `every_rule_code_the_tax_audit_crate_emits_is_listed` holds it
 /// equal to the codes the engine's sources emit, so a new code fails that test
 /// rather than going missing from a receipt.
-const RULE_CODES: [&str; 61] = [
+const RULE_CODES: [&str; 63] = [
     "BIND-BOOK-DUPLICATE-ID",
     "BIND-COLLISION",
     "BIND-GROUP-UNKNOWN",
@@ -180,6 +180,8 @@ const RULE_CODES: [&str; 61] = [
     "CFG-mixed",
     "CFG-no-directory",
     "CFG-path",
+    "CFG-period-outside-rules",
+    "CFG-rules-year",
     "CFG-snapshot-for-read",
     "CFG-stock",
     "CFG-tally-pin",

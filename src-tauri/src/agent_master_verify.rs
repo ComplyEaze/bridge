@@ -156,7 +156,10 @@ pub(super) fn not_read_back_next_step(code: &str) -> &'static str {
         | "company_identity_ambiguous"
         | "company_identity_incomplete"
         | "company_identity_mismatch"
-        | "company_number_invalid" => NEXT_LOAD_SAME_COMPANIES,
+        | "company_number_invalid"
+        // A name Bridge cannot send: renaming the company in Tally back to the
+        // name the create was recorded under is the remedy.
+        | "company_name_invalid" => NEXT_LOAD_SAME_COMPANIES,
         "master_batch_invalid" | "master_batch_too_large" | "master_intent_missing" => {
             NEXT_RECORD_NOT_READABLE
         }
@@ -355,7 +358,10 @@ impl Server {
                 *evidence = combine_evidence(evidence.clone(), ledger_evidence);
                 profile = Some(boundary);
                 match self
-                    .post_read(identity, native_group_snapshot_read(company))
+                    .post_read(
+                        identity,
+                        native_group_snapshot_read(identity.company_name()),
+                    )
                     .await
                 {
                     Err(failure) => status["group_index"] = unavailable(&failure.code),
@@ -431,7 +437,7 @@ impl Server {
             .map_err(|_| "period_unsupported".to_string())?;
         let part = single_parent_part(parent).ok_or("parent_unsupported".to_string())?;
         let request = crate::agent::read_profiles::party_ledger_master_for_parent_read(
-            identity.display_name(),
+            identity.company_name(),
             &period,
             &part,
         );

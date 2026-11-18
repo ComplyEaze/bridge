@@ -1,0 +1,4 @@
+# fixture: agent/partial-landing-rows/partial-landing-r0-verification-before.utf16le.xml
+# parser: parse_import_verification_rows(STOCK_CREATE_LAB)
+# source: captured
+Ok([])

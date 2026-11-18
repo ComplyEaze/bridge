@@ -1,0 +1,6 @@
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_company.rs
+src-tauri/src/agent_desktop_journal.rs
+src-tauri/src/agent_protocol.rs
+reviewer: lamemustafa

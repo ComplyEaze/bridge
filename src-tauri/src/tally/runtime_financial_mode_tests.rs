@@ -3,6 +3,7 @@ use super::*;
 use crate::reports::party_ledger_master::SourceNoteKind;
 use crate::tally::connection::PartyLedgerMasterSourceValidationError;
 use crate::tally::ConnectionStatus;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -418,7 +419,8 @@ fn balance_request_sha256(company: &str, to: &str) -> String {
     )
     .unwrap();
     let request = bridge_tally_protocol::native_outstandings::render_native_ledger_snapshot_request(
-        company, &period,
+        &ValidatedCompanyName::new(company).unwrap(),
+        &period,
     );
     let mut encoded = vec![0xff, 0xfe];
     encoded.extend(request.encode_utf16().flat_map(u16::to_le_bytes));

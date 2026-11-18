@@ -598,6 +598,19 @@ test("no page tells a visitor to turn on or switch on the Terms setting", () => 
   }
 });
 
+test("the Download page shows the runtime installer address as text, marks the checksum optional and says installing over 0.7.0 is not measured", () => {
+  const page = visibleText(read("download.html")).replaceAll("&nbsp;", " ").replaceAll("&rsquo;", "'").replace(/\s+/g, " ");
+  assert.match(page, /Microsoft's x64 installer is at https:\/\/aka\.ms\/vc14\/vc_redist\.x64\.exe \(type or paste it into your browser/);
+  assert.doesNotMatch(read("download.html"), /href="https:\/\/aka\.ms/, "the page links only to this project");
+  assert.match(page, /This check is optional and you can install without it/);
+  assert.match(page, /Installing over 0\.5\.1, 0\.6\.0, 0\.6\.1 or 0\.7\.0 has not been measured/);
+  const html = read("download.html");
+  const steps = html.slice(html.indexOf("<h2>Install, once</h2>"), html.indexOf("<h2>If you already have an older release</h2>"));
+  assert.ok(steps.length > 500, "the slice holds the steps");
+  assert.doesNotMatch(steps, /after an update from 0\.4\.2/, "the 0.5.0 update note is in the older-release list, not in the steps");
+  assert.match(html.slice(html.indexOf("<h2>If you already have an older release</h2>")), /after an update from 0\.4\.2, Claude&nbsp;Desktop may not start the extension/);
+});
+
 // The Windows package links the Visual C++ runtime dynamically (staticVCRuntime is false in
 // tauri.conf.json) and does not carry it, so the two places a person installs from say so (#1860).
 test("the Download page and the install guide name the Windows Visual C++ runtime prerequisite", () => {

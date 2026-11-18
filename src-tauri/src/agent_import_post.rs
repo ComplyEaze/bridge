@@ -1,4 +1,5 @@
-//! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra);
+//! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra,
+//! or one Sales invoice);
 //! subsequent calls only reconcile its identity.
 use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined, PreviewForm};
 use super::*;
@@ -21,8 +22,9 @@ pub(super) const IMPORT_POST_WINDOW_NOT_BOUNDED: &str = "import_post_window_not_
 /// read's parts together are its size. A verification that reported nothing is
 /// refused, not assumed small.
 /// Which saved batches a caller may post. The agent's `post_import` posts one
-/// Journal, Payment, Receipt or Contra (ADR 0004, amended 2026-09-22); the
-/// desktop's review and approval were built for one Journal and stay so.
+/// Journal, Payment, Receipt or Contra (ADR 0004, amended 2026-09-22), or one
+/// Sales invoice (#2162); the desktop's review and approval were built for one
+/// Journal and stay so.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::agent) enum PostScope {
     JournalOnly,
@@ -1059,7 +1061,7 @@ impl Server {
             if line
                 .vouchers
                 .iter()
-                .any(|voucher| voucher.voucher_type.is_invoice())
+                .any(|voucher| voucher.voucher_type.invoice_class().is_some())
             {
                 let (evidence, plan) = Box::pin(self.recheck_sales_invoice(
                     &identity,
@@ -1073,8 +1075,7 @@ impl Server {
                 invoice_plan = Some(plan);
             }
             let group_collection_request = if renders_bank_shape(&payload.vouchers) {
-                let (groups, evidence) =
-                    self.read_group_collection(&identity, &company.name).await?;
+                let (groups, evidence) = self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
                 let observed =
                     ObservedMasters::new(catalogue_identities.catalog().parents(), groups);
@@ -1109,7 +1110,7 @@ impl Server {
                 }
                 Some(
                     crate::tally::agent_read_request::AgentReadRequest::parse(
-                        native_group_snapshot_read(&company.name).into_xml(),
+                        native_group_snapshot_read(identity.company_name()).into_xml(),
                     )
                     .map_err(|error| error.to_string())?,
                 )
@@ -1130,7 +1131,7 @@ impl Server {
             // Read before approval, so a refused book is never asked about, and
             // sent with the approval so the queue reads it again.
             let (currencies, evidence) = self
-                .post_read(&identity, company_currency_read(&company.name))
+                .post_read(&identity, company_currency_read(identity.company_name()))
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             admit_post_currency(&currencies).map_err(|refusal| {
@@ -1138,7 +1139,7 @@ impl Server {
                 ToolFailure::from(refusal.to_string())
             })?;
             let currency_request = crate::tally::agent_read_request::AgentReadRequest::parse(
-                company_currency_read(&company.name).into_xml(),
+                company_currency_read(identity.company_name()).into_xml(),
             )
             .map_err(|error| error.to_string())?;
             let mode = self.qualified_import_profile().await?;
@@ -1229,7 +1230,7 @@ impl Server {
                     if line
                         .vouchers
                         .iter()
-                        .any(|voucher| voucher.voucher_type.is_invoice())
+                        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
                     {
                         // The catalogue read before the dialog is as old as the
                         // dialog: read it again, so the party's bill-wise flag
@@ -3175,7 +3176,7 @@ pub(super) fn admit_saved_voucher_integrity(
     // An invoice renders only from what its build observed in Tally: one saved
     // without that is not postable, and is never rendered as an empty message.
     if line.vouchers.iter().any(|voucher| {
-        voucher.voucher_type.is_invoice()
+        voucher.voucher_type.invoice_class().is_some()
             && voucher
                 .invoice
                 .as_ref()
@@ -3405,7 +3406,7 @@ fn review_text(
         return batch_review_text(line, company, &origin, &debit, &credit, footer, form);
     }
     let voucher = &line.vouchers[0];
-    if voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_some() {
         return invoice_review_preview(
             line,
             company,

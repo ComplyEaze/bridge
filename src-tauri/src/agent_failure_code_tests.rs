@@ -29,7 +29,6 @@ const READ: &[(ReadCode, &str)] = &[
         ReadCode::CompanyIdentityIncomplete,
         "company_identity_incomplete",
     ),
-    (ReadCode::CompanyNameInvalid, "company_name_invalid"),
     (ReadCode::InvalidDate, "invalid_date"),
     (
         ReadCode::VoucherEntriesUnbalanced,
@@ -77,6 +76,47 @@ const OUTSTANDINGS: &[(OutstandingsCode, &str)] = &[
     (
         OutstandingsCode::AmountInvalid,
         "outstandings_amount_invalid",
+    ),
+];
+
+/// The codes of the invoice number read after the post (#2162).
+const INVOICE_NUMBER_AFTER_POST: &[(InvoiceNumberAfterPostCode, &str)] = &[
+    (
+        InvoiceNumberAfterPostCode::ReadFailed,
+        "invoice_number_read_failed",
+    ),
+    (
+        InvoiceNumberAfterPostCode::TypeUnread,
+        "invoice_number_type_unread",
+    ),
+    (
+        InvoiceNumberAfterPostCode::InAnotherType,
+        "invoice_number_in_another_type",
+    ),
+    (
+        InvoiceNumberAfterPostCode::ReadMissedInvoice,
+        "invoice_number_read_missed_invoice",
+    ),
+    (
+        InvoiceNumberAfterPostCode::NotUnique,
+        "invoice_number_not_unique",
+    ),
+];
+
+/// The lab master tool's refusals that name what they refused (#2499).
+#[cfg(feature = "lab-writes")]
+const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
+    (
+        LabMastersCode::OpeningBillsUnsupported,
+        "lab_opening_bills_unsupported",
+    ),
+    (
+        LabMastersCode::RootParentUnmeasured,
+        "lab_root_parent_unmeasured",
+    ),
+    (
+        LabMastersCode::NameSharesKey,
+        "lab_master_name_shares_a_key",
     ),
 ];
 
@@ -130,7 +170,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
             .map(|(code, text)| ((*code).into(), *text))
             .collect()
     }
-    [
+    let pins = [
         of(GST_UNCERTAIN),
         of(READ),
         of(PROPOSALS),
@@ -138,11 +178,15 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(GST_BY_LEDGER),
         of(REGISTER),
         of(OUTSTANDINGS),
+        of(INVOICE_NUMBER_AFTER_POST),
         of(MOVEMENT),
         of(PRESENCE),
         of(TIE_OUT),
     ]
-    .concat()
+    .concat();
+    #[cfg(feature = "lab-writes")]
+    let pins = [pins, of(LAB_MASTERS)].concat();
+    pins
 }
 
 /// Every declared variant of every enum, as the failure code it makes.
@@ -150,7 +194,7 @@ fn declared() -> Vec<FailureCode> {
     fn of<C: Copy + Into<FailureCode>>(all: &[C]) -> Vec<FailureCode> {
         all.iter().map(|code| (*code).into()).collect()
     }
-    [
+    let codes = [
         of(GstUncertainCode::ALL),
         of(ReadCode::ALL),
         of(ProposalsCode::ALL),
@@ -158,11 +202,15 @@ fn declared() -> Vec<FailureCode> {
         of(GstByLedgerCode::ALL),
         of(RegisterCode::ALL),
         of(OutstandingsCode::ALL),
+        of(InvoiceNumberAfterPostCode::ALL),
         of(MovementCode::ALL),
         of(PresenceCode::ALL),
         of(TieOutCode::ALL),
     ]
-    .concat()
+    .concat();
+    #[cfg(feature = "lab-writes")]
+    let codes = [codes, of(LabMastersCode::ALL)].concat();
+    codes
 }
 
 /// The pins cover every variant, once each and in declaration order, so a variant added without a
@@ -178,10 +226,16 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(GST_BY_LEDGER), GstByLedgerCode::ALL);
     assert_eq!(variants(REGISTER), RegisterCode::ALL);
     assert_eq!(variants(OUTSTANDINGS), OutstandingsCode::ALL);
+    assert_eq!(
+        variants(INVOICE_NUMBER_AFTER_POST),
+        InvoiceNumberAfterPostCode::ALL
+    );
     assert_eq!(variants(PROPOSALS), ProposalsCode::ALL);
     assert_eq!(variants(MOVEMENT), MovementCode::ALL);
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
+    #[cfg(feature = "lab-writes")]
+    assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -212,10 +266,16 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(GST_BY_LEDGER, GstByLedgerCode::as_str);
     check_pins(REGISTER, RegisterCode::as_str);
     check_pins(OUTSTANDINGS, OutstandingsCode::as_str);
+    check_pins(
+        INVOICE_NUMBER_AFTER_POST,
+        InvoiceNumberAfterPostCode::as_str,
+    );
     check_pins(PROPOSALS, ProposalsCode::as_str);
     check_pins(MOVEMENT, MovementCode::as_str);
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
+    #[cfg(feature = "lab-writes")]
+    check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -233,7 +293,12 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    assert_eq!(codes.len(), 39, "the declared codes");
+    // The three lab master codes are declared only in a build with `lab-writes`.
+    #[cfg(not(feature = "lab-writes"))]
+    let expected = 43;
+    #[cfg(feature = "lab-writes")]
+    let expected = 46;
+    assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();
         assert!((1..=64).contains(&text.len()), "{text}");
@@ -243,5 +308,40 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
             "{text}"
         );
         assert!(seen.insert(text), "{text} is declared twice");
+    }
+}
+
+/// The company-read code, pinned as above (#2433).
+#[test]
+fn the_company_read_code_is_pinned() {
+    let pinned: &[(CompanyReadCode, &str)] =
+        &[(CompanyReadCode::NameInvalid, "company_name_invalid")];
+    assert_eq!(
+        pinned.iter().map(|(code, _)| *code).collect::<Vec<_>>(),
+        CompanyReadCode::ALL
+    );
+    for (code, string) in pinned {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+    }
+}
+
+/// The census-reuse refusal (#2399), pinned the same way as the codes above: written out here, so
+/// a changed string fails a test.
+const CENSUS_REUSE: &[(CensusReuseCode, &str)] =
+    &[(CensusReuseCode::Mismatch, "census_reused_mismatch")];
+
+#[test]
+fn the_census_reuse_code_is_pinned_once_and_is_the_string_a_caller_sees() {
+    let pinned: Vec<CensusReuseCode> = CENSUS_REUSE.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, CensusReuseCode::ALL);
+    for (code, string) in CENSUS_REUSE {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()));
+        assert!(string
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'));
     }
 }

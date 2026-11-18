@@ -69,6 +69,42 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The differences of the number's month reads sent again after a clean read-back (#2162). Each
+    /// is a read-back difference, so `posted_verified` is never given; `InAnotherType` is followed
+    /// in the difference by the names of the Sales types that hold the number.
+    pub(crate) enum InvoiceNumberAfterPostCode {
+        /// A month read after the post failed.
+        ReadFailed = "invoice_number_read_failed",
+        /// The posted type, or a returned row's type, could not be read.
+        TypeUnread = "invoice_number_type_unread",
+        /// A Sales voucher of another type holds the number.
+        InAnotherType = "invoice_number_in_another_type",
+        /// No Sales-class voucher holds the number, though the read-back found the invoice.
+        ReadMissedInvoice = "invoice_number_read_missed_invoice",
+        /// More than one Sales voucher of the posted type holds the number.
+        NotUnique = "invoice_number_not_unique",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a read for a listed company, before any request names it.
+    pub(crate) enum CompanyReadCode {
+        /// The company's name, as Tally reported it, is one a request cannot carry (#2433).
+        NameInvalid = "company_name_invalid",
+    }
+}
+
+failure_codes! {
+    /// The refusal of a `vouchers` read that took a held census (#2399).
+    pub(crate) enum CensusReuseCode {
+        /// The read used a census counted by an earlier call, and a part it read
+        /// was not the vouchers that census described. The census is dropped; the
+        /// next call counts afresh. `cause` says how the part differed.
+        Mismatch = "census_reused_mismatch",
+    }
+}
+
+failure_codes! {
     /// Codes that several read tools write for the same failure, declared once.
     pub(crate) enum ReadCode {
         /// The window's `from` is after its `to`.
@@ -87,8 +123,6 @@ failure_codes! {
         InvalidAsOf = "invalid_as_of",
         /// The verified company's identity lacks a part the read needs.
         CompanyIdentityIncomplete = "company_identity_incomplete",
-        /// The company's name is not one a request can carry.
-        CompanyNameInvalid = "company_name_invalid",
         /// A date is not a date.
         InvalidDate = "invalid_date",
         /// A voucher's entries do not sum to zero.
@@ -192,6 +226,20 @@ failure_codes! {
         InvalidDirection = "invalid_direction",
         /// A bill's amount is not an exact decimal.
         AmountInvalid = "outstandings_amount_invalid",
+    }
+}
+
+#[cfg(feature = "lab-writes")]
+failure_codes! {
+    /// The refusals of `lab_import_masters` that name what they refused, each before any write.
+    pub(crate) enum LabMastersCode {
+        /// A ledger carries opening bill allocations (bridge#1500).
+        OpeningBillsUnsupported = "lab_opening_bills_unsupported",
+        /// A group's parent is the root, or absent (bridge#974).
+        RootParentUnmeasured = "lab_root_parent_unmeasured",
+        /// A requested name shares one of master's name-index keys with a target master whose name
+        /// has another canonical key (#2499).
+        NameSharesKey = "lab_master_name_shares_a_key",
     }
 }
 

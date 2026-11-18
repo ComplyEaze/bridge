@@ -30,13 +30,18 @@ export function companyIdentityKey(input: CompanyIdentityKeyInput): CompanyIdent
   ]) as CompanyIdentityKey;
 }
 
-export function companyIdentityLabel(identity: CompanyIdentityKey): string {
-  const [canonicalOrigin, companyGuid, companyNumber, companyName, booksFrom] = JSON.parse(identity) as [
+/**
+ * Spells out an identity for the screen. The key holds the raw name, as Tally
+ * reported it; the label draws `shownName`, the company's name by the one
+ * display rule (#2462), and takes every other part from the key.
+ */
+export function companyIdentityLabel(identity: CompanyIdentityKey, shownName: string): string {
+  const [canonicalOrigin, companyGuid, companyNumber, , booksFrom] = JSON.parse(identity) as [
     string,
     string,
     string,
     string,
     string,
   ];
-  return `${companyName} · Company no. ${companyNumber} · Books from ${booksFrom} · GUID ${companyGuid} · Endpoint ${canonicalOrigin}`;
+  return `${shownName} · Company no. ${companyNumber} · Books from ${booksFrom} · GUID ${companyGuid} · Endpoint ${canonicalOrigin}`;
 }

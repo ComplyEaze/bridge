@@ -1,5 +1,5 @@
 //! Movement for the local MCP adapter.
-use super::failure_code::{FailureCode, MovementCode, ReadCode};
+use super::failure_code::{CompanyReadCode, FailureCode, MovementCode, ReadCode};
 use super::voucher_window::{WindowScope, LEDGER_SCOPE_NEEDS_DAY_SPLIT};
 use super::*;
 use bridge_tally_core::TallyDate;
@@ -495,7 +495,7 @@ impl Server {
         known_marks: Option<CompanyMarks>,
     ) -> Result<MovementWindowRead, ToolFailure> {
         let company = ValidatedCompanyName::new(company.to_string())
-            .map_err(|_| ReadCode::CompanyNameInvalid)?;
+            .map_err(|_| CompanyReadCode::NameInvalid)?;
         let range = ValidatedDateRange::new(from.as_str(), to.as_str())
             .map_err(|_| ReadCode::InvalidDateRange)?;
         let shape = VoucherReadShape::Movement;

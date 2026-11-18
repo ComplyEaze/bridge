@@ -192,8 +192,13 @@ pub(crate) struct InvoiceReadPlan {
     /// so it is unchanged when one is regrouped; this is how the queue tells.
     pub(crate) ledger_parents: Vec<(String, String)>,
     pub(crate) voucher_types: AgentReadRequest,
-    pub(crate) number: AgentReadRequest,
-    /// The same read for the invoice the journal held as the number's control.
+    /// The invoice's financial year read for its Sales rows one calendar
+    /// month at a time, in order: the number is looked for in these answers
+    /// (#2162 item 11).
+    pub(crate) number: Vec<AgentReadRequest>,
+    /// The same read of the month of the invoice the journal held as the
+    /// number's control, when that invoice is dated outside the year above;
+    /// one dated inside it is checked in that month's answer.
     pub(crate) number_control: Option<AgentReadRequest>,
     pub(crate) registration: AgentReadRequest,
     /// The company object the HSN/SAC check reads once the classification
@@ -230,7 +235,8 @@ pub(crate) struct InvoiceAnswers {
     pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
     pub(crate) rates: Option<String>,
     pub(crate) voucher_types: Option<String>,
-    pub(crate) number: Option<String>,
+    /// The answers to the plan's month reads, in order, as far as read.
+    pub(crate) number: Vec<String>,
     pub(crate) number_control: Option<String>,
     pub(crate) registration: Option<String>,
     pub(crate) company_hsn: Option<String>,
@@ -315,7 +321,7 @@ impl MasterAdmission {
             )?,
             group_index_request: AgentReadRequest::parse(
                 bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
-                    company.display_name(),
+                    company.company_name(),
                 ),
             )?,
             company: company.clone(),
@@ -3437,10 +3443,8 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // was seen not to hold when the box opened seconds after the
                 // last input went to Tally. With MB_SYSTEMMODAL added the box
                 // held it in one lab run on Windows 10, where Tally still took a
-                // click and a key while the box was open (#1780). That run did
-                // not test what else a system-modal box changes: the taskbar
-                // showed no task buttons while it was open, cause not tested
-                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // click and a key while the box was open (#1780). It is also
+                // owned by `guarded`'s hidden topmost
                 // window, the other way a stand-in box was seen to stay on top
                 // (#1780); an owned box has no taskbar button. When Windows lets it,
                 // MB_SETFOREGROUND also gives the box the foreground, so a key

@@ -7,9 +7,9 @@ use quick_xml::{events::Event, Reader};
 
 use crate::{
     attr_value, configured_reader, normalized_standard_company_guid, normalized_standard_value,
-    path_eq, pop_expected_path, read_identifier_text, read_optional_text, read_required_text,
-    validate_export_response, validate_only_attributes, PartyLedgerMasterFieldObservation,
-    TallyLedger,
+    path_eq, pop_expected_path, read_identifier_text, read_optional_text,
+    read_required_identifier_text, read_required_text, validate_export_response,
+    validate_only_attributes, PartyLedgerMasterFieldObservation, TallyLedger,
 };
 
 /// Rows either parser in this file will hold from one `List of Ledgers`
@@ -108,6 +108,17 @@ pub struct StandardLedgerIdentityObservation {
     pub ledger_count: u64,
 }
 
+/// A company name as a request carries it and as Tally echoes it back: exactly as given, never
+/// trimmed, checked by `ValidatedCompanyName` alone, so the name a read sends and the name it
+/// is compared with are the same bytes (#2433).
+fn sendable_company_name(value: &str) -> anyhow::Result<String> {
+    crate::xml_read_profiles::ValidatedCompanyName::new(value)
+        .map(|name| name.as_str().to_owned())
+        .map_err(|_| {
+            anyhow::anyhow!("standard ledger collection contained an invalid company name")
+        })
+}
+
 /// Validates the fixed, documented `List of Ledgers` collection used only to
 /// bootstrap a scoped company identity on responders that reject Bridge's
 /// custom report profile. Ledger names, balances, and identities are inspected
@@ -120,7 +131,7 @@ pub fn parse_standard_ledger_identity_observation(
     let marked = crate::mark_forbidden_numeric_references(xml);
     let xml = marked.as_ref();
     validate_export_response(xml)?;
-    let expected_company_name = normalized_standard_value(expected_company_name, "company name")?;
+    let expected_company_name = sendable_company_name(expected_company_name)?;
     let mut reader = configured_reader(xml);
     let mut path = Vec::<Vec<u8>>::new();
     let mut ledger_count = 0_usize;
@@ -801,7 +812,7 @@ fn parse_standard_ledger_catalog_rows(
     let xml = marked.as_ref();
     validate_export_response(xml).map_err(|_| StandardLedgerCatalogError::MalformedResponse)?;
     let expected_company_name = expected_company_name
-        .map(|name| normalized_standard_value(name, "company name"))
+        .map(sendable_company_name)
         .transpose()
         .map_err(|_| StandardLedgerCatalogError::BoundsViolation)?;
     let expected_company_guid = normalized_standard_company_guid(expected_company_guid)
@@ -1020,10 +1031,10 @@ fn parse_standard_ledger_identity_row(
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         set_bootstrap_context_once(
                             &mut company_name,
-                            normalized_standard_value(
-                                &read_required_text(reader, child.name())?,
-                                "company name",
-                            )?,
+                            sendable_company_name(&read_required_identifier_text(
+                                reader,
+                                child.name(),
+                            )?)?,
                             "company name",
                         )?;
                     }

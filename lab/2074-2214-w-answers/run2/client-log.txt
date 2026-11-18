@@ -1,0 +1,20 @@
+2026-11-18T08:48:50Z exe sha256=7086f1d0d7430e7dc1fefd6f69c0d4a14d717a2e06477b32935a1d3aa4fee1b8 ok; launch-env.json sha256=5e04928921817cdc51a470792080ffc52b66fa8c40c2682446b90d826b7a22ad; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_MAX_BYTES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-18T08:48:50Z launched pid 21844; stderr to server-stderr-20261118T084850Z.log
+2026-11-18T08:48:51Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-18T08:49:19Z 000-tools-list.json tool=list secs=0.019 isError=None error=None saved_sha256=2443e4d22d2e100df63db529e9dcc162838dcd844d9a9907daa3aacd756cd6fd
+2026-11-18T08:49:21Z 001-list-companies.json tool=list_companies secs=0.260 isError=False error=None saved_sha256=0bb3e3f474627b32e904e66801df1943d8a4d800a3b35f7e42f1c531d05874b5
+2026-11-18T08:49:35Z 002-r1-standard-1.json tool=ledger_masters secs=1.485 isError=False error=None saved_sha256=e5cdc08d9d1a137565ab2e86549f686c0c79b99d1e697b1d20cc2370f55249a9
+2026-11-18T08:49:35Z 003-r1-standard-1-egress_log.json tool=egress_log secs=0.061 isError=False error=None saved_sha256=1af42128bde6c730b5083d30b2879a29f7e659d99dbf309b66562293dda715be
+2026-11-18T08:51:36Z 004-r1-standard-2.json tool=ledger_masters secs=2.103 isError=False error=None saved_sha256=343441ba48fd94c9006ea8dbb1e929505e4b8bf1b2279bc42e235adb245acf9a
+2026-11-18T08:51:36Z 005-r1-standard-2-egress_log.json tool=egress_log secs=0.078 isError=False error=None saved_sha256=c2886b9d79ac4c0c2f2a14704a2a8e0e2353d14dd52fc1221c1488cb1c6d49c0
+2026-11-18T08:52:16Z 006-a2-mailing.json tool=ledger_masters secs=1.560 isError=False error=None saved_sha256=39d85851c84f4c4db9aa0d778794794f759cad2df626c0ddcee5e4cd6a337bd0
+2026-11-18T08:52:17Z 007-a2-mailing-egress_log.json tool=egress_log secs=0.031 isError=False error=None saved_sha256=8f26be218b659eb86b15801fcb9218d54a5938fbe2f5c710a436293571079c59
+2026-11-18T09:15:18Z 008-m2-standard.json tool=ledger_masters secs=1.669 isError=False error=None saved_sha256=341e353b7c0de85f3ba46cf30b6a8615463c2ab7b84e651d50a1b93d953f319e
+2026-11-18T09:15:19Z 009-m2-standard-egress_log.json tool=egress_log secs=0.053 isError=False error=None saved_sha256=749e29739d23842537fce61e7ea9e78198409d43615c8212c28b6ea51ebaff23
+2026-11-18T09:15:33Z 010-m2-mailing.json tool=ledger_masters secs=9.752 isError=False error=None saved_sha256=05ea2b3739a431d37d260907a0b4699db7ef066d634bd7354f59f6448deded53
+2026-11-18T09:15:34Z 011-m2-mailing-egress_log.json tool=egress_log secs=0.046 isError=False error=None saved_sha256=aece51490aef6c0b65d3a1f98255971c935784f5c3ccc85a92b06d1ee385228e
+2026-11-18T09:15:37Z 012-m2-mailing-p1.json tool=ledger_masters secs=2.199 isError=False error=None saved_sha256=3e4a76daace0a99849074a16d90e92a60beebe5f9a289861b6dd26d97e909f8e
+2026-11-18T09:15:38Z 013-m2-mailing-p1-egress_log.json tool=egress_log secs=0.049 isError=False error=None saved_sha256=c432319097e7139974127a7218e3d3bc950f03fbd872dc38c04c1065d87c54bf
+2026-11-18T09:15:39Z 014-m2-mailing-p2.json tool=ledger_masters secs=1.077 isError=False error=None saved_sha256=9ede7c0dfd75d959bc1c33e7b53e8abb3d761535a5ce5235f9fd284aa9124e7d
+2026-11-18T09:15:40Z 015-m2-mailing-p2-egress_log.json tool=egress_log secs=0.106 isError=False error=None saved_sha256=2822a530e842de97e0f3982a72cace987a71a782d13e5f17069d24e6b54bb9cd
+2026-11-18T09:19:31Z session ended; server pid 21844 exit code 0

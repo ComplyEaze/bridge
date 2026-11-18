@@ -243,13 +243,18 @@ async fn the_party_bills_pair_reads_a_body_twice_as_before() {
     assert_eq!(bytes, 3926);
 }
 
-/// Empty once beside a body, in either order, is the pair's drift, never either answer.
+/// Empty once beside a body, including a typed empty body, in either order, is the pair's drift,
+/// never either answer. The typed empty body is derived, not captured: the captured empty answer
+/// carries no content type, and the two differ only as answer values (equal bytes, equal hash).
 #[tokio::test]
 async fn an_empty_answer_beside_a_body_is_the_pairs_drift() {
     let body = report_answer("ledger-outstandings-p1-20260731.utf16le.xml");
+    let typed_empty = report_answer("ledger-outstandings-unknown-party.utf16le.xml");
     for (first, second) in [
         (EMPTY_HEAD.to_vec(), body.clone()),
         (body.clone(), EMPTY_HEAD.to_vec()),
+        (EMPTY_HEAD.to_vec(), typed_empty.clone()),
+        (typed_empty.clone(), EMPTY_HEAD.to_vec()),
     ] {
         let (client, server) = serve(vec![
             ("POST", first),

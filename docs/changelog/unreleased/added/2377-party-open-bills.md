@@ -10,8 +10,9 @@
   from the ledger catalogue as the other party details resolve it, and the book's own name is sent only if it is ASCII
   letters, digits and single inner spaces; any other name is refused before anything is sent
   (`party_name_not_admitted`). The company's marks are read before and after, and must be unchanged. Measured with
-  curl on TallyPrime 7.2 on one synthetic book: a receivable party at two dates, and parties with one bill each;
-  Bridge's own build has not yet been run against a live Tally. Not measured: a payable party, a party with bill-wise
-  off, a foreign-currency ledger, a party with no open bills. Until that last answer is measured, an answer with no
-  rows refuses (`party_bills_no_rows_not_established`). The answer carries `ledger_match`, which says when the party
-  asked for was bound by case or spacing.
+  curl on TallyPrime 7.2 on two synthetic books: a receivable party at two dates, parties with one bill each, and
+  `BRIDGE Supplier RJ` on `BRIDGE PILOT LAB` at 31 July 2026 answering empty, its ledger bill-wise with an empty
+  closing; Bridge's own build has not yet been run against a live Tally. Not measured: a payable party with a
+  non-empty answer, a party with bill-wise off, a foreign-currency ledger, a party with no open bills. Until that last
+  answer is measured, an answer with no rows refuses (`party_bills_no_rows_not_established`). The answer carries
+  `ledger_match`, which says when the party asked for was bound by case or spacing.

@@ -28,8 +28,8 @@ Tests: `src/native_outstandings/party_bills_tests.rs` parses each answer and tie
 record keeps what each parser returns.
 
 Confidence, with the markers of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`: PARTIAL for every finding here. Each was
-observed live, with request and answer captured, but on one synthetic book, one release and one edition, in two
-sittings on one day; Bridge's own transport did not send these requests.
+observed live, with request and answer captured, but on two synthetic books and one release, in sittings on 8 and
+9 Nov 2026; Bridge's own transport did not send these requests.
 
 Protocol behaviour these captures record, for the declared reference part (P9). Each is PARTIAL on the scope above, and
 none is yet in a declared part of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`, which is a pinned file and is changed in a
@@ -41,9 +41,9 @@ pull request of its own:
 - Of two On Account rows on one party, the second leaves `BILLDUE` and `BILLOVERDUE` empty
   (`ledger-outstandings-two-on-account.utf16le.xml`).
 
-Not established: Bridge's own transport against a live Tally for this report (curl sent it); a payable party; a party
-with bill-wise off; a foreign-currency ledger; a real bill whose reference is the text `On Account`; a party with no
-open bills; other releases, editions, a client book.
+Not established: Bridge's own transport against a live Tally for this report (curl sent it); a payable party with
+a non-empty answer; a party with bill-wise off; a foreign-currency ledger; a real bill whose reference is the text
+`On Account`; a party with no open bills; other releases, editions, a client book.
 
 | Fixture | Bytes | SHA-256 | Source (lab file) | What it is |
 | --- | ---: | --- | --- | --- |

@@ -47,7 +47,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::xml_text::escape_text as xml_escape;
+use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 
 /// The name of the `SYSTEM` formula a census slice request adds.
 pub const CENSUS_FORMULA_NAME: &str = "BridgeSpan";
@@ -357,10 +357,7 @@ pub fn render_ledger_census_slice_request(company: &str, slice: &LedgerCensusSli
     </HEADER>
     <BODY>
         <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                <SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY>
-            </STATICVARIABLES>
+            {static_variables}
             <TDL>
                 <TDLMESSAGE>
                     <SYSTEM TYPE="Formulae" NAME="{formula}">$AlterID &gt; {after} AND $AlterID &lt;= {through}</SYSTEM>
@@ -374,7 +371,11 @@ pub fn render_ledger_census_slice_request(company: &str, slice: &LedgerCensusSli
         </DESC>
     </BODY>
 </ENVELOPE>"#,
-        company = xml_escape(company),
+        static_variables = static_variables_for_unvalidated_company(
+            company,
+            "\n                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>\n                ",
+            "\n            ",
+        ),
         formula = CENSUS_FORMULA_NAME,
         after = slice.after,
         through = slice.through,
@@ -416,8 +417,12 @@ fn render_master_census_slice<C>(
     slice: &CensusSlice<C>,
 ) -> String {
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="{formula}">$AlterID &gt; {after} AND $AlterID &lt;= {through}</SYSTEM><COLLECTION NAME="{collection}" ISMODIFY="No"><TYPE>{master_type}</TYPE><FETCH>GUID</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE><FILTERS>{formula}</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="{formula}">$AlterID &gt; {after} AND $AlterID &lt;= {through}</SYSTEM><COLLECTION NAME="{collection}" ISMODIFY="No"><TYPE>{master_type}</TYPE><FETCH>GUID</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE><FILTERS>{formula}</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        static_variables = static_variables_for_unvalidated_company(
+            company,
+            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+            "",
+        ),
         formula = CENSUS_FORMULA_NAME,
         after = slice.after,
         through = slice.through,

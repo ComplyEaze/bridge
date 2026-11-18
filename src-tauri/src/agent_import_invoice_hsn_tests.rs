@@ -93,6 +93,7 @@ fn company(rows: Vec<HsnRow>) -> CompanyHsn {
             code_length: Some("4".to_string()),
         }],
         classification_on: Some("No".to_string()),
+        gst: CompanyGst::On,
     }
 }
 
@@ -115,6 +116,7 @@ const DATE: &str = "20260807";
 fn the_company_object_answer_carries_the_company_code_and_its_settings() {
     let firm = parse_company_hsn(&utf16(COMPANY_OBJECT), LAB_GUID).unwrap();
     assert_eq!(firm.classification_on.as_deref(), Some("No"));
+    assert_eq!(firm.gst, CompanyGst::On);
     assert_eq!(
         firm.settings,
         vec![CompanyGstRow {
@@ -705,4 +707,266 @@ fn a_warning_code_is_saved_under_the_name_the_response_gives_it() {
     ] {
         assert_eq!(serde_json::to_value(code).unwrap(), code.as_str());
     }
+}
+
+const GY_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml"
+);
+
+const GY_OFF: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"
+);
+
+/// Row 2162-GY's two company object answers (copies with the company number
+/// replaced; see `pilot-lab-gy/PROVENANCE.md`), one book before and after
+/// its GST setting was turned off: the setting reads on, then off, and the
+/// HSN/SAC settings the resolution reads are the same in both.
+#[test]
+fn row_2162_gy_reads_the_company_gst_on_before_and_off_after() {
+    let before = parse_company_hsn(&utf16(GY_BEFORE), LAB_GUID).unwrap();
+    let off = parse_company_hsn(&utf16(GY_OFF), LAB_GUID).unwrap();
+    assert_eq!(before.gst, CompanyGst::On);
+    assert_eq!(off.gst, CompanyGst::Off);
+    assert_eq!(before.classification_on.as_deref(), Some("No"));
+    assert_eq!(
+        (&off.rows, &off.settings, &off.classification_on),
+        (&before.rows, &before.settings, &before.classification_on)
+    );
+}
+
+/// The company's GST setting, on edits of the captured company object (marked
+/// as edits; the captured `ISGSTON` reads `Yes`): `No` reads as off, `Yes` and
+/// `No` padded with spaces read as the value (the edge trims), and an element
+/// emptied, removed or holding other text reads as not stated. A
+/// second `ISGSTON` fails the read, as any repeated field does.
+#[test]
+fn the_company_gst_setting_is_on_only_for_yes_and_off_only_for_no() {
+    let answer = utf16(COMPANY_OBJECT);
+    let element = "<ISGSTON TYPE=\"Logical\">Yes</ISGSTON>";
+    assert_eq!(answer.matches("<ISGSTON").count(), 1);
+    assert_eq!(answer.matches(element).count(), 1);
+    let read = |edited: &str| parse_company_hsn(edited, LAB_GUID).map(|firm| firm.gst);
+    assert_eq!(read(&answer), Ok(CompanyGst::On));
+    for (edit, gst) in [
+        ("<ISGSTON TYPE=\"Logical\">No</ISGSTON>", CompanyGst::Off),
+        // The edge trims: a padded value reads as the value.
+        ("<ISGSTON TYPE=\"Logical\"> Yes </ISGSTON>", CompanyGst::On),
+        ("<ISGSTON TYPE=\"Logical\"> No </ISGSTON>", CompanyGst::Off),
+        ("<ISGSTON TYPE=\"Logical\"></ISGSTON>", CompanyGst::Unstated),
+        (
+            "<ISGSTON TYPE=\"Logical\"> </ISGSTON>",
+            CompanyGst::Unstated,
+        ),
+        ("", CompanyGst::Unstated),
+        (
+            "<ISGSTON TYPE=\"Logical\">yes</ISGSTON>",
+            CompanyGst::Unstated,
+        ),
+        (
+            "<ISGSTON TYPE=\"Logical\">True</ISGSTON>",
+            CompanyGst::Unstated,
+        ),
+    ] {
+        assert_eq!(read(&answer.replace(element, edit)), Ok(gst), "{edit}");
+    }
+    let twice = answer.replace(element, &format!("{element}{element}"));
+    assert_eq!(read(&twice), Err("invoice_read_field_repeated"));
+}
+
+// The tests below hold what the mutation record for this module found no test
+// holding (#2058).
+
+/// Each refusal code is one the response has advice for, and its own advice.
+#[test]
+fn each_refusal_code_has_its_own_advice() {
+    let unresolved = crate::agent::refusal_remediation(UNRESOLVED);
+    let not_measured = crate::agent::refusal_remediation(NOT_MEASURED);
+    assert!(unresolved.is_some() && not_measured.is_some());
+    assert_ne!(unresolved, not_measured);
+}
+
+/// A row that says it carries its own code but holds none is not measured,
+/// even under a company whose minimum length would admit an empty code.
+#[test]
+fn a_row_specifying_its_own_code_but_holding_none_is_refused() {
+    let mut firm = no_code_company();
+    firm.settings[0].code_length = Some("0".to_string());
+    assert_eq!(
+        resolve_hsn(
+            &ledger(vec![own("20260401", "")]),
+            Some(&top_chain()),
+            None,
+            &firm,
+            DATE
+        ),
+        HsnStep::Refused(NOT_MEASURED)
+    );
+}
+
+/// The minimum length counts characters, as a warning's length does: a code
+/// of two two-byte characters is shorter than four (synthetic codes).
+#[test]
+fn the_minimum_length_counts_characters_not_bytes() {
+    let firm = no_code_company();
+    let step = |code: &str| {
+        resolve_hsn(
+            &ledger(vec![own("20260401", code)]),
+            Some(&top_chain()),
+            None,
+            &firm,
+            DATE,
+        )
+    };
+    assert_eq!(step("\u{e9}\u{e9}"), HsnStep::Refused(NOT_MEASURED));
+    assert_eq!(
+        step("\u{e9}\u{e9}\u{e9}\u{e9}"),
+        resolved("\u{e9}\u{e9}\u{e9}\u{e9}", HsnLevel::Ledger)
+    );
+}
+
+/// The rules read ASCII digits only, take the SAC chapter as its two digits,
+/// judge a type of supply not read on its length alone, and count a code's
+/// length in characters (edited codes).
+#[test]
+fn the_warning_rules_read_ascii_digits_and_the_two_digit_sac_chapter() {
+    use HsnWarningCode::*;
+    use SupplyType::{Goods, NotJudged, Services};
+    let codes = |code: &str, supply| {
+        hsn_warnings("L", code, &HsnLevel::Ledger, supply)
+            .into_iter()
+            .map(|warning| warning.code)
+            .collect::<Vec<_>>()
+    };
+    // Devanagari digits are numeric, but not the digits a code is written in.
+    let devanagari = "\u{96f}\u{96f}\u{96e}\u{969}\u{967}\u{969}";
+    assert_eq!(codes(devanagari, Services), [NotDigits]);
+    assert_eq!(
+        hsn_warnings("L", devanagari, &HsnLevel::Ledger, Services)[0].characters,
+        6
+    );
+    // One leading 9 is not the SAC chapter.
+    assert_eq!(codes("984713", Goods), []);
+    assert_eq!(codes("984713", Services), [NotASacForServices]);
+    assert_eq!(codes("847130", NotJudged), [TypeOfSupplyNotJudged]);
+}
+
+/// Edits of the captured company object (marked as edits): a row whose date
+/// is written twice fails the read, rather than reading as a row with no date
+/// or as no row; a classification named in the row reaches the resolution;
+/// and a row holding only an attribute, or only text, is not the placeholder.
+#[test]
+fn the_company_row_is_read_whole_or_refused() {
+    let answer = utf16(COMPANY_OBJECT);
+    let open = "<HSNDETAILS.LIST>";
+    assert_eq!(answer.matches(open).count(), 1);
+    // Edit: the row's date twice.
+    let date = "<APPLICABLEFROM TYPE=\"Date\">20260401</APPLICABLEFROM>";
+    let twice = answer.replace(open, &format!("{open}{date}"));
+    assert_eq!(
+        parse_company_hsn(&twice, LAB_GUID),
+        Err("invoice_read_field_repeated")
+    );
+    // Edit: a classification named in the row.
+    let unnamed = "<HSNCLASSIFICATIONNAME TYPE=\"String\"></HSNCLASSIFICATIONNAME>";
+    assert_eq!(answer.matches(unnamed).count(), 1);
+    let named = answer.replace(
+        unnamed,
+        "<HSNCLASSIFICATIONNAME TYPE=\"String\">Edited</HSNCLASSIFICATIONNAME>",
+    );
+    let firm = parse_company_hsn(&named, LAB_GUID).unwrap();
+    assert_eq!(
+        firm.rows.as_ref().unwrap()[0].classification.as_deref(),
+        Some("Edited")
+    );
+    assert_eq!(
+        resolve_hsn(
+            &ledger(vec![defer("20260401")]),
+            Some(&top_chain()),
+            Some(&chart(vec![], vec![placeholder()])),
+            &firm,
+            DATE,
+        ),
+        HsnStep::Refused(NOT_MEASURED)
+    );
+    // Edits: the row holding only an attribute, or only text.
+    let start = answer.find(open).unwrap();
+    let end = answer.find("</HSNDETAILS.LIST>").unwrap();
+    for edit in [
+        "<HSNDETAILS.LIST TYPE=\"Edited\">",
+        "<HSNDETAILS.LIST>Edited",
+    ] {
+        let edited = format!("{}{edit}{}", &answer[..start], &answer[end..]);
+        let firm = parse_company_hsn(&edited, LAB_GUID).unwrap();
+        let rows = firm.rows.as_ref().unwrap();
+        assert!(!rows[0].empty && !rows[0].unmeasured, "{edit}");
+    }
+}
+
+/// The company object's one company is bound by its GUID whatever the case;
+/// an answer with no company object (the captured group listing), or with
+/// the company twice or without its GUID (edits, marked as such), is refused.
+#[test]
+fn the_company_object_is_one_company_bound_by_its_guid() {
+    let answer = utf16(COMPANY_OBJECT);
+    assert!(parse_company_hsn(&answer, &LAB_GUID.to_uppercase()).is_ok());
+    assert_eq!(
+        parse_company_hsn(&utf16(GROUPS), LAB_GUID),
+        Err("invoice_company_object_absent")
+    );
+    // Edit: the company twice.
+    let start = answer.find("<COMPANY NAME=").unwrap();
+    let end = answer.rfind("</COMPANY>").unwrap() + "</COMPANY>".len();
+    let twice = format!("{}{}", &answer[..end], &answer[start..]);
+    assert_eq!(
+        parse_company_hsn(&twice, LAB_GUID),
+        Err("invoice_company_object_absent")
+    );
+    // Edit: the GUID removed.
+    let guid = format!("<GUID TYPE=\"String\">{LAB_GUID}</GUID>");
+    assert_eq!(answer.matches(&guid).count(), 1);
+    assert_eq!(
+        parse_company_hsn(&answer.replace(&guid, ""), LAB_GUID),
+        Err("invoice_company_object_mismatch")
+    );
+}
+
+/// Edits of the captured group listings (marked as edits): the binding GUID
+/// is compared whatever its case and must be there, every group must be
+/// named, an answer with no collection is refused under its own code, and a
+/// group whose rows cannot be read is kept as having none.
+#[test]
+fn the_group_parser_reads_each_group_or_refuses_under_its_own_code() {
+    let answer = utf16(GROUPS);
+    assert_eq!(
+        parse_group_hsn(&answer, &LAB_GUID.to_uppercase()).map(|groups| groups.len()),
+        Ok(28)
+    );
+    // Edit: the first group's binding removed.
+    let bound = format!("<BRIDGECOMPANYGUID TYPE=\"String\">{LAB_GUID}</BRIDGECOMPANYGUID>");
+    assert_eq!(
+        parse_group_hsn(&answer.replacen(&bound, "", 1), LAB_GUID),
+        Err("invoice_group_hsn_company_mismatch")
+    );
+    // Edit: the first group's name removed.
+    let first = "<GROUP NAME=\"Bank Accounts\"";
+    assert_eq!(answer.matches(first).count(), 1);
+    assert_eq!(
+        parse_group_hsn(&answer.replace(first, "<GROUP"), LAB_GUID),
+        Err("invoice_group_hsn_row_unnamed")
+    );
+    // Edit: the collection renamed.
+    let renamed = answer
+        .replace("<COLLECTION ", "<LISTING ")
+        .replace("</COLLECTION>", "</LISTING>");
+    assert_eq!(
+        parse_group_hsn(&renamed, LAB_GUID),
+        Err("invoice_read_collection_absent")
+    );
+    // Edit: the sub-group's code twice.
+    let listing = utf16(GROUPS_HSN);
+    let code = "<HSNCODE TYPE=\"String\">998343</HSNCODE>";
+    assert_eq!(listing.matches(code).count(), 1);
+    let groups =
+        parse_group_hsn(&listing.replace(code, &format!("{code}{code}")), LAB_GUID).unwrap();
+    assert_eq!(groups.get("BRIDGE Sales Sub"), Some(&None));
 }

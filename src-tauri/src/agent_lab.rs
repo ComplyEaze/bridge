@@ -514,11 +514,16 @@ pub(super) fn render_lab_master_collection(
         .map_err(|_| "company_name_invalid".to_string())?;
     let object_type = kind.tally_type();
     let name = format!("Bridge Lab {object_type}s");
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            r#"<SVFROMDATE TYPE="Date">{}</SVFROMDATE><SVTODATE TYPE="Date">{}</SVTODATE>"#,
+            period.from().as_str(),
+            period.to().as_str(),
+        ),
+    );
     Ok(format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{name}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{}</SVFROMDATE><SVTODATE TYPE="Date">{}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="{name}" ISMODIFY="No"><TYPE>{object_type}</TYPE><FETCH>{}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        xml_escape(company.as_str()),
-        period.from().as_str(),
-        period.to().as_str(),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{name}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="{name}" ISMODIFY="No"><TYPE>{object_type}</TYPE><FETCH>{}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         kind.fetch_fields()
     ))
 }
@@ -1272,9 +1277,14 @@ pub(super) fn render_lab_voucher_key_probe(
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
     let (day, method, key) = (day.as_str(), term.method(), key.as_str());
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            r#"<SVFROMDATE TYPE="Date">{day}</SVFROMDATE><SVTODATE TYPE="Date">{day}</SVTODATE>"#
+        ),
+    );
     Ok(format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Key Probe</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{day}</SVFROMDATE><SVTODATE TYPE="Date">{day}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeLabKeyProbe">$Date &gt;= $$Date:"{day}" AND $Date &lt;= $$Date:"{day}" AND {method} = "{key}"</SYSTEM><COLLECTION NAME="Bridge Lab Voucher Key Probe" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERTYPENAME,GUID,MASTERID,ALTERID,ISCANCELLED,ISOPTIONAL</FETCH><COMPUTE>BRIDGEREMOTEID:$RemoteID</COMPUTE><FILTERS>BridgeLabKeyProbe</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        xml_escape(company.as_str())
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Key Probe</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeLabKeyProbe">$Date &gt;= $$Date:"{day}" AND $Date &lt;= $$Date:"{day}" AND {method} = "{key}"</SYSTEM><COLLECTION NAME="Bridge Lab Voucher Key Probe" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERTYPENAME,GUID,MASTERID,ALTERID,ISCANCELLED,ISOPTIONAL</FETCH><COMPUTE>BRIDGEREMOTEID:$RemoteID</COMPUTE><FILTERS>BridgeLabKeyProbe</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#
     ))
 }
 

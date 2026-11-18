@@ -78,7 +78,7 @@ fn proposal_marker_bytes_are_admitted_before_entry_conversion() {
     vouchers[255]["party"] = json!(format!("{party}P"));
     vouchers[255]["entries"][0]["amount"] = json!("not-an-amount");
     assert_eq!(
-        parse_proposals(&json!({"vouchers": vouchers})),
+        parse_proposals(&json!({"vouchers": vouchers})).map_err(|failure| failure.code),
         Err("presence_proposal_raw_bytes_too_large".to_string())
     );
 }
@@ -2285,14 +2285,23 @@ async fn voucher_presence_reads_a_captured_composite_window_under_the_books_base
         .collect::<Vec<_>>();
     // The currency reads follow the window, for the company the identity named.
     for (offset, request) in [
-        (5, render_company_currency_request("BRIDGE FOREXGROUP LAB")),
+        (
+            5,
+            render_company_currency_request(
+                &ValidatedCompanyName::new("BRIDGE FOREXGROUP LAB").unwrap(),
+            ),
+        ),
         (
             9,
-            render_company_currency_request_with_originalname("BRIDGE FOREXGROUP LAB"),
+            render_company_currency_request_with_originalname(
+                &ValidatedCompanyName::new("BRIDGE FOREXGROUP LAB").unwrap(),
+            ),
         ),
         (
             13,
-            render_company_base_currency_request("BRIDGE FOREXGROUP LAB"),
+            render_company_base_currency_request(
+                &ValidatedCompanyName::new("BRIDGE FOREXGROUP LAB").unwrap(),
+            ),
         ),
     ] {
         assert_eq!(

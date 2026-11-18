@@ -5,6 +5,7 @@ use crate::native_outstandings::{
     render_company_base_currency_request, render_company_currency_request,
     render_company_currency_request_with_originalname,
 };
+use crate::xml_read_profiles::ValidatedCompanyName;
 
 const COMPANY_CURRENCY_LIVE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -48,17 +49,21 @@ fn forex_row(xml: &str) -> &str {
 /// (TALLY_PROTOCOL_REFERENCE §9.10a.2).
 #[test]
 fn only_the_classified_read_fetches_originalname() {
-    let plain = render_company_currency_request("Synthetic Company");
+    let plain =
+        render_company_currency_request(&ValidatedCompanyName::new("Synthetic Company").unwrap());
     assert!(plain.contains("<FETCH>NAME, MAILINGNAME, DECIMALPLACES</FETCH>"));
     assert!(!plain.contains("ORIGINALNAME"));
     assert_eq!(
-        render_company_currency_request_with_originalname("Synthetic Company"),
+        render_company_currency_request_with_originalname(
+            &ValidatedCompanyName::new("Synthetic Company").unwrap()
+        ),
         plain.replace(
             "DECIMALPLACES</FETCH>",
             "DECIMALPLACES, ORIGINALNAME</FETCH>"
         )
     );
-    let company = render_company_base_currency_request("Synthetic & Co");
+    let company =
+        render_company_base_currency_request(&ValidatedCompanyName::new("Synthetic & Co").unwrap());
     assert!(company.contains("<TYPE>Company</TYPE><FETCH>NAME, GUID, CURRENCYNAME</FETCH>"));
     assert!(company.contains("<SVCURRENTCOMPANY>Synthetic &amp; Co</SVCURRENTCOMPANY>"));
     assert!(!company.contains("FILTER") && !company.contains("FORMULA"));

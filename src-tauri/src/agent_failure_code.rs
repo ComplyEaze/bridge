@@ -84,6 +84,192 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The differences an invoice's read-back names for the company registration Tally filed it
+    /// under (#2464).
+    pub(crate) enum InvoiceRegistrationCode {
+        /// The registration's name or its GSTIN did not come back, or came back empty.
+        Missing = "invoice_registration_missing",
+        /// The GSTIN is not a valid GSTIN of the company's state the build recorded.
+        Differs = "invoice_registration_differs",
+    }
+}
+
+failure_codes! {
+    /// The differences of the number's month reads sent again after a clean read-back (#2162). Each
+    /// is a read-back difference, so `posted_verified` is never given; `InAnotherType` is followed
+    /// in the difference by the names of the Sales types that hold the number.
+    pub(crate) enum InvoiceNumberAfterPostCode {
+        /// A month read after the post failed.
+        ReadFailed = "invoice_number_read_failed",
+        /// The posted type, or a returned row's type, could not be read.
+        TypeUnread = "invoice_number_type_unread",
+        /// A Sales voucher of another type holds the number.
+        InAnotherType = "invoice_number_in_another_type",
+        /// No Sales-class voucher holds the number, though the read-back found the invoice.
+        ReadMissedInvoice = "invoice_number_read_missed_invoice",
+        /// More than one Sales voucher of the posted type holds the number.
+        NotUnique = "invoice_number_not_unique",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a read for a listed company, before any request names it.
+    pub(crate) enum CompanyReadCode {
+        /// The company's name, as Tally reported it, is one a request cannot carry (#2433).
+        NameInvalid = "company_name_invalid",
+    }
+}
+
+failure_codes! {
+    /// The refusal of a `vouchers` read that took a held census (#2399).
+    pub(crate) enum CensusReuseCode {
+        /// The read used a census counted by an earlier call, and a part it read
+        /// was not the vouchers that census described. The census is dropped; the
+        /// next call counts afresh. `cause` says how the part differed.
+        Mismatch = "census_reused_mismatch",
+    }
+}
+
+failure_codes! {
+    /// Codes that several read tools write for the same failure, declared once.
+    pub(crate) enum ReadCode {
+        /// The window's `from` is after its `to`.
+        InvalidDateRange = "invalid_date_range",
+        /// An answer lacks a part its read's shape requires.
+        ReadProtocolInvalid = "agent_read_protocol_invalid",
+        /// An amount is not an exact decimal, or a sum of amounts overflows.
+        VoucherAmountInvalid = "voucher_amount_invalid",
+        /// A voucher names a ledger the masters read did not list, or the read lists one twice.
+        LedgerSnapshotDrifted = "ledger_snapshot_drifted",
+        /// Tally answered with a voucher outside the window the request asked for.
+        WindowNotHonoured = "window_not_honoured",
+        /// The host's current date is not a date.
+        CurrentDateInvalid = "current_date_invalid",
+        /// No `as_of` was given and the host's current date, which stands in for it, is not a date.
+        InvalidAsOf = "invalid_as_of",
+        /// The verified company's identity lacks a part the read needs.
+        CompanyIdentityIncomplete = "company_identity_incomplete",
+        /// A date is not a date.
+        InvalidDate = "invalid_date",
+        /// A voucher's entries do not sum to zero.
+        VoucherEntriesUnbalanced = "voucher_entries_unbalanced",
+    }
+}
+
+failure_codes! {
+    /// Codes about a saved proposals file, or the vouchers a tool is given, that several tools
+    /// write for the same failure.
+    pub(crate) enum ProposalsCode {
+        /// The proposals file does not read as the shape it was written in.
+        FileInvalid = "proposals_file_invalid",
+        /// No `proposals_id` was given.
+        IdRequired = "proposals_id_required",
+        /// No `vouchers` were given.
+        VouchersRequired = "vouchers_required",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `ledger_movement` itself.
+    pub(crate) enum MovementCode {
+        /// The vouchers changed between the reads the movement is built from.
+        VoucherSnapshotDrifted = "voucher_snapshot_drifted",
+        /// The ledger's opening balance was not observed, so the answer is partial.
+        OpeningBalanceNotObserved = "opening_balance_not_observed",
+        /// The ledger's movement read failed.
+        ReadFailed = "ledger_movement_read_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `voucher_presence` itself.
+    pub(crate) enum PresenceCode {
+        /// The ledger catalogue the check needs was not read whole.
+        LedgerCatalogueIncomplete = "ledger_catalogue_incomplete",
+        /// The numbering the check was given differs from the book's.
+        NumberingMethodDiffers = "presence_numbering_method_differs_from_book",
+        /// No `numbering` was given.
+        NumberingRequired = "numbering_required",
+        /// A voucher to check lacks a part of its import identity.
+        ImportIdentityIncomplete = "presence_import_identity_incomplete",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `statement_tie_out` itself.
+    pub(crate) enum TieOutCode {
+        /// A sum or difference of the tie-out's amounts is out of range.
+        ArithmeticOutOfRange = "tie_out_arithmetic_out_of_range",
+        /// The ledger's opening balance is not an exact decimal.
+        LedgerOpeningInvalid = "ledger_opening_invalid",
+        /// The ledger's opening balance is missing.
+        LedgerOpeningMissing = "ledger_opening_missing",
+        /// The ledger catalogue names the ledger more than once.
+        LedgerNameDuplicated = "ledger_name_duplicated_in_catalogue",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `gst_status` itself.
+    pub(crate) enum GstStatusCode {
+        /// `voucher_type_name` is not a name the request can carry.
+        TypeNameInvalid = "gst_status_type_name_invalid",
+        /// The window is longer than the tool reads.
+        WindowTooLong = "gst_status_window_too_long",
+        /// The book's voucher mark is above the bound the selection formula is read under.
+        BookTooLarge = "gst_status_book_too_large",
+        /// A voucher in the answer has no date that parses.
+        ReadVoucherUnidentified = "gst_status_read_voucher_unidentified",
+        /// Tally answered with a voucher of another type.
+        TypeNotHonoured = "gst_status_type_not_honoured",
+        /// At least one voucher's flags were unread, so the answer is partial.
+        VoucherUnread = "gst_status_voucher_unread",
+    }
+}
+
+failure_codes! {
+    /// The refusal of `gst_by_counter_ledger` itself.
+    pub(crate) enum GstByLedgerCode {
+        /// The window is partial or withholds a voucher, so it has no totals.
+        WindowPartial = "gst_by_ledger_window_partial",
+    }
+}
+
+failure_codes! {
+    /// The refusal of the register tools themselves.
+    pub(crate) enum RegisterCode {
+        /// The masters read carried no master mark to pin the read under.
+        MasterMarkUnavailable = "register_master_mark_unavailable",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `outstandings` itself.
+    pub(crate) enum OutstandingsCode {
+        /// `ageing_basis` is not one the tool reads.
+        InvalidAgeingBasis = "invalid_ageing_basis",
+        /// `direction` is not one the tool reads.
+        InvalidDirection = "invalid_direction",
+        /// A bill's amount is not an exact decimal.
+        AmountInvalid = "outstandings_amount_invalid",
+    }
+}
+
+#[cfg(feature = "lab-writes")]
+failure_codes! {
+    /// The refusals of `lab_import_masters` that name what they refused, each before any write.
+    pub(crate) enum LabMastersCode {
+        /// A ledger carries opening bill allocations (bridge#1500).
+        OpeningBillsUnsupported = "lab_opening_bills_unsupported",
+        /// A group's parent is the root, or absent (bridge#974).
+        RootParentUnmeasured = "lab_root_parent_unmeasured",
+        /// A requested name shares one of master's name-index keys with a target master whose name
+        /// has another canonical key (#2499).
+        NameSharesKey = "lab_master_name_shares_a_key",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

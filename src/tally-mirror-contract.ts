@@ -12,7 +12,10 @@ export type ConnectionStatus = {
 };
 
 export type TallyCompany = {
+  /** Exactly as Tally reported it: what is stored, compared and sent. */
   name: string;
+  /** `name` by the one company-name rule, from the backend; the only form drawn (#2462). */
+  shown_name: string;
   guid?: string;
   company_number?: string;
   books_from_yyyymmdd?: string;

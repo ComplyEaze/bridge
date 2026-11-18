@@ -13,7 +13,7 @@
 //! about what the books contain or what the setting was during a period (a
 //! cost-centre allocation is stored although the setting reads No, §12a.17).
 use crate::native_stock_summary::{read_collection, read_row_fields, NativeStockError};
-use crate::xml_text::escape_text as xml_escape;
+use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use bridge_tally_primitives::company_guid::CompanyGuid;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -44,8 +44,12 @@ const FIELDS: [&str; 8] = [
 /// formula's string.
 pub fn render_company_features_request(company: &str, company_guid: &CompanyGuid) -> String {
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyFeaturesV1</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeCompanyGuidFilter">$GUID = "{company_guid}"</SYSTEM><COLLECTION NAME="BridgeCompanyFeaturesV1" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{FETCH}</FETCH><FILTERS>BridgeCompanyGuidFilter</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyFeaturesV1</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeCompanyGuidFilter">$GUID = "{company_guid}"</SYSTEM><COLLECTION NAME="BridgeCompanyFeaturesV1" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{FETCH}</FETCH><FILTERS>BridgeCompanyGuidFilter</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        static_variables = static_variables_for_unvalidated_company(
+            company,
+            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+            "",
+        ),
     )
 }
 

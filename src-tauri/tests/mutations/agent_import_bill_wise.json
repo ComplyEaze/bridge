@@ -1,0 +1,1450 @@
+{
+  "file": "src-tauri/src/agent_import_bill_wise.rs",
+  "base_commit": "de54a0f2",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again).",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2319,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_bill_wise.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|bill/)'",
+      "time": "2026-11-11T12:05:23Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 632,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/bill|on_account|invoice|approv/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5079,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5079, for the seven hand-written mutants the filtered run missed and the two the tool's run missed; one hand-written mutant (B60) was caught there",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5085,
+      "command": "as the whole_set run, for the eight still missed there (six hand-written, two from the tool)",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 66,
+      "missed": 0,
+      "unviable": 5
+    },
+    "hand": {
+      "caught": 78,
+      "missed": 0,
+      "unviable": 1
+    },
+    "survived_at_base": {
+      "tool": 2,
+      "hand": 6
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 0
+    },
+    "accepted_not_equivalent": {
+      "tool": 0,
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "54:9 replace ObservedBillWise::from_catalogue -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "66:9 replace ObservedBillWise::is_bill_wise -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_the_observation_does_not_hold_counts_as_bill_wise",
+      "killer_at": "base"
+    },
+    "66:9 replace ObservedBillWise::is_bill_wise -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "66:9 delete ! in ObservedBillWise::is_bill_wise": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_the_observation_does_not_hold_counts_as_bill_wise",
+      "killer_at": "base"
+    },
+    "80:5 replace flags_still_as_approved -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_not_bill_wise_at_the_build_must_still_not_be_bill_wise",
+      "killer_at": "base"
+    },
+    "80:5 replace flags_still_as_approved -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_not_bill_wise_at_the_build_must_still_not_be_bill_wise",
+      "killer_at": "base"
+    },
+    "98:5 replace named_ledgers -> BTreeSet<&str> with BTreeSet::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::live_a_batch_naming_a_bill_wise_and_a_plain_ledger_has_one_party",
+      "killer_at": "base"
+    },
+    "98:5 replace named_ledgers -> BTreeSet<&str> with BTreeSet::from_iter([\"\"])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::live_a_batch_naming_a_bill_wise_and_a_plain_ledger_has_one_party",
+      "killer_at": "base"
+    },
+    "98:5 replace named_ledgers -> BTreeSet<&str> with BTreeSet::from_iter([\"xyzzy\"])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::live_a_batch_naming_a_bill_wise_and_a_plain_ledger_has_one_party",
+      "killer_at": "base"
+    },
+    "108:66 replace != with == in named_ledgers": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::live_a_batch_naming_a_bill_wise_and_a_plain_ledger_has_one_party",
+      "killer_at": "base"
+    },
+    "137:5 replace bill_wise_parties -> Vec<BillWiseParty> with vec![]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "137:5 replace bill_wise_parties -> Vec<BillWiseParty> with vec![Default::default()]": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "143:76 replace || with && in bill_wise_parties": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_the_observation_does_not_hold_counts_as_bill_wise",
+      "killer_at": "base"
+    },
+    "143:42 replace || with && in bill_wise_parties": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_the_observation_does_not_hold_counts_as_bill_wise",
+      "killer_at": "base"
+    },
+    "143:29 replace == with != in bill_wise_parties": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "143:45 delete ! in bill_wise_parties": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_the_observation_does_not_hold_counts_as_bill_wise",
+      "killer_at": "base"
+    },
+    "143:79 delete ! in bill_wise_parties": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "153:58 replace == with != in bill_wise_parties": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_payment_or_receipt_money_leg_on_a_bill_wise_ledger_is_a_party_row",
+      "killer_at": "base"
+    },
+    "185:9 replace Encoder::field with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "191:9 replace Encoder::count with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "195:9 replace Encoder::optional with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "205:9 replace Encoder::finish -> [u8; 32] with [0; 32]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "205:9 replace Encoder::finish -> [u8; 32] with [1; 32]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "210:5 replace side_text -> &'static[u8] with Vec::leak(Vec::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "210:5 replace side_text -> &'static[u8] with Vec::leak(vec![0])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "210:5 replace side_text -> &'static[u8] with Vec::leak(vec![1])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "220:5 replace batch_content_digest -> [u8; 32] with [0; 32]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "220:5 replace batch_content_digest -> [u8; 32] with [1; 32]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "269:5 replace hex -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "269:5 replace hex -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "279:5 replace party_digest -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "279:5 replace party_digest -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "329:5 replace in_listing_order -> Vec<T> with vec![]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_masked_party_list_is_ordered_by_digest_not_by_name",
+      "killer_at": "base"
+    },
+    "329:5 replace in_listing_order -> Vec<T> with vec![Default::default()]": {
+      "verdict": "unviable",
+      "reason": "does not compile: the element type is generic and has no Default bound"
+    },
+    "339:5 replace approved_json -> Vec<Value> with vec![]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::an_approval_by_digest_builds_when_party_names_are_masked",
+      "killer_at": "base"
+    },
+    "339:5 replace approved_json -> Vec<Value> with vec![Default::default()]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::a_party_with_no_bill_wise_ledger_builds_without_an_approval_and_records_none",
+      "killer_at": "base"
+    },
+    "378:9 replace ApprovalError::cause -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::an_approval_that_is_malformed_or_repeated_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "378:9 replace ApprovalError::cause -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::an_approval_that_is_malformed_or_repeated_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "390:5 replace take_approvals -> Result<Vec<OnAccountApproval>, ApprovalError> with Ok(vec![])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "390:5 replace take_approvals -> Result<Vec<OnAccountApproval>, ApprovalError> with Ok(vec![Default::default()])": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "403:12 delete ! in take_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "409:13 replace && with || in take_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "408:54 replace == with != in take_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "412:51 replace || with && in take_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_well_formed_approval_is_parsed",
+      "killer_at": "base"
+    },
+    "413:12 delete ! in take_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "418:43 replace == with != in take_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::one_party_approved_twice_is_refused",
+      "killer_at": "base"
+    },
+    "439:5 replace judge_approvals -> Result<ApprovalVerdict<'a>, ApprovalError> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the type has no Default"
+    },
+    "447:41 replace == with != in judge_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted",
+      "killer_at": "base"
+    },
+    "457:13 delete ! in judge_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted",
+      "killer_at": "base"
+    },
+    "459:56 replace == with != in judge_approvals": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (None, None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (None, Some(String::new()))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (None, Some(\"xyzzy\".into()))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (Some(String::new()), None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (Some(String::new()), Some(String::new()))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (Some(String::new()), Some(\"xyzzy\".into()))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (Some(\"xyzzy\".into()), None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (Some(\"xyzzy\".into()), Some(String::new()))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "473:5 replace side_totals -> (Option<String>, Option<String>) with (Some(\"xyzzy\".into()), Some(\"xyzzy\".into()))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "493:5 replace row_json -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "511:5 replace refused_parties_json -> (Vec<Value>, usize) with (vec![], 0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "511:5 replace refused_parties_json -> (Vec<Value>, usize) with (vec![], 1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "511:5 replace refused_parties_json -> (Vec<Value>, usize) with (vec![Default::default()], 0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "511:5 replace refused_parties_json -> (Vec<Value>, usize) with (vec![Default::default()], 1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "526:17 replace > with == in refused_parties_json": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_whose_header_does_not_fit_is_counted_as_omitted",
+      "killer_at": "base"
+    },
+    "526:17 replace > with < in refused_parties_json": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "526:17 replace > with >= in refused_parties_json": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::a_header_that_takes_the_whole_budget_is_shown_with_every_row_omitted",
+      "killer_at": "this_commit"
+    },
+    "527:21 replace += with -= in refused_parties_json": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_whose_header_does_not_fit_is_counted_as_omitted",
+      "killer_at": "base"
+    },
+    "527:21 replace += with *= in refused_parties_json": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_whose_header_does_not_fit_is_counted_as_omitted",
+      "killer_at": "base"
+    },
+    "530:19 replace -= with += in refused_parties_json": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::a_header_that_takes_the_whole_budget_is_shown_with_every_row_omitted",
+      "killer_at": "this_commit"
+    },
+    "530:19 replace -= with /= in refused_parties_json": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::rows_past_the_budget_are_counted_not_cut_and_the_party_keeps_its_digest",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "B01": {
+      "what": "from_catalogue: every catalogue ledger kept, not only the requested",
+      "edits": [
+        {
+          "from": "            .filter(|(name, _, _)| requested.contains(name))\n            .map(|(name, _, flag)| (name.to_string(), flag))",
+          "to": "            .map(|(name, _, flag)| (name.to_string(), flag))"
+        }
+      ],
+      "mutation": "99e5731ac638c6dcbc390860c35a7b54",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::only_the_requested_ledgers_are_kept_and_the_rest_count_as_bill_wise",
+      "killer_at": "base"
+    },
+    "B02": {
+      "what": "is_bill_wise: a ledger marked on reads as not bill-wise",
+      "edits": [
+        {
+          "from": "!matches!(self.flags.get(ledger), Some(BillWiseFlag::Off))",
+          "to": "!matches!(self.flags.get(ledger), Some(BillWiseFlag::On))"
+        }
+      ],
+      "mutation": "ea9b345ea93d91a87dcb6802368a9b4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_the_observation_does_not_hold_counts_as_bill_wise",
+      "killer_at": "base"
+    },
+    "B03": {
+      "what": "is_bill_wise: an unobserved ledger reads as not bill-wise",
+      "edits": [
+        {
+          "from": "!matches!(self.flags.get(ledger), Some(BillWiseFlag::Off))",
+          "to": "!matches!(self.flags.get(ledger), Some(BillWiseFlag::Off) | None)"
+        }
+      ],
+      "mutation": "c7598278ee0cf6b7fbdf64fb959284b2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_the_observation_does_not_hold_counts_as_bill_wise",
+      "killer_at": "base"
+    },
+    "B04": {
+      "what": "flags_still_as_approved: a ledger the catalogue no longer holds passes",
+      "edits": [
+        {
+          "from": "        None => false,\n    })",
+          "to": "        None => true,\n    })"
+        }
+      ],
+      "mutation": "81f3bdcd43b6790a50d4f28a9d4f00ae",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_named_ledger_the_catalogue_no_longer_holds_fails_the_recheck",
+      "killer_at": "base"
+    },
+    "B05": {
+      "what": "flags_still_as_approved: a ledger now bill-wise passes unapproved",
+      "edits": [
+        {
+          "from": "        Some(BillWiseFlag::On) => approved.contains(name),",
+          "to": "        Some(BillWiseFlag::On) => true,"
+        }
+      ],
+      "mutation": "da386b23da8ad31ea514472d9d803014",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_ledger_not_bill_wise_at_the_build_must_still_not_be_bill_wise",
+      "killer_at": "base"
+    },
+    "B06": {
+      "what": "flags_still_as_approved: an approved ledger no longer bill-wise fails",
+      "edits": [
+        {
+          "from": "        Some(BillWiseFlag::Off) => true,\n        Some(BillWiseFlag::On)",
+          "to": "        Some(BillWiseFlag::Off) => !approved.contains(name),\n        Some(BillWiseFlag::On)"
+        }
+      ],
+      "mutation": "738df6417c3d595af71a3b46966465d7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::an_approved_ledger_passes_whether_it_stays_bill_wise_or_is_switched_off",
+      "killer_at": "base"
+    },
+    "B07": {
+      "what": "named_ledgers: an invoice's New Ref party is named too",
+      "edits": [
+        {
+          "from": "            voucher\n                .entries\n                .iter()\n                .filter(move |entry| Some(entry.ledger.as_str()) != allocated)\n",
+          "to": "            let _ = allocated;\n            voucher.entries.iter()\n"
+        }
+      ],
+      "mutation": "68906b2e95923e2f370d30624150f83e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::a_new_ref_party_is_not_named_to_the_on_account_gate_and_every_other_leg_still_is",
+      "killer_at": "base"
+    },
+    "B08": {
+      "what": "bill_wise_parties: an invoice's New Ref party is a party",
+      "edits": [
+        {
+          "from": "if Some(ledger) == allocated || !observed.is_bill_wise(ledger) || !seen.insert(ledger) {",
+          "to": "if !observed.is_bill_wise(ledger) || !seen.insert(ledger) {"
+        }
+      ],
+      "mutation": "a0150fe65982c02d02b0fbdcd1ca0afc",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::an_invoices_new_ref_party_is_no_on_account_party",
+      "killer_at": "this_commit"
+    },
+    "B09": {
+      "what": "bill_wise_parties: a ledger twice in one voucher gives two rows",
+      "edits": [
+        {
+          "from": "if Some(ledger) == allocated || !observed.is_bill_wise(ledger) || !seen.insert(ledger) {",
+          "to": "if Some(ledger) == allocated || !observed.is_bill_wise(ledger) {"
+        }
+      ],
+      "mutation": "4da3ff852f90108455e97947aeb3146f",
+      "verdict": "unviable",
+      "reason": "does not compile: the set's element type cannot be inferred"
+    },
+    "B10": {
+      "what": "bill_wise_parties: a row carries every entry of its voucher",
+      "edits": [
+        {
+          "from": "                    .filter(|candidate| candidate.ledger == ledger)\n",
+          "to": ""
+        }
+      ],
+      "mutation": "a7dfa5ae56923ec8f5182c94d12835c3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_payment_counterparty_on_a_bill_wise_ledger_is_a_party_row",
+      "killer_at": "base"
+    },
+    "B11": {
+      "what": "bill_wise_parties: rows in reverse batch order",
+      "edits": [
+        {
+          "from": "parties.entry(ledger).or_default().push(PartyRow {",
+          "to": "parties.entry(ledger).or_default().insert(0, PartyRow {"
+        }
+      ],
+      "mutation": "61a891ba04102e3150c392a7f2656b06",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_in_two_vouchers_is_one_party_with_its_rows_in_batch_order",
+      "killer_at": "base"
+    },
+    "B12": {
+      "what": "field: no length prefix",
+      "edits": [
+        {
+          "from": "        self.0.update(length.to_be_bytes());\n        self.0.update(bytes);",
+          "to": "        let _ = length;\n        self.0.update(bytes);"
+        }
+      ],
+      "mutation": "0f2d213a5a04a466c299f99cdd4ed7ea",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B13": {
+      "what": "field: length little-endian",
+      "edits": [
+        {
+          "from": "        self.0.update(length.to_be_bytes());",
+          "to": "        self.0.update(length.to_le_bytes());"
+        }
+      ],
+      "mutation": "16da626cabc4cf4ba85b0886bab7f2f0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B14": {
+      "what": "optional: absent encoded as present and empty",
+      "edits": [
+        {
+          "from": "            None => self.field(b\"absent\"),",
+          "to": "            None => {\n                self.field(b\"present\");\n                self.field(b\"\");\n            }"
+        }
+      ],
+      "mutation": "691bd5dd43d25e2d49b37ac8b8f59ec3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::an_absent_optional_field_and_an_empty_one_are_different_batches",
+      "killer_at": "base"
+    },
+    "B15": {
+      "what": "optional: a present value carries no marker",
+      "edits": [
+        {
+          "from": "                self.field(b\"present\");\n                self.field(text.as_bytes());",
+          "to": "                self.field(text.as_bytes());"
+        }
+      ],
+      "mutation": "ca78d51d812644e94f6c024156974453",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::a_narration_spelled_absent_is_not_an_absent_narration",
+      "killer_at": "this_commit"
+    },
+    "B16": {
+      "what": "side_text: Dr and Cr swapped",
+      "edits": [
+        {
+          "from": "        EntrySide::Dr => b\"Dr\",\n        EntrySide::Cr => b\"Cr\",",
+          "to": "        EntrySide::Dr => b\"Cr\",\n        EntrySide::Cr => b\"Dr\","
+        }
+      ],
+      "mutation": "2857773fa38a496673a1ad6dec82cfab",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B17": {
+      "what": "batch digest: another domain",
+      "edits": [
+        {
+          "from": "Encoder::new(\"bridge-on-account-batch-v1\")",
+          "to": "Encoder::new(\"bridge-on-account-batch-v2\")"
+        }
+      ],
+      "mutation": "082285c79430967953bec8a4cab69aee",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B18": {
+      "what": "batch digest: voucher count not bound",
+      "edits": [
+        {
+          "from": "    encoder.count(vouchers.len());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "65874f9d4510bf62342e8216a412b4e0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B19": {
+      "what": "batch digest: bridge_txn_id not bound",
+      "edits": [
+        {
+          "from": "        encoder.field(bridge_txn_id.as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "cfeb4a5cffa5110495ee6db59ee6622a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B20": {
+      "what": "batch digest: date not bound",
+      "edits": [
+        {
+          "from": "        encoder.field(date.as_str().as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "9c50e7c608de0f782b0d2d14a382779b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B21": {
+      "what": "batch digest: voucher_type not bound",
+      "edits": [
+        {
+          "from": "        encoder.field(voucher_type.as_str().as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "2eaafcaed366d02d099ff5c801cb6b8a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B22": {
+      "what": "batch digest: narration not bound",
+      "edits": [
+        {
+          "from": "        encoder.optional(narration.as_deref());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "da7cc766ff84c18fde9cbc7bc7e2b108",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B23": {
+      "what": "batch digest: reference not bound",
+      "edits": [
+        {
+          "from": "        encoder.optional(reference.as_deref());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "b37034ed58b0786d3a9eb62cace65894",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B24": {
+      "what": "batch digest: voucher_number not bound",
+      "edits": [
+        {
+          "from": "        encoder.optional(voucher_number.as_deref());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "3154f183905ebf7f83ab432b4f03a620",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B25": {
+      "what": "batch digest: entry count not bound",
+      "edits": [
+        {
+          "from": "        encoder.count(entries.len());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "003c35d2136922b14de0bd590a709fc6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B26": {
+      "what": "batch digest: entry ledger not bound",
+      "edits": [
+        {
+          "from": "            encoder.field(ledger.as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "57c962912d4498efd2226fc292d67020",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B27": {
+      "what": "batch digest: entry amount not bound",
+      "edits": [
+        {
+          "from": "            encoder.field(amount.as_str().as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "e0b0becbdcef4d336f3cecd701be40e6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B28": {
+      "what": "batch digest: entry side not bound",
+      "edits": [
+        {
+          "from": "            encoder.field(side_text(side));\n        }\n    }\n    encoder.finish()\n",
+          "to": "        }\n    }\n    encoder.finish()\n"
+        }
+      ],
+      "mutation": "0a72ff37487263423c22e94032940e63",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B29": {
+      "what": "batch digest: invoice detail not bound",
+      "edits": [
+        {
+          "from": "        if let Some(detail) = invoice {\n            encoder.field(b\"invoice\");\n            super::invoice::encode_detail(&mut |bytes| encoder.field(bytes), detail);\n        }\n",
+          "to": "        let _ = invoice;\n"
+        }
+      ],
+      "mutation": "8b045c398333e841e996fb32b9d70f84",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone",
+      "killer_at": "base"
+    },
+    "B30": {
+      "what": "batch digest: invoice marker not bound",
+      "edits": [
+        {
+          "from": "            encoder.field(b\"invoice\");\n",
+          "to": ""
+        }
+      ],
+      "mutation": "49376bfb9e03c097542025a3b65452c8",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::the_batch_digest_of_an_invoice_is_pinned",
+      "killer_at": "this_commit"
+    },
+    "B31": {
+      "what": "party digest: another domain",
+      "edits": [
+        {
+          "from": "Encoder::new(\"bridge-on-account-party-v1\")",
+          "to": "Encoder::new(\"bridge-on-account-party-v2\")"
+        }
+      ],
+      "mutation": "da3bca9a10426063b374b13d354f3c5b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B32": {
+      "what": "party digest: company name not bound",
+      "edits": [
+        {
+          "from": "        name.as_str(),\n        ",
+          "to": "        "
+        }
+      ],
+      "mutation": "0ec39796a4e2ffb080d1067384fe23a0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B33": {
+      "what": "party digest: company guid not bound",
+      "edits": [
+        {
+          "from": "        guid.as_str(),\n        ",
+          "to": "        "
+        }
+      ],
+      "mutation": "e861044033786d7cc7daaac20d143816",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B34": {
+      "what": "party digest: company company_number not bound",
+      "edits": [
+        {
+          "from": "        company_number.as_str(),\n        ",
+          "to": "        "
+        }
+      ],
+      "mutation": "89b177c4199836a83f3fd4143afa2b0d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::an_approval_made_for_another_company_or_an_edited_batch_does_not_carry",
+      "killer_at": "base"
+    },
+    "B35": {
+      "what": "party digest: company books_from not bound",
+      "edits": [
+        {
+          "from": "        books_from.as_str(),\n    ] {",
+          "to": "    ] {"
+        }
+      ],
+      "mutation": "5720c642144992c3d1cc927dbe488969",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B36": {
+      "what": "party digest: endpoint not bound",
+      "edits": [
+        {
+          "from": "    encoder.field(context.endpoint_origin.as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "8377c840a20a6d3db09181662b2605fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B37": {
+      "what": "party digest: amended batch not bound",
+      "edits": [
+        {
+          "from": "    encoder.field(context.amends_batch_id.unwrap_or_default().as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "9c9c70b690c195808f1f2550c4bcd2ed",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B38": {
+      "what": "party digest: batch content not bound",
+      "edits": [
+        {
+          "from": "    encoder.field(&context.batch_content);\n",
+          "to": ""
+        }
+      ],
+      "mutation": "b8b4cf6514d9fd6a12d22a61d8ab4f78",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_digest",
+      "killer_at": "base"
+    },
+    "B39": {
+      "what": "party digest: ledger not bound",
+      "edits": [
+        {
+          "from": "    encoder.field(party.ledger.as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "937b634ec5f481cf789a399f87952cd6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B40": {
+      "what": "party digest: row count not bound",
+      "edits": [
+        {
+          "from": "    encoder.count(party.rows.len());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "579c5f473d9c109c645b3f514f0106d0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B41": {
+      "what": "party digest: row txn id not bound",
+      "edits": [
+        {
+          "from": "        encoder.field(row.bridge_txn_id.as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "aade56edd773ff83b7223158e4384797",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B42": {
+      "what": "party digest: row voucher type not bound",
+      "edits": [
+        {
+          "from": "        encoder.field(row.voucher_type.as_str().as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "67c2fec599b1990fec986b7bb8cfee9e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B43": {
+      "what": "party digest: row date not bound",
+      "edits": [
+        {
+          "from": "        encoder.field(row.date.as_str().as_bytes());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "a3314e5ccc1a345a9351a558927002cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B44": {
+      "what": "party digest: row entry count not bound",
+      "edits": [
+        {
+          "from": "        encoder.count(row.entries.len());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "479fe33493200dd17fe4586e82bd3082",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B45": {
+      "what": "party digest: row entry side not bound",
+      "edits": [
+        {
+          "from": "            encoder.field(side_text(side));\n            encoder.field(amount.as_bytes());",
+          "to": "            let _ = side;\n            encoder.field(amount.as_bytes());"
+        }
+      ],
+      "mutation": "ccc5c0437659325267e65095088ff761",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B46": {
+      "what": "party digest: row entry amount not bound",
+      "edits": [
+        {
+          "from": "            encoder.field(side_text(side));\n            encoder.field(amount.as_bytes());",
+          "to": "            encoder.field(side_text(side));\n            let _ = amount;"
+        }
+      ],
+      "mutation": "3391c5daf85f0c0382b0e7451d96dca7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::each_field_the_digest_binds_moves_it",
+      "killer_at": "base"
+    },
+    "B47": {
+      "what": "hex: not zero-padded",
+      "edits": [
+        {
+          "from": "write!(text, \"{byte:02x}\")",
+          "to": "write!(text, \"{byte:x}\")"
+        }
+      ],
+      "mutation": "9e777c96b616f3b3a3adc26e7189874b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B48": {
+      "what": "hex: upper case",
+      "edits": [
+        {
+          "from": "write!(text, \"{byte:02x}\")",
+          "to": "write!(text, \"{byte:02X}\")"
+        }
+      ],
+      "mutation": "ce68a025753229b159442dc5fca0d184",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_party_digest_of_a_known_batch_is_pinned",
+      "killer_at": "base"
+    },
+    "B49": {
+      "what": "in_listing_order: masked list in reverse digest order",
+      "edits": [
+        {
+          "from": "digest(left).cmp(digest(right))",
+          "to": "digest(right).cmp(digest(left))"
+        }
+      ],
+      "mutation": "7d1c573fe7e1028cddf0f8f59d5179f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_masked_party_list_is_ordered_by_digest_not_by_name",
+      "killer_at": "base"
+    },
+    "B50": {
+      "what": "in_listing_order: sorted by digest when not masked",
+      "edits": [
+        {
+          "from": "    if masked {\n        parties.sort_by",
+          "to": "    if !masked {\n        parties.sort_by"
+        }
+      ],
+      "mutation": "675fc157d6b4d81ce6c01f3f21712ab2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_masked_party_list_is_ordered_by_digest_not_by_name",
+      "killer_at": "base"
+    },
+    "B51": {
+      "what": "approved_json: ledger not marked as a party name",
+      "edits": [
+        {
+          "from": "\"ledger\": party_name(item.ledger.clone()),",
+          "to": "\"ledger\": item.ledger.clone(),"
+        }
+      ],
+      "mutation": "42bbf7a313919213740b53355bb5b410",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::a_bank_batch_names_its_bill_wise_counterparty_and_builds_once_approved",
+      "killer_at": "base"
+    },
+    "B52": {
+      "what": "OnAccountApproved: unknown fields accepted",
+      "edits": [
+        {
+          "from": "#[serde(deny_unknown_fields)]\npub(super) struct OnAccountApproved {",
+          "to": "pub(super) struct OnAccountApproved {"
+        }
+      ],
+      "mutation": "737064b31a237d44decb6f6f91ff3c1e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::a_saved_approval_with_an_unknown_field_is_refused",
+      "killer_at": "this_commit"
+    },
+    "B53": {
+      "what": "OnAccountApproval: unknown fields accepted",
+      "edits": [
+        {
+          "from": "#[serde(deny_unknown_fields)]\npub(super) struct OnAccountApproval {",
+          "to": "pub(super) struct OnAccountApproval {"
+        }
+      ],
+      "mutation": "35503f6be9989bc066c6ea7c1c055e52",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "B54": {
+      "what": "cause: duplicate named malformed",
+      "edits": [
+        {
+          "from": "Self::Duplicate => \"duplicate\",",
+          "to": "Self::Duplicate => \"malformed\","
+        }
+      ],
+      "mutation": "d4c34da027f7048754f9181eca745be4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::an_approval_that_is_malformed_or_repeated_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "B55": {
+      "what": "cause: digest_differs named duplicate",
+      "edits": [
+        {
+          "from": "Self::DigestDiffers => \"digest_differs\",",
+          "to": "Self::DigestDiffers => \"duplicate\","
+        }
+      ],
+      "mutation": "882c6c59fbb060cf9c7dda3314903740",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::an_approval_with_a_digest_that_is_no_partys_is_refused",
+      "killer_at": "base"
+    },
+    "B56": {
+      "what": "cause: malformed named digest_differs",
+      "edits": [
+        {
+          "from": "Self::Malformed => \"malformed\",",
+          "to": "Self::Malformed => \"digest_differs\","
+        }
+      ],
+      "mutation": "121466e4f8d4bf302094e70c26e018a4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::an_approval_that_is_malformed_or_repeated_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "B57": {
+      "what": "take_approvals: a missing key is malformed",
+      "edits": [
+        {
+          "from": "    else {\n        return Ok(Vec::new());\n    };",
+          "to": "    else {\n        return Err(ApprovalError::Malformed);\n    };"
+        }
+      ],
+      "mutation": "b06e60da2d050f2b8ec6ad29130dcbd1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_approvals_key_is_removed_from_the_arguments_whatever_it_holds",
+      "killer_at": "base"
+    },
+    "B58": {
+      "what": "take_approvals: a value that is not an array is no approvals",
+      "edits": [
+        {
+          "from": "    let Value::Array(items) = value else {\n        return Err(ApprovalError::Malformed);\n    };",
+          "to": "    let Value::Array(items) = value else {\n        return Ok(Vec::new());\n    };"
+        }
+      ],
+      "mutation": "162241362096210eab88573c6626137f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "B59": {
+      "what": "take_approvals: an item that is not an object is read",
+      "edits": [
+        {
+          "from": "        if !item.is_object() {\n            return Err(ApprovalError::Malformed);\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "9a3a55819decd4b820d5a9a2c7382dda",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "B60": {
+      "what": "take_approvals: a digest longer than 64 accepted",
+      "edits": [
+        {
+          "from": "approved.party_digest.len() == 64",
+          "to": "approved.party_digest.len() >= 64"
+        }
+      ],
+      "mutation": "b2405177d222ae0cc99af38a887fe7e2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
+      "killer_at": "base"
+    },
+    "B61": {
+      "what": "take_approvals: upper-case hex accepted",
+      "edits": [
+        {
+          "from": ".all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));",
+          "to": ".all(|byte| byte.is_ascii_hexdigit());"
+        }
+      ],
+      "mutation": "6c4f04be513ed040b9b4db287623485a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "B62": {
+      "what": "take_approvals: letters past f accepted",
+      "edits": [
+        {
+          "from": "(b'a'..=b'f').contains(&byte)",
+          "to": "(b'a'..=b'z').contains(&byte)"
+        }
+      ],
+      "mutation": "aac142375cccb3ebc9c466067ed48f6f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_malformed_approval_is_refused_not_dropped",
+      "killer_at": "base"
+    },
+    "B63": {
+      "what": "take_approvals: a duplicate accepted",
+      "edits": [
+        {
+          "from": "        if approvals\n            .iter()\n            .any(|seen| seen.party_digest == approved.party_digest)\n        {\n            return Err(ApprovalError::Duplicate);\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "b7ebd3b686dba44e2cf421291a229017",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::one_party_approved_twice_is_refused",
+      "killer_at": "base"
+    },
+    "B64": {
+      "what": "take_approvals: the key is left in the arguments",
+      "edits": [
+        {
+          "from": ".and_then(|map| map.remove(APPROVALS_KEY))",
+          "to": ".and_then(|map| map.get(APPROVALS_KEY).cloned())"
+        }
+      ],
+      "mutation": "3d99b76d9b81c1110621fac0a23561bf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::the_approvals_key_is_removed_from_the_arguments_whatever_it_holds",
+      "killer_at": "base"
+    },
+    "B65": {
+      "what": "judge_approvals: an unknown digest is skipped",
+      "edits": [
+        {
+          "from": "        let (_, party) = digests\n            .iter()\n            .find(|(digest, _)| *digest == approval.party_digest)\n            .ok_or(ApprovalError::DigestDiffers)?;",
+          "to": "        let Some((_, party)) = digests\n            .iter()\n            .find(|(digest, _)| *digest == approval.party_digest)\n        else {\n            continue;\n        };"
+        }
+      ],
+      "mutation": "8943b03ca14316bbf0f2f2b6ba0e2755",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::an_approval_for_a_ledger_that_is_not_a_party_of_the_batch_is_refused",
+      "killer_at": "base"
+    },
+    "B66": {
+      "what": "judge_approvals: approved parties not sorted",
+      "edits": [
+        {
+          "from": "    approved.sort_by(|left, right| left.ledger.cmp(&right.ledger));\n",
+          "to": ""
+        }
+      ],
+      "mutation": "66b8d48374225c35eece9a95712cafad",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted",
+      "killer_at": "base"
+    },
+    "B67": {
+      "what": "judge_approvals: approved parties sorted by digest",
+      "edits": [
+        {
+          "from": "left.ledger.cmp(&right.ledger)",
+          "to": "left.party_digest.cmp(&right.party_digest)"
+        }
+      ],
+      "mutation": "4ce06182310aa3c92cadb0edff0404ef",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::masked_party_lists_are_in_digest_order_where_it_differs_from_name_order",
+      "killer_at": "base"
+    },
+    "B68": {
+      "what": "judge_approvals: approved parties listed as unapproved too",
+      "edits": [
+        {
+          "from": "        .filter(|(digest, _)| {\n            !approvals\n                .iter()\n                .any(|approval| &approval.party_digest == digest)\n        })\n",
+          "to": ""
+        }
+      ],
+      "mutation": "32ce14359087b3d021d7434055283878",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted",
+      "killer_at": "base"
+    },
+    "B69": {
+      "what": "side_totals: debit and credit swapped",
+      "edits": [
+        {
+          "from": "            EntrySide::Dr => &mut debit,\n            EntrySide::Cr => &mut credit,",
+          "to": "            EntrySide::Dr => &mut credit,\n            EntrySide::Cr => &mut debit,"
+        }
+      ],
+      "mutation": "09d7a1e3804c86402cb992ee632ba1e5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "B70": {
+      "what": "side_totals: an amount that does not read is skipped",
+      "edits": [
+        {
+          "from": "            ExactDecimal::parse(amount.clone())\n                .ok()\n                .and_then(|value| sum.checked_add(&value).ok())",
+          "to": "            ExactDecimal::parse(amount.clone())\n                .ok()\n                .map_or(Some(sum.clone()), |value| sum.checked_add(&value).ok())"
+        }
+      ],
+      "mutation": "00a22eac0a0e668ccdd64ca3cdff9b27",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_total_that_cannot_be_added_is_absent_rather_than_guessed",
+      "killer_at": "base"
+    },
+    "B71": {
+      "what": "side_totals: the debit total starts absent",
+      "edits": [
+        {
+          "from": "    let mut debit = Some(ExactDecimal::zero());",
+          "to": "    let mut debit: Option<ExactDecimal> = None;"
+        }
+      ],
+      "mutation": "504c971d8911d5a26adbda03aadd24d4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "B72": {
+      "what": "row_json: every side reported Dr",
+      "edits": [
+        {
+          "from": "\"side\": std::str::from_utf8(side_text(side)).unwrap_or_default(),",
+          "to": "\"side\": \"Dr\","
+        }
+      ],
+      "mutation": "b58c9195337bb4446df4ccb31cdd4812",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::a_refused_rows_entries_keep_their_sides",
+      "killer_at": "this_commit"
+    },
+    "B73": {
+      "what": "refused_parties_json: parties after one that does not fit are not counted",
+      "edits": [
+        {
+          "from": "            omitted += 1;\n            continue;",
+          "to": "            omitted += 1;\n            break;"
+        }
+      ],
+      "mutation": "e8f3acd43af4c3009f47cf9883677885",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_whose_header_does_not_fit_is_counted_as_omitted",
+      "killer_at": "base"
+    },
+    "B74": {
+      "what": "refused_parties_json: a header's cost not taken from the budget",
+      "edits": [
+        {
+          "from": "        remaining -= cost;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "a79d4a220acca5a8faf8c843d9b9b4a1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::bill_wise::tests::a_header_that_takes_the_whole_budget_is_shown_with_every_row_omitted",
+      "killer_at": "this_commit"
+    },
+    "B75": {
+      "what": "refused_parties_json: rows_omitted left at every row",
+      "edits": [
+        {
+          "from": "        entry[\"rows_omitted\"] = json!(rows_omitted);\n",
+          "to": "        let _ = rows_omitted;\n"
+        }
+      ],
+      "mutation": "942dd61d4524451f65b0aabbd1a263d8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "B76": {
+      "what": "refused_parties_json: no row shown",
+      "edits": [
+        {
+          "from": "        entry[\"rows\"] = Value::Array(kept);\n",
+          "to": "        let _ = kept;\n"
+        }
+      ],
+      "mutation": "3df750da2beb026540161a1ccb67fae3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "B77": {
+      "what": "refused_parties_json: ledger not marked as a party name",
+      "edits": [
+        {
+          "from": "\"ledger\": party_name(party.ledger.clone()),",
+          "to": "\"ledger\": party.ledger.clone(),"
+        }
+      ],
+      "mutation": "850db7e0a84db2921b8069f6257ec23e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::an_approval_by_digest_builds_when_party_names_are_masked",
+      "killer_at": "base"
+    },
+    "B78": {
+      "what": "refused_parties_json: debit and credit totals swapped",
+      "edits": [
+        {
+          "from": "            \"debit_total\": debit,\n            \"credit_total\": credit,",
+          "to": "            \"debit_total\": credit,\n            \"credit_total\": debit,"
+        }
+      ],
+      "mutation": "3153823118380e25095ddd283181ada3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::a_party_list_that_fits_shows_every_row_and_the_exact_totals",
+      "killer_at": "base"
+    },
+    "B79": {
+      "what": "bill_wise_parties: a ledger twice in one voucher gives two rows, the set filled but not read",
+      "edits": [
+        {
+          "from": "|| !observed.is_bill_wise(ledger) || !seen.insert(ledger) {",
+          "to": "|| !observed.is_bill_wise(ledger) || {\n                seen.insert(ledger);\n                false\n            } {"
+        }
+      ],
+      "mutation": "9e02ccb99f6dd8dfda9cb5f7bf6eb31b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::bill_wise::tests::several_entries_of_one_ledger_in_one_voucher_fold_into_one_row_in_entry_order",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {}
+}

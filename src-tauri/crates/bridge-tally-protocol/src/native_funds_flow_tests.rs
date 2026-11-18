@@ -64,7 +64,10 @@ fn mutate(from: &str, to: &str) -> String {
 #[test]
 fn the_request_is_byte_equal_to_its_committed_capture() {
     assert_eq!(
-        render_native_funds_flow_request("BRIDGE PROBE B SANDBOX", &year()),
+        render_native_funds_flow_request(
+            &ValidatedCompanyName::new("BRIDGE PROBE B SANDBOX").unwrap(),
+            &year()
+        ),
         decode_xml_bytes(REQUEST).unwrap()
     );
 }

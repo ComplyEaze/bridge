@@ -42,7 +42,7 @@ fn synthetic_read_matches_the_python_golden() {
     let d = diffs(&rust);
     assert!(d.is_empty(), "parity failed:\n{}", d.join("\n"));
     // Anchor the pass to content, so an empty or trivial dump cannot be what passed.
-    assert_eq!(rust["figures"].as_array().unwrap().len(), 235);
+    assert_eq!(rust["figures"].as_array().unwrap().len(), 237);
     assert_eq!(value(&rust, "trial_balance.ledger_rows_count"), json!(46));
     assert_eq!(
         rust["module_invariants_evaluated"],

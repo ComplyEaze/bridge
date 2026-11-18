@@ -28,6 +28,7 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 
 use crate::ledger_scope::LedgerScopeName;
+use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use crate::xml_text::escape_text as xml_escape;
 
 use super::date::{parse_native_bill_date, parse_native_due_date};
@@ -41,11 +42,17 @@ pub fn render_ledger_outstandings_request(
     party: &LedgerScopeName,
     to: &TallyDate,
 ) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "",
+        &format!(
+            r#"<LedgerName>{party}</LedgerName><SVTODATE TYPE="Date">{to}</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><EXPLODEFLAG>Yes</EXPLODEFLAG>"#,
+            party = xml_escape(party.as_str()),
+            to = to.as_str(),
+        ),
+    );
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Ledger Outstandings</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><LedgerName>{party}</LedgerName><SVTODATE TYPE="Date">{to}</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><EXPLODEFLAG>Yes</EXPLODEFLAG></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        company = xml_escape(company),
-        party = xml_escape(party.as_str()),
-        to = to.as_str(),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Ledger Outstandings</ID></HEADER><BODY><DESC>{static_variables}</DESC></BODY></ENVELOPE>"#
     )
 }
 
@@ -101,8 +108,10 @@ impl PartyBillsAnswer {
                 ledger_closing: ledger_closing.clone(),
             });
         }
-        // What Tally answers for a bill-wise party with no open bills is not
-        // measured, so an answer with no rows is not told as one (P1).
+        // An envelope with no rows has not been seen, so it is not told as no
+        // open bills (P1). Tally's answer with no bytes at all, which it sends a
+        // party it reports nothing for, never reaches this parse: the runtime
+        // tells it against the snapshot (protocol reference §12a.27).
         if self.bills.is_empty() {
             return Err(PartyBillsRefusal::NoRowsNotEstablished);
         }

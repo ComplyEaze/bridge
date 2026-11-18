@@ -806,6 +806,25 @@ fn only_a_sales_holder_with_an_irn_says_the_number_carries_one() {
 }
 
 #[test]
+fn an_empty_field_inside_a_list_is_recorded_only_on_the_list_row() {
+    for empty in [
+        "<GSTHSNNAME TYPE=\"String\"/>",
+        "<GSTHSNNAME TYPE=\"String\"></GSTHSNNAME>",
+    ] {
+        let xml = format!(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION><VOUCHER><ALLLEDGERENTRIES.LIST>{empty}</ALLLEDGERENTRIES.LIST></VOUCHER></COLLECTION></DATA></ENVELOPE>"
+        );
+        let voucher = rows(&xml, "VOUCHER").unwrap().remove(0);
+        let [(tag, list)] = voucher.lists.as_slice() else {
+            panic!("one ledger entry list: {voucher:?}");
+        };
+        assert_eq!(tag, "ALLLEDGERENTRIES.LIST");
+        assert_eq!(list.empties, ["GSTHSNNAME"], "{empty}");
+        assert_eq!(voucher.empties, Vec::<String>::new(), "{empty}");
+    }
+}
+
+#[test]
 fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     let guid = &format!("{}-00000193", sentinel_uuid(0x5));
     let (from, to) = (date("20250401"), date("20260331"));

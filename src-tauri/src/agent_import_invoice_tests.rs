@@ -1050,7 +1050,10 @@ fn an_empty_gstin_before_a_repeated_gstin_fails_the_read() {
     let xml = readback_xml(&observed_voucher());
     let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
     let twice = xml.replace(&gstin, &format!("<CMPGSTIN/>{gstin}"));
-    assert!(wire::parse_invoice_readback(&twice).is_err());
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
 }
 
 #[test]
@@ -1058,7 +1061,10 @@ fn an_empty_gstin_after_a_repeated_gstin_fails_the_read() {
     let xml = readback_xml(&observed_voucher());
     let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
     let twice = xml.replace(&gstin, &format!("{gstin}<CMPGSTIN/>"));
-    assert!(wire::parse_invoice_readback(&twice).is_err());
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
 }
 
 #[test]
@@ -1066,7 +1072,10 @@ fn an_empty_registration_before_a_repeated_registration_fails_the_read() {
     let xml = readback_xml(&observed_voucher());
     let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
     let twice = xml.replace(unit, &format!("<GSTREGISTRATION TYPE=\"String\"/>{unit}"));
-    assert!(wire::parse_invoice_readback(&twice).is_err());
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
 }
 
 #[test]
@@ -1074,7 +1083,145 @@ fn an_empty_registration_after_a_repeated_registration_fails_the_read() {
     let xml = readback_xml(&observed_voucher());
     let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
     let twice = xml.replace(unit, &format!("{unit}<GSTREGISTRATION TYPE=\"String\"/>"));
-    assert!(wire::parse_invoice_readback(&twice).is_err());
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_before_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(
+        &gstin,
+        &format!("<CMPGSTIN TYPE=\"String\"></CMPGSTIN>{gstin}"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_after_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(
+        &gstin,
+        &format!("{gstin}<CMPGSTIN TYPE=\"String\"></CMPGSTIN>"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_without_a_type_before_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("<CMPGSTIN></CMPGSTIN>{gstin}"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_without_a_type_after_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("{gstin}<CMPGSTIN></CMPGSTIN>"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_before_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(
+        unit,
+        &format!("<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>{unit}"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_after_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(
+        unit,
+        &format!("{unit}<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_without_a_type_before_a_repeated_registration_fails_the_read(
+) {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("<GSTREGISTRATION></GSTREGISTRATION>{unit}"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_without_a_type_after_a_repeated_registration_fails_the_read(
+) {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("{unit}<GSTREGISTRATION></GSTREGISTRATION>"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn two_open_and_closed_empty_fields_fail_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    for (empty, populated) in [
+        ("<CMPGSTIN></CMPGSTIN>", gstin),
+        ("<GSTREGISTRATION></GSTREGISTRATION>", unit.to_string()),
+    ] {
+        let twice = xml.replace(&populated, &format!("{empty}{empty}"));
+        assert_eq!(
+            wire::parse_invoice_readback(&twice),
+            Err("invoice_read_field_repeated")
+        );
+    }
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_reads_as_missing() {
+    let voucher = observed_voucher();
+    let xml = readback_xml(&voucher);
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    for empty in [
+        "<CMPGSTIN TYPE=\"String\"></CMPGSTIN>",
+        "<CMPGSTIN></CMPGSTIN>",
+    ] {
+        assert_eq!(
+            differences(&voucher, &xml.replace(&gstin, empty)),
+            vec!["invoice_registration_missing"]
+        );
+    }
 }
 
 #[test]

@@ -199,7 +199,7 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                         let value = text.trim();
                         if !value.is_empty() {
                             current.fields.push((relative, value.to_string()));
-                        } else if leaf {
+                        } else if leaf && list_depth.is_none() {
                             current.empties.push(relative);
                         }
                     }
@@ -1151,7 +1151,8 @@ fn render_ledger_rates(
 
 /// One element of an answer with its attributes, text and children, kept
 /// whole so a field that is present but empty stays different from one that is
-/// absent (`rows` drops empty leaves; the rate rows depend on the difference).
+/// absent (`rows` keeps empty leaves on their containing row; the rate rows
+/// depend on the difference).
 #[derive(Debug, Default)]
 struct Node {
     name: String,

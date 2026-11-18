@@ -1562,8 +1562,9 @@ fn invoice_readback_differences(
 /// returns it: the unit's name (`GSTREGISTRATION`) and its GSTIN (`CMPGSTIN`).
 /// On the one-registration book, Tally filed the build's request under that
 /// registration, naming none in it (row 2464-GN, `BP/26-27/0010`). Either
-/// field not back, or back empty, is missing: the read keeps no voucher-level
-/// empty, so it cannot tell the two apart. A GSTIN that is not a valid GSTIN of
+/// field not back, or back empty, is missing: the row reader keeps voucher-level
+/// empties, and `readback_fields` drops the absent/empty distinction by omitting
+/// both from its map. A GSTIN that is not a valid GSTIN of
 /// the company's state the build recorded differs. The name is not compared,
 /// since the build records no unit's name, and a second registration in the
 /// same state is not told apart by the GSTIN's state. The registration's state
@@ -1591,9 +1592,10 @@ fn registration_difference(
 /// fetched the registration, with the two fields added once to each voucher
 /// (counted), valued as the lab's answer for `BP/26-27/0010` returned them on
 /// 10 Nov 2026 (row 2464-GN): the pilot lab's unit name, with `TYPE="String"`,
-/// and its GSTIN. They go last in the voucher. Where Tally writes them is not
-/// recorded here, since that answer holds a GSTIN and stayed on the lab PC; the
-/// read takes fields by tag.
+/// and its GSTIN. They go last in the voucher and the GSTIN has no attribute,
+/// which is not how Tally writes them: its answer for `BP/26-27/0105` has the
+/// pair after `VOUCHERTYPENAME`, the empty GSTIN with `TYPE="String"` too
+/// (§9.16, row 2464-RB). The read takes fields by tag and keeps no attribute.
 #[cfg(test)]
 pub(super) fn with_registration(xml: &str) -> String {
     // By the whole tag: `<GSTREGISTRATIONTYPE>` begins with `<GSTREGISTRATION`.

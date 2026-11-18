@@ -360,7 +360,7 @@ fn a_voucher_naming_a_ledger_the_masters_do_not_list_refuses() {
     let mut row = on("03");
     row["amounts"][0]["ledger"] = json!("A ledger not in the masters");
     assert_eq!(
-        dispose(&index, &row).unwrap_err(),
+        dispose(&index, &row).unwrap_err().as_str(),
         "ledger_snapshot_drifted"
     );
 }
@@ -370,7 +370,10 @@ fn an_amount_that_is_not_an_exact_decimal_refuses() {
     let index = captured_index();
     let mut row = on("03");
     row["amounts"][0]["amount"] = json!("1,000.00");
-    assert_eq!(dispose(&index, &row).unwrap_err(), "voucher_amount_invalid");
+    assert_eq!(
+        dispose(&index, &row).unwrap_err().as_str(),
+        "voucher_amount_invalid"
+    );
 }
 
 #[test]
@@ -383,7 +386,9 @@ fn a_partial_window_has_no_totals() {
         reason: Some("nonempty_window_unqualified"),
     };
     assert_eq!(
-        CompleteWindow::admit(window, ("20251101", "20251130")).err(),
+        CompleteWindow::admit(window, ("20251101", "20251130"))
+            .err()
+            .map(|failure| failure.code),
         Some("gst_by_ledger_window_partial".to_string())
     );
 }
@@ -468,11 +473,15 @@ fn a_withheld_voucher_refuses_the_totals_and_one_outside_the_window_refuses_as_n
         reason: None,
     };
     assert_eq!(
-        CompleteWindow::admit(window(), ("20250402", "20250430")).err(),
+        CompleteWindow::admit(window(), ("20250402", "20250430"))
+            .err()
+            .map(|failure| failure.code),
         Some("window_not_honoured".to_string())
     );
     assert_eq!(
-        CompleteWindow::admit(window(), ("20250401", "20250401")).err(),
+        CompleteWindow::admit(window(), ("20250401", "20250401"))
+            .err()
+            .map(|failure| failure.code),
         Some("gst_by_ledger_window_partial".to_string())
     );
 }

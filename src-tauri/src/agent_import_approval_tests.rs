@@ -5,8 +5,8 @@
 //! test-only seam, held open until a test answers it.
 use super::*;
 use crate::agent::agent_import::approval::{
-    ApprovalBinding, Begin, Joined, PostApprovals, PreviewForm, CALL_BUDGET, CALL_CEILING,
-    MAX_KEPT_REFUSALS, MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
+    ApprovalBinding, Begin, Joined, KeptRefusalCode, PostApprovals, PreviewForm, CALL_BUDGET,
+    CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
 use crate::agent::agent_protocol::{run_post, serve_stdio, Framer, ToolCallEnd};
 use crate::tally::agent_read_request::AgentReadRequest;
@@ -72,6 +72,11 @@ async fn first_call_pending(
         "{pending}"
     );
     assert_eq!(result(&pending)["attempt_recorded"], false, "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["retry_after_s"],
+        15,
+        "the next call is due 15 s after a pending answer: {pending}"
+    );
     assert_eq!(intents(directory), 0);
     assert!(
         server.post_approvals.holds(&line.batch_id),
@@ -131,6 +136,16 @@ async fn a_click_between_calls_is_posted_by_the_next_call() {
 /// Answered only once a second call has taken the held dialog to wait on it,
 /// so the click lands inside that call's wait and never before it.
 async fn click_while_joined(server: &Server, batch_id: &str, scripted: &ScriptedApproval) {
+    answer_while_joined(server, batch_id, scripted, true).await;
+}
+
+/// `click_while_joined`, answered Yes or No.
+async fn answer_while_joined(
+    server: &Server,
+    batch_id: &str,
+    scripted: &ScriptedApproval,
+    approved: bool,
+) {
     tokio::time::timeout(Duration::from_secs(5), async {
         while !server.post_approvals.joined_for_test(batch_id) {
             tokio::time::sleep(Duration::from_millis(1)).await;
@@ -138,7 +153,7 @@ async fn click_while_joined(server: &Server, batch_id: &str, scripted: &Scripted
     })
     .await
     .expect("the second call joined the held dialog");
-    scripted.answer(true);
+    scripted.answer(approved);
 }
 
 /// A click that lands while a later call waits on the dialog is reported by
@@ -185,6 +200,33 @@ async fn a_click_during_a_joining_call_is_reported_and_posted_by_the_next() {
         &observed,
         post_at,
     );
+}
+
+/// A No given while a later call waits on the dialog is that call's own
+/// answer, not a kept one (#2516): it carries no `approval_answered_earlier`
+/// cause and no step, like a No given in the box a call opened itself. A
+/// waiting call's refusal is a plain code, so this pins the design.
+#[tokio::test]
+async fn a_decline_during_a_joining_call_carries_no_kept_cause() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+
+    let (declined, ()) = tokio::join!(
+        server.call_tool("post_import", args),
+        answer_while_joined(&server, &line.batch_id, &scripted, false)
+    );
+    let observed = sent(simulator);
+    let error = &result(&declined)["error"];
+    assert_eq!(error["code"], "import_approval_declined", "{declined}");
+    assert!(error.get("cause").is_none(), "{declined}");
+    assert!(error.get("next_step").is_none(), "{declined}");
+    assert_eq!(scripted.counts(), [1]);
+    assert_eq!(observed.len(), before_approval().len());
+    assert_eq!(intents(directory.path()), 0);
 }
 
 /// Answered in its call, but too late for the measured post to fit: the call
@@ -473,6 +515,26 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
     );
     assert_eq!(scripted.counts(), [1], "and was not asked again");
     assert_eq!(observed.len(), 2 * before_approval().len());
+    // #2516: only the kept No says it is one. The No given in its own call
+    // carries no cause and no step, and apart from the cause and step the two
+    // answers are byte-equal: same code, message and attempt_recorded.
+    let asked_error = &result(&declined)["error"];
+    assert!(asked_error.get("cause").is_none(), "{declined}");
+    assert!(asked_error.get("next_step").is_none(), "{declined}");
+    let mut kept_error = result(&again)["error"].clone();
+    assert_eq!(kept_error["cause"], "approval_answered_earlier", "{again}");
+    assert_eq!(
+        kept_error["next_step"].as_str(),
+        crate::agent::refusal_remediation("approval_answered_earlier"),
+        "{again}"
+    );
+    let kept = kept_error.as_object_mut().unwrap();
+    kept.remove("cause");
+    kept.remove("next_step");
+    assert_eq!(&kept_error, asked_error);
+    for field in ["attempt_recorded", "dispatch_response"] {
+        assert_eq!(result(&again)[field], result(&declined)[field], "{field}");
+    }
 }
 
 /// An approval's time runs from the click, not from whichever call collects
@@ -898,7 +960,7 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
     // Its own batch's next call reads why, and is not asked again.
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_unavailable"
+        Begin::Refused(code) if code.code() == "import_approval_unavailable"
     ));
 }
 
@@ -941,7 +1003,7 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
     );
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_declined"
+        Begin::Refused(code) if code.code() == "import_approval_declined"
     ));
     assert!(
         matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
@@ -960,6 +1022,42 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
         matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "nothing is left held"
     );
+}
+
+/// Every kept refusal, a timeout and an unanswered end as well as a No, keeps
+/// its own code and carries the kept cause, whose step both tools give (#2516).
+/// A plain code made into a failure carries no cause, as before. The kept
+/// timeout is pinned here only: no scripted dialog times out, and none was
+/// seen live.
+#[test]
+fn a_kept_refusal_keeps_its_code_and_carries_the_kept_cause() {
+    for code in [
+        "import_approval_declined",
+        "import_approval_timed_out",
+        "import_approval_unavailable",
+        "master_approval_declined",
+        "master_approval_timed_out",
+    ] {
+        let failure = crate::agent::ToolFailure::from(KeptRefusalCode::kept_for_test(code));
+        assert_eq!(failure.code, code);
+        assert_eq!(failure.cause, Some("approval_answered_earlier"), "{code}");
+        let step = crate::agent::remediation_for(code, failure.cause).unwrap();
+        assert_eq!(
+            Some(step),
+            crate::agent::refusal_remediation("approval_answered_earlier"),
+            "{code}"
+        );
+        assert!(step.contains("same batch_id"), "{step}");
+        // The ruling's two other claims: no box was shown in this call, and
+        // nothing was sent.
+        assert!(
+            step.starts_with("This call showed no approval box."),
+            "{step}"
+        );
+        assert!(step.contains("Nothing was sent."), "{step}");
+        let plain = crate::agent::ToolFailure::from(code.to_string());
+        assert_eq!(plain.cause, None, "{code}");
+    }
 }
 
 /// Kept refusals age out with the approval limit, and past the cap the oldest
@@ -999,7 +1097,7 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     for kept in [batch(1), batch(MAX_KEPT_REFUSALS)] {
         assert!(matches!(
             approvals.begin(&kept),
-            Begin::Refused(code) if code == "import_approval_declined"
+            Begin::Refused(code) if code.code() == "import_approval_declined"
         ));
     }
 }
@@ -2917,7 +3015,7 @@ async fn revoke_unredeemed_takes_only_a_given_untaken_approval_of_its_batch() {
     approvals.revoke_unredeemed(&line.batch_id, "post_refused_before_intent");
     assert!(matches!(
         approvals.begin(&line.batch_id),
-        Begin::Refused(code) if code == "import_approval_declined"
+        Begin::Refused(code) if code.code() == "import_approval_declined"
     ));
 
     // An approval a call has taken is not withdrawn from under it.
@@ -3016,9 +3114,9 @@ mod masters {
     use crate::agent::agent_import::master_post::MasterPostRequest;
     use crate::tally::approved_import::PostKind;
     use crate::tally::ledger_create_item::{
-        AdmittedDutyHead, AdmittedLedgerKind, LedgerCreateItem, MasterName, PartySide,
-        VerifiedGstin,
+        AdmittedDutyHead, AdmittedLedgerKind, LedgerCreateItem, PartySide, VerifiedGstin,
     };
+    use crate::tally::master_name::MasterName;
     use crate::tally::VerifiedCompanyIdentity;
     use bridge_tally_protocol::GstDutyHead;
 
@@ -3284,6 +3382,19 @@ mod masters {
         let other_company =
             VerifiedCompanyIdentity::test_fixture(LAB, "00000000-0000-4000-8000-000000000002");
         let renamed_company = VerifiedCompanyIdentity::test_fixture("Another Lab", lab_guid());
+        let renumbered_company = VerifiedCompanyIdentity::from_observed_companies(
+            LAB.to_string(),
+            crate::tally::test_company_guid(lab_guid()),
+            "2".to_string(),
+            "20260401".to_string(),
+            &[bridge_tally_protocol::TallyCompany {
+                name: LAB.to_string(),
+                guid: Some(lab_guid().to_string()),
+                company_number: Some("2".to_string()),
+                books_from: Some("20260401".to_string()),
+            }],
+        )
+        .unwrap();
         let fresh_bindings: Vec<(&str, ApprovalBinding)> = vec![
             ("name", binding(&party("MLab Party 2", Some(GSTIN), true))),
             ("gstin absent", binding(&party("MLab Party", None, true))),
@@ -3358,6 +3469,16 @@ mod masters {
                     SHA,
                     ORIGIN,
                     &renamed_company,
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
+            ),
+            (
+                "company number",
+                ApprovalBinding::masters(
+                    SHA,
+                    ORIGIN,
+                    &renumbered_company,
                     &base.clone().into(),
                     PREVIEW,
                 ),
@@ -4023,4 +4144,599 @@ async fn a_totals_approval_held_for_the_next_call_is_redeemed_as_totals() {
         line.batch_id.as_str()
     );
     assert!(observed.len() > post_at, "{posted}");
+}
+
+/// Another batch's approval answers nothing about this one. While another
+/// batch's approval is held, no time left is reported for this batch and a
+/// dispatch of this batch takes nothing; while it is taken, a redemption of
+/// this batch is refused as revoked (nothing of its own is held), never as in
+/// use. Kills the tool's survivors on the batch guards of `approval_remaining`,
+/// `take_for_dispatch` and `begin_redeem` (#2058).
+#[tokio::test]
+async fn another_batchs_approval_is_never_this_batchs_time_or_use() {
+    const OTHER: &str = "bridge-00000000-0000-4000-8000-000000000587";
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_secs(60));
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(OTHER, binding.clone(), request, native, answered)
+        .unwrap();
+    assert_eq!(
+        approvals.approval_remaining(&line.batch_id),
+        None,
+        "another batch's approval"
+    );
+    assert!(
+        approvals
+            .approval_remaining(OTHER)
+            .is_some_and(|left| left > Duration::from_secs(30)),
+        "its own approval, just clicked, has most of its time left"
+    );
+    assert_eq!(
+        approvals
+            .take_for_dispatch(&line.batch_id, &binding)
+            .err()
+            .as_deref(),
+        Some("import_approval_revoked"),
+        "dispatch: another batch's held approval"
+    );
+
+    let (taken, _, _) = approvals.take_for_dispatch(OTHER, &binding).unwrap();
+    assert_eq!(
+        approvals.begin_redeem(&line.batch_id).err().as_deref(),
+        Some("import_approval_revoked"),
+        "redeem: another batch's taken approval"
+    );
+    drop(taken);
+}
+
+/// A lapse note is read whole up to its cap and not at all past it. A note of
+/// exactly the cap, ending on its closing brace, is read; the same note with
+/// one more byte is refused, although its first cap of bytes would parse.
+/// Kills the tool's four survivors on the cap in `lapse_note` (#2058).
+#[tokio::test]
+async fn a_lapse_note_is_read_up_to_its_cap_and_refused_past_it() {
+    /// `MAX_LAPSE_NOTE_BYTES` in agent_import_approval.rs, which is private.
+    const CAP: usize = 4_096;
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(
+            &line.batch_id,
+            binding_of(&line, "Synthetic preview"),
+            request,
+            native,
+            answered,
+        )
+        .unwrap();
+    approvals.revoke(&line.batch_id, "test_reset");
+    assert!(approvals.lapse_note(&line.batch_id).is_some(), "a note");
+    let note = std::fs::read_dir(directory.path().join("imports"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.to_string_lossy().ends_with(".approval_lapse.json"))
+        .unwrap();
+
+    let fill = CAP - r#"{"reason":""}"#.len();
+    let at_cap = format!(r#"{{"reason":"{}"}}"#, "a".repeat(fill));
+    assert_eq!(at_cap.len(), CAP);
+    std::fs::write(&note, &at_cap).unwrap();
+    assert_eq!(
+        approvals
+            .lapse_note(&line.batch_id)
+            .and_then(|note| note["reason"].as_str().map(str::len)),
+        Some(fill),
+        "exactly the cap is read whole"
+    );
+
+    std::fs::write(&note, format!("{at_cap} ")).unwrap();
+    assert_eq!(
+        approvals.lapse_note(&line.batch_id),
+        None,
+        "one byte past the cap is refused"
+    );
+}
+
+/// A redemption ended late releases only itself. Dropped after its approval
+/// was revoked and the batch approved and taken again, it leaves the newer
+/// redemption in use. Kills the tool's survivor on `release_unspent`'s
+/// batch-and-id test (#2058).
+#[tokio::test]
+async fn a_stale_redemption_releases_nothing_of_a_newer_one() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let approvals = PostApprovals::new(directory.path());
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
+        .unwrap();
+    let (stale, _, _) = approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .unwrap();
+    approvals.revoke(&line.batch_id, "test_reset");
+
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
+        .unwrap();
+    let (newer, _, _) = approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .unwrap();
+    drop(stale);
+    assert_eq!(
+        approvals.begin_redeem(&line.batch_id).err().as_deref(),
+        Some("import_approval_in_use"),
+        "the newer redemption is still taken"
+    );
+    drop(newer);
+}
+
+/// An approval given `wall_ago` ago on the wall clock and `mono_ago` ago on
+/// the monotonic one, approved.
+fn answered_ago(mono_ago: Duration, wall_ago: Option<Duration>, wall_ahead: Duration) -> Answered {
+    let now = std::time::SystemTime::now();
+    Answered {
+        approved: true,
+        at: std::time::Instant::now()
+            .checked_sub(mono_ago)
+            .expect("the monotonic clock reaches back that far"),
+        at_wall: match wall_ago {
+            Some(ago) => now - ago,
+            None => now + wall_ahead,
+        },
+    }
+}
+
+/// A batch's time is past when either clock says so: the wall clock alone, or
+/// the monotonic clock alone, ends it. A click the wall clock dates after now
+/// is counted on the monotonic clock only, not as past its time (#2058).
+#[tokio::test]
+async fn an_approval_is_past_its_time_on_either_clock_and_not_for_a_click_dated_ahead() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_secs(60));
+    let old = Duration::from_secs(120);
+    let cases = [
+        (
+            "wall clock",
+            answered_ago(Duration::ZERO, Some(old), Duration::ZERO),
+            true,
+        ),
+        (
+            "monotonic clock",
+            answered_ago(old, Some(Duration::ZERO), Duration::ZERO),
+            true,
+        ),
+        (
+            "dated ahead",
+            answered_ago(Duration::ZERO, None, Duration::from_secs(3_600)),
+            false,
+        ),
+    ];
+    for (case, answered, past) in cases {
+        let (request, _, native) = granted(&line, 1).await;
+        approvals
+            .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
+            .unwrap();
+        let left = approvals.approval_remaining(&line.batch_id).expect(case);
+        if past {
+            assert_eq!(left, Duration::ZERO, "{case}");
+        } else {
+            assert!(left > Duration::from_secs(30), "{case}: {left:?}");
+        }
+        approvals.revoke(&line.batch_id, "test_reset");
+    }
+}
+
+/// A batch refused twice before any call reads it keeps only the newer
+/// refusal: it is returned once, and the next call asks again (#2058).
+#[tokio::test]
+async fn a_second_refusal_of_a_batch_replaces_the_first() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    for _ in 0..2 {
+        hold_declined(&approvals, &line, &line.batch_id).await;
+        assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
+    }
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Refused(code) if code.code() == "import_approval_declined"
+    ));
+    assert!(
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
+        "one refusal was kept, not two"
+    );
+}
+
+/// A refusal already past its time when it is settled is not kept, so it never
+/// pushes a live one out at the cap (#2058).
+#[tokio::test]
+async fn a_refusal_past_its_time_pushes_no_live_one_out() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let ttl = Duration::from_secs(3);
+    let approvals = PostApprovals::with_ttl(directory.path(), ttl);
+    let late = dialog_with(ScriptedApproval::declining(), 1).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while late.refusal().is_none() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("the dialog was declined");
+    tokio::time::sleep(ttl + Duration::from_millis(100)).await;
+
+    let batch = |i: usize| format!("bridge-00000000-0000-4000-8000-{i:012}");
+    for i in 0..MAX_KEPT_REFUSALS {
+        hold_declined(&approvals, &line, &batch(i)).await;
+        assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
+    }
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    approvals
+        .hold_pending(
+            &batch(MAX_KEPT_REFUSALS),
+            binding_of(&line, "Synthetic preview"),
+            late,
+            native,
+        )
+        .unwrap();
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
+    assert!(
+        matches!(
+            approvals.begin(&batch(0)),
+            Begin::Refused(code) if code.code() == "import_approval_declined"
+        ),
+        "the oldest live refusal is still kept"
+    );
+    assert!(
+        matches!(approvals.begin(&batch(MAX_KEPT_REFUSALS)), Begin::Ask(_)),
+        "the one past its time was not kept"
+    );
+}
+
+/// A redeem that finds this batch's approval past its time lets it go at once,
+/// with its note: nothing is left held for the next call to settle (#2058).
+#[tokio::test]
+async fn a_late_redeem_lets_the_approval_go_with_its_note_at_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(1));
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(
+            &line.batch_id,
+            binding_of(&line, "Synthetic preview"),
+            request,
+            native,
+            answered,
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(5));
+    assert_eq!(
+        approvals.begin_redeem(&line.batch_id).err().as_deref(),
+        Some("import_approval_expired")
+    );
+    assert!(!approvals.holds(&line.batch_id), "let go by the redeem");
+    assert_eq!(
+        approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "approval_expired"
+    );
+}
+
+/// `begin` names what it finds: a taken approval is in use, and a dialog that
+/// another call has taken to wait on is waited on, never refused as busy
+/// (#2058).
+#[tokio::test]
+async fn begin_names_a_taken_approval_in_use_and_a_joined_dialog_waiting() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let approvals = PostApprovals::new(directory.path());
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
+        .unwrap();
+    let taken = approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .unwrap();
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Busy("import_approval_in_use")
+    ));
+    drop(taken);
+
+    let scripted = ScriptedApproval::held();
+    let dialog = dialog_with(scripted.clone(), 1).await;
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    approvals
+        .hold_pending(&line.batch_id, binding, dialog, native)
+        .unwrap();
+    let Begin::Join(joined) = approvals.begin(&line.batch_id) else {
+        panic!("the first call joins the open dialog");
+    };
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Waiting));
+    drop(joined);
+}
+
+/// Hold, for `batch_id`, a dialog nobody has answered yet.
+async fn hold_open(
+    approvals: &PostApprovals,
+    line: &ImportLedgerLine,
+    batch_id: &str,
+) -> Result<(), String> {
+    let dialog = dialog_with(ScriptedApproval::held(), 1).await;
+    let native = native_post_request(line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    approvals.hold_pending(
+        batch_id,
+        binding_of(line, "Synthetic preview"),
+        dialog,
+        native,
+    )
+}
+
+/// A dialog held is never replaced: a second hold, of any batch, is refused,
+/// and the first stays held (#2058).
+#[tokio::test]
+async fn a_second_hold_is_refused_and_the_first_stays() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    hold_open(&approvals, &line, &line.batch_id).await.unwrap();
+    assert_eq!(
+        hold_open(&approvals, &line, OTHER).await.err().as_deref(),
+        Some("post_approval_busy")
+    );
+    assert!(approvals.holds(&line.batch_id), "the first is still held");
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Join(_)));
+}
+
+/// A joined wait that ends in a refusal returns it and lets the dialog go;
+/// one approved past its time is refused as expired, with its note, and kept
+/// for nobody (#2058).
+#[tokio::test]
+async fn a_joined_dialog_that_ends_refused_or_too_late_is_let_go() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    for (case, approve, ttl, code) in [
+        (
+            "declined",
+            false,
+            Duration::from_secs(60),
+            "import_approval_declined",
+        ),
+        (
+            "too late",
+            true,
+            Duration::from_millis(1),
+            "import_approval_expired",
+        ),
+    ] {
+        let approvals = PostApprovals::with_ttl(directory.path(), ttl);
+        let scripted = ScriptedApproval::held();
+        let dialog = dialog_with(scripted.clone(), 1).await;
+        let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+        approvals
+            .hold_pending(
+                &line.batch_id,
+                binding_of(&line, "Synthetic preview"),
+                dialog,
+                native,
+            )
+            .unwrap();
+        let Begin::Join(joined) = approvals.begin(&line.batch_id) else {
+            panic!("{case}: joined");
+        };
+        scripted.answer(approve);
+        let waited = joined.answer_within(Duration::from_secs(5)).await;
+        assert!(waited.is_ok(), "{case}: answered");
+        std::thread::sleep(Duration::from_millis(5));
+        assert!(
+            matches!(
+                approvals.settle_join(&line.batch_id, waited),
+                Joined::Refused(refused) if refused == code
+            ),
+            "{case}"
+        );
+        assert!(!approvals.holds(&line.batch_id), "{case}: let go");
+        if approve {
+            assert_eq!(
+                approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+                "approval_expired",
+                "{case}"
+            );
+        }
+    }
+}
+
+/// A taken approval has no kind, so a withdrawal of either kind reaches it:
+/// revoked by the master tool's withdrawal, it can no longer be spent (#2058).
+#[tokio::test]
+async fn a_taken_approval_is_withdrawn_by_a_revocation_of_either_kind() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let approvals = PostApprovals::new(directory.path());
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
+        .unwrap();
+    let (taken, _, _) = approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .unwrap();
+    approvals.revoke_of(
+        crate::tally::approved_import::PostKind::Masters,
+        &line.batch_id,
+        "test_reset",
+    );
+    assert!(matches!(
+        approvals.spend(&line.batch_id, taken.id()),
+        Err(UnderLockRefusal::ApprovalRevoked)
+    ));
+}
+
+/// A voucher dialog clicked while no call waits is withdrawn unredeemed only
+/// as a voucher post: the master tool's withdrawal leaves it (#2058).
+#[tokio::test]
+async fn a_clicked_dialog_is_not_withdrawn_as_the_other_kind() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    approvals
+        .hold_pending(
+            &line.batch_id,
+            binding_of(&line, "Synthetic preview"),
+            approved_dialog(1).await,
+            native,
+        )
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !approvals.answered_for_test(&line.batch_id) {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("clicked");
+    approvals.revoke_unredeemed_of(
+        crate::tally::approved_import::PostKind::Masters,
+        &line.batch_id,
+        "test_reset",
+    );
+    assert!(approvals.holds(&line.batch_id), "left as it is");
+    approvals.revoke_unredeemed(&line.batch_id, "test_reset");
+    assert!(
+        !approvals.holds(&line.batch_id),
+        "withdrawn as a voucher post"
+    );
+}
+
+/// A declined dialog withdrawn before any call reads it leaves no note: only
+/// an approval that was given lapses with one (#2058).
+#[tokio::test]
+async fn a_declined_dialog_withdrawn_leaves_no_note() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    hold_declined(&approvals, &line, &line.batch_id).await;
+    approvals.revoke(&line.batch_id, "request_cancelled");
+    assert!(!approvals.holds(&line.batch_id));
+    assert_eq!(approvals.lapse_note(&line.batch_id), None);
+}
+
+/// A lapse note is named by the batch's parsed id, in the imports folder, and
+/// says which batch lapsed and when it was approved, which is the click, not
+/// the lapse. A batch id that is not a Bridge batch id gets no note (#2058).
+#[tokio::test]
+async fn a_lapse_note_is_named_by_the_parsed_id_and_holds_the_click() {
+    const GIVEN: &str = "bridge-AAAAAAAA-0000-4000-8000-000000000587";
+    const UNPREFIXED: &str = "aaaaaaaa-0000-4000-8000-000000000588";
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let imports = directory.path().join("imports");
+    let notes = || {
+        std::fs::read_dir(&imports)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains("lapse"))
+            .collect::<Vec<_>>()
+    };
+
+    let answered = answered_ago(
+        Duration::ZERO,
+        Some(Duration::from_secs(120)),
+        Duration::ZERO,
+    );
+    let (request, _, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(
+            GIVEN,
+            binding_of(&line, "Synthetic preview"),
+            request,
+            native,
+            answered,
+        )
+        .unwrap();
+    approvals.revoke(GIVEN, "test_reset");
+    assert_eq!(
+        notes(),
+        ["bridge-aaaaaaaa-0000-4000-8000-000000000587.approval_lapse.json"]
+    );
+    let note = approvals.lapse_note(GIVEN).unwrap();
+    assert_eq!(note["batch_id"], GIVEN);
+    assert_eq!(
+        note["approved_at"],
+        chrono::DateTime::<chrono::Utc>::from(answered.at_wall)
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+    );
+    assert_ne!(note["approved_at"], note["lapsed_at"]);
+
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(
+            UNPREFIXED,
+            binding_of(&line, "Synthetic preview"),
+            request,
+            native,
+            answered,
+        )
+        .unwrap();
+    approvals.revoke(UNPREFIXED, "test_reset");
+    assert_eq!(approvals.lapse_note(UNPREFIXED), None);
+    assert_eq!(notes().len(), 1, "no note for an id without the prefix");
+}
+
+/// A ledger binding is the same whatever case the catalog gave its GUIDs in:
+/// the catalog keeps each GUID as Tally sent it, and the approval binds it in
+/// lowercase (#2058).
+#[tokio::test]
+async fn a_binding_reads_ledger_guids_in_either_case() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let names: Vec<String> = requested_ledger_names(&ImportPayload {
+        company_guid: line.company_guid.clone(),
+        vouchers: line.vouchers.clone(),
+        amends_batch_id: None,
+    })
+    .into_iter()
+    .collect();
+    let bind = |xml: &str| {
+        crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+            xml,
+            "WR2 Unicode Lab",
+            GUID,
+        )
+        .unwrap()
+        .bind_selected(names.clone())
+        .unwrap()
+    };
+    let observed = bind(&catalogue());
+    let mut flipped_xml = catalogue();
+    for (_, guid) in observed.pairs() {
+        let flipped = if guid.bytes().any(|byte| byte.is_ascii_lowercase()) {
+            guid.to_ascii_uppercase()
+        } else {
+            guid.to_ascii_lowercase()
+        };
+        flipped_xml = flipped_xml.replace(guid, &flipped);
+    }
+    let flipped = bind(&flipped_xml);
+    assert!(
+        observed
+            .pairs()
+            .zip(flipped.pairs())
+            .all(|((_, kept), (_, other))| kept != other && kept.eq_ignore_ascii_case(other)),
+        "the catalog keeps each GUID's case"
+    );
+    assert_eq!(
+        ApprovalBinding::new(&line, "Synthetic preview", &observed, PreviewForm::Listed),
+        ApprovalBinding::new(&line, "Synthetic preview", &flipped, PreviewForm::Listed)
+    );
 }

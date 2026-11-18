@@ -17,7 +17,10 @@ use crate::bank::{
     BankReference, RowGrammar, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES,
     PARSER_SENTINELS,
 };
-use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
+use crate::cash::{
+    Answered, CashAnswer, CashAnswers, CashMovement, CASH_LIMIT_FLAG, CASH_PAYMENT_LIMIT,
+    PURPOSE_NOT_CONFIRMED,
+};
 use crate::date::Date;
 use crate::mapping::{Mapping, Treatment};
 use crate::money::money;
@@ -42,6 +45,12 @@ pub const UNIDENTIFIED: &str = "UNIDENTIFIED - reallocate from";
 /// posted to a mapped ledger: ` | Statement party: <name>`, after the date. It
 /// says where the name came from, so it is not read as a Tally party ledger.
 pub const STATEMENT_PARTY_LABEL: &str = "Statement party:";
+
+/// What a cash withdrawal's row id is followed by to name the cash Payment
+/// made from it (`paid_to_someone`). The result is not a statement row id
+/// ([`is_statement_txn_id`]): the Payment has no bank leg, so it is never half
+/// of a transfer.
+pub const CASH_PAYMENT_ID_SUFFIX: &str = "-cash";
 
 /// The counterparty a statement printed, fit to be written into a narration of
 /// a voucher posted to a mapped ledger. It cannot be built from a parser
@@ -221,6 +230,10 @@ pub struct StatementRecord {
     pub cash_movement: Option<CashMovement>,
     /// The person's answer for a cash line, when given.
     pub cash_answer: Option<CashAnswer>,
+    /// The cash Payment a `paid_to_someone` answer adds after the row's
+    /// Contra into cash, whose ledger is [`Self::ledger`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paid_to: Option<CashPaidTo>,
     /// Which way the row moved money on the statement's own account.
     pub direction: Direction,
     /// The statement holds another row, read on the same date, of an equal
@@ -228,6 +241,21 @@ pub struct StatementRecord {
     /// not half of a transfer. Read over every row of the statement, not only
     /// those in the date window.
     pub reversed_same_day: bool,
+}
+
+/// The cash Payment of a `paid_to_someone` row: Dr the payee, Cr the row's
+/// cash ledger, the same day and amount.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CashPaidTo {
+    /// The payee's ledger, as the person named it.
+    pub ledger: String,
+    /// The Payment's own id: the row's id and [`CASH_PAYMENT_ID_SUFFIX`].
+    pub bridge_txn_id: String,
+    /// The cash this file pays that payee on that day, this Payment included,
+    /// is over [`CASH_PAYMENT_LIMIT`], and its narration carries
+    /// [`CASH_LIMIT_FLAG`]. Only this file's answers are counted, never cash
+    /// paid to that payee in the books or through another statement.
+    pub over_cash_limit: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -579,17 +607,23 @@ fn require_answers(
     ))
 }
 
-/// The one entry an answer maps to: the non-bank leg's ledger and the type.
-/// Only "don't know" reaches the suspense ledger.
+/// The entry an answer maps to: the non-bank leg's ledger and the type. Only
+/// "don't know" reaches the suspense ledger. For `paid_to_someone` it is the
+/// Contra into the cash ledger; the cash Payment after it is built by
+/// [`build`].
 fn cash_entry(
     movement: CashMovement,
-    answer: CashAnswer,
-    named: &str,
+    answered: &Answered,
     suspense_ledger: &str,
     number: usize,
 ) -> Result<(String, VoucherType), Refusal> {
+    let answer = answered.answer();
+    let named = answered.ledger();
     require_answers(movement, answer, number)?;
-    if answer != CashAnswer::DontKnow && ledger_key(named) == ledger_key(suspense_ledger) {
+    let names_suspense = |ledger: &str| ledger_key(ledger) == ledger_key(suspense_ledger);
+    if answer != CashAnswer::DontKnow
+        && (names_suspense(named) || answered.cash_ledger().is_some_and(names_suspense))
+    {
         return Err(Refusal::at_row(
             "cash_answer_names_suspense",
             number,
@@ -598,13 +632,26 @@ fn cash_entry(
             ),
         ));
     }
+    if let Some(cash_ledger) = answered.cash_ledger() {
+        if ledger_key(named) == ledger_key(cash_ledger) {
+            return Err(Refusal::at_row(
+                "self_cancelling_voucher",
+                number,
+                format!(
+                    "row {number}: the person paid and the cash ledger are the same ledger, so the cash Payment would balance, import cleanly and move nothing; name the payee's own ledger"
+                ),
+            ));
+        }
+    }
     let voucher_type = match answer {
-        CashAnswer::BusinessCash | CashAnswer::OwnCashBox => VoucherType::Contra,
+        CashAnswer::BusinessCash | CashAnswer::OwnCashBox | CashAnswer::PaidToSomeone => {
+            VoucherType::Contra
+        }
         CashAnswer::OwnerUse => VoucherType::Payment,
         CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => VoucherType::Receipt,
         CashAnswer::DontKnow if movement.outward() => VoucherType::Payment,
         CashAnswer::DontKnow => VoucherType::Receipt,
-        CashAnswer::PaidToSomeone | CashAnswer::UnbookedCashSales => {
+        CashAnswer::UnbookedCashSales => {
             return Err(Refusal::at_row(
                 "cash_answer_not_built",
                 number,
@@ -612,12 +659,121 @@ fn cash_entry(
             ))
         }
     };
-    let ledger = if answer == CashAnswer::DontKnow {
-        suspense_ledger.to_string()
-    } else {
-        named.to_string()
+    let ledger = match (answer, answered.cash_ledger()) {
+        (CashAnswer::DontKnow, _) => suspense_ledger.to_string(),
+        (_, Some(cash_ledger)) => cash_ledger.to_string(),
+        (_, None) => named.to_string(),
     };
     Ok((ledger, voucher_type))
+}
+
+/// What [`cash_payment`] builds a `paid_to_someone` row's cash Payment from.
+struct CashPayment<'a> {
+    row_id: &'a str,
+    payee: &'a str,
+    cash_ledger: &'a str,
+    bank_ledger: &'a str,
+    date: String,
+    amount: &'a str,
+    /// The row's mode and bank reference, as its Contra's narration opens.
+    lead: &'a str,
+    /// The account label and the date, as every narration ends.
+    tail: &'a str,
+    number: usize,
+}
+
+/// The cash Payment after a `paid_to_someone` row's Contra: Dr the payee, Cr
+/// the cash ledger the Contra filled, the same day and amount. Its narration
+/// leaves room for [`CASH_LIMIT_FLAG`], so flagging it later cannot refuse.
+fn cash_payment(row: CashPayment<'_>) -> Result<Proposal, Refusal> {
+    let number = row.number;
+    require_ledger(row.payee, "ledger of the person paid", Some(number))?;
+    // A Payment from cash to the bank would be a Contra under another name.
+    if ledger_key(row.payee) == ledger_key(row.bank_ledger) {
+        return Err(Refusal::at_row(
+            "cash_payment_to_statement_bank",
+            number,
+            format!(
+                "row {number}: the person paid is this statement's own bank ledger; cash paid back into the bank is a deposit on the statement, not a payment to someone"
+            ),
+        ));
+    }
+    let narration = squash(&format!(
+        "Cash paid to {} from {} | withdrawn {} | {}",
+        row.payee, row.cash_ledger, row.lead, row.tail
+    ));
+    if !admissible_text(
+        &format!("{narration} | {CASH_LIMIT_FLAG}"),
+        MAX_NARRATION_CHARS,
+    ) {
+        return Err(Refusal::at_row(
+            "narration_not_admissible",
+            number,
+            format!(
+                "row {number}'s cash Payment narration carries control characters, the reserved [BRIDGE: marker, or more than {MAX_NARRATION_CHARS} characters"
+            ),
+        ));
+    }
+    Ok(Proposal {
+        bridge_txn_id: format!("{}{CASH_PAYMENT_ID_SUFFIX}", row.row_id),
+        date: row.date,
+        voucher_type: VoucherType::Payment,
+        narration,
+        entries: vec![
+            Entry {
+                ledger: row.payee.to_string(),
+                amount: row.amount.to_string(),
+                side: Side::Dr,
+            },
+            Entry {
+                ledger: row.cash_ledger.to_string(),
+                amount: row.amount.to_string(),
+                side: Side::Cr,
+            },
+        ],
+    })
+}
+
+/// Flag every cash Payment whose payee this file pays, in cash, more than
+/// [`CASH_PAYMENT_LIMIT`] on that day, the Payment's own amount included.
+/// Payees are told apart by the ledger key; nothing is decided, only marked.
+fn flag_cash_over_limit(
+    proposals: &mut [Proposal],
+    records: &mut [StatementRecord],
+) -> Result<(), Refusal> {
+    let limit = ExactDecimal::parse(CASH_PAYMENT_LIMIT).map_err(out_of_range)?;
+    let mut paid: BTreeMap<(String, String), ExactDecimal> = BTreeMap::new();
+    for record in records.iter() {
+        let Some(paid_to) = &record.paid_to else {
+            continue;
+        };
+        let amount = ExactDecimal::parse(record.amount.as_str()).map_err(out_of_range)?;
+        let total = paid
+            .entry((record.date.clone(), ledger_key(&paid_to.ledger)))
+            .or_insert_with(ExactDecimal::zero);
+        *total = total.checked_add(&amount).map_err(out_of_range)?;
+    }
+    for record in records.iter_mut() {
+        let date = record.date.clone();
+        let Some(paid_to) = &mut record.paid_to else {
+            continue;
+        };
+        let Some(total) = paid.get(&(date, ledger_key(&paid_to.ledger))) else {
+            continue;
+        };
+        let over = total.checked_subtract(&limit).map_err(out_of_range)?;
+        if over.is_zero() || over.is_negative() {
+            continue;
+        }
+        paid_to.over_cash_limit = true;
+        if let Some(payment) = proposals
+            .iter_mut()
+            .find(|proposal| proposal.bridge_txn_id == paid_to.bridge_txn_id)
+        {
+            payment.narration.push_str(&format!(" | {CASH_LIMIT_FLAG}"));
+        }
+    }
+    Ok(())
 }
 
 /// Proposals and a record per statement row, in printed order (`build`).
@@ -719,7 +875,7 @@ pub fn build(
         let instrument = bank.instrument(row);
         let cash_movement = CashMovement::of_party(&party);
         let answered = options.cash_answers.get(&txn_id);
-        let (ledger, voucher_type, cash_answer) = match cash_movement {
+        let (ledger, voucher_type, cash_answer, cash_payee) = match cash_movement {
             Some(movement) => {
                 if movement.outward() != outward {
                     return Err(Refusal::at_row(
@@ -731,7 +887,7 @@ pub fn build(
                         ),
                     ));
                 }
-                let Some((answer, named)) = answered else {
+                let Some(answer) = answered else {
                     require_unique(&mut seen, &txn_id, number)?;
                     records.push(StatementRecord {
                         row: number,
@@ -746,14 +902,16 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement,
                         cash_answer: None,
+                        paid_to: None,
                         direction: Direction::of(outward),
                         reversed_same_day: reversed[index],
                     });
                     continue;
                 };
                 let (ledger, voucher_type) =
-                    cash_entry(movement, *answer, named, options.suspense_ledger, number)?;
-                (ledger, voucher_type, Some(*answer))
+                    cash_entry(movement, answer, options.suspense_ledger, number)?;
+                let cash_payee = answer.cash_ledger().map(|_| answer.ledger().to_string());
+                (ledger, voucher_type, Some(answer.answer()), cash_payee)
             }
             None => {
                 if answered.is_some() {
@@ -819,6 +977,7 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement: None,
                         cash_answer: None,
+                        paid_to: None,
                         direction: Direction::of(outward),
                         reversed_same_day: reversed[index],
                     });
@@ -829,7 +988,7 @@ pub fn build(
                     (_, true) => VoucherType::Payment,
                     (_, false) => VoucherType::Receipt,
                 };
-                (ledger, voucher_type, None)
+                (ledger, voucher_type, None, None)
             }
         };
         require_ledger(&ledger, "mapped ledger", Some(number))?;
@@ -925,6 +1084,29 @@ pub fn build(
                 },
             ],
         });
+        let paid_to = match cash_payee {
+            Some(payee) => {
+                let payment = cash_payment(CashPayment {
+                    row_id: &txn_id,
+                    payee: &payee,
+                    cash_ledger: &ledger,
+                    bank_ledger: options.bank_ledger,
+                    date: date.iso(),
+                    amount: &amount_text,
+                    lead: &format!("{mode} {reference}"),
+                    tail: &format!("{} | {}", options.account_label, date.narration()),
+                    number,
+                })?;
+                let paid_to = CashPaidTo {
+                    ledger: payee,
+                    bridge_txn_id: payment.bridge_txn_id.clone(),
+                    over_cash_limit: false,
+                };
+                proposals.push(payment);
+                Some(paid_to)
+            }
+            None => None,
+        };
         records.push(StatementRecord {
             row: number,
             date: date.iso(),
@@ -938,10 +1120,12 @@ pub fn build(
             bridge_txn_id: txn_id,
             cash_movement,
             cash_answer,
+            paid_to,
             direction: Direction::of(outward),
             reversed_same_day: reversed[index],
         });
     }
+    flag_cash_over_limit(&mut proposals, &mut records)?;
     if let Some(stale) = options
         .cash_answers
         .ids()
@@ -1042,6 +1226,7 @@ pub fn selfcheck(build: &Build, bank_ledger: &str) -> Result<Selfcheck, Refusal>
             }
         }
     }
+    // A paid_to_someone row posts its Contra and its cash Payment.
     let posted = build
         .records
         .iter()
@@ -1051,12 +1236,13 @@ pub fn selfcheck(build: &Build, bank_ledger: &str) -> Result<Selfcheck, Refusal>
                 Disposition::Skipped | Disposition::NeedsAnswer
             )
         })
-        .count();
+        .map(|record| 1 + usize::from(record.paid_to.is_some()))
+        .sum::<usize>();
     if posted != build.proposals.len() {
         return Err(Refusal::new(
             "manifest_count_mismatch",
             format!(
-                "{posted} rows were dispositioned as vouchers but {} proposals exist",
+                "the rows dispositioned as vouchers make {posted} vouchers but {} proposals exist",
                 build.proposals.len()
             ),
         ));

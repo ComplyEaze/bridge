@@ -9,7 +9,8 @@ use bridge_tally_core::master_name_index::Via;
 const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const NAME: &str = "Synthetic Masters Lab";
 
-use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, MasterName};
+use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch};
+use crate::tally::master_name::MasterName;
 use std::sync::LazyLock;
 
 /// A batch of one Suspense ledger named `name`.
@@ -553,7 +554,8 @@ fn a_group_answer_for_another_company_is_refused() {
 mod queue {
     use super::*;
     use crate::tally::approved_import::{ApprovedImport, BeforeDispatchError, UnderLockRefusal};
-    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
+    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+    use crate::tally::master_name::MasterName;
     use crate::tally::{TallyConfig, TallyRuntime, VerifiedCompanyIdentity};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;

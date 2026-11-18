@@ -93,9 +93,26 @@ test("evidence identity distinguishes same-named books by the pinned composite k
   const fy27 = companyIdentityKey({ ...shared, books_from_yyyymmdd: "20260401" });
 
   assert.notEqual(fy26, fy27);
-  assert.notEqual(companyIdentityLabel(fy26), companyIdentityLabel(fy27));
-  assert.match(companyIdentityLabel(fy26), /Same Name · Company no\. 100001 · Books from 20250401 · GUID same-guid · Endpoint http:\/\/127\.0\.0\.1:9000/);
-  assert.match(panel, /companyIdentityLabel\(evidence\.companyIdentity\)/);
+  assert.notEqual(companyIdentityLabel(fy26, "Same Name"), companyIdentityLabel(fy27, "Same Name"));
+  assert.match(companyIdentityLabel(fy26, "Same Name"), /Same Name · Company no\. 100001 · Books from 20250401 · GUID same-guid · Endpoint http:\/\/127\.0\.0\.1:9000/);
+  assert.match(panel, /companyIdentityLabel\(evidence\.companyIdentity, evidence\.companyShownName\)/);
+});
+
+test("the evidence Company line draws the shown name while the identity key keeps the raw one (#2462)", () => {
+  const raw = "Synthetic\u200bTra\u202eders";
+  const shown = "Synthetic\\u{200b}Tra\\u{202e}ders";
+  const key = companyIdentityKey({
+    canonical_origin: "http://127.0.0.1:9000",
+    company_guid: "same-guid",
+    company_number: "100001",
+    company_name: raw,
+    books_from_yyyymmdd: "20250401",
+  });
+
+  assert.equal(JSON.parse(key)[3], raw);
+  const label = companyIdentityLabel(key, shown);
+  assert.equal(label.split(" · ")[0], shown);
+  assert.equal(label.includes(raw), false);
 });
 
 test("local-only and failed report reads have distinct no-evidence drawer entries", async () => {

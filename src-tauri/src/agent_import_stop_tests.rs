@@ -185,6 +185,10 @@ async fn a_release_needs_the_person_and_survives_a_restart() {
     assert_eq!(result(&response)["state"], "stop_released", "{response}");
     assert_eq!(result(&response)["seen_at_release"], "not_established");
     assert_eq!(result(&response)["seen_detail"], "sent_not_attributed");
+    assert_eq!(
+        result(&response)["next_step"],
+        "The stop is released. Invoices for this company can be built and posted again."
+    );
     assert_eq!(approval.review_counts(), [1]);
     // Asked as the release, not as a review: its dialog says what Y does to the
     // stop, not that a voucher was reviewed (#1780).
@@ -337,6 +341,10 @@ async fn a_release_whose_read_finds_the_stop_gone_asks_nothing() {
     let response = release(&server, args(&line), approval.clone()).await;
     verifier.join().unwrap();
     assert_eq!(result(&response)["state"], "not_held", "{response}");
+    assert_eq!(
+        result(&response)["next_step"],
+        "This batch no longer stops the company: nothing was released."
+    );
     assert_eq!(result(&response)["seen_at_release"], Value::Null);
     assert_eq!(result(&response)["seen_detail"], Value::Null);
     assert!(approval.reviews().is_empty(), "no dialog: {response}");
@@ -411,6 +419,7 @@ fn what_was_seen_is_placed_for_every_status_the_verification_writes() {
     let seen = |row: Value, duplicates: Value| {
         let seen = Seen::of(&json!({"vouchers": [row], "duplicates": duplicates}), &line);
         let (kind, detail) = seen.reported();
+        assert_eq!(serde_json::to_value(seen.recorded()).unwrap(), kind);
         (kind.to_string(), detail.to_string(), seen.words())
     };
     for (status, reason, kind, words) in placed {
@@ -463,6 +472,14 @@ fn an_unattributed_invoice_after_an_unclean_answer_drops_the_edit_example() {
     for (rewrite, words) in [
         (
             verification::mark_sent_not_attributed_after_unclean_answer as fn(&mut Value),
+            "not established: no voucher matching this invoice was found, and one may be in the book",
+        ),
+        // A post that landed in part adds a count after that step: the words
+        // are the same, and name no count.
+        (
+            (|result| {
+                verification::mark_sent_not_attributed_after_partly_created_answer(result, 1, 3)
+            }) as fn(&mut Value),
             "not established: no voucher matching this invoice was found, and one may be in the book",
         ),
         (verification::mark_sent_not_attributed, NOT_ATTRIBUTED),
@@ -654,6 +671,41 @@ fn the_release_dialog_does_not_show_text_that_could_mislead() {
         release_preview(&line, &seen),
         words.replace("WR2 Unicode Lab", GUID)
     );
+}
+
+/// The dialog lists the batch's invoice and no other voucher of the batch,
+/// and shows a character that could reorder what the person reads, in the
+/// invoice number or the batch id, as `?`.
+#[test]
+fn the_release_dialog_lists_only_the_invoice_and_shows_no_reordering_character() {
+    use super::super::super::stop::release_preview;
+    let mut line = batch("Sales", "http://127.0.0.1:9000");
+    let seen = Seen::of(
+        &json!({"vouchers": [{"bridge_txn_id": "t1", "status": "posted_divergent"}]}),
+        &line,
+    );
+    let words = dialog(&line, "found in Tally, not confirmed as built");
+    line.vouchers.push(
+        serde_json::from_value(json!({"bridge_txn_id":"t2","date":"20260907",
+            "voucher_type":"Receipt","narration":null,"reference":null,
+            "voucher_number":"R/0001",
+            "entries":[{"ledger":"Cash","amount":"118.00","side":"Dr"},
+                {"ledger":"Customer","amount":"118.00","side":"Cr"}]}))
+        .unwrap(),
+    );
+    assert_eq!(release_preview(&line, &seen), words);
+
+    let batch_id = line.batch_id.clone();
+    line.vouchers[0].voucher_number = Some("BP/\u{202e}0010".to_string());
+    line.batch_id = format!("{batch_id}\u{202e}");
+    let shown = release_preview(&line, &seen);
+    assert_eq!(
+        shown,
+        words
+            .replace("BP/26-27/0010", "BP/?0010")
+            .replace(&batch_id, &format!("{batch_id}?"))
+    );
+    assert!(!shown.contains('\u{202e}'), "{shown}");
 }
 
 /// What the release dialog shows (#1780): the statement that the stop is
@@ -875,6 +927,27 @@ fn a_post_refused_for_a_stopped_company_says_what_to_do() {
         .as_str()
         .unwrap()
         .contains("invoice_stop"));
+}
+
+/// The company GUID the caller names is matched without regard to case, and
+/// the answer names the batch's own company as the batch recorded it.
+#[tokio::test]
+async fn a_release_naming_its_company_in_capitals_goes_ahead_under_the_batch_s_company() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_without_tally(directory.path());
+    let line = saved(&server, "Sales");
+    posted(&server, &line);
+    let mut upper = args(&line);
+    upper["company_guid"] = json!(GUID.to_ascii_uppercase());
+    let approval = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(approval.clone(), server.call_tool_response(ACK, upper))
+        .await;
+    assert_eq!(response.egress.company_guid.as_deref(), Some(GUID));
+    let response = response.value;
+    assert_eq!(result(&response)["state"], "stop_released", "{response}");
+    assert_eq!(approval.review_counts(), [1]);
+    assert_eq!(stop(&server), None);
 }
 
 /// The company the caller names is the batch's own: a wrong one is refused

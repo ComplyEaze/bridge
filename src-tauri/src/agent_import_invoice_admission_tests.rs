@@ -1156,6 +1156,23 @@ fn pilot_saved(number: &str, observed: bool) -> ImportVoucher {
     saved
 }
 
+#[tokio::test]
+async fn a_payment_with_invoice_detail_fails_before_read_back_and_month_reads() {
+    let lab = pilot_lab_over(READBACK_THEN_NUMBER_ORDER);
+    let mut saved = pilot_saved("BP/26-27/0010", true);
+    saved.voucher_type = VoucherType::Payment;
+    let (differences, ..) = lab
+        .server
+        .read_back_sales_invoice(&lab.identity, &lab.company, &saved)
+        .await
+        .expect("a read-back after a post is never an error");
+    assert_eq!(differences, ["invoice_readback_failed"]);
+    let requests = received(lab.simulator);
+    assert_eq!(requests.len(), "eMsMse".len());
+    assert!(sent_as(READBACK_THEN_NUMBER_ORDER, &requests, 'R').is_empty());
+    assert!(months_sent(READBACK_THEN_NUMBER_ORDER, &requests).is_empty());
+}
+
 /// A posted invoice's read-back, on the pilot lab's answers: the marks are
 /// read first (6 requests), then the invoice by type and number (6). The
 /// read-back's answer before the post (a captured collection with no voucher)
@@ -1788,6 +1805,25 @@ fn the_judge_asks_for_the_marks_first_and_the_listing_whatever_the_master_mark()
     assert_eq!(needs(&answers), invoice::Need::Listing);
     answers.marks = Some(pilot_marks(16, 900_000));
     assert_eq!(needs(&answers), invoice::Need::Listing);
+}
+
+#[test]
+fn a_payment_with_invoice_detail_cannot_plan_a_number_read() {
+    let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    voucher.voucher_type = VoucherType::Payment;
+    let catalogue = pilot_catalogue();
+    let control = ledger::NumberControl::NoneStanding;
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
+    let judge = InvoiceJudge {
+        identity: &identity,
+        voucher: &voucher,
+        catalogue: &catalogue,
+        control: &control,
+    };
+    assert!(matches!(
+        judge.request(invoice::Need::Number(0)),
+        Err(invoice::Verdict::Failed(code)) if code == "invoice_read_plan_inconsistent"
+    ));
 }
 
 /// `admit_queued_invoice` holds the plan the queue sent to the invoice's own

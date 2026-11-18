@@ -366,6 +366,68 @@ fn exact_readback_requires_a_clean_persisted_response_to_reconcile() {
     }
 }
 
+/// A batch with no response record points at the receipt of the call that sent
+/// it, and says what its absence means (bridge#852); a batch whose answer is on
+/// record gets no such step.
+#[test]
+fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
+    let clean = dispatch_response("success", 1, 0);
+    let altered = dispatch_response("success", 0, 1);
+    let unverified = || json!({"result": {"counts": {"posted_verified": 0}, "duplicates": []}});
+    for (response, pointed) in [(None, true), (Some(&altered), false), (Some(&clean), false)] {
+        let mut previous = unverified();
+        finalize_previous_attempt_reconciliation(&mut previous, response, None, 1);
+        let mut current = unverified();
+        finalize_current_dispatch(&mut current, response, None, 1);
+        for payload in [previous, current] {
+            let error = &payload["result"]["error"];
+            assert_eq!(error["code"], "import_reconciliation_required");
+            if pointed {
+                assert_eq!(error["next_step"], RESPONSE_MISSING_NEXT_STEP);
+            } else {
+                assert!(error.get("next_step").is_none());
+            }
+        }
+    }
+    let verified = || json!({"result": {"counts": {"posted_verified": 1}, "duplicates": []}});
+    let mut previous = verified();
+    finalize_previous_attempt_reconciliation(&mut previous, None, None, 1);
+    let mut current = verified();
+    finalize_current_dispatch(&mut current, None, None, 1);
+    for payload in [previous, current] {
+        let result = &payload["result"];
+        assert_eq!(result["dispatch"]["state"], "reconciliation_required");
+        assert_eq!(result["error"]["code"], "import_reconciliation_required");
+        assert_eq!(result["error"]["next_step"], RESPONSE_MISSING_NEXT_STEP);
+    }
+    let step = RESPONSE_MISSING_NEXT_STEP;
+    // The log returns only recent receipts, with the trail's two fields named.
+    for part in [
+        "egress_log returns the most recent receipts",
+        "The sending post_import call's receipt is there only if recent enough",
+        "request_trail",
+        "held_ms",
+        "how long each send held the endpoint",
+        "outcome",
+        "but does not mark which send was the post",
+        "A later post_import or verify_import tool call on this batch does not post it again and also leaves a receipt",
+        "its request_trail lists only that call's reads",
+        "A receipt not returned may be older than egress_log reads",
+        "or may never have been written: the process may have ended first",
+        "without resending it",
+    ] {
+        assert!(step.contains(part), "{part}");
+    }
+    assert!(!step.contains("the post's among them"));
+    // It promises no receipt and no cause, and reasons about neither.
+    // The cap the text names is the trail's own.
+    let cap = format!("the last {} sends", crate::request_trail::TRAIL_LAST);
+    assert!(step.contains(&cap), "{cap}");
+    for word in ["always", "will be", "because", "caused"] {
+        assert!(!step.contains(word), "{word}");
+    }
+}
+
 #[test]
 fn recovery_failure_retains_the_saved_dispatch_response() {
     let response = dispatch_response("success", 1, 0);

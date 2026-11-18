@@ -246,6 +246,7 @@ impl MailingReadFailure {
             TallyTransportError::ResponseReadFailed => Self::ReadFailed,
             TallyTransportError::RequestFailed => Self::NoAnswer,
             TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer
             | TallyTransportError::UnsupportedContentEncoding => Self::Undecodable,
             TallyTransportError::HttpStatus { .. } => Self::HttpStatus,
             TallyTransportError::EndpointInvalid { .. }
@@ -1423,6 +1424,49 @@ impl PairedNativeReportResponseFailure {
         self.0
             .chain()
             .find_map(|cause| cause.downcast_ref::<TallyTransportError>())
+    }
+}
+
+/// What one send of a paired read may answer: a report read admits only a body.
+pub(crate) trait PairedAnswer: PartialEq + Sized {
+    fn admit(
+        sent: anyhow::Result<(String, usize, String)>,
+    ) -> anyhow::Result<(Self, usize, String)>;
+}
+
+impl PairedAnswer for String {
+    fn admit(
+        sent: anyhow::Result<(String, usize, String)>,
+    ) -> anyhow::Result<(Self, usize, String)> {
+        sent
+    }
+}
+
+/// One send of the party-bills report: a body, or the empty answer Tally gives a party it reports
+/// nothing for (protocol reference §12a.27). The empty answer is recorded at 0 bytes, with the
+/// SHA-256 of no input.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum PartyBillsAnswerBody {
+    Rows(String),
+    Empty,
+}
+
+impl PairedAnswer for PartyBillsAnswerBody {
+    fn admit(
+        sent: anyhow::Result<(String, usize, String)>,
+    ) -> anyhow::Result<(Self, usize, String)> {
+        match sent {
+            Ok((text, bytes, sha256)) => Ok((Self::Rows(text), bytes, sha256)),
+            Err(error)
+                if error.chain().any(|cause| {
+                    cause.downcast_ref::<TallyTransportError>()
+                        == Some(&TallyTransportError::EmptyAnswer)
+                }) =>
+            {
+                Ok((Self::Empty, 0, sha256_hex(&[])))
+            }
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -3173,10 +3217,44 @@ impl TallyClient {
         &self,
         request_xml: String,
     ) -> anyhow::Result<(String, usize, String)> {
-        let (first, first_bytes, first_sha256) = self
-            .post_xml_with_encoded_bytes(request_xml.clone())
+        self.paired_with_evidence::<String>(request_xml).await
+    }
+
+    /// The party-bills report read twice as [`Self::fetch_native_report_paired`] reads a report,
+    /// with the empty answer (protocol reference §12a.27) admitted as a value of its own. Empty
+    /// twice is [`PartyBillsAnswerBody::Empty`]; empty once, beside a body, is the pair's drift,
+    /// `party_bills_drifted`. Every other failure is the report read's.
+    pub(crate) async fn fetch_party_bills_paired(
+        &self,
+        request_xml: String,
+    ) -> anyhow::Result<(PartyBillsAnswerBody, usize, String)> {
+        match self
+            .paired_with_evidence::<PartyBillsAnswerBody>(request_xml)
             .await
-            .map_err(|error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error)))?;
+        {
+            Err(error)
+                if error
+                    .chain()
+                    .any(|cause| cause.is::<NativeReportPairDrift>()) =>
+            {
+                let failure = error.downcast::<super::runtime::RuntimeReadFailure>()?;
+                Err(super::runtime::with_read_evidence(
+                    PairedReadValidationError::PartyBills.into(),
+                    failure.evidence,
+                ))
+            }
+            read => read,
+        }
+    }
+
+    async fn paired_with_evidence<A: PairedAnswer>(
+        &self,
+        request_xml: String,
+    ) -> anyhow::Result<(A, usize, String)> {
+        let (first, first_bytes, first_sha256) = A::admit(
+            self.post_xml_with_encoded_bytes(request_xml.clone()).await,
+        )
+        .map_err(|error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error)))?;
         let mut evidence =
             RuntimeReadEvidence::single(&request_xml, first_sha256.clone(), first_bytes);
         let result = async {
@@ -3184,12 +3262,10 @@ impl TallyClient {
                 .get_status_decoded()
                 .await
                 .context("Tally health check between paired native report reads failed")?;
-            let (second, second_bytes, second_sha256) = self
-                .post_xml_with_encoded_bytes(request_xml.clone())
-                .await
-                .map_err(|error| {
-                    anyhow::Error::new(PairedNativeReportResponseFailure::new(error))
-                })?;
+            let (second, second_bytes, second_sha256) = A::admit(
+                self.post_xml_with_encoded_bytes(request_xml.clone()).await,
+            )
+            .map_err(|error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error)))?;
             if first_bytes == second_bytes && first_sha256 == second_sha256 {
                 evidence.bytes = evidence.bytes.saturating_add(second_bytes);
             } else {

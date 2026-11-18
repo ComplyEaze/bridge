@@ -78,7 +78,7 @@ fn proposal_marker_bytes_are_admitted_before_entry_conversion() {
     vouchers[255]["party"] = json!(format!("{party}P"));
     vouchers[255]["entries"][0]["amount"] = json!("not-an-amount");
     assert_eq!(
-        parse_proposals(&json!({"vouchers": vouchers})),
+        parse_proposals(&json!({"vouchers": vouchers})).map_err(|failure| failure.code),
         Err("presence_proposal_raw_bytes_too_large".to_string())
     );
 }

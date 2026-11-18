@@ -1,0 +1,46 @@
+$ send.py b2-pre requests/marks.utf16le.xml
+2026-11-18T07:38:55.174Z b2-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 74fafb9357731ee2dd10897eade5202c2be7c891dc3af17164b514a300478893 | first byte 0.006243 s total 0.007073 s
+exit 0
+$ check_r1.py marks answers/a-b2-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 215
+exit 0
+$ send.py b2 requests/b2-create.utf16le.xml
+2026-11-18T07:38:55.773Z b2 requests/b2-create.utf16le.xml request 3674 B sha256 6961f4754673d5359c7bf597dd272e11c28b64cbe74f9e27064875f1709c526c | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.171109 s total 0.173351 s
+exit 0
+$ check_r1.py import answers/a-b2.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after b2 checked by the operator: no dialog)
+$ send.py b2-post requests/marks.utf16le.xml
+2026-11-18T07:39:06.712Z b2-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 90d37c84d2da567f4141db1a36039b5b5e6cf2d5c1a437fa9f2ba4e44eb381ef | first byte 0.005944 s total 0.007394 s
+exit 0
+$ check_r1.py marks answers/a-b2-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 216
+exit 0
+$ send.py a1-b2 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:39:07.247Z a1-b2 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 20136 answer 20136 B sha256 a0132a4edea7ed48b76d2bd86b0ea468420c981ddd1dcd610f3be3031d4ae37a | first byte 0.017042 s total 0.018561 s
+exit 0
+$ check_r1.py diff answers/a-a1-t5.xml answers/a-a1-b2.xml
+rows before: 6  after: 7
+ADDED STOCKITEM 'SC Copied Marked' (16 characters)
+unchanged rows: 6
+exit 0
+$ check_r1.py same answers/a-a1-b2.xml "SC Copied Marked" answers/a-a1-b2.xml "SC Sibling Goods"
+PARENT: same (a value / a value)
+BASEUNITS: same (a value / a value)
+GSTAPPLICABLE: same (a value / a value)
+GSTTYPEOFSUPPLY: same (a value / a value)
+GSTDETAILS.LIST: same (1 element(s), 24 descendants / 1 element(s), 24 descendants)
+HSNDETAILS.LIST: same (1 element(s), 4 descendants / 1 element(s), 4 descendants)
+exit 0

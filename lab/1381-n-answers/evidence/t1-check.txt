@@ -1,0 +1,38 @@
+$ send.py t1-pre requests/marks.utf16le.xml
+2026-11-18T07:36:00.508Z t1-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1 | first byte 0.008177 s total 0.009496 s
+exit 0
+$ check_r1.py marks answers/a-t1-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 210
+exit 0
+$ send.py t1 requests/t1-hyphen-target.utf16le.xml
+2026-11-18T07:36:01.037Z t1 requests/t1-hyphen-target.utf16le.xml request 966 B sha256 db8652a08b4f6c3c52ae4cdbee4429be6db9fab3467cc0570f4315f7457f4272 | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.218214 s total 0.219644 s
+exit 0
+$ check_r1.py import answers/a-t1.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after t1 checked by the operator: no dialog)
+$ send.py t1-post requests/marks.utf16le.xml
+2026-11-18T07:37:14.399Z t1-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 4e9f77ceaba1315dbbe2c340da3bdf30d6a8f9fca36145e24570f7fb53760f81 | first byte 0.007253 s total 0.008160 s
+exit 0
+$ check_r1.py marks answers/a-t1-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 211
+exit 0
+$ send.py a1-t1 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:37:14.887Z a1-t1 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 9612 answer 9612 B sha256 053f16040521e0555d74a1f0fb669d9c63774b955db7fc08b5754180315f024e | first byte 0.011678 s total 0.012706 s
+exit 0
+$ check_r1.py diff answers/a-a1.xml answers/a-a1-t1.xml
+rows before: 1  after: 2
+ADDED STOCKITEM 'SN Hyphen Item' (14 characters)
+unchanged rows: 1
+exit 0

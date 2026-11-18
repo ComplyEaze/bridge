@@ -1,0 +1,44 @@
+$ send.py n5-pre requests/marks.utf16le.xml
+2026-11-18T07:40:54.204Z n5-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 2dd6406bb6ae42b678029f6c48cc7cbd53877c172d3996f115f6e2f6cfb8f967 | first byte 0.008112 s total 0.009516 s
+exit 0
+$ check_r1.py marks answers/a-n5-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 220
+exit 0
+$ send.py n5 requests/n5-case-gst.utf16le.xml
+2026-11-18T07:40:54.950Z n5 requests/n5-case-gst.utf16le.xml request 974 B sha256 2b844bc0ef1c473b9a00c1b4a1f60da0996cf2dae8f5ce620412dc966d3ababd | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901 | first byte 0.298432 s total 0.299854 s
+exit 0
+$ check_r1.py import answers/a-n5.xml
+CREATED 0
+ALTERED 1
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after n5 checked by the operator: no dialog)
+$ send.py n5-post requests/marks.utf16le.xml
+2026-11-18T07:41:07.351Z n5-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 e28d52f0baafa81379099507cc02ed97a8b4788b4573df87dd2166e0d1022568 | first byte 0.004431 s total 0.005933 s
+exit 0
+$ check_r1.py marks answers/a-n5-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 221
+exit 0
+$ send.py a1-n5 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:41:07.830Z a1-n5 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 20132 answer 20132 B sha256 5926becf5bcf0e45d47bc35cc2deb27e228362ee6334fe1e771a2f46ee9ab99f | first byte 0.013985 s total 0.015215 s
+exit 0
+$ check_r1.py diff answers/a-a1-n4.xml answers/a-a1-n5.xml
+rows before: 7  after: 7
+CHANGED 'SC Sibling Goods' (16 characters) : ALTERID, LANGUAGENAME.LIST
+  ALTERID: <ALTERID TYPE='Number'>210</ALTERID>  ->  <ALTERID TYPE='Number'>221</ALTERID>
+  LANGUAGENAME.LIST: <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>SC Sibling Goods</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>  ->  <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>sc sibling goods</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>
+unchanged rows: 6
+exit 0
+$ check_r1.py names answers/a-a1-n5.xml "SC Sibling Goods"
+LANGUAGENAME.LIST elements: 1; name entries: 1
+   'sc sibling goods' (16 characters)
+exit 0

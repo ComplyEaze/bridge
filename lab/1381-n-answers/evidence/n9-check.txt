@@ -1,0 +1,43 @@
+$ send.py n9-pre requests/marks.utf16le.xml
+2026-11-18T07:44:28.912Z n9-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 584083b42eb267dc6aeaeb3b6e5f8bd8d0ef3d108c3e3fdd5e3309a51ce0c975 | first byte 0.010843 s total 0.012066 s
+exit 0
+$ check_r1.py marks answers/a-n9-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 225
+exit 0
+$ send.py n9 requests/n9-alias.utf16le.xml
+2026-11-18T07:44:29.429Z n9 requests/n9-alias.utf16le.xml request 966 B sha256 abd89643b0ed891f396cac4b719be489b3641ef2bf433b14ad637ae0e0563f42 | curl exit 0 status 200 CONTENT-LENGTH 622 answer 622 B sha256 0d7af6209f81ad4d6f1ed05a207fa62a1731964262e6bf58e6a6c8eb1b58be0a | first byte 0.056528 s total 0.058964 s
+exit 0
+$ check_r1.py import answers/a-n9.xml
+CREATED 0
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 1
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+LINEERROR 'Duplicate Entry!'
+exit 0
+(screen after n9 checked by the operator: no dialog)
+$ send.py n9-post requests/marks.utf16le.xml
+2026-11-18T07:44:41.231Z n9-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 584083b42eb267dc6aeaeb3b6e5f8bd8d0ef3d108c3e3fdd5e3309a51ce0c975 | first byte 0.005743 s total 0.008318 s
+exit 0
+$ check_r1.py marks answers/a-n9-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 225
+exit 0
+$ send.py a1-n9 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:44:41.708Z a1-n9 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 26304 answer 26304 B sha256 18c8888136d346550919e4f53ccdd5ffe1672d5b9302ac1cdb2645d68ff6fe59 | first byte 0.014272 s total 0.015625 s
+exit 0
+$ check_r1.py diff answers/a-a1-c.xml answers/a-a1-n9.xml
+rows before: 9  after: 9
+unchanged rows: 9
+exit 0
+$ check_r1.py names answers/a-a1-n9.xml "SN Alias Item"
+LANGUAGENAME.LIST elements: 1; name entries: 2
+   'SN Alias Item' (13 characters)
+   'SN Alias Other' (14 characters)
+exit 0

@@ -1,0 +1,2 @@
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 210

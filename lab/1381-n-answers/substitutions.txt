@@ -1,0 +1,9 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/notes.txt: original 13045 B sha256 d8e9d72c39d2c4ab066a976476f1393257085df5b7c22d6dd8673604bc285b83 (kept on the lab PC); the company GUID replaced in 1 place(s); 1 x -> GO and RESTORE word (S8 only) recorded about 07:33Z.; 1 x -> (removed); 1 x -> after the previous row's close; 1 x -> TallyPrime, edition as recorded (title); 1 x -> 18-Nov-26, 1:05 pm; 2 x -> "status=200, bytes=51"; 1 x -> GET /status status=200, bytes=51; 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>; 1 x -> stop
+evidence/s3-check.txt: original 1366 B sha256 a238cf888140a74e36c6186aae80b79aa9c4e197f324bfad495dcbb3c955274c (kept on the lab PC); 2 x -> <1381-R1 lab folder>
+scripts/send.py: original 3612 B sha256 d79d1fb4decacc889244cd72c5e5c8bf55f006646f53e9ce5a2bd1870daaa090 (kept on the lab PC); 7 x -> stop
+scripts/step0.py: original 2751 B sha256 beb67adad8b9edd4a84e51b11e6a32ec2fd85da7cca9f384bc40a9fe9ff4a5e9 (kept on the lab PC); 1 x -> <lab folder>
+scripts/loop.py: original 2802 B sha256 be4d1e969aedd09fa0e68421f18236075cc094dc4cf64ef5eb8dbe8566730f2d (kept on the lab PC); 1 x -> <lab folder>; 3 x -> stop
+scripts/loopb.py: original 1469 B sha256 c0be4a9b09904d024333201ece5ee325aa66c7124667be546d63b35685250dd7 (kept on the lab PC); 1 x -> stop
+scripts/note.py: original 542 B sha256 2a449115cd2c0e41b3875d2a6a253248051ec66463e9e716e9d30b651461fa69 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/mk-restore-plan.py: original 3191 B sha256 aee35ea1198988b5c06d85960fe052aae8f56bf61e92cbe707cfb758b8fb8325 (kept on the lab PC); 1 x -> 18-Nov-26, 1:05 pm; 2 x -> <Tally data folder>

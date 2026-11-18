@@ -1,0 +1,38 @@
+$ send.py t2-pre requests/marks.utf16le.xml
+2026-11-18T07:37:26.253Z t2-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 4e9f77ceaba1315dbbe2c340da3bdf30d6a8f9fca36145e24570f7fb53760f81 | first byte 0.007908 s total 0.012297 s
+exit 0
+$ check_r1.py marks answers/a-t2-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 211
+exit 0
+$ send.py t2 requests/t2-slash-target.utf16le.xml
+2026-11-18T07:37:27.003Z t2 requests/t2-slash-target.utf16le.xml request 962 B sha256 aeaa084148077d0b4556159e1670a166293f307a55bbb80f02e2cbdda5b86648 | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.342569 s total 0.343932 s
+exit 0
+$ check_r1.py import answers/a-t2.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after t2 checked by the operator: no dialog)
+$ send.py t2-post requests/marks.utf16le.xml
+2026-11-18T07:37:40.873Z t2-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 1a0b5290a2990729589f438d8e126310871e3fe13fe179593e081c87cd0c00e6 | first byte 0.011378 s total 0.012269 s
+exit 0
+$ check_r1.py marks answers/a-t2-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 212
+exit 0
+$ send.py a1-t2 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:37:41.619Z a1-t2 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 10950 answer 10950 B sha256 03da54addb7a2b0b92fcb9b645ca95b42f1b6db1e304a08ebad431c364c40f6a | first byte 0.016304 s total 0.017864 s
+exit 0
+$ check_r1.py diff answers/a-a1-t1.xml answers/a-a1-t2.xml
+rows before: 2  after: 3
+ADDED STOCKITEM 'SN Slash Item' (13 characters)
+unchanged rows: 2
+exit 0

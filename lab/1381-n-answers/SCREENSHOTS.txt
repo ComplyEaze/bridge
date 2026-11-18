@@ -1,0 +1,25 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the whole Tally window (PrintWindow).
+shots/b2-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/c10-window.png: 72933 B, sha256 acc2cec8345d704022abd2303c64247f9ccd67e5e0bdd4155fd001dfbcb972fb
+shots/n1-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n2-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n3-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n4-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n5-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n6-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n7-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n8-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/n9-after.png: 45725 B, sha256 ee67330529117813cd7b3d34216e1acc4cb5fca30a5aebb66c6d9b4528f2d499
+shots/s0-gateway.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/s0-window.png: 72363 B, sha256 e89ad746a4290b3d422f62623626d57517d3d3429b628e0af1f7c2e9b13ac378
+shots/s2-before-accept.png: 70156 B, sha256 aa8a97400fcb60ac00580a67f5dfdf7e5528a70bcfd00de29df2171b0bc25a3e
+shots/s7-after-accept.png: 52732 B, sha256 ba426c8eb5c28a988c3677487e0233f95b6c01b343ea611244a82e1ac94230bb
+shots/s7-alias-typed.png: 49840 B, sha256 76a24369bc5490953ded92e84aa12d0d900882dc9a5b418b8ca05b780968f3a0
+shots/s7-alter-open.png: 49156 B, sha256 0687d1eba7dc2d92c3a95cca09bd3fee7120c7f8dbe962f12dff63381cb00604
+shots/s8-after-gateway.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/s8-before-accept.png: 35318 B, sha256 45b0696dd7a6f89f188ba8c8aa200ab0091a4c11215ecc38063017a380ed1bd1
+shots/t1-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/t2-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/t3-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/t4-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c
+shots/t5-after.png: 45718 B, sha256 f28a77774b3adfc1340ca239834d76240fadf5b10169489f93dfa740f1c8ef4c

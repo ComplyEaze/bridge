@@ -1,0 +1,40 @@
+$ send.py n2-pre requests/marks.utf16le.xml
+2026-11-18T07:39:42.732Z n2-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 9f9a7e6b44a567f76262b3177870d00961966e187c421671c1df993b12b5253e | first byte 0.005303 s total 0.009984 s
+exit 0
+$ check_r1.py marks answers/a-n2-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 217
+exit 0
+$ send.py n2 requests/n2-slash.utf16le.xml
+2026-11-18T07:39:43.493Z n2 requests/n2-slash.utf16le.xml request 962 B sha256 75ad74f6958bb590f94dbb3f2198b6d17655c28111b869aa7b8855cce14a6dc2 | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901 | first byte 0.182147 s total 0.199501 s
+exit 0
+$ check_r1.py import answers/a-n2.xml
+CREATED 0
+ALTERED 1
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after n2 checked by the operator: no dialog)
+$ send.py n2-post requests/marks.utf16le.xml
+2026-11-18T07:39:56.522Z n2-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 dc1cb5152f777d77db2da030d67f2195f034451daf5beef2398e49aef86ad8c6 | first byte 0.010544 s total 0.011682 s
+exit 0
+$ check_r1.py marks answers/a-n2-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 218
+exit 0
+$ send.py a1-n2 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:39:57.226Z a1-n2 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 20136 answer 20136 B sha256 4138dbcdabff4037fb54a3b5c51597a3061dea38a7853201dcd5f9d38988ea31 | first byte 0.034854 s total 0.036535 s
+exit 0
+$ check_r1.py diff answers/a-a1-n1.xml answers/a-a1-n2.xml
+rows before: 7  after: 7
+CHANGED 'SN Slash Item' (13 characters) : ALTERID, LANGUAGENAME.LIST
+  ALTERID: <ALTERID TYPE='Number'>212</ALTERID>  ->  <ALTERID TYPE='Number'>218</ALTERID>
+  LANGUAGENAME.LIST: <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>SN Slash Item</NAME></NAME.LIST></LANGUAGENAME.LIST>  ->  <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>SN Slash/Item</NAME></NAME.LIST></LANGUAGENAME.LIST>
+unchanged rows: 6
+exit 0

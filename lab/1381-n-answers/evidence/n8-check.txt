@@ -1,0 +1,45 @@
+$ send.py n8-pre requests/marks.utf16le.xml
+2026-11-18T07:42:05.332Z n8-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 3c67d980bb5519183aebab02950d910b65528f34042a9b174db73f46140233c5 | first byte 0.004959 s total 0.005681 s
+exit 0
+$ check_r1.py marks answers/a-n8-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 223
+exit 0
+$ send.py n8 requests/n8-unit-name.utf16le.xml
+2026-11-18T07:42:05.909Z n8 requests/n8-unit-name.utf16le.xml request 922 B sha256 2e05d1197b79f2657a8db58de571be71340fda64bb094130eff56c09a188f0b1 | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.293589 s total 0.294551 s
+exit 0
+$ check_r1.py import answers/a-n8.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after n8 checked by the operator: no dialog)
+$ send.py n8-post requests/marks.utf16le.xml
+2026-11-18T07:42:17.509Z n8-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 337dfbec35236940a5e075c27418e82c4390596988f663fb54f0e00c24ef6122 | first byte 0.005016 s total 0.005665 s
+exit 0
+$ check_r1.py marks answers/a-n8-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 224
+exit 0
+$ send.py a1-n8 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:42:18.011Z a1-n8 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 22774 answer 22774 B sha256 e28b9632d691689b06a6d5e2bc76b292dbb4f0dcc480ef7af68753d6a63e34f8 | first byte 0.015423 s total 0.016332 s
+exit 0
+$ check_r1.py diff answers/a-a1-n7.xml answers/a-a1-n8.xml
+rows before: 8  after: 9
+ADDED STOCKITEM 'Nos' (3 characters)
+unchanged rows: 8
+exit 0
+$ send.py u-n8 requests/units.utf16le.xml
+2026-11-18T07:42:18.679Z u-n8 requests/units.utf16le.xml request 1174 B sha256 3f79503b5480a6e3a23ec6fb8fc8fd5ca8200d4f0889590c994d1240ed299d0c | curl exit 0 status 200 CONTENT-LENGTH 4042 answer 4042 B sha256 12d78da436eb7ad5e1a9fd5d1c6ca5fb604aa28d9ac63262f1b9d280c503872d | first byte 0.005213 s total 0.006308 s
+exit 0
+$ check_r1.py diff answers/a-u1.xml answers/a-u-n8.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0

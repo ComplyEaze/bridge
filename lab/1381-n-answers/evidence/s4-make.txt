@@ -1,0 +1,2 @@
+written: 4 scalars, 1 GST entries (1 state rows), 1 HSN entries, 3 marked values
+6961f4754673d5359c7bf597dd272e11c28b64cbe74f9e27064875f1709c526c  3674  requests/b2-create.utf16le.xml

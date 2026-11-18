@@ -1,0 +1,38 @@
+$ send.py t3-pre requests/marks.utf16le.xml
+2026-11-18T07:37:50.984Z t3-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 1a0b5290a2990729589f438d8e126310871e3fe13fe179593e081c87cd0c00e6 | first byte 0.010249 s total 0.011702 s
+exit 0
+$ check_r1.py marks answers/a-t3-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 212
+exit 0
+$ send.py t3 requests/t3-space-target.utf16le.xml
+2026-11-18T07:37:51.995Z t3 requests/t3-space-target.utf16le.xml request 962 B sha256 c502db5ccf4ad24b4322f7b070c669a21656c10d41f19e935fcd71c2a221a68b | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.486452 s total 0.487738 s
+exit 0
+$ check_r1.py import answers/a-t3.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after t3 checked by the operator: no dialog)
+$ send.py t3-post requests/marks.utf16le.xml
+2026-11-18T07:38:05.927Z t3-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 6ea74562630bb0e4e3e6d540fbba7651a8786317ee9b8a947ca3b35b39add302 | first byte 0.009244 s total 0.010138 s
+exit 0
+$ check_r1.py marks answers/a-t3-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 213
+exit 0
+$ send.py a1-t3 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:38:06.530Z a1-t3 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 12288 answer 12288 B sha256 e426fef1202af857a9463fc8bf502c39888354a4dc779b8687ddc55a3bdbf6ef | first byte 0.012775 s total 0.013866 s
+exit 0
+$ check_r1.py diff answers/a-a1-t2.xml answers/a-a1-t3.xml
+rows before: 3  after: 4
+ADDED STOCKITEM 'SN Space Item' (13 characters)
+unchanged rows: 3
+exit 0

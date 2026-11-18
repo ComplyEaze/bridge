@@ -1,0 +1,45 @@
+$ send.py n7-pre requests/marks.utf16le.xml
+2026-11-18T07:41:38.903Z n7-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 d163d48eeb846c7aaac72720df19d2a0e198a102b42e202ef3b0f1f37a9b51d8 | first byte 0.008609 s total 0.009987 s
+exit 0
+$ check_r1.py marks answers/a-n7-pre.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 222
+exit 0
+$ send.py n7 requests/n7-group-name.utf16le.xml
+2026-11-18T07:41:39.688Z n7 requests/n7-group-name.utf16le.xml request 966 B sha256 f6c4e55abedea3e5e023bd0f3130d096f768ed619af66280e1e98b84de0fdcec | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.204426 s total 0.206537 s
+exit 0
+$ check_r1.py import answers/a-n7.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+(screen after n7 checked by the operator: no dialog)
+$ send.py n7-post requests/marks.utf16le.xml
+2026-11-18T07:41:51.687Z n7-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3320 answer 3320 B sha256 3c67d980bb5519183aebab02950d910b65528f34042a9b174db73f46140233c5 | first byte 0.005554 s total 0.006438 s
+exit 0
+$ check_r1.py marks answers/a-n7-post.xml
+COMPANY rows: 1
+  GUID bac2b5e9... ALTVCHID absent ALTMSTID 223
+exit 0
+$ send.py a1-n7 requests/a1-candidate-items.utf16le.xml
+2026-11-18T07:41:52.183Z a1-n7 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 21476 answer 21476 B sha256 5f9c66cdd3fa326b0eda6cf1e3f70a69817bf7bd07b730fe46a9b471bafae5d5 | first byte 0.013231 s total 0.014898 s
+exit 0
+$ check_r1.py diff answers/a-a1-n6.xml answers/a-a1-n7.xml
+rows before: 7  after: 8
+ADDED STOCKITEM 'SC Goods Group' (14 characters)
+unchanged rows: 7
+exit 0
+$ send.py g-n7 requests/groups.utf16le.xml
+2026-11-18T07:41:57.795Z g-n7 requests/groups.utf16le.xml request 1144 B sha256 d79503503a31c4fee4195b2e03308c2833aa2e9c3072bd4cc0ed1f73d9121245 | curl exit 0 status 200 CONTENT-LENGTH 4172 answer 4172 B sha256 a099c8b598e90a20a7f2d4b8ee8ccfd954b87645fcf4656bd00b00c7edfb02db | first byte 0.011785 s total 0.012942 s
+exit 0
+$ check_r1.py diff answers/a-g1.xml answers/a-g-n7.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0

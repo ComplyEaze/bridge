@@ -782,7 +782,8 @@ pub(super) struct ReadLeg {
 impl ReadLeg {
     /// The HSN/SAC Tally used for the line: on an item line it is the one Tally
     /// filled on the item's allocation (from the ledger, on the measured book),
-    /// and the leg's own elements are empty (row 1379-IT, 10 Nov 2026).
+    /// and the leg's own elements are empty (§9.16, entry "A stock item under a
+    /// ledger entry in the read-back", row 1379-IT, 10 Nov 2026).
     pub(super) fn line_hsn(&self) -> &LegHsn {
         match &self.items {
             LegItems::One(item) => &item.hsn,
@@ -791,7 +792,8 @@ impl ReadLeg {
     }
 }
 
-/// The stock items under one ledger entry. Row 1379-IT (TallyPrime 7.2,
+/// The stock items under one ledger entry. §9.16, entry "A stock item under a
+/// ledger entry in the read-back" (row 1379-IT, TallyPrime 7.2,
 /// 10 Nov 2026, one amount-only item line on a book with one godown and no
 /// batches) found the line read back as its ledger's entry, with the item in
 /// one `INVENTORYALLOCATIONS.LIST` under it and no inventory list on the
@@ -807,7 +809,8 @@ pub(super) enum LegItems {
     Several,
 }
 
-/// One stock item under a ledger entry, as row 1379-IT read it back.
+/// One stock item under a ledger entry, as §9.16's entry "A stock item under a
+/// ledger entry in the read-back" records row 1379-IT reading it back.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct ReadItem {
     pub(super) item: EntryText,

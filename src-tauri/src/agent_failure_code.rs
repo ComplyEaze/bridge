@@ -69,6 +69,22 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The differences an invoice's read-back names for a stock item Tally holds under one of its
+    /// ledger entries (#1379).
+    pub(crate) enum InvoiceItemLineCode {
+        /// An entry holds a stock item, and the build sent no item line.
+        NotSent = "invoice_line_item_not_sent",
+        /// An entry holds more than one stock item.
+        Several = "invoice_line_items_several",
+        /// The item's side or amount is not its entry's, or it carries a rate or a quantity.
+        Differs = "invoice_line_item_differs",
+        /// The item does not hold exactly one batch allocation, naming a godown and a batch, for
+        /// its amount.
+        Batch = "invoice_line_item_batch",
+    }
+}
+
+failure_codes! {
     /// The differences an invoice's read-back names for the company registration Tally filed it
     /// under (#2464).
     pub(crate) enum InvoiceRegistrationCode {

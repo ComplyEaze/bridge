@@ -348,6 +348,39 @@ fn the_registration_codes_are_pinned_and_have_the_receipts_code_shape() {
     }
 }
 
+/// The read-back's item-line differences (#1379), declared new, so each string is pinned as
+/// declared, with every check above made for them too.
+const INVOICE_ITEM_LINE: &[(InvoiceItemLineCode, &str)] = &[
+    (InvoiceItemLineCode::NotSent, "invoice_line_item_not_sent"),
+    (InvoiceItemLineCode::Several, "invoice_line_items_several"),
+    (InvoiceItemLineCode::Differs, "invoice_line_item_differs"),
+    (InvoiceItemLineCode::Batch, "invoice_line_item_batch"),
+];
+
+#[test]
+fn the_item_line_codes_are_pinned_and_have_the_receipts_code_shape() {
+    let pinned: Vec<InvoiceItemLineCode> =
+        INVOICE_ITEM_LINE.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, InvoiceItemLineCode::ALL);
+    let mut seen = GstUncertainCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    for (code, string) in INVOICE_ITEM_LINE {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()), "{string}");
+        assert!(
+            string
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+            "{string}"
+        );
+        assert!(seen.insert(string), "{string} is declared twice");
+    }
+}
+
 /// The company-read code, pinned as above (#2433).
 #[test]
 fn the_company_read_code_is_pinned() {

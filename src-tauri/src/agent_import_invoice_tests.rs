@@ -3564,6 +3564,348 @@ fn a_sales_line_missing_its_code_or_its_source_is_unresolved() {
     );
 }
 
+// ---- A stock item under a sales line (row 1379-IT, 10 Nov 2026, the pilot lab) ----
+
+/// Row 1379-IT's read-back answer, as Tally sent it
+/// (`pilot-lab-invoice-readback-item-line.utf16le.xml`, captured from
+/// `lab/1379-it-answers` at a5b9d603, `answers/a-s4r-R-0093.xml`).
+const ITEM_LINE_READBACK: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml"
+);
+
+/// One stock item under a sales leg, with the structure of row 1379-IT's
+/// read-back answer for an amount-only item line (`ITEM_LINE_READBACK`): the
+/// item; the HSN/SAC Tally filled on the item line, from the ledger, and not
+/// on the leg; the line's side; an empty rate; the amount; empty quantities;
+/// and one batch allocation Tally added for the book's one godown. DERIVED,
+/// not Tally's bytes: only the elements the parse reads, in that answer's
+/// order, with this leg's ledger and amount, so that the off-form cases below
+/// can each change one of them on `BP/26-27/0010`'s answer.
+fn item_allocation(ledger: &str, amount: &str) -> String {
+    format!(
+        "<INVENTORYALLOCATIONS.LIST><STOCKITEMNAME>BRIDGE Item A</STOCKITEMNAME>\
+         <HSNSOURCETYPE>Ledger</HSNSOURCETYPE><HSNLEDGERSOURCE>{ledger}</HSNLEDGERSOURCE>\
+         <HSNGROUPSOURCE/><GSTHSNNAME>998313</GSTHSNNAME>\
+         <GSTHSNINFERAPPLICABILITY>As per Masters/Company</GSTHSNINFERAPPLICABILITY>\
+         <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><RATE/><AMOUNT>{amount}</AMOUNT>\
+         <ACTUALQTY/><BILLEDQTY/><BATCHALLOCATIONS.LIST><GODOWNNAME>Main Location</GODOWNNAME>\
+         <BATCHNAME>Primary Batch</BATCHNAME><AMOUNT>{amount}</AMOUNT><ACTUALQTY/><BILLEDQTY/>\
+         </BATCHALLOCATIONS.LIST></INVENTORYALLOCATIONS.LIST>"
+    )
+}
+
+/// The lab's read-back of `BP/26-27/0010` with its first sales line made an
+/// item line the way row 1379-IT's answer held one: the leg's own five
+/// HSN/SAC elements written empty, and `allocation` under the leg where that
+/// answer put it (after `INPUTCRALLOCS.LIST`).
+fn as_item_line(allocation: &str) -> String {
+    let xml = HSN_TAGS.iter().fold(utf16le(STATUS_INCLUDED), |xml, tag| {
+        let empty = format!("<{tag}/>");
+        if leg_element(leg_of(&xml, SVC_998313), tag) == empty {
+            return xml;
+        }
+        with_leg_element(&xml, SVC_998313, tag, &empty)
+    });
+    let leg = leg_of(&xml, SVC_998313);
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    xml.replacen(leg, &edited, 1)
+}
+
+/// On Tally's own bytes: row 1379-IT's read-back of `BP/26-27/0093`, whose one
+/// sales line holds one stock item, reads that item under its leg, with the
+/// HSN/SAC Tally filled on the item line and the batch Tally added, while the
+/// leg's own HSN/SAC is empty. No other leg holds an item.
+#[test]
+fn the_captured_item_line_reads_back_as_one_item_under_its_leg() {
+    let xml = utf16le(ITEM_LINE_READBACK);
+    let leg = read_leg(&xml, SVC_998313);
+    assert_eq!(leg.hsn.code, wire::EntryText::Empty);
+    let text = |value: &str| wire::EntryText::Text(value.into());
+    let empty = wire::EntryText::Empty;
+    assert_eq!(
+        leg.items,
+        wire::LegItems::One(Box::new(wire::ReadItem {
+            item: text("BRIDGE Item A"),
+            deemed_positive: text("No"),
+            amount: text("1000.80"),
+            rate: empty.clone(),
+            actual_qty: empty.clone(),
+            billed_qty: empty.clone(),
+            batches: vec![(
+                Some("Main Location".into()),
+                Some("Primary Batch".into()),
+                "1000.80".into()
+            )],
+            hsn: wire::LegHsn {
+                code: text("998313"),
+                source_type: text("Ledger"),
+                ledger_source: text(SVC_998313),
+                group_source: empty,
+                applicability: text("As per Masters/Company"),
+            },
+        }))
+    );
+    assert!(leg.line_hsn().resolved());
+    for other in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%", "BRIDGE Round Off"] {
+        assert_eq!(read_leg(&xml, other).items, wire::LegItems::None, "{other}");
+    }
+}
+
+/// The item line reads back under its leg, and its HSN/SAC is the one Tally
+/// filled on the item line: the leg's own elements are empty, as row 1379-IT
+/// found, so reading them alone would call the line unresolved. The build
+/// sends no item line yet, so the item is a difference of its own, and the
+/// only one.
+#[test]
+fn an_item_line_reads_back_under_its_leg_with_the_items_hsn() {
+    let xml = as_item_line(&item_allocation(SVC_998313, "600.40"));
+    let leg = read_leg(&xml, SVC_998313);
+    assert_eq!(leg.hsn.code, wire::EntryText::Empty);
+    let text = |value: &str| wire::EntryText::Text(value.into());
+    let empty = wire::EntryText::Empty;
+    assert_eq!(
+        leg.items,
+        wire::LegItems::One(Box::new(wire::ReadItem {
+            item: text("BRIDGE Item A"),
+            deemed_positive: text("No"),
+            amount: text("600.40"),
+            rate: empty.clone(),
+            actual_qty: empty.clone(),
+            billed_qty: empty.clone(),
+            batches: vec![(
+                Some("Main Location".into()),
+                Some("Primary Batch".into()),
+                "600.40".into()
+            )],
+            hsn: wire::LegHsn {
+                code: text("998313"),
+                source_type: text("Ledger"),
+                ledger_source: text(SVC_998313),
+                group_source: empty,
+                applicability: text("As per Masters/Company"),
+            },
+        }))
+    );
+    assert!(leg.line_hsn().resolved());
+    assert_eq!(
+        read_leg(&xml, SVC_998314).items,
+        wire::LegItems::None,
+        "the other sales line holds no item"
+    );
+    let (differences, lines) = hsn_outcome(&pilot_0010(), &xml);
+    assert_eq!(differences, ["invoice_line_item_not_sent"]);
+    assert_eq!(
+        lines,
+        [
+            line_evidence(SVC_998313, Some("998313")),
+            line_evidence(SVC_998314, Some("998314")),
+        ]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the committed clean read-back of
+/// `BP/26-27/0010`, with only this batch-only inventory list added under its
+/// first sales leg, whose own resolved ledger HSN/SAC is left in place.
+#[test]
+fn an_inventory_list_with_only_unmodelled_content_is_not_clean() {
+    let allocation = "<INVENTORYALLOCATIONS.LIST><BATCHALLOCATIONS.LIST>\
+         <GODOWNNAME>Main Location</GODOWNNAME><BATCHNAME>Primary Batch</BATCHNAME>\
+         <AMOUNT>600.40</AMOUNT></BATCHALLOCATIONS.LIST></INVENTORYALLOCATIONS.LIST>";
+    let xml = utf16le(STATUS_INCLUDED);
+    assert_eq!(hsn_outcome(&pilot_0010(), &xml).0, Vec::<String>::new());
+    let leg = leg_of(&xml, SVC_998313);
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    let xml = xml.replacen(leg, &edited, 1);
+    let differences = hsn_outcome(&pilot_0010(), &xml).0;
+    assert_eq!(differences, ["invoice_readback_unreadable"]);
+}
+
+/// DERIVED, each from the item line above edited in one place: a rate, an
+/// amount that is not the leg's, no batch allocation, a smaller, larger or
+/// unparsable batch amount, two items under one leg, and a whitespace-only
+/// list, which holds no item.
+#[test]
+fn an_item_line_off_the_measured_form_is_named() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let differences = |allocation: &str| hsn_outcome(&pilot_0010(), &as_item_line(allocation)).0;
+    let edit = |old: &str, new: &str| {
+        assert_eq!(measured.matches(old).count(), 1, "{old}");
+        measured.replacen(old, new, 1)
+    };
+    assert_eq!(
+        differences(&edit("<RATE/>", "<RATE>600.40</RATE>")),
+        ["invoice_line_item_not_sent", "invoice_line_item_differs"]
+    );
+    assert_eq!(
+        differences(&item_allocation(SVC_998313, "600.00")),
+        ["invoice_line_item_not_sent", "invoice_line_item_differs"]
+    );
+    let batch_start = measured.find("<BATCHALLOCATIONS.LIST>").unwrap();
+    let batch_end = measured.find("</INVENTORYALLOCATIONS.LIST>").unwrap();
+    assert_eq!(
+        differences(&edit(&measured[batch_start..batch_end], "")),
+        ["invoice_line_item_not_sent", "invoice_line_item_batch"]
+    );
+    let batch_amount = |amount: &str| {
+        edit(
+            "<AMOUNT>600.40</AMOUNT><ACTUALQTY/><BILLEDQTY/></BATCHALLOCATIONS.LIST>",
+            &format!("<AMOUNT>{amount}</AMOUNT><ACTUALQTY/><BILLEDQTY/></BATCHALLOCATIONS.LIST>"),
+        )
+    };
+    for amount in ["600.00", "600.80", "not-a-number"] {
+        assert_eq!(
+            differences(&batch_amount(amount)),
+            ["invoice_line_item_not_sent", "invoice_line_item_batch"],
+            "{amount}"
+        );
+    }
+    let two = as_item_line(&measured.repeat(2));
+    assert_eq!(read_leg(&two, SVC_998313).items, wire::LegItems::Several);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &two).0,
+        [
+            "invoice_line_hsn_unresolved",
+            "invoice_line_item_not_sent",
+            "invoice_line_items_several"
+        ]
+    );
+    let blank = as_item_line("<INVENTORYALLOCATIONS.LIST>      </INVENTORYALLOCATIONS.LIST>");
+    assert_eq!(read_leg(&blank, SVC_998313).items, wire::LegItems::None);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &blank).0,
+        ["invoice_line_hsn_unresolved"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place,
+/// with its side the opposite of its leg's.
+#[test]
+fn an_item_whose_side_is_not_its_legs_differs() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let edited = measured.replacen(
+        "<ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>",
+        "<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>",
+        1,
+    );
+    assert_ne!(edited, measured);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &as_item_line(&edited)).0,
+        ["invoice_line_item_not_sent", "invoice_line_item_differs"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place for
+/// each case, with an actual or billed quantity where the measured line's is
+/// empty.
+#[test]
+fn an_item_with_a_quantity_differs() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    for (tag, value) in [("ACTUALQTY", "1"), ("BILLEDQTY", "1")] {
+        let old = "<AMOUNT>600.40</AMOUNT><ACTUALQTY/><BILLEDQTY/><BATCHALLOCATIONS.LIST>";
+        assert_eq!(measured.matches(old).count(), 1);
+        let new = match tag {
+            "ACTUALQTY" => format!("<AMOUNT>600.40</AMOUNT><ACTUALQTY>{value}</ACTUALQTY><BILLEDQTY/><BATCHALLOCATIONS.LIST>"),
+            _ => format!("<AMOUNT>600.40</AMOUNT><ACTUALQTY/><BILLEDQTY>{value}</BILLEDQTY><BATCHALLOCATIONS.LIST>"),
+        };
+        let edited = measured.replacen(old, &new, 1);
+        assert_eq!(
+            hsn_outcome(&pilot_0010(), &as_item_line(&edited)).0,
+            ["invoice_line_item_not_sent", "invoice_line_item_differs"],
+            "{tag}"
+        );
+    }
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place for
+/// each case, with an empty godown name, an empty batch name, or a second
+/// batch allocation.
+#[test]
+fn an_item_batch_must_name_a_godown_and_a_batch_and_be_alone() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let edit = |old: &str, new: &str| {
+        assert_eq!(measured.matches(old).count(), 1, "{old}");
+        measured.replacen(old, new, 1)
+    };
+    for (old, new) in [
+        ("<GODOWNNAME>Main Location</GODOWNNAME>", "<GODOWNNAME/>"),
+        ("<BATCHNAME>Primary Batch</BATCHNAME>", "<BATCHNAME/>"),
+    ] {
+        assert_eq!(
+            hsn_outcome(&pilot_0010(), &as_item_line(&edit(old, new))).0,
+            ["invoice_line_item_not_sent", "invoice_line_item_batch"],
+            "{old}"
+        );
+    }
+    let batch_start = measured.find("<BATCHALLOCATIONS.LIST>").unwrap();
+    let batch_end = measured.find("</INVENTORYALLOCATIONS.LIST>").unwrap();
+    let batch = &measured[batch_start..batch_end];
+    let two = edit(batch, &format!("{batch}{batch}"));
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &as_item_line(&two)).0,
+        ["invoice_line_item_not_sent", "invoice_line_item_batch"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place,
+/// with its own amount empty while its batch amount remains the leg's.
+#[test]
+fn an_item_without_its_own_amount_differs_and_has_no_matching_batch() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let old = "<RATE/><AMOUNT>600.40</AMOUNT><ACTUALQTY/>";
+    assert_eq!(measured.matches(old).count(), 1);
+    let edited = measured.replacen(old, "<RATE/><AMOUNT/><ACTUALQTY/>", 1);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &as_item_line(&edited)).0,
+        [
+            "invoice_line_item_not_sent",
+            "invoice_line_item_differs",
+            "invoice_line_item_batch"
+        ]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the committed clean read-back of
+/// `BP/26-27/0010`, with only the measured item line added under its CGST leg.
+#[test]
+fn an_item_under_a_non_sales_leg_is_not_sent() {
+    let xml = utf16le(STATUS_INCLUDED);
+    assert_eq!(hsn_outcome(&pilot_0010(), &xml).0, Vec::<String>::new());
+    let leg = leg_of(&xml, "BRIDGE CGST 2.5%");
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let allocation = item_allocation("BRIDGE CGST 2.5%", "25.02");
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    let xml = xml.replacen(leg, &edited, 1);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &xml).0,
+        ["invoice_line_item_not_sent"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the committed clean read-back of
+/// `BP/26-27/0010`, with only an inventory list whose only content is an empty
+/// godown element added under its first sales leg.
+#[test]
+fn an_inventory_list_with_only_an_empty_element_is_unreadable() {
+    let allocation = "<INVENTORYALLOCATIONS.LIST><BATCHALLOCATIONS.LIST>\
+         <GODOWNNAME/></BATCHALLOCATIONS.LIST></INVENTORYALLOCATIONS.LIST>";
+    let xml = utf16le(STATUS_INCLUDED);
+    assert_eq!(hsn_outcome(&pilot_0010(), &xml).0, Vec::<String>::new());
+    let leg = leg_of(&xml, SVC_998313);
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    let xml = xml.replacen(leg, &edited, 1);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &xml).0,
+        ["invoice_readback_unreadable"]
+    );
+}
+
 /// A batch saved before the build recorded its sales lines cannot say which
 /// legs to judge: its read-back is `invoice_not_observed`, never a pass.
 #[test]

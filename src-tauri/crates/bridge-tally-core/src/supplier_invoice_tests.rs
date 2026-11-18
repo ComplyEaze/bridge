@@ -175,6 +175,15 @@ fn numbers_that_only_run_together_or_share_a_serial_are_different_without_a_seco
 }
 
 #[test]
+fn two_full_numbers_sharing_a_serial_are_different_even_with_a_second_signal() {
+    let new = incoming("A/1", "20251201");
+    let same_date = booked("B/1", Some("20251201"), "20251203");
+    assert_eq!(compare(&new, &same_date), InvoiceMatch::Different);
+    let same_value = booked("B/1", Some("20251205"), "20251206");
+    assert_eq!(compare(&new, &same_value), InvoiceMatch::Different);
+}
+
+#[test]
 fn the_voucher_date_fallback_takes_the_year_before_from_april_to_november_only() {
     let last_year = incoming("GS1/P/0001", "20260310");
     for (voucher_date, expected) in [

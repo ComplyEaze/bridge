@@ -704,6 +704,7 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
             | TallyTransportError::ResponseReadFailed
             | TallyTransportError::UnsupportedContentEncoding
             | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer
             | TallyTransportError::HttpStatus { .. } => protocol_error(transport.safe_code()),
             TallyTransportError::RequestTimedOut => TallyError::RequestDeadlineExceeded,
             TallyTransportError::ConnectionFailed | TallyTransportError::RequestFailed => {

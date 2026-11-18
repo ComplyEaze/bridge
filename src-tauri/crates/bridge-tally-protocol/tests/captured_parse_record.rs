@@ -486,6 +486,12 @@ const ROWS: &[Row] = &[
         parse: |_, text| typed(parse_native_ledger_snapshot(text)),
     },
     Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-supplier-rj-20260731.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-ampersand.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot",

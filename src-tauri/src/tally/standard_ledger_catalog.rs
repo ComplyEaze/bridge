@@ -244,7 +244,8 @@ fn classify_transport_error(error: &TallyTransportError) -> StandardLedgerCatalo
         // same situation to the operator: a complete answer that cannot be read,
         // reproduced exactly by retrying.
         TallyTransportError::UnsupportedContentEncoding
-        | TallyTransportError::InvalidEncoding { .. } => {
+        | TallyTransportError::InvalidEncoding { .. }
+        | TallyTransportError::EmptyAnswer => {
             StandardLedgerCatalogReadError::MalformedResponse
         }
     }

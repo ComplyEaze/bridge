@@ -488,6 +488,7 @@ fn classify_audit_part_failure(error: &anyhow::Error) -> AuditPartFailure {
             | TallyTransportError::ResponseTruncated => AuditPartFailureKind::ConnectionDropped,
             TallyTransportError::HttpStatus { .. }
             | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer
             | TallyTransportError::UnsupportedContentEncoding => {
                 AuditPartFailureKind::HeadRejected(transport.safe_code())
             }
@@ -4766,7 +4767,8 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
         ) => ReadFailureClass::SizeLimit,
         Some(
             TallyTransportError::UnsupportedContentEncoding
-            | TallyTransportError::InvalidEncoding { .. },
+            | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer,
         ) => ReadFailureClass::Decode,
         Some(
             TallyTransportError::EndpointInvalid { .. }

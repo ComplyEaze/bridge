@@ -26,16 +26,18 @@
 //!   digit and so is treated as a placeholder.
 //! - The characters folded (separators, characters that draw nothing, and the listed digits and
 //!   Latin letters) are closed lists: Devanagari and full-width digits, full-width Latin letters,
-//!   and the dashes and slashes named in `SEPARATORS`. Anything else is kept as it is, so a number
-//!   differing only there is not found as the same.
+//!   and the dashes and slashes named in `SEPARATORS`. Every other letter is upper-cased with the
+//!   full Unicode rule, so `ß` becomes `SS`. Every Unicode whitespace character is read as a
+//!   separator. Anything else is kept as it is, so a number differing only there is not found as
+//!   the same.
 use crate::{ExactDecimal, TallyDate};
 
 /// The separators a supplier writes between the parts of a number, folded to one form: the ASCII
 /// ones, and the dashes, minus sign and full-width forms a number copied from a PDF or a word
 /// processor carries in their place.
-const SEPARATORS: [char; 13] = [
+const SEPARATORS: [char; 18] = [
     '-', '/', '\\', '.', '_', '\u{2010}', '\u{2011}', '\u{2012}', '\u{2013}', '\u{2014}',
-    '\u{2212}', '\u{FF0D}', '\u{FF0F}',
+    '\u{2015}', '\u{2044}', '\u{2212}', '\u{2215}', '\u{FE58}', '\u{FE63}', '\u{FF0D}', '\u{FF0F}',
 ];
 /// Rule 46(b): at most sixteen characters.
 const GSTR1_MAX_CHARS: usize = 16;
@@ -53,10 +55,13 @@ pub struct SupplierInvoiceRef {
     raw: String,
     /// Upper case with `-` and `/` as typed; only what cannot be in a GSTR-1 number (whitespace,
     /// `.`, `_`, a backslash) is dropped. Two numbers the portal could hold apart differ here.
+    /// As a stated limit, that dropping makes `1.1`, `1_1` and `1 1` compare as `Booked` against
+    /// each other.
     strict: String,
     exact: String,
-    loose: String,
-    serial: Option<String>,
+    loose: Vec<String>,
+    serial: Vec<String>,
+    placeholder: bool,
 }
 
 impl SupplierInvoiceRef {
@@ -83,16 +88,21 @@ impl SupplierInvoiceRef {
         if exact.is_empty() {
             return Err(SupplierInvoiceRefError::Empty);
         }
-        let core = without_year(&exact);
-        let loose = loose_form(&core);
-        let serial = serial_form(&core);
+        let (cores, has_nonzero_digit) = without_year(&exact);
+        let loose = cores.iter().map(|core| loose_form(core)).collect();
+        let serial = cores.iter().filter_map(|core| serial_form(core)).collect();
         let strict = raw
             .chars()
             .filter(|ch| !is_invisible(*ch))
             .map(ascii_character)
             .filter_map(|ch| match ch {
-                '-' | '\u{2010}'..='\u{2014}' | '\u{2212}' | '\u{FF0D}' => Some('-'),
-                '/' | '\u{FF0F}' => Some('/'),
+                '-'
+                | '\u{2010}'..='\u{2015}'
+                | '\u{2212}'
+                | '\u{FE58}'
+                | '\u{FE63}'
+                | '\u{FF0D}' => Some('-'),
+                '/' | '\u{2044}' | '\u{2215}' | '\u{FF0F}' => Some('/'),
                 ch if ch.is_whitespace() || SEPARATORS.contains(&ch) => None,
                 ch => Some(ch),
             })
@@ -104,6 +114,7 @@ impl SupplierInvoiceRef {
             exact,
             loose,
             serial,
+            placeholder: !has_nonzero_digit,
         })
     }
 
@@ -132,72 +143,96 @@ impl SupplierInvoiceRef {
     /// shared by two full numbers is often the year (`001/2025-26`), so it is no match by itself.
     fn loose_equal(&self, other: &Self) -> bool {
         let serial_alone = self.is_digits_only() || other.is_digits_only();
-        self.loose == other.loose
+        self.loose.iter().any(|loose| other.loose.contains(loose))
             || (serial_alone
-                && matches!((&self.serial, &other.serial), (Some(left), Some(right)) if left == right))
+                && self
+                    .serial
+                    .iter()
+                    .any(|serial| other.serial.contains(serial)))
     }
 
     fn is_digits_only(&self) -> bool {
         self.exact.chars().all(|ch| ch.is_ascii_digit())
     }
 
-    /// No digit but zero: `NA`, `Cash`, `-0-` and the like stand in for a number.
+    /// No non-zero digit outside a named year (an `FY` part, or a pair a year apart): `NA`, `Cash`,
+    /// `-0-`, and those beside such a year (`NA/2025-26`), stand in for a number. A lone four-digit
+    /// run is not a named year here, so `INV/2025` and `NA/2025` are numbers.
     fn is_placeholder(&self) -> bool {
-        !self
-            .exact
-            .chars()
-            .any(|ch| ch.is_ascii_digit() && ch != '0')
+        self.placeholder
     }
 }
 
 /// The exact form without the parts that name a financial year: `FY` with or without its year
 /// (`FY26`, `FY25-26`), two runs of two or four digits a year apart (`2025/26`, `25/26`,
-/// `2025/2026`), and a run of
-/// four digits from 2000 to 2099 at either end. The exact form itself when that leaves no digit,
-/// so `INV/2025` keeps its year as its number.
-fn without_year(exact: &str) -> String {
+/// `2025/2026`), and a run of four digits from 2000 to 2099 at either end. A pair starting with
+/// four digits is the year rather than a neighbouring serial; equally strong overlapping readings
+/// each produce a form. The exact form itself when that leaves no digit, so `INV/2025` keeps its
+/// year as its number.
+fn without_year(exact: &str) -> (Vec<String>, bool) {
     let parts: Vec<&str> = exact.split('/').collect();
     let year_digits = |part: &str| {
         (part.len() == 2 || part.len() == 4) && part.chars().all(|ch| ch.is_ascii_digit())
     };
-    let a_year_apart = |first: &str, second: &str| {
-        let first: u32 = first.parse().expect("digits");
-        let second: u32 = second.parse().expect("digits");
-        (first % 100 + 1) % 100 == second % 100
-    };
-    let mut year = vec![false; parts.len()];
-    for (index, part) in parts.iter().enumerate() {
+    let a_year_apart =
+        |first: &str, second: &str| match (first.parse::<u32>(), second.parse::<u32>()) {
+            (Ok(first), Ok(second)) => (first % 100 + 1) % 100 == second % 100,
+            _ => false,
+        };
+    let mut pairs = Vec::new();
+    for (index, pair) in parts.windows(2).enumerate() {
+        let part = pair[0];
+        let next = pair[1];
+        // `FY25-26`: the year after an `FY` part is part of it.
         let fy_year = part.strip_prefix("FY").filter(|digits| year_digits(digits));
-        if *part == "FY" || fy_year.is_some() {
-            year[index] = true;
-        }
-        if let Some(next) = parts.get(index + 1) {
-            // `FY25-26`: the year after an `FY` part is part of it.
-            let first = fy_year.or_else(|| year_digits(part).then_some(*part));
-            if let Some(first) = first {
-                if year_digits(next) && a_year_apart(first, next) {
-                    year[index] = true;
-                    year[index + 1] = true;
-                }
+        let first = fy_year.or_else(|| year_digits(part).then_some(part));
+        if let Some(first) = first {
+            if year_digits(next) && a_year_apart(first, next) {
+                let four_digit_start = first.len() == 4 && first.starts_with("20");
+                pairs.push((index, four_digit_start));
             }
         }
-        let at_end = index == 0 || index + 1 == parts.len();
-        if at_end && part.len() == 4 && part.starts_with("20") && year_digits(part) {
-            year[index] = true;
-        }
     }
-    let core = parts
-        .iter()
-        .zip(&year)
-        .filter(|(_, is_year)| !**is_year)
-        .map(|(part, _)| *part)
-        .collect::<Vec<_>>()
-        .join("/");
-    if core.chars().any(|ch| ch.is_ascii_digit()) {
-        core
+    let has_four_digit_start = pairs.iter().any(|(_, four_digit)| *four_digit);
+    let selected: Vec<Option<usize>> = if pairs.is_empty() {
+        vec![None]
     } else {
-        exact.to_string()
+        pairs
+            .iter()
+            .filter(|(_, four_digit)| !has_four_digit_start || *four_digit)
+            .map(|(index, _)| Some(*index))
+            .collect()
+    };
+    let mut cores = Vec::new();
+    let mut has_nonzero_digit = false;
+    for pair_index in selected {
+        let mut year = vec![false; parts.len()];
+        for (index, part) in parts.iter().enumerate() {
+            let fy_year = part.strip_prefix("FY").filter(|digits| year_digits(digits));
+            let at_end = index == 0 || index + 1 == parts.len();
+            let named = *part == "FY"
+                || fy_year.is_some()
+                || pair_index.is_some_and(|pair| index == pair || index == pair + 1);
+            // A lone four-digit run is dropped from the loose form, but it may be the number
+            // itself (`INV/2025`), so it still counts as a digit for the placeholder question.
+            has_nonzero_digit |= !named && part.chars().any(|ch| ch.is_ascii_digit() && ch != '0');
+            year[index] =
+                named || (at_end && part.len() == 4 && part.starts_with("20") && year_digits(part));
+        }
+        let core = parts
+            .iter()
+            .zip(&year)
+            .filter(|(_, is_year)| !**is_year)
+            .map(|(part, _)| *part)
+            .collect::<Vec<_>>()
+            .join("/");
+        cores.push(if core.chars().any(|ch| ch.is_ascii_digit()) {
+            core
+        } else {
+            exact.to_string()
+        });
     }
+    (cores, has_nonzero_digit)
 }
 
 /// A character that draws nothing (a soft hyphen, a zero-width space or joiner, a direction

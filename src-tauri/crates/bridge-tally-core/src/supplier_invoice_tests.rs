@@ -359,6 +359,179 @@ fn a_year_written_into_the_number_does_not_hide_the_running_number() {
 }
 
 #[test]
+fn a_serial_before_a_four_digit_year_is_kept() {
+    let new = incoming("INV/24/2025-26", "20251201");
+    let copy = booked("INV/24", Some("20251201"), "20251203");
+    assert_eq!(
+        compare(&new, &copy),
+        InvoiceMatch::PossiblyBooked,
+        "INV/24/2025-26 INV/24"
+    );
+}
+
+#[test]
+fn leading_zeros_on_a_serial_before_the_year_are_kept() {
+    let new = incoming("0124/2025-26", "20251201");
+    let copy = booked("124", Some("20251201"), "20251203");
+    assert_eq!(
+        compare(&new, &copy),
+        InvoiceMatch::PossiblyBooked,
+        "0124/2025-26 124"
+    );
+}
+
+#[test]
+fn a_two_digit_serial_before_the_year_is_kept() {
+    let new = incoming("24/2025-26", "20251201");
+    let copy = booked("24", Some("20251201"), "20251203");
+    assert_eq!(
+        compare(&new, &copy),
+        InvoiceMatch::PossiblyBooked,
+        "24/2025-26 24"
+    );
+}
+
+#[test]
+fn a_serial_after_the_year_is_kept_with_leading_zeros() {
+    let new = incoming("INV/2025-26/0127", "20251201");
+    let copy = booked("INV/25-26/127", Some("20251201"), "20251203");
+    assert_eq!(
+        compare(&new, &copy),
+        InvoiceMatch::PossiblyBooked,
+        "INV/2025-26/0127 INV/25-26/127"
+    );
+}
+
+#[test]
+fn a_serial_after_the_year_is_kept() {
+    let new = incoming("2025-26/27", "20251201");
+    let copy = booked("25-26/27", Some("20251201"), "20251203");
+    assert_eq!(
+        compare(&new, &copy),
+        InvoiceMatch::PossiblyBooked,
+        "2025-26/27 25-26/27"
+    );
+}
+
+#[test]
+fn a_serial_after_a_two_digit_year_is_kept() {
+    let new = incoming("GST/24-25/26", "20241201");
+    let copy = booked("GST/2024-25/26", Some("20241201"), "20241203");
+    assert_eq!(
+        compare(&new, &copy),
+        InvoiceMatch::PossiblyBooked,
+        "GST/24-25/26 GST/2024-25/26"
+    );
+}
+
+#[test]
+fn different_running_numbers_beside_one_year_stay_different() {
+    for (new, copy) in [
+        ("INV/24/2025-26", "INV/25/2025-26"),
+        ("0124/2025-26", "0125/2025-26"),
+        ("INV/2025-26/0127", "INV/2025-26/0128"),
+    ] {
+        let new = incoming(new, "20251201");
+        let copy = booked(copy, Some("20251201"), "20251203");
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::Different,
+            "{new:?} {copy:?}"
+        );
+    }
+}
+
+#[test]
+fn a_running_number_beside_the_year_needs_a_second_signal() {
+    for (new, copy) in [
+        ("INV/24/2025-26", "INV/24"),
+        ("0124/2025-26", "124"),
+        ("24/2025-26", "24"),
+        ("INV/2025-26/0127", "INV/25-26/127"),
+        ("2025-26/27", "25-26/27"),
+        ("GST/24-25/26", "GST/2024-25/26"),
+    ] {
+        let invoice_date = if new.starts_with("GST/") {
+            "20241201"
+        } else {
+            "20251201"
+        };
+        let other_date = if new.starts_with("GST/") {
+            "20241205"
+        } else {
+            "20251205"
+        };
+        let new = incoming(new, invoice_date);
+        let mut copy = booked(copy, Some(other_date), other_date);
+        copy.value = Some(value("100.00"));
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::Different,
+            "{new:?} {copy:?}"
+        );
+    }
+}
+
+#[test]
+fn an_ambiguous_three_part_number_keeps_both_serial_readings() {
+    let new = incoming("24/25/26", "20251201");
+    for serial in ["24", "26"] {
+        let copy = booked(serial, Some("20251201"), "20251203");
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::PossiblyBooked,
+            "24/25/26 {serial}"
+        );
+    }
+    let copy = booked("24/25/26", Some("20251202"), "20251203");
+    assert_eq!(compare(&new, &copy), InvoiceMatch::Booked);
+}
+
+#[test]
+fn a_placeholder_with_a_year_is_never_booked_and_needs_a_second_signal() {
+    for placeholder in ["NA/2025-26", "CASH/25-26", "0/2025-26", "2025-26"] {
+        let new = incoming(placeholder, "20251201");
+        let mut copy = booked(placeholder, Some("20251205"), "20251206");
+        copy.value = Some(value("100.00"));
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::Different,
+            "{placeholder} without a second signal"
+        );
+        copy.invoice_date = Some(date("20251201"));
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::PossiblyBooked,
+            "{placeholder} with the same date"
+        );
+        copy.invoice_date = Some(date("20251205"));
+        copy.value = Some(value("-11800.00"));
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::PossiblyBooked,
+            "{placeholder} with the same value"
+        );
+    }
+}
+
+#[test]
+fn a_real_serial_with_a_year_can_still_be_booked() {
+    let new = incoming("INV/7/2025-26", "20251201");
+    let copy = booked("INV/7/2025-26", Some("20251202"), "20251203");
+    assert_eq!(compare(&new, &copy), InvoiceMatch::Booked);
+}
+
+/// A lone year-like run is the number when nothing else is: it is not a placeholder.
+#[test]
+fn a_number_that_is_only_a_year_like_run_can_still_be_booked() {
+    for number in ["INV/2025", "2025", "2025/INV"] {
+        let new = incoming(number, "20251201");
+        let copy = booked(number, Some("20251205"), "20251206");
+        assert_eq!(compare(&new, &copy), InvoiceMatch::Booked, "{number}");
+    }
+}
+
+#[test]
 fn a_placeholder_is_never_booked_and_matches_only_with_a_second_signal() {
     for placeholder in ["NA", "N/A", "Cash", "0", "-0-"] {
         let new = incoming(placeholder, "20251201");
@@ -414,7 +587,12 @@ fn every_folded_character_reads_as_its_ascii_form() {
         ('\u{2012}', "INV-12/A"),
         ('\u{2013}', "INV-12/A"),
         ('\u{2014}', "INV-12/A"),
+        ('\u{2015}', "INV-12/A"),
+        ('\u{2044}', "INV/12/A"),
         ('\u{2212}', "INV-12/A"),
+        ('\u{2215}', "INV/12/A"),
+        ('\u{FE58}', "INV-12/A"),
+        ('\u{FE63}', "INV-12/A"),
         ('\u{FF0D}', "INV-12/A"),
         ('\u{FF0F}', "INV/12/A"),
     ] {
@@ -507,6 +685,83 @@ fn every_folded_character_reads_as_its_ascii_form() {
             compare(
                 &incoming("INV-12/A", "20251201"),
                 &booked(copied, Some("20251202"), "20251203")
+            ),
+            outcome,
+            "{copied:?}"
+        );
+    }
+    // U+200A, U+2029, U+202F and U+205F are whitespace, so they read as separators.
+    // U+002D, U+002E, U+002F, U+200F, U+2010..U+2015 and U+FF0F are folded too.
+    // U+0030 and U+FF10 are ASCII and full-width zero, not separators.
+    for (ch, expected, outcome) in [
+        // Below and above each single invisible character.
+        ('\u{00AC}', "INV/1\u{00AC}2/A", InvoiceMatch::Different),
+        ('\u{00AE}', "INV/1\u{00AE}2/A", InvoiceMatch::Different),
+        ('\u{034E}', "INV/1\u{034E}2/A", InvoiceMatch::Different),
+        ('\u{0350}', "INV/1\u{0350}2/A", InvoiceMatch::Different),
+        ('\u{061B}', "INV/1\u{061B}2/A", InvoiceMatch::Different),
+        ('\u{061D}', "INV/1\u{061D}2/A", InvoiceMatch::Different),
+        ('\u{180D}', "INV/1\u{180D}2/A", InvoiceMatch::Different),
+        ('\u{180F}', "INV/1\u{180F}2/A", InvoiceMatch::Different),
+        ('\u{FEFE}', "INV/1\u{FEFE}2/A", InvoiceMatch::Different),
+        ('\u{FF00}', "INV/1\u{FF00}2/A", InvoiceMatch::Different),
+        // Below and above each invisible range.
+        ('\u{200A}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{200F}', "INV/12/A", InvoiceMatch::Booked),
+        ('\u{2029}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{202F}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{205F}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{2065}', "INV/1\u{2065}2/A", InvoiceMatch::Different),
+        ('\u{206A}', "INV/1\u{206A}2/A", InvoiceMatch::Different),
+        ('\u{FDFF}', "INV/1\u{FDFF}2/A", InvoiceMatch::Different),
+        ('\u{FE10}', "INV/1\u{FE10}2/A", InvoiceMatch::Different),
+        // Below and above each ASCII separator.
+        (',', "INV/1,2/A", InvoiceMatch::Different),
+        ('-', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('.', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('/', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('0', "INV/102/A", InvoiceMatch::Different),
+        ('[', "INV/1[2/A", InvoiceMatch::Different),
+        (']', "INV/1]2/A", InvoiceMatch::Different),
+        ('^', "INV/1^2/A", InvoiceMatch::Different),
+        ('`', "INV/1`2/A", InvoiceMatch::Different),
+        // Below and above the dash range and each single copied separator.
+        ('\u{2010}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{2011}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{2012}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{2013}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{2014}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{2015}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{2016}', "INV/1\u{2016}2/A", InvoiceMatch::Different),
+        ('\u{2043}', "INV/1\u{2043}2/A", InvoiceMatch::Different),
+        ('\u{2045}', "INV/1\u{2045}2/A", InvoiceMatch::Different),
+        ('\u{2211}', "INV/1\u{2211}2/A", InvoiceMatch::Different),
+        ('\u{2213}', "INV/1\u{2213}2/A", InvoiceMatch::Different),
+        ('\u{2214}', "INV/1\u{2214}2/A", InvoiceMatch::Different),
+        ('\u{2216}', "INV/1\u{2216}2/A", InvoiceMatch::Different),
+        ('\u{FE57}', "INV/1\u{FE57}2/A", InvoiceMatch::Different),
+        ('\u{FE59}', "INV/1\u{FE59}2/A", InvoiceMatch::Different),
+        ('\u{FE62}', "INV/1\u{FE62}2/A", InvoiceMatch::Different),
+        ('\u{FE64}', "INV/1\u{FE64}2/A", InvoiceMatch::Different),
+        ('\u{FF0C}', "INV/1\u{FF0C}2/A", InvoiceMatch::Different),
+        ('\u{FF0E}', "INV/1\u{FF0E}2/A", InvoiceMatch::Different),
+        ('\u{FF0F}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
+        ('\u{FF10}', "INV/102/A", InvoiceMatch::Different),
+        // Below and above each folded digit and Latin-letter range.
+        ('\u{0965}', "INV/1\u{0965}2/A", InvoiceMatch::Different),
+        ('\u{0970}', "INV/1\u{0970}2/A", InvoiceMatch::Different),
+        ('\u{FF1A}', "INV/1\u{FF1A}2/A", InvoiceMatch::Different),
+        ('\u{FF20}', "INV/1\u{FF20}2/A", InvoiceMatch::Different),
+        ('\u{FF3B}', "INV/1\u{FF3B}2/A", InvoiceMatch::Different),
+        ('\u{FF40}', "INV/1\u{FF40}2/A", InvoiceMatch::Different),
+        ('\u{FF5B}', "INV/1\u{FF5B}2/A", InvoiceMatch::Different),
+    ] {
+        let copied = format!("INV-1{ch}2/A");
+        assert_eq!(reference(&copied).exact(), expected, "{copied:?}");
+        assert_eq!(
+            compare(
+                &incoming("INV-12/A", "20251201"),
+                &booked(&copied, Some("20251202"), "20251203")
             ),
             outcome,
             "{copied:?}"

@@ -4286,8 +4286,10 @@ fn each_gap_in_a_ledgers_ancestry_gives_its_own_reason() {
     }
 }
 
-/// The demo company's ledgers under a bank group, a money group Bridge does
-/// not admit, and a party group, for the detail and refusal tests below.
+/// The demo company's captured groups, with a `Bank OCC A/c` group added by
+/// hand and three invented ledgers: one under a bank group, one under a money
+/// group Bridge does not admit, and one under a party group, for the detail and
+/// refusal tests below.
 fn detail_probes() -> ObservedMasters {
     let mut groups = captured_demo_groups();
     groups.push(TallyNamedMaster {

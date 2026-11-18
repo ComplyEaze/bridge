@@ -1,7 +1,7 @@
 {
   "file": "src-tauri/src/agent_import_cash_bank.rs",
   "base_commit": "a8864cc9",
-  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again).",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file byte for byte as there. The test module was as at base_commit for the tool, hand and whole_set runs. The survivors_again run used the test module as the first commit of this change (5dfc8ba3) left it, before two assertions that a later commit of this change adds: that an admitted counterparty has no refusal, and that a ledger whose name starts with a space is found as spelled. By reading, those two assertions change no earlier verdict (they only read values); the thirty were not run again with them. C65 and C66 were written after the survivors_again run and are caught only by those two assertions: the later_hand run says how each was run, and its killer is the one test that was run, not the first of a whole run.",
   "runs": [
     {
       "run": "tool",
@@ -28,9 +28,16 @@
     },
     {
       "run": "survivors_again",
-      "tests_at": "this_commit",
+      "tests_at": "this change as at 5dfc8ba3, before its two later assertions",
       "tests_run": 5071,
       "command": "as the whole_set run, for the thirty still missed there",
+      "tree": "base_commit"
+    },
+    {
+      "run": "later_hand",
+      "tests_at": "base, then this_commit",
+      "tests_run": 5065,
+      "command": "for C65 and C66 only: each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge (every bridge test) with the test module as at base_commit, after the unmutated tree passed all 5065: neither was caught. Then, with the test module as this change leaves it, cargo nextest run --locked -p bridge -E 'test(<the killer's function name>)' for each: 1 test run, 1 failed. With the test module as at 5dfc8ba3 the same one-test run passed for each",
       "tree": "base_commit"
     }
   ],
@@ -41,12 +48,12 @@
       "unviable": 1
     },
     "hand": {
-      "caught": 63,
+      "caught": 65,
       "missed": 1
     },
     "survived_at_base": {
       "tool": 0,
-      "hand": 30
+      "hand": 32
     },
     "equivalent": {
       "tool": 0,
@@ -1077,6 +1084,34 @@
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::tests::bank_tests::a_reserved_identity_matches_whatever_its_case_and_padding",
+      "killer_at": "this_commit"
+    },
+    "C65": {
+      "what": "refusal: an admitted leg is refused on the counterparty side",
+      "edits": [
+        {
+          "from": "if self.admits(state)",
+          "to": "if self.admits(state) && self == Self::Money"
+        }
+      ],
+      "mutation": "b45a9b51b30625cdc7087735df43b095",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_counterparty_refusal_carries_the_detail_and_names_the_voucher_type",
+      "killer_at": "this_commit"
+    },
+    "C66": {
+      "what": "new: ledger names are trimmed at the start only",
+      "edits": [
+        {
+          "from": "name.to_string()",
+          "to": "name.trim_start().to_string()"
+        }
+      ],
+      "mutation": "876ee1ccb31c971c4b89edc908cc3f6c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::a_ledger_is_found_by_its_exact_catalogue_spelling",
       "killer_at": "this_commit"
     }
   },

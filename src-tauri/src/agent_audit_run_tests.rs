@@ -358,6 +358,189 @@ async fn marks_that_moved_during_the_read_refuse_it_with_a_rule_code() {
     assert!(!carries_any(&held, &book_names(), &[]));
 }
 
+/// The receipt a run of `replay` leaves in the egress journal: the call through
+/// the adapter, then the framed write a client is sent, as production makes them.
+async fn receipt_of_run(replay: &Replay) -> Value {
+    let one = replayed(replay, Redaction::None);
+    let response = one
+        .server
+        .call_tool_response("audit_test_run", args())
+        .await;
+    let mut stdout = Vec::new();
+    super::super::agent_protocol::finish_response(
+        &one.server,
+        &mut stdout,
+        json!(1),
+        Ok(response.value),
+        Some(response.egress),
+        None,
+        true,
+    )
+    .await
+    .unwrap();
+    let journal =
+        std::fs::read_to_string(one._directory.path().join("agent-egress.jsonl")).unwrap();
+    let mut records: Vec<Value> = journal
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    // One receipt for the prepared response, then one for its completed write.
+    assert_eq!(records.len(), 2, "{journal}");
+    assert_eq!(records[1]["record_type"], "stdio_write_completed");
+    assert_eq!(records[0]["record_type"], "response_prepared");
+    records.swap_remove(0)
+}
+
+/// Every string of a receipt is a field name, a released field's path, a code,
+/// a hash, the receipt's own id and time, the company's GUID, or a fixed word
+/// (the record type, the tool, the redaction preset, a send's kind and
+/// outcome): lower-case
+/// letters, digits and `_ . [ ] : -` only, so no name as the books write it,
+/// with its capitals and spaces, fits. A lower-case name would, so the callers
+/// also look for the book's names. The error code, which may be one of the
+/// crate's rule codes (`C6-moved`), the callers check whole.
+fn assert_closed_strings(receipt: &Value) {
+    let mut held = Vec::new();
+    strings(receipt, &mut held);
+    for text in held
+        .iter()
+        .filter(|text| **text != receipt["error"]["code"])
+    {
+        assert!(
+            !text.is_empty()
+                && text.bytes().all(|b| {
+                    b.is_ascii_lowercase()
+                        || b.is_ascii_digit()
+                        || b"_.[]:-".contains(&b)
+                        // The receipt's time, as RFC 3339 writes it.
+                        || (*text == receipt["ts"] && (b == b'T' || b == b'Z' || b == b'+'))
+                }),
+            "{text:?} in {receipt}"
+        );
+    }
+}
+
+/// The names of `names` a receipt carries, by [`carries_any`]. `Receipt`, a
+/// voucher type Tally makes in every company, is also a word of the receipt's
+/// own field name `receipt_id`, so it counts only as a whole string.
+fn names_in(receipt: &Value, names: &[String]) -> Vec<String> {
+    let mut held = Vec::new();
+    strings(receipt, &mut held);
+    names
+        .iter()
+        .filter(|name| carries_any(&held, std::slice::from_ref(*name), &["Receipt"]))
+        .cloned()
+        .collect()
+}
+
+/// bridge#697 (#1145 item 9): the receipt of a completed run names the figure
+/// and finding id fields it released, never their values, and carries none of
+/// the evidence the crate cited for them: no ref id, no ref label, and no
+/// subject or detail of a failed book check. The control is the crate's own
+/// dump of the same book, which cites ledgers by name (`cash_44ab` cites
+/// `ledger` and `rule` refs only; a stock item, PAN, payee or config ref is
+/// kept out by the receipt recording paths, not values).
+#[tokio::test]
+async fn a_completed_runs_receipt_holds_no_ref_id_or_label_and_no_name_of_the_book() {
+    let (audit, _) = super::super::audit_read::tests::read_replay(&Replay::small()).await;
+    let audit = audit.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+    let test = AdmittedTest::parse("cash_44ab").unwrap();
+    let dump = run_test(test, &audit.engagement, &audit.book).unwrap();
+    // Every ref id and label of the dump, and the subject and detail of every
+    // failed book check: what the projection leaves behind.
+    let mut cited = Vec::new();
+    let mut kinds = std::collections::BTreeSet::new();
+    for item in ["figures", "findings"]
+        .iter()
+        .flat_map(|key| dump[*key].as_array().unwrap())
+    {
+        for reference in item["evidence"].as_array().unwrap() {
+            kinds.insert(reference["kind"].as_str().unwrap().to_string());
+            for key in ["id", "label"] {
+                let text = reference[key].as_str().unwrap();
+                if !text.is_empty() {
+                    cited.push(text.to_string());
+                }
+            }
+        }
+    }
+    for key in [
+        "book_invariant_violations",
+        "result_invariant_violations",
+        "module_invariant_violations",
+    ] {
+        for violation in dump[key].as_array().unwrap() {
+            for field in ["subject", "detail"] {
+                if let Some(text) = violation[field].as_str().filter(|text| !text.is_empty()) {
+                    cited.push(text.to_string());
+                }
+            }
+        }
+    }
+    assert!(kinds.contains("ledger"), "{kinds:?}");
+    assert!(
+        cited.iter().any(|text| text == "Cash"),
+        "the dump cites no ledger by name"
+    );
+    // The finder finds them where they are.
+    assert!(names_in(&dump, &cited).contains(&"Cash".to_string()));
+
+    let receipt = receipt_of_run(&Replay::small()).await;
+    assert_eq!(receipt["tool"], "audit_test_run");
+    assert!(receipt.get("error").is_none(), "{receipt}");
+    let fields: Vec<&str> = receipt["fields_prepared"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|field| field.as_str().unwrap())
+        .collect();
+    // The id fields are named; their values, like every other value of the
+    // result, are not in the receipt.
+    for named in ["result.figures[].id", "result.findings[].id"] {
+        assert!(fields.contains(&named), "{named} in {fields:?}");
+    }
+    // The crate's evidence, labels and failed checks' subjects and details are
+    // not released, so no path of the result names them. (The top-level
+    // `evidence` is the call's own record: hashes, size, state and time.)
+    for path in fields.iter().filter(|path| path.starts_with("result.")) {
+        for dropped in ["evidence", "label", "subject", "detail"] {
+            assert!(!path.contains(dropped), "{path}");
+        }
+    }
+    let mut held = Vec::new();
+    strings(&receipt, &mut held);
+    for value in ["cash_44ab.cash_receipts", "cash_44ab/applicability"] {
+        assert!(!held.iter().any(|text| text == value), "{value}");
+    }
+    assert_eq!(
+        names_in(&receipt, &cited),
+        Vec::<String>::new(),
+        "{receipt}"
+    );
+    assert_eq!(
+        names_in(&receipt, &book_names()),
+        Vec::<String>::new(),
+        "{receipt}"
+    );
+    assert_closed_strings(&receipt);
+}
+
+/// The receipt of a run the read refused keeps the rule code and nothing of
+/// the book.
+#[tokio::test]
+async fn a_refused_runs_receipt_keeps_the_rule_code_and_no_name_of_the_book() {
+    let mut replay = Replay::small();
+    replay.marks_before = replay.marks_before.replace("> 30<", "> 29<");
+    let receipt = receipt_of_run(&replay).await;
+    assert_eq!(receipt["error"], json!({"code": "C6-moved"}), "{receipt}");
+    assert_eq!(
+        names_in(&receipt, &book_names()),
+        Vec::<String>::new(),
+        "{receipt}"
+    );
+    assert_closed_strings(&receipt);
+}
+
 /// `clause21a_candidates`' projection, whether or not the tool admits the test:
 /// the crate's test, through its registry, on the book the audit read admits
 /// from the replay's vouchers 14 to 43 under the engagement the tool builds,

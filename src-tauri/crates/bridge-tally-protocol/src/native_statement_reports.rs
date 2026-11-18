@@ -22,8 +22,7 @@ use std::{collections::HashSet, fmt};
 
 use crate::{
     native_outstandings::NativeLedgerSnapshotPeriod,
-    tolerant_xml::sanitize_invalid_numeric_references,
-    xml_read_profiles::compatibility::static_variables_for_unvalidated_company,
+    tolerant_xml::sanitize_invalid_numeric_references, xml_read_profiles::ValidatedCompanyName,
 };
 
 /// Which built-in statement a request names and a response is parsed as.
@@ -134,7 +133,7 @@ impl std::error::Error for NativeStatementError {}
 /// already-admitted period, for the named company (§12a.1's shape). No TDL.
 pub fn render_native_statement_request(
     kind: NativeStatementKind,
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_built_in_report_request(kind.into(), company, period)
@@ -208,7 +207,7 @@ impl From<NativeStatementKind> for BuiltInReport {
 /// shape by construction.
 pub(crate) fn render_built_in_report_request(
     report: BuiltInReport,
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_report_envelope(report.id(), company, period, "")
@@ -218,7 +217,7 @@ pub(crate) fn render_built_in_report_request(
 /// variable measured on a built-in report (§12a.13, §12a.24). Only the Stock
 /// Summary is sent this way.
 pub(crate) fn render_exploded_stock_summary_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_report_envelope(
@@ -234,12 +233,11 @@ pub(crate) fn render_exploded_stock_summary_request(
 /// builders, never from data; the company is escaped here, once.
 pub(crate) fn render_report_envelope(
     id: &str,
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
     extra: &str,
 ) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>{extra}"#,

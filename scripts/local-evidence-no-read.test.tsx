@@ -15,6 +15,7 @@ import { isLocalEvidenceReadSuppressed } from "../src/evidence-read-boundary";
 
 const firstSavedCompany = {
   name: "Synthetic saved company one",
+  shown_name: "Synthetic saved company one",
   guid: "11111111-1111-1111-1111-111111111111",
   company_number: "100001",
   books_from_yyyymmdd: "20250401",
@@ -24,6 +25,7 @@ const firstSavedCompany = {
 const secondSavedCompany = {
   ...firstSavedCompany,
   name: "Synthetic saved company two",
+  shown_name: "Synthetic saved company two",
   guid: "22222222-2222-2222-2222-222222222222",
   company_number: "100002",
 };

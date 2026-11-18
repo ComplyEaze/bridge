@@ -4031,6 +4031,73 @@ async fn an_open_dialog_returns_pending_and_the_next_call_posts_the_click() {
     );
 }
 
+/// A No given while no call waits is returned once to the batch's next call
+/// with the kept cause and its step, in place of the step a No given in its
+/// own call carries (#2516). Apart from the cause and step the two answers are
+/// byte-equal, and the call after the kept one asks the person again.
+#[tokio::test]
+async fn a_kept_decline_says_it_was_given_earlier_and_the_next_call_asks_again() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let scripted = ScriptedApproval::held();
+    let pending = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    scripted.answer(false);
+    until_answered(&server, &batch.batch_id).await;
+    let kept = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    let again = ScriptedApproval::declining();
+    let asked = posting(&again, server.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(simulator);
+    assert_eq!(error_code(&kept), "master_approval_declined", "{kept}");
+    assert_eq!(scripted.masters().len(), 1, "the kept No asked nobody");
+    assert_eq!(again.masters().len(), 1, "the next call asked again");
+    assert_eq!(error_code(&asked), "master_approval_declined", "{asked}");
+    let asked_error = &result(&asked)["error"];
+    assert!(asked_error.get("cause").is_none(), "{asked}");
+    assert!(
+        asked_error["next_step"]
+            .as_str()
+            .unwrap()
+            .starts_with("Nothing was sent: the approval was declined."),
+        "{asked}"
+    );
+    let mut kept_error = result(&kept)["error"].clone();
+    assert_eq!(kept_error["cause"], "approval_answered_earlier", "{kept}");
+    assert_eq!(
+        kept_error["next_step"].as_str(),
+        crate::agent::refusal_remediation("approval_answered_earlier"),
+        "{kept}"
+    );
+    let mut asked_error = asked_error.clone();
+    for error in [&mut kept_error, &mut asked_error] {
+        let error = error.as_object_mut().unwrap();
+        error.remove("cause");
+        error.remove("next_step");
+    }
+    assert_eq!(kept_error, asked_error);
+    for field in ["attempt_recorded", "dispatch"] {
+        assert_eq!(result(&kept)[field], result(&asked)[field], "{field}");
+    }
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert_eq!(observed.len(), 2 * before_approval().len());
+}
+
 #[tokio::test]
 async fn the_next_step_of_an_approved_answer_names_the_master_tool() {
     let mut plans = before_approval();
@@ -4615,6 +4682,31 @@ fn the_busy_tally_step_is_given_only_when_nothing_was_sent() {
     assert_eq!(nothing_sent["next_step"], NEXT_TALLY_BUSY);
     assert_eq!(send_recorded["next_step"], NEXT_UNCONFIRMED);
     assert_eq!(not_known["next_step"], NEXT_SEND_NOT_KNOWN);
+}
+
+/// Only the kept cause puts its step before the master tool's own (#2516). A
+/// refusal with any other cause that has a step of its own keeps the master
+/// step, so a later cause cannot change a master answer's step.
+#[test]
+fn only_the_kept_cause_takes_the_place_of_the_master_step() {
+    let next_step = |cause: &'static str| {
+        let mut failure = ToolFailure::from("master_approval_declined".to_string());
+        failure.cause = Some(cause);
+        let outcome =
+            master_failure_outcome("bridge-batch", GUID, failure, empty_evidence(), Some(false));
+        outcome.payload["result"]["error"]["next_step"].clone()
+    };
+    // Any cause with a step of its own in `refusal_remediation`.
+    let other = "statement_trial_balance_row_inconsistent";
+    assert!(crate::agent::refusal_remediation(other).is_some());
+    assert_eq!(
+        next_step(other),
+        master_next_step("master_approval_declined").unwrap()
+    );
+    assert_eq!(
+        next_step(crate::agent::APPROVAL_ANSWERED_EARLIER),
+        crate::agent::refusal_remediation(crate::agent::APPROVAL_ANSWERED_EARLIER).unwrap()
+    );
 }
 
 /// `tools/call post_ledger_creates` runs the master post, not the voucher

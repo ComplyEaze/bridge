@@ -267,7 +267,7 @@ fn sent_requests() -> [String; 3] {
             period: &range,
         }
         .render(),
-        render_native_stock_summary_request(&name, &period),
+        render_native_stock_summary_request(&company, &period),
     ]
 }
 

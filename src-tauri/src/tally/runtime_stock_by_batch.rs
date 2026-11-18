@@ -262,7 +262,7 @@ impl TallyRuntime {
                             continue;
                         }
                         let request =
-                            render_stock_query_request(identity.display_name(), &name, &period);
+                            render_stock_query_request(identity.company_name(), &name, &period);
                         match client
                             .fetch_stock_query(request.clone(), STOCK_QUERY_ANSWER_MAX_BYTES)
                             .await

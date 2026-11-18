@@ -854,6 +854,12 @@ It checks every file first and writes none if one fails. Then:
    the next publication, so dispatch it once after the post-release pull request
    merges.
 
+   After publication and these edits, run `node scripts/release-text-agreement.mjs --published mcp-vX.Y.Z`
+   by hand. It checks the spans and registry file against the newest non-draft GitHub release and its
+   publication date in India time, and a release GitHub still marks as a pre-release disagrees; it is
+   not wired into a workflow. Exit 1 means the answer disagrees; exit 2 means the command could not
+   determine the answer.
+
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.
 

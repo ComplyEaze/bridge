@@ -627,7 +627,7 @@ impl ReadRequest {
 
 /// The book's voucher-type masters, as the sync connector reads them: names
 /// and GUIDs only, no period (bridge#664).
-pub(super) fn voucher_type_catalogue_read(company: &str) -> ReadRequest {
+pub(super) fn voucher_type_catalogue_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_voucher_type_export_request(
             company,
@@ -672,7 +672,7 @@ pub(super) fn ledger_name_index_read(company: &str) -> anyhow::Result<ReadReques
 /// sensitive master values; the one caller projects each row onto the few
 /// fields it reads (`agent_master_verdict::PartyView`).
 pub(super) fn party_ledger_master_for_parent_read(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod,
     part: &bridge_tally_protocol::parent_partition::ParentPart,
 ) -> ReadRequest {
@@ -683,7 +683,7 @@ pub(super) fn party_ledger_master_for_parent_read(
     )
 }
 
-pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
+pub(super) fn native_group_snapshot_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(company),
     )
@@ -696,13 +696,16 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
 }
 
 /// Every voucher of one window (a calendar month of an invoice's financial
-/// year), with the measured per-row Sales-class compute, for the
+/// year), with the measured per-row compute of the invoice's class, for the
 /// duplicate-number check: the program compares the numbers (#2162 item 11).
 pub(super) fn invoice_window_numbers_read(
     company: &str,
+    class: agent_import::InvoiceClass,
     window: (&TallyDate, &TallyDate),
 ) -> ReadRequest {
-    ReadRequest(agent_import::invoice::render_invoice_window_numbers_request(company, window))
+    ReadRequest(
+        agent_import::invoice::render_invoice_window_numbers_request(company, class, window),
+    )
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.
@@ -767,7 +770,7 @@ pub(super) fn invoice_company_registration_read(company: &str) -> ReadRequest {
 /// The company's Currency masters: the request the outstandings paths send,
 /// verbatim. Its response carries no company GUID, so it is bound only by the
 /// identity brackets it is read inside.
-pub(super) fn company_currency_read(company: &str) -> ReadRequest {
+pub(super) fn company_currency_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_company_currency_request(company),
     )
@@ -910,7 +913,7 @@ mod sealed_read_tests {
         let mut reads = vec![
             company_high_water_read(company),
             standard_ledger_catalog_read(company).unwrap(),
-            native_group_snapshot_read(company),
+            native_group_snapshot_read(&ValidatedCompanyName::new(company).unwrap()),
             voucher_census_read(company, &from, &to, span).unwrap(),
             gst_status_read(
                 company,

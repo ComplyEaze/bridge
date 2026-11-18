@@ -1183,6 +1183,42 @@ const ROWS: &[Row] = &[
         parse: |_, text| untyped(parse_import_outcome(text)),
     },
     Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/post-span-import-response.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",
@@ -1214,6 +1250,12 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/single-import-missing-ledger.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/single-import-stock-in-hand-journal.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",
         parse: |_, text| untyped(parse_import_outcome(text)),
@@ -4258,6 +4300,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-after.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-after.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
         "tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml",
         APP_HIGH_WATER,
     ),
@@ -4582,6 +4640,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-after.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-after.utf16le.xml",
         APP_VERIFICATION,
     ),
     (

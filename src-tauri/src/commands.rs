@@ -693,6 +693,7 @@ fn persisted_tally_probe_result(
                 )
             });
         companies.push(PersistedTallyCompany {
+            shown_name: ShownCompanyName::of(&company.name).into_text(),
             name: company.name,
             guid: company.guid,
             company_number: company.company_number,
@@ -915,6 +916,7 @@ pub async fn save_tally_setup(
             canonical_origin,
             observed_at_unix_ms,
             company: PersistedTallyCompany {
+                shown_name: ShownCompanyName::of(&company.name).into_text(),
                 name: company.name,
                 correlation_key,
                 guid: company.guid,
@@ -1143,9 +1145,13 @@ pub async fn revoke_tally_write_fixture_enrollment(
         })
 }
 
+/// A verified company. `name` is exactly as Tally reported it, and is what the
+/// webview stores, compares and sends; every screen draws `shown_name`, by the
+/// one company-name rule (#2462).
 #[derive(Debug, Serialize)]
 pub struct PersistedTallyCompany {
     pub name: String,
+    pub shown_name: String,
     pub guid: Option<String>,
     pub company_number: Option<String>,
     pub books_from_yyyymmdd: Option<String>,
@@ -2381,6 +2387,8 @@ pub struct AllCompaniesEntry {
 #[derive(Debug, Serialize)]
 pub struct CompanyOutstandingsEntry {
     pub company: String,
+    /// `company` by the one company-name rule; only this is drawn (#2462).
+    pub company_shown_name: String,
     pub company_guid: String,
     pub company_number: String,
     pub books_from_yyyymmdd: String,
@@ -2600,6 +2608,7 @@ async fn fetch_tally_outstandings_all_companies_once(
             }
         };
         entries.push(CompanyOutstandingsEntry {
+            company_shown_name: ShownCompanyName::of(&selected.display_name).into_text(),
             company: selected.display_name,
             company_guid: selected.company_guid,
             company_number: selected.company_number,

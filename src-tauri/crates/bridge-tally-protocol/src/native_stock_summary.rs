@@ -31,6 +31,7 @@ use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::outstandings_shared::COMPANY_EXTENT_V2_FETCH;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use bridge_tally_primitives::company_guid::CompanyGuid;
 use bridge_tally_primitives::{ExactDecimal, TallyDate};
 use quick_xml::{
@@ -89,7 +90,7 @@ pub fn render_company_inventory_flags_request(company: &str, company_guid: &Comp
 /// The Stock Summary by report name, in the built-in statements' envelope
 /// (§12a.1), over the already-admitted period.
 pub fn render_native_stock_summary_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_built_in_report_request(BuiltInReport::StockSummary, company, period)

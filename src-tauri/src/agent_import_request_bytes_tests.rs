@@ -51,7 +51,8 @@ use crate::agent::read_profiles::{
 };
 use crate::agent::voucher_parse::{EInvoiceFields, NamedVoucherFields, VoucherGstFields};
 use crate::agent::voucher_window::AlterIdSpan;
-use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
+use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+use crate::tally::master_name::MasterName;
 use crate::tally::VerifiedCompanyIdentity;
 
 /// Every variant of a fieldless enum, in the order named: the list a table

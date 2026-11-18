@@ -413,7 +413,7 @@ impl TallyRuntime {
                         return Err(TrialBalanceReadError::BeforeBooks.into());
                     }
 
-                    let currency_request = render_company_currency_request(identity.display_name());
+                    let currency_request = render_company_currency_request(identity.company_name());
                     let (currency_xml, bytes, hash) = client
                         .fetch_native_report_paired(currency_request.clone())
                         .await?
@@ -508,7 +508,7 @@ impl TallyRuntime {
                                 return Err(anyhow::anyhow!("cash_flow_window_not_built"));
                             };
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let (xml, bytes, hash) = client
                                 .fetch_native_report_paired(request.clone())
                                 .await?
@@ -519,7 +519,7 @@ impl TallyRuntime {
                             let groups =
                                 parse_native_group_snapshot(&xml, identity.company_guid())?;
                             let request =
-                                render_native_cash_flow_request(identity.display_name(), window);
+                                render_native_cash_flow_request(identity.company_name(), window);
                             let (xml, bytes, hash) = client
                                 .fetch_native_report_paired(request.clone())
                                 .await?
@@ -548,7 +548,7 @@ impl TallyRuntime {
                         }
                         TrialBalanceExtras::Statement(kind, today) => {
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let (xml, bytes, hash) = client
                                 .fetch_native_report_paired(request.clone())
                                 .await?
@@ -563,7 +563,7 @@ impl TallyRuntime {
                             // closing stock sits, and it gates a P&L's gross and net.
                             let request = render_native_statement_request(
                                 NativeStatementKind::BalanceSheet,
-                                identity.display_name(),
+                                identity.company_name(),
                                 &period,
                             );
                             let (xml, bytes, hash) = client
@@ -583,7 +583,7 @@ impl TallyRuntime {
                             let profit_and_loss_read: anyhow::Result<_> = async {
                                 let request = render_native_statement_request(
                                     NativeStatementKind::ProfitAndLoss,
-                                    identity.display_name(),
+                                    identity.company_name(),
                                     &period,
                                 );
                                 let (xml, bytes, hash) = client
@@ -759,7 +759,7 @@ async fn read_statement_stock_rows(
     if super::stock_summary::admit_stock_summary_size(mark.get()).is_err() {
         return StockRows::BookTooLarge;
     }
-    let request = render_native_stock_summary_request(identity.display_name(), window.period());
+    let request = render_native_stock_summary_request(identity.company_name(), window.period());
     let read: anyhow::Result<_> = async {
         let (xml, bytes, hash) = client
             .fetch_native_report_paired(request.clone())

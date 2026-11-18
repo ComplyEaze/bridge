@@ -5,7 +5,8 @@
 //! (the 9 Oct set, the company object `O` of 12 Oct and the ledger catalogue of
 //! 21 Oct), except the rates read `Q`, which is DERIVED: the lab's 21 Oct answer
 //! to the read restricted to the invoice ledgers' parents, cut to the invoice's
-//! ledgers (below).
+//! ledgers (below). The read-back `R` is also DERIVED: its registration name and
+//! GSTIN are inserted by `with_registration` and are not part of the capture.
 //!
 //! - The admission: the company list, the marks, the book extent, the
 //!   currencies, the ledger compliance listing, the paired listing, the

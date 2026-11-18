@@ -7440,7 +7440,10 @@ macro_rules! pilot_queue_block {
 // restricted to the parents of the invoice's ledgers (with the HSN/SAC fields,
 // #691) cut to the invoice's six ledgers (`lab_invoice_rates_hsn`), because the
 // code now names those ledgers by GUID (#1331) and that six-GUID request was
-// never sent to the lab. They are paired here with the earlier answers of the same book (the 9 Oct listings,
+// never sent to the lab. The read-back `R` is also DERIVED: its registration
+// name and GSTIN are inserted by `with_registration` and are not part of the
+// capture. Those 21 Oct answers are paired here with the earlier answers of the
+// same book (the 9 Oct listings,
 // groups and tax units; the 12 Oct company object `O` and groups with HSN `G`;
 // the 16 Oct numbering answers `X` and `Y`, DERIVED above); the pairing was not
 // observed at one time. The order below is the order the

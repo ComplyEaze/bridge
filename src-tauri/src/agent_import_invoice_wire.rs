@@ -34,17 +34,20 @@ pub(super) struct Row {
     /// Each direct child whose tag ends in `.LIST`, as its own row (its fields
     /// are relative to it): the ledger entries of a voucher.
     pub(super) lists: Vec<(String, Row)>,
-    /// In a list's row, the path of each element that came back with no text
-    /// (`<GSTHSNNAME/>`): present, unlike an element that did not come back.
+    /// The path of each element that came back with no text (`<GSTHSNNAME/>`):
+    /// present, unlike an element that did not come back.
     pub(super) empties: Vec<String>,
 }
 
 impl Row {
-    /// The one value at `path`, `Ok(None)` when absent, an error when repeated.
+    /// The one value at `path`, `Ok(None)` when absent or empty, an error when repeated.
     pub(super) fn one(&self, path: &str) -> Result<Option<&str>, &'static str> {
         let mut found = self.fields.iter().filter(|(key, _)| key == path);
         let first = found.next().map(|(_, value)| value.as_str());
-        if found.next().is_some() {
+        let occurrences = usize::from(first.is_some())
+            + found.count()
+            + self.empties.iter().filter(|key| *key == path).count();
+        if occurrences > 1 {
             return Err("invoice_read_field_repeated");
         }
         Ok(first)
@@ -193,6 +196,8 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                         let value = text.trim();
                         if !value.is_empty() {
                             current.fields.push((relative, value.to_string()));
+                        } else if leaf {
+                            current.empties.push(relative);
                         }
                     }
                 }
@@ -205,6 +210,15 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                 if let (Some(_), Some(list)) = (row_depth, list_depth) {
                     sub.empties.push(
                         path[list + 1..]
+                            .iter()
+                            .cloned()
+                            .chain(std::iter::once(empty.name().as_ref().to_string()))
+                            .collect::<Vec<_>>()
+                            .join("/"),
+                    );
+                } else if let Some(depth) = row_depth {
+                    current.empties.push(
+                        path[depth + 1..]
                             .iter()
                             .cloned()
                             .chain(std::iter::once(empty.name().as_ref().to_string()))

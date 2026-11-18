@@ -1046,6 +1046,38 @@ fn the_registration_tally_filed_the_invoice_under_is_read_back() {
 }
 
 #[test]
+fn an_empty_gstin_before_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("<CMPGSTIN/>{gstin}"));
+    assert!(wire::parse_invoice_readback(&twice).is_err());
+}
+
+#[test]
+fn an_empty_gstin_after_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("{gstin}<CMPGSTIN/>"));
+    assert!(wire::parse_invoice_readback(&twice).is_err());
+}
+
+#[test]
+fn an_empty_registration_before_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("<GSTREGISTRATION TYPE=\"String\"/>{unit}"));
+    assert!(wire::parse_invoice_readback(&twice).is_err());
+}
+
+#[test]
+fn an_empty_registration_after_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("{unit}<GSTREGISTRATION TYPE=\"String\"/>"));
+    assert!(wire::parse_invoice_readback(&twice).is_err());
+}
+
+#[test]
 fn what_the_renderer_writes_reads_back_clean() {
     let v = observed_voucher();
     assert_eq!(differences(&v, &readback_xml(&v)), Vec::<String>::new());
@@ -1483,10 +1515,12 @@ fn pilot_posted_to(number: &str, party: &str, bill_wise: bool) -> ImportVoucher 
 }
 
 /// The invoice the pilot lab's book took (9 Oct 2026), written as the build
-/// saved it, against Tally's answer to the read-back request the code sends
-/// now (the GSTR-1 status fields and each line's HSN/SAC, answered on 10 Oct
-/// 2026): no difference. The same answer against the invoice under another
-/// number differs in the number and the reference the number gives. The 9 Oct
+/// saved it, against the derived read-back `R` (Tally's answer of 3 Nov 2026
+/// to the request with the GSTR-1 status fields and each line's HSN/SAC): `R`'s
+/// registration name and GSTIN are inserted by `with_registration` and are not
+/// part of the capture; the comparison has no difference. The same answer
+/// against the invoice under another number differs in the number and the
+/// reference the number gives. The 9 Oct
 /// answer, whose request asked for no status field, reads as the build wrote it
 /// in everything else, and says so once: the GSTR-1 status not reported.
 #[test]

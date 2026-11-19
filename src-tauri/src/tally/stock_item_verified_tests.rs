@@ -115,6 +115,10 @@ fn differs(fields: &[SiblingField]) -> ReadBackVerdict {
     }
 }
 
+fn clean_create() -> StockItemImportOutcome {
+    StockItemImportOutcome::CountersClean(CleanCreate(()))
+}
+
 fn clean_counters() -> ImportCounters {
     ImportCounters {
         created: 1,
@@ -129,10 +133,7 @@ fn clean_counters() -> ImportCounters {
 
 #[test]
 fn the_captured_create_answer_is_counters_clean() {
-    assert_eq!(
-        outcome(&decode(ANSWER)),
-        StockItemImportOutcome::CountersClean
-    );
+    assert_eq!(outcome(&decode(ANSWER)), clean_create());
 }
 
 #[test]
@@ -214,9 +215,10 @@ fn the_marked_create_reads_back_equal_and_is_verified() {
     let verdict = ReadBackVerdict::of(&shown, &catalogue(&decode(MARKED)));
     assert_eq!(
         verdict,
-        ReadBackVerdict::Equal {
-            guid: MARKED_GUID.to_string()
-        }
+        ReadBackVerdict::Equal(EqualRead {
+            guid: MARKED_GUID.to_string(),
+            name: name(MARKED_NAME),
+        })
     );
     let verified = VerifiedItem::new(outcome(&decode(ANSWER)), verdict, &shown)
         .expect("a clean answer with an equal read is verified");
@@ -232,9 +234,9 @@ fn the_plain_create_reads_back_without_applicability_and_gst_details_and_is_not_
     let expected = differs(&[SiblingField::Applicability, SiblingField::GstDetails]);
     assert_eq!(verdict, expected);
     let outcome = outcome(&decode(ANSWER));
-    assert_eq!(outcome, StockItemImportOutcome::CountersClean);
+    assert_eq!(outcome, clean_create());
     let refused = VerifiedItem::new(outcome, verdict, &shown).expect_err("the read differs");
-    assert_eq!(refused.outcome, StockItemImportOutcome::CountersClean);
+    assert_eq!(refused.outcome, clean_create());
     assert_eq!(refused.verdict, expected);
 }
 
@@ -454,9 +456,9 @@ fn only_a_clean_answer_with_an_equal_read_is_verified() {
     let before = catalogue(&decode(BEFORE));
     let shown = shown(&before, MARKED_NAME);
     let equal = ReadBackVerdict::of(&shown, &catalogue(&decode(MARKED)));
-    assert!(matches!(equal, ReadBackVerdict::Equal { .. }));
+    assert!(matches!(equal, ReadBackVerdict::Equal(_)));
     let clean = outcome(&decode(ANSWER));
-    assert_eq!(clean, StockItemImportOutcome::CountersClean);
+    assert_eq!(clean, clean_create());
 
     let outcomes = [
         StockItemImportOutcome::AlteredExisting {
@@ -472,6 +474,7 @@ fn only_a_clean_answer_with_an_equal_read_is_verified() {
             line_errors: 1,
         },
         StockItemImportOutcome::Unreported,
+        StockItemImportOutcome::ApplicationFailure,
     ];
     for other in outcomes {
         let refused = VerifiedItem::new(other.clone(), equal.clone(), &shown)
@@ -495,4 +498,64 @@ fn only_a_clean_answer_with_an_equal_read_is_verified() {
 
     let verified = VerifiedItem::new(clean, equal, &shown).expect("the captured pair verifies");
     assert_eq!(verified.guid(), MARKED_GUID);
+}
+
+/// The captured answer's counters inside an import `ENVELOPE` whose
+/// `HEADER/STATUS` is `status`. A hand edit: it shows the check fires on edited
+/// text, not how Tally behaves.
+fn in_envelope(status: &str) -> String {
+    let answer = edited(
+        &decode(ANSWER),
+        "<RESPONSE>",
+        &format!(
+            "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER>\
+             <BODY><DATA><IMPORTRESULT>"
+        ),
+    );
+    edited(
+        &answer,
+        "</RESPONSE>",
+        "</IMPORTRESULT></DATA></BODY></ENVELOPE>",
+    )
+}
+
+#[test]
+fn a_failure_status_with_clean_counters_is_an_application_failure() {
+    assert_eq!(
+        outcome(&in_envelope("0")),
+        StockItemImportOutcome::ApplicationFailure
+    );
+    // The same counters under a success status are clean, so the status alone
+    // decides.
+    assert_eq!(outcome(&in_envelope("1")), clean_create());
+}
+
+#[test]
+fn a_name_held_by_two_items_is_not_found_once() {
+    let before = catalogue(&decode(BEFORE));
+    let shown = shown(&before, MARKED_NAME);
+    // Hand edit: the sibling's row also takes the created name as a name
+    // entry, so the new row holds it as its row name and the sibling as an
+    // entry. It shows the check fires on edited text, not how Tally behaves.
+    let read = edited(
+        &decode(MARKED),
+        "<NAME>SC Sibling Goods</NAME>",
+        "<NAME>SC Sibling Goods</NAME><NAME>SC Copied Marked</NAME>",
+    );
+    assert_eq!(
+        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        ReadBackVerdict::NotFoundOnce { rows: 2 }
+    );
+}
+
+#[test]
+fn an_equal_read_for_another_draft_name_is_not_verified() {
+    let before = catalogue(&decode(BEFORE));
+    let marked = shown(&before, MARKED_NAME);
+    let equal = ReadBackVerdict::of(&marked, &catalogue(&decode(MARKED)));
+    assert!(matches!(equal, ReadBackVerdict::Equal(_)));
+    let other = shown(&before, PLAIN_NAME);
+    let refused = VerifiedItem::new(clean_create(), equal.clone(), &other)
+        .expect_err("the read was for another draft's name");
+    assert_eq!(refused.verdict, equal);
 }

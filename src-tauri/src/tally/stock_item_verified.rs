@@ -7,6 +7,9 @@
 //! §12a.13 records a Create the counters reported clean whose stored item a
 //! fresh read showed to differ. So `VerifiedItem` is built only from a clean
 //! answer together with a fresh read whose new row equals the shown draft.
+//! Outside this module neither can be made by hand: `CountersClean` holds a
+//! `CleanCreate` that only `StockItemImportOutcome::of` makes, and `Equal`
+//! holds an `EqualRead` that only `ReadBackVerdict::of` makes.
 //!
 //! `VerifiedItem` does not prove:
 //! - that the fresh read was taken after the Create was posted (the caller's
@@ -15,8 +18,9 @@
 //!   constructor);
 //! - that the fresh read is the whole book (size and count admission are the
 //!   caller's, as the module doc of `stock_item_create.rs` says);
-//! - that the outcome and the verdict were taken for the `shown` it is given:
-//!   it takes all three as they are passed.
+//! - that the answer was Tally's answer to this draft's Create: it takes the
+//!   outcome as it is passed. The equal read must be for a draft of the same
+//!   name as `shown`, but `new` cannot tell two drafts of one name apart.
 //!
 //! The tests read the captures in
 //! `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/`; see their
@@ -30,14 +34,23 @@ use super::stock_item_create::{
     measured_shape, missing_fields, DraftRefusal, GoodsSibling, NotGoodsSibling, ShownDraft,
     SiblingField, SiblingGst, SiblingRefusal, StockItemCatalogue,
 };
-use bridge_tally_protocol::{ImportCounters, TallyImportOutcome};
+use bridge_tally_protocol::{ImportCounters, TallyImportApplicationStatus, TallyImportOutcome};
+
+/// The proof inside `CountersClean`. Its field is private, so only
+/// `StockItemImportOutcome::of` makes one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CleanCreate(());
 
 /// What the import answer to one stock item Create says, by the protocol
 /// crate's own counter rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum StockItemImportOutcome {
-    /// `CREATED 1`, every other counter reported 0, and no `LINEERROR`.
-    CountersClean,
+    /// The answer's `HEADER/STATUS` reads 0, the application's failure,
+    /// whatever its counters say.
+    ApplicationFailure,
+    /// `CREATED 1`, every other counter reported 0, no `LINEERROR`, and no
+    /// failure status. A bare `RESPONSE`, as captured, reports no status.
+    CountersClean(CleanCreate),
     /// No item created and at least one altered: the counters report an
     /// existing item altered, not a new one (§12a.13 records such answers to a
     /// Create on a name an item already held, row 1381-N among them).
@@ -56,16 +69,21 @@ pub(crate) enum StockItemImportOutcome {
 }
 
 impl StockItemImportOutcome {
-    /// Classifies the answer with `reported_counters` and
+    /// Classifies the answer by its status, then with `reported_counters` and
     /// `is_clean_success_for(1, 0, 0)`; it writes no counter rule of its own.
+    /// The status check is the one `import_outcome_is_clean` makes for a
+    /// voucher post.
     pub(crate) fn of(outcome: &TallyImportOutcome) -> Self {
+        if outcome.application_status() == TallyImportApplicationStatus::Failure {
+            return Self::ApplicationFailure;
+        }
         let result = outcome.counters();
         let Some(counters) = result.reported_counters() else {
             return Self::Unreported;
         };
         let line_errors = result.line_error_count;
         if result.is_clean_success_for(1, 0, 0) {
-            Self::CountersClean
+            Self::CountersClean(CleanCreate(()))
         } else if counters.created == 0 && counters.altered >= 1 {
             Self::AlteredExisting {
                 counters,
@@ -80,16 +98,25 @@ impl StockItemImportOutcome {
     }
 }
 
+/// The proof inside `Equal`: the new row's GUID and the draft name it was
+/// read for. Its fields are private, so only `ReadBackVerdict::of` makes one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EqualRead {
+    guid: String,
+    name: MasterName,
+}
+
 /// What a fresh stock item read says of the item a shown draft proposed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ReadBackVerdict {
     /// One new row holds the draft's name as its row name, none of its six
     /// fields is missing, `GoodsSibling` admits its applicability, type of
     /// supply and taxability, and its parent, unit, GST entry and HSN entry
-    /// equal the draft's; `guid` is that row's GUID.
-    Equal { guid: String },
-    /// The new row's fields that are missing, or that differ from the draft,
-    /// in `SiblingField` order.
+    /// equal the draft's.
+    Equal(EqualRead),
+    /// When any field is missing, the missing fields only; otherwise the
+    /// fields that differ from the draft, up to a refusal (see `of`). In
+    /// `SiblingField` order. Never empty.
     Differs { fields: Vec<SiblingField> },
     /// Not exactly one item holds the draft's name as its row name or a name
     /// entry, or the one that does holds it only as a name entry; `rows` is how
@@ -107,8 +134,9 @@ impl ReadBackVerdict {
     ///
     /// The six fields are read by the code the sibling is read by
     /// (`missing_fields`, `SiblingGst::named`, `GoodsSibling::from_sibling`
-    /// and `measured_shape`), then compared with the draft by `==`. A field
-    /// missing from the read is listed as differing. A refusal by
+    /// and `measured_shape`), then compared with the draft by `==`. When any
+    /// field is missing from the read, only the missing fields are listed and
+    /// nothing is compared. A refusal by
     /// `GoodsSibling::from_sibling` or `measured_shape` names the field it is
     /// about and ends the comparison of the GST and HSN entries, so the list
     /// then names every field found to differ up to that refusal and may not
@@ -193,9 +221,10 @@ impl ReadBackVerdict {
         }
 
         if fields.is_empty() {
-            Self::Equal {
+            Self::Equal(EqualRead {
                 guid: item.guid.clone(),
-            }
+                name: draft.name().clone(),
+            })
         } else {
             Self::Differs { fields }
         }
@@ -249,18 +278,22 @@ pub(crate) struct NotVerified {
 }
 
 impl VerifiedItem {
-    /// `Ok` only for `CountersClean` with `Equal`; the name is the shown
-    /// draft's and the GUID is the verdict's.
+    /// `Ok` only for `CountersClean` with an `Equal` read for a draft of the
+    /// shown draft's name; the GUID is the read's.
     pub(crate) fn new(
         outcome: StockItemImportOutcome,
         verdict: ReadBackVerdict,
         shown: &ShownDraft<'_>,
     ) -> Result<Self, NotVerified> {
         match (outcome, verdict) {
-            (StockItemImportOutcome::CountersClean, ReadBackVerdict::Equal { guid }) => Ok(Self {
-                guid,
-                name: shown.draft().name().clone(),
-            }),
+            (StockItemImportOutcome::CountersClean(_), ReadBackVerdict::Equal(read))
+                if read.name == *shown.draft().name() =>
+            {
+                Ok(Self {
+                    guid: read.guid,
+                    name: read.name,
+                })
+            }
             (outcome, verdict) => Err(NotVerified { outcome, verdict }),
         }
     }

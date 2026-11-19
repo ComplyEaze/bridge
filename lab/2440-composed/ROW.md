@@ -48,7 +48,9 @@ The build is the Windows bundle `unsigned-bundle-smoke-windows-latest` of a Brid
 
 It sends those three hashes to the run coordinator, who fills the line below by a new commit on this branch, after checking that the run's commit is #2440's head. While any field reads `<to fill>`, this row does not run: STOP. Before the first call, hash the exe that will run and compare it with the line; any other hash = STOP. Record the version the tool reports.
 
-RC COMMIT: <to fill>  CI RUN: <to fill>  ARTIFACT: <to fill>  ZIP DIGEST: <to fill>  EXE SHA256: <to fill>
+RC COMMIT: e0467fbc344969ba8d8c8f119e7726e3bdca6cca  CI RUN: 44463467192 (started by hand on 19 Nov 2026)  ARTIFACT: unsigned-bundle-smoke-windows-latest, 60,609,752 bytes  ZIP DIGEST: 092e41de16d96986ee9b59971beba7f0a893d2cf8aaabf19482ab5f4cf26139c  EXE SHA256: c437138a08dc10a8609e42d28104920401b4615daa69f3cdf404f6e37d6323dd
+
+The `.mcpb` in that artifact: `archive_sha256` 212f5880b8c1daf3e8b48b54002e7c1aded1e771524f613a7b0de354d8fa98a9. The build reports version 0.7.0. The run coordinator read these from its own download; the exe's hash was taken from the file inside the `.mcpb`, which was not run.
 
 Run it as the lab runs a staged exe over stdio, ONE launch from step 6 to the end of step 10, never relaunched in between. Environment:
 - `BRIDGE_TALLY_HOST=127.0.0.1` and `BRIDGE_TALLY_PORT=9001`;

@@ -518,6 +518,7 @@ fn stock_item_review_refuses_unsafe_company_and_origin_text() {
 
 #[test]
 fn stock_item_review_refuses_an_overlong_field_instead_of_cutting_it() {
+    // Hand edit of the captured read: only the HSN description changes.
     let xml = stock_decode(STOCK_BEFORE);
     let description = "Plastic Articles for Conveyance";
     assert_eq!(xml.matches(description).count(), 1);
@@ -636,6 +637,12 @@ fn the_preview_shows_what_the_create_renderer_sends_for_the_same_draft() {
         let preview = stock_item_review_text(&draft, ORIGIN).expect("the draft has a review");
         let request =
             render_stock_item_create(&ShownDraft::from_draft(draft)).expect("the draft renders");
+        // The captured company name needs no XML escape, so the envelope holds
+        // it as shown.
+        assert_eq!(
+            shown_values(&preview, "Create ONE stock item in "),
+            tag_values(&request, "SVCURRENTCOMPANY")
+        );
         for (label, tag) in [
             ("Create stock item ", "NAME"),
             ("Parent (stock group): ", "PARENT"),
@@ -692,4 +699,21 @@ fn the_preview_shows_what_the_create_renderer_sends_for_the_same_draft() {
         assert_eq!(rates, sent);
         assert_eq!(rates.len(), 5);
     }
+}
+
+#[test]
+fn a_quote_or_backslash_in_the_company_name_is_shown_escaped() {
+    // Hand-made company name; the capture is unchanged.
+    let preview = stock_preview_with(
+        "Bolt \"A\" \\ Lab",
+        STOCK_BEFORE,
+        "SC Copied Marked",
+        "SC Sibling Goods",
+        ORIGIN,
+    )
+    .expect("the draft has a review");
+    assert_eq!(
+        preview.lines().next(),
+        Some(r#"Create ONE stock item in "Bolt \"A\" \\ Lab""#)
+    );
 }

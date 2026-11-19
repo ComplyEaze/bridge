@@ -1,0 +1,12 @@
+$ python -I check_1108.py import e1w-e1-equal-first.utf16le.xml
+exit 0
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 2
+LASTMID 0

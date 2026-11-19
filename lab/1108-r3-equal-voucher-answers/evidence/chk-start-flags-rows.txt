@@ -1,0 +1,8 @@
+$ python -I check_1108.py rows start-flags.utf16le.xml
+exit 0
+rows: 1
+COMPANY 'BRIDGE STOCK CREATE LAB' (23 characters) GUID <company guid>
+  MASTERID absent
+  ALTERID absent
+  ISINTEGRATED 'Yes'
+  ISINVENTORYON 'Yes'

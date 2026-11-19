@@ -1,0 +1,7 @@
+step 0 exe hash at 2026-11-19T14:04:32Z
+exe: the 2214 row's build copy, 2214-cut\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+bytes: 35770880
+sha256: 7086f1d0d7430e7dc1fefd6f69c0d4a14d717a2e06477b32935a1d3aa4fee1b8
+want:   7086f1d0d7430e7dc1fefd6f69c0d4a14d717a2e06477b32935a1d3aa4fee1b8
+equal: True
+note: the installed path read from this shell shows the package view's overlay copy (sha256 dd819eaf...), not the install; 2214 read the install outside that view as 7086f1d0... and ran this build copy as its server.

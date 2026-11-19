@@ -1,0 +1,6 @@
+r3-first at 2026-11-19T14:14:05Z: proxy folder holds proxy.jsonl only, no x-N.request: r3-first = 0
+proxy.jsonl
+netstat 9003:
+  TCP    127.0.0.1:9003         0.0.0.0:0              LISTENING       19560
+agent-r3 listing before the server:
+ls: cannot access 'agent-r3': No such file or directory

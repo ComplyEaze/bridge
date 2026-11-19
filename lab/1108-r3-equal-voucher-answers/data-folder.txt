@@ -1,0 +1,10 @@
+Bridge's data folder of each row (BRIDGE_AGENT_DATA_DIR, absent before its row), by file name, size and sha256. They stay on the lab PC.
+agent-r3/agent-egress.jsonl 22510 B dc78fc4d90beb6287747fae5d30c811aa6f6b22bcdbdcbca8db46991cd7b69bd
+agent-r3/agent-import-admission.lock 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+agent-r3/agent-import-ledger.jsonl 2366 B edd0b48bbe99f112a286fed6cf8446ae9c9a9de4d9a463b046c5aa87f67b8ce3
+agent-r3/terms-acceptance.jsonl 90 B a7973ec254a17f7ab1eb19e860a4465056e76fb7c512d93a8dcee8a5e8dd919b
+agent-r3/imports/bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1.proof.20261119T141523578Z.84e8a9626c16968953583fd72ddced00fbb987fc8517a24d71b3a1566f48fd5b.json 2969 B 84e8a9626c16968953583fd72ddced00fbb987fc8517a24d71b3a1566f48fd5b
+agent-r3/imports/bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1.proof.20261119T141523578Z.84e8a9626c16968953583fd72ddced00fbb987fc8517a24d71b3a1566f48fd5b.md 1053 B 4e359b70e5e9ffc786ebeffee07432156ecaae0f46c1403d98e0d865b8a1a90d
+agent-r3/imports/bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1.proof.20261119T141746244Z.deaf465e1ebe5ec2c25840820c8ecfd306c0704876f44caa67c5682c3ab17baf.json 2969 B deaf465e1ebe5ec2c25840820c8ecfd306c0704876f44caa67c5682c3ab17baf
+agent-r3/imports/bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1.proof.20261119T141746244Z.deaf465e1ebe5ec2c25840820c8ecfd306c0704876f44caa67c5682c3ab17baf.md 1053 B 0625803a76a6db4003859bcc51b3b135905f310d963110a7cfe3fc6edd345759
+agent-r3/imports/bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1.xml 2212 B 8d4df2a3a9ae16112928297ce15b756c16e0b917da84c9a9f0b01b2dcb73327b

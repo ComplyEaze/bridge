@@ -1,0 +1,3 @@
+$ python -I check_1108.py rows start-vouchers.utf16le.xml
+exit 0
+rows: 0

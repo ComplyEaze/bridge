@@ -1,0 +1,9 @@
+2026-11-19T14:17:20.145Z check of r3-p1 for batch bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1, 3 voucher(s), total 66 (log read whole after 461 read(s))
+FAIL box seen
+FAIL (a) one Create line, whole: Create 3 vouchers in "BRIDGE STOCK CREATE LAB"
+FAIL (b) Company GUID line, whole
+FAIL (b) Batch line, whole: Batch: bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1
+FAIL (c) totals line, whole: Total debit: 66  Total credit: 66
+  Create lines seen: []
+NOT ALL PASS
+2026-11-19T14:17:20.146Z answer file written: No

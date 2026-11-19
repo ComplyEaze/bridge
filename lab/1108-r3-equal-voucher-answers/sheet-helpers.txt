@@ -1,0 +1,13 @@
+The sheet's helpers as run from the row folder, each equal by sha256 and size to the sheet's SHA256.txt line for helpers/<name>:
+args1108.py 1428 B 6efe38b4d9f2f9e17d028b2f326dc9f75f9f92211a2996816e5bb59c627a7b9d equal
+body.py 1534 B 8c676affdccad01ca7ca988ea042c32d49d1e6eef5564ec65c074d55900a01d3 equal
+box.ps1 7322 B 550fc11f53a495c6a34a5b9ab6f17b4f4fe574bb778a7a023d44e02d9dc0bfb3 equal
+boxcheck.py 4318 B fdc4a73738675186404f907916d8ab606b9aa27249cc8efd8630e7f7df682d90 equal
+call.py 2770 B d72843b382d76371fd07c11efdafe2a1d031e5fd3e203b7baba3a5c7a1ef6c67 equal
+cap.py 1254 B f20300af795abc4cec49fd4493c53dcd468b7d50576f6b3709ae922cb50a71e7 equal
+capwin2.ps1 1249 B 1a326a4ccd5494842ebad1c243286ade4a9a4e75e45c3ddf9e93acbda531a655 equal
+chk.py 2625 B e7d0f09929f4aff6edda93c04965dbdbb247e8114ec646d7a4be08e95ab1c235 equal
+front.ps1 537 B 51c2bb22bafd1b4c78a356b4ad8764f028814e073aa9626dae2b463b0db57411 equal
+p1108s2.py 7154 B 2d2112790b33b59cca9464a7723f6ec63668aad22348ca254ddba3fc5db69b8e equal
+send.py 3482 B 4ee06e4a4aeb58cbfb31b5efaae6c0fc812b9ad888c0e19ff9de896783f441be equal
+show.py 1550 B e4f1b295459b76ba47a30968e29dc98263436c54422e939dfae3a0cc98f65416 equal

@@ -1,0 +1,21 @@
+python -I setup-r3.py, run from the sheet folder lab/1108-r3-equal-voucher at 0f7f9e08 (before <LAB_DIR> existed), console output whole:
+files: ok 31, FAIL 0
+BK-R: TDBK1800_<company number>.001, 26485 B sha256 f02e31d171d92e41cf2120bdcbdf50375383e461da64d8c273df16d8b9179e59
+args1108.py sha256 6efe38b4d9f2f9e17d028b2f326dc9f75f9f92211a2996816e5bb59c627a7b9d
+body.py sha256 8c676affdccad01ca7ca988ea042c32d49d1e6eef5564ec65c074d55900a01d3
+box.ps1 sha256 550fc11f53a495c6a34a5b9ab6f17b4f4fe574bb778a7a023d44e02d9dc0bfb3
+boxcheck.py sha256 fdc4a73738675186404f907916d8ab606b9aa27249cc8efd8630e7f7df682d90
+call.py sha256 d72843b382d76371fd07c11efdafe2a1d031e5fd3e203b7baba3a5c7a1ef6c67
+cap.py sha256 f20300af795abc4cec49fd4493c53dcd468b7d50576f6b3709ae922cb50a71e7
+capwin2.ps1 sha256 1a326a4ccd5494842ebad1c243286ade4a9a4e75e45c3ddf9e93acbda531a655
+chk.py sha256 e7d0f09929f4aff6edda93c04965dbdbb247e8114ec646d7a4be08e95ab1c235
+front.ps1 sha256 51c2bb22bafd1b4c78a356b4ad8764f028814e073aa9626dae2b463b0db57411
+p1108s2.py sha256 2d2112790b33b59cca9464a7723f6ec63668aad22348ca254ddba3fc5db69b8e
+send.py sha256 4ee06e4a4aeb58cbfb31b5efaae6c0fc812b9ad888c0e19ff9de896783f441be
+show.py sha256 e4f1b295459b76ba47a30968e29dc98263436c54422e939dfae3a0cc98f65416
+guid.txt copied from the rows 1108-R0 to R2
+company-number.txt copied from the rows 1108-R0 to R2
+BK-R copied to backups/bkr
+agent-run-r3/client.py sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63
+launch-env.json sha256 5bbad08f3aa2536859cecee3834864b6d491ec7281aad4aad86b769d192c58d7, keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']
+setup: ok, 12 helpers, <LAB_DIR> made

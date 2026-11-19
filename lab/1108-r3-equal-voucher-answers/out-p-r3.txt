@@ -1,0 +1,36 @@
+args-post-r3.json 1bf51a3394d5c2c9
+args-verify-r3.json 1bf51a3394d5c2c9
+--- mN-before
+2026-11-19T14:15:17Z r3pre-marks.utf16le.xml request sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b curl exit 0 status 200 CONTENT-LENGTH 3406 answer 3406 B sha256 3d1d3bc99704e3bd66972e6cf2812d5cf2a0cb164f7741b6033364ce823ba152
+  parses as XML (C4)
+exit 0
+COMPANY rows: 1
+  GUID <company guid> ALTVCHID 2 ALTMSTID 213
+GUID check: 1 GUID(s) named, 0 not beginning with THE COMPANY's
+box.ps1 argv: ['powershell', '-NoProfile', '-File', '<LAB_DIR>\\box.ps1', '-RowDir', '<LAB_DIR>', '-Tag', 'r3-p1', '-SeeWithin', '120', '-AnswerBy', '120']
+box.ps1 watching: 2026-11-19T14:15:19.791Z watch start: tally window 0x1130730; see within 120 s; answer by 120 s
+--- post_import start 2026-11-19T14:15:19.921Z
+004-r3-p1.json: post_import sent 2026-11-19T14:15:20.205Z secs 3.599 bytes 5077 isError True rpc False
+{'attempt_recorded': False, 'batch_id': 'bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1', 'error': {'code': 'import_preexisting_identity', 'message': 'Nothing was sent: rows of this batch already match vouchers in the book. See error.next_step.', 'next_step': "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, type, ledgers, amounts and sides match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open the matching voucher and confirm it is a regular voucher (if it is optional or post-dat
+post_import end 2026-11-19T14:15:24.244Z
+--- box log
+2026-11-19T14:15:19.791Z watch start: tally window 0x1130730; see within 120 s; answer by 120 s
+2026-11-19T14:17:19.974Z NO BOX seen within 120 s
+2026-11-19T14:17:20.346Z capture r3-p1-nobox.png 1920x1080 355883 B sha256 becb1ddb861dcddb2eb1502cbb04b7ab521174147e8d7413c1abd1af2da73891
+--- check
+2026-11-19T14:17:20.145Z check of r3-p1 for batch bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1, 3 voucher(s), total 66 (log read whole after 461 read(s))
+FAIL box seen
+FAIL (a) one Create line, whole: Create 3 vouchers in "BRIDGE STOCK CREATE LAB"
+FAIL (b) Company GUID line, whole
+FAIL (b) Batch line, whole: Batch: bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1
+FAIL (c) totals line, whole: Total debit: 66  Total credit: 66
+  Create lines seen: []
+NOT ALL PASS
+2026-11-19T14:17:20.146Z answer file written: No
+--- post answer 004-r3-p1.json
+post_import secs 3.599 isError True rpc_error None
+result keys ['attempt_recorded', 'batch_id', 'dispatch_response', 'error']
+attempt_recorded: false
+batch_id: "bridge-c2935cd7-634e-46cc-b6cc-917c7d8ef1b1"
+HALT: the box check did not pass
+p1108s2 exit 1

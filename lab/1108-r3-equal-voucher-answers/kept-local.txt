@@ -1,0 +1,13 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backups/bks/TDBK1800_<company number>.001, 24219 B ecc8d4028b88b763e5a8a22014bc699b07db68c3eb32cff3c6c92052b373b0f4 (BK-S, the START book)
+backups/bkr/TDBK1800_<company number>.001, 26485 B f02e31d171d92e41cf2120bdcbdf50375383e461da64d8c273df16d8b9179e59 (BK-R, the BASELINE book of rows R0 to R2)
+guid.txt 36 B d49ecd16b69118dfafd544af8d9fd62f835d93cdcd1a0624140562166f95e249 (lab copy: the company GUID or number)
+company-number.txt 6 B 7b501a4208b6b1a3afe9249a145f73df675eb13a0888b44d6e746f285320fd08 (lab copy: the company GUID or number)
+agent-run-r3/inbox/<close file> 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (the empty file that closes the client)
+agent-run-r3/client.py 4687 B 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (the held-book client, byte for byte: its clientInfo name holds a desk word)
+note.py 525 B d74800cbd05c1fc79a03712a5440685b378a4d9eb0759432c5b3104fd56d3fe7 (the lab copy of the sheet placeholder helper, run from the row folder; it names the lab paths)
+c6prep.py 2799 B 71c8e21c4fa6e9b364e364c2766ebf68737b62d750e08b1f6c023f61dcdd69b4 (the lab copy of the sheet placeholder helper, run from the row folder; it names the lab paths)
+aside/s0-exe-sha256-shifted.txt 65 B d7dca8f4453b2aaadf5c331f9d10119b113088ace1fa290553dc747ebb35a12b (the first write of the step 0 exe hash, shifted by a leading backslash; set aside)
+scripts/stage-1108r3-2.py 17456 B 4cb6ecb32ef317775133a8fb4303679caaa254a825cf1b5cc21782f7a633a267 (a stage script: its patterns name the lab paths)
+scripts/stage-1108r3.py 16208 B c639cb0d8aab000073453a95b505e846d3eeff99f82b5833c4f6939074b0d67d (a stage script: its patterns name the lab paths)
+stage-try-1: stage attempt 1, stopped part way: files a=401, bytes b=1439386, sha256 of its sorted listing b2d046059b5ed09233a47300083c4b65f19ea5a9d7dbb662bfadf61f088e2625

@@ -1057,9 +1057,10 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   post 19.672 s after it was forwarded, and nothing more went out on that connection. The export failed with its
   withheld message and `[tally_request_deadline_exceeded]`, and wrote no file. The drain record read owed, six
   standard calls were refused `tally_endpoint_draining` (`retry_after_s` 10) with no master post sent, and the
-  seventh, 93.9 s after the owed record, was admitted and read the book whole, 13 of 13 rows equal to a whole read
-  after it (`lab/2214-export-cut-current-app-answers` at 0a4cc166, RESULTS.md, W4). Not measured: a cut with no other
-  client's work ahead of it, a cut of another read, another book, and another release.
+  seventh was admitted and read the book whole, ending 93.9 s after the owed record, 13 of 13 rows equal to a
+  whole read after it with the snapshot left out (`lab/2214-export-cut-current-app-answers` at 0a4cc166,
+  RESULTS.md, W4). Not measured: a cut with no other client's work ahead of it, a cut of another read, another
+  book, and another release.
 - **The party/ledger master workbook read the mailing details by the ledger count past a master mark of 4,266, read
   about 30 MB of them whole, and, past 32 MiB, was written again without them with its note. PARTIAL: TallyPrime 7.2 on
   Windows, 2026-11-18, one synthetic book, one sitting, the desktop app 0.7.0, built from master a83ee02d on the run

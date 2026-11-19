@@ -74,9 +74,9 @@ use bridge_tally_protocol::stock_item_candidate::{
 };
 use bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER;
 
-const GOODS: &str = "Goods";
-const TAXABLE: &str = "Taxable";
-const SPECIFY_DETAILS_HERE: &str = "Specify Details Here";
+pub(crate) const GOODS: &str = "Goods";
+pub(crate) const TAXABLE: &str = "Taxable";
+pub(crate) const SPECIFY_DETAILS_HERE: &str = "Specify Details Here";
 const BASED_ON_VALUE: &str = "Based on Value";
 
 /// A control-reference value that the measured copy kept marked (§12a.13).
@@ -102,7 +102,7 @@ impl MarkedConstant {
     }
 
     /// The marked text sent in the measured Create (§12a.13).
-    fn render(self) -> &'static str {
+    pub(crate) fn render(self) -> &'static str {
         match self {
             Self::Applicable => "&#4; Applicable",
             Self::Any => "&#4; Any",
@@ -122,7 +122,7 @@ pub(crate) enum RateValuation {
 
 impl RateValuation {
     /// The valuation text sent in the measured Create (§12a.13).
-    fn render(self) -> &'static str {
+    pub(crate) fn render(self) -> &'static str {
         match self {
             Self::BasedOnValue => BASED_ON_VALUE,
             Self::NotApplicable => MarkedConstant::NotApplicable.render(),
@@ -409,6 +409,7 @@ pub(crate) enum SiblingRefusal {
 pub(crate) struct SiblingGst<'a> {
     catalogue: &'a StockItemCatalogue,
     item: &'a CandidateStockItem,
+    source_name: MasterName,
     parent: &'a str,
     unit: &'a str,
     applicability: &'a str,
@@ -558,6 +559,7 @@ impl<'a> SiblingGst<'a> {
         Ok(Self {
             catalogue,
             item,
+            source_name: name.clone(),
             parent,
             unit,
             applicability,
@@ -580,6 +582,11 @@ impl<'a> SiblingGst<'a> {
     /// The item's row name as read.
     pub(crate) fn name(&self) -> &'a str {
         &self.item.name
+    }
+
+    /// The exact row name or alias by which this sibling was selected.
+    pub(crate) fn source_name(&self) -> &MasterName {
+        &self.source_name
     }
 
     /// The item's parent as read.
@@ -887,18 +894,13 @@ pub(crate) enum CreateRenderRefusal {
     TextNeedsEscaping { field: DraftText },
 }
 
-/// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
-/// nothing, and renders the structure of the first marked Create measured (one run,
-/// PARTIAL, §12a.13), with values read from the sibling. It checks Name, Parent,
-/// Unit, HsnCode and HsnDescription in that order and returns the first refusal.
-/// Name receives only the five-character check because it is a `MasterName`.
-/// Each other value must first pass the `MasterName` rule, then hold none of
-/// `& < > " '`. The rate's magnitude is not checked, and Bridge does not know
-/// how Tally treats values other than the measured ones.
-pub(crate) fn render_stock_item_create(
-    shown: &ShownDraft<'_>,
-) -> Result<String, CreateRenderRefusal> {
-    let draft = shown.draft();
+/// The renderer's text rule, in its order: Name, Parent, Unit, HsnCode and
+/// HsnDescription, returning the first refusal. Name receives only the
+/// five-character check because it is a `MasterName`. Each other value must
+/// first pass the `MasterName` rule, then hold none of `& < > " '`. The
+/// preview applies the same rule, so a draft the renderer refuses is never
+/// shown for approval.
+pub(crate) fn create_text_refusal(draft: &StockItemDraft<'_>) -> Result<(), CreateRenderRefusal> {
     for (field, text) in [
         (DraftText::Name, draft.name().as_str()),
         (DraftText::Parent, draft.parent()),
@@ -919,6 +921,20 @@ pub(crate) fn render_stock_item_create(
             return Err(CreateRenderRefusal::TextNeedsEscaping { field });
         }
     }
+    Ok(())
+}
+
+/// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
+/// nothing, and renders the structure of the first marked Create measured (one run,
+/// PARTIAL, §12a.13), with values read from the sibling. It first applies
+/// `create_text_refusal` and returns its refusal. The rate's magnitude is not
+/// checked, and Bridge does not know how Tally treats values other than the
+/// measured ones.
+pub(crate) fn render_stock_item_create(
+    shown: &ShownDraft<'_>,
+) -> Result<String, CreateRenderRefusal> {
+    let draft = shown.draft();
+    create_text_refusal(draft)?;
 
     let name = draft.name().as_str();
     let parent = draft.parent();

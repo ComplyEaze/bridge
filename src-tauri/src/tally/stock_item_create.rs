@@ -28,9 +28,11 @@
 //! Taxable and whose applicability is the marked Applicable. Neither is yet a
 //! copy that may be sent. A copy sent without Tally's mark on three of its
 //! values was stored without its GST applicability and rates, and no counter
-//! showed it (one run, PARTIAL; §12a.13). One shape was measured that way; the
-//! Creates that later changed one variable each (§12a.13) are not admitted by
-//! anything here. `SiblingGst`
+//! showed it (one run, PARTIAL; §12a.13). One shape was measured that way. Of
+//! the Creates that later changed one variable each (§12a.13), `StockItemDraft`
+//! refuses a second dated GST or HSN entry and a Cess rate; it copies the rates
+//! and the unit as read, so a sibling with other rates or another unit drafts
+//! and renders though no such copy was measured. `SiblingGst`
 //! requires the parent, unit, applicability and type of supply to be present and
 //! not blank; each dated GST entry needs its taxability and source, at least one
 //! state row with a name, and at least one rate row with a duty head and
@@ -46,11 +48,12 @@
 //! `render_stock_item_create` renders it. The name is a `MasterName`; the parent
 //! and unit equal a row name in the same company's group or unit read; the dates
 //! were parsed by the protocol crate. Each rate is a plain non-zero decimal on
-//! the three rows that carry one and absent on the two that do not. The parent,
-//! unit, HSN code and HSN description pass the `MasterName` rule and hold none
-//! of `& < > " '`; the HSN code and description do not hold the root marker. The
-//! rate's magnitude is not checked. Bridge does not know how Tally treats values
-//! other than the measured ones.
+//! the three rows that carry one and absent on the two that do not; the HSN
+//! code and description do not hold the root marker. The draft does not hold
+//! text to plain text: the renderer does, refusing a parent, unit, HSN code or
+//! HSN description that fails the `MasterName` rule or holds one of
+//! `& < > " '`. The rate's magnitude and the unit's value are not checked.
+//! Bridge does not know how Tally treats values other than the measured ones.
 
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -618,8 +621,9 @@ impl<'a> GoodsSibling<'a> {
 /// the same company's group or unit read; the dates were parsed by the protocol
 /// crate; and the HSN code and description do not hold the root marker. Each
 /// rate is a plain non-zero decimal on the three rows that carry one and absent
-/// on the two that do not; its magnitude is not checked. Bridge does not know
-/// how Tally treats values other than the measured ones.
+/// on the two that do not; its magnitude is not checked, and neither is the
+/// unit's value. The draft does not hold text to plain text; the renderer does.
+/// Bridge does not know how Tally treats values other than the measured ones.
 #[derive(Debug)]
 pub(crate) struct StockItemDraft<'a> {
     sibling: GoodsSibling<'a>,

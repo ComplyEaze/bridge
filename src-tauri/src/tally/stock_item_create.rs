@@ -28,12 +28,19 @@
 //! Taxable and whose applicability is the marked Applicable. Neither is yet a
 //! copy that may be sent. A copy sent without Tally's mark on three of its
 //! values was stored without its GST applicability and rates, and no counter
-//! showed it (one run, PARTIAL; §12a.13). One shape was measured, and these two
-//! types do not examine the rates, the sources, the state names, the valuation
-//! types, the ineligible-ITC flag, the number of dated entries or state rows, or
-//! a parent at the root. `StockItemDraft` is the type that holds a copy to
-//! send: it admits the measured shape only, and a later builder renders it
-//! (§12a.13).
+//! showed it (one run, PARTIAL; §12a.13). One shape was measured. `SiblingGst`
+//! requires the parent, unit, applicability and type of supply to be present and
+//! not blank; each dated GST entry needs its taxability and source, at least one
+//! state row with a name, and at least one rate row with a duty head and
+//! valuation type; each HSN entry needs its code, description and source.
+//! Except where `GoodsSibling` checks Goods, Taxable and the marked Applicable,
+//! their values are not examined: the unit's value, the sources' values, the
+//! state names' values, the duty heads' values and number of rate rows, the
+//! valuation types' values, the rates (which may be absent, zero or empty), the
+//! HSN code's and description's values, the ineligible-ITC flag, the numbers of
+//! dated entries and state rows, and a parent at the root are not examined.
+//! `StockItemDraft` is the type that holds a copy to send: it admits the
+//! measured shape only, and a later builder renders it (§12a.13).
 
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -45,6 +52,7 @@ use bridge_tally_core::master_name_index::{
 };
 use bridge_tally_protocol::gst_details::{GstDetailsEntry, GstDetailsObservation, GstRate};
 use bridge_tally_protocol::hsn_details::{HsnDetailsEntry, HsnDetailsObservation};
+use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::native_masters::{
     parse_native_masters, NativeMasterKind, NativeMastersError,
 };
@@ -79,6 +87,15 @@ impl MarkedConstant {
             _ => None,
         }
     }
+
+    /// The marked text sent in the measured Create (§12a.13).
+    fn render(self) -> &'static str {
+        match self {
+            Self::Applicable => "&#4; Applicable",
+            Self::Any => "&#4; Any",
+            Self::NotApplicable => "&#4; Not Applicable",
+        }
+    }
 }
 
 /// The two valuation values the measured copy sent (§12a.13).
@@ -88,6 +105,16 @@ pub(crate) enum RateValuation {
     BasedOnValue,
     /// The marked valuation sent on Cess.
     NotApplicable,
+}
+
+impl RateValuation {
+    /// The valuation text sent in the measured Create (§12a.13).
+    fn render(self) -> &'static str {
+        match self {
+            Self::BasedOnValue => BASED_ON_VALUE,
+            Self::NotApplicable => MarkedConstant::NotApplicable.render(),
+        }
+    }
 }
 
 /// The five duty rows of the measured copy, in order: duty head, valuation and
@@ -310,6 +337,7 @@ impl StockItemCatalogue {
 }
 
 impl<'a> ItemNameAbsent<'a> {
+    /// The proposed name, shown absent from the catalogue.
     pub(crate) fn name(&self) -> &MasterName {
         &self.name
     }
@@ -331,7 +359,7 @@ pub(crate) enum SiblingField {
     HsnDetails,
 }
 
-/// Why no complete sibling answers to the name.
+/// Why no sibling with the six required fields answers to the name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SiblingRefusal {
     /// No item answers to the name.
@@ -339,19 +367,31 @@ pub(crate) enum SiblingRefusal {
     /// More than one item holds the name exactly; this many.
     Ambiguous { items: usize },
     /// No item holds the name exactly, and this many items answer to it by a
-    /// fold of the name index. Those folds exist to refuse a proposed name, and
-    /// one keeps only letters and digits, so a fold never names a sibling.
+    /// fold of the name index. Bridge's rule so far, a choice and not a Tally
+    /// fact: an item is a source only when it holds the name exactly, as its row
+    /// name or a name entry, and a name that only folds to an item is refused.
     OnlyByFold { items: usize },
     /// The first field that is absent or empty, or whose list holds content the parser does not model.
+    /// `Incomplete(SiblingField::GstDetails)` also reports slab rates, a list
+    /// the parser cannot read, and a missing state row or rate row, so it does
+    /// not by itself mean that the GST details are missing.
     Incomplete(SiblingField),
     /// The index could not check the name.
     Unchecked(MasterNameIndexError),
 }
 
-/// The six source fields of the one item that holds the name exactly, each
-/// present and not blank as read. A field of only white space counts as missing.
-/// Presence only: the rates, the sources, the
-/// state names, the valuation types and the ineligible-ITC flag are not examined.
+/// The six source fields of the one item that holds the name exactly, with the
+/// parent, unit, applicability and type of supply present and not blank; each
+/// dated GST entry needs its taxability and source, at least one state row with
+/// a name, and at least one rate row with a duty head and valuation type, and
+/// each HSN entry needs its code, description and source. A field of only white
+/// space counts as missing. Except where `GoodsSibling` checks Goods, Taxable
+/// and the marked Applicable, their values are not examined: the unit's value,
+/// the sources' values, the state names' values, the duty heads' values and
+/// number of rate rows, the valuation types' values, the rates (which may be
+/// absent, zero or empty), the HSN code's and description's values, the
+/// ineligible-ITC flag, the numbers of dated entries and state rows, and a
+/// parent at the root are not examined.
 #[derive(Debug)]
 pub(crate) struct SiblingGst<'a> {
     catalogue: &'a StockItemCatalogue,
@@ -472,7 +512,7 @@ impl<'a> SiblingGst<'a> {
         })
     }
 
-    /// The catalogue this complete read belongs to.
+    /// The catalogue the sibling was found in.
     pub(crate) fn catalogue(&self) -> &'a StockItemCatalogue {
         self.catalogue
     }
@@ -518,7 +558,7 @@ impl<'a> SiblingGst<'a> {
     }
 }
 
-/// Why a complete sibling is not the measured Goods case.
+/// Why a sibling whose six fields are present is not the measured Goods case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NotGoodsSibling {
     /// The type of supply is not Goods.
@@ -555,7 +595,7 @@ impl<'a> GoodsSibling<'a> {
         Ok(Self { sibling })
     }
 
-    /// The complete read admitted as a Goods sibling.
+    /// The sibling whose six fields are present, admitted as Goods.
     pub(crate) fn sibling(&self) -> &SiblingGst<'a> {
         &self.sibling
     }
@@ -730,10 +770,114 @@ impl<'a> StockItemDraft<'a> {
         &self.hsn
     }
 
-    /// The complete Goods sibling from which this draft was built.
+    /// The Goods sibling whose six fields are present, from which this draft was built.
     pub(crate) fn sibling(&self) -> &GoodsSibling<'a> {
         &self.sibling
     }
+}
+
+/// Marks a draft that the approval window of the later change displays before
+/// anything is built from it. Nothing in this module shows a draft to anyone;
+/// the only caller of `from_draft` is meant to be that window.
+#[derive(Debug)]
+pub(crate) struct ShownDraft<'a> {
+    draft: StockItemDraft<'a>,
+}
+
+impl<'a> ShownDraft<'a> {
+    pub(crate) fn from_draft(draft: StockItemDraft<'a>) -> Self {
+        Self { draft }
+    }
+
+    pub(crate) fn draft(&self) -> &StockItemDraft<'a> {
+        &self.draft
+    }
+}
+
+/// The measured Create wrote these five values as plain text (§12a.13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DraftText {
+    Name,
+    Parent,
+    Unit,
+    HsnCode,
+    HsnDescription,
+}
+
+/// No Create of a stock item with `&`, `<`, `>`, `"` or `'` in one of these
+/// values was measured, so the builder writes no escape and refuses them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum CreateRenderRefusal {
+    TextNeedsEscaping { field: DraftText },
+}
+
+/// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
+/// nothing, and renders the measured marked request of §12a.13 and no other.
+pub(crate) fn render_stock_item_create(
+    shown: &ShownDraft<'_>,
+) -> Result<String, CreateRenderRefusal> {
+    let draft = shown.draft();
+    for (field, text) in [
+        (DraftText::Name, draft.name().as_str()),
+        (DraftText::Parent, draft.parent()),
+        (DraftText::Unit, draft.unit()),
+        (DraftText::HsnCode, draft.hsn().code()),
+        (DraftText::HsnDescription, draft.hsn().description()),
+    ] {
+        if text
+            .chars()
+            .any(|c| matches!(c, '&' | '<' | '>' | '"' | '\''))
+        {
+            return Err(CreateRenderRefusal::TextNeedsEscaping { field });
+        }
+    }
+
+    let name = draft.name().as_str();
+    let parent = draft.parent();
+    let unit = draft.unit();
+    let applicability = MarkedConstant::Applicable.render();
+    let gst = draft.gst();
+    let applicable_from = gst.applicable_from();
+    let state = MarkedConstant::Any.render();
+    let mut message = format!(
+        "<TALLYMESSAGE><STOCKITEM NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME><PARENT>{parent}</PARENT><BASEUNITS>{unit}</BASEUNITS><GSTAPPLICABLE>{applicability}</GSTAPPLICABLE><GSTTYPEOFSUPPLY>{GOODS}</GSTTYPEOFSUPPLY><GSTDETAILS.LIST><APPLICABLEFROM>{applicable_from}</APPLICABLEFROM><TAXABILITY>{TAXABLE}</TAXABILITY><SRCOFGSTDETAILS>{SPECIFY_DETAILS_HERE}</SRCOFGSTDETAILS><STATEWISEDETAILS.LIST><STATENAME>{state}</STATENAME>"
+    );
+    for rate in gst.rates() {
+        message.push_str("<RATEDETAILS.LIST><GSTRATEDUTYHEAD>");
+        message.push_str(rate.duty_head());
+        message.push_str("</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE>");
+        message.push_str(rate.valuation().render());
+        message.push_str("</GSTRATEVALUATIONTYPE>");
+        if let Some(value) = rate.rate() {
+            message.push_str("<GSTRATE>");
+            message.push_str(value);
+            message.push_str("</GSTRATE>");
+        }
+        message.push_str("</RATEDETAILS.LIST>");
+    }
+    message.push_str(
+        "<GSTSLABRATES.LIST></GSTSLABRATES.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>",
+    );
+    let hsn = draft.hsn();
+    let hsn_from = hsn.applicable_from();
+    let code = hsn.code();
+    let description = hsn.description();
+    message.push_str(&format!(
+        "<HSNDETAILS.LIST><APPLICABLEFROM>{hsn_from}</APPLICABLEFROM><HSNCODE>{code}</HSNCODE><HSN>{description}</HSN><SRCOFHSNDETAILS>{SPECIFY_DETAILS_HERE}</SRCOFHSNDETAILS></HSNDETAILS.LIST></STOCKITEM></TALLYMESSAGE>"
+    ));
+
+    let company = shown
+        .draft()
+        .sibling()
+        .sibling()
+        .catalogue()
+        .company()
+        .display_name();
+    Ok(render_import_envelope(
+        company,
+        ImportReport::AllMasters,
+        &message,
+    ))
 }
 
 #[cfg(test)]

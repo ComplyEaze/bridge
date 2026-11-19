@@ -1,12 +1,13 @@
-//! Tests the stock-item catalogue and the name check on row 1381-R1's captured reads.
-//! See `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/PROVENANCE.md`.
+//! Tests the stock-item catalogue and name check, the named sibling and Goods check, and the draft.
+//! The tests use row 1381-R1's captured reads; see `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/PROVENANCE.md`.
 
 use super::*;
 use crate::tally::master_name::MasterNameError;
 use bridge_tally_core::master_name_index::Via;
 use bridge_tally_protocol::gst_details::GstRate;
 use bridge_tally_protocol::{
-    decode_tally_xml_response_bytes_limited, decode_xml_bytes, ExpectedTallyTextEncoding,
+    decode_tally_xml_response_bytes_limited, decode_xml_bytes, encode_tally_xml_request_utf16le,
+    ExpectedTallyTextEncoding,
 };
 
 const COMPANY: &str = "BRIDGE STOCK CREATE LAB";
@@ -42,6 +43,10 @@ const MARKED_REQUEST: &[u8] = include_bytes!(
 const PLAIN_REQUEST: &[u8] = include_bytes!(
     "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-plain-create.request.utf16le.xml"
 );
+
+const EXTRA_GST_ENTRY: &str = "<GSTDETAILS.LIST><APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM><TAXABILITY TYPE=\"String\">Taxable</TAXABILITY><SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS><STATEWISEDETAILS.LIST><STATENAME TYPE=\"String\">&#4; Any</STATENAME><RATEDETAILS.LIST><GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE TYPE=\"String\">Based on Value</GSTRATEVALUATIONTYPE><GSTRATE TYPE=\"Number\"> 18</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>";
+
+const EXTRA_HSN_ENTRY: &str = "<HSNDETAILS.LIST><APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM><HSNCODE TYPE=\"String\">39239090</HSNCODE><HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN><SRCOFHSNDETAILS TYPE=\"String\">Specify Details Here</SRCOFHSNDETAILS></HSNDETAILS.LIST>";
 
 fn decode(bytes: &[u8]) -> String {
     decode_tally_xml_response_bytes_limited(
@@ -647,6 +652,29 @@ fn a_padded_unit_and_parent_are_handed_back_exactly_as_read() {
 }
 
 #[test]
+fn a_padded_applicability_and_supply_are_handed_back_exactly_as_read() {
+    // Both hand edits add padding and are not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "<GSTTYPEOFSUPPLY TYPE=\"String\">Goods</GSTTYPEOFSUPPLY>",
+        "<GSTTYPEOFSUPPLY TYPE=\"String\">Goods </GSTTYPEOFSUPPLY>",
+    );
+    let xml = edited(
+        &xml,
+        "<GSTAPPLICABLE TYPE=\"String\">&#4; Applicable</GSTAPPLICABLE>",
+        "<GSTAPPLICABLE TYPE=\"String\">&#4; Applicable </GSTAPPLICABLE>",
+    );
+    let before = catalogue(&xml);
+    let item = SiblingGst::named(&before, &name("SC Sibling Goods")).expect("padding is not blank");
+    assert_eq!(item.supply().as_bytes(), b"Goods ");
+    let applicability = format!("{TALLY_SANITIZED_ROOT_MARKER} Applicable ");
+    assert!(item
+        .applicability()
+        .starts_with(TALLY_SANITIZED_ROOT_MARKER));
+    assert_eq!(item.applicability().as_bytes(), applicability.as_bytes());
+}
+
+#[test]
 fn a_blank_gst_or_hsn_sub_field_is_refused_like_a_missing_one() {
     let cases = [
         (
@@ -1113,15 +1141,31 @@ fn a_state_row_other_than_the_marked_any_is_refused() {
 }
 
 #[test]
+fn a_second_state_row_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let extra = "<STATEWISEDETAILS.LIST><STATENAME TYPE=\"String\">Karnataka</STATENAME><RATEDETAILS.LIST><GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE TYPE=\"String\">Based on Value</GSTRATEVALUATIONTYPE><GSTRATE TYPE=\"Number\"> 18</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST>";
+    // This second state row is a hand edit of the capture, not a captured state.
+    let xml = edited(
+        &decode(BEFORE),
+        "</STATEWISEDETAILS.LIST>",
+        &format!("</STATEWISEDETAILS.LIST>{extra}"),
+    );
+    let b = catalogue(&xml);
+    assert!(sibling(&b, "SC Sibling Goods").is_ok());
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(got.unwrap_err(), DraftRefusal::StateNotAny);
+}
+
+#[test]
 fn a_second_dated_entry_is_refused_with_the_count() {
     let g = decode(GROUPS);
     let u = decode(UNITS);
-    let extra = "<GSTDETAILS.LIST><APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM><TAXABILITY TYPE=\"String\">Taxable</TAXABILITY><SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS><STATEWISEDETAILS.LIST><STATENAME TYPE=\"String\">&#4; Any</STATENAME><RATEDETAILS.LIST><GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE TYPE=\"String\">Based on Value</GSTRATEVALUATIONTYPE><GSTRATE TYPE=\"Number\"> 18</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>";
     // This second GST entry is a hand edit of the capture, not a captured state.
     let xml = edited(
         &decode(BEFORE),
         "</GSTDETAILS.LIST>",
-        &format!("</GSTDETAILS.LIST>{extra}"),
+        &format!("</GSTDETAILS.LIST>{EXTRA_GST_ENTRY}"),
     );
     let b = catalogue(&xml);
     let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
@@ -1135,12 +1179,11 @@ fn a_second_dated_entry_is_refused_with_the_count() {
 fn a_second_hsn_entry_is_refused_with_the_count() {
     let g = decode(GROUPS);
     let u = decode(UNITS);
-    let extra = "<HSNDETAILS.LIST><APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM><HSNCODE TYPE=\"String\">39239090</HSNCODE><HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN><SRCOFHSNDETAILS TYPE=\"String\">Specify Details Here</SRCOFHSNDETAILS></HSNDETAILS.LIST>";
     // This second HSN entry is a hand edit of the capture, not a captured state.
     let xml = edited(
         &decode(BEFORE),
         "</HSNDETAILS.LIST>",
-        &format!("</HSNDETAILS.LIST>{extra}"),
+        &format!("</HSNDETAILS.LIST>{EXTRA_HSN_ENTRY}"),
     );
     let b = catalogue(&xml);
     let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
@@ -1148,6 +1191,70 @@ fn a_second_hsn_entry_is_refused_with_the_count() {
         got.unwrap_err(),
         DraftRefusal::HsnEntriesNotMeasured { entries: 2 }
     );
+}
+
+#[test]
+fn the_draft_refuses_in_the_order_its_checks_run() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let assert_first = |xml: String, expected: DraftRefusal| {
+        let b = catalogue(&xml);
+        assert!(sibling(&b, "SC Sibling Goods").is_ok());
+        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), expected);
+    };
+
+    // Both extra dated entries are hand edits of the capture, not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "</GSTDETAILS.LIST>",
+        &format!("</GSTDETAILS.LIST>{EXTRA_GST_ENTRY}"),
+    );
+    let xml = edited(
+        &xml,
+        "</HSNDETAILS.LIST>",
+        &format!("</HSNDETAILS.LIST>{EXTRA_HSN_ENTRY}"),
+    );
+    assert_first(xml, DraftRefusal::GstEntriesNotMeasured { entries: 2 });
+
+    // The extra HSN entry and GST source are hand edits, not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "</HSNDETAILS.LIST>",
+        &format!("</HSNDETAILS.LIST>{EXTRA_HSN_ENTRY}"),
+    );
+    let xml = edited(
+        &xml,
+        "<SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS>",
+        "<SRCOFGSTDETAILS TYPE=\"String\">As per Company/Stock Group</SRCOFGSTDETAILS>",
+    );
+    assert_first(xml, DraftRefusal::HsnEntriesNotMeasured { entries: 2 });
+
+    // The other parent and extra GST entry are hand edits, not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "<PARENT TYPE=\"String\">SC Goods Group</PARENT>",
+        "<PARENT TYPE=\"String\">SC Other Group</PARENT>",
+    );
+    let xml = edited(
+        &xml,
+        "</GSTDETAILS.LIST>",
+        &format!("</GSTDETAILS.LIST>{EXTRA_GST_ENTRY}"),
+    );
+    assert_first(xml, DraftRefusal::ParentNotInBook);
+
+    // The other unit and extra GST entry are hand edits, not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>",
+        "<BASEUNITS TYPE=\"String\">Kgs</BASEUNITS>",
+    );
+    let xml = edited(
+        &xml,
+        "</GSTDETAILS.LIST>",
+        &format!("</GSTDETAILS.LIST>{EXTRA_GST_ENTRY}"),
+    );
+    assert_first(xml, DraftRefusal::UnitNotInBook);
 }
 
 #[test]
@@ -1410,4 +1517,256 @@ fn an_hsn_entry_other_than_the_measured_shape_is_refused() {
         let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
         assert_eq!(got.unwrap_err(), DraftRefusal::HsnNotMeasured);
     }
+}
+
+fn render_captured_create(proposed_name: &str) -> String {
+    let before = catalogue(&decode(BEFORE));
+    let shown = ShownDraft::from_draft(
+        draft(
+            &before,
+            proposed_name,
+            "SC Sibling Goods",
+            &decode(GROUPS),
+            &decode(UNITS),
+        )
+        .expect("the captured values draft"),
+    );
+    render_stock_item_create(&shown).expect("the captured values render")
+}
+
+fn assert_create_text_refusal(built: Result<StockItemDraft<'_>, DraftRefusal>, field: DraftText) {
+    let shown = ShownDraft::from_draft(built.expect("the edited value still drafts"));
+    assert_eq!(
+        render_stock_item_create(&shown),
+        Err(CreateRenderRefusal::TextNeedsEscaping { field })
+    );
+}
+
+#[test]
+fn the_create_is_the_measured_marked_request_byte_for_byte() {
+    let text = render_captured_create("SC Copied Marked");
+    let expected = decode_xml_bytes(MARKED_REQUEST).expect("the marked request decodes");
+    assert_eq!(text, expected);
+    let encoded = encode_tally_xml_request_utf16le(&text);
+    assert_eq!(
+        encoded.len(),
+        MARKED_REQUEST.len(),
+        "the encoded request length differs"
+    );
+    assert_eq!(encoded.as_slice(), MARKED_REQUEST);
+}
+
+#[test]
+fn the_create_is_never_the_plain_form() {
+    let text = render_captured_create("SC Copied Marked");
+    let plain = decode_xml_bytes(PLAIN_REQUEST).expect("the plain request decodes");
+    assert_ne!(text, plain);
+    assert_eq!(text.matches("&#4;").count(), 3);
+    for plain_text in [
+        "<GSTAPPLICABLE> Applicable",
+        "<STATENAME> Any",
+        "<GSTRATEVALUATIONTYPE> Not Applicable",
+    ] {
+        assert!(!text.contains(plain_text));
+    }
+}
+
+#[test]
+fn only_the_name_varies_between_two_creates() {
+    let first = render_captured_create("SC Copied Marked");
+    assert_eq!(first.matches("SC Copied Marked").count(), 2);
+    let second = render_captured_create("SC Copied Other");
+    assert_eq!(second, first.replace("SC Copied Marked", "SC Copied Other"));
+}
+
+#[test]
+fn a_value_that_needs_escaping_is_refused_by_field() {
+    for (character, entity) in [
+        ('&', "&amp;"),
+        ('<', "&lt;"),
+        ('>', "&gt;"),
+        ('"', "&quot;"),
+        ('\'', "&apos;"),
+    ] {
+        let before = catalogue(&decode(BEFORE));
+        assert_create_text_refusal(
+            draft(
+                &before,
+                &format!("SC Copied {character} Marked"),
+                "SC Sibling Goods",
+                &decode(GROUPS),
+                &decode(UNITS),
+            ),
+            DraftText::Name,
+        );
+
+        // These matching parent edits are hand edits, not captured states.
+        let parent = format!("SC Goods {entity} Group");
+        let xml = edited(
+            &decode(BEFORE),
+            "<PARENT TYPE=\"String\">SC Goods Group</PARENT>",
+            &format!("<PARENT TYPE=\"String\">{parent}</PARENT>"),
+        );
+        let groups = edited(
+            &decode(GROUPS),
+            "NAME=\"SC Goods Group\"",
+            &format!("NAME=\"{parent}\""),
+        );
+        let groups = edited(
+            &groups,
+            "<NAME>SC Goods Group</NAME>",
+            &format!("<NAME>{parent}</NAME>"),
+        );
+        let before = catalogue(&xml);
+        assert_create_text_refusal(
+            draft(
+                &before,
+                "SC Copied Marked",
+                "SC Sibling Goods",
+                &groups,
+                &decode(UNITS),
+            ),
+            DraftText::Parent,
+        );
+
+        // These matching unit edits are hand edits, not captured states.
+        let unit = format!("No{entity}s");
+        let xml = edited(
+            &decode(BEFORE),
+            "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>",
+            &format!("<BASEUNITS TYPE=\"String\">{unit}</BASEUNITS>"),
+        );
+        let units = edited(&decode(UNITS), "NAME=\"Nos\"", &format!("NAME=\"{unit}\""));
+        let units = edited(
+            &units,
+            "<NAME TYPE=\"String\">Nos</NAME>",
+            &format!("<NAME TYPE=\"String\">{unit}</NAME>"),
+        );
+        let before = catalogue(&xml);
+        assert_create_text_refusal(
+            draft(
+                &before,
+                "SC Copied Marked",
+                "SC Sibling Goods",
+                &decode(GROUPS),
+                &units,
+            ),
+            DraftText::Unit,
+        );
+
+        // This HSN code edit is a hand edit, not a captured state.
+        let code = format!("3923{entity}9090");
+        let xml = edited(
+            &decode(BEFORE),
+            "<HSNCODE TYPE=\"String\">39239090</HSNCODE>",
+            &format!("<HSNCODE TYPE=\"String\">{code}</HSNCODE>"),
+        );
+        let before = catalogue(&xml);
+        assert_create_text_refusal(
+            draft(
+                &before,
+                "SC Copied Marked",
+                "SC Sibling Goods",
+                &decode(GROUPS),
+                &decode(UNITS),
+            ),
+            DraftText::HsnCode,
+        );
+
+        // This HSN description edit is a hand edit, not a captured state.
+        let description = format!("Plastic {entity} Articles");
+        let xml = edited(
+            &decode(BEFORE),
+            "<HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN>",
+            &format!("<HSN TYPE=\"String\">{description}</HSN>"),
+        );
+        let before = catalogue(&xml);
+        assert_create_text_refusal(
+            draft(
+                &before,
+                "SC Copied Marked",
+                "SC Sibling Goods",
+                &decode(GROUPS),
+                &decode(UNITS),
+            ),
+            DraftText::HsnDescription,
+        );
+    }
+}
+
+#[test]
+fn two_values_that_need_escaping_name_the_first_field() {
+    // The parent and HSN description edits are hand edits, not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "<PARENT TYPE=\"String\">SC Goods Group</PARENT>",
+        "<PARENT TYPE=\"String\">SC Goods &amp; Group</PARENT>",
+    );
+    let xml = edited(
+        &xml,
+        "<HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN>",
+        "<HSN TYPE=\"String\">Plastic &amp; Articles</HSN>",
+    );
+    let groups = edited(
+        &decode(GROUPS),
+        "NAME=\"SC Goods Group\"",
+        "NAME=\"SC Goods &amp; Group\"",
+    );
+    let groups = edited(
+        &groups,
+        "<NAME>SC Goods Group</NAME>",
+        "<NAME>SC Goods &amp; Group</NAME>",
+    );
+    let before = catalogue(&xml);
+    assert_create_text_refusal(
+        draft(
+            &before,
+            "SC Copied Marked",
+            "SC Sibling Goods",
+            &groups,
+            &decode(UNITS),
+        ),
+        DraftText::Parent,
+    );
+
+    // The name and matching unit edits are hand edits, not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>",
+        "<BASEUNITS TYPE=\"String\">No&amp;s</BASEUNITS>",
+    );
+    let units = edited(&decode(UNITS), "NAME=\"Nos\"", "NAME=\"No&amp;s\"");
+    let units = edited(
+        &units,
+        "<NAME TYPE=\"String\">Nos</NAME>",
+        "<NAME TYPE=\"String\">No&amp;s</NAME>",
+    );
+    let before = catalogue(&xml);
+    assert_create_text_refusal(
+        draft(
+            &before,
+            "SC Copied & Marked",
+            "SC Sibling Goods",
+            &decode(GROUPS),
+            &units,
+        ),
+        DraftText::Name,
+    );
+}
+
+#[test]
+fn a_shown_draft_holds_the_draft_it_was_made_from() {
+    let before = catalogue(&decode(BEFORE));
+    let built = draft(
+        &before,
+        "SC Copied Marked",
+        "SC Sibling Goods",
+        &decode(GROUPS),
+        &decode(UNITS),
+    )
+    .expect("the captured values draft");
+    let expected_name = built.name().clone();
+    let shown = ShownDraft::from_draft(built);
+    assert_eq!(shown.draft().name(), &expected_name);
+    assert!(render_stock_item_create(&shown).is_ok());
 }

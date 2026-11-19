@@ -1,0 +1,151 @@
+line=592, utc=2026-11-19T13:12:47Z at 1146810.234 conn 3 req 104 post sent 2524 front None answered answered bytes=4018, secs=0.0 s
+line=595, utc=2026-11-19T13:12:47Z at 1146810.750 conn 3 req 105 post sent 2524 front None answered answered bytes=4018, secs=0.0 s
+line=598, utc=2026-11-19T13:12:47Z at 1146810.765 conn 3 req 106 post sent 1094 front None answered answered bytes=3856, secs=0.0 s
+line=601, utc=2026-11-19T13:12:47Z at 1146810.765 conn 3 req 107 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=604, utc=2026-11-19T13:12:47Z at 1146810.765 conn 3 req 108 post sent 1094 front None answered answered bytes=3856, secs=0.016 s
+line=607, utc=2026-11-19T13:12:47Z at 1146810.781 conn 3 req 109 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=610, utc=2026-11-19T13:12:47Z at 1146810.781 conn 3 req 110 post sent 966 front None answered answered bytes=3418, secs=0.0 s
+line=613, utc=2026-11-19T13:12:47Z at 1146810.796 conn 3 req 111 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=616, utc=2026-11-19T13:12:47Z at 1146810.796 conn 3 req 112 post sent 966 front None answered answered bytes=3418, secs=0.0 s
+line=619, utc=2026-11-19T13:12:47Z at 1146810.796 conn 3 req 113 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=622, utc=2026-11-19T13:12:47Z at 1146810.812 conn 3 req 114 post sent 1094 front None answered answered bytes=3856, secs=0.0 s
+line=625, utc=2026-11-19T13:12:47Z at 1146810.812 conn 3 req 115 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=628, utc=2026-11-19T13:12:47Z at 1146810.812 conn 3 req 116 post sent 1094 front None answered answered bytes=3856, secs=0.016 s
+line=631, utc=2026-11-19T13:12:47Z at 1146810.828 conn 3 req 117 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=634, utc=2026-11-19T13:12:48Z at 1146810.828 conn 3 req 118 post sent 2524 front None answered answered bytes=4018, secs=0.0 s
+line=637, utc=2026-11-19T13:12:48Z at 1146811.343 conn 3 req 119 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=640, utc=2026-11-19T13:12:48Z at 1146811.359 conn 3 req 120 post sent 2524 front None answered answered bytes=4018, secs=0.0 s
+line=643, utc=2026-11-19T13:12:48Z at 1146811.359 conn 3 req 121 post sent 2524 front None answered answered bytes=4018, secs=0.016 s
+line=646, utc=2026-11-19T13:12:48Z at 1146811.375 conn 3 req 122 post sent 1094 front None answered answered bytes=3856, secs=0.0 s
+line=649, utc=2026-11-19T13:12:48Z at 1146811.375 conn 3 req 123 status sent 0 front None answered answered bytes=51, secs=0.015 s
+line=652, utc=2026-11-19T13:12:48Z at 1146811.390 conn 3 req 124 post sent 1094 front None answered answered bytes=3856, secs=0.0 s
+line=655, utc=2026-11-19T13:12:48Z at 1146811.390 conn 3 req 125 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=660, utc=2026-11-19T13:12:48Z at 1146811.734 conn 3 req 126 mailing master sent 1784 front 1 CUT 19.672 s
+line=664, utc=2026-11-19T13:13:08Z at 1146831.656 conn 4 req 1 post sent 0 front None CUT 5.0 s
+line=668, utc=2026-11-19T13:13:24Z at 1146846.906 conn 5 req 1 post sent 0 front None CUT 5.031 s
+line=672, utc=2026-11-19T13:13:39Z at 1146862.390 conn 6 req 1 post sent 0 front None CUT 5.0 s
+line=676, utc=2026-11-19T13:13:54Z at 1146877.718 conn 7 req 1 post sent 0 front None CUT 5.016 s
+line=680, utc=2026-11-19T13:14:10Z at 1146893.156 conn 8 req 1 post sent 0 front None CUT 5.0 s
+line=684, utc=2026-11-19T13:14:25Z at 1146908.718 conn 9 req 1 status sent 0 front None answered answered bytes=51, secs=2.922 s
+line=689, utc=2026-11-19T13:14:39Z at 1146921.953 conn 9 req 2 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=692, utc=2026-11-19T13:14:41Z at 1146923.968 conn 9 req 3 status sent 0 front None answered answered bytes=51, secs=0.016 s
+line=695, utc=2026-11-19T13:14:41Z at 1146923.984 conn 9 req 4 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=698, utc=2026-11-19T13:14:41Z at 1146924.000 conn 9 req 5 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=701, utc=2026-11-19T13:14:41Z at 1146924.000 conn 9 req 6 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=704, utc=2026-11-19T13:14:41Z at 1146924.015 conn 9 req 7 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=707, utc=2026-11-19T13:14:41Z at 1146924.515 conn 9 req 8 post sent 2524 front None answered answered bytes=4024, secs=0.016 s
+line=710, utc=2026-11-19T13:14:41Z at 1146924.531 conn 9 req 9 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=713, utc=2026-11-19T13:14:41Z at 1146924.546 conn 9 req 10 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=716, utc=2026-11-19T13:14:41Z at 1146924.546 conn 9 req 11 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=719, utc=2026-11-19T13:14:41Z at 1146924.546 conn 9 req 12 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=722, utc=2026-11-19T13:14:41Z at 1146924.546 conn 9 req 13 post sent 966 front None answered answered bytes=3424, secs=0.016 s
+line=725, utc=2026-11-19T13:14:41Z at 1146924.562 conn 9 req 14 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=728, utc=2026-11-19T13:14:41Z at 1146924.562 conn 9 req 15 post sent 966 front None answered answered bytes=3424, secs=0.0 s
+line=731, utc=2026-11-19T13:14:41Z at 1146924.562 conn 9 req 16 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=734, utc=2026-11-19T13:14:41Z at 1146924.578 conn 9 req 17 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=737, utc=2026-11-19T13:14:41Z at 1146924.578 conn 9 req 18 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=740, utc=2026-11-19T13:14:41Z at 1146924.578 conn 9 req 19 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=743, utc=2026-11-19T13:14:41Z at 1146924.578 conn 9 req 20 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=746, utc=2026-11-19T13:14:41Z at 1146924.578 conn 9 req 21 post sent 2524 front None answered answered bytes=4024, secs=0.015 s
+line=749, utc=2026-11-19T13:14:42Z at 1146925.109 conn 9 req 22 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=752, utc=2026-11-19T13:14:42Z at 1146925.109 conn 9 req 23 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=755, utc=2026-11-19T13:14:42Z at 1146925.109 conn 9 req 24 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=758, utc=2026-11-19T13:14:42Z at 1146925.125 conn 9 req 25 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=761, utc=2026-11-19T13:14:42Z at 1146925.125 conn 9 req 26 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=764, utc=2026-11-19T13:14:42Z at 1146925.125 conn 9 req 27 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=767, utc=2026-11-19T13:14:42Z at 1146925.125 conn 9 req 28 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=770, utc=2026-11-19T13:14:42Z at 1146925.125 conn 9 req 29 standard master sent 1736 front None answered answered bytes=27468, secs=0.015 s
+line=773, utc=2026-11-19T13:14:42Z at 1146925.140 conn 9 req 30 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=776, utc=2026-11-19T13:14:42Z at 1146925.140 conn 9 req 31 standard master sent 1736 front None answered answered bytes=27468, secs=0.016 s
+line=779, utc=2026-11-19T13:14:42Z at 1146925.156 conn 9 req 32 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=782, utc=2026-11-19T13:14:42Z at 1146925.156 conn 9 req 33 standard master sent 1284 front None answered answered bytes=19028, secs=0.015 s
+line=785, utc=2026-11-19T13:14:42Z at 1146925.171 conn 9 req 34 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=788, utc=2026-11-19T13:14:42Z at 1146925.171 conn 9 req 35 standard master sent 1284 front None answered answered bytes=19028, secs=0.0 s
+line=791, utc=2026-11-19T13:14:42Z at 1146925.187 conn 9 req 36 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=794, utc=2026-11-19T13:14:42Z at 1146925.187 conn 9 req 37 post sent 1066 front None answered answered bytes=54304, secs=0.0 s
+line=797, utc=2026-11-19T13:14:42Z at 1146925.187 conn 9 req 38 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=800, utc=2026-11-19T13:14:42Z at 1146925.203 conn 9 req 39 post sent 1066 front None answered answered bytes=54304, secs=0.0 s
+line=803, utc=2026-11-19T13:14:42Z at 1146925.203 conn 9 req 40 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=806, utc=2026-11-19T13:14:42Z at 1146925.203 conn 9 req 41 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=809, utc=2026-11-19T13:14:42Z at 1146925.218 conn 9 req 42 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=812, utc=2026-11-19T13:14:42Z at 1146925.218 conn 9 req 43 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=815, utc=2026-11-19T13:14:42Z at 1146925.218 conn 9 req 44 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=818, utc=2026-11-19T13:14:42Z at 1146925.218 conn 9 req 45 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=821, utc=2026-11-19T13:14:42Z at 1146925.234 conn 9 req 46 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=824, utc=2026-11-19T13:14:42Z at 1146925.234 conn 9 req 47 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=827, utc=2026-11-19T13:14:43Z at 1146926.406 conn 9 req 48 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=830, utc=2026-11-19T13:14:43Z at 1146926.421 conn 9 req 49 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=833, utc=2026-11-19T13:14:43Z at 1146926.421 conn 9 req 50 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=836, utc=2026-11-19T13:14:43Z at 1146926.421 conn 9 req 51 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=839, utc=2026-11-19T13:14:44Z at 1146926.937 conn 9 req 52 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=842, utc=2026-11-19T13:14:44Z at 1146926.953 conn 9 req 53 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=845, utc=2026-11-19T13:14:44Z at 1146926.953 conn 9 req 54 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=848, utc=2026-11-19T13:14:44Z at 1146926.953 conn 9 req 55 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=851, utc=2026-11-19T13:14:44Z at 1146926.953 conn 9 req 56 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=854, utc=2026-11-19T13:14:44Z at 1146926.953 conn 9 req 57 post sent 966 front None answered answered bytes=3424, secs=0.015 s
+line=857, utc=2026-11-19T13:14:44Z at 1146926.968 conn 9 req 58 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=860, utc=2026-11-19T13:14:44Z at 1146926.968 conn 9 req 59 post sent 966 front None answered answered bytes=3424, secs=0.0 s
+line=863, utc=2026-11-19T13:14:44Z at 1146926.968 conn 9 req 60 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=866, utc=2026-11-19T13:14:44Z at 1146926.968 conn 9 req 61 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=869, utc=2026-11-19T13:14:44Z at 1146926.984 conn 9 req 62 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=872, utc=2026-11-19T13:14:44Z at 1146926.984 conn 9 req 63 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=875, utc=2026-11-19T13:14:44Z at 1146926.984 conn 9 req 64 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=878, utc=2026-11-19T13:14:44Z at 1146926.984 conn 9 req 65 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=881, utc=2026-11-19T13:14:44Z at 1146927.515 conn 9 req 66 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=884, utc=2026-11-19T13:14:44Z at 1146927.515 conn 9 req 67 post sent 2524 front None answered answered bytes=4024, secs=0.016 s
+line=887, utc=2026-11-19T13:14:44Z at 1146927.531 conn 9 req 68 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=890, utc=2026-11-19T13:14:44Z at 1146927.546 conn 9 req 69 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=893, utc=2026-11-19T13:14:44Z at 1146927.546 conn 9 req 70 status sent 0 front None answered answered bytes=51, secs=0.016 s
+line=896, utc=2026-11-19T13:14:44Z at 1146927.562 conn 9 req 71 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=899, utc=2026-11-19T13:14:44Z at 1146927.562 conn 9 req 72 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=902, utc=2026-11-19T13:14:44Z at 1146927.562 conn 9 req 73 standard master sent 1736 front None answered answered bytes=27468, secs=0.016 s
+line=905, utc=2026-11-19T13:14:44Z at 1146927.578 conn 9 req 74 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=908, utc=2026-11-19T13:14:44Z at 1146927.578 conn 9 req 75 standard master sent 1736 front None answered answered bytes=27468, secs=0.015 s
+line=911, utc=2026-11-19T13:14:44Z at 1146927.593 conn 9 req 76 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=914, utc=2026-11-19T13:14:44Z at 1146927.593 conn 9 req 77 standard master sent 1284 front None answered answered bytes=19028, secs=0.016 s
+line=917, utc=2026-11-19T13:14:44Z at 1146927.609 conn 9 req 78 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=920, utc=2026-11-19T13:14:44Z at 1146927.609 conn 9 req 79 standard master sent 1284 front None answered answered bytes=19028, secs=0.0 s
+line=923, utc=2026-11-19T13:14:44Z at 1146927.609 conn 9 req 80 status sent 0 front None answered answered bytes=51, secs=0.016 s
+line=926, utc=2026-11-19T13:14:44Z at 1146927.625 conn 9 req 81 post sent 1066 front None answered answered bytes=54304, secs=0.0 s
+line=929, utc=2026-11-19T13:14:44Z at 1146927.625 conn 9 req 82 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=932, utc=2026-11-19T13:14:44Z at 1146927.625 conn 9 req 83 post sent 1066 front None answered answered bytes=54304, secs=0.015 s
+line=935, utc=2026-11-19T13:14:44Z at 1146927.640 conn 9 req 84 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=938, utc=2026-11-19T13:14:44Z at 1146927.640 conn 9 req 85 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=941, utc=2026-11-19T13:14:44Z at 1146927.640 conn 9 req 86 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=944, utc=2026-11-19T13:14:44Z at 1146927.656 conn 9 req 87 post sent 1094 front None answered answered bytes=3864, secs=0.0 s
+line=947, utc=2026-11-19T13:14:44Z at 1146927.656 conn 9 req 88 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=950, utc=2026-11-19T13:14:44Z at 1146927.656 conn 9 req 89 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+line=953, utc=2026-11-19T13:14:44Z at 1146927.656 conn 9 req 90 status sent 0 front None answered answered bytes=51, secs=0.0 s
+line=956, utc=2026-11-19T13:14:44Z at 1146927.671 conn 9 req 91 post sent 2524 front None answered answered bytes=4024, secs=0.0 s
+658 {"event": "front_send", "front": 1, "bytes": 3502700, "sent_sha256": "ffe8cc8eff1c872474e1e6079d99a28712a8463e6f704038d691a0704e7d7c60", "utc": "2026-11-19T13:12:48Z", "at": 1146811.421}
+659 {"event": "front_written", "front": 1, "utc": "2026-11-19T13:12:48Z", "at": 1146811.421}
+661 {"event": "bridge_cut", "conn": 3, "request": 126, "sent": 1784, "sent_sha256": "99cf89a6d90239211af81ec7e4770f65fdf1d766528260c35a60964fc70422bb", "utc": "2026-11-19T13:13:08Z", "at": 1146831.406}
+662 {"event": "close", "conn": 3, "requests": 126, "utc": "2026-11-19T13:13:08Z", "at": 1146831.421}
+663 {"event": "open", "conn": 4, "client_port": 55250, "utc": "2026-11-19T13:13:08Z", "at": 1146831.656}
+665 {"event": "bridge_cut", "conn": 4, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-19T13:13:13Z", "at": 1146836.656}
+666 {"event": "close", "conn": 4, "requests": 1, "utc": "2026-11-19T13:13:13Z", "at": 1146836.656}
+667 {"event": "open", "conn": 5, "client_port": 55255, "utc": "2026-11-19T13:13:24Z", "at": 1146846.906}
+669 {"event": "bridge_cut", "conn": 5, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-19T13:13:29Z", "at": 1146851.937}
+670 {"event": "close", "conn": 5, "requests": 1, "utc": "2026-11-19T13:13:29Z", "at": 1146851.937}
+671 {"event": "open", "conn": 6, "client_port": 55271, "utc": "2026-11-19T13:13:39Z", "at": 1146862.39}
+673 {"event": "bridge_cut", "conn": 6, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-19T13:13:44Z", "at": 1146867.39}
+674 {"event": "close", "conn": 6, "requests": 1, "utc": "2026-11-19T13:13:44Z", "at": 1146867.39}
+675 {"event": "open", "conn": 7, "client_port": 55299, "utc": "2026-11-19T13:13:54Z", "at": 1146877.718}
+677 {"event": "bridge_cut", "conn": 7, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-19T13:13:59Z", "at": 1146882.734}
+678 {"event": "close", "conn": 7, "requests": 1, "utc": "2026-11-19T13:13:59Z", "at": 1146882.734}
+679 {"event": "open", "conn": 8, "client_port": 55323, "utc": "2026-11-19T13:14:10Z", "at": 1146893.156}
+681 {"event": "bridge_cut", "conn": 8, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-19T13:14:15Z", "at": 1146898.156}
+682 {"event": "close", "conn": 8, "requests": 1, "utc": "2026-11-19T13:14:15Z", "at": 1146898.156}
+683 {"event": "open", "conn": 9, "client_port": 55404, "utc": "2026-11-19T13:14:25Z", "at": 1146908.718}
+685 {"event": "front_first_byte", "front": 1, "utc": "2026-11-19T13:14:28Z", "at": 1146911.546}
+686 {"event": "front_answered", "front": 1, "answered": 550, "utc": "2026-11-19T13:14:28Z", "at": 1146911.546}
+SUMMARY first bridge_cut: forwarded line 660, conn 3 req 126 mailing master, 19.672 s after its forwarded event (forwarded at UTC 2026-11-19T13:12:48Z)
+SUMMARY master posts forwarded after the cut: 8; on the cut's own connection after it: 0
+SUMMARY   line=770, utc=2026-11-19T13:14:42Z conn 9 req 29 standard master answered
+SUMMARY   line=776, utc=2026-11-19T13:14:42Z conn 9 req 31 standard master answered
+SUMMARY   line=782, utc=2026-11-19T13:14:42Z conn 9 req 33 standard master answered
+SUMMARY   line=788, utc=2026-11-19T13:14:42Z conn 9 req 35 standard master answered
+SUMMARY   line=902, utc=2026-11-19T13:14:44Z conn 9 req 73 standard master answered
+SUMMARY   line=908, utc=2026-11-19T13:14:44Z conn 9 req 75 standard master answered
+SUMMARY   line=914, utc=2026-11-19T13:14:44Z conn 9 req 77 standard master answered
+SUMMARY   line=920, utc=2026-11-19T13:14:44Z conn 9 req 79 standard master answered

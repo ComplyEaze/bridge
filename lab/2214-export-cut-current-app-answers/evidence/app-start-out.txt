@@ -1,0 +1,4 @@
+app start at 19-11-2026 17:33:25.93 
+pid 16736 parent 17196 path <local app data>\Bridge\bridge.exe
+8c1a640d4fb8a8e2586683beb90bd421776bae07908bf03f351906230e53a8ed
+done 

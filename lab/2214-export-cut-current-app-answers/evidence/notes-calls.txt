@@ -1,0 +1,3 @@
+000-list-companies.json: list_companies sent 2026-11-19T11:59:46.969Z secs 0.317 bytes 1565 isError False rpc False
+{}
+[{'name': 'BRIDGE BATCH LAB', 'guid': 'a30f23c3-4819-4334-96ab-ffa6fba70976', 'identity_state': 'verified_tuple'}]

@@ -1,0 +1,17 @@
+app-start.cmd: <lab folder> x1, <local app data> x1; sha256 fc20bd970fa96653b23cca849ab59f9cc1452156da6b13ea9787d1a5c6d833a7 727 B
+c6prep.py: <lab folder> x3, <Tally data folder> x4; sha256=4eb6b5121065e5cd885f3bcb7030b4fa095ed40952458708ece0cebec6b5a128 3355 B
+call.py: no placeholder; sha256=5a70d96a5fc3218a25a84edcd059d0429a75def94cb3861c47b6fc4192f567d6 2757 B
+client.py: no placeholder; sha256=09e3d47b1f9c4465f3f0929db08f78d7d382ac23bbf04d81edd39ea192ce6809 4775 B
+close-hash.cmd: <lab folder> x1, <local app data> x2; sha256=37f5143fb3145605d679811ae5612dfd4ee7a7a477461eb2c0668a3dde2d1259 501 B
+launch-env.json: <lab folder> x1; sha256=8430e281f1fcf112e02a9d3c9c49d511d76624ae8a557a84a1326b0d64533ceb 198 B
+note.py: <lab folder> x1; sha256=264346f0bce43c29c3addd6edf5c74684789aa6ed99c194e5312c9832e557a44 403 B
+raw.py: <lab folder> x2, <lab root> x1; sha256=09aca0747a4ef8924bf9af6bda17fb5cb3e9f09ac5b6eeb89ad67df7f5872588 5542 B
+rd.py: <lab folder> x1; sha256=2ee9f3be1a322bba8f8d5b9c1a6a4078ca0a28209737663d0c29669bd4d11535 5652 B
+setup-run3.py: <lab folder> x2; sha256 ae0d0091360959cd85f929aa7f904e30ed0153181e814f7850b714cd97bcaf7b 977 B
+w4.py: <lab folder> x2; sha256 f613d5dc7d1eb77ceed1f860a5b86b0e737f9370ea4007a93210afc9c6e7ae1b 7089 B
+args/basic.json: no placeholder; sha256 b7305dd1d3ebe2616f7b16d85b76389c5b34f87a7e1d01401608263cc0e17c0f 56 B
+args/standard.json: no placeholder; sha256=4a7bdb6b87a5844b336e4f5cd445e6019ebaa8710f941ff95d3ee771c6bc900f 80 B
+scripts/cutlog.py: no placeholder; sha256=651508ee910cc35f02d273e58ca8508492c85c36bf0a81d70a5fad15600e8a90 3180 B
+scripts/listdirs.cmd: <lab folder> x1; sha256=25d4e6b577904d04da8576bf09346a2c4e7e1c8d7c4804329b1800dede7c0843 809 B
+make_front.py: no placeholder; sha256=93a30066da527574389dcd37558d216a836edf8383d92cfbffa2d200f68b01a0 3034 B
+proxy.py: no placeholder; sha256=271af169d6183a2448b6cacafb6a0512d2194d1ebc1524725d2e1d1f99aea5d3 9652 B

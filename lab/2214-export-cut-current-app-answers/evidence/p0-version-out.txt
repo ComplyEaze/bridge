@@ -1,0 +1,4 @@
+version read at 19-11-2026 17:22:59.70 
+bridge.exe ProductVersion 0.7.0 FileVersion 0.7.0 bytes 37977088 written 2026-11-12T11:25:44Z
+bridge_mcp.exe ProductVersion 0.7.0 FileVersion 0.7.0 bytes 35770880 written 2026-11-12T11:25:20Z
+done 

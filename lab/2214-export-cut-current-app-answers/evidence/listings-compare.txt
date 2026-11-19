@@ -1,0 +1,13 @@
+The four folder listings of this row (scripts/listdirs.cmd: Downloads, Documents and Desktop of the lab PC's user, files only, one level). They stay on the lab PC, by size and sha256 in kept-local.txt, because they name the PC's own files. This file gives what the sheet grades from them.
+
+files per folder, as each listing's File(s) line reads:
+- w0-before: Downloads files=140, Documents files=17, Desktop files=13; each dir ok
+- w0-after: Downloads files=141, Documents files=17, Desktop files=13; each dir ok
+- w4-before: Downloads files=141, Documents files=17, Desktop files=13; each dir ok
+- w4-after: Downloads files=141, Documents files=17, Desktop files=13; each dir ok
+
+W0, after against before: one new line, in Downloads:
+  19-11-2026 18:41 (local), size=10,495, party-ledger-master-bridge-batch-lab-20260831-4.xlsx
+Documents and Desktop unchanged.
+
+W4, after against before: no new file in any folder; the date, time and size columns are equal line for line; no file has a write time after the arm (13:12:41.711Z, 18:42:41 local). The text of three existing file names differs only in how they were printed: the before listing was run from another shell with another code page, so non-ASCII letters in those names show as other characters.

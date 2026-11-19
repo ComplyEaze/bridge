@@ -1,0 +1,25 @@
+2026-11-19T11:59:34Z exe sha256=7086f1d0d7430e7dc1fefd6f69c0d4a14d717a2e06477b32935a1d3aa4fee1b8 ok; launch-env.json sha256=8430e281f1fcf112e02a9d3c9c49d511d76624ae8a557a84a1326b0d64533ceb; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_MAX_BYTES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-19T11:59:34Z launched pid 12076; stderr to server-stderr-20261119T115934Z.log
+2026-11-19T11:59:34Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-19T11:59:47Z 000-list-companies.json tool=list_companies secs=0.317 isError=False error=None saved_sha256=5994f26d1591dec9ab3c36da29824a59ead4515d8124bc1227ea40b1fdade9a6
+2026-11-19T12:00:02Z 001-r1a.json tool=ledger_masters secs=1.542 isError=False error=None saved_sha256=e5dcc3465b1dc625622cad1dd5b8ba57e788cdd1f660a2226168bf0a5832d8c2
+2026-11-19T12:00:03Z 002-r1a-egress_log.json tool=egress_log secs=0.079 isError=False error=None saved_sha256=ea6b6ced5911e23ee0d6d17f470bd6b00dc708335d05d78c3e14cd7bcbff7ec0
+2026-11-19T12:02:16Z 003-r1b.json tool=ledger_masters secs=1.325 isError=False error=None saved_sha256=99f5d20c2b55e94d8f6650f149282cfbc2759d6abee79369572cd92b861c3f57
+2026-11-19T12:02:17Z 004-r1b-egress_log.json tool=egress_log secs=0.039 isError=False error=None saved_sha256=ff36f86c7855f80c3e21449b59ac5c89d3fb59037b47ce84f1fd96cb300ab702
+2026-11-19T13:13:13Z 005-xw4-D2-01.json tool=ledger_masters secs=5.054 isError=True error=None saved_sha256=4e5e6ad22f6e845e85f3239fffe0f918ee39516acc802d1841c44c87375372ae
+2026-11-19T13:13:14Z 006-xw4-D2-01-egress_log.json tool=egress_log secs=0.061 isError=False error=None saved_sha256=4bd4f057eedc0843c75ca001dcf4c36e8c5edcd65dc5bf6291f7fd1e894fc474
+2026-11-19T13:13:29Z 007-xw4-D2-02.json tool=ledger_masters secs=5.127 isError=True error=None saved_sha256=a91f4d6c069943c27d8e0fe42fc5ec6f535de65b07ceb7cd189fed19d3f96fc1
+2026-11-19T13:13:29Z 008-xw4-D2-02-egress_log.json tool=egress_log secs=0.084 isError=False error=None saved_sha256=943832c0eae780834d61fa1d4f20f8d0a5e95efaf69ee08f87acb94d563f4fcb
+2026-11-19T13:13:44Z 009-xw4-D2-03.json tool=ledger_masters secs=5.068 isError=True error=None saved_sha256=9c7a4ae73bb8118d25bfd1d78c81545c63cdf79b4d69cbce8705bc12e36a9653
+2026-11-19T13:13:45Z 010-xw4-D2-03-egress_log.json tool=egress_log secs=0.055 isError=False error=None saved_sha256=fe2d2d78e1d84299f6771753da1b3d49ab051eafaf1a1d8eb9ac249fc1cbf234
+2026-11-19T13:13:59Z 011-xw4-D2-04.json tool=ledger_masters secs=5.098 isError=True error=None saved_sha256=b2c92eda78a36c5f399cdcf6c5542673c52e61f09a749b61aee385fc1207ccfb
+2026-11-19T13:14:00Z 012-xw4-D2-04-egress_log.json tool=egress_log secs=0.101 isError=False error=None saved_sha256=701c9e57d33f4ed9b96ce25782b40870ffaf44945451b37496543b288509ec48
+2026-11-19T13:14:15Z 013-xw4-D2-05.json tool=ledger_masters secs=5.104 isError=True error=None saved_sha256=876a21b296541a05da7e97e57d7ee4795e337801ce430652322f89ea37245e35
+2026-11-19T13:14:15Z 014-xw4-D2-05-egress_log.json tool=egress_log secs=0.073 isError=False error=None saved_sha256=ba89cfd6f7fada083eae521358dcc35b25903c71280c197a66b790fd1e19d9dd
+2026-11-19T13:14:28Z 015-xw4-D2-06.json tool=ledger_masters secs=2.954 isError=True error=None saved_sha256=d33a7f656d2f21d823a5e0a813ddb16630bfd7e4e5fbe45385baac4fb0992a98
+2026-11-19T13:14:29Z 016-xw4-D2-06-egress_log.json tool=egress_log secs=0.062 isError=False error=None saved_sha256=5aba2b936064308d295fd176b02cdb519d4fc1576e04ac9a3eef13fc93952c7b
+2026-11-19T13:14:42Z 017-xw4-D2-07.json tool=ledger_masters secs=3.360 isError=False error=None saved_sha256=a9fd02b1d587e5ac5db55a5693d84778d0dbaee7cc43780f9671cebf934214b5
+2026-11-19T13:14:43Z 018-xw4-D2-07-egress_log.json tool=egress_log secs=0.072 isError=False error=None saved_sha256=a69071e5fd9a2986a41eaa52a48212494f6a52d5dbc438de3c77827c2e87205c
+2026-11-19T13:14:44Z 019-xw4-whole.json tool=ledger_masters secs=1.376 isError=False error=None saved_sha256=c0ccd2f53cf7407a6c558a0436862e59fb18907e9f774b81b24d316a715e4e94
+2026-11-19T13:14:45Z 020-xw4-whole-egress_log.json tool=egress_log secs=0.073 isError=False error=None saved_sha256=a7098042efac17fec35483665a52397a03bb0baa9fefc43dc88ae17ff16fda28
+2026-11-19T13:15:55Z session ended; server pid 12076 exit code 0

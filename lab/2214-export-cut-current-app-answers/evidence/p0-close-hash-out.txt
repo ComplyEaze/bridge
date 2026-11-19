@@ -1,0 +1,8 @@
+close re-hash at 19-11-2026 17:22:59.64 
+SHA256 hash of <local app data>\Bridge\bridge.exe:
+8c1a640d4fb8a8e2586683beb90bd421776bae07908bf03f351906230e53a8ed
+CertUtil: -hashfile command completed successfully.
+SHA256 hash of <local app data>\Bridge\bridge_mcp.exe:
+7086f1d0d7430e7dc1fefd6f69c0d4a14d717a2e06477b32935a1d3aa4fee1b8
+CertUtil: -hashfile command completed successfully.
+done 

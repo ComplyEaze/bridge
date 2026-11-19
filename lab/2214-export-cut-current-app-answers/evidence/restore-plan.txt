@@ -1,0 +1,11 @@
+restore plan, 2214-cut Close, written 2026-11-19T13:16:38Z
+folder: <lab folder>\bk (one file)
+file: TDBK1800_<company number>.001
+bytes: 57180
+sha256: 7cec76828a020ee8496ad4d842ae163a794e34723f575c3ab8fa20a9ada592cb
+company: BRIDGE BATCH LAB, number <company number> (its own data folder name)
+backup taken: 2026-11-19 17:28 local (11:58:12Z); the Restore list should show 19-Nov-26 at that time
+Restore Data Path: Tally data folder <Tally data folder> (<Tally data folder>)
+source: Specify Path, <lab folder>\bk
+prompts expected: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace will overwrite the existing folder." = Replace
+before it: Company > Shut THE COMPANY

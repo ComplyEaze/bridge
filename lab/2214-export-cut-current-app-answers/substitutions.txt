@@ -1,0 +1,26 @@
+The company number is X at equal length in raw files, bodies/ (whose names stay the sha256 of the originals), the front answer and the drain copies, so sizes stand. company_number values go first in tool answers, by a JSON parser. Other replacements in text files and file names, with counts:
+<Tally data folder>: 8
+<app data>: 2
+<company number>: 7
+<lab folder>: 26
+<lab root name>: 1
+<lab root>: 3
+<local app data>: 10
+Proxy: 5
+label: "status=\1, bytes=\2": 12
+label: .1800: : 2
+label: \1=: 53
+label: answered bytes=\1, secs=\2 s: 214
+label: front-w4.xml first=500, n=3000:: 1
+label: line=\1, utc=: 228
+label: proxy.py listen=9002, tally=9001: 1
+notes line rewritten to the plain fact: 7
+proxy: 48
+Notes text rewritten to the plain fact (each once, in evidence/notes.txt; the original is listed in kept-local.txt), the new text:
+- , after rows 1381-O and 2440-CP (the C6 restore after Close step 2 given in advance)
+- at 11:50Z, 2440-CP's book was shut while that row waited (its own notes) and this row began.
+- The app's window could not yet be used by the lab, so the endpoint check (127.0.0.1:9002), the company choice and the export button waited. Held at W0 step 1;
+- Hold at W0 step 1 kept: 226 / 587, proxy and server up, nothing pressed; no Close without the recorded word. W4's held times are to be compared by hand with this row's 2,048 ms; w4.py's constant reads 2026 ms (recorded, not a stop).
+- (the app's window usable by the lab from about 13:10Z)
+- a focusing click landed on it and put it in text-select mode; nothing was typed into it.
+- sha256 c05afd0ea3e4e30dfc0d04dc2dbe49b477aaae2330095600384c909dbc5e8948 (one character short in the line as written; the correction line below), written

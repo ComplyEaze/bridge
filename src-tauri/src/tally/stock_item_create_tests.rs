@@ -1061,6 +1061,7 @@ fn a_group_or_unit_read_that_is_unreadable_or_foreign_is_refused() {
     let before = catalogue(&decode(BEFORE));
     let guid = "<BRIDGECOMPANYGUID TYPE=\"String\">bac2b5e9-ada9-43c0-b8f8-a2812a813fa1</BRIDGECOMPANYGUID>";
     let empty_guid = "<BRIDGECOMPANYGUID TYPE=\"String\"></BRIDGECOMPANYGUID>";
+    // These edits are hand edits of the capture, not captured states.
     let cases = [
         (
             decode(UNITS),
@@ -1094,6 +1095,7 @@ fn a_group_or_unit_read_that_is_unreadable_or_foreign_is_refused() {
 fn a_gst_source_other_than_the_measured_one_is_refused() {
     let g = decode(GROUPS);
     let u = decode(UNITS);
+    // These edits are hand edits of the capture, not captured states.
     let xml = edited(
         &decode(BEFORE),
         "<SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS>",
@@ -1110,6 +1112,7 @@ fn an_ineligible_itc_flag_is_refused() {
     let u = decode(UNITS);
     let source = "<SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS>";
     for value in ["No", "Yes"] {
+        // These edits are hand edits of the capture, not captured states.
         let xml = edited(
             &decode(BEFORE),
             source,
@@ -1129,6 +1132,7 @@ fn a_state_row_other_than_the_marked_any_is_refused() {
     let u = decode(UNITS);
     let from = "<STATENAME TYPE=\"String\">&#4; Any</STATENAME>";
     for value in ["Karnataka", " Any", "&#4; Applicable"] {
+        // These edits are hand edits of the capture, not captured states.
         let xml = edited(
             &decode(BEFORE),
             from,
@@ -1197,10 +1201,10 @@ fn a_second_hsn_entry_is_refused_with_the_count() {
 fn the_draft_refuses_in_the_order_its_checks_run() {
     let g = decode(GROUPS);
     let u = decode(UNITS);
-    let assert_first = |xml: String, expected: DraftRefusal| {
+    let assert_first = |xml: String, g: &str, u: &str, expected: DraftRefusal| {
         let b = catalogue(&xml);
         assert!(sibling(&b, "SC Sibling Goods").is_ok());
-        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", g, u);
         assert_eq!(got.unwrap_err(), expected);
     };
 
@@ -1215,7 +1219,12 @@ fn the_draft_refuses_in_the_order_its_checks_run() {
         "</HSNDETAILS.LIST>",
         &format!("</HSNDETAILS.LIST>{EXTRA_HSN_ENTRY}"),
     );
-    assert_first(xml, DraftRefusal::GstEntriesNotMeasured { entries: 2 });
+    assert_first(
+        xml,
+        &g,
+        &u,
+        DraftRefusal::GstEntriesNotMeasured { entries: 2 },
+    );
 
     // The extra HSN entry and GST source are hand edits, not captured states.
     let xml = edited(
@@ -1228,7 +1237,12 @@ fn the_draft_refuses_in_the_order_its_checks_run() {
         "<SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS>",
         "<SRCOFGSTDETAILS TYPE=\"String\">As per Company/Stock Group</SRCOFGSTDETAILS>",
     );
-    assert_first(xml, DraftRefusal::HsnEntriesNotMeasured { entries: 2 });
+    assert_first(
+        xml,
+        &g,
+        &u,
+        DraftRefusal::HsnEntriesNotMeasured { entries: 2 },
+    );
 
     // The other parent and extra GST entry are hand edits, not captured states.
     let xml = edited(
@@ -1241,7 +1255,7 @@ fn the_draft_refuses_in_the_order_its_checks_run() {
         "</GSTDETAILS.LIST>",
         &format!("</GSTDETAILS.LIST>{EXTRA_GST_ENTRY}"),
     );
-    assert_first(xml, DraftRefusal::ParentNotInBook);
+    assert_first(xml, &g, &u, DraftRefusal::ParentNotInBook);
 
     // The other unit and extra GST entry are hand edits, not captured states.
     let xml = edited(
@@ -1254,7 +1268,28 @@ fn the_draft_refuses_in_the_order_its_checks_run() {
         "</GSTDETAILS.LIST>",
         &format!("</GSTDETAILS.LIST>{EXTRA_GST_ENTRY}"),
     );
-    assert_first(xml, DraftRefusal::UnitNotInBook);
+    assert_first(xml, &g, &u, DraftRefusal::UnitNotInBook);
+
+    // Both unknown master names are hand edits of the capture, not captured states.
+    let xml = edited(
+        &decode(BEFORE),
+        "<PARENT TYPE=\"String\">SC Goods Group</PARENT>",
+        "<PARENT TYPE=\"String\">SC Other Group</PARENT>",
+    );
+    let xml = edited(
+        &xml,
+        "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>",
+        "<BASEUNITS TYPE=\"String\">Kgs</BASEUNITS>",
+    );
+    assert_first(xml, &g, &u, DraftRefusal::ParentNotInBook);
+
+    // These reads are swapped by hand, not captured in these roles.
+    assert_first(
+        decode(BEFORE),
+        &decode(UNITS),
+        &decode(GROUPS),
+        DraftRefusal::GroupsUnreadable(NativeMastersError::ForeignChild),
+    );
 }
 
 #[test]
@@ -1402,6 +1437,7 @@ fn a_valuation_other_than_the_two_measured_is_refused() {
     let u = decode(UNITS);
     let from = "<GSTRATEVALUATIONTYPE TYPE=\"String\">&#4; Not Applicable</GSTRATEVALUATIONTYPE>";
     for value in [" Not Applicable", "&#4; Applicable", "Based on Quantity"] {
+        // These edits are hand edits of the capture, not captured states.
         let xml = edited(
             &decode(BEFORE),
             from,
@@ -1483,6 +1519,7 @@ fn a_zero_or_empty_rate_is_refused() {
         ("<GSTRATE TYPE=\"Number\"> 0</GSTRATE>", GstRate::Zero),
         ("<GSTRATE TYPE=\"Number\"></GSTRATE>", GstRate::Empty),
     ] {
+        // These edits are hand edits of the capture, not captured states.
         let xml = edited(&decode(BEFORE), from, to);
         let before = catalogue(&xml);
         let item = sibling(&before, "SC Sibling Goods").expect("the sibling is complete");
@@ -1512,6 +1549,7 @@ fn an_hsn_entry_other_than_the_measured_shape_is_refused() {
         ),
     ];
     for (from, to) in cases {
+        // These edits are hand edits of the capture, not captured states.
         let xml = edited(&decode(BEFORE), from, to);
         let b = catalogue(&xml);
         let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
@@ -1769,4 +1807,262 @@ fn a_shown_draft_holds_the_draft_it_was_made_from() {
     let shown = ShownDraft::from_draft(built);
     assert_eq!(shown.draft().name(), &expected_name);
     assert!(render_stock_item_create(&shown).is_ok());
+}
+
+fn edit_create_text(
+    items: &str,
+    groups: &str,
+    units: &str,
+    field: DraftText,
+    value: &str,
+) -> (String, String, String) {
+    let mut items = items.to_string();
+    let mut groups = groups.to_string();
+    let mut units = units.to_string();
+    // A character reference keeps a raw tab through XML attribute normalization.
+    let attribute_value = value.replace('\t', "&#9;");
+    match field {
+        DraftText::Name => unreachable!("the proposed name is not edited here"),
+        DraftText::Parent => {
+            // These matching parent edits are hand edits, not captured states.
+            items = edited(
+                &items,
+                "<PARENT TYPE=\"String\">SC Goods Group</PARENT>",
+                &format!("<PARENT TYPE=\"String\">{value}</PARENT>"),
+            );
+            groups = edited(
+                &groups,
+                "NAME=\"SC Goods Group\"",
+                &format!("NAME=\"{attribute_value}\""),
+            );
+            groups = edited(
+                &groups,
+                "<NAME>SC Goods Group</NAME>",
+                &format!("<NAME>{value}</NAME>"),
+            );
+        }
+        DraftText::Unit => {
+            // These matching unit edits are hand edits, not captured states.
+            items = edited(
+                &items,
+                "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>",
+                &format!("<BASEUNITS TYPE=\"String\">{value}</BASEUNITS>"),
+            );
+            units = edited(
+                &units,
+                "NAME=\"Nos\"",
+                &format!("NAME=\"{attribute_value}\""),
+            );
+            units = edited(
+                &units,
+                "<NAME TYPE=\"String\">Nos</NAME>",
+                &format!("<NAME TYPE=\"String\">{value}</NAME>"),
+            );
+        }
+        DraftText::HsnCode => {
+            // This HSN code edit is a hand edit, not a captured state.
+            items = edited(
+                &items,
+                "<HSNCODE TYPE=\"String\">39239090</HSNCODE>",
+                &format!("<HSNCODE TYPE=\"String\">{value}</HSNCODE>"),
+            );
+        }
+        DraftText::HsnDescription => {
+            // This HSN description edit is a hand edit, not a captured state.
+            items = edited(
+                &items,
+                "<HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN>",
+                &format!("<HSN TYPE=\"String\">{value}</HSN>"),
+            );
+        }
+    }
+    (items, groups, units)
+}
+
+fn assert_create_render_refusal(
+    items: &str,
+    groups: &str,
+    units: &str,
+    expected: CreateRenderRefusal,
+) {
+    let before = catalogue(items);
+    let built = draft(
+        &before,
+        "SC Copied Marked",
+        "SC Sibling Goods",
+        groups,
+        units,
+    )
+    .expect("the edited value still drafts");
+    let shown = ShownDraft::from_draft(built);
+    assert_eq!(render_stock_item_create(&shown), Err(expected));
+}
+
+fn assert_create_text_not_plain(field: DraftText, value: &str) {
+    let (items, groups, units) = edit_create_text(
+        &decode(BEFORE),
+        &decode(GROUPS),
+        &decode(UNITS),
+        field,
+        value,
+    );
+    let before = catalogue(&items);
+    let built = draft(
+        &before,
+        "SC Copied Marked",
+        "SC Sibling Goods",
+        &groups,
+        &units,
+    )
+    .unwrap_or_else(|error| panic!("{field:?} value {value:?} did not draft: {error:?}"));
+    let shown = ShownDraft::from_draft(built);
+    assert_eq!(
+        render_stock_item_create(&shown),
+        Err(CreateRenderRefusal::TextNotPlain { field })
+    );
+}
+
+const NON_PLAIN_TEXT_EDITS: [&str; 9] = [
+    "A\u{1}B",
+    "A\tB",
+    "A&#10;B",
+    "A&#1;B",
+    " A",
+    "A ",
+    "A  B",
+    "AéB",
+    "A\u{10000}B",
+];
+
+#[test]
+fn parent_text_that_is_not_plain_is_refused() {
+    for value in NON_PLAIN_TEXT_EDITS {
+        assert_create_text_not_plain(DraftText::Parent, value);
+    }
+}
+
+#[test]
+fn unit_text_that_is_not_plain_is_refused() {
+    for value in NON_PLAIN_TEXT_EDITS {
+        assert_create_text_not_plain(DraftText::Unit, value);
+    }
+}
+
+#[test]
+fn hsn_code_text_that_is_not_plain_is_refused() {
+    for value in NON_PLAIN_TEXT_EDITS {
+        assert_create_text_not_plain(DraftText::HsnCode, value);
+    }
+}
+
+#[test]
+fn hsn_description_text_that_is_not_plain_is_refused() {
+    for value in NON_PLAIN_TEXT_EDITS {
+        assert_create_text_not_plain(DraftText::HsnDescription, value);
+    }
+}
+
+#[test]
+fn a_name_fails_master_name_before_any_non_plain_render_check() {
+    // These are the `MasterName` refusals that apply before the renderer.
+    for value in ["SC\u{1}Copied", "SC\tCopied", "SC\nCopied"] {
+        assert_eq!(
+            MasterName::new(value),
+            Err(MasterNameError::ControlCharacter)
+        );
+    }
+    for value in [" SC Copied", "SC Copied "] {
+        assert_eq!(
+            MasterName::new(value),
+            Err(MasterNameError::SurroundingWhitespace)
+        );
+    }
+    assert_eq!(
+        MasterName::new("SC  Copied"),
+        Err(MasterNameError::RepeatedSpaces)
+    );
+    for value in ["SCéCopied", "SC\u{10000}Copied", "SC\u{fffd}#1;Copied"] {
+        assert_eq!(MasterName::new(value), Err(MasterNameError::NonAscii));
+    }
+    // A name is a Rust string, not a read, so a line feed cannot arrive as a
+    // character reference; the raw line feed above is the case that applies.
+}
+
+#[test]
+fn create_text_refusals_follow_field_and_check_order() {
+    // Every combined value edit is a hand edit, not a captured state.
+    let (items, groups, units) = edit_create_text(
+        &decode(BEFORE),
+        &decode(GROUPS),
+        &decode(UNITS),
+        DraftText::Parent,
+        "SC\u{1}Goods Group",
+    );
+    let (items, groups, units) =
+        edit_create_text(&items, &groups, &units, DraftText::Unit, "No&amp;s");
+    assert_create_render_refusal(
+        &items,
+        &groups,
+        &units,
+        CreateRenderRefusal::TextNotPlain {
+            field: DraftText::Parent,
+        },
+    );
+
+    let (items, groups, units) = edit_create_text(
+        &decode(BEFORE),
+        &decode(GROUPS),
+        &decode(UNITS),
+        DraftText::Unit,
+        "No&amp;s",
+    );
+    let (items, groups, units) =
+        edit_create_text(&items, &groups, &units, DraftText::HsnCode, " 39239090");
+    assert_create_render_refusal(
+        &items,
+        &groups,
+        &units,
+        CreateRenderRefusal::TextNeedsEscaping {
+            field: DraftText::Unit,
+        },
+    );
+
+    let (items, groups, units) = edit_create_text(
+        &decode(BEFORE),
+        &decode(GROUPS),
+        &decode(UNITS),
+        DraftText::Parent,
+        "SC Goods  &amp; Group",
+    );
+    assert_create_render_refusal(
+        &items,
+        &groups,
+        &units,
+        CreateRenderRefusal::TextNotPlain {
+            field: DraftText::Parent,
+        },
+    );
+
+    let (items, groups, units) = edit_create_text(
+        &decode(BEFORE),
+        &decode(GROUPS),
+        &decode(UNITS),
+        DraftText::HsnCode,
+        " 39239090",
+    );
+    let (items, groups, units) = edit_create_text(
+        &items,
+        &groups,
+        &units,
+        DraftText::HsnDescription,
+        "Plastic\u{1} Articles",
+    );
+    assert_create_render_refusal(
+        &items,
+        &groups,
+        &units,
+        CreateRenderRefusal::TextNotPlain {
+            field: DraftText::HsnCode,
+        },
+    );
 }

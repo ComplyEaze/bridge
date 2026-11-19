@@ -39,8 +39,16 @@
 //! valuation types' values, the rates (which may be absent, zero or empty), the
 //! HSN code's and description's values, the ineligible-ITC flag, the numbers of
 //! dated entries and state rows, and a parent at the root are not examined.
-//! `StockItemDraft` is the type that holds a copy to send: it admits the
-//! measured shape only, and a later builder renders it (§12a.13).
+//! `StockItemDraft` admits the structure of the one Create measured (one run,
+//! PARTIAL, §12a.13), with values read from the sibling, and
+//! `render_stock_item_create` renders it. The name is a `MasterName`; the parent
+//! and unit equal a row name in the same company's group or unit read; the dates
+//! were parsed by the protocol crate. Each rate is a plain non-zero decimal on
+//! the three rows that carry one and absent on the two that do not. The parent,
+//! unit, HSN code and HSN description pass the `MasterName` rule and hold none
+//! of `& < > " '`; the HSN code and description do not hold the root marker. The
+//! rate's magnitude is not checked. Bridge does not know how Tally treats values
+//! other than the measured ones.
 
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -601,9 +609,15 @@ impl<'a> GoodsSibling<'a> {
     }
 }
 
-/// A copy in the measured shape only. It refuses unmeasured GST and HSN entry
-/// counts, sources, ITC flags, state rows, duty heads, valuations, rates and
-/// marked HSN values (§12a.13).
+/// A copy with the structure of the one Create measured (one run, PARTIAL,
+/// §12a.13), with values read from the sibling. It refuses unmeasured GST and
+/// HSN entry counts, sources, ITC flags, state rows, duty heads, valuations and
+/// rates. The name is a `MasterName`; the parent and unit equal a row name in
+/// the same company's group or unit read; the dates were parsed by the protocol
+/// crate; and the HSN code and description do not hold the root marker. Each
+/// rate is a plain non-zero decimal on the three rows that carry one and absent
+/// on the two that do not; its magnitude is not checked. Bridge does not know
+/// how Tally treats values other than the measured ones.
 #[derive(Debug)]
 pub(crate) struct StockItemDraft<'a> {
     sibling: GoodsSibling<'a>,
@@ -616,7 +630,7 @@ pub(crate) struct StockItemDraft<'a> {
 
 impl<'a> StockItemDraft<'a> {
     /// Checks the proposed name and sibling against the same company's group
-    /// and unit reads, then admits only the measured copy shape (§12a.13).
+    /// and unit reads, then admits the one measured copy's structure (§12a.13).
     pub(crate) fn new(
         name: ItemNameAbsent<'a>,
         sibling: GoodsSibling<'a>,
@@ -804,15 +818,27 @@ pub(crate) enum DraftText {
     HsnDescription,
 }
 
-/// No Create of a stock item with `&`, `<`, `>`, `"` or `'` in one of these
-/// values was measured, so the builder writes no escape and refuses them.
+/// Why a value cannot be written as the measured Create's plain text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum CreateRenderRefusal {
+    /// The value is not plain ASCII text of the kind `MasterName` admits: it is
+    /// empty, non-ASCII, holds a control character, has a space at either end,
+    /// has two spaces together, or is too long. No Create with such a value was
+    /// measured (§12a.13).
+    TextNotPlain { field: DraftText },
+    /// No Create with one of these five characters in the value was measured,
+    /// so the renderer writes no escape and refuses it (§12a.13).
     TextNeedsEscaping { field: DraftText },
 }
 
 /// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
-/// nothing, and renders the measured marked request of §12a.13 and no other.
+/// nothing, and renders the structure of the one Create measured (one run,
+/// PARTIAL, §12a.13), with values read from the sibling. It checks Name, Parent,
+/// Unit, HsnCode and HsnDescription in that order and returns the first refusal.
+/// Name receives only the five-character check because it is a `MasterName`.
+/// Each other value must first pass the `MasterName` rule, then hold none of
+/// `& < > " '`. The rate's magnitude is not checked, and Bridge does not know
+/// how Tally treats values other than the measured ones.
 pub(crate) fn render_stock_item_create(
     shown: &ShownDraft<'_>,
 ) -> Result<String, CreateRenderRefusal> {
@@ -824,6 +850,12 @@ pub(crate) fn render_stock_item_create(
         (DraftText::HsnCode, draft.hsn().code()),
         (DraftText::HsnDescription, draft.hsn().description()),
     ] {
+        // The closed rule also refuses an HSN description or a group or unit
+        // name with two spaces together, non-ASCII text or over 16,384 bytes;
+        // this is Bridge's choice, not a Tally fact.
+        if field != DraftText::Name && MasterName::new(text).is_err() {
+            return Err(CreateRenderRefusal::TextNotPlain { field });
+        }
         if text
             .chars()
             .any(|c| matches!(c, '&' | '<' | '>' | '"' | '\''))

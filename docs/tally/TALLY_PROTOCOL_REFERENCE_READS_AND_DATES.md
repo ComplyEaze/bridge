@@ -1036,8 +1036,9 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   the export waits and tries again, for at most 60 s, a bound not measured on this read, and fails past it. The
   standard read keeps every refusal it has without the mailing details.
 - **A mailing read cut at the 20 s limit owes the drain, and the standard read admitted after it answers whole.
-  PARTIAL: TallyPrime 7.2 Silver, 2026-11-03 and 2026-11-08, one synthetic book, two sittings, master builds at
-  a6c64b8b and 1f5dc024 (`lab/2074-2214-export-cut-answers`, `lab/2074-2214-w4-answers`).** The book held about 172
+  PARTIAL: TallyPrime 7.2 Silver, 2026-11-03, 2026-11-08 and 2026-11-19, one synthetic book, three sittings, master
+  builds at a6c64b8b and 1f5dc024 and the 0.7.0 desktop app (`lab/2074-2214-export-cut-answers`,
+  `lab/2074-2214-w4-answers`, `lab/2214-export-cut-current-app-answers`).** The book held about 172
   ledgers and 32,000 dated entries; on 2026-11-03 its mailing answer, about 30 MB, came whole in three pages with
   Tally idle. An import of Journals sent by another client just ahead kept Tally busy, and Bridge cut the mailing
   read's post at the 20 s limit. On 2026-11-03 this was `ledger_masters` with `include_mailing_details`, three times,
@@ -1051,8 +1052,15 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   draining and admitted the fifth, ending 68 s after the owed record, whole. The export failed with its withheld
   message and wrote no file, but the desktop app that ran it was a 2026-10-30 build (0.6.1), older than the export's
   re-read without the details (#2188), so that step is not evidence for later builds; the server rows ran on the
-  bundle's own server. Not measured: the export step after a cut on a later build, a cut with no other client's work
-  ahead of it, a cut of another read, another book, and another release.
+  bundle's own server. On 2026-11-19 the same step ran on the installed 0.7.0 desktop app and server, with the book
+  at 13 ledgers: a front of 3,000 Journals went in just ahead of the export's mailing read, Bridge cut the mailing
+  post 19.672 s after it was forwarded, and nothing more went out on that connection. The export failed with its
+  withheld message and `[tally_request_deadline_exceeded]`, and wrote no file. The drain record read owed, six
+  standard calls were refused `tally_endpoint_draining` (`retry_after_s` 10) with no master post sent, and the
+  seventh was admitted and read the book whole, ending 93.9 s after the owed record, 13 of 13 rows equal to a
+  whole read after it with the snapshot left out (`lab/2214-export-cut-current-app-answers` at 0a4cc166,
+  RESULTS.md, W4). Not measured: a cut with no other client's work ahead of it, a cut of another read, another
+  book, and another release.
 - **The party/ledger master workbook read the mailing details by the ledger count past a master mark of 4,266, read
   about 30 MB of them whole, and, past 32 MiB, was written again without them with its note. PARTIAL: TallyPrime 7.2 on
   Windows, 2026-11-18, one synthetic book, one sitting, the desktop app 0.7.0, built from master a83ee02d on the run

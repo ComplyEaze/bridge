@@ -506,6 +506,9 @@ base revision.
 <a id="12a27-ledger-outstandings-answers-a-bill-wise-party-with-no-entry-by-its-date-as-it-answers-a-name-no-ledger-carries-http-200-a-zero-length-no-type-no-body-partial"></a>
 
 [12a.27 Ledger Outstandings answers a bill-wise party with no entry by its date as it answers a name no ledger carries: HTTP 200, a zero length, no type, no body (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a27-ledger-outstandings-answers-a-bill-wise-party-with-no-entry-by-its-date-as-it-answers-a-name-no-ledger-carries-http-200-a-zero-length-no-type-no-body-partial)
+<a id="12a28-a-bank-cash-withdrawal-answered-as-paid-to-someone-posts-as-a-contra-into-cash-and-a-cash-payment-and-reads-back-as-built-partial"></a>
+
+[12a.28 A bank cash withdrawal answered as paid to someone posts as a Contra into cash and a cash Payment, and reads back as built (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a28-a-bank-cash-withdrawal-answered-as-paid-to-someone-posts-as-a-contra-into-cash-and-a-cash-payment-and-reads-back-as-built-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

@@ -28,7 +28,9 @@
 //! Taxable and whose applicability is the marked Applicable. Neither is yet a
 //! copy that may be sent. A copy sent without Tally's mark on three of its
 //! values was stored without its GST applicability and rates, and no counter
-//! showed it (one run, PARTIAL; §12a.13). One shape was measured. `SiblingGst`
+//! showed it (one run, PARTIAL; §12a.13). One shape was measured that way; the
+//! Creates that later changed one variable each (§12a.13) are not admitted by
+//! anything here. `SiblingGst`
 //! requires the parent, unit, applicability and type of supply to be present and
 //! not blank; each dated GST entry needs its taxability and source, at least one
 //! state row with a name, and at least one rate row with a duty head and
@@ -39,7 +41,7 @@
 //! valuation types' values, the rates (which may be absent, zero or empty), the
 //! HSN code's and description's values, the ineligible-ITC flag, the numbers of
 //! dated entries and state rows, and a parent at the root are not examined.
-//! `StockItemDraft` admits the structure of the one Create measured (one run,
+//! `StockItemDraft` admits the structure of the first marked Create measured (one run,
 //! PARTIAL, §12a.13), with values read from the sibling, and
 //! `render_stock_item_create` renders it. The name is a `MasterName`; the parent
 //! and unit equal a row name in the same company's group or unit read; the dates
@@ -609,7 +611,7 @@ impl<'a> GoodsSibling<'a> {
     }
 }
 
-/// A copy with the structure of the one Create measured (one run, PARTIAL,
+/// A copy with the structure of the first marked Create measured (one run, PARTIAL,
 /// §12a.13), with values read from the sibling. It refuses unmeasured GST and
 /// HSN entry counts, sources, ITC flags, state rows, duty heads, valuations and
 /// rates. The name is a `MasterName`; the parent and unit equal a row name in
@@ -630,7 +632,7 @@ pub(crate) struct StockItemDraft<'a> {
 
 impl<'a> StockItemDraft<'a> {
     /// Checks the proposed name and sibling against the same company's group
-    /// and unit reads, then admits the one measured copy's structure (§12a.13).
+    /// and unit reads, then admits the first measured copy's structure (§12a.13).
     pub(crate) fn new(
         name: ItemNameAbsent<'a>,
         sibling: GoodsSibling<'a>,
@@ -832,7 +834,7 @@ pub(crate) enum CreateRenderRefusal {
 }
 
 /// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
-/// nothing, and renders the structure of the one Create measured (one run,
+/// nothing, and renders the structure of the first marked Create measured (one run,
 /// PARTIAL, §12a.13), with values read from the sibling. It checks Name, Parent,
 /// Unit, HsnCode and HsnDescription in that order and returns the first refusal.
 /// Name receives only the five-character check because it is a `MasterName`.

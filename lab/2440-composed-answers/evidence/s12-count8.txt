@@ -1,0 +1,12 @@
+== a-s12-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ('eb2f5190-292e-4ed8-bfd3-eace839fe699', '3', '215') against ('eb2f5190-292e-4ed8-bfd3-eace839fe699', '3', '215')
+  equal
+== a-s12-K-customer.xml: 2994 bytes, GSTIN shapes 0
+  STATUS '1'
+  LEDGER rows: 0
+== a-s12-F-0101.xml: 3022 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s12-M-marks.xml: 3398 bytes, GSTIN shapes 0
+  STATUS '1'
+  COMPANY: GUID is the book's: yes ALTVCHID '3' ALTMSTID '215'
+  COMPANY rows: 1

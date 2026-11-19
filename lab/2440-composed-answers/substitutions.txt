@@ -1,0 +1,18 @@
+The company number is X at equal length in Tally's raw answers (tally/), so sizes stand. company_number values go first in tool answers, by a JSON parser. Other replacements in text files and file names, with counts:
+<Tally data folder>: 7
+<company number>: 13
+<lab folder>: 17
+<lab root>: 2
+label: "status=\1, bytes=\2": 4
+label: /status status=200, bytes=51: 1
+label: \1, \2: 2
+label: \1: : 4
+label: \1=: 8
+label: before-write mode: 4
+label: long hex outside a hash, bytes joined by colons: 4
+lead: 12
+notes line rewritten to the plain fact: 3
+Notes text rewritten to the plain fact (each once, in evidence/notes.txt; the original is listed in kept-local.txt), the new text:
+- The one launch of steps 6 to 10 waits until the approval clicks of steps 8 and 9 can be answered at the screen.
+- Hold before step 6: as the recorded word says when step 6 cannot start by 11:50Z, BRIDGE EINVOICE LAB shut
+- The row resumes at step 6 after row 2214-cut.

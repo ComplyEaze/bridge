@@ -1,0 +1,30 @@
+read at 2026-11-19T13:45:27.911Z windows 1
+WINDOW name=[ComplyEaze Bridge — post this voucher?] class=#32770
+ControlType.Pane | Yes
+ControlType.Pane | No
+ControlType.Pane | Cancel
+ControlType.Pane | Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Sales invoice in "BRIDGE EINVOICE LAB"
+Company GUID: eb2f5190-292e-4ed8-bfd3-eace839fe699
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9001  (the voucher's own text: last two lines)
+Voucher type: "BRIDGE CP Sales"  Date: 3-Apr-2025  Number: "CP/25-26/0101"
+Customer: "BRIDGE CP Customer MH"
+Regular, GSTIN 27ZZZZZ0000Z3ZO  Place of supply: Maharashtra
+Bill allocation: none (customer not bill-wise)
+Dr 118.00  "BRIDGE CP Customer MH"
+Cr 100.00  "BRIDGE IRN Sales"
+Cr 9.00  "BRIDGE CP CGST"
+Cr 9.00  "BRIDGE CP SGST"
+Total debit: 118  Total credit: 118
+Checked: customer, Sales Accounts ledgers, CGST and state tax per line at the ledger's rate.
+Batch: bridge-50607914-c941-4a47-92b4-565578cc428b
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually. Pause other edits/imports in this company.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: "CP/25-26/0101"
+Narration: (none)

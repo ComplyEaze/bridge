@@ -1,0 +1,5 @@
+F-0101.xml: 3022 bytes
+F-0102.xml: 3022 bytes
+M-marks.xml: 3398 bytes
+ml	a-s11-F-0102.xml	curl 0	3022 bytes
+19:20:06	M-marks.xml	a-s11-M-marks.xml	curl 0	3398 bytes

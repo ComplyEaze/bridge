@@ -1,0 +1,17 @@
+2026-11-19T13:42:03.262Z 000-s6-tools-list.json list secs 0.015 bytes 244001 isError None
+2026-11-19T13:42:08.314Z 001-s6-list-companies.json list_companies secs 0.087 bytes 1569 isError False
+2026-11-19T13:42:16.394Z 002-s6-marks.json ledger_masters secs 0.717 bytes 4028 isError False
+2026-11-19T13:42:25.283Z 003-s6-voucher-types.json masters secs 0.723 bytes 29593 isError False
+2026-11-19T13:42:35.314Z 004-s7-build-a.json build_import_xml secs 14.594 bytes 8912 isError False
+2026-11-19T13:43:00.500Z 005-s8-marks-v8a.json ledger_masters secs 0.749 bytes 4028 isError False
+2026-11-19T13:43:20.171Z 006-s8-post-a-1.json post_import secs 40.049 bytes 1775 isError False
+2026-11-19T13:44:21.839Z 007-s8-post-a-2.json post_import secs 40.047 bytes 1507 isError False
+2026-11-19T13:45:25.263Z 008-s8-post-a-3.json post_import secs 11.864 bytes 1608 isError True
+2026-11-19T13:45:51.037Z 009-s8-marks-after-timeout.json ledger_masters secs 0.739 bytes 4029 isError False
+2026-11-19T13:46:46.167Z 010-s8-marks-before-retry.json ledger_masters secs 0.665 bytes 4029 isError False
+2026-11-19T13:46:56.902Z 011-s8-post-a-retry-1.json post_import secs 40.062 bytes 1776 isError False
+2026-11-19T13:47:52.750Z 012-s8-post-a-retry-2.json post_import secs 40.07 bytes 1507 isError False
+2026-11-19T13:48:48.617Z 013-s8-post-a-retry-3.json post_import secs 25.062 bytes 1608 isError True
+2026-11-19T13:49:23.784Z 014-s8-marks-after-retry.json ledger_masters secs 0.694 bytes 4029 isError False
+2026-11-19T13:49:34.218Z 015-s10-marks.json ledger_masters secs 0.716 bytes 4029 isError False
+2026-11-19T13:49:36.138Z 016-s10-vouchers.json vouchers secs 1.944 bytes 7087 isError False

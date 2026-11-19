@@ -1,0 +1,10 @@
+== a-s11-F-0101.xml: 3022 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s11-F-0102.xml: 3022 bytes, GSTIN shapes 0
+  STATUS '1'
+  VOUCHER rows: 0
+== a-s11-M-marks.xml: 3398 bytes, GSTIN shapes 0
+  STATUS '1'
+  COMPANY: GUID is the book's: yes ALTVCHID '3' ALTMSTID '220'
+  COMPANY rows: 1

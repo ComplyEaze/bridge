@@ -28,11 +28,32 @@
 //! Taxable and whose applicability is the marked Applicable. Neither is yet a
 //! copy that may be sent. A copy sent without Tally's mark on three of its
 //! values was stored without its GST applicability and rates, and no counter
-//! showed it (one run, PARTIAL; §12a.13). One shape was measured, and these two
-//! types do not examine the rates, the sources, the state names, the valuation
-//! types, the ineligible-ITC flag, the number of dated entries or state rows, or
-//! a parent at the root. The type that holds a copy to send must admit the
-//! measured shape only.
+//! showed it (one run, PARTIAL; §12a.13). One shape was measured that way. Of
+//! the Creates that later changed one variable each (§12a.13), `StockItemDraft`
+//! refuses a second dated GST or HSN entry and a Cess rate; it copies the rates
+//! and the unit as read, so a sibling with other rates or another unit drafts
+//! and renders though no such copy was measured. `SiblingGst`
+//! requires the parent, unit, applicability and type of supply to be present and
+//! not blank; each dated GST entry needs its taxability and source, at least one
+//! state row with a name, and at least one rate row with a duty head and
+//! valuation type; each HSN entry needs its code, description and source.
+//! Except where `GoodsSibling` checks Goods, Taxable and the marked Applicable,
+//! their values are not examined: the unit's value, the sources' values, the
+//! state names' values, the duty heads' values and number of rate rows, the
+//! valuation types' values, the rates (which may be absent, zero or empty), the
+//! HSN code's and description's values, the ineligible-ITC flag, the numbers of
+//! dated entries and state rows, and a parent at the root are not examined.
+//! `StockItemDraft` admits the structure of the first marked Create measured (one run,
+//! PARTIAL, §12a.13), with values read from the sibling, and
+//! `render_stock_item_create` renders it. The name is a `MasterName`; the parent
+//! and unit equal a row name in the same company's group or unit read; the dates
+//! were parsed by the protocol crate. Each rate is a plain non-zero decimal on
+//! the three rows that carry one and absent on the two that do not; the HSN
+//! code and description do not hold the root marker. The draft does not hold
+//! text to plain text: the renderer does, refusing a parent, unit, HSN code or
+//! HSN description that fails the `MasterName` rule or holds one of
+//! `& < > " '`. The rate's magnitude and the unit's value are not checked.
+//! Bridge does not know how Tally treats values other than the measured ones.
 
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -42,9 +63,12 @@ use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError, NameCollision,
 };
-use bridge_tally_protocol::gst_details::{GstDetailsEntry, GstDetailsObservation};
+use bridge_tally_protocol::gst_details::{GstDetailsEntry, GstDetailsObservation, GstRate};
 use bridge_tally_protocol::hsn_details::{HsnDetailsEntry, HsnDetailsObservation};
-use bridge_tally_protocol::native_masters::NativeMastersError;
+use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
+use bridge_tally_protocol::native_masters::{
+    parse_native_masters, NativeMasterKind, NativeMastersError,
+};
 use bridge_tally_protocol::stock_item_candidate::{
     parse_candidate_stock_items, CandidateStockItem, ScalarObservation,
 };
@@ -52,7 +76,172 @@ use bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER;
 
 const GOODS: &str = "Goods";
 const TAXABLE: &str = "Taxable";
-const APPLICABLE: &str = " Applicable";
+const SPECIFY_DETAILS_HERE: &str = "Specify Details Here";
+const BASED_ON_VALUE: &str = "Based on Value";
+
+/// A control-reference value that the measured copy kept marked (§12a.13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MarkedConstant {
+    /// GST applicability in the measured marked form.
+    Applicable,
+    /// The one state row in the measured marked form.
+    Any,
+    /// The Cess valuation in the measured marked form.
+    NotApplicable,
+}
+
+impl MarkedConstant {
+    /// Recognises only the exact marked text returned by the read.
+    pub(crate) fn from_read(text: &str) -> Option<Self> {
+        match text.strip_prefix(TALLY_SANITIZED_ROOT_MARKER) {
+            Some(" Applicable") => Some(Self::Applicable),
+            Some(" Any") => Some(Self::Any),
+            Some(" Not Applicable") => Some(Self::NotApplicable),
+            _ => None,
+        }
+    }
+
+    /// The marked text sent in the measured Create (§12a.13).
+    fn render(self) -> &'static str {
+        match self {
+            Self::Applicable => "&#4; Applicable",
+            Self::Any => "&#4; Any",
+            Self::NotApplicable => "&#4; Not Applicable",
+        }
+    }
+}
+
+/// The two valuation values the measured copy sent (§12a.13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RateValuation {
+    /// The valuation sent on CGST, SGST/UTGST, IGST and State Cess.
+    BasedOnValue,
+    /// The marked valuation sent on Cess.
+    NotApplicable,
+}
+
+impl RateValuation {
+    /// The valuation text sent in the measured Create (§12a.13).
+    fn render(self) -> &'static str {
+        match self {
+            Self::BasedOnValue => BASED_ON_VALUE,
+            Self::NotApplicable => MarkedConstant::NotApplicable.render(),
+        }
+    }
+}
+
+/// The five duty rows of the measured copy, in order: duty head, valuation and
+/// whether a rate value is required (§12a.13).
+const MEASURED_RATE_ROWS: [(&str, RateValuation, bool); 5] = [
+    ("CGST", RateValuation::BasedOnValue, true),
+    ("SGST/UTGST", RateValuation::BasedOnValue, true),
+    ("IGST", RateValuation::BasedOnValue, true),
+    ("Cess", RateValuation::NotApplicable, false),
+    ("State Cess", RateValuation::BasedOnValue, false),
+];
+
+/// One duty row admitted for the measured copy (§12a.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DraftRate<'a> {
+    duty_head: &'a str,
+    valuation: RateValuation,
+    rate: Option<&'a str>,
+}
+
+impl<'a> DraftRate<'a> {
+    /// The unmarked duty head at its measured position.
+    pub(crate) fn duty_head(&self) -> &'a str {
+        self.duty_head
+    }
+
+    /// The valuation measured for this duty head.
+    pub(crate) fn valuation(&self) -> RateValuation {
+        self.valuation
+    }
+
+    /// The value is the read's decimal without the read's leading space, as the
+    /// measured request sent it; the two Cess rows have none (§12a.13).
+    pub(crate) fn rate(&self) -> Option<&'a str> {
+        self.rate
+    }
+}
+
+/// The one dated GST entry admitted for the measured copy (§12a.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DraftGstEntry<'a> {
+    applicable_from: &'a str,
+    rates: Vec<DraftRate<'a>>,
+}
+
+impl<'a> DraftGstEntry<'a> {
+    /// The entry's applicability date as read.
+    pub(crate) fn applicable_from(&self) -> &'a str {
+        self.applicable_from
+    }
+
+    /// The five measured duty rows in their measured order.
+    pub(crate) fn rates(&self) -> &[DraftRate<'a>] {
+        &self.rates
+    }
+}
+
+/// The one dated HSN entry admitted for the measured copy (§12a.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DraftHsnEntry<'a> {
+    applicable_from: &'a str,
+    code: &'a str,
+    description: &'a str,
+}
+
+impl<'a> DraftHsnEntry<'a> {
+    /// The entry's applicability date as read.
+    pub(crate) fn applicable_from(&self) -> &'a str {
+        self.applicable_from
+    }
+
+    /// The unmarked HSN code as read.
+    pub(crate) fn code(&self) -> &'a str {
+        self.code
+    }
+
+    /// The unmarked HSN description as read.
+    pub(crate) fn description(&self) -> &'a str {
+        self.description
+    }
+}
+
+/// Why a Goods sibling cannot be drafted as the measured copy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DraftRefusal {
+    /// The proposed name and sibling came from different catalogue reads.
+    OtherCatalogue,
+    /// The stock-group read could not be parsed for the sibling's company.
+    GroupsUnreadable(NativeMastersError),
+    /// No stock group in the same company's read has the parent's exact name.
+    ParentNotInBook,
+    /// The unit read could not be parsed for the sibling's company.
+    UnitsUnreadable(NativeMastersError),
+    /// No unit in the same company's read has the base unit's exact name.
+    UnitNotInBook,
+    /// A copy with this many dated GST entries was not measured (§12a.13).
+    GstEntriesNotMeasured { entries: usize },
+    /// This GST source was not sent in the measured copy (§12a.13).
+    GstSourceNotMeasured,
+    /// An ineligible-ITC flag was not sent in the measured copy (§12a.13).
+    ItcNotMeasured,
+    /// The measured copy had one state row marked `Any` (§12a.13).
+    StateNotAny,
+    /// The duty head at this row is absent, extra or not the measured head (§12a.13).
+    DutyHeadNotMeasured { row: usize },
+    /// The valuation at this row is not the one measured for its head (§12a.13).
+    ValuationNotMeasured { row: usize },
+    /// The rate at this row is not present or absent as measured (§12a.13).
+    RateNotMeasured { row: usize },
+    /// A copy with this many dated HSN entries was not measured (§12a.13).
+    HsnEntriesNotMeasured { entries: usize },
+    /// The HSN source, code or description is not in the measured form (§12a.13).
+    HsnNotMeasured,
+}
 
 /// The stock items of one answer to the candidate read, each bound to one
 /// verified company, with their names indexed. It does not show that the
@@ -161,6 +350,7 @@ impl StockItemCatalogue {
 }
 
 impl<'a> ItemNameAbsent<'a> {
+    /// The proposed name, shown absent from the catalogue.
     pub(crate) fn name(&self) -> &MasterName {
         &self.name
     }
@@ -182,7 +372,7 @@ pub(crate) enum SiblingField {
     HsnDetails,
 }
 
-/// Why no complete sibling answers to the name.
+/// Why no sibling with the six required fields answers to the name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SiblingRefusal {
     /// No item answers to the name.
@@ -190,19 +380,31 @@ pub(crate) enum SiblingRefusal {
     /// More than one item holds the name exactly; this many.
     Ambiguous { items: usize },
     /// No item holds the name exactly, and this many items answer to it by a
-    /// fold of the name index. Those folds exist to refuse a proposed name, and
-    /// one keeps only letters and digits, so a fold never names a sibling.
+    /// fold of the name index. Bridge's rule so far, a choice and not a Tally
+    /// fact: an item is a source only when it holds the name exactly, as its row
+    /// name or a name entry, and a name that only folds to an item is refused.
     OnlyByFold { items: usize },
     /// The first field that is absent or empty, or whose list holds content the parser does not model.
+    /// `Incomplete(SiblingField::GstDetails)` also reports slab rates, a list
+    /// the parser cannot read, and a missing state row or rate row, so it does
+    /// not by itself mean that the GST details are missing.
     Incomplete(SiblingField),
     /// The index could not check the name.
     Unchecked(MasterNameIndexError),
 }
 
-/// The six source fields of the one item that holds the name exactly, each
-/// present and not blank as read. A field of only white space counts as missing.
-/// Presence only: the rates, the sources, the
-/// state names, the valuation types and the ineligible-ITC flag are not examined.
+/// The six source fields of the one item that holds the name exactly, with the
+/// parent, unit, applicability and type of supply present and not blank; each
+/// dated GST entry needs its taxability and source, at least one state row with
+/// a name, and at least one rate row with a duty head and valuation type, and
+/// each HSN entry needs its code, description and source. A field of only white
+/// space counts as missing. Except where `GoodsSibling` checks Goods, Taxable
+/// and the marked Applicable, their values are not examined: the unit's value,
+/// the sources' values, the state names' values, the duty heads' values and
+/// number of rate rows, the valuation types' values, the rates (which may be
+/// absent, zero or empty), the HSN code's and description's values, the
+/// ineligible-ITC flag, the numbers of dated entries and state rows, and a
+/// parent at the root are not examined.
 #[derive(Debug)]
 pub(crate) struct SiblingGst<'a> {
     catalogue: &'a StockItemCatalogue,
@@ -323,7 +525,7 @@ impl<'a> SiblingGst<'a> {
         })
     }
 
-    /// The catalogue this complete read belongs to.
+    /// The catalogue the sibling was found in.
     pub(crate) fn catalogue(&self) -> &'a StockItemCatalogue {
         self.catalogue
     }
@@ -369,7 +571,7 @@ impl<'a> SiblingGst<'a> {
     }
 }
 
-/// Why a complete sibling is not the measured Goods case.
+/// Why a sibling whose six fields are present is not the measured Goods case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NotGoodsSibling {
     /// The type of supply is not Goods.
@@ -400,20 +602,320 @@ impl<'a> GoodsSibling<'a> {
                 return Err(NotGoodsSibling::NotTaxable { entry });
             }
         }
-        if sibling
-            .applicability()
-            .strip_prefix(TALLY_SANITIZED_ROOT_MARKER)
-            != Some(APPLICABLE)
-        {
+        if MarkedConstant::from_read(sibling.applicability()) != Some(MarkedConstant::Applicable) {
             return Err(NotGoodsSibling::GstNotApplicable);
         }
         Ok(Self { sibling })
     }
 
-    /// The complete read admitted as a Goods sibling.
+    /// The sibling whose six fields are present, admitted as Goods.
     pub(crate) fn sibling(&self) -> &SiblingGst<'a> {
         &self.sibling
     }
+}
+
+/// A copy with the structure of the first marked Create measured (one run, PARTIAL,
+/// §12a.13), with values read from the sibling. It refuses unmeasured GST and
+/// HSN entry counts, sources, ITC flags, state rows, duty heads, valuations and
+/// rates. The name is a `MasterName`; the parent and unit equal a row name in
+/// the same company's group or unit read; the dates were parsed by the protocol
+/// crate; and the HSN code and description do not hold the root marker. Each
+/// rate is a plain non-zero decimal on the three rows that carry one and absent
+/// on the two that do not; its magnitude is not checked, and neither is the
+/// unit's value. The draft does not hold text to plain text; the renderer does.
+/// Bridge does not know how Tally treats values other than the measured ones.
+#[derive(Debug)]
+pub(crate) struct StockItemDraft<'a> {
+    sibling: GoodsSibling<'a>,
+    name: MasterName,
+    parent: &'a str,
+    unit: &'a str,
+    gst: DraftGstEntry<'a>,
+    hsn: DraftHsnEntry<'a>,
+}
+
+impl<'a> StockItemDraft<'a> {
+    /// Checks the proposed name and sibling against the same company's group
+    /// and unit reads, then admits the first measured copy's structure (§12a.13).
+    pub(crate) fn new(
+        name: ItemNameAbsent<'a>,
+        sibling: GoodsSibling<'a>,
+        groups: &str,
+        units: &str,
+    ) -> Result<Self, DraftRefusal> {
+        if !std::ptr::eq(name.catalogue(), sibling.sibling().catalogue()) {
+            return Err(DraftRefusal::OtherCatalogue);
+        }
+        let company_guid = name.catalogue().company().company_guid();
+        let groups = parse_native_masters(NativeMasterKind::StockGroups, groups, company_guid)
+            .map_err(DraftRefusal::GroupsUnreadable)?;
+        let parent = sibling.sibling().parent();
+        if !groups.rows.iter().any(|row| row.name == parent) {
+            return Err(DraftRefusal::ParentNotInBook);
+        }
+        let units = parse_native_masters(NativeMasterKind::Units, units, company_guid)
+            .map_err(DraftRefusal::UnitsUnreadable)?;
+        let unit = sibling.sibling().unit();
+        if !units.rows.iter().any(|row| row.name == unit) {
+            return Err(DraftRefusal::UnitNotInBook);
+        }
+
+        let gst = match sibling.sibling().gst() {
+            [details] => details,
+            entries => {
+                return Err(DraftRefusal::GstEntriesNotMeasured {
+                    entries: entries.len(),
+                });
+            }
+        };
+        let hsn = match sibling.sibling().hsn() {
+            [details] => details,
+            entries => {
+                return Err(DraftRefusal::HsnEntriesNotMeasured {
+                    entries: entries.len(),
+                });
+            }
+        };
+
+        if gst.source.as_deref() != Some(SPECIFY_DETAILS_HERE) {
+            return Err(DraftRefusal::GstSourceNotMeasured);
+        }
+        if gst.ineligible_itc.is_some() {
+            return Err(DraftRefusal::ItcNotMeasured);
+        }
+        let state = match gst.states.as_slice() {
+            [state]
+                if state
+                    .state_name
+                    .as_deref()
+                    .and_then(MarkedConstant::from_read)
+                    == Some(MarkedConstant::Any) =>
+            {
+                state
+            }
+            _ => return Err(DraftRefusal::StateNotAny),
+        };
+        let mut rates = Vec::with_capacity(MEASURED_RATE_ROWS.len());
+        for (row, (duty_head, expected_valuation, rate_required)) in
+            MEASURED_RATE_ROWS.iter().enumerate()
+        {
+            let read = match state.rates.get(row) {
+                Some(read) => read,
+                None => return Err(DraftRefusal::DutyHeadNotMeasured { row }),
+            };
+            if read.duty_head.as_deref() != Some(*duty_head) {
+                return Err(DraftRefusal::DutyHeadNotMeasured { row });
+            }
+            let valuation = match read.valuation_type.as_deref() {
+                Some(BASED_ON_VALUE) => RateValuation::BasedOnValue,
+                Some(text)
+                    if MarkedConstant::from_read(text) == Some(MarkedConstant::NotApplicable) =>
+                {
+                    RateValuation::NotApplicable
+                }
+                _ => return Err(DraftRefusal::ValuationNotMeasured { row }),
+            };
+            if valuation != *expected_valuation {
+                return Err(DraftRefusal::ValuationNotMeasured { row });
+            }
+            let rate = match (&read.rate, rate_required) {
+                (GstRate::Value { decimal, .. }, true) => Some(decimal.as_str()),
+                (GstRate::Absent, false) => None,
+                _ => return Err(DraftRefusal::RateNotMeasured { row }),
+            };
+            rates.push(DraftRate {
+                duty_head,
+                valuation,
+                rate,
+            });
+        }
+        if state.rates.get(MEASURED_RATE_ROWS.len()).is_some() {
+            return Err(DraftRefusal::DutyHeadNotMeasured {
+                row: MEASURED_RATE_ROWS.len(),
+            });
+        }
+        let gst = DraftGstEntry {
+            applicable_from: &gst.applicable_from,
+            rates,
+        };
+
+        let (code, description) = match (&hsn.hsn_code, &hsn.description) {
+            (Some(code), Some(description))
+                if hsn.source.as_deref() == Some(SPECIFY_DETAILS_HERE)
+                    && !code.contains(TALLY_SANITIZED_ROOT_MARKER)
+                    && !description.contains(TALLY_SANITIZED_ROOT_MARKER) =>
+            {
+                (code.as_str(), description.as_str())
+            }
+            _ => return Err(DraftRefusal::HsnNotMeasured),
+        };
+        let hsn = DraftHsnEntry {
+            applicable_from: &hsn.applicable_from,
+            code,
+            description,
+        };
+
+        Ok(Self {
+            sibling,
+            name: name.name().clone(),
+            parent,
+            unit,
+            gst,
+            hsn,
+        })
+    }
+
+    /// The proposed name proved absent from this catalogue.
+    pub(crate) fn name(&self) -> &MasterName {
+        &self.name
+    }
+
+    /// The parent exact name proved present in the same company's group read.
+    pub(crate) fn parent(&self) -> &'a str {
+        self.parent
+    }
+
+    /// The base-unit exact name proved present in the same company's unit read.
+    pub(crate) fn unit(&self) -> &'a str {
+        self.unit
+    }
+
+    /// The one dated GST entry in the measured shape.
+    pub(crate) fn gst(&self) -> &DraftGstEntry<'a> {
+        &self.gst
+    }
+
+    /// The one dated HSN entry in the measured shape.
+    pub(crate) fn hsn(&self) -> &DraftHsnEntry<'a> {
+        &self.hsn
+    }
+
+    /// The Goods sibling whose six fields are present, from which this draft was built.
+    pub(crate) fn sibling(&self) -> &GoodsSibling<'a> {
+        &self.sibling
+    }
+}
+
+/// Marks a draft that the approval window of the later change displays before
+/// anything is built from it. Nothing in this module shows a draft to anyone;
+/// the only caller of `from_draft` is meant to be that window.
+#[derive(Debug)]
+pub(crate) struct ShownDraft<'a> {
+    draft: StockItemDraft<'a>,
+}
+
+impl<'a> ShownDraft<'a> {
+    pub(crate) fn from_draft(draft: StockItemDraft<'a>) -> Self {
+        Self { draft }
+    }
+
+    pub(crate) fn draft(&self) -> &StockItemDraft<'a> {
+        &self.draft
+    }
+}
+
+/// The measured Create wrote these five values as plain text (§12a.13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DraftText {
+    Name,
+    Parent,
+    Unit,
+    HsnCode,
+    HsnDescription,
+}
+
+/// Why a value cannot be written as the measured Create's plain text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum CreateRenderRefusal {
+    /// The value is not plain ASCII text of the kind `MasterName` admits: it is
+    /// empty, non-ASCII, holds a control character, has a space at either end,
+    /// has two spaces together, or is too long. No Create with such a value was
+    /// measured (§12a.13).
+    TextNotPlain { field: DraftText },
+    /// No Create with one of these five characters in the value was measured,
+    /// so the renderer writes no escape and refuses it (§12a.13).
+    TextNeedsEscaping { field: DraftText },
+}
+
+/// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
+/// nothing, and renders the structure of the first marked Create measured (one run,
+/// PARTIAL, §12a.13), with values read from the sibling. It checks Name, Parent,
+/// Unit, HsnCode and HsnDescription in that order and returns the first refusal.
+/// Name receives only the five-character check because it is a `MasterName`.
+/// Each other value must first pass the `MasterName` rule, then hold none of
+/// `& < > " '`. The rate's magnitude is not checked, and Bridge does not know
+/// how Tally treats values other than the measured ones.
+pub(crate) fn render_stock_item_create(
+    shown: &ShownDraft<'_>,
+) -> Result<String, CreateRenderRefusal> {
+    let draft = shown.draft();
+    for (field, text) in [
+        (DraftText::Name, draft.name().as_str()),
+        (DraftText::Parent, draft.parent()),
+        (DraftText::Unit, draft.unit()),
+        (DraftText::HsnCode, draft.hsn().code()),
+        (DraftText::HsnDescription, draft.hsn().description()),
+    ] {
+        // The closed rule also refuses an HSN description or a group or unit
+        // name with two spaces together, non-ASCII text or over 16,384 bytes;
+        // this is Bridge's choice, not a Tally fact.
+        if field != DraftText::Name && MasterName::new(text).is_err() {
+            return Err(CreateRenderRefusal::TextNotPlain { field });
+        }
+        if text
+            .chars()
+            .any(|c| matches!(c, '&' | '<' | '>' | '"' | '\''))
+        {
+            return Err(CreateRenderRefusal::TextNeedsEscaping { field });
+        }
+    }
+
+    let name = draft.name().as_str();
+    let parent = draft.parent();
+    let unit = draft.unit();
+    let applicability = MarkedConstant::Applicable.render();
+    let gst = draft.gst();
+    let applicable_from = gst.applicable_from();
+    let state = MarkedConstant::Any.render();
+    let mut message = format!(
+        "<TALLYMESSAGE><STOCKITEM NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME><PARENT>{parent}</PARENT><BASEUNITS>{unit}</BASEUNITS><GSTAPPLICABLE>{applicability}</GSTAPPLICABLE><GSTTYPEOFSUPPLY>{GOODS}</GSTTYPEOFSUPPLY><GSTDETAILS.LIST><APPLICABLEFROM>{applicable_from}</APPLICABLEFROM><TAXABILITY>{TAXABLE}</TAXABILITY><SRCOFGSTDETAILS>{SPECIFY_DETAILS_HERE}</SRCOFGSTDETAILS><STATEWISEDETAILS.LIST><STATENAME>{state}</STATENAME>"
+    );
+    for rate in gst.rates() {
+        message.push_str("<RATEDETAILS.LIST><GSTRATEDUTYHEAD>");
+        message.push_str(rate.duty_head());
+        message.push_str("</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE>");
+        message.push_str(rate.valuation().render());
+        message.push_str("</GSTRATEVALUATIONTYPE>");
+        if let Some(value) = rate.rate() {
+            message.push_str("<GSTRATE>");
+            message.push_str(value);
+            message.push_str("</GSTRATE>");
+        }
+        message.push_str("</RATEDETAILS.LIST>");
+    }
+    message.push_str(
+        "<GSTSLABRATES.LIST></GSTSLABRATES.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>",
+    );
+    let hsn = draft.hsn();
+    let hsn_from = hsn.applicable_from();
+    let code = hsn.code();
+    let description = hsn.description();
+    message.push_str(&format!(
+        "<HSNDETAILS.LIST><APPLICABLEFROM>{hsn_from}</APPLICABLEFROM><HSNCODE>{code}</HSNCODE><HSN>{description}</HSN><SRCOFHSNDETAILS>{SPECIFY_DETAILS_HERE}</SRCOFHSNDETAILS></HSNDETAILS.LIST></STOCKITEM></TALLYMESSAGE>"
+    ));
+
+    let company = shown
+        .draft()
+        .sibling()
+        .sibling()
+        .catalogue()
+        .company()
+        .display_name();
+    Ok(render_import_envelope(
+        company,
+        ImportReport::AllMasters,
+        &message,
+    ))
 }
 
 #[cfg(test)]

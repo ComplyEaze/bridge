@@ -1,6 +1,6 @@
 # 2214 export cut on the current desktop app: the party/ledger master export, with its mailing read cut at the 20 s limit (Part of #2214)
 
-Not for merge. Draft for the run coordinator: **the build block below is not yet filled, and the row does not start until it is.** About 70 minutes, one sitting. Form and rules are those of `lab/2074-2214-export-cut` at `7a49b5c1` (the sheet of the W row), whose Part W4 this row runs again, alone, on a current desktop app: `LAB-COMMON.md`, `relay.py`, `scripts/make_front.py` and `requests/marks.utf16le.xml` are that sheet's files, byte for byte (see `SHA256.txt`).
+Not for merge. Draft for the run coordinator: **the build block below is filled from the W row's record, and the lab confirms the two installed hashes at P0 (STOP if they differ).** About 70 minutes, one sitting. Form and rules are those of `lab/2074-2214-export-cut` at `7a49b5c1` (the sheet of the W row), whose Part W4 this row runs again, alone, on a current desktop app: `LAB-COMMON.md`, `relay.py`, `scripts/make_front.py` and `requests/marks.utf16le.xml` are that sheet's files, byte for byte (see `SHA256.txt`).
 
 ## The one question
 **With a front of Journals queued ahead of the export's mailing read, does the export on the current desktop app fail closed with its sentence, write no file, and send no master post to Tally until the drain clears?**
@@ -18,7 +18,7 @@ Why this row: #2214 was reopened on 9 Nov 2026 because the 8 Nov export step ran
 ## Needs, and what needs a person
 - **The installed desktop app** whose two files' hashes equal the build block. This sheet installs nothing: an install (the NSIS setup from Explorer, as on 8 Nov) is an owner act outside this sheet. If the hashes differ: STOP and tell the run coordinator.
 - **No setting of the app is changed.** The app's Tally endpoint must already read `127.0.0.1:9002` when it starts (the W row found it so). If it reads anything else: STOP. Choosing THE COMPANY in the app's company list is the one click that is not an export; the W row made it.
-- **Acts on application windows, all by the lab, none by the owner:** starting the app by `helpers\app-start.cmd`; the clicks of W0 and W4 (the company choice, the export button); closing the app at Close by its window's close button, as the W row did. No application is restarted during the row and no process is ended by name or number. If closing the app at Close is not wanted, leave it running and say so in the notes: nothing after it needs it closed.
+- **Acts on application windows, all by the lab, none by the owner:** starting the app by `helpers\app-start.cmd`; the clicks of W0 and W4 (the company choice, the export button); the app is left running at Close, with a line in the notes saying so (nothing after it needs it closed); closing it by its window's close button, as the W row did, is allowed. No application is restarted during the row and no process is ended by name or number.
 - **The run coordinator's word** for the restore (C6), as in every row.
 - **Standing words the lab names in its notes:** raw requests, writes included (26 Oct 2026); master writes on a synthetic book (28 Oct 2026); the backup (C5).
 
@@ -39,21 +39,21 @@ Why this row: #2214 was reopened on 9 Nov 2026 because the 8 Nov export step ran
 
 **Keys.** The Gateway is the only Tally screen used: Select Company at P0, Backup at S0, Restore and Company > Shut at Close. Never Ctrl+Q or Escape at the Gateway. Licensed mode only; Education mode = STOP.
 
-## Build (NOT YET FILLED: the run coordinator fills this block after picking the build)
+## Build (filled from the W row's record; the lab confirms the two installed hashes at P0, STOP if they differ)
 | line | value |
 |---|---|
-| head commit of the build | NOT FILLED |
-| CI run (name, id, trigger, result) | NOT FILLED |
-| artifact name and GitHub digest | NOT FILLED |
-| bundle zip: bytes and sha256 | NOT FILLED |
-| app version string | NOT FILLED |
-| installed `bridge.exe` sha256, read from the real install path | NOT FILLED |
-| installed `bridge_mcp.exe` sha256, read from the real install path | NOT FILLED |
-| the bundle's `bridge_mcp.exe` sha256 (the server of every tool read) | NOT FILLED |
-| TallyPrime release and edition at the lab | NOT FILLED |
-| the app's file lines this sheet cites, rechecked at that head | NOT FILLED |
+| head commit of the build | `a83ee02da443fb1e2256919b18b4a5fb84056781` (master), the commit the W row's RESULTS names. It holds both changes this row tests: `9821af8e` (PR 2188) and `2a886581` (PR 2204). |
+| CI run (name, id, trigger, result) | As recorded in the W row's RESULTS (run id not in the pushed record): trigger scheduled, branch master, result success. The lab does not look the run up; the line below it is the record. |
+| artifact name and GitHub digest | `unsigned-bundle-smoke-windows-latest`; GitHub digest `sha256:4f6e91b082d5fde228aded36713e65dcb0f65f36a7fb7f13bb03730aa8a72734` (the W row records that the zip on its PC equalled it). |
+| bundle zip: bytes and sha256 | Not in the W row's pushed record: the lab reads it at P0 (it is the file already on the lab PC) and records it in the notes. Its sha256 is expected to equal the GitHub digest above; if it does not, record that and send it, do not explain it. |
+| app version string | 0.7.0, as the W row records the installed desktop app. The lab reads the version string at P0 and records it. |
+| installed `bridge.exe` sha256, read from the real install path | `8c1a640d4fb8a8e2586683beb90bd421776bae07908bf03f351906230e53a8ed` (W row). The lab reads it at P0 with `helpers\close-hash.cmd`; a difference = STOP. |
+| installed `bridge_mcp.exe` sha256, read from the real install path | `7086f1d0d7430e7dc1fefd6f69c0d4a14d717a2e06477b32935a1d3aa4fee1b8` (W row). The lab reads it at P0 with `helpers\close-hash.cmd`; a difference = STOP. |
+| the bundle's `bridge_mcp.exe` sha256 (the server of every tool read) | The W row records its server as that bundle's `bridge_mcp.exe`, `7086f1d0d7430e7dc1fefd6f69c0d4a14d717a2e06477b32935a1d3aa4fee1b8` (equal to the bundle's `binary_sha256`), server version 0.7.0. The lab reads the hash of the exe it runs at P0 and `client.py` refuses on a difference. |
+| TallyPrime release and edition at the lab | Release 7.2 as the W row records it; the edition is stated there only as "as recorded", with no value in the pushed record: the lab reads the edition at P0 and records it (Licensed mode is required; Education mode = STOP). |
+| the app's file lines this sheet cites, rechecked at that head | Rechecked at `a83ee02d`. `src-tauri/src/commands.rs:489` (`MAILING_DETAILS_READ_FAILED_SENTENCE`, holding "The read that failed also asked Tally for each party's dated mailing addresses"); `commands.rs:427-428` (the export's opening "ComplyEaze Bridge withheld the party/ledger master: {}", with the sentence appended at `:444` for a deadline); `src-tauri/src/tally/connection.rs:208` (`MailingReadFailure::decision`, mapping `Deadline` to `MailingReadDecision::Refuse` at `:211-213`; the enum is at `:184` and the refusal is taken at `:2472`); `src/OutstandingsScreen.tsx:714` (the button "Ledger master + group subtotal trace"); `src-tauri/src/commands.rs:252` (the code `tally_request_deadline_exceeded`), shown in brackets by `src/tally-command-error.tsx:59` and `:94`. Every quoted string equals the head's text. |
 
-**File lines to recheck at that head:** the export's failure message, `commands.rs` (`MAILING_DETAILS_READ_FAILED_SENTENCE`, and the sentence that opens "ComplyEaze Bridge withheld the party/ledger master:"); the decision, `tally/connection.rs` (`MailingReadFailure::decision`); the button, `OutstandingsScreen.tsx` ("Ledger master + group subtotal trace"). At master `72c2408b8` the sentence and the button read as quoted in this sheet; any difference at the picked head is recorded before W0.
+**File lines to recheck at that head:** the export's failure message, `commands.rs` (`MAILING_DETAILS_READ_FAILED_SENTENCE`, and the sentence that opens "ComplyEaze Bridge withheld the party/ledger master:"); the decision, `tally/connection.rs` (`MailingReadFailure::decision`); the button, `OutstandingsScreen.tsx` ("Ledger master + group subtotal trace"). At master `72c2408b8` the sentence and the button read as quoted in this sheet, and they read the same at the picked head `a83ee02d` (line numbers in the table above); the lab need not recheck them.
 
 ## Inputs
 - **The kit:** this folder, copied whole to `<lab folder>\sheet\`. `SHA256.txt` lists every file with its bytes; check each before P0.
@@ -92,7 +92,7 @@ Why this row: #2214 was reopened on 9 Nov 2026 because the 8 Nov export step ran
 ## Part W0: the baseline export (no front)
 1. App start: `helpers\app-start.cmd`. EXPECT its output file to show one `bridge.exe` process at the real install path with a sha256 equal to the build block's. Check Tally in the app: EXPECT the endpoint `127.0.0.1:9002`, reachable, THE COMPANY alone offered; choose it. Anything else = STOP.
 2. `scripts\listdirs.cmd w0-before`. Note `relay.jsonl`'s line count `L0`.
-3. Press the Outstandings screen's "Ledger master + group subtotal trace" with the As of field at the host's date. No front is armed.
+3. On the app's Overview screen (the left-hand "Overview" item; its component is `OutstandingsScreen`, `src/main.tsx:104`, `:1260` and `:1578-1580` at `a83ee02d`), press "Ledger master + group subtotal trace" with the As of field at the host's date. No front is armed.
 4. `scripts\listdirs.cmd w0-after`. `python -I -X utf8 cutlog.py <relay.jsonl> L0+1 > evidence\w0-cutlog.txt`. Save the workbook's name, bytes and sha256.
 - **EXPECT (W0):**
   - `w0-cutlog.txt`: one "mailing master" request from the app's connection, state `answered`; no `front_send` and no `bridge_cut` line; the SUMMARY reads "no bridge_cut". A "standard master" request in the log is recorded, not graded: it would show another path of the app, not a failure of this step.
@@ -122,7 +122,7 @@ Why this row: #2214 was reopened on 9 Nov 2026 because the 8 Nov export step ran
 | 12 | Drain record `{"state":"clear"}` after the Whole read and the marks. | `debt\` copy |
 
 ## Close
-1. Writes off: reads only. Close the app by its window's close button (or leave it, and say so). Stop the server by `run2\inbox\stop`. Stop the relay by the lab's own handle on the process it started, not by name or number. Parse `relay.jsonl` whole; each `relay_error` or `tally_closed` line, if any, is named in the notes.
+1. Writes off: reads only. Leave the app running and say so in the notes (closing it by its window's close button is allowed). Stop the server by `run2\inbox\stop`. Stop the relay by the lab's own handle on the process it started, not by name or number. Parse `relay.jsonl` whole; each `relay_error` or `tally_closed` line, if any, is named in the notes.
 2. Re-hash the installed app's two files (`helpers\close-hash.cmd`), the server exe and the kit: all equal to P0's.
 3. **Restore the S0 backup by C6**, on the run coordinator's word, with `helpers\c6prep.py before` and `after`.
 4. MARKS: EXPECT 224 / 87, as after S0. Then `helpers\setup-run3.py` and a basic `ledger_masters` through a new server on port 9001 (`args\basic.json`): EXPECT 11 ledgers.

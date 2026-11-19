@@ -425,6 +425,94 @@ fn non_blank_text(text: &str) -> bool {
     !text.trim().is_empty()
 }
 
+// The six readers of the sibling rule, one per field. Each gives `None` for a
+// field `SiblingGst::named` refuses; `named` and `missing_fields` both use them.
+
+fn read_parent(item: &CandidateStockItem) -> Option<&str> {
+    // The parser gives no parent for one that is empty after `str::trim`
+    // (`native_masters.rs`), so `Some` is never blank here.
+    item.parent.as_deref()
+}
+
+fn read_unit(item: &CandidateStockItem) -> Option<&str> {
+    match &item.base_units {
+        ScalarObservation::Text(unit) if non_blank_text(unit) => Some(unit.as_str()),
+        _ => None,
+    }
+}
+
+fn read_applicability(item: &CandidateStockItem) -> Option<&str> {
+    match &item.gst_applicable {
+        ScalarObservation::Text(applicability) if non_blank_text(applicability) => {
+            Some(applicability.as_str())
+        }
+        _ => None,
+    }
+}
+
+fn read_supply(item: &CandidateStockItem) -> Option<&str> {
+    match &item.gst_type_of_supply {
+        ScalarObservation::Text(supply) if non_blank_text(supply) => Some(supply.as_str()),
+        _ => None,
+    }
+}
+
+fn read_gst(item: &CandidateStockItem) -> Option<&[GstDetailsEntry]> {
+    let gst = match &item.gst {
+        GstDetailsObservation::Entries { entries } if !entries.is_empty() => entries.as_slice(),
+        _ => return None,
+    };
+    let gst_complete = gst.iter().all(|entry| {
+        non_blank(&entry.taxability)
+            && non_blank(&entry.source)
+            && !entry.other_content_skipped
+            && !entry.states.is_empty()
+            && entry.states.iter().all(|state| {
+                non_blank(&state.state_name)
+                    && !state.slab_rates_present
+                    && !state.rates.is_empty()
+                    && state
+                        .rates
+                        .iter()
+                        .all(|rate| non_blank(&rate.duty_head) && non_blank(&rate.valuation_type))
+            })
+    });
+    gst_complete.then_some(gst)
+}
+
+fn read_hsn(item: &CandidateStockItem) -> Option<&[HsnDetailsEntry]> {
+    let hsn = match &item.hsn {
+        HsnDetailsObservation::Entries { entries } if !entries.is_empty() => entries.as_slice(),
+        _ => return None,
+    };
+    let hsn_complete = hsn.iter().all(|entry| {
+        non_blank(&entry.hsn_code)
+            && non_blank(&entry.description)
+            && non_blank(&entry.source)
+            && !entry.other_content_skipped
+    });
+    hsn_complete.then_some(hsn)
+}
+
+/// Every field of `item` that `SiblingGst::named` refuses, in the order it
+/// checks them; `named` refuses with the first.
+pub(super) fn missing_fields(item: &CandidateStockItem) -> Vec<SiblingField> {
+    [
+        (SiblingField::Parent, read_parent(item).is_none()),
+        (SiblingField::Unit, read_unit(item).is_none()),
+        (
+            SiblingField::Applicability,
+            read_applicability(item).is_none(),
+        ),
+        (SiblingField::TypeOfSupply, read_supply(item).is_none()),
+        (SiblingField::GstDetails, read_gst(item).is_none()),
+        (SiblingField::HsnDetails, read_hsn(item).is_none()),
+    ]
+    .into_iter()
+    .filter_map(|(field, missing)| missing.then_some(field))
+    .collect()
+}
+
 impl<'a> SiblingGst<'a> {
     /// Finds the one item that holds the name exactly, as its row name or a name
     /// entry, then requires all six fields. A name that only folds to an item is refused.
@@ -459,60 +547,14 @@ impl<'a> SiblingGst<'a> {
             }
             _ => return Err(SiblingRefusal::Ambiguous { items: exact.len() }),
         };
-        let parent = match &item.parent {
-            // The parser gives no parent for one that is empty after `str::trim`
-            // (`native_masters.rs`), so `Some` is never blank here.
-            Some(parent) => parent.as_str(),
-            _ => return Err(SiblingRefusal::Incomplete(SiblingField::Parent)),
-        };
-        let unit = match &item.base_units {
-            ScalarObservation::Text(unit) if non_blank_text(unit) => unit.as_str(),
-            _ => return Err(SiblingRefusal::Incomplete(SiblingField::Unit)),
-        };
-        let applicability = match &item.gst_applicable {
-            ScalarObservation::Text(applicability) if non_blank_text(applicability) => {
-                applicability.as_str()
-            }
-            _ => return Err(SiblingRefusal::Incomplete(SiblingField::Applicability)),
-        };
-        let supply = match &item.gst_type_of_supply {
-            ScalarObservation::Text(supply) if non_blank_text(supply) => supply.as_str(),
-            _ => return Err(SiblingRefusal::Incomplete(SiblingField::TypeOfSupply)),
-        };
-        let gst = match &item.gst {
-            GstDetailsObservation::Entries { entries } if !entries.is_empty() => entries.as_slice(),
-            _ => return Err(SiblingRefusal::Incomplete(SiblingField::GstDetails)),
-        };
-        let gst_complete = gst.iter().all(|entry| {
-            non_blank(&entry.taxability)
-                && non_blank(&entry.source)
-                && !entry.other_content_skipped
-                && !entry.states.is_empty()
-                && entry.states.iter().all(|state| {
-                    non_blank(&state.state_name)
-                        && !state.slab_rates_present
-                        && !state.rates.is_empty()
-                        && state.rates.iter().all(|rate| {
-                            non_blank(&rate.duty_head) && non_blank(&rate.valuation_type)
-                        })
-                })
-        });
-        if !gst_complete {
-            return Err(SiblingRefusal::Incomplete(SiblingField::GstDetails));
-        }
-        let hsn = match &item.hsn {
-            HsnDetailsObservation::Entries { entries } if !entries.is_empty() => entries.as_slice(),
-            _ => return Err(SiblingRefusal::Incomplete(SiblingField::HsnDetails)),
-        };
-        let hsn_complete = hsn.iter().all(|entry| {
-            non_blank(&entry.hsn_code)
-                && non_blank(&entry.description)
-                && non_blank(&entry.source)
-                && !entry.other_content_skipped
-        });
-        if !hsn_complete {
-            return Err(SiblingRefusal::Incomplete(SiblingField::HsnDetails));
-        }
+        use SiblingRefusal::Incomplete;
+        let parent = read_parent(item).ok_or(Incomplete(SiblingField::Parent))?;
+        let unit = read_unit(item).ok_or(Incomplete(SiblingField::Unit))?;
+        let applicability =
+            read_applicability(item).ok_or(Incomplete(SiblingField::Applicability))?;
+        let supply = read_supply(item).ok_or(Incomplete(SiblingField::TypeOfSupply))?;
+        let gst = read_gst(item).ok_or(Incomplete(SiblingField::GstDetails))?;
+        let hsn = read_hsn(item).ok_or(Incomplete(SiblingField::HsnDetails))?;
         Ok(Self {
             catalogue,
             item,
@@ -659,101 +701,7 @@ impl<'a> StockItemDraft<'a> {
         if !units.rows.iter().any(|row| row.name == unit) {
             return Err(DraftRefusal::UnitNotInBook);
         }
-
-        let gst = match sibling.sibling().gst() {
-            [details] => details,
-            entries => {
-                return Err(DraftRefusal::GstEntriesNotMeasured {
-                    entries: entries.len(),
-                });
-            }
-        };
-        let hsn = match sibling.sibling().hsn() {
-            [details] => details,
-            entries => {
-                return Err(DraftRefusal::HsnEntriesNotMeasured {
-                    entries: entries.len(),
-                });
-            }
-        };
-
-        if gst.source.as_deref() != Some(SPECIFY_DETAILS_HERE) {
-            return Err(DraftRefusal::GstSourceNotMeasured);
-        }
-        if gst.ineligible_itc.is_some() {
-            return Err(DraftRefusal::ItcNotMeasured);
-        }
-        let state = match gst.states.as_slice() {
-            [state]
-                if state
-                    .state_name
-                    .as_deref()
-                    .and_then(MarkedConstant::from_read)
-                    == Some(MarkedConstant::Any) =>
-            {
-                state
-            }
-            _ => return Err(DraftRefusal::StateNotAny),
-        };
-        let mut rates = Vec::with_capacity(MEASURED_RATE_ROWS.len());
-        for (row, (duty_head, expected_valuation, rate_required)) in
-            MEASURED_RATE_ROWS.iter().enumerate()
-        {
-            let read = match state.rates.get(row) {
-                Some(read) => read,
-                None => return Err(DraftRefusal::DutyHeadNotMeasured { row }),
-            };
-            if read.duty_head.as_deref() != Some(*duty_head) {
-                return Err(DraftRefusal::DutyHeadNotMeasured { row });
-            }
-            let valuation = match read.valuation_type.as_deref() {
-                Some(BASED_ON_VALUE) => RateValuation::BasedOnValue,
-                Some(text)
-                    if MarkedConstant::from_read(text) == Some(MarkedConstant::NotApplicable) =>
-                {
-                    RateValuation::NotApplicable
-                }
-                _ => return Err(DraftRefusal::ValuationNotMeasured { row }),
-            };
-            if valuation != *expected_valuation {
-                return Err(DraftRefusal::ValuationNotMeasured { row });
-            }
-            let rate = match (&read.rate, rate_required) {
-                (GstRate::Value { decimal, .. }, true) => Some(decimal.as_str()),
-                (GstRate::Absent, false) => None,
-                _ => return Err(DraftRefusal::RateNotMeasured { row }),
-            };
-            rates.push(DraftRate {
-                duty_head,
-                valuation,
-                rate,
-            });
-        }
-        if state.rates.get(MEASURED_RATE_ROWS.len()).is_some() {
-            return Err(DraftRefusal::DutyHeadNotMeasured {
-                row: MEASURED_RATE_ROWS.len(),
-            });
-        }
-        let gst = DraftGstEntry {
-            applicable_from: &gst.applicable_from,
-            rates,
-        };
-
-        let (code, description) = match (&hsn.hsn_code, &hsn.description) {
-            (Some(code), Some(description))
-                if hsn.source.as_deref() == Some(SPECIFY_DETAILS_HERE)
-                    && !code.contains(TALLY_SANITIZED_ROOT_MARKER)
-                    && !description.contains(TALLY_SANITIZED_ROOT_MARKER) =>
-            {
-                (code.as_str(), description.as_str())
-            }
-            _ => return Err(DraftRefusal::HsnNotMeasured),
-        };
-        let hsn = DraftHsnEntry {
-            applicable_from: &hsn.applicable_from,
-            code,
-            description,
-        };
+        let (gst, hsn) = measured_shape(sibling.sibling())?;
 
         Ok(Self {
             sibling,
@@ -794,6 +742,108 @@ impl<'a> StockItemDraft<'a> {
     pub(crate) fn sibling(&self) -> &GoodsSibling<'a> {
         &self.sibling
     }
+}
+
+/// A sibling's GST and HSN lists as the first measured copy's entries
+/// (§12a.13), refusing in the order `StockItemDraft::new` refuses them.
+pub(super) fn measured_shape<'a>(
+    sibling: &SiblingGst<'a>,
+) -> Result<(DraftGstEntry<'a>, DraftHsnEntry<'a>), DraftRefusal> {
+    let gst = match sibling.gst() {
+        [details] => details,
+        entries => {
+            return Err(DraftRefusal::GstEntriesNotMeasured {
+                entries: entries.len(),
+            });
+        }
+    };
+    let hsn = match sibling.hsn() {
+        [details] => details,
+        entries => {
+            return Err(DraftRefusal::HsnEntriesNotMeasured {
+                entries: entries.len(),
+            });
+        }
+    };
+
+    if gst.source.as_deref() != Some(SPECIFY_DETAILS_HERE) {
+        return Err(DraftRefusal::GstSourceNotMeasured);
+    }
+    if gst.ineligible_itc.is_some() {
+        return Err(DraftRefusal::ItcNotMeasured);
+    }
+    let state = match gst.states.as_slice() {
+        [state]
+            if state
+                .state_name
+                .as_deref()
+                .and_then(MarkedConstant::from_read)
+                == Some(MarkedConstant::Any) =>
+        {
+            state
+        }
+        _ => return Err(DraftRefusal::StateNotAny),
+    };
+    let mut rates = Vec::with_capacity(MEASURED_RATE_ROWS.len());
+    for (row, (duty_head, expected_valuation, rate_required)) in
+        MEASURED_RATE_ROWS.iter().enumerate()
+    {
+        let read = match state.rates.get(row) {
+            Some(read) => read,
+            None => return Err(DraftRefusal::DutyHeadNotMeasured { row }),
+        };
+        if read.duty_head.as_deref() != Some(*duty_head) {
+            return Err(DraftRefusal::DutyHeadNotMeasured { row });
+        }
+        let valuation = match read.valuation_type.as_deref() {
+            Some(BASED_ON_VALUE) => RateValuation::BasedOnValue,
+            Some(text)
+                if MarkedConstant::from_read(text) == Some(MarkedConstant::NotApplicable) =>
+            {
+                RateValuation::NotApplicable
+            }
+            _ => return Err(DraftRefusal::ValuationNotMeasured { row }),
+        };
+        if valuation != *expected_valuation {
+            return Err(DraftRefusal::ValuationNotMeasured { row });
+        }
+        let rate = match (&read.rate, rate_required) {
+            (GstRate::Value { decimal, .. }, true) => Some(decimal.as_str()),
+            (GstRate::Absent, false) => None,
+            _ => return Err(DraftRefusal::RateNotMeasured { row }),
+        };
+        rates.push(DraftRate {
+            duty_head,
+            valuation,
+            rate,
+        });
+    }
+    if state.rates.get(MEASURED_RATE_ROWS.len()).is_some() {
+        return Err(DraftRefusal::DutyHeadNotMeasured {
+            row: MEASURED_RATE_ROWS.len(),
+        });
+    }
+    let gst = DraftGstEntry {
+        applicable_from: &gst.applicable_from,
+        rates,
+    };
+
+    let (code, description) = match (&hsn.hsn_code, &hsn.description) {
+        (Some(code), Some(description))
+            if hsn.source.as_deref() == Some(SPECIFY_DETAILS_HERE)
+                && !code.contains(TALLY_SANITIZED_ROOT_MARKER)
+                && !description.contains(TALLY_SANITIZED_ROOT_MARKER) =>
+        {
+            (code.as_str(), description.as_str())
+        }
+        _ => return Err(DraftRefusal::HsnNotMeasured),
+    };
+    let hsn = DraftHsnEntry {
+        applicable_from: &hsn.applicable_from,
+        code,
+        description,
+    };
+    Ok((gst, hsn))
 }
 
 /// Marks a draft that the approval window of the later change displays before

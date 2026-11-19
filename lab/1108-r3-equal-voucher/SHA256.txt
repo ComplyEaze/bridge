@@ -1,0 +1,37 @@
+# sha256  bytes  file. Provenance, by branch @ commit and path:
+# BYTE-EQUAL to lab/1108-r-rows-sheet @ 8c9c11b9, lab/1108-r/<same path>: .gitattributes (f50b500a), LAB-COMMON.md (5370c6d2), check_1108.py (9e0a3cb8), check-request-ids.py (8889de2c), relay-keep.py (ca2c0018), check-relay-keep.py (6f93e15a), check-exchanges.py (8d45af6d), test-exchanges.py (46f3a431), requests/marks.utf16le.xml (5802b3fe), requests/flags.utf16le.xml (7146a97f), requests/ledgers.utf16le.xml (6b8bda84), requests/vouchers.utf16le.xml (6af4d714), helpers/box.ps1 (550fc11f), helpers/call.py (d72843b3), helpers/show.py (e4f1b295), helpers/capwin2.ps1 (1a326a4c), helpers/front.ps1 (51c2bb22).
+# BYTE-EQUAL to lab/1108-r-rows-sheet @ 8c9c11b9, lab/1108-r/batches/r0.json: batches/r3.json (d87c2862).
+# CHANGED from lab/1108-r-rows-sheet @ 8c9c11b9, lab/1108-r/helpers/<same name> (R's sha256 in brackets), only the row folder C:/bridge-lab/1108r3 and sheet folder lab/1108-r3 in place of R's, plus for send.py the write-once rule also covering e1- files, and each first comment line: args1108.py (f6babb05), body.py (2143b91c), boxcheck.py (ee234e95), cap.py (dce49834), chk.py (47c86383), p1108s2.py (3c3a4504), send.py (9971d42c).
+# BYTE-EQUAL to lab/1108-r-rows-answers @ 1300c41e, lab/1108-r-rows-answers/scripts/<name>, pushed copies with the placeholders <LAB_DIR> and <Tally data folder>, which the lab sets in copies kept in the row folder: placeholder-helpers/note.py (ca6ccc24), placeholder-helpers/c6prep.py (c9fb22e8).
+# NEW, not run on Windows: RUN-SHEET.md, setup-r3.py, scripts/make_e1.py, requests/e1-equal-first.utf16le.xml (made by make_e1.py on macOS; its shape compared there with the seed Journal request of rows R0 to R2; it has not met Tally).
+f50b500ac7ddb47b8fbf83724776360fd559a27996b047ed134226093f27014e  67  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+f7f8f97bc79cf8a43e5fd042c6af4700873f65775f3ab816036b2067f6c6d451  34494  RUN-SHEET.md
+d87c28629ce5701317bf1bde79e183ab0b9404f36c5bae33ff9bcf3a28982e7d  690  batches/r3.json
+8d45af6d19f41b97ef286e7e13772af23645bf336e1e0b585ec12a0ced803d5d  7167  check-exchanges.py
+6f93e15a5aa2c3862ab4ec431d15cb728d59ceb6d3cdbb45a6da823bfe5fc60c  8748  check-relay-keep.py
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
+9e0a3cb8876332dafa92dd78619654b8dd89fc5579b4df676801c9e64b30b3c3  7165  check_1108.py
+6efe38b4d9f2f9e17d028b2f326dc9f75f9f92211a2996816e5bb59c627a7b9d  1428  helpers/args1108.py
+8c676affdccad01ca7ca988ea042c32d49d1e6eef5564ec65c074d55900a01d3  1534  helpers/body.py
+550fc11f53a495c6a34a5b9ab6f17b4f4fe574bb778a7a023d44e02d9dc0bfb3  7322  helpers/box.ps1
+fdc4a73738675186404f907916d8ab606b9aa27249cc8efd8630e7f7df682d90  4318  helpers/boxcheck.py
+d72843b382d76371fd07c11efdafe2a1d031e5fd3e203b7baba3a5c7a1ef6c67  2770  helpers/call.py
+f20300af795abc4cec49fd4493c53dcd468b7d50576f6b3709ae922cb50a71e7  1254  helpers/cap.py
+1a326a4ccd5494842ebad1c243286ade4a9a4e75e45c3ddf9e93acbda531a655  1249  helpers/capwin2.ps1
+e7d0f09929f4aff6edda93c04965dbdbb247e8114ec646d7a4be08e95ab1c235  2625  helpers/chk.py
+51c2bb22bafd1b4c78a356b4ad8764f028814e073aa9626dae2b463b0db57411  537  helpers/front.ps1
+2d2112790b33b59cca9464a7723f6ec63668aad22348ca254ddba3fc5db69b8e  7154  helpers/p1108s2.py
+4ee06e4a4aeb58cbfb31b5efaae6c0fc812b9ad888c0e19ff9de896783f441be  3482  helpers/send.py
+e4f1b295459b76ba47a30968e29dc98263436c54422e939dfae3a0cc98f65416  1550  helpers/show.py
+c9fb22e8b5ea0d158340e39bd5855a72b431c049c0287bda3833d468e0bb61f0  2728  placeholder-helpers/c6prep.py
+ca6ccc24681461d1cacecbf33e7b303c1c4da135ded48769bc920385adba9abe  503  placeholder-helpers/note.py
+ca2c0018e9f4ddb09d4abbeac869a076a4ca0760265db934f1bbceffb15c2117  10024  relay-keep.py
+493399a35c481542d76febff5661b8a678fe95d569871a3ae171c2697f3d1ed8  1826  requests/e1-equal-first.utf16le.xml
+7146a97fb35faeed0df69dc208f0999e4549433819030011f63fc7d1523585b2  1154  requests/flags.utf16le.xml
+6b8bda84c414413acccf231e0c295aa3a4aab9bb9d844b0bab9c1316684421f0  1124  requests/ledgers.utf16le.xml
+5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b  990  requests/marks.utf16le.xml
+6af4d7142baffbae2d0133b25251d4762e030d1db64a2bccd0900dd69445b9a8  1450  requests/vouchers.utf16le.xml
+008d527432bf64bb516ab3fce89ee911530b81c308b593d138b545fc4ba97c09  3019  scripts/make_e1.py
+833b3257ca65a1de225b1fd0d4283677a557116c482d93d26183b78ad89ac458  7187  setup-r3.py
+46f3a43151b5fc6f8df908d3331e4acc09a6a6460fe77ee64e4c35458b71cffe  7786  test-exchanges.py

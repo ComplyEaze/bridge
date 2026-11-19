@@ -31,8 +31,9 @@
 //! showed it (one run, PARTIAL; §12a.13). One shape was measured, and these two
 //! types do not examine the rates, the sources, the state names, the valuation
 //! types, the ineligible-ITC flag, the number of dated entries or state rows, or
-//! a parent at the root. The type that holds a copy to send must admit the
-//! measured shape only.
+//! a parent at the root. `StockItemDraft` is the type that holds a copy to
+//! send: it admits the measured shape only, and a later builder renders it
+//! (§12a.13).
 
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -42,9 +43,11 @@ use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError, NameCollision,
 };
-use bridge_tally_protocol::gst_details::{GstDetailsEntry, GstDetailsObservation};
+use bridge_tally_protocol::gst_details::{GstDetailsEntry, GstDetailsObservation, GstRate};
 use bridge_tally_protocol::hsn_details::{HsnDetailsEntry, HsnDetailsObservation};
-use bridge_tally_protocol::native_masters::NativeMastersError;
+use bridge_tally_protocol::native_masters::{
+    parse_native_masters, NativeMasterKind, NativeMastersError,
+};
 use bridge_tally_protocol::stock_item_candidate::{
     parse_candidate_stock_items, CandidateStockItem, ScalarObservation,
 };
@@ -52,7 +55,153 @@ use bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER;
 
 const GOODS: &str = "Goods";
 const TAXABLE: &str = "Taxable";
-const APPLICABLE: &str = " Applicable";
+const SPECIFY_DETAILS_HERE: &str = "Specify Details Here";
+const BASED_ON_VALUE: &str = "Based on Value";
+
+/// A control-reference value that the measured copy kept marked (§12a.13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MarkedConstant {
+    /// GST applicability in the measured marked form.
+    Applicable,
+    /// The one state row in the measured marked form.
+    Any,
+    /// The Cess valuation in the measured marked form.
+    NotApplicable,
+}
+
+impl MarkedConstant {
+    /// Recognises only the exact marked text returned by the read.
+    pub(crate) fn from_read(text: &str) -> Option<Self> {
+        match text.strip_prefix(TALLY_SANITIZED_ROOT_MARKER) {
+            Some(" Applicable") => Some(Self::Applicable),
+            Some(" Any") => Some(Self::Any),
+            Some(" Not Applicable") => Some(Self::NotApplicable),
+            _ => None,
+        }
+    }
+}
+
+/// The two valuation values the measured copy sent (§12a.13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RateValuation {
+    /// The valuation sent on CGST, SGST/UTGST, IGST and State Cess.
+    BasedOnValue,
+    /// The marked valuation sent on Cess.
+    NotApplicable,
+}
+
+/// The five duty rows of the measured copy, in order: duty head, valuation and
+/// whether a rate value is required (§12a.13).
+const MEASURED_RATE_ROWS: [(&str, RateValuation, bool); 5] = [
+    ("CGST", RateValuation::BasedOnValue, true),
+    ("SGST/UTGST", RateValuation::BasedOnValue, true),
+    ("IGST", RateValuation::BasedOnValue, true),
+    ("Cess", RateValuation::NotApplicable, false),
+    ("State Cess", RateValuation::BasedOnValue, false),
+];
+
+/// One duty row admitted for the measured copy (§12a.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DraftRate<'a> {
+    duty_head: &'a str,
+    valuation: RateValuation,
+    rate: Option<&'a str>,
+}
+
+impl<'a> DraftRate<'a> {
+    /// The unmarked duty head at its measured position.
+    pub(crate) fn duty_head(&self) -> &'a str {
+        self.duty_head
+    }
+
+    /// The valuation measured for this duty head.
+    pub(crate) fn valuation(&self) -> RateValuation {
+        self.valuation
+    }
+
+    /// The value is the read's decimal without the read's leading space, as the
+    /// measured request sent it; the two Cess rows have none (§12a.13).
+    pub(crate) fn rate(&self) -> Option<&'a str> {
+        self.rate
+    }
+}
+
+/// The one dated GST entry admitted for the measured copy (§12a.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DraftGstEntry<'a> {
+    applicable_from: &'a str,
+    rates: Vec<DraftRate<'a>>,
+}
+
+impl<'a> DraftGstEntry<'a> {
+    /// The entry's applicability date as read.
+    pub(crate) fn applicable_from(&self) -> &'a str {
+        self.applicable_from
+    }
+
+    /// The five measured duty rows in their measured order.
+    pub(crate) fn rates(&self) -> &[DraftRate<'a>] {
+        &self.rates
+    }
+}
+
+/// The one dated HSN entry admitted for the measured copy (§12a.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DraftHsnEntry<'a> {
+    applicable_from: &'a str,
+    code: &'a str,
+    description: &'a str,
+}
+
+impl<'a> DraftHsnEntry<'a> {
+    /// The entry's applicability date as read.
+    pub(crate) fn applicable_from(&self) -> &'a str {
+        self.applicable_from
+    }
+
+    /// The unmarked HSN code as read.
+    pub(crate) fn code(&self) -> &'a str {
+        self.code
+    }
+
+    /// The unmarked HSN description as read.
+    pub(crate) fn description(&self) -> &'a str {
+        self.description
+    }
+}
+
+/// Why a Goods sibling cannot be drafted as the measured copy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DraftRefusal {
+    /// The proposed name and sibling came from different catalogue reads.
+    OtherCatalogue,
+    /// The stock-group read could not be parsed for the sibling's company.
+    GroupsUnreadable(NativeMastersError),
+    /// No stock group in the same company's read has the parent's exact name.
+    ParentNotInBook,
+    /// The unit read could not be parsed for the sibling's company.
+    UnitsUnreadable(NativeMastersError),
+    /// No unit in the same company's read has the base unit's exact name.
+    UnitNotInBook,
+    /// A copy with this many dated GST entries was not measured (§12a.13).
+    GstEntriesNotMeasured { entries: usize },
+    /// This GST source was not sent in the measured copy (§12a.13).
+    GstSourceNotMeasured,
+    /// An ineligible-ITC flag was not sent in the measured copy (§12a.13).
+    ItcNotMeasured,
+    /// The measured copy had one state row marked `Any` (§12a.13).
+    StateNotAny,
+    /// The duty head at this row is absent, extra or not the measured head (§12a.13).
+    DutyHeadNotMeasured { row: usize },
+    /// The valuation at this row is not the one measured for its head (§12a.13).
+    ValuationNotMeasured { row: usize },
+    /// The rate at this row is not present or absent as measured (§12a.13).
+    RateNotMeasured { row: usize },
+    /// A copy with this many dated HSN entries was not measured (§12a.13).
+    HsnEntriesNotMeasured { entries: usize },
+    /// The HSN source, code or description is not in the measured form (§12a.13).
+    HsnNotMeasured,
+}
 
 /// The stock items of one answer to the candidate read, each bound to one
 /// verified company, with their names indexed. It does not show that the
@@ -400,11 +549,7 @@ impl<'a> GoodsSibling<'a> {
                 return Err(NotGoodsSibling::NotTaxable { entry });
             }
         }
-        if sibling
-            .applicability()
-            .strip_prefix(TALLY_SANITIZED_ROOT_MARKER)
-            != Some(APPLICABLE)
-        {
+        if MarkedConstant::from_read(sibling.applicability()) != Some(MarkedConstant::Applicable) {
             return Err(NotGoodsSibling::GstNotApplicable);
         }
         Ok(Self { sibling })
@@ -412,6 +557,181 @@ impl<'a> GoodsSibling<'a> {
 
     /// The complete read admitted as a Goods sibling.
     pub(crate) fn sibling(&self) -> &SiblingGst<'a> {
+        &self.sibling
+    }
+}
+
+/// A copy in the measured shape only. It refuses unmeasured GST and HSN entry
+/// counts, sources, ITC flags, state rows, duty heads, valuations, rates and
+/// marked HSN values (§12a.13).
+#[derive(Debug)]
+pub(crate) struct StockItemDraft<'a> {
+    sibling: GoodsSibling<'a>,
+    name: MasterName,
+    parent: &'a str,
+    unit: &'a str,
+    gst: DraftGstEntry<'a>,
+    hsn: DraftHsnEntry<'a>,
+}
+
+impl<'a> StockItemDraft<'a> {
+    /// Checks the proposed name and sibling against the same company's group
+    /// and unit reads, then admits only the measured copy shape (§12a.13).
+    pub(crate) fn new(
+        name: ItemNameAbsent<'a>,
+        sibling: GoodsSibling<'a>,
+        groups: &str,
+        units: &str,
+    ) -> Result<Self, DraftRefusal> {
+        if !std::ptr::eq(name.catalogue(), sibling.sibling().catalogue()) {
+            return Err(DraftRefusal::OtherCatalogue);
+        }
+        let company_guid = name.catalogue().company().company_guid();
+        let groups = parse_native_masters(NativeMasterKind::StockGroups, groups, company_guid)
+            .map_err(DraftRefusal::GroupsUnreadable)?;
+        let parent = sibling.sibling().parent();
+        if !groups.rows.iter().any(|row| row.name == parent) {
+            return Err(DraftRefusal::ParentNotInBook);
+        }
+        let units = parse_native_masters(NativeMasterKind::Units, units, company_guid)
+            .map_err(DraftRefusal::UnitsUnreadable)?;
+        let unit = sibling.sibling().unit();
+        if !units.rows.iter().any(|row| row.name == unit) {
+            return Err(DraftRefusal::UnitNotInBook);
+        }
+
+        let gst = match sibling.sibling().gst() {
+            [details] => details,
+            entries => {
+                return Err(DraftRefusal::GstEntriesNotMeasured {
+                    entries: entries.len(),
+                });
+            }
+        };
+        let hsn = match sibling.sibling().hsn() {
+            [details] => details,
+            entries => {
+                return Err(DraftRefusal::HsnEntriesNotMeasured {
+                    entries: entries.len(),
+                });
+            }
+        };
+
+        if gst.source.as_deref() != Some(SPECIFY_DETAILS_HERE) {
+            return Err(DraftRefusal::GstSourceNotMeasured);
+        }
+        if gst.ineligible_itc.is_some() {
+            return Err(DraftRefusal::ItcNotMeasured);
+        }
+        let state = match gst.states.as_slice() {
+            [state]
+                if state
+                    .state_name
+                    .as_deref()
+                    .and_then(MarkedConstant::from_read)
+                    == Some(MarkedConstant::Any) =>
+            {
+                state
+            }
+            _ => return Err(DraftRefusal::StateNotAny),
+        };
+        let mut rates = Vec::with_capacity(MEASURED_RATE_ROWS.len());
+        for (row, (duty_head, expected_valuation, rate_required)) in
+            MEASURED_RATE_ROWS.iter().enumerate()
+        {
+            let read = match state.rates.get(row) {
+                Some(read) => read,
+                None => return Err(DraftRefusal::DutyHeadNotMeasured { row }),
+            };
+            if read.duty_head.as_deref() != Some(*duty_head) {
+                return Err(DraftRefusal::DutyHeadNotMeasured { row });
+            }
+            let valuation = match read.valuation_type.as_deref() {
+                Some(BASED_ON_VALUE) => RateValuation::BasedOnValue,
+                Some(text)
+                    if MarkedConstant::from_read(text) == Some(MarkedConstant::NotApplicable) =>
+                {
+                    RateValuation::NotApplicable
+                }
+                _ => return Err(DraftRefusal::ValuationNotMeasured { row }),
+            };
+            if valuation != *expected_valuation {
+                return Err(DraftRefusal::ValuationNotMeasured { row });
+            }
+            let rate = match (&read.rate, rate_required) {
+                (GstRate::Value { decimal, .. }, true) => Some(decimal.as_str()),
+                (GstRate::Absent, false) => None,
+                _ => return Err(DraftRefusal::RateNotMeasured { row }),
+            };
+            rates.push(DraftRate {
+                duty_head,
+                valuation,
+                rate,
+            });
+        }
+        if state.rates.get(MEASURED_RATE_ROWS.len()).is_some() {
+            return Err(DraftRefusal::DutyHeadNotMeasured {
+                row: MEASURED_RATE_ROWS.len(),
+            });
+        }
+        let gst = DraftGstEntry {
+            applicable_from: &gst.applicable_from,
+            rates,
+        };
+
+        let (code, description) = match (&hsn.hsn_code, &hsn.description) {
+            (Some(code), Some(description))
+                if hsn.source.as_deref() == Some(SPECIFY_DETAILS_HERE)
+                    && !code.contains(TALLY_SANITIZED_ROOT_MARKER)
+                    && !description.contains(TALLY_SANITIZED_ROOT_MARKER) =>
+            {
+                (code.as_str(), description.as_str())
+            }
+            _ => return Err(DraftRefusal::HsnNotMeasured),
+        };
+        let hsn = DraftHsnEntry {
+            applicable_from: &hsn.applicable_from,
+            code,
+            description,
+        };
+
+        Ok(Self {
+            sibling,
+            name: name.name().clone(),
+            parent,
+            unit,
+            gst,
+            hsn,
+        })
+    }
+
+    /// The proposed name proved absent from this catalogue.
+    pub(crate) fn name(&self) -> &MasterName {
+        &self.name
+    }
+
+    /// The parent exact name proved present in the same company's group read.
+    pub(crate) fn parent(&self) -> &'a str {
+        self.parent
+    }
+
+    /// The base-unit exact name proved present in the same company's unit read.
+    pub(crate) fn unit(&self) -> &'a str {
+        self.unit
+    }
+
+    /// The one dated GST entry in the measured shape.
+    pub(crate) fn gst(&self) -> &DraftGstEntry<'a> {
+        &self.gst
+    }
+
+    /// The one dated HSN entry in the measured shape.
+    pub(crate) fn hsn(&self) -> &DraftHsnEntry<'a> {
+        &self.hsn
+    }
+
+    /// The complete Goods sibling from which this draft was built.
+    pub(crate) fn sibling(&self) -> &GoodsSibling<'a> {
         &self.sibling
     }
 }

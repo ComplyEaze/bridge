@@ -5,7 +5,9 @@ use super::*;
 use crate::tally::master_name::MasterNameError;
 use bridge_tally_core::master_name_index::Via;
 use bridge_tally_protocol::gst_details::GstRate;
-use bridge_tally_protocol::{decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding};
+use bridge_tally_protocol::{
+    decode_tally_xml_response_bytes_limited, decode_xml_bytes, ExpectedTallyTextEncoding,
+};
 
 const COMPANY: &str = "BRIDGE STOCK CREATE LAB";
 const COMPANY_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
@@ -27,6 +29,18 @@ const ALIAS: &[u8] = include_bytes!(
 );
 const TWO_DATES: &[u8] = include_bytes!(
     "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml"
+);
+const GROUPS: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml"
+);
+const UNITS: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml"
+);
+const MARKED_REQUEST: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-marked-create.request.utf16le.xml"
+);
+const PLAIN_REQUEST: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-plain-create.request.utf16le.xml"
 );
 
 fn decode(bytes: &[u8]) -> String {
@@ -62,6 +76,23 @@ fn sibling<'c>(
 fn edited(xml: &str, from: &str, to: &str) -> String {
     assert_eq!(xml.matches(from).count(), 1, "the edit starts in one place");
     xml.replacen(from, to, 1)
+}
+
+fn draft<'c>(
+    catalogue: &'c StockItemCatalogue,
+    new_name: &str,
+    sibling_name: &str,
+    groups: &str,
+    units: &str,
+) -> Result<StockItemDraft<'c>, DraftRefusal> {
+    let absent = catalogue
+        .name_absent(&name(new_name))
+        .expect("the new name is absent");
+    let sibling =
+        SiblingGst::named(catalogue, &name(sibling_name)).expect("the sibling is complete");
+    let sibling =
+        GoodsSibling::from_sibling(sibling).expect("the sibling is the measured Goods case");
+    StockItemDraft::new(absent, sibling, groups, units)
 }
 
 fn taken(guid: &str, via: Via, existing: &str) -> ItemNameNotAbsent {
@@ -117,6 +148,7 @@ fn a_doubled_space_is_refused_before_any_read() {
         Err(MasterNameError::RepeatedSpaces)
     );
 }
+
 #[test]
 fn the_alias_is_taken_once_it_is_keyed() {
     let before = catalogue(&decode(BEFORE));
@@ -131,6 +163,7 @@ fn the_alias_is_taken_once_it_is_keyed() {
         );
     }
 }
+
 #[test]
 fn a_created_item_is_absent_before_and_taken_after() {
     let before = catalogue(&decode(BEFORE));
@@ -684,7 +717,6 @@ fn a_gst_entry_needs_a_state_row_and_a_state_row_needs_a_rate_row() {
         sibling(&before, "SC Sibling Goods").unwrap_err(),
         SiblingRefusal::Incomplete(SiblingField::GstDetails)
     );
-
     let mut xml = decode(BEFORE);
     assert_eq!(xml.matches("<RATEDETAILS.LIST>").count(), 5);
     let start = xml
@@ -824,4 +856,558 @@ fn only_a_goods_taxable_applicable_sibling_is_a_goods_sibling() {
         GoodsSibling::from_sibling(item).unwrap_err(),
         NotGoodsSibling::NotTaxable { entry: 1 }
     );
+}
+
+#[test]
+fn marked_constants_are_read_only_in_the_marked_form() {
+    let m = TALLY_SANITIZED_ROOT_MARKER;
+    for (text, expected) in [
+        (format!("{m} Applicable"), MarkedConstant::Applicable),
+        (format!("{m} Any"), MarkedConstant::Any),
+        (format!("{m} Not Applicable"), MarkedConstant::NotApplicable),
+    ] {
+        assert_eq!(MarkedConstant::from_read(&text), Some(expected));
+    }
+    let before = catalogue(&decode(BEFORE));
+    let item = sibling(&before, "SC Sibling Goods").expect("the sibling is complete");
+    assert_eq!(
+        MarkedConstant::from_read(item.applicability()),
+        Some(MarkedConstant::Applicable)
+    );
+    assert_eq!(
+        item.gst()[0].states[0]
+            .state_name
+            .as_deref()
+            .and_then(MarkedConstant::from_read),
+        Some(MarkedConstant::Any)
+    );
+    assert_eq!(
+        item.gst()[0].states[0].rates[3]
+            .valuation_type
+            .as_deref()
+            .and_then(MarkedConstant::from_read),
+        Some(MarkedConstant::NotApplicable)
+    );
+    for text in [
+        " Applicable".to_string(),
+        " Any".to_string(),
+        " Not Applicable".to_string(),
+        format!("{m}Applicable"),
+        format!("{m} Primary"),
+        format!("{m} Any State"),
+        "Applicable".to_string(),
+        String::new(),
+    ] {
+        assert_eq!(MarkedConstant::from_read(&text), None);
+    }
+    let plain = decode_xml_bytes(PLAIN_REQUEST).expect("the plain request decodes");
+    for text in [
+        "<GSTAPPLICABLE> Applicable</GSTAPPLICABLE>",
+        "<STATENAME> Any</STATENAME>",
+        "<GSTRATEVALUATIONTYPE> Not Applicable</GSTRATEVALUATIONTYPE>",
+    ] {
+        assert_eq!(plain.matches(text).count(), 1);
+    }
+    assert_eq!(plain.matches("&#4;").count(), 0);
+}
+
+#[test]
+fn the_draft_holds_the_values_the_marked_request_sent() {
+    let before = catalogue(&decode(BEFORE));
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let b = &before;
+    let built = draft(b, "SC Copied Marked", "SC Sibling Goods", &g, &u)
+        .expect("the measured values draft");
+    assert_eq!(built.name().as_str(), "SC Copied Marked");
+    assert_eq!(built.parent(), "SC Goods Group");
+    assert_eq!(built.unit(), "Nos");
+    assert_eq!(built.sibling().sibling().guid(), SIBLING_GUID);
+    assert_eq!(built.gst().applicable_from(), "20250401");
+    assert_eq!(
+        built
+            .gst()
+            .rates()
+            .iter()
+            .map(|rate| (rate.duty_head(), rate.valuation(), rate.rate()))
+            .collect::<Vec<_>>(),
+        [
+            ("CGST", RateValuation::BasedOnValue, Some("9")),
+            ("SGST/UTGST", RateValuation::BasedOnValue, Some("9")),
+            ("IGST", RateValuation::BasedOnValue, Some("18")),
+            ("Cess", RateValuation::NotApplicable, None),
+            ("State Cess", RateValuation::BasedOnValue, None),
+        ]
+    );
+    assert_eq!(
+        (
+            built.hsn().applicable_from(),
+            built.hsn().code(),
+            built.hsn().description(),
+        ),
+        ("20250401", "39239090", "Plastic Articles for Conveyance")
+    );
+    let request = decode_xml_bytes(MARKED_REQUEST).expect("the marked request decodes");
+    for text in [
+        "<NAME>SC Copied Marked</NAME>",
+        "<PARENT>SC Goods Group</PARENT>",
+        "<BASEUNITS>Nos</BASEUNITS>",
+        "<GSTAPPLICABLE>&#4; Applicable</GSTAPPLICABLE>",
+        "<STATENAME>&#4; Any</STATENAME>",
+        "<GSTDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><TAXABILITY>Taxable</TAXABILITY><SRCOFGSTDETAILS>Specify Details Here</SRCOFGSTDETAILS>",
+        "<RATEDETAILS.LIST><GSTRATEDUTYHEAD>CGST</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE>Based on Value</GSTRATEVALUATIONTYPE><GSTRATE>9</GSTRATE></RATEDETAILS.LIST>",
+        "<RATEDETAILS.LIST><GSTRATEDUTYHEAD>SGST/UTGST</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE>Based on Value</GSTRATEVALUATIONTYPE><GSTRATE>9</GSTRATE></RATEDETAILS.LIST>",
+        "<RATEDETAILS.LIST><GSTRATEDUTYHEAD>IGST</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE>Based on Value</GSTRATEVALUATIONTYPE><GSTRATE>18</GSTRATE></RATEDETAILS.LIST>",
+        "<RATEDETAILS.LIST><GSTRATEDUTYHEAD>Cess</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE>&#4; Not Applicable</GSTRATEVALUATIONTYPE></RATEDETAILS.LIST>",
+        "<RATEDETAILS.LIST><GSTRATEDUTYHEAD>State Cess</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE>Based on Value</GSTRATEVALUATIONTYPE></RATEDETAILS.LIST>",
+        "<HSNDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><HSNCODE>39239090</HSNCODE><HSN>Plastic Articles for Conveyance</HSN><SRCOFHSNDETAILS>Specify Details Here</SRCOFHSNDETAILS></HSNDETAILS.LIST>",
+    ] {
+        assert_eq!(request.matches(text).count(), 1, "{text}");
+    }
+    assert_eq!(request.matches("<RATEDETAILS.LIST>").count(), 5);
+    assert_eq!(request.matches("<GSTDETAILS.LIST>").count(), 1);
+    assert_eq!(request.matches("<GSTRATE> 9</GSTRATE>").count(), 0);
+}
+
+#[test]
+fn a_name_and_a_sibling_from_two_catalogues_give_no_draft() {
+    let first = catalogue(&decode(BEFORE));
+    let second = catalogue(&decode(BEFORE));
+    let absent = first
+        .name_absent(&name("SC Copied Marked"))
+        .expect("the new name is absent");
+    let sibling =
+        SiblingGst::named(&second, &name("SC Sibling Goods")).expect("the sibling is complete");
+    let sibling = GoodsSibling::from_sibling(sibling).expect("the sibling is Goods");
+    assert_eq!(
+        StockItemDraft::new(absent, sibling, &decode(GROUPS), &decode(UNITS)).unwrap_err(),
+        DraftRefusal::OtherCatalogue
+    );
+}
+
+#[test]
+fn a_parent_or_unit_the_book_does_not_hold_by_that_exact_name_is_refused() {
+    use DraftRefusal as R;
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let parent = "<PARENT TYPE=\"String\">SC Goods Group</PARENT>";
+    let unit = "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>";
+    let cases = [
+        (
+            parent,
+            "<PARENT TYPE=\"String\">SC Other Group</PARENT>",
+            DraftRefusal::ParentNotInBook,
+        ),
+        (
+            parent,
+            "<PARENT TYPE=\"String\">sc goods group</PARENT>",
+            R::ParentNotInBook,
+        ),
+        (
+            parent,
+            "<PARENT TYPE=\"String\">&#4; Primary</PARENT>",
+            R::ParentNotInBook,
+        ),
+        (
+            unit,
+            "<BASEUNITS TYPE=\"String\">Kgs</BASEUNITS>",
+            DraftRefusal::UnitNotInBook,
+        ),
+        (
+            unit,
+            "<BASEUNITS TYPE=\"String\">nos</BASEUNITS>",
+            R::UnitNotInBook,
+        ),
+    ];
+    for (from, to, expected) in cases {
+        // These edits substitute arbitrary text; they are not captured states.
+        let xml = edited(&decode(BEFORE), from, to);
+        let b = catalogue(&xml);
+        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), expected);
+    }
+}
+
+#[test]
+fn a_group_or_unit_read_that_is_unreadable_or_foreign_is_refused() {
+    let before = catalogue(&decode(BEFORE));
+    let guid = "<BRIDGECOMPANYGUID TYPE=\"String\">bac2b5e9-ada9-43c0-b8f8-a2812a813fa1</BRIDGECOMPANYGUID>";
+    let empty_guid = "<BRIDGECOMPANYGUID TYPE=\"String\"></BRIDGECOMPANYGUID>";
+    let cases = [
+        (
+            decode(UNITS),
+            decode(UNITS),
+            DraftRefusal::GroupsUnreadable(NativeMastersError::ForeignChild),
+        ),
+        (
+            decode(GROUPS),
+            decode(GROUPS),
+            DraftRefusal::UnitsUnreadable(NativeMastersError::ForeignChild),
+        ),
+        (
+            edited(&decode(GROUPS), guid, empty_guid),
+            decode(UNITS),
+            DraftRefusal::GroupsUnreadable(NativeMastersError::RowCompanyMismatch),
+        ),
+        (
+            decode(GROUPS),
+            edited(&decode(UNITS), guid, empty_guid),
+            DraftRefusal::UnitsUnreadable(NativeMastersError::RowCompanyMismatch),
+        ),
+    ];
+    for (g, u, expected) in cases {
+        let b = &before;
+        let got = draft(b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), expected);
+    }
+}
+
+#[test]
+fn a_gst_source_other_than_the_measured_one_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let xml = edited(
+        &decode(BEFORE),
+        "<SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS>",
+        "<SRCOFGSTDETAILS TYPE=\"String\">As per Company/Stock Group</SRCOFGSTDETAILS>",
+    );
+    let b = catalogue(&xml);
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(got.unwrap_err(), DraftRefusal::GstSourceNotMeasured);
+}
+
+#[test]
+fn an_ineligible_itc_flag_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let source = "<SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS>";
+    for value in ["No", "Yes"] {
+        let xml = edited(
+            &decode(BEFORE),
+            source,
+            &format!("{source}<GSTINELIGIBLEITC TYPE=\"Logical\">{value}</GSTINELIGIBLEITC>"),
+        );
+        let before = catalogue(&xml);
+        assert!(sibling(&before, "SC Sibling Goods").is_ok());
+        let b = &before;
+        let got = draft(b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), DraftRefusal::ItcNotMeasured);
+    }
+}
+
+#[test]
+fn a_state_row_other_than_the_marked_any_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let from = "<STATENAME TYPE=\"String\">&#4; Any</STATENAME>";
+    for value in ["Karnataka", " Any", "&#4; Applicable"] {
+        let xml = edited(
+            &decode(BEFORE),
+            from,
+            &format!("<STATENAME TYPE=\"String\">{value}</STATENAME>"),
+        );
+        let b = catalogue(&xml);
+        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), DraftRefusal::StateNotAny);
+    }
+}
+
+#[test]
+fn a_second_dated_entry_is_refused_with_the_count() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let extra = "<GSTDETAILS.LIST><APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM><TAXABILITY TYPE=\"String\">Taxable</TAXABILITY><SRCOFGSTDETAILS TYPE=\"String\">Specify Details Here</SRCOFGSTDETAILS><STATEWISEDETAILS.LIST><STATENAME TYPE=\"String\">&#4; Any</STATENAME><RATEDETAILS.LIST><GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE TYPE=\"String\">Based on Value</GSTRATEVALUATIONTYPE><GSTRATE TYPE=\"Number\"> 18</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>";
+    // This second GST entry is a hand edit of the capture, not a captured state.
+    let xml = edited(
+        &decode(BEFORE),
+        "</GSTDETAILS.LIST>",
+        &format!("</GSTDETAILS.LIST>{extra}"),
+    );
+    let b = catalogue(&xml);
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(
+        got.unwrap_err(),
+        DraftRefusal::GstEntriesNotMeasured { entries: 2 }
+    );
+}
+
+#[test]
+fn a_second_hsn_entry_is_refused_with_the_count() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let extra = "<HSNDETAILS.LIST><APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM><HSNCODE TYPE=\"String\">39239090</HSNCODE><HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN><SRCOFHSNDETAILS TYPE=\"String\">Specify Details Here</SRCOFHSNDETAILS></HSNDETAILS.LIST>";
+    // This second HSN entry is a hand edit of the capture, not a captured state.
+    let xml = edited(
+        &decode(BEFORE),
+        "</HSNDETAILS.LIST>",
+        &format!("</HSNDETAILS.LIST>{extra}"),
+    );
+    let b = catalogue(&xml);
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(
+        got.unwrap_err(),
+        DraftRefusal::HsnEntriesNotMeasured { entries: 2 }
+    );
+}
+
+#[test]
+fn the_rate_rows_must_be_the_five_measured_in_order() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    // Both head edits are hand edits of the capture, not captured states.
+    for (from, to, row) in [
+        (
+            "<GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD>",
+            "<GSTRATEDUTYHEAD TYPE=\"String\">Integrated Tax</GSTRATEDUTYHEAD>",
+            2,
+        ),
+        (
+            "<GSTRATEDUTYHEAD TYPE=\"String\">State Cess</GSTRATEDUTYHEAD>",
+            "<GSTRATEDUTYHEAD TYPE=\"String\">&#4; State Cess</GSTRATEDUTYHEAD>",
+            4,
+        ),
+    ] {
+        let xml = edited(&decode(BEFORE), from, to);
+        let b = catalogue(&xml);
+        assert!(
+            sibling(&b, "SC Sibling Goods").is_ok(),
+            "the edited head at row {row} remains complete"
+        );
+        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), DraftRefusal::DutyHeadNotMeasured { row });
+    }
+
+    // Swap the first two captured rows by range after checking their count.
+    let mut xml = decode(BEFORE);
+    let opening = "<RATEDETAILS.LIST>";
+    let closing = "</RATEDETAILS.LIST>";
+    assert_eq!(xml.matches(opening).count(), 5);
+    let first_start = xml.find(opening).expect("the first rate row occurs");
+    let first_end = xml[first_start..]
+        .find(closing)
+        .expect("the first rate row closes")
+        + first_start
+        + closing.len();
+    let second_start = xml[first_end..]
+        .find(opening)
+        .expect("the second rate row occurs")
+        + first_end;
+    let second_end = xml[second_start..]
+        .find(closing)
+        .expect("the second rate row closes")
+        + second_start
+        + closing.len();
+    let first = xml[first_start..first_end].to_string();
+    let second = xml[second_start..second_end].to_string();
+    xml.replace_range(second_start..second_end, &first);
+    xml.replace_range(first_start..first_end, &second);
+    let b = catalogue(&xml);
+    assert!(sibling(&b, "SC Sibling Goods").is_ok());
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(
+        got.unwrap_err(),
+        DraftRefusal::DutyHeadNotMeasured { row: 0 }
+    );
+
+    // Remove the last captured row by range after checking the row and head counts.
+    let mut xml = decode(BEFORE);
+    assert_eq!(xml.matches(opening).count(), 5);
+    let head = "<GSTRATEDUTYHEAD TYPE=\"String\">State Cess</GSTRATEDUTYHEAD>";
+    assert_eq!(xml.matches(head).count(), 1);
+    let head_start = xml.find(head).expect("the State Cess head occurs");
+    let start = xml[..head_start]
+        .rfind(opening)
+        .expect("the State Cess row starts");
+    let end = xml[head_start..]
+        .find(closing)
+        .expect("the State Cess row closes")
+        + head_start
+        + closing.len();
+    xml.replace_range(start..end, "");
+    let b = catalogue(&xml);
+    assert!(sibling(&b, "SC Sibling Goods").is_ok());
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(
+        got.unwrap_err(),
+        DraftRefusal::DutyHeadNotMeasured { row: 4 }
+    );
+
+    // This sixth rate row is a hand edit of the capture, not a captured state.
+    let extra = "<RATEDETAILS.LIST><GSTRATEDUTYHEAD TYPE=\"String\">Other Tax</GSTRATEDUTYHEAD><GSTRATEVALUATIONTYPE TYPE=\"String\">Based on Value</GSTRATEVALUATIONTYPE></RATEDETAILS.LIST>";
+    let xml = edited(
+        &decode(BEFORE),
+        "<GSTSLABRATES.LIST>       </GSTSLABRATES.LIST>",
+        &format!("{extra}<GSTSLABRATES.LIST>       </GSTSLABRATES.LIST>"),
+    );
+    let b = catalogue(&xml);
+    assert!(sibling(&b, "SC Sibling Goods").is_ok());
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(
+        got.unwrap_err(),
+        DraftRefusal::DutyHeadNotMeasured { row: 5 }
+    );
+}
+
+#[test]
+fn a_valuation_other_than_the_one_measured_for_its_head_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    // Change IGST by range after checking the head and valuation counts. This
+    // hand edit uses the other modelled valuation and is not a captured state.
+    let mut xml = decode(BEFORE);
+    let head = "<GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD>";
+    let valuation = "<GSTRATEVALUATIONTYPE TYPE=\"String\">Based on Value</GSTRATEVALUATIONTYPE>";
+    assert_eq!(xml.matches(head).count(), 1);
+    assert_eq!(xml.matches(valuation).count(), 4);
+    let after_head = xml.find(head).expect("the IGST head occurs") + head.len();
+    let start = xml[after_head..]
+        .find(valuation)
+        .expect("the IGST valuation occurs")
+        + after_head;
+    xml.replace_range(
+        start..start + valuation.len(),
+        "<GSTRATEVALUATIONTYPE TYPE=\"String\">&#4; Not Applicable</GSTRATEVALUATIONTYPE>",
+    );
+    let b = catalogue(&xml);
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(
+        got.unwrap_err(),
+        DraftRefusal::ValuationNotMeasured { row: 2 }
+    );
+
+    // This Cess edit likewise uses the other modelled valuation.
+    let xml = edited(
+        &decode(BEFORE),
+        "<GSTRATEVALUATIONTYPE TYPE=\"String\">&#4; Not Applicable</GSTRATEVALUATIONTYPE>",
+        "<GSTRATEVALUATIONTYPE TYPE=\"String\">Based on Value</GSTRATEVALUATIONTYPE>",
+    );
+    let b = catalogue(&xml);
+    let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+    assert_eq!(
+        got.unwrap_err(),
+        DraftRefusal::ValuationNotMeasured { row: 3 }
+    );
+}
+
+#[test]
+fn a_valuation_other_than_the_two_measured_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let from = "<GSTRATEVALUATIONTYPE TYPE=\"String\">&#4; Not Applicable</GSTRATEVALUATIONTYPE>";
+    for value in [" Not Applicable", "&#4; Applicable", "Based on Quantity"] {
+        let xml = edited(
+            &decode(BEFORE),
+            from,
+            &format!("<GSTRATEVALUATIONTYPE TYPE=\"String\">{value}</GSTRATEVALUATIONTYPE>"),
+        );
+        let b = catalogue(&xml);
+        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(
+            got.unwrap_err(),
+            DraftRefusal::ValuationNotMeasured { row: 3 }
+        );
+    }
+}
+
+#[test]
+fn a_rate_other_than_as_measured_for_its_head_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    // Every rate edit is a hand edit of the capture, not a captured state.
+    for (head, rate, rate_count, row) in [
+        (
+            "<GSTRATEDUTYHEAD TYPE=\"String\">CGST</GSTRATEDUTYHEAD>",
+            "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>",
+            2,
+            0,
+        ),
+        (
+            "<GSTRATEDUTYHEAD TYPE=\"String\">IGST</GSTRATEDUTYHEAD>",
+            "<GSTRATE TYPE=\"Number\"> 18</GSTRATE>",
+            1,
+            2,
+        ),
+    ] {
+        // Remove each rate by range after checking the head and rate counts.
+        let mut xml = decode(BEFORE);
+        assert_eq!(xml.matches(head).count(), 1);
+        assert_eq!(xml.matches(rate).count(), rate_count);
+        let after_head = xml.find(head).expect("the duty head occurs") + head.len();
+        let start = xml[after_head..]
+            .find(rate)
+            .expect("the duty head's rate occurs")
+            + after_head;
+        xml.replace_range(start..start + rate.len(), "");
+        let before = catalogue(&xml);
+        assert!(SiblingGst::named(&before, &name("SC Sibling Goods")).is_ok());
+        let got = draft(&before, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), DraftRefusal::RateNotMeasured { row });
+    }
+    for (head, row) in [
+        ("<GSTRATEDUTYHEAD TYPE=\"String\">Cess</GSTRATEDUTYHEAD>", 3),
+        (
+            "<GSTRATEDUTYHEAD TYPE=\"String\">State Cess</GSTRATEDUTYHEAD>",
+            4,
+        ),
+    ] {
+        // Add each rate by range after checking the head and rate-row counts.
+        let mut xml = decode(BEFORE);
+        assert_eq!(xml.matches(head).count(), 1);
+        assert_eq!(xml.matches("<RATEDETAILS.LIST>").count(), 5);
+        let after_head = xml.find(head).expect("the Cess duty head occurs") + head.len();
+        let end = xml[after_head..]
+            .find("</RATEDETAILS.LIST>")
+            .expect("the Cess rate row closes")
+            + after_head;
+        xml.insert_str(end, "<GSTRATE TYPE=\"Number\"> 1</GSTRATE>");
+        let before = catalogue(&xml);
+        assert!(SiblingGst::named(&before, &name("SC Sibling Goods")).is_ok());
+        let got = draft(&before, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), DraftRefusal::RateNotMeasured { row });
+    }
+}
+
+#[test]
+fn a_zero_or_empty_rate_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let from = "<GSTRATE TYPE=\"Number\"> 18</GSTRATE>";
+    for (to, expected_rate) in [
+        ("<GSTRATE TYPE=\"Number\"> 0</GSTRATE>", GstRate::Zero),
+        ("<GSTRATE TYPE=\"Number\"></GSTRATE>", GstRate::Empty),
+    ] {
+        let xml = edited(&decode(BEFORE), from, to);
+        let before = catalogue(&xml);
+        let item = sibling(&before, "SC Sibling Goods").expect("the sibling is complete");
+        assert_eq!(&item.gst()[0].states[0].rates[2].rate, &expected_rate);
+        let b = &before;
+        let got = draft(b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), DraftRefusal::RateNotMeasured { row: 2 });
+    }
+}
+
+#[test]
+fn an_hsn_entry_other_than_the_measured_shape_is_refused() {
+    let g = decode(GROUPS);
+    let u = decode(UNITS);
+    let cases = [
+        (
+            "<SRCOFHSNDETAILS TYPE=\"String\">Specify Details Here</SRCOFHSNDETAILS>",
+            "<SRCOFHSNDETAILS TYPE=\"String\">As per Company/Stock Group</SRCOFHSNDETAILS>",
+        ),
+        (
+            "<HSNCODE TYPE=\"String\">39239090</HSNCODE>",
+            "<HSNCODE TYPE=\"String\">&#4; 39239090</HSNCODE>",
+        ),
+        (
+            "<HSN TYPE=\"String\">Plastic Articles for Conveyance</HSN>",
+            "<HSN TYPE=\"String\">&#4; Plastic Articles</HSN>",
+        ),
+    ];
+    for (from, to) in cases {
+        let xml = edited(&decode(BEFORE), from, to);
+        let b = catalogue(&xml);
+        let got = draft(&b, "SC Copied Marked", "SC Sibling Goods", &g, &u);
+        assert_eq!(got.unwrap_err(), DraftRefusal::HsnNotMeasured);
+    }
 }

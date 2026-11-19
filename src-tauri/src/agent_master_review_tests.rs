@@ -6,7 +6,8 @@ use crate::tally::ledger_create_item::{
 };
 use crate::tally::master_name::MasterName;
 use crate::tally::stock_item_create::{
-    GoodsSibling, SiblingGst, StockItemCatalogue, StockItemDraft,
+    render_stock_item_create, CreateRenderRefusal, DraftText, GoodsSibling, ShownDraft, SiblingGst,
+    StockItemCatalogue, StockItemDraft,
 };
 use bridge_tally_protocol::{
     decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding, GstDutyHead,
@@ -428,7 +429,7 @@ fn stock_preview_with(
     new_name: &str,
     source_name: &str,
     origin: &str,
-) -> Result<String, MasterReviewError> {
+) -> Result<String, StockItemReviewError> {
     let xml = stock_decode(items);
     let catalogue = stock_catalogue(company_name, &xml);
     let draft = stock_draft(&catalogue, new_name, source_name);
@@ -500,7 +501,7 @@ fn stock_item_review_refuses_unsafe_company_and_origin_text() {
                 "SC Sibling Goods",
                 ORIGIN,
             ),
-            Err(refusal)
+            Err(StockItemReviewError::Review(refusal))
         );
     }
     assert_eq!(
@@ -511,7 +512,7 @@ fn stock_item_review_refuses_unsafe_company_and_origin_text() {
             "SC Sibling Goods",
             "http://127.0.0.1:9000\nTally: other",
         ),
-        Err(MasterReviewError::LayoutText)
+        Err(StockItemReviewError::Review(MasterReviewError::LayoutText))
     );
 }
 
@@ -525,7 +526,7 @@ fn stock_item_review_refuses_an_overlong_field_instead_of_cutting_it() {
     let draft = stock_draft(&catalogue, "SC Copied Marked", "SC Sibling Goods");
     assert_eq!(
         stock_item_review_text(&draft, ORIGIN),
-        Err(MasterReviewError::TooLarge)
+        Err(StockItemReviewError::Review(MasterReviewError::TooLarge))
     );
 }
 
@@ -537,4 +538,158 @@ fn an_alias_source_is_named_exactly_as_approved() {
         .replace("SC Sibling Goods", "SC Sibling Alias");
     assert_eq!(preview, expected);
     assert!(!preview.contains("SC Sibling Goods"));
+}
+
+/// The HSN description of the captured sibling, replaced in the decoded read.
+fn stock_preview_with_description(description_xml: &str) -> Result<String, StockItemReviewError> {
+    let xml = stock_decode(STOCK_BEFORE);
+    let original = "Plastic Articles for Conveyance";
+    assert_eq!(xml.matches(original).count(), 1);
+    let xml = xml.replace(original, description_xml);
+    let catalogue = stock_catalogue(STOCK_COMPANY, &xml);
+    let draft = stock_draft(&catalogue, "SC Copied Marked", "SC Sibling Goods");
+    stock_item_review_text(&draft, ORIGIN)
+}
+
+#[test]
+fn unsafe_text_in_a_copied_field_is_refused_by_code() {
+    // Hand edit of the captured read: only the HSN description changes.
+    assert_eq!(
+        stock_preview_with_description("Plastic\u{2028}Articles"),
+        Err(StockItemReviewError::Review(MasterReviewError::LayoutText))
+    );
+    assert_eq!(
+        stock_preview_with_description("Plastic\u{200b}Articles"),
+        Err(StockItemReviewError::Review(MasterReviewError::FormatText))
+    );
+}
+
+#[test]
+fn a_draft_the_renderer_refuses_is_not_previewed() {
+    // Hand edit of the captured read: `&amp;` is read as `&`, which the
+    // renderer refuses to write; two spaces together fail the plain-text rule.
+    assert_eq!(
+        stock_preview_with_description("Tools &amp; Dies"),
+        Err(StockItemReviewError::NotRenderable(
+            CreateRenderRefusal::TextNeedsEscaping {
+                field: DraftText::HsnDescription
+            }
+        ))
+    );
+    assert_eq!(
+        stock_preview_with_description("Tools  Dies"),
+        Err(StockItemReviewError::NotRenderable(
+            CreateRenderRefusal::TextNotPlain {
+                field: DraftText::HsnDescription
+            }
+        ))
+    );
+}
+
+#[test]
+fn a_line_at_the_limit_fits_and_one_character_more_is_refused() {
+    let prefix = "  HSN description: \"\"";
+    let fitting = BATCH_REVIEW_MAX_LINE_CHARS - prefix.chars().count();
+    let preview = stock_preview_with_description(&"x".repeat(fitting))
+        .expect("a line of exactly the limit fits");
+    let longest = preview.lines().map(|line| line.chars().count()).max();
+    assert_eq!(longest, Some(BATCH_REVIEW_MAX_LINE_CHARS));
+    assert_eq!(
+        stock_preview_with_description(&"x".repeat(fitting + 1)),
+        Err(StockItemReviewError::Review(MasterReviewError::TooLarge))
+    );
+}
+
+/// Every text between `open` and `close` in `xml`, in order.
+fn tag_values<'x>(xml: &'x str, tag: &str) -> Vec<&'x str> {
+    let (open, close) = (format!("<{tag}>"), format!("</{tag}>"));
+    xml.split(open.as_str())
+        .skip(1)
+        .map(|rest| rest.split(close.as_str()).next().expect("closed tag"))
+        .collect()
+}
+
+/// The first JSON-quoted value after `label` on each line that starts with it.
+fn shown_values(preview: &str, label: &str) -> Vec<String> {
+    preview
+        .lines()
+        .filter_map(|line| line.strip_prefix(label))
+        .map(|rest| {
+            serde_json::Deserializer::from_str(rest)
+                .into_iter::<String>()
+                .next()
+                .expect("a quoted value")
+                .expect("a JSON string")
+        })
+        .collect()
+}
+
+#[test]
+fn the_preview_shows_what_the_create_renderer_sends_for_the_same_draft() {
+    for (items, new_name, source_name) in [
+        (STOCK_BEFORE, "SC Copied Marked", "SC Sibling Goods"),
+        (STOCK_ALIAS, "SC Copied From Alias", "SC Sibling Alias"),
+    ] {
+        let xml = stock_decode(items);
+        let catalogue = stock_catalogue(STOCK_COMPANY, &xml);
+        let draft = stock_draft(&catalogue, new_name, source_name);
+        let preview = stock_item_review_text(&draft, ORIGIN).expect("the draft has a review");
+        let request =
+            render_stock_item_create(&ShownDraft::from_draft(draft)).expect("the draft renders");
+        for (label, tag) in [
+            ("Create stock item ", "NAME"),
+            ("Parent (stock group): ", "PARENT"),
+            ("Base unit: ", "BASEUNITS"),
+            ("GST applicability: ", "GSTAPPLICABLE"),
+            ("Type of supply: ", "GSTTYPEOFSUPPLY"),
+            ("  Applicable from: ", "APPLICABLEFROM"),
+            ("  Taxability: ", "TAXABILITY"),
+            ("  Source of GST details: ", "SRCOFGSTDETAILS"),
+            ("  State row 1: ", "STATENAME"),
+            ("  HSN code: ", "HSNCODE"),
+            ("  HSN description: ", "HSN"),
+            ("  Source of HSN details: ", "SRCOFHSNDETAILS"),
+        ] {
+            assert_eq!(
+                shown_values(&preview, label),
+                tag_values(&request, tag),
+                "{label}"
+            );
+        }
+        let rates: Vec<(String, String, Option<String>)> = preview
+            .lines()
+            .filter(|line| line.starts_with("  Rate row "))
+            .map(|line| {
+                let mut quoted = serde_json::Deserializer::from_str(
+                    line.split_once(": ").expect("a rate row").1,
+                )
+                .into_iter::<String>();
+                let head = quoted.next().expect("duty head").expect("a JSON string");
+                let rest = line.split_once("; valuation: ").expect("valuation").1;
+                let valuation = serde_json::Deserializer::from_str(rest)
+                    .into_iter::<String>()
+                    .next()
+                    .expect("valuation")
+                    .expect("a JSON string");
+                let rate = rest.split_once("; rate: ").expect("rate").1;
+                let rate = (rate != "absent")
+                    .then(|| serde_json::from_str::<String>(rate).expect("a JSON string"));
+                (head, valuation, rate)
+            })
+            .collect();
+        let sent: Vec<(String, String, Option<String>)> = request
+            .split("<RATEDETAILS.LIST>")
+            .skip(1)
+            .map(|row| {
+                let one = |tag: &str| tag_values(row, tag).first().map(|v| (*v).to_string());
+                (
+                    one("GSTRATEDUTYHEAD").expect("duty head"),
+                    one("GSTRATEVALUATIONTYPE").expect("valuation"),
+                    one("GSTRATE"),
+                )
+            })
+            .collect();
+        assert_eq!(rates, sent);
+        assert_eq!(rates.len(), 5);
+    }
 }

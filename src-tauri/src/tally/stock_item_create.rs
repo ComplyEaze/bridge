@@ -894,18 +894,13 @@ pub(crate) enum CreateRenderRefusal {
     TextNeedsEscaping { field: DraftText },
 }
 
-/// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
-/// nothing, and renders the structure of the first marked Create measured (one run,
-/// PARTIAL, §12a.13), with values read from the sibling. It checks Name, Parent,
-/// Unit, HsnCode and HsnDescription in that order and returns the first refusal.
-/// Name receives only the five-character check because it is a `MasterName`.
-/// Each other value must first pass the `MasterName` rule, then hold none of
-/// `& < > " '`. The rate's magnitude is not checked, and Bridge does not know
-/// how Tally treats values other than the measured ones.
-pub(crate) fn render_stock_item_create(
-    shown: &ShownDraft<'_>,
-) -> Result<String, CreateRenderRefusal> {
-    let draft = shown.draft();
+/// The renderer's text rule, in its order: Name, Parent, Unit, HsnCode and
+/// HsnDescription, returning the first refusal. Name receives only the
+/// five-character check because it is a `MasterName`. Each other value must
+/// first pass the `MasterName` rule, then hold none of `& < > " '`. The
+/// preview applies the same rule, so a draft the renderer refuses is never
+/// shown for approval.
+pub(crate) fn create_text_refusal(draft: &StockItemDraft<'_>) -> Result<(), CreateRenderRefusal> {
     for (field, text) in [
         (DraftText::Name, draft.name().as_str()),
         (DraftText::Parent, draft.parent()),
@@ -926,6 +921,20 @@ pub(crate) fn render_stock_item_create(
             return Err(CreateRenderRefusal::TextNeedsEscaping { field });
         }
     }
+    Ok(())
+}
+
+/// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
+/// nothing, and renders the structure of the first marked Create measured (one run,
+/// PARTIAL, §12a.13), with values read from the sibling. It first applies
+/// `create_text_refusal` and returns its refusal. The rate's magnitude is not
+/// checked, and Bridge does not know how Tally treats values other than the
+/// measured ones.
+pub(crate) fn render_stock_item_create(
+    shown: &ShownDraft<'_>,
+) -> Result<String, CreateRenderRefusal> {
+    let draft = shown.draft();
+    create_text_refusal(draft)?;
 
     let name = draft.name().as_str();
     let parent = draft.parent();

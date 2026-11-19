@@ -1,7 +1,9 @@
 //! The text the master approval dialogs show.
 //!
-//! One request of ledger `Create`s, two lines for each master in the order
-//! they are sent, under the pinned company the voucher preview names. It is
+//! For ledgers: one request of ledger `Create`s, two lines for each master in
+//! the order they are sent, under the pinned company the voucher preview
+//! names. For a stock item: one `Create` with each copied field and its
+//! source. Values are shown JSON-quoted, so a backslash shows doubled. It is
 //! built from the typed items and the verified company, never from caller
 //! text, and it is refused rather than cut when it does not fit: a dialog
 //! that hides part of what will be created is not a review. The limits and the
@@ -12,7 +14,8 @@ use super::post::{
 };
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
 use crate::tally::stock_item_create::{
-    MarkedConstant, StockItemDraft, GOODS, SPECIFY_DETAILS_HERE, TAXABLE,
+    create_text_refusal, CreateRenderRefusal, MarkedConstant, StockItemDraft, GOODS,
+    SPECIFY_DETAILS_HERE, TAXABLE,
 };
 use crate::tally::VerifiedCompanyIdentity;
 
@@ -174,13 +177,27 @@ fn review_lines(
     Ok(lines)
 }
 
+/// Why a stock-item preview was refused. Nothing was shown. Refusal codes for
+/// these come with the dialog that shows the preview.
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum StockItemReviewError {
+    /// The shared review checks refused the text.
+    Review(MasterReviewError),
+    /// The Create renderer would refuse this draft, so it is not shown for
+    /// approval.
+    NotRenderable(CreateRenderRefusal),
+}
+
 /// The complete preview of one stock-item draft, with every copied field shown
 /// and the exact row name or alias used to select its sibling named as source.
+/// Every shown value first passes the layout and format checks; then the draft
+/// must pass the renderer's own text rule, `create_text_refusal`.
 #[allow(dead_code)]
 pub(super) fn stock_item_review_text(
     draft: &StockItemDraft<'_>,
     origin: &str,
-) -> Result<String, MasterReviewError> {
+) -> Result<String, StockItemReviewError> {
     let sibling = draft.sibling().sibling();
     let company = sibling.catalogue().company();
     let source = sibling.source_name().as_str();
@@ -220,11 +237,12 @@ pub(super) fn stock_item_review_text(
         .copied()
         .any(has_unsafe_review_layout_character)
     {
-        return Err(MasterReviewError::LayoutText);
+        return Err(StockItemReviewError::Review(MasterReviewError::LayoutText));
     }
     if shown.iter().copied().any(has_unreviewable_format_character) {
-        return Err(MasterReviewError::FormatText);
+        return Err(StockItemReviewError::Review(MasterReviewError::FormatText));
     }
+    create_text_refusal(draft).map_err(StockItemReviewError::NotRenderable)?;
 
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let mut lines = vec![
@@ -296,7 +314,7 @@ pub(super) fn stock_item_review_text(
     if fits(&lines) {
         Ok(lines.join("\n"))
     } else {
-        Err(MasterReviewError::TooLarge)
+        Err(StockItemReviewError::Review(MasterReviewError::TooLarge))
     }
 }
 

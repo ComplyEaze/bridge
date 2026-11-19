@@ -1,4 +1,4 @@
-//! The text the ledger dialog shows.
+//! The text the master approval dialogs show.
 //!
 //! One request of ledger `Create`s, two lines for each master in the order
 //! they are sent, under the pinned company the voucher preview names. It is
@@ -11,6 +11,9 @@ use super::post::{
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
 };
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
+use crate::tally::stock_item_create::{
+    MarkedConstant, StockItemDraft, GOODS, SPECIFY_DETAILS_HERE, TAXABLE,
+};
 use crate::tally::VerifiedCompanyIdentity;
 
 /// The last line of the preview: what the person must not do while the post
@@ -169,6 +172,132 @@ fn review_lines(
     lines.push(String::new());
     lines.push(MASTER_REVIEW_WARNING.to_string());
     Ok(lines)
+}
+
+/// The complete preview of one stock-item draft, with every copied field shown
+/// and the exact row name or alias used to select its sibling named as source.
+#[allow(dead_code)]
+pub(super) fn stock_item_review_text(
+    draft: &StockItemDraft<'_>,
+    origin: &str,
+) -> Result<String, MasterReviewError> {
+    let sibling = draft.sibling().sibling();
+    let company = sibling.catalogue().company();
+    let source = sibling.source_name().as_str();
+    let gst = draft.gst();
+    let hsn = draft.hsn();
+    let applicability = MarkedConstant::Applicable.render();
+    let state = MarkedConstant::Any.render();
+    let mut shown = vec![
+        company.display_name(),
+        company.company_guid(),
+        company.company_number(),
+        company.books_from_yyyymmdd(),
+        origin,
+        draft.name().as_str(),
+        source,
+        draft.parent(),
+        draft.unit(),
+        applicability,
+        GOODS,
+        gst.applicable_from(),
+        TAXABLE,
+        SPECIFY_DETAILS_HERE,
+        state,
+        hsn.applicable_from(),
+        hsn.code(),
+        hsn.description(),
+    ];
+    for rate in gst.rates() {
+        shown.push(rate.duty_head());
+        shown.push(rate.valuation().render());
+        if let Some(value) = rate.rate() {
+            shown.push(value);
+        }
+    }
+    if shown
+        .iter()
+        .copied()
+        .any(has_unsafe_review_layout_character)
+    {
+        return Err(MasterReviewError::LayoutText);
+    }
+    if shown.iter().copied().any(has_unreviewable_format_character) {
+        return Err(MasterReviewError::FormatText);
+    }
+
+    let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+    let mut lines = vec![
+        format!(
+            "Create ONE stock item in {}",
+            quoted(company.display_name())
+        ),
+        format!("Company GUID: {}", company.company_guid()),
+        format!(
+            "Company number: {}  Books from: {}",
+            company.company_number(),
+            bridge_tally_core::TallyDate::parse(company.books_from_yyyymmdd()).map_or_else(
+                |_| company.books_from_yyyymmdd().to_string(),
+                |date| date.shown()
+            )
+        ),
+        format!("Tally: {origin}"),
+        String::new(),
+        format!("Create stock item {}", quoted(draft.name().as_str())),
+        format!(
+            "All six copied fields come from sibling stock item {}.",
+            quoted(source)
+        ),
+        format!(
+            "Parent (stock group): {} — source: {}",
+            quoted(draft.parent()),
+            quoted(source)
+        ),
+        format!(
+            "Base unit: {} — source: {}",
+            quoted(draft.unit()),
+            quoted(source)
+        ),
+        format!(
+            "GST applicability: {} — source: {}",
+            quoted(applicability),
+            quoted(source)
+        ),
+        format!(
+            "Type of supply: {} — source: {}",
+            quoted(GOODS),
+            quoted(source)
+        ),
+        format!("GST details entry 1 — source: {}", quoted(source)),
+        format!("  Applicable from: {}", quoted(gst.applicable_from())),
+        format!("  Taxability: {}", quoted(TAXABLE)),
+        format!("  Source of GST details: {}", quoted(SPECIFY_DETAILS_HERE)),
+        format!("  State row 1: {}", quoted(state)),
+    ];
+    for (index, rate) in gst.rates().iter().enumerate() {
+        let value = rate.rate().map_or_else(|| "absent".to_string(), &quoted);
+        lines.push(format!(
+            "  Rate row {}: {}; valuation: {}; rate: {value}",
+            index + 1,
+            quoted(rate.duty_head()),
+            quoted(rate.valuation().render())
+        ));
+    }
+    lines.extend([
+        "  GST slab rates: empty".to_string(),
+        format!("HSN details entry 1 — source: {}", quoted(source)),
+        format!("  Applicable from: {}", quoted(hsn.applicable_from())),
+        format!("  HSN code: {}", quoted(hsn.code())),
+        format!("  HSN description: {}", quoted(hsn.description())),
+        format!("  Source of HSN details: {}", quoted(SPECIFY_DETAILS_HERE)),
+        String::new(),
+        "Do not create or rename stock items in Tally until this is done.".to_string(),
+    ]);
+    if fits(&lines) {
+        Ok(lines.join("\n"))
+    } else {
+        Err(MasterReviewError::TooLarge)
+    }
 }
 
 #[cfg(test)]

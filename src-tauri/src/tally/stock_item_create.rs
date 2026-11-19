@@ -74,9 +74,9 @@ use bridge_tally_protocol::stock_item_candidate::{
 };
 use bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER;
 
-const GOODS: &str = "Goods";
-const TAXABLE: &str = "Taxable";
-const SPECIFY_DETAILS_HERE: &str = "Specify Details Here";
+pub(crate) const GOODS: &str = "Goods";
+pub(crate) const TAXABLE: &str = "Taxable";
+pub(crate) const SPECIFY_DETAILS_HERE: &str = "Specify Details Here";
 const BASED_ON_VALUE: &str = "Based on Value";
 
 /// A control-reference value that the measured copy kept marked (§12a.13).
@@ -102,7 +102,7 @@ impl MarkedConstant {
     }
 
     /// The marked text sent in the measured Create (§12a.13).
-    fn render(self) -> &'static str {
+    pub(crate) fn render(self) -> &'static str {
         match self {
             Self::Applicable => "&#4; Applicable",
             Self::Any => "&#4; Any",
@@ -122,7 +122,7 @@ pub(crate) enum RateValuation {
 
 impl RateValuation {
     /// The valuation text sent in the measured Create (§12a.13).
-    fn render(self) -> &'static str {
+    pub(crate) fn render(self) -> &'static str {
         match self {
             Self::BasedOnValue => BASED_ON_VALUE,
             Self::NotApplicable => MarkedConstant::NotApplicable.render(),
@@ -409,6 +409,7 @@ pub(crate) enum SiblingRefusal {
 pub(crate) struct SiblingGst<'a> {
     catalogue: &'a StockItemCatalogue,
     item: &'a CandidateStockItem,
+    source_name: MasterName,
     parent: &'a str,
     unit: &'a str,
     applicability: &'a str,
@@ -558,6 +559,7 @@ impl<'a> SiblingGst<'a> {
         Ok(Self {
             catalogue,
             item,
+            source_name: name.clone(),
             parent,
             unit,
             applicability,
@@ -580,6 +582,11 @@ impl<'a> SiblingGst<'a> {
     /// The item's row name as read.
     pub(crate) fn name(&self) -> &'a str {
         &self.item.name
+    }
+
+    /// The exact row name or alias by which this sibling was selected.
+    pub(crate) fn source_name(&self) -> &MasterName {
+        &self.source_name
     }
 
     /// The item's parent as read.

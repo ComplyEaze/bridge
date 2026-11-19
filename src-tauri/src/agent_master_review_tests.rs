@@ -5,7 +5,12 @@ use crate::tally::ledger_create_item::{
     AdmittedDutyHead, AdmittedLedgerKind, PartySide, VerifiedGstin,
 };
 use crate::tally::master_name::MasterName;
-use bridge_tally_protocol::GstDutyHead;
+use crate::tally::stock_item_create::{
+    GoodsSibling, SiblingGst, StockItemCatalogue, StockItemDraft,
+};
+use bridge_tally_protocol::{
+    decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding, GstDutyHead,
+};
 
 /// The preview of a batch of `item` alone: the one-ledger text, through the
 /// batch's one builder.
@@ -326,4 +331,210 @@ fn a_batch_at_the_limit_fits_the_box() {
     )
     .unwrap();
     assert!(super::master_review_text(&batch, &company("BRIDGE MASTERS LAB"), ORIGIN).is_ok());
+}
+
+const STOCK_COMPANY: &str = "BRIDGE STOCK CREATE LAB";
+const STOCK_COMPANY_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
+const STOCK_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml"
+);
+const STOCK_ALIAS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-with-alias.utf16le.xml"
+);
+const STOCK_GROUPS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml"
+);
+const STOCK_UNITS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml"
+);
+
+const STOCK_ITEM_PREVIEW: &str = concat!(
+    "Create ONE stock item in \"BRIDGE STOCK CREATE LAB\"\n",
+    "Company GUID: bac2b5e9-ada9-43c0-b8f8-a2812a813fa1\n",
+    "Company number: 1  Books from: 1-Apr-2026\n",
+    "Tally: http://127.0.0.1:9000\n",
+    "\n",
+    "Create stock item \"SC Copied Marked\"\n",
+    "All six copied fields come from sibling stock item \"SC Sibling Goods\".\n",
+    "Parent (stock group): \"SC Goods Group\" — source: \"SC Sibling Goods\"\n",
+    "Base unit: \"Nos\" — source: \"SC Sibling Goods\"\n",
+    "GST applicability: \"&#4; Applicable\" — source: \"SC Sibling Goods\"\n",
+    "Type of supply: \"Goods\" — source: \"SC Sibling Goods\"\n",
+    "GST details entry 1 — source: \"SC Sibling Goods\"\n",
+    "  Applicable from: \"20250401\"\n",
+    "  Taxability: \"Taxable\"\n",
+    "  Source of GST details: \"Specify Details Here\"\n",
+    "  State row 1: \"&#4; Any\"\n",
+    "  Rate row 1: \"CGST\"; valuation: \"Based on Value\"; rate: \"9\"\n",
+    "  Rate row 2: \"SGST/UTGST\"; valuation: \"Based on Value\"; rate: \"9\"\n",
+    "  Rate row 3: \"IGST\"; valuation: \"Based on Value\"; rate: \"18\"\n",
+    "  Rate row 4: \"Cess\"; valuation: \"&#4; Not Applicable\"; rate: absent\n",
+    "  Rate row 5: \"State Cess\"; valuation: \"Based on Value\"; rate: absent\n",
+    "  GST slab rates: empty\n",
+    "HSN details entry 1 — source: \"SC Sibling Goods\"\n",
+    "  Applicable from: \"20250401\"\n",
+    "  HSN code: \"39239090\"\n",
+    "  HSN description: \"Plastic Articles for Conveyance\"\n",
+    "  Source of HSN details: \"Specify Details Here\"\n",
+    "\n",
+    "Do not create or rename stock items in Tally until this is done."
+);
+
+fn stock_decode(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("the capture decodes")
+    .text
+}
+
+fn stock_catalogue(company_name: &str, xml: &str) -> StockItemCatalogue {
+    StockItemCatalogue::from_candidate_read(
+        &VerifiedCompanyIdentity::test_fixture(company_name, STOCK_COMPANY_GUID),
+        xml,
+    )
+    .expect("the capture catalogues")
+}
+
+fn stock_draft<'c>(
+    catalogue: &'c StockItemCatalogue,
+    new_name: &str,
+    source_name: &str,
+) -> StockItemDraft<'c> {
+    let absent = catalogue
+        .name_absent(&MasterName::new(new_name).unwrap())
+        .expect("the proposed name is absent");
+    let sibling = SiblingGst::named(
+        catalogue,
+        &MasterName::new(source_name).expect("the source name is admitted"),
+    )
+    .expect("the sibling is complete");
+    let sibling = GoodsSibling::from_sibling(sibling).expect("the sibling is the Goods case");
+    StockItemDraft::new(
+        absent,
+        sibling,
+        &stock_decode(STOCK_GROUPS),
+        &stock_decode(STOCK_UNITS),
+    )
+    .expect("the sibling drafts")
+}
+
+fn stock_preview_with(
+    company_name: &str,
+    items: &[u8],
+    new_name: &str,
+    source_name: &str,
+    origin: &str,
+) -> Result<String, MasterReviewError> {
+    let xml = stock_decode(items);
+    let catalogue = stock_catalogue(company_name, &xml);
+    let draft = stock_draft(&catalogue, new_name, source_name);
+    stock_item_review_text(&draft, origin)
+}
+
+fn stock_preview(items: &[u8], new_name: &str, source_name: &str) -> String {
+    stock_preview_with(STOCK_COMPANY, items, new_name, source_name, ORIGIN)
+        .expect("the captured draft has a review")
+}
+
+#[test]
+fn the_captured_stock_item_preview_is_exact() {
+    assert_eq!(
+        stock_preview(STOCK_BEFORE, "SC Copied Marked", "SC Sibling Goods"),
+        STOCK_ITEM_PREVIEW
+    );
+}
+
+#[test]
+fn absent_cess_rates_are_shown_as_absent_not_zero() {
+    let preview = stock_preview(STOCK_BEFORE, "SC Copied Marked", "SC Sibling Goods");
+    let cess_lines = preview
+        .lines()
+        .filter(|line| line.contains("\"Cess\"") || line.contains("\"State Cess\""))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        cess_lines,
+        [
+            "  Rate row 4: \"Cess\"; valuation: \"&#4; Not Applicable\"; rate: absent",
+            "  Rate row 5: \"State Cess\"; valuation: \"Based on Value\"; rate: absent",
+        ]
+    );
+    for line in cess_lines {
+        assert!(line.ends_with("rate: absent"));
+        assert!(!line.contains("rate: \"0\""));
+        assert!(!line.contains("rate: \"0.0\""));
+    }
+}
+
+#[test]
+fn marked_values_are_shown_as_request_text_not_parser_markers() {
+    let preview = stock_preview(STOCK_BEFORE, "SC Copied Marked", "SC Sibling Goods");
+    assert_eq!(preview.matches("&#4;").count(), 3);
+    assert!(!preview.contains('\u{fffd}'));
+    for value in [
+        "\"&#4; Applicable\"",
+        "\"&#4; Any\"",
+        "\"&#4; Not Applicable\"",
+    ] {
+        assert!(preview.contains(value));
+    }
+    for plain in ["\" Applicable\"", "\" Any\"", "\" Not Applicable\""] {
+        assert!(!preview.contains(plain));
+    }
+}
+
+#[test]
+fn stock_item_review_refuses_unsafe_company_and_origin_text() {
+    for (company_name, refusal) in [
+        ("BRIDGE\u{2028}STOCK LAB", MasterReviewError::LayoutText),
+        ("BRIDGE\u{200b}STOCK LAB", MasterReviewError::FormatText),
+    ] {
+        assert_eq!(
+            stock_preview_with(
+                company_name,
+                STOCK_BEFORE,
+                "SC Copied Marked",
+                "SC Sibling Goods",
+                ORIGIN,
+            ),
+            Err(refusal)
+        );
+    }
+    assert_eq!(
+        stock_preview_with(
+            STOCK_COMPANY,
+            STOCK_BEFORE,
+            "SC Copied Marked",
+            "SC Sibling Goods",
+            "http://127.0.0.1:9000\nTally: other",
+        ),
+        Err(MasterReviewError::LayoutText)
+    );
+}
+
+#[test]
+fn stock_item_review_refuses_an_overlong_field_instead_of_cutting_it() {
+    let xml = stock_decode(STOCK_BEFORE);
+    let description = "Plastic Articles for Conveyance";
+    assert_eq!(xml.matches(description).count(), 1);
+    let xml = xml.replace(description, &"x".repeat(101));
+    let catalogue = stock_catalogue(STOCK_COMPANY, &xml);
+    let draft = stock_draft(&catalogue, "SC Copied Marked", "SC Sibling Goods");
+    assert_eq!(
+        stock_item_review_text(&draft, ORIGIN),
+        Err(MasterReviewError::TooLarge)
+    );
+}
+
+#[test]
+fn an_alias_source_is_named_exactly_as_approved() {
+    let preview = stock_preview(STOCK_ALIAS, "SC Copied From Alias", "SC Sibling Alias");
+    let expected = STOCK_ITEM_PREVIEW
+        .replace("SC Copied Marked", "SC Copied From Alias")
+        .replace("SC Sibling Goods", "SC Sibling Alias");
+    assert_eq!(preview, expected);
+    assert!(!preview.contains("SC Sibling Goods"));
 }

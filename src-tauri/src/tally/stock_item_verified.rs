@@ -6,10 +6,12 @@
 //! 1381-R1 of `TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md`
 //! §12a.13 records a Create the counters reported clean whose stored item a
 //! fresh read showed to differ. So `VerifiedItem` is built only from a clean
-//! answer together with a fresh read whose new row equals the shown draft.
-//! Outside this module neither can be made by hand: `CountersClean` holds a
-//! `CleanCreate` that only `StockItemImportOutcome::of` makes, and `Equal`
-//! holds an `EqualRead` that only `ReadBackVerdict::of` makes.
+//! answer together with a fresh read whose new row equals the shown draft:
+//! `VerifiedItem::new` takes the shown draft and the fresh read and judges the
+//! read itself, so no verdict made for another draft can be passed in.
+//! Outside this module a clean answer cannot be made by hand: `CountersClean`
+//! holds a `CleanCreate` that only `StockItemImportOutcome::of` makes (and
+//! `Equal` an `EqualRead` that only `ReadBackVerdict::of` makes).
 //!
 //! `VerifiedItem` does not prove:
 //! - that the fresh read was taken after the Create was posted (the caller's
@@ -19,8 +21,7 @@
 //! - that the fresh read is the whole book (size and count admission are the
 //!   caller's, as the module doc of `stock_item_create.rs` says);
 //! - that the answer was Tally's answer to this draft's Create: it takes the
-//!   outcome as it is passed. The equal read must be for a draft of the same
-//!   name as `shown`, but `new` cannot tell two drafts of one name apart.
+//!   outcome as it is passed.
 //!
 //! The tests read the captures in
 //! `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/`; see their
@@ -98,12 +99,11 @@ impl StockItemImportOutcome {
     }
 }
 
-/// The proof inside `Equal`: the new row's GUID and the draft name it was
-/// read for. Its fields are private, so only `ReadBackVerdict::of` makes one.
+/// The proof inside `Equal`: the new row's GUID. Its field is private, so only
+/// `ReadBackVerdict::of` makes one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EqualRead {
     guid: String,
-    name: MasterName,
 }
 
 /// What a fresh stock item read says of the item a shown draft proposed.
@@ -223,7 +223,6 @@ impl ReadBackVerdict {
         if fields.is_empty() {
             Self::Equal(EqualRead {
                 guid: item.guid.clone(),
-                name: draft.name().clone(),
             })
         } else {
             Self::Differs { fields }
@@ -270,7 +269,8 @@ pub(crate) struct VerifiedItem {
     name: MasterName,
 }
 
-/// Why no `VerifiedItem` was built: the outcome and verdict as given.
+/// Why no `VerifiedItem` was built: the outcome as given and the verdict
+/// `new` reached.
 #[derive(Debug)]
 pub(crate) struct NotVerified {
     pub(crate) outcome: StockItemImportOutcome,
@@ -278,22 +278,19 @@ pub(crate) struct NotVerified {
 }
 
 impl VerifiedItem {
-    /// `Ok` only for `CountersClean` with an `Equal` read for a draft of the
-    /// shown draft's name; the GUID is the read's.
+    /// Judges `fresh` against `shown` with `ReadBackVerdict::of`, and is `Ok`
+    /// only for `CountersClean` with `Equal`; the GUID is the read's and the
+    /// name the shown draft's.
     pub(crate) fn new(
         outcome: StockItemImportOutcome,
-        verdict: ReadBackVerdict,
         shown: &ShownDraft<'_>,
+        fresh: &StockItemCatalogue,
     ) -> Result<Self, NotVerified> {
-        match (outcome, verdict) {
-            (StockItemImportOutcome::CountersClean(_), ReadBackVerdict::Equal(read))
-                if read.name == *shown.draft().name() =>
-            {
-                Ok(Self {
-                    guid: read.guid,
-                    name: read.name,
-                })
-            }
+        match (outcome, ReadBackVerdict::of(shown, fresh)) {
+            (StockItemImportOutcome::CountersClean(_), ReadBackVerdict::Equal(read)) => Ok(Self {
+                guid: read.guid,
+                name: shown.draft().name().clone(),
+            }),
             (outcome, verdict) => Err(NotVerified { outcome, verdict }),
         }
     }

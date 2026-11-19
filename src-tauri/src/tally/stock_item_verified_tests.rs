@@ -5,8 +5,9 @@
 //! whose helpers are private to that module.
 
 use super::*;
-use crate::tally::stock_item_create::StockItemDraft;
+use crate::tally::stock_item_create::{StockItemCatalogueError, StockItemDraft};
 use crate::tally::VerifiedCompanyIdentity;
+use bridge_tally_protocol::native_masters::NativeMastersError;
 use bridge_tally_protocol::{
     decode_tally_xml_response_bytes_limited, parse_import_outcome, ExpectedTallyTextEncoding,
 };
@@ -217,11 +218,14 @@ fn the_marked_create_reads_back_equal_and_is_verified() {
         verdict,
         ReadBackVerdict::Equal(EqualRead {
             guid: MARKED_GUID.to_string(),
-            name: name(MARKED_NAME),
         })
     );
-    let verified = VerifiedItem::new(outcome(&decode(ANSWER)), verdict, &shown)
-        .expect("a clean answer with an equal read is verified");
+    let verified = VerifiedItem::new(
+        outcome(&decode(ANSWER)),
+        &shown,
+        &catalogue(&decode(MARKED)),
+    )
+    .expect("a clean answer with an equal read is verified");
     assert_eq!(verified.guid(), MARKED_GUID);
     assert_eq!(verified.name(), &name(MARKED_NAME));
 }
@@ -235,7 +239,8 @@ fn the_plain_create_reads_back_without_applicability_and_gst_details_and_is_not_
     assert_eq!(verdict, expected);
     let outcome = outcome(&decode(ANSWER));
     assert_eq!(outcome, clean_create());
-    let refused = VerifiedItem::new(outcome, verdict, &shown).expect_err("the read differs");
+    let refused = VerifiedItem::new(outcome, &shown, &catalogue(&decode(PLAIN)))
+        .expect_err("the read differs");
     assert_eq!(refused.outcome, clean_create());
     assert_eq!(refused.verdict, expected);
 }
@@ -453,9 +458,12 @@ fn a_read_for_another_company_is_refused() {
 
 #[test]
 fn only_a_clean_answer_with_an_equal_read_is_verified() {
-    let before = catalogue(&decode(BEFORE));
+    let before_xml = decode(BEFORE);
+    let before = catalogue(&before_xml);
     let shown = shown(&before, MARKED_NAME);
-    let equal = ReadBackVerdict::of(&shown, &catalogue(&decode(MARKED)));
+    let marked_xml = decode(MARKED);
+    let marked = catalogue(&marked_xml);
+    let equal = ReadBackVerdict::of(&shown, &marked);
     assert!(matches!(equal, ReadBackVerdict::Equal(_)));
     let clean = outcome(&decode(ANSWER));
     assert_eq!(clean, clean_create());
@@ -477,26 +485,57 @@ fn only_a_clean_answer_with_an_equal_read_is_verified() {
         StockItemImportOutcome::ApplicationFailure,
     ];
     for other in outcomes {
-        let refused = VerifiedItem::new(other.clone(), equal.clone(), &shown)
+        let refused = VerifiedItem::new(other.clone(), &shown, &marked)
             .expect_err("only a clean answer is verified");
         assert_eq!(refused.outcome, other);
         assert_eq!(refused.verdict, equal);
     }
 
-    let verdicts = [
-        differs(&[SiblingField::GstDetails]),
-        ReadBackVerdict::NotFoundOnce { rows: 0 },
-        ReadBackVerdict::NotNew,
-        ReadBackVerdict::OtherCompany,
+    // Each read below is a hand edit or a read taken before the Create, as in
+    // the verdict tests above; they show the check fires, not how Tally
+    // behaves.
+    let changed_rate = edited_in_row(
+        &marked_xml,
+        MARKED_NAME,
+        CGST,
+        RATE_9,
+        "<GSTRATE TYPE=\"Number\"> 8</GSTRATE>",
+    );
+    let renamed_sibling = edited(
+        &edited(
+            &before_xml,
+            "<STOCKITEM NAME=\"SC Sibling Goods\"",
+            "<STOCKITEM NAME=\"SC Copied Marked\"",
+        ),
+        "<NAME>SC Sibling Goods</NAME>",
+        "<NAME>SC Copied Marked</NAME>",
+    );
+    let reads = [
+        (
+            catalogue(&changed_rate),
+            differs(&[SiblingField::GstDetails]),
+        ),
+        (
+            catalogue(&before_xml),
+            ReadBackVerdict::NotFoundOnce { rows: 0 },
+        ),
+        (catalogue(&renamed_sibling), ReadBackVerdict::NotNew),
+        (
+            catalogue_for(
+                OTHER_COMPANY_GUID,
+                &marked_xml.replace(COMPANY_GUID, OTHER_COMPANY_GUID),
+            ),
+            ReadBackVerdict::OtherCompany,
+        ),
     ];
-    for other in verdicts {
-        let refused = VerifiedItem::new(clean.clone(), other.clone(), &shown)
+    for (read, expected) in reads {
+        let refused = VerifiedItem::new(clean.clone(), &shown, &read)
             .expect_err("only an equal read is verified");
         assert_eq!(refused.outcome, clean);
-        assert_eq!(refused.verdict, other);
+        assert_eq!(refused.verdict, expected);
     }
 
-    let verified = VerifiedItem::new(clean, equal, &shown).expect("the captured pair verifies");
+    let verified = VerifiedItem::new(clean, &shown, &marked).expect("the captured pair verifies");
     assert_eq!(verified.guid(), MARKED_GUID);
 }
 
@@ -546,16 +585,40 @@ fn a_name_held_by_two_items_is_not_found_once() {
         ReadBackVerdict::of(&shown, &catalogue(&read)),
         ReadBackVerdict::NotFoundOnce { rows: 2 }
     );
+    // Hand edit: the sibling's row name and name entry both changed to the
+    // created name, so two rows would hold it as their row name. The parser
+    // refuses such a read, so no verdict is reached. It shows the check fires
+    // on edited text, not how Tally behaves.
+    let read = edited(
+        &edited(
+            &decode(MARKED),
+            "<STOCKITEM NAME=\"SC Sibling Goods\"",
+            "<STOCKITEM NAME=\"SC Copied Marked\"",
+        ),
+        "<NAME>SC Sibling Goods</NAME>",
+        "<NAME>SC Copied Marked</NAME>",
+    );
+    assert_eq!(
+        StockItemCatalogue::from_candidate_read(
+            &VerifiedCompanyIdentity::test_fixture(COMPANY, COMPANY_GUID),
+            &read,
+        )
+        .expect_err("two rows of one name are refused"),
+        StockItemCatalogueError::Unreadable(NativeMastersError::DuplicateName)
+    );
 }
 
 #[test]
-fn an_equal_read_for_another_draft_name_is_not_verified() {
+fn a_draft_is_judged_against_the_read_it_is_given() {
+    // The read after both Creates, given with the plain draft: `new` judges
+    // the plain draft's own row in it, which differs, and not the marked row
+    // that equals the marked draft.
     let before = catalogue(&decode(BEFORE));
-    let marked = shown(&before, MARKED_NAME);
-    let equal = ReadBackVerdict::of(&marked, &catalogue(&decode(MARKED)));
-    assert!(matches!(equal, ReadBackVerdict::Equal(_)));
-    let other = shown(&before, PLAIN_NAME);
-    let refused = VerifiedItem::new(clean_create(), equal.clone(), &other)
-        .expect_err("the read was for another draft's name");
-    assert_eq!(refused.verdict, equal);
+    let plain = shown(&before, PLAIN_NAME);
+    let refused = VerifiedItem::new(clean_create(), &plain, &catalogue(&decode(MARKED)))
+        .expect_err("the plain draft's row differs");
+    assert_eq!(
+        refused.verdict,
+        differs(&[SiblingField::Applicability, SiblingField::GstDetails])
+    );
 }

@@ -1023,8 +1023,8 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   at the same state and the marks unchanged, in three of three tries. A mailing read cut at the 20 s limit, and the
   drain after one, were not reached on that book (they were on another, below). Since #2142 an oversize Tally declares owes the drain, because its
   body is left unread (§11c.2). After one, the party/ledger master export reads the book once more with the standard
-  request inside the same operation (#2214), once the drain clears; neither that read nor those probes have been run
-  against Tally. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
+  request inside the same operation (#2214), once the drain clears; that read was run against Tally once after an
+  oversize, on 2026-11-18 (the last entry below), and the probes after the other failures were not. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
   still be working on that read; a cut at the time limit has since been seen live (the next entry). After any other failure of that read
   it reads the book once more without the details, and the workbook names the failure (the maintainers' ruling on
   #2074; none reached on this book): an answer that broke off, could not be read, did not decode or never came, an
@@ -1051,8 +1051,30 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   draining and admitted the fifth, ending 68 s after the owed record, whole. The export failed with its withheld
   message and wrote no file, but the desktop app that ran it was a 2026-10-30 build (0.6.1), older than the export's
   re-read without the details (#2188), so that step is not evidence for later builds; the server rows ran on the
-  bundle's own server. Not measured: the export step on a later build, a cut with no other client's work ahead of it,
-  a cut of another read, the export's retry after a declared oversize, another book, and another release.
+  bundle's own server. Not measured: the export step after a cut on a later build, a cut with no other client's work
+  ahead of it, a cut of another read, another book, and another release.
+- **The party/ledger master workbook read the mailing details by the ledger count past a master mark of 4,266, read
+  about 30 MB of them whole, and, past 32 MiB, was written again without them with its note. PARTIAL: TallyPrime 7.2
+  Silver, 2026-11-18, one synthetic book, one sitting, the desktop app 0.7.0 built from master a83ee02d
+  (`lab/2074-2214-w-answers` at b8422a36, RESULTS.md).** The book's master mark was taken to 4,400 by 4,174
+  alterations, with 13 ledgers. The workbook export then sent a count read (the ledgers' name, GUID and parent) and
+  one master post that named `LEDMAILINGDETAILS.LIST`, answered whole (36,444 bytes), and no master post with the
+  standard fetch; the workbook carried one party's entry (from 20260405, in force) and "no mailing details" on a
+  ledger without one, and its header held no failed-read note. After 160 more parties of 200 entries each, the same
+  export's mailing answer was 30,125,084 bytes, came whole in 2.906 s and 1.891 s, and the workbook held 173 ledger
+  rows with the latest entry of one party in force. After 40 more parties, the mailing answer was 37,647,244 bytes:
+  Tally's first byte came 3.4 s after the post, the app closed that connection, and a new one sent three status
+  requests 2 s apart and then the standard master post, which answered 401,694 bytes; 8.375 s passed from the
+  mailing post to the standard post. The workbook held 213 ledgers (the sheet's 215 counted two ledgers of other
+  parts, not of this sitting), every Mailing status "not observed", and its header said the details were asked for,
+  Tally's answer to that read passed the 32 MiB limit, the book was read again without them, and the empty Mailing
+  columns are not the same as no address; the app's notice read the same. The master mark did not move across the
+  oversize read (4,600) and the drain record read clear after it. The proxy that sat between the app and Tally
+  logged a `ConnectionAbortedError` (WinError 10053) on that mailing post and a `ConnectionResetError` (WinError
+  10054) when the app was closed; neither is explained. RESULTS.md does not record whether Tally declared the length
+  in the head of the 37,647,244-byte answer. Not measured: a cut at the time limit on this build, the wait after
+  an HTTP error status, a broken-off answer or one that did not decode, the 60 s bound, a ledger count near the
+  count path's bound, another book, and another release.
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
   `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one

@@ -1,0 +1,15 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/notes.txt: original 8549 B sha256 633922a613a4eb653b214c3231c9dc14ab3259c19b0f5419e5272aa1be1e3748 (kept on the lab PC); the company GUID replaced in 1 place(s); 1 x -> The recorded go for this sheet on BRIDGE STOCK CREATE LAB, with RESTORE given for S6.; 1 x -> Held on the recorded word until another row's sitting allowed this one to start.; 1 x ->  was given; 1 x -> the recorded RESTORE word; 2 x -> "status=\1, bytes=\2"; 1 x -> <Tally data folder>
+evidence/o1-checks.txt: original 2606 B sha256 cbc5fa04dadddebec3656d2cab8dad2fa6389876bc57c08abc92f9ffa6a3b759 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/o2-checks.txt: original 2957 B sha256 078ace7b979003125711b88a9ffdd508bd7aa3d5845f42cda5ea89315247eacc (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/o3-checks.txt: original 3293 B sha256 f771e9dcf0e31fd064d51a20ade52f3ef08405bdfff0a81fdf891408a7157061 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/o4-checks.txt: original 3643 B sha256 4a62b67423a11c5466bb8ddedfbd012bc66d8fe6dbf82ba78e330955978721e3 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/o5-checks.txt: original 3989 B sha256 3f1ddc7a81d51a40d71338d63d7b98ce8972a223adf6d12ca0a0a7c6a77a7301 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/o6-checks.txt: original 4335 B sha256 97a631e79ce61268f7e5273d28195d27cbd7d19c27982ad3bb5df2b2c1cf05f1 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/o7-checks.txt: original 4686 B sha256 c96f2284f7584af80c0debf44872fc6984a232a6648f82c47459dfd0c5e55026 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/s4-rows-a1-o6.txt: original 14971 B sha256 6ffc3d3593811245699ec8c0a8982937b6f8a5866afb62b8df2441ca8a71e1bc (kept on the lab PC); the company GUID replaced in 14 place(s)
+evidence/s5-rows-o7-and-o1-item.txt: original 6503 B sha256 166e8913eef6ed25ffafff17c5466ad245f7c93531be748c95c7d81ac33e362b (kept on the lab PC); the company GUID replaced in 4 place(s)
+scripts/send.py: original 3811 B sha256 96e485a1a4092351c7de0260dcbd07b17bf86ce0895a9bfb610ba9518f095fb1 (kept on the lab PC); 8 x -> stop
+scripts/step0.py: original 2754 B sha256 9eea940bcfa100bbcc33aa8ce121054113ae3c409f3a62918051d458ee140645 (kept on the lab PC); 1 x -> <lab folder>
+scripts/probe.py: original 3637 B sha256 1755d38af5ed6d53c59f2a396586d9a7e8bebeb08b96cfcc77c226903c22ddb0 (kept on the lab PC); 1 x -> <LAB_DIR>; 7 x -> stop
+scripts/capnow.ps1: original 621 B sha256 9932ad332ced5ac55ca8d8515958f23fb33a5bd84b91b11dc0df78f570885562 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>

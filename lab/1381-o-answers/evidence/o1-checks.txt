@@ -1,0 +1,50 @@
+2026-11-19T10:45:54.975Z o1-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1 | first byte 0.008383 s total 0.009252 s
+o1-pre marks: [('bac2b5e9', 'absent', '210')]
+2026-11-19T10:45:55.300Z o1 requests/o1-two-gst-dates.utf16le.xml request 5740 B sha256 73ab014846857e5f3972785a7f976a1ff4d3dbf192ce3b2e7c89f6e43f038703 | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.231628 s total 0.233618 s
+capture <LAB_DIR>\shots\o1-after.png 44771292e9f58b7c08d15a9aa1d96d625785146d52b70b46dc6f73447bdd10bf
+> check_r1.py import answers/a-o1.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+2026-11-19T10:46:05.365Z o1-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 4e9f77ceaba1315dbbe2c340da3bdf30d6a8f9fca36145e24570f7fb53760f81 | first byte 0.007933 s total 0.008844 s
+o1-post marks: [('bac2b5e9', 'absent', '211')]
+marks difference: V absent -> absent, M 210 -> 211
+2026-11-19T10:46:05.737Z a1-o1 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 16576 answer 16576 B sha256 e735d88fc51da45f6aaeda6fc9bd7fca99c9c5d43ae4c510e9cb9c46debb60b3 | first byte 0.016083 s total 0.017858 s
+> check_r1.py diff answers/a-a1.xml answers/a-a1-o1.xml
+rows before: 1  after: 2
+ADDED STOCKITEM 'SO Two Gst Dates' (16 characters)
+unchanged rows: 1
+exit 0
+> check_r1.py rows answers/a-a1-o1.xml
+rows: 2
+STOCKITEM 'SC Sibling Goods' (16 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 24 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 3 descendants
+  MASTERID: a value
+  PARENT: a value
+STOCKITEM 'SO Two Gst Dates' (16 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 2 element(s), 48 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 2 descendants
+  MASTERID: a value
+  PARENT: a value
+exit 0

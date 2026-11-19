@@ -1,0 +1,11 @@
+> sent_vs_stored.py answers/a-a1-o7.xml (o1 to o7; a sent NAME looked for in LANGUAGENAME.LIST/NAME.LIST/NAME)
+requests/o1-two-gst-dates.utf16le.xml 'SO Two Gst Dates': sent leaves=43, kept=43, not kept=0, kept with another spelling=0
+requests/o2-two-hsn-dates.utf16le.xml 'SO Two Hsn Dates': sent leaves=30, kept=30, not kept=0, kept with another spelling=0
+requests/o3-cess-rate.utf16le.xml 'SO Cess Rate': sent leaves=27, kept=27, not kept=0, kept with another spelling=0
+requests/o4-other-rates.utf16le.xml 'SO Other Rates': sent leaves=26, kept=26, not kept=0, kept with another spelling=2
+  kept as: GSTDETAILS.LIST/STATEWISEDETAILS.LIST/RATEDETAILS.LIST/GSTRATE sent '2.5' stored '2.50'
+  kept as: GSTDETAILS.LIST/STATEWISEDETAILS.LIST/RATEDETAILS.LIST/GSTRATE sent '2.5' stored '2.50'
+requests/o5-root-parent.utf16le.xml 'SO Root Parent': sent leaves=25, kept=25, not kept=0, kept with another spelling=0
+requests/o6-root-marked.utf16le.xml 'SO Root Marked': sent leaves=26, kept=26, not kept=0, kept with another spelling=0
+requests/o7-create.utf16le.xml 'SO Two Dates Copied': sent leaves=43, kept=43, not kept=0, kept with another spelling=0
+exit 0

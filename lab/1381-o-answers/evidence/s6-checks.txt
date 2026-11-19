@@ -1,0 +1,20 @@
+m0 vs m-r: byte-equal (sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1 / ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1; sizes 3318 / 3318)
+a1 vs a1-r: byte-equal (sha256 92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4 / 92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4; sizes 8270 / 8270)
+g1 vs g-r: byte-equal (sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a / b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a; sizes 4170 / 4170)
+u1 vs u-r: byte-equal (sha256 cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39 / cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39; sizes 4040 / 4040)
+> check_r1.py diff answers/a-m0.xml answers/a-m-r.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0
+> check_r1.py diff answers/a-a1.xml answers/a-a1-r.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0
+> check_r1.py diff answers/a-g1.xml answers/a-g-r.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0
+> check_r1.py diff answers/a-u1.xml answers/a-u-r.xml
+rows before: 1  after: 1
+unchanged rows: 1
+exit 0

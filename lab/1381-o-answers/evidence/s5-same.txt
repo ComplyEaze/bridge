@@ -1,0 +1,6 @@
+PARENT: same (a value / a value)
+BASEUNITS: same (a value / a value)
+GSTAPPLICABLE: same (a value / a value)
+GSTTYPEOFSUPPLY: same (a value / a value)
+GSTDETAILS.LIST: same (2 element(s), 48 descendants / 2 element(s), 48 descendants)
+HSNDETAILS.LIST: same (1 element(s), 4 descendants / 1 element(s), 4 descendants)

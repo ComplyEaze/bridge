@@ -1,0 +1,94 @@
+2026-11-19T10:46:49.051Z o5-pre requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 7b8d64c6c2dc77c1c2e2162621e13c5c6ebc31a01fc9f5d8c4a66eba704a7057 | first byte 0.008497 s total 0.009529 s
+o5-pre marks: [('bac2b5e9', 'absent', '214')]
+2026-11-19T10:46:49.346Z o5 requests/o5-root-parent.utf16le.xml request 3604 B sha256 a05be92ba34851e61c9339e539fd726f20cf48bff330ea3360f42b5dd275389c | curl exit 0 status 200 CONTENT-LENGTH 538 answer 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010 | first byte 0.259623 s total 0.260769 s
+capture <LAB_DIR>\shots\o5-after.png 44771292e9f58b7c08d15a9aa1d96d625785146d52b70b46dc6f73447bdd10bf
+> check_r1.py import answers/a-o5.xml
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0
+exit 0
+2026-11-19T10:46:53.221Z o5-post requests/marks.utf16le.xml request 990 B sha256 5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit 0 status 200 CONTENT-LENGTH 3318 answer 3318 B sha256 74fafb9357731ee2dd10897eade5202c2be7c891dc3af17164b514a300478893 | first byte 0.007259 s total 0.008876 s
+o5-post marks: [('bac2b5e9', 'absent', '215')]
+marks difference: V absent -> absent, M 214 -> 215
+2026-11-19T10:46:53.566Z a1-o5 requests/a1-candidate-items.utf16le.xml request 1330 B sha256 581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 37888 answer 37888 B sha256 44de274e98892a292ad0e8be2187c499701941eefe9f948eca3fabbb65f24b33 | first byte 0.022845 s total 0.024198 s
+> check_r1.py diff answers/a-a1-o4.xml answers/a-a1-o5.xml
+rows before: 5  after: 6
+ADDED STOCKITEM 'SO Root Parent' (14 characters)
+unchanged rows: 5
+exit 0
+> check_r1.py rows answers/a-a1-o5.xml
+rows: 6
+STOCKITEM 'SC Sibling Goods' (16 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 24 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 3 descendants
+  MASTERID: a value
+  PARENT: a value
+STOCKITEM 'SO Cess Rate' (12 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 25 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 2 descendants
+  MASTERID: a value
+  PARENT: a value
+STOCKITEM 'SO Other Rates' (14 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 24 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 2 descendants
+  MASTERID: a value
+  PARENT: a value
+STOCKITEM 'SO Root Parent' (14 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 24 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 2 descendants
+  MASTERID: a value
+  PARENT: a value
+STOCKITEM 'SO Two Gst Dates' (16 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 2 element(s), 48 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 1 element(s), 4 descendants
+  LANGUAGENAME.LIST: 1 element(s), 2 descendants
+  MASTERID: a value
+  PARENT: a value
+STOCKITEM 'SO Two Hsn Dates' (16 characters)
+  ALTERID: a value
+  BASEUNITS: a value
+  BRIDGECOMPANYGUID: a value
+  GSTAPPLICABLE: a value
+  GSTDETAILS.LIST: 1 element(s), 24 descendants
+  GSTTYPEOFSUPPLY: a value
+  HSNDETAILS.LIST: 2 element(s), 8 descendants
+  LANGUAGENAME.LIST: 1 element(s), 2 descendants
+  MASTERID: a value
+  PARENT: a value
+exit 0

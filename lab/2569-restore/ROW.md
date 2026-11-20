@@ -30,9 +30,9 @@ Use the lab's own copy from row 2440-CP if its exe hash equals the line; otherwi
 - the `.mcpb` against `archive_sha256` in its `mcpb-smoke.json`;
 - `bridge_mcp.exe` against `binary_sha256` in the same file.
 
-It sends those three hashes to the run coordinator, who fills the line below by a new commit on this branch, after checking that the run's commit is 8c3fb9f2. While any field reads `<to fill>`, Parts H2, H3 and B do not run: STOP. Record the version the tool reports.
+The artifact's size and digest below were read by the run coordinator from GitHub, without a download; the CI log does not print the other two. The lab sends all three hashes to the run coordinator, who fills the two left by a new commit on this branch, after checking the zip's against the line. GitHub keeps this artifact until 27 Nov 2026. While any field reads `<to fill>`, Parts H2, H3 and B do not run: STOP. Record the version the tool reports.
 
-NEW RC COMMIT: 8c3fb9f2277966fa98b31bdc775b65c5ea3c29f7  CI RUN: 44740211021 (started by hand on 20 Nov 2026)  ARTIFACT: unsigned-bundle-smoke-windows-latest, <to fill> bytes  ZIP DIGEST: <to fill>  MCPB archive_sha256: <to fill>  EXE SHA256: <to fill>
+NEW RC COMMIT: 8c3fb9f2277966fa98b31bdc775b65c5ea3c29f7  CI RUN: 44740211021 (started by hand on 20 Nov 2026)  ARTIFACT: unsigned-bundle-smoke-windows-latest, 60,653,959 bytes  ZIP DIGEST: f8dc02e1f7bbb134e5ecc929c1f567aa265df2d3d1c866fea6636270e52e9472  MCPB archive_sha256: <to fill>  EXE SHA256: <to fill>
 
 **Read in 8c3fb9f2, for the steps of row 2440-CP:** `e_invoice` under `invoice`, requiring `irn`, `ack_no` and `ack_date`; `vouchers` with `include_e_invoice`; the window lines `E-invoice IRN: ` and `E-invoice ack: <number> of <date>`; the registration read-back of #2475 (`invoice_registration_missing`, `invoice_registration_differs`); and `invoice_company_stopped`. Row 2440-CP's sheet note on the registration read holds: in steps 8 and 9 an answer reading `posted_divergent` whose `invoice_fields` name `invoice_registration_missing` or `invoice_registration_differs` is a FINDING: record it whole and go to step 10.
 

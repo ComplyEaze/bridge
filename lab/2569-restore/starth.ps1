@@ -5,7 +5,13 @@
 # Usage: powershell -NoProfile -File starth.ps1 -Exe <exe> -Show <1|7> -In <input> -OutFile <new> -ErrFile <new>
 param([string]$Exe, [int]$Show, [string]$In, [string]$OutFile, [string]$ErrFile)
 if ($Show -ne 1 -and $Show -ne 7) { throw "Show must be 1 or 7" }
-foreach ($f in $OutFile, $ErrFile) { if (Test-Path $f) { throw "exists: $f" } }
+# Resolve every path against this shell's location once, so .NET and Test-Path read the same files.
+$Exe = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Exe)
+$In = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($In)
+$OutFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
+$ErrFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ErrFile)
+if (-not (Test-Path -LiteralPath $In)) { throw "missing: $In" }
+foreach ($f in $OutFile, $ErrFile) { if (Test-Path -LiteralPath $f) { throw "exists: $f" } }
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

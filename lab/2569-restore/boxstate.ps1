@@ -4,7 +4,8 @@
 # element holding keyboard focus. Clicks nothing, sends no key, moves no window.
 # Usage: powershell -NoProfile -File boxstate.ps1 -ProcId <pid> -Out <file>   (never overwrites <file>)
 param([int]$ProcId, [string]$Out)
-if (Test-Path $Out) { throw "exists: $Out" }
+$Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
+if (Test-Path -LiteralPath $Out) { throw "exists: $Out" }
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 Add-Type @"
 using System;

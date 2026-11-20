@@ -36,12 +36,12 @@ NEW RC COMMIT: 8c3fb9f2277966fa98b31bdc775b65c5ea3c29f7  CI RUN: 44740211021 (st
 
 **Read in 8c3fb9f2, for the steps of row 2440-CP:** `e_invoice` under `invoice`, requiring `irn`, `ack_no` and `ack_date`; `vouchers` with `include_e_invoice`; the window lines `E-invoice IRN: ` and `E-invoice ack: <number> of <date>`; the registration read-back of #2475 (`invoice_registration_missing`, `invoice_registration_differs`); and `invoice_company_stopped`. Row 2440-CP's sheet note on the registration read holds: in steps 8 and 9 an answer reading `posted_divergent` whose `invoice_fields` name `invoice_registration_missing` or `invoice_registration_differs` is a FINDING: record it whole and go to step 10.
 
-**Read in both builds, for the approval box:** the post box is `MessageBoxW` with Yes, No and Cancel, No the default button (`MB_DEFBUTTON2`), topmost and system-modal, titled `ComplyEaze Bridge — post this voucher?`. The helper is the exe run with the one argument `--confirm-journal` and no other (with any further argument the exe starts as a server instead). It reads from its standard input a nonce line (a UUID), a count line and the text to show; it writes a token to its standard output only on Yes, and exits 0 on Yes and 1 otherwise. Only the new build restores a minimised box and writes the restore line.
+**Read in both builds, for the approval box:** the post box is `MessageBoxW` with Yes, No and Cancel, No the default button (`MB_DEFBUTTON2`), topmost and system-modal, titled `ComplyEaze Bridge — post this voucher?`. The helper is the exe run with the one argument `--confirm-journal` and no other (with any further argument the exe starts as a server instead). It reads from its standard input a nonce line (a UUID), a count line and the text to show; it writes a token to its standard output only on Yes. A declined box (No or Cancel) writes nothing and exits 1; a box that does not fit the screen exits with another status, and a box that could not be shown exits 0 with no token. Only the new build restores a minimised box and writes the restore line.
 
 ## The launches (Parts K and B)
-Each launch runs a staged exe over stdio under `client.py` in this folder: byte-equal to the client row 2440-CP ran (`lab/2440-composed-answers` at 781598c0, `scripts/client.py`, sha256 `8d3729ea3ab3c5c272ddad1d1c7eb034b9c6fbdb6293b8b9620c190481b969fa`). The client starts the server with piped standard input and output, its error output to a file, and no start-up information of its own; calls go through its inbox, one at a time, as in row 2440-CP. Do not change the client, how it is started, or the console or account it is started from between the launches: the exe is the only thing that changes from K to B. Record how the client was started for each launch (the command, the shell, and whether that shell's window was minimised), the same both times.
+Each launch runs a staged exe over stdio under `client.py` in this folder: byte-equal to the client row 2440-CP ran (`lab/2440-composed-answers` at 781598c0, `scripts/client.py`, sha256 `8d3729ea3ab3c5c272ddad1d1c7eb034b9c6fbdb6293b8b9620c190481b969fa`). The client starts the server with piped standard input and output, its error output to a file, and no start-up information of its own; calls go through its inbox, one at a time, as in row 2440-CP. Do not change the client, how it is started, or the console or account it is started from between the launches. The exe is the only setting the row changes from K to B; the client folder and data folder are new for each launch by design. The two builds differ by more than #2577 (OLD is #2440's head, NEW is master after it merged), but #2577 is the only change between them to `box_fit.rs`, the code that shows the box. Record how the client was started for each launch (the command, the shell, and whether that shell's window was minimised), the same both times.
 
-Each launch has its own environment file, as row 2440-CP's:
+Each launch has its own new empty client folder, the client's first argument: `C:\bridge-lab\2569-r\run-k\` for K and `C:\bridge-lab\2569-r\run-b\` for B, each holding only that launch's `launch-env.json` before the launch, and its own `inbox\` and `answers\`. Nothing is copied from one to the other. Each `launch-env.json` is as row 2440-CP's:
 - `BRIDGE_TALLY_HOST=127.0.0.1` and `BRIDGE_TALLY_PORT=9001`;
 - ONE new empty `BRIDGE_AGENT_DATA_DIR`: `C:\bridge-lab\2569-r\data-k\` for K and `C:\bridge-lab\2569-r\data-b\` for B, each made before its launch, with its trailing backslash;
 - `BRIDGE_TERMS_ACCEPTED=true`, the person responsible for the lab accepting the Terms of Use;
@@ -57,12 +57,12 @@ A box is read with two read-only helpers in this folder, before anyone answers i
 - **`boxstate.ps1`** (new): for each top-level window of a process, its handle, title, class, `iconic` (Windows holds it minimised), `visible`, `topmost`, its rectangle, its UI Automation `visual_state`, and whether it is the foreground window; then the foreground window's process and the element holding keyboard focus. Usage: `powershell -NoProfile -File boxstate.ps1 -ProcId <pid> -Out <new file>`.
 - **`readwin.ps1`**: byte-equal to row 2440-CP's (`scripts/readwin.ps1` at 781598c0, sha256 `c138b645933c8e8d2a1f87e2767983ea911aced0de4453b1d28abf08f640873f`): every text of the process's windows, by UI Automation.
 
-Neither clicks, presses a key or moves a window. Running them while a box is open is allowed; nothing else is done on the PC then. The helper's pid is the process whose command line ends with `--confirm-journal`: in Parts K and B, the child of the server (`Get-CimInstance Win32_Process` with the server's pid as `ParentProcessId`); in Part H, the pid `starth.ps1` prints.
+Neither clicks, presses a key or moves a window. Running them while a box is open is allowed; nothing else is done on the PC then. The helper's pid: in Parts K and B, the child of the server whose command line contains `--confirm-journal` (`Get-CimInstance Win32_Process` with the server's pid as `ParentProcessId`; record its command line whole); in Part H, the pid `starth.ps1` prints.
 
 Run `boxstate.ps1` first, then `readwin.ps1`, then take one screenshot of the whole screen. If `boxstate.ps1` prints `windows 0`, run it again every 2 seconds, each to a new file, up to 10 seconds; the first read that shows the box is the one graded. No box within 10 seconds is recorded as such. Record the time the box was first read, the time it was answered or timed out, and the answer.
 
 **The box checks.** For the box's window (title `ComplyEaze Bridge — post this voucher?`, class `#32770`) in that first read:
-- **W1, not minimised:** `iconic=False` and `visual_state=Normal`.
+- **W1, not minimised:** `iconic=False`. `visual_state` is recorded beside it; `iconic=False` with `visual_state=Minimized` is a FINDING, and `unreadable` is recorded as such, neither changing W1.
 - **W2, in front:** `foreground=True`, and the FOREGROUND pid is the helper's.
 - **W3, focus on No:** the FOCUS line names `No`, with the helper's pid. Its type is recorded, not graded: on 19 Nov UI Automation read this box's buttons as `ControlType.Pane`.
 - **W4, topmost and visible:** `topmost=True` and `visible=True`.
@@ -101,17 +101,17 @@ EXPECT W1, W3 and W4 PASS, and W2 recorded. EXPECT `h3-err.txt` to hold the line
 Any EXITED code other than 1, a non-empty `-out` file, or a box that did not appear = record it and STOP Part H; go on to Part A on the run coordinator's word.
 
 ## Part A: the book, by raw requests (no ComplyEaze Bridge running)
-Row 2440-CP's steps 1 to 5, exactly as written in its sheet (`lab/2440-composed-sheet` at 3d8275c0, `lab/2440-composed/ROW.md`), with its EXPECTs and its checks before each write, using this folder's byte-equal files. Its backup goes into a NEW empty folder `C:\bridge-lab\2569-r\backups\BK1\`. EXPECT step 1 to read the book as **The book as last read** says. The book at the end of Part A: the masters of steps 3 to 5 added; no voucher.
+Row 2440-CP's steps 1 to 5, exactly as written in its sheet (`lab/2440-composed-sheet` at 3d8275c0, `lab/2440-composed/ROW.md`), with its EXPECTs and its checks before each write, using this folder's byte-equal files. Its backup goes into a NEW empty folder `C:\bridge-lab\2569-r\backups\BK1\`. One change, as row 2440-CP recorded it: this release's Tax type list offers IGST, CGST, SGST/UTGST and Cess, so in step 4 key Tax type `CGST` for `BRIDGE CP CGST` and `SGST/UTGST` for `BRIDGE CP SGST`, and step 4's EXPECT reads `GSTDUTYHEAD` CGST and SGST/UTGST. Another list = stop before saving and ask, as step 4 says. EXPECT step 1 to read the book as **The book as last read** says. The book at the end of Part A: the masters of steps 3 to 5 added; no voucher.
 
 ## Part K: the control (OLD, ONE launch, nothing posted)
 1. Step 0 as row 2440-CP's step 6.1, with the OLD exe and `data-k\`: the process list, `BRIDGE_AGENT_ENABLE_WRITES` present, the exe hash equal to the OLD line.
 2. `list_companies`: EXPECT exactly BRIDGE EINVOICE LAB, with the GUID `count8.py` holds as `BOOK`. Another GUID = STOP.
 3. MARKS: MK and VK. EXPECT them equal to Part A step 5's `s5r` ALTMSTID and ALTVCHID.
 4. `build_import_xml` with row 2440-CP's step 7 arguments, unchanged. EXPECT `voucher_count` 1 and a `batch_id`, KA. A refusal: record it whole, close the exe, and go to Part B; Part K is then NOT RUN.
-5. Tell [OWNER] a window will open, and that it is NOT to be answered or touched. `post_import` with `company_guid` and `batch_id` KA. When an answer reads `pending`, read the box (**Reading a box**). EXPECT W1 FAIL: `iconic=True` (the window of 19 Nov). Then, as the tool's flow asks, wait `approval.retry_after_s` and call `post_import` again with KA, until an answer is final. Nobody answers the box. EXPECT `import_approval_timed_out` with `attempt_recorded` false.
+5. Tell [OWNER] a window will open, and that it is NOT to be answered or touched: nobody uses the mouse or keyboard until step 6. A Yes here would post invoice A outside steps 8 and 9, and Part B's own invoice A would then be refused as a duplicate number. `post_import` with `company_guid` and `batch_id` KA. When an answer reads `pending`, read the box (**Reading a box**). EXPECT W1 FAIL: `iconic=True` (the window of 19 Nov). Then, as the tool's flow asks, wait `approval.retry_after_s` and call `post_import` again with KA, until an answer is final. Nobody answers the box. EXPECT `import_approval_timed_out` with `attempt_recorded` false.
 6. MARKS: EXPECT MK and VK unchanged. Close the exe. That ends Part K.
 
-**If the box in step 5 is not minimised** (`iconic=False`): record its read whole. If it is still open, [OWNER] answers it **No**; record that answer and the final `post_import` answer. The launch path no longer reproduces the failure, so Part B cannot show the fix there: #2569's result on this path is INCONCLUSIVE and rests on Part H. Part B still runs, for row 2440-CP's posts and to record W1 to W4.
+**If the box in step 5 is not minimised** (`iconic=False`): record its read whole. If it is still open, [OWNER] answers it **No**; record that answer and the final `post_import` answer. The launch path no longer reproduces the failure, so Part B cannot show the fix there, and #2569's grade is at best INCONCLUSIVE (**Grading #2569**). Part B still runs, for row 2440-CP's posts and to record W1 to W4: a minimised new-build box there is still a FAIL.
 
 ## Part B: the build holding the fix (NEW, ONE launch)
 Row 2440-CP's steps 6 to 10, exactly as written in its sheet, with these changes:
@@ -126,14 +126,18 @@ Then close the exe. That ends Part B.
 Row 2440-CP's steps 11 and 12, exactly as written in its sheet. The restore is BK1 of Part A, on the run coordinator's explicit RESTORE.
 
 ## Grading #2569
-- **PASS** needs all of: H2's W1 and its restore line; K's box minimised (W1 FAIL in Part K step 5); and in Part B, for each box shown, W1 PASS and an answer by [OWNER] inside its time. W2, W3 and W4 are graded and reported with it; a FAIL of any of them is a FINDING beside the result, not a FAIL of it.
-- **FAIL:** a box of the new build minimised in H2 or in Part B.
-- **INCONCLUSIVE:** K's box not minimised, or Part K not run, with no FAIL above.
+Graded on the new build's boxes; every other read is reported beside the grade.
+- **FAIL:** any box of the new build read with W1 FAIL (`iconic=True`): in H2, H3, or Part B.
+- **PASS** needs all of, with no FAIL:
+  - H2: W1 PASS, and its error output holds the restore line (the hook restored a box that started minimised);
+  - Part K step 5: the old build's box read with `iconic=True` (the launch path still gives a minimised box);
+  - Part B step 8's box read, W1 PASS, and answered by [OWNER] inside its time; and step 9's box, if step 9 ran, the same.
+- **INCONCLUSIVE:** no FAIL, and any PASS condition not met: for example H2 not minimised at the start (no restore line), Part K not run or its box not minimised, or no Part B box read (step 7 refused, or a STOP before step 8).
 
-H1 and H3 are reported beside the grade: H1 on the issue's named cause, H3 on a box shown normally being left as it was.
+W2, W3 and W4 are graded for each box and reported with the result; a FAIL of any of them is a FINDING beside it. H1 is reported on the issue's named cause, and H3 on a box shown normally being left as it was (no restore line). Part K is one sample; 19 Nov's record holds two more.
 
 ## STOP RULES
-C7 and C8; any dialog before a call or a request; an approval window other than Part H's, K's step 5 and B's steps 8 and 9; a mark that moves outside the step that changes it (Part K moves none); any answer outside the stated shape; an exe whose hash differs from its line. On a STOP during a launch, close the exe first, then go to step 12 on the run coordinator's word.
+C7 and C8; a post in Part K (any answer reading `posted_` or a MARK that moves): record it, close the exe, and go to step 12 on the run coordinator's word; any dialog before a call or a request; an approval window other than Part H's, K's step 5 and B's steps 8 and 9; a mark that moves outside the step that changes it (Part K moves none); any answer outside the stated shape; an exe whose hash differs from its line. On a STOP during a launch, close the exe first, then go to step 12 on the run coordinator's word.
 
 ## Not covered by this row
 - Other MCP clients, a server started by the desktop app, and any other Windows version or account: the issue measured one client and this row uses the same one.

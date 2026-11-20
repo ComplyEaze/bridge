@@ -681,6 +681,12 @@ async fn the_bundled_sqlite_has_the_fix_for_the_write_ahead_log_advisory() {
 /// equal to a mirror this build creates; the release's row reads back, and a row written now reads
 /// back after the mirror is reopened and migrated again. The file and how it was made are in
 /// `fixtures/PROVENANCE.md`.
+/// The versions release 0.7.0 recorded in the fixture, read from it when it was written
+/// (`PROVENANCE.md`). Versions 7 and 24 are never recorded on a new mirror.
+const RELEASE_0_7_0_VERSIONS: [i64; 25] = [
+    2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27, 28,
+];
+
 #[tokio::test]
 async fn a_mirror_written_by_release_0_7_0_opens_and_migrates_under_this_build() {
     // Stored as hex text: the merge gate admits no binary file without the owner's attestation.
@@ -735,16 +741,29 @@ async fn a_mirror_written_by_release_0_7_0_opens_and_migrates_under_this_build()
         .await
         .expect("the right key opens the release mirror");
     let release_versions = recorded_versions(&pool).await;
+    assert_eq!(
+        release_versions
+            .iter()
+            .map(|(version, _)| *version)
+            .collect::<Vec<_>>(),
+        RELEASE_0_7_0_VERSIONS,
+        "the fixture records the versions release 0.7.0 applied"
+    );
+    for recorded in &release_versions {
+        assert!(
+            fresh_versions.contains(recorded),
+            "a version 0.7.0 recorded must mean the same migration in this build: {recorded:?}"
+        );
+    }
     TallyMirrorRepository::new(pool.clone())
         .migrate()
         .await
         .expect("this build's migrations run on the release mirror");
     assert_eq!(
         recorded_versions(&pool).await,
-        release_versions,
-        "the release mirror already holds every migration: none is applied again"
+        fresh_versions,
+        "after migrating, the release mirror records what a mirror this build creates records"
     );
-    assert_eq!(release_versions, fresh_versions);
     assert_eq!(mirror_schema(&pool).await, fresh_schema);
     assert_eq!(endpoint_ids(&pool).await, ["endpoint-written-by-0-7-0"]);
     sqlx::query(

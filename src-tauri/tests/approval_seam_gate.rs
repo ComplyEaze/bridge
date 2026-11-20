@@ -1729,12 +1729,12 @@ pub(crate) fn guarded(show: impl FnOnce(windows_sys::Win32::Foundation::HWND) ->
     }
 }"#;
 
-/// The hook that measures the box and cancels one that does not fit, verbatim
-/// (#1832). An edit that measured nothing, or always found a fit, would leave
-/// the unit-tested outcome logic intact and measure nothing.
+/// The hook that restores an iconic box, measures it and cancels one that does
+/// not fit, verbatim (#1832, #2569). An edit that measured nothing, or always
+/// found a fit, would leave the unit-tested outcome logic intact and measure nothing.
 const BOX_FIT_HOOK: &str = r#"#[cfg(windows)]
 mod windows_hook {
-    use super::{Rect, Seen};
+    use super::{needs_restore, Rect, Seen};
     use std::cell::Cell;
     use std::ffi::c_void;
     use std::io::Write;
@@ -1749,10 +1749,10 @@ mod windows_hook {
     use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, CallNextHookEx, CreateWindowExW, DestroyWindow, EnumThreadWindows,
-        FlashWindowEx, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId,
-        IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx,
-        FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT,
-        WM_COMMAND, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+        FlashWindowEx, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, IsIconic,
+        IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowsHookExW, ShowWindow,
+        UnhookWindowsHookEx, FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK,
+        IDCANCEL, SW_RESTORE, WH_CBT, WM_COMMAND, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
     };
 
     #[link(name = "kernel32")]
@@ -1858,6 +1858,9 @@ mod windows_hook {
         /// owner as the box closes, and the owner's empty rectangle would read
         /// as a box that did not fit, refusing an answer already given.
         static OWNER: Cell<HWND> = const { Cell::new(std::ptr::null_mut()) };
+        /// Nested activations during a restore call the next hook only: they
+        /// must not issue another restore or overwrite the box's fit state.
+        static RESTORING: Cell<bool> = const { Cell::new(false) };
     }
 
     impl TopmostOwner {
@@ -2118,19 +2121,32 @@ mod windows_hook {
         fitted
     }
 
-    /// The hook procedure: when the box is about to be activated, measure it;
-    /// if it does not fit, post it a Cancel and remember that it did not. The
-    /// box's owner is not the box and is not measured.
+    /// The hook procedure: when the box is about to be activated, restore it if
+    /// minimised, then measure it; if it does not fit, post it a Cancel and
+    /// remember that it did not. The box's owner is not the box and is not measured.
     unsafe extern "system" fn on_activate(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if code == HCBT_ACTIVATE as i32 && wparam as HWND != OWNER.with(Cell::get) {
             let window = wparam as HWND;
-            let fitted = fits(window);
-            remember(seen().after(fitted));
-            if !fitted {
-                // SAFETY: `window` is the box being activated; Cancel is a
-                // button every box this module guards has.
-                unsafe {
-                    PostMessageW(window, WM_COMMAND, IDCANCEL as WPARAM, 0);
+            if !RESTORING.with(Cell::get) {
+                // SAFETY: `window` is the box being activated.
+                let iconic = unsafe { IsIconic(window) } != 0;
+                if needs_restore(iconic) {
+                    RESTORING.with(|restoring| restoring.set(true));
+                    // SAFETY: `window` is the box being activated.
+                    unsafe {
+                        ShowWindow(window, SW_RESTORE);
+                    }
+                    RESTORING.with(|restoring| restoring.set(false));
+                    let _ = writeln!(std::io::stderr(), "box-fit: restored from minimised");
+                }
+                let fitted = fits(window);
+                remember(seen().after(fitted));
+                if !fitted {
+                    // SAFETY: `window` is the box being activated; Cancel is a
+                    // button every box this module guards has.
+                    unsafe {
+                        PostMessageW(window, WM_COMMAND, IDCANCEL as WPARAM, 0);
+                    }
                 }
             }
         }
@@ -2201,6 +2217,15 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
         source.replacen("rect.is_wholly_inside(work));", "true);", 1),
         source.replacen("if !fitted {", "if false {", 1),
         source.replacen("remember(seen().after(fitted));", "remember(Seen::Fits);", 1),
+        // The iconic box is not restored, restoration happens after measurement,
+        // or every box is restored rather than only an iconic one (#2569).
+        source.replacen("                        ShowWindow(window, SW_RESTORE);\n", "", 1),
+        source.replacen(
+            "                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                    let _ = writeln!(std::io::stderr(), \"box-fit: restored from minimised\");\n                }\n                let fitted = fits(window);",
+            "                let fitted = fits(window);\n                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                    let _ = writeln!(std::io::stderr(), \"box-fit: restored from minimised\");\n                }",
+            1,
+        ),
+        source.replacen("if needs_restore(iconic) {", "if true {", 1),
         // The hook measures the box's hidden owner again, so an owner Windows
         // activates as the box closes refuses the answer just given (#1780).
         source.replacen(" && wparam as HWND != OWNER.with(Cell::get) {", " {", 1),

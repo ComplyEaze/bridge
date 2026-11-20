@@ -717,8 +717,9 @@ pub(super) fn verify_batch_as(
 /// (#2162).
 pub(super) const NO_E_INVOICE_DETAILS_NOTE: &str = "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act; ComplyEaze Bridge does not generate one.";
 
-/// Which e-invoice details the saved invoice detail records as sent. This
-/// build's detail has no e-invoice field, so `None` is the only value.
+/// Which e-invoice details the saved invoice detail records as sent. Only an
+/// invoice sent without them gets a value (`None`); one that carried them gets
+/// no note here, because the note would be false for it.
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum EInvoiceDetailsSent {
@@ -744,7 +745,11 @@ fn e_invoice_details_sent(expected: &ImportVoucher) -> Option<EInvoiceDetailsSen
         place_of_supply: _,
         round_off_ledger: _,
         observed: _,
+        e_invoice,
     } = detail;
+    if e_invoice.is_some() {
+        return None;
+    }
     Some(EInvoiceDetailsSent::None)
 }
 

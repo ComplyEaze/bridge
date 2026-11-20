@@ -546,6 +546,31 @@ fn a_posted_verified_sales_invoice_carries_the_e_invoice_sent_note() {
 }
 
 #[test]
+fn a_posted_verified_sales_invoice_sent_with_e_invoice_details_has_no_e_invoice_sent_field() {
+    let mut line = invoice_batch("INV/26-27/002");
+    line.vouchers[0]
+        .invoice
+        .as_mut()
+        .expect("invoice detail")
+        .e_invoice = Some(
+        serde_json::from_value(json!({
+            "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+            "ack_no": "445566",
+            "ack_date": "2025-04-03"
+        }))
+        .unwrap(),
+    );
+    let result = verified_post(
+        &line,
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    assert!(
+        result["vouchers"][0].get("e_invoice_sent").is_none(),
+        "{result}"
+    );
+}
+
+#[test]
 fn a_sales_invoice_without_native_dispatch_has_no_e_invoice_sent_field() {
     let result = verified_post(
         &invoice_batch("INV/26-27/002"),

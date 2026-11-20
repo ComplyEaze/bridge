@@ -8,6 +8,7 @@
 //! text, and it is refused rather than cut when it does not fit: a dialog
 //! that hides part of what will be created is not a review. The limits and the
 //! unsafe-character checks are the voucher preview's own.
+use super::super::failure_code::{create_render_refusal_code, StockItemCreateCode};
 use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
@@ -187,6 +188,18 @@ pub(super) enum StockItemReviewError {
     /// The Create renderer would refuse this draft, so it is not shown for
     /// approval.
     NotRenderable(CreateRenderRefusal),
+}
+
+impl StockItemReviewError {
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn code(&self) -> StockItemCreateCode {
+        match self {
+            Self::Review(MasterReviewError::LayoutText) => StockItemCreateCode::ReviewLayoutText,
+            Self::Review(MasterReviewError::FormatText) => StockItemCreateCode::ReviewFormatText,
+            Self::Review(MasterReviewError::TooLarge) => StockItemCreateCode::ReviewTooLarge,
+            Self::NotRenderable(error) => create_render_refusal_code(error),
+        }
+    }
 }
 
 /// The complete preview of one stock-item draft, with every copied field shown

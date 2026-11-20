@@ -486,6 +486,12 @@ const ROWS: &[Row] = &[
         parse: |_, text| typed(parse_native_ledger_snapshot(text)),
     },
     Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-supplier-rj-20260731.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-ampersand.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot",
@@ -1178,6 +1184,42 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/import_line_error_partial_commit_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",
         parse: |_, text| untyped(parse_import_outcome(text)),
@@ -4011,6 +4053,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_READBACK,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml",
         PILOT_LAB_REPLAY,
     ),
@@ -4261,6 +4307,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/stock-create-lab/stock-create-lab-marks.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-after.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-after.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (
@@ -4588,6 +4650,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-after.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-after.utf16le.xml",
         APP_VERIFICATION,
     ),
     (

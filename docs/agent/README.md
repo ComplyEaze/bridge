@@ -2009,7 +2009,8 @@ no estimate for a larger or a smaller window.
   took at least (N - 1) x 0.5 s in gaps. It is time between reads, not time spent
   sleeping (the gate sleeps only what is left of the half second after Bridge's own
   work). It is rounded down.
-- `host_240` says how this window sat against the one measured host limit:
+- `host_240` says how this window sat against the 240 s limit of Claude Desktop's chat app on macOS
+  (it does not judge a window against the Windows limits that `host_limits` names):
   `window_fits` with `vouchers_that_fitted` (what this window carried; it claims
   nothing about a larger or a smaller window, since fewer vouchers are not cheaper:
   a window with no voucher is read twice), `window_too_long` (this window did not
@@ -2017,14 +2018,17 @@ no estimate for a larger or a smaller window.
   shorter window saves only the time of its vouchers and how short is enough is not
   established), or `not_established` (no voucher was read, whatever the time: such a window is read
   twice, the second read wider (with its own census on a large book; a small book's
-  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
+  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop's chat app on macOS is cancelled and
   its result never arrives, so `window_too_long` is seen on another host.
 - A read that **stopped** (a refusal) states the floor and no verdict: a request
   that failed or hung is not what a window costs.
 - `host_limits` names each host and its basis: Claude Desktop's chat app on macOS
   cancelled a silent 250 s call at 240 s in two runs on one build (calls between
   130 s and 240 s were not tried, and the call's other reads are not in the figures; and whether progress would extend the limit is not
-  answered; protocol reference 11f); on Windows it is unmeasured; Claude Code
+  answered; protocol reference 11f); on Windows the chat tab cut a 60 s call at about
+  60 s with no cancel logged by the server, and the Code tab cut a 90 s call at 60.0 s and sent a
+  cancel (one run of each kind on each tab, 5 Nov, #2119 row H, not yet in the protocol reference; a call just under 60 s was not tried
+  on either tab); Claude Code
   completed a 150 s call under its defaults (CLI 2.1.285: one silent run and one with
   progress; Code tab 2.1.284: one silent run), and a 60 s per-server timeout set on a
   scratch project cut a 150 s call at exactly 60 s and was not reset by progress (CLI,
@@ -2103,7 +2107,8 @@ ends).
 Not covered: the data parts (they need the census), the wider read an empty window gets in `vouchers` and in
 `ledger_movement` (it pays its own census on a large book), the second window read of `ledger_movement`
 (it sends no census),
-`outstandings` and `voucher_presence`. Windows hosts are not measured.
+`outstandings` and `voucher_presence`. No window is judged against a Windows host's limit: `host_limits`
+names what was measured there, one run of each kind on each tab.
 
 ### Search and summaries in `vouchers` (#1230)
 
@@ -3340,7 +3345,9 @@ cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
 `master_approval_timed_out` say the person declined the dialog, the dialog could
 not be shown, or the person did not answer in time; each says nothing was sent,
 and a declined or timed-out answer's `next_step` says that the next call with the
-same `batch_id` opens a new dialog. `master_review_too_large` from
+same `batch_id` opens a new dialog. One returned from a dialog an earlier call left
+open carries `cause` `approval_answered_earlier` and that cause's `next_step`
+instead, as `post_import`'s does. `master_review_too_large` from
 `post_ledger_creates` says the dialog's text was over its limit or, on Windows,
 where the dialog is measured against the screen as the post's is, that it did not
 fit the screen whole; nothing was sent, and its `next_step` says to try a
@@ -3703,7 +3710,11 @@ external changes are outside the validated posting workflow.
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
 approval. (The tool call itself returns "approval pending" after about 40 seconds
 and the dialog stays open (for up to the two minutes); calling `post_import`
-again with the same batch waits on that same dialog.) If dispatch has already begun, cancellation cannot undo Tally's
+again with the same batch waits on that same dialog.) If that dialog is answered No,
+runs out of time or ends unanswered while no call is waiting, the batch's next call
+returns that refusal once without showing a dialog, with `error.cause`
+`approval_answered_earlier` and a `next_step` saying so; the call after it asks the
+person again. If dispatch has already begun, cancellation cannot undo Tally's
 work. A timeout, crash, malformed response or incomplete readback requires
 `verify_import` on the **same original batch**. Once dispatch intent exists,
 `post_import` only reconciles and never resends, including after process restart.
@@ -3903,7 +3914,15 @@ Tally reported the voucher as not created when it was sent, and to look for it
 in Tally before entering it by hand; the status and the batch's state are the
 same. A partly created batch is never read as not created: a
 count does not say which voucher Tally rejected, and two vouchers of one batch
-with the same content defeat matching by content. A binding refusal is final: an
+with the same content defeat matching by content. When the post's own answer
+reported every counter, at least one created and one exception, nothing else
+counted and a total equal to the vouchers sent, and the company's voucher mark
+moved by what Tally reported creating (read on both sides of the post, or the
+post's recorded verdict for a later check), the `next_step` of each voucher the
+check cannot find adds that Tally's answer reported that many of the vouchers
+sent as not created and that ComplyEaze Bridge cannot say which: the count is
+all that is claimed, no voucher is named, and the status stays
+`sent_not_attributed` (bridge#1108). A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays

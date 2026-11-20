@@ -1,5 +1,6 @@
 //! Captured currency/native sources with one extent or currency fault at a time.
 use super::*;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 
 fn currency_source() -> String {
     decode(include_bytes!(
@@ -879,15 +880,21 @@ async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
     for (indexes, request) in [
         (
             [5, 7],
-            render_company_currency_request("BRIDGE CORPUS FOREX"),
+            render_company_currency_request(
+                &ValidatedCompanyName::new("BRIDGE CORPUS FOREX").unwrap(),
+            ),
         ),
         (
             [9, 11],
-            render_company_currency_request_with_originalname("BRIDGE CORPUS FOREX"),
+            render_company_currency_request_with_originalname(
+                &ValidatedCompanyName::new("BRIDGE CORPUS FOREX").unwrap(),
+            ),
         ),
         (
             [13, 15],
-            render_company_base_currency_request("BRIDGE CORPUS FOREX"),
+            render_company_base_currency_request(
+                &ValidatedCompanyName::new("BRIDGE CORPUS FOREX").unwrap(),
+            ),
         ),
     ] {
         for index in indexes {
@@ -1088,7 +1095,9 @@ async fn a_one_master_classified_read_sends_only_the_plain_currency_read() {
             .unwrap();
         let requests = simulator.finish().unwrap();
         assert_eq!(requests.len(), plan_count);
-        let plain = request_sha256(&render_company_currency_request("Bridge Ageing Lab"));
+        let plain = request_sha256(&render_company_currency_request(
+            &ValidatedCompanyName::new("Bridge Ageing Lab").unwrap(),
+        ));
         assert_eq!(requests[5].request_body_sha256, plain);
         assert_eq!(requests[7].request_body_sha256, plain);
         match read.admit_inr_classified() {

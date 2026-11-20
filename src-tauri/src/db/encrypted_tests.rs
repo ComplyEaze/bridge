@@ -4,6 +4,7 @@ use super::{
     is_forwardable_encrypted_open_sqlite_code, resolve_mirror_key, EncryptedOpenError,
     MirrorKeyError, MirrorKeyStore, MIRROR_KEY_BYTES,
 };
+use crate::db::tally_mirror::TallyMirrorRepository;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{ConnectOptions, Connection, SqliteConnection};
 use std::fs;
@@ -637,4 +638,183 @@ fn only_verified_sqlite_codes_are_forwarded_from_encrypted_initialization() {
             "unverified or transient SQLite code must remain on SQLx's retry path"
         );
     }
+}
+
+/// The SQLite compiled into the mirror is a release with the fix for
+/// RUSTSEC-2026-0459, which the advisory names as SQLite 3.54.0. The crate's
+/// version does not decide this: libsqlite3-sys 0.39 bundles a fixed SQLite,
+/// but its SQLCipher bundle, the one Bridge builds, is still on 3.53.4
+/// (#2432). Read from the running library, so a lock change that brings an
+/// older SQLCipher back fails here.
+#[tokio::test]
+async fn the_bundled_sqlite_has_the_fix_for_the_write_ahead_log_advisory() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let database = directory.path().join("mirror.db");
+    let key = Zeroizing::new(vec![0x22_u8; MIRROR_KEY_BYTES]);
+    let pool = connect_encrypted(&database, key)
+        .await
+        .expect("open encrypted mirror");
+    let cipher = sqlx::query_scalar::<_, String>("PRAGMA cipher_version;")
+        .fetch_one(&pool)
+        .await
+        .expect("read SQLCipher version");
+    assert!(!cipher.is_empty(), "the mirror must run on SQLCipher");
+    let version = sqlx::query_scalar::<_, String>("SELECT sqlite_version();")
+        .fetch_one(&pool)
+        .await
+        .expect("read SQLite version");
+    let parts = version
+        .split('.')
+        .map(|part| part.parse::<u32>().expect("numeric SQLite version part"))
+        .collect::<Vec<_>>();
+    assert!(
+        parts.as_slice() >= [3, 54, 0].as_slice(),
+        "bundled SQLite {version} predates 3.54.0, the release with the fix (#2432)"
+    );
+    pool.close().await;
+}
+
+/// The versions release 0.7.0 recorded in the fixture, read from it when it was written
+/// (`PROVENANCE.md`). Versions 7 and 24 are never recorded on a new mirror.
+const RELEASE_0_7_0_VERSIONS: [i64; 25] = [
+    2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27, 28,
+];
+
+/// A mirror written by release 0.7.0, the last release before #2432's bump (SQLCipher 4.10.0 on
+/// SQLite 3.50.4, all mirror migrations applied), opens and migrates under this build, as the app
+/// opens it: a wrong key is refused as SQLite code 26 and leaves the file unchanged; with the right
+/// key the mirror records the versions 0.7.0 applied, and its migrations run and leave the schema
+/// and the recorded versions equal to a mirror this build creates (a migration added after 0.7.0
+/// applies here); the release's row reads back, and a row written now reads
+/// back after the mirror is reopened and migrated again. The file and how it was made are in
+/// `fixtures/PROVENANCE.md`.
+#[tokio::test]
+async fn a_mirror_written_by_release_0_7_0_opens_and_migrates_under_this_build() {
+    // Stored as hex text: the merge gate admits no binary file without the owner's attestation.
+    let hex: String = include_str!("fixtures/mirror-release-0.7.0.db.hex")
+        .split_whitespace()
+        .collect();
+    let fixture: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|at| u8::from_str_radix(&hex[at..at + 2], 16).expect("fixture is hex"))
+        .collect();
+    assert_eq!(
+        fixture.len(),
+        647_168,
+        "the fixture is the whole 647,168-byte mirror"
+    );
+    let key = || Zeroizing::new(vec![0x5a_u8; MIRROR_KEY_BYTES]);
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let database = directory.path().join("mirror.db");
+    fs::write(&database, &fixture).expect("copy the release mirror");
+
+    let wrong_key_error =
+        connect_encrypted(&database, Zeroizing::new(vec![0x22_u8; MIRROR_KEY_BYTES]))
+            .await
+            .expect_err("a wrong key must refuse the release mirror");
+    let source = match wrong_key_error.downcast_ref::<EncryptedOpenError>() {
+        Some(EncryptedOpenError::UnreadableWithSuppliedKey { source }) => source,
+        _ => panic!("a wrong key must give the typed unreadable refusal: {wrong_key_error:?}"),
+    };
+    assert!(matches!(
+        source,
+        sqlx::Error::Database(error) if error.code().as_deref() == Some("26")
+    ));
+    assert_eq!(
+        fs::read(&database).expect("read the release mirror after the wrong key"),
+        fixture,
+        "a wrong-key attempt must not change the release mirror"
+    );
+
+    let fresh = directory.path().join("fresh.db");
+    let fresh_pool = connect_encrypted(&fresh, key())
+        .await
+        .expect("create a mirror with this build");
+    TallyMirrorRepository::new(fresh_pool.clone())
+        .migrate()
+        .await
+        .expect("migrate a mirror this build created");
+    let fresh_schema = mirror_schema(&fresh_pool).await;
+    let fresh_versions = recorded_versions(&fresh_pool).await;
+    fresh_pool.close().await;
+
+    let pool = connect_encrypted(&database, key())
+        .await
+        .expect("the right key opens the release mirror");
+    let release_versions = recorded_versions(&pool).await;
+    assert_eq!(
+        release_versions
+            .iter()
+            .map(|(version, _)| *version)
+            .collect::<Vec<_>>(),
+        RELEASE_0_7_0_VERSIONS,
+        "the fixture records the versions release 0.7.0 applied"
+    );
+    for recorded in &release_versions {
+        assert!(
+            fresh_versions.contains(recorded),
+            "a version 0.7.0 recorded must mean the same migration in this build: {recorded:?}"
+        );
+    }
+    TallyMirrorRepository::new(pool.clone())
+        .migrate()
+        .await
+        .expect("this build's migrations run on the release mirror");
+    assert_eq!(
+        recorded_versions(&pool).await,
+        fresh_versions,
+        "after migrating, the release mirror records what a mirror this build creates records"
+    );
+    assert_eq!(mirror_schema(&pool).await, fresh_schema);
+    assert_eq!(endpoint_ids(&pool).await, ["endpoint-written-by-0-7-0"]);
+    sqlx::query(
+        "INSERT INTO tally_endpoints (id, canonical_origin, created_at_unix_ms, last_observed_at_unix_ms) \
+         VALUES ('endpoint-written-by-this-build', 'http://127.0.0.1:9001', 3, 4);",
+    )
+    .execute(&pool)
+    .await
+    .expect("write to the release mirror");
+    pool.close().await;
+    assert_no_plaintext_artifacts(&database);
+
+    let pool = connect_encrypted(&database, key())
+        .await
+        .expect("the right key reopens the mirror");
+    TallyMirrorRepository::new(pool.clone())
+        .migrate()
+        .await
+        .expect("the reopened mirror migrates");
+    assert_eq!(
+        endpoint_ids(&pool).await,
+        [
+            "endpoint-written-by-0-7-0",
+            "endpoint-written-by-this-build"
+        ]
+    );
+    pool.close().await;
+}
+
+/// The mirror's schema as SQLite records it: every table, index, view and trigger with its SQL.
+async fn mirror_schema(pool: &sqlx::SqlitePool) -> Vec<(String, String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name;",
+    )
+    .fetch_all(pool)
+    .await
+    .expect("read the mirror's schema")
+}
+
+/// The migration versions and descriptions the mirror records as applied.
+async fn recorded_versions(pool: &sqlx::SqlitePool) -> Vec<(i64, String)> {
+    sqlx::query_as("SELECT version, description FROM tally_schema_migrations ORDER BY version;")
+        .fetch_all(pool)
+        .await
+        .expect("read the recorded migrations")
+}
+
+async fn endpoint_ids(pool: &sqlx::SqlitePool) -> Vec<String> {
+    sqlx::query_scalar("SELECT id FROM tally_endpoints ORDER BY created_at_unix_ms;")
+        .fetch_all(pool)
+        .await
+        .expect("read the endpoints")
 }

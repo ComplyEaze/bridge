@@ -15,6 +15,7 @@ import { LedgerEntriesScreen } from "../src/LedgerEntriesScreen";
 
 const company = {
   name: "Synthetic company",
+  shown_name: "Synthetic company",
   guid: "11111111-1111-1111-1111-111111111111",
   company_number: "100001",
   books_from_yyyymmdd: "20250401",
@@ -175,5 +176,34 @@ test("a voucher displays cancelled and optional accounting states together", asy
     host.querySelector<HTMLFormElement>("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   });
   expect(host.textContent).toContain("Accounting state: cancelled and optional.");
+  root.unmount();
+});
+
+// #2462: the provenance line draws the company's shown name; the read sends
+// the name exactly as Tally reported it.
+test("the provenance line draws the shown name while the read sends the raw one", async () => {
+  const raw = "Synthetic\u200bTra\u202eders";
+  const shown = "Synthetic\\u{200b}Tra\\u{202e}ders";
+  mocks.invoke.mockResolvedValue({ company: {}, read_at: "2026-09-08T00:00:00Z", evidence: { state: "complete", bytes: 1 }, truncated: false, result: { state: "complete", items: [], offset: 0, total: 0, profile: "agent_vouchers_v1_filters" } });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => {
+    root.render(<LedgerEntriesScreen config={{ host: "127.0.0.1", port: 9000 }} company={{ ...company, name: raw, shown_name: shown }} locked={false} onReadActivity={() => {}} />);
+  });
+  const inputs = host.querySelectorAll<HTMLInputElement>("input");
+  await act(async () => {
+    enter(inputs[0], "Cash");
+    enter(inputs[1], "2026-04-01");
+    enter(inputs[2], "2026-04-30");
+  });
+  await act(async () => {
+    host.querySelector<HTMLFormElement>("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  });
+  const reads = mocks.invoke.mock.calls.filter(([command]) => command === "fetch_selected_ledger_entries");
+  expect(reads).toHaveLength(1);
+  expect(JSON.stringify(reads[0][1])).toContain(JSON.stringify(raw));
+  expect(host.querySelector(".ledger-investigation-provenance")?.textContent).toContain(`for ${shown}; requested ledger Cash`);
+  expect(host.textContent).not.toContain(raw);
   root.unmount();
 });

@@ -216,7 +216,8 @@ pub(super) fn folded_number(number: &str) -> Option<String> {
 fn invoice_number(voucher: &ImportVoucher) -> Option<String> {
     voucher
         .voucher_type
-        .is_invoice()
+        .invoice_class()
+        .is_some()
         .then(|| voucher.voucher_number.as_deref().and_then(folded_number))
         .flatten()
 }
@@ -965,7 +966,7 @@ pub(super) fn invoice_readback_due<'a>(
 ) -> Option<(&'a ImportVoucher, Value)> {
     let voucher = vouchers
         .iter()
-        .find(|voucher| voucher.voucher_type.is_invoice())?;
+        .find(|voucher| voucher.voucher_type.invoice_class().is_some())?;
     let matched = result["vouchers"]
         .as_array()?
         .iter()
@@ -1009,6 +1010,64 @@ pub(super) fn mark_sent_not_attributed_after_unclean_answer(result: &mut Value) 
         "sent_not_attributed",
         Some(SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP),
     );
+}
+
+/// How many of the `sent` vouchers of a post Tally's own answer reported as not
+/// created, when the answer has the captured shape of a post that landed in
+/// part: every counter reported, `CREATED` and `EXCEPTIONS` each at least 1,
+/// their sum equal to `sent`, every other counter zero, and the company's
+/// voucher mark confirmed to have moved by what Tally reported creating
+/// (`step_confirms`, given `CREATED`). That is a count of what Tally reported,
+/// not a fact about any voucher: it does not say which vouchers they were
+/// (bridge#1108; protocol reference §9.2). `None` for every other answer,
+/// including one Tally rejected whole, which [`unmatched_cause`] reads.
+pub(super) fn reported_not_created_count(
+    counters: &bridge_tally_protocol::TallyImportResult,
+    sent: usize,
+    step_confirms: impl FnOnce(u64) -> bool,
+) -> Option<u64> {
+    let sent = u64::try_from(sent).ok()?;
+    let landed_in_part = counters.counter_presence.all_reported()
+        && counters.created >= 1
+        && counters.exceptions >= 1
+        && counters.altered == 0
+        && counters.deleted == 0
+        && counters.ignored == 0
+        && counters.errors == 0
+        && counters.cancelled == 0
+        && counters.created.checked_add(counters.exceptions) == Some(sent);
+    (landed_in_part && step_confirms(counters.created)).then_some(counters.exceptions)
+}
+
+/// What Tally's answer reported of a post that landed in part, said after the
+/// next step of a voucher the post's readback cannot find. It names no voucher
+/// and never says one was not posted: only how many of the `sent` vouchers
+/// Tally reported as not created, and that which ones is not known.
+pub(super) fn partly_created_sentence(not_created: u64, sent: usize) -> String {
+    let which = if not_created == 1 {
+        "was that one"
+    } else {
+        "were those"
+    };
+    format!(
+        "Tally's answer to this post reported {not_created} of the {sent} vouchers as not created; ComplyEaze Bridge cannot say which of the vouchers it sent {which}."
+    )
+}
+
+/// Rewrites a verification of an unbound post whose answer reported that it
+/// landed in part: as [`mark_sent_not_attributed_after_unclean_answer`], with
+/// [`partly_created_sentence`] after the next step. The status is the same
+/// `sent_not_attributed`; no voucher is named or read as not created.
+pub(super) fn mark_sent_not_attributed_after_partly_created_answer(
+    result: &mut Value,
+    not_created: u64,
+    sent: usize,
+) {
+    let next_step = format!(
+        "{SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP} {}",
+        partly_created_sentence(not_created, sent)
+    );
+    mark_not_found_with(result, "sent_not_attributed", Some(&next_step));
 }
 
 /// Rewrites a later verification of a post whose saved answer reported its

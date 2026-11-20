@@ -4,8 +4,11 @@ mod box_fit;
 pub mod connection;
 pub mod connector;
 pub(crate) mod ledger_create_item;
+pub(crate) mod master_name;
 pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
+pub(crate) mod stock_item_create;
+pub(crate) mod stock_item_verified;
 // Crate-internal only: `tally::runtime` is the sole consumer.
 mod runtime_control;
 pub mod tdl_engine;

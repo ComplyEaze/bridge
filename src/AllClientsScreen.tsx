@@ -63,6 +63,8 @@ type LoadResult =
 
 type Entry = {
   company: string;
+  /** `company` by the one company-name rule; the only form drawn (#2462). */
+  company_shown_name: string;
   company_guid: string;
   company_number: string;
   books_from_yyyymmdd: string;
@@ -287,6 +289,7 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
           : null;
         return {
           company: entry.company,
+          companyShownName: entry.company_shown_name,
           // Group labels and React row keys must not merge year-end split
           // books that share a Tally GUID.
           companyGuid: companyIdentityKey({
@@ -443,7 +446,7 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
           aria-hidden="true"
         />
         <span role="cell" className="clients-name">
-          <strong>{row.company}</strong>
+          <strong>{row.companyShownName}</strong>
           {partial
             ? <><em>{partial.title}</em><em>{partial.message}</em></>
             : row.unallocatedShare !== null && (
@@ -530,9 +533,9 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
               {rows.map((row) => {
                 return (
                   <label key={row.companyGuid}>
-                    <span>{row.company}</span>
+                    <span>{row.companyShownName}</span>
                     <input
-                      aria-label={`Group label for ${row.company}`}
+                      aria-label={`Group label for ${row.companyShownName}`}
                       value={groupLabels[row.sourceGuid] ?? ""}
                       placeholder="No group"
                       disabled={!groupLabelsReady}

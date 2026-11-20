@@ -12,6 +12,8 @@
 //! (never from a ledger's name: duty heads, reserved groups), the arithmetic,
 //! and the rendering. The reads that fill `LedgerFacts` belong to the build.
 
+use super::super::failure_code::InvoiceItemLineCode;
+use super::super::failure_code::InvoiceRegistrationCode;
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
 use crate::tally::approved_import::{
     ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheckInput, InvoiceReadPlan,
@@ -21,10 +23,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
+#[path = "agent_import_invoice_e_invoice.rs"]
+mod e_invoice;
 #[path = "agent_import_invoice_scope.rs"]
 mod scope;
 #[path = "agent_import_invoice_wire.rs"]
 mod wire;
+
+pub(in crate::agent) use e_invoice::EInvoiceDetails;
 
 #[cfg(test)]
 pub(super) use wire::HsnWarning;
@@ -55,6 +61,11 @@ pub(super) struct InvoiceDetail {
     /// The ledger carrying a round off, when the invoice total is rounded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) round_off_ledger: Option<String>,
+    /// The e-invoice details the portal already registered for this invoice, written into the
+    /// import as given; absent for an invoice that has none. A saved invoice without them
+    /// serialises exactly as before they existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) e_invoice: Option<EInvoiceDetails>,
     /// Filled by the build from what Tally returned; refused when supplied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) observed: Option<InvoiceObserved>,
@@ -638,7 +649,7 @@ pub(super) fn refuse_supplied_observed<D: super::PayloadDate>(
 pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(), String> {
     if vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice())
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
     {
         return Err("invoice_amendment_not_supported".to_string());
     }
@@ -648,7 +659,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
 pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
-    if !voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_none() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
             None => Ok(()),
@@ -1151,7 +1162,7 @@ impl super::super::Server {
         let Some(voucher) = line
             .vouchers
             .iter()
-            .find(|voucher| voucher.voucher_type.is_invoice())
+            .find(|voucher| voucher.voucher_type.invoice_class().is_some())
         else {
             return Ok(None);
         };
@@ -1182,7 +1193,7 @@ pub(super) fn queued_invoice_for<'a>(
 > {
     let invoiced = vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice());
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some());
     match (invoiced, invoice, control, vouchers) {
         (false, None, None, _) => Ok(None),
         (true, Some(queued), Some(control), [voucher]) => Ok(Some((voucher, queued, control))),
@@ -1360,6 +1371,7 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
         voucher_type_name,
         place_of_supply,
         round_off_ledger,
+        e_invoice,
         observed,
     } = detail;
     field(voucher_type_name.as_bytes());
@@ -1370,6 +1382,14 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
             field(ledger.as_bytes());
         }
         None => field(b"0"),
+    }
+    // Nothing for an invoice without details, so its digest is the one it always was; the tag
+    // is one no field after it starts with (`observed` writes "0" or "1").
+    if let Some(details) = e_invoice {
+        field(b"e_invoice");
+        for value in details.digest_fields() {
+            field(value);
+        }
     }
     match observed {
         None => field(b"0"),
@@ -1489,6 +1509,9 @@ fn invoice_readback_differences(
     want("ISINVOICE", Some("Yes"), &mut diffs);
     want("ISCANCELLED", Some("No"), &mut diffs);
     want("ISOPTIONAL", Some("No"), &mut diffs);
+    if let Some(code) = registration_difference(&read.fields, &observed.company_state) {
+        diffs.push(code.as_str().to_string());
+    }
     // Legs: the same multiset of (ledger, signed amount, side).
     let key = |ledger: &str, amount: i128, positive: bool| (ledger.to_string(), amount, positive);
     let mut expected_legs = expected
@@ -1543,15 +1566,134 @@ fn invoice_readback_differences(
     }
     // Each sales line names the HSN/SAC Tally used and the kind of master it
     // took it from (§9.16); the code itself is not judged here.
-    if sales_legs(observed, read).any(|leg| !leg.hsn.resolved()) {
+    if sales_legs(observed, read).any(|leg| !leg.line_hsn().resolved()) {
         diffs.push("invoice_line_hsn_unresolved".to_string());
     }
+    diffs.extend(
+        item_line_differences(read)
+            .into_iter()
+            .map(|code| code.as_str().to_string()),
+    );
     diffs.extend(
         gst_status_differences(&read.fields)
             .into_iter()
             .map(|difference| difference.code().to_string()),
     );
     diffs
+}
+
+/// What differs about the stock items Tally holds under the invoice's legs,
+/// each code once, in a fixed order. The build sends no item line yet
+/// (#1379), so any item is stored other than sent. Each item is also held to
+/// the one form row 1379-IT measured: an amount-only line, whose side and
+/// amount are its leg's, with no rate or quantity, and one batch allocation
+/// naming a godown and a batch for its amount (on that book, its one godown
+/// and `Primary Batch`, which Tally added). The item's name and godown are not
+/// compared: nothing the build sends names them yet.
+fn item_line_differences(read: &wire::ReadInvoice) -> Vec<InvoiceItemLineCode> {
+    let text = |value: &wire::EntryText| match value {
+        wire::EntryText::Text(text) => Some(text.clone()),
+        wire::EntryText::Absent | wire::EntryText::Empty => None,
+    };
+    let mut found = Vec::new();
+    for leg in &read.legs {
+        let item = match &leg.items {
+            wire::LegItems::None => continue,
+            wire::LegItems::Several => {
+                found.push(InvoiceItemLineCode::NotSent);
+                found.push(InvoiceItemLineCode::Several);
+                continue;
+            }
+            wire::LegItems::One(item) => item,
+        };
+        found.push(InvoiceItemLineCode::NotSent);
+        let amount = text(&item.amount).and_then(|amount| signed_paise(&amount));
+        let quantified = [&item.rate, &item.actual_qty, &item.billed_qty]
+            .iter()
+            .any(|value| text(value).is_some());
+        if amount.is_none()
+            || amount != signed_paise(&leg.amount)
+            || text(&item.deemed_positive) != leg.deemed_positive
+            || quantified
+        {
+            found.push(InvoiceItemLineCode::Differs);
+        }
+        let batch_ok = matches!(
+            item.batches.as_slice(),
+            [(Some(_), Some(_), batch)] if amount.is_some() && signed_paise(batch) == amount
+        );
+        if !batch_ok {
+            found.push(InvoiceItemLineCode::Batch);
+        }
+    }
+    [
+        InvoiceItemLineCode::NotSent,
+        InvoiceItemLineCode::Several,
+        InvoiceItemLineCode::Differs,
+        InvoiceItemLineCode::Batch,
+    ]
+    .into_iter()
+    .filter(|code| found.contains(code))
+    .collect()
+}
+
+/// The company registration Tally filed the invoice under, as the read-back
+/// returns it: the unit's name (`GSTREGISTRATION`) and its GSTIN (`CMPGSTIN`).
+/// On the one-registration book, Tally filed the build's request under that
+/// registration, naming none in it (row 2464-GN, `BP/26-27/0010`). Either
+/// field not back, or back empty, is missing: the row reader keeps voucher-level
+/// empties, and `readback_fields` drops the absent/empty distinction by omitting
+/// both from its map. A GSTIN that is not a valid GSTIN of
+/// the company's state the build recorded differs. The name is not compared,
+/// since the build records no unit's name, and a second registration in the
+/// same state is not told apart by the GSTIN's state. The registration's state
+/// and type (`CMPGSTSTATE`, `CMPGSTREGISTRATIONTYPE`) are not fetched, so an
+/// invoice that stored its name and GSTIN with those two empty reads no
+/// difference here (row 2464-RB, `BP/26-27/0107`); its GSTR-1 status and its
+/// lines' HSN/SAC are judged on their own.
+fn registration_difference(
+    fields: &BTreeMap<String, String>,
+    company_state: &str,
+) -> Option<InvoiceRegistrationCode> {
+    let text = |name: &str| fields.get(name).filter(|value| !value.is_empty());
+    match (text("GSTREGISTRATION"), text("CMPGSTIN")) {
+        (Some(_), Some(gstin))
+            if gstin_valid(gstin) && gstin_state(gstin) == Some(company_state) =>
+        {
+            None
+        }
+        (Some(_), Some(_)) => Some(InvoiceRegistrationCode::Differs),
+        _ => Some(InvoiceRegistrationCode::Missing),
+    }
+}
+
+/// DERIVED, not Tally's bytes: a read-back answer from before the request
+/// fetched the registration, with the two fields added once to each voucher
+/// (counted), valued as the lab's answer for `BP/26-27/0010` returned them on
+/// 10 Nov 2026 (row 2464-GN): the pilot lab's unit name, with `TYPE="String"`,
+/// and its GSTIN. They go last in the voucher and the GSTIN has no attribute,
+/// which is not how Tally writes them: its answer for `BP/26-27/0105` has the
+/// pair after `VOUCHERTYPENAME`, the empty GSTIN with `TYPE="String"` too
+/// (§9.16, row 2464-RB). The read takes fields by tag and keeps no attribute.
+#[cfg(test)]
+pub(super) fn with_registration(xml: &str) -> String {
+    // By the whole tag: `<GSTREGISTRATIONTYPE>` begins with `<GSTREGISTRATION`.
+    for tag in ["GSTREGISTRATION", "CMPGSTIN"] {
+        for open in [format!("<{tag}>"), format!("<{tag} "), format!("<{tag}/")] {
+            assert!(!xml.contains(&open), "{open}");
+        }
+    }
+    // Each row closes at the first `</VOUCHER>` after its own opening tag. The
+    // answer's CMPINFO block, before the rows, holds a `<VOUCHER>` counter.
+    let added = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION><CMPGSTIN>08ZZZZZ0000Z1ZQ</CMPGSTIN></VOUCHER>";
+    let mut parts = xml.split("<VOUCHER ");
+    let mut out = parts.next().unwrap_or_default().to_string();
+    for part in parts {
+        assert!(part.contains("</VOUCHER>"), "a row with no close");
+        out.push_str("<VOUCHER ");
+        out.push_str(&part.replacen("</VOUCHER>", added, 1));
+    }
+    out
 }
 
 /// The read-back's legs on the ledgers the build classified as sales lines.
@@ -1589,11 +1731,11 @@ fn sales_line_evidence(
         .map(|leg| {
             serde_json::json!({
                 "ledger": super::super::party_name(leg.ledger.as_str()),
-                "hsn_code": text(&leg.hsn.code),
-                "hsn_source_type": text(&leg.hsn.source_type),
-                "hsn_ledger_source": name(&leg.hsn.ledger_source),
-                "hsn_group_source": name(&leg.hsn.group_source),
-                "hsn_resolved": leg.hsn.resolved(),
+                "hsn_code": text(&leg.line_hsn().code),
+                "hsn_source_type": text(&leg.line_hsn().source_type),
+                "hsn_ledger_source": name(&leg.line_hsn().ledger_source),
+                "hsn_group_source": name(&leg.line_hsn().group_source),
+                "hsn_resolved": leg.line_hsn().resolved(),
             })
         })
         .collect()
@@ -1781,7 +1923,8 @@ impl super::super::Server {
             return only("invoice_readback_book_too_large", mark_evidence);
         }
         let date = voucher.date.as_str();
-        let (Some(year), Some(type_guid), Some(number)) = (
+        let (Some(class), Some(year), Some(type_guid), Some(number)) = (
+            voucher.voucher_type.invoice_class(),
             financial_year_window(date),
             VoucherTypeGuid::parse(&observed.voucher_type_guid),
             voucher
@@ -1820,6 +1963,7 @@ impl super::super::Server {
                     for month in &months {
                         let request = super::super::invoice_window_numbers_read(
                             &company.name,
+                            class,
                             (&month.0, &month.1),
                         );
                         match self.post_read(identity, request).await {
@@ -1845,12 +1989,61 @@ impl super::super::Server {
             } else {
                 differences.extend(wire::number_after_post_difference(
                     &answers,
+                    class,
                     number.as_str(),
                     posted_type.as_deref(),
                 ));
             }
         }
+        if let Some(details) = voucher
+            .invoice
+            .as_ref()
+            .and_then(|detail| detail.e_invoice.as_ref())
+        {
+            // Without the GUID the details cannot be matched to a voucher: not found, never a pass.
+            let Some(guid) = guid.as_deref() else {
+                differences.push(
+                    crate::agent::failure_code::EInvoiceReadbackCode::NotFound
+                        .as_str()
+                        .to_string(),
+                );
+                return Ok((differences, alter_id, guid, lines, evidence));
+            };
+            let (found, read_evidence) = self
+                .read_back_e_invoice(identity, company, voucher, details, guid)
+                .await;
+            differences.extend(found);
+            if let Some(read_evidence) = read_evidence {
+                evidence = super::super::combine_evidence(evidence, read_evidence);
+            }
+        }
         Ok((differences, alter_id, guid, lines, evidence))
+    }
+
+    /// The e-invoice details of a posted invoice, read over its one date and found by the GUID
+    /// its read-back returned (#2162 item 9). The invoice read-back's own request does not name
+    /// the three elements, so the measured window read that does is sent instead of a new shape.
+    /// A failed or unreadable read is a difference, never a pass.
+    async fn read_back_e_invoice(
+        &self,
+        identity: &super::super::VerifiedCompanyIdentity,
+        company: &bridge_tally_protocol::TallyCompany,
+        voucher: &ImportVoucher,
+        details: &EInvoiceDetails,
+        guid: &str,
+    ) -> (Vec<String>, Option<super::super::Evidence>) {
+        use crate::agent::failure_code::EInvoiceReadbackCode;
+        let failed = |code: EInvoiceReadbackCode| vec![code.as_str().to_string()];
+        let Ok(request) = super::super::invoice_e_invoice_read(&company.name, &voucher.date) else {
+            return (failed(EInvoiceReadbackCode::ReadFailed), None);
+        };
+        let Ok((xml, evidence)) = self.post_read(identity, request).await else {
+            return (failed(EInvoiceReadbackCode::ReadFailed), None);
+        };
+        match e_invoice::read_rows(&xml, identity.company_guid()) {
+            Ok(rows) => (details.readback_differences(&rows, guid), Some(evidence)),
+            Err(_) => (failed(EInvoiceReadbackCode::Unreadable), Some(evidence)),
+        }
     }
 }
 
@@ -1957,9 +2150,7 @@ pub(super) fn party_bill_wise_in(
 /// of the customer's bills.
 pub(super) fn new_ref_party(voucher: &ImportVoucher) -> Option<&str> {
     // Only an invoice has one, whatever detail another voucher may carry.
-    if !voucher.voucher_type.is_invoice() {
-        return None;
-    }
+    voucher.voucher_type.invoice_class()?;
     let detail = voucher.invoice.as_ref()?;
     if !detail.observed.as_ref()?.party_bill_wise {
         return None;
@@ -2222,6 +2413,7 @@ impl InvoiceJudge<'_> {
                     .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))?;
                 admitted(super::super::invoice_window_numbers_read(
                     company,
+                    self.class()?,
                     (&month.0, &month.1),
                 ))
             }
@@ -2231,6 +2423,15 @@ impl InvoiceJudge<'_> {
             },
             Need::Marks | Need::Listing => Err(unusable("invoice_read_plan_inconsistent")),
         }
+    }
+
+    /// The invoice's class, from its voucher type. A judge is made only for
+    /// an invoice, so `None` is a plan that cannot be (#2346).
+    fn class(&self) -> Result<super::InvoiceClass, Verdict> {
+        self.voucher
+            .voucher_type
+            .invoice_class()
+            .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))
     }
 
     /// The invoice's number, parsed once: the month reads compare it after
@@ -2272,6 +2473,7 @@ impl InvoiceJudge<'_> {
             .ok_or_else(unreadable)?;
         admitted(super::super::invoice_window_numbers_read(
             self.identity.display_name(),
+            self.class()?,
             (&month.0, &month.1),
         ))
         .map(Some)
@@ -2406,7 +2608,8 @@ impl InvoiceJudge<'_> {
         };
         let types = wire::parse_voucher_types(types_body)
             .map_err(|code| Verdict::Failed(code.to_string()))?;
-        let resolved = wire::resolve_voucher_type(&types, &type_name, "Sales")
+        let class = self.class()?;
+        let resolved = wire::resolve_voucher_type(&types, &type_name, class.reserved())
             .map_err(|code| refusing(refuse_value(code, &type_name)))?;
 
         // 3b. The number must not already be in use on a Sales-class voucher
@@ -2418,8 +2621,9 @@ impl InvoiceJudge<'_> {
         let number = number.as_str();
         let months = self.months()?;
         for body in &answers.number {
-            if let wire::NumberHolding::Held { with_irn } = wire::number_holding(body, number)
-                .map_err(|code| Verdict::Failed(code.to_string()))?
+            if let wire::NumberHolding::Held { with_irn } =
+                wire::number_holding(body, class, number)
+                    .map_err(|code| Verdict::Failed(code.to_string()))?
             {
                 let code = if with_irn {
                     "invoice_number_already_used_with_irn"
@@ -2457,10 +2661,10 @@ impl InvoiceJudge<'_> {
                         None => return Err(Verdict::Need(Need::NumberControl)),
                     },
                 };
-                if !wire::control_row_found(control_body, known, date)
+                if !wire::control_row_found(control_body, class, known, date)
                     .map_err(|code| Verdict::Failed(code.to_string()))?
                 {
-                    let miss = wire::control_miss(control_body, guid.as_deref())
+                    let miss = wire::control_miss(control_body, class, guid.as_deref())
                         .map_err(|code| Verdict::Failed(code.to_string()))?;
                     return Err(refusing(InvoiceRefusal {
                         code: "invoice_number_control_missing",
@@ -2871,8 +3075,13 @@ pub(super) fn render_sales_invoice_xml(
         .as_deref()
         .map(|gstin| format!("<PARTYGSTIN>{}</PARTYGSTIN>", xml_escape(gstin)))
         .unwrap_or_default();
+    let e_invoice = detail
+        .e_invoice
+        .as_ref()
+        .map(EInvoiceDetails::render)
+        .unwrap_or_default();
     Some(format!(
-        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"{action}\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{narration}{legs}</VOUCHER></TALLYMESSAGE>",
+        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"{action}\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{e_invoice}{narration}{legs}</VOUCHER></TALLYMESSAGE>",
         xml_escape(number),
         xml_escape(number),
         xml_escape(&observed.party_state),

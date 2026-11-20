@@ -70,7 +70,9 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
   assert.match(app, /const identityDiscriminator = clientIdentityDiscriminator\(company\);/);
   assert.match(app, /const summaryDiscriminator = clientIdentitySummaryDiscriminator\(company\);/);
   assert.match(app, /summaryDiscriminator,/);
-  assert.match(app, /searchText: `\$\{company\.name\} \$\{identityDiscriminator\}`/);
+  // #2462: a verified client is drawn and found by the name the backend shows.
+  assert.match(app, /name: company\.shown_name,\s*summaryDiscriminator,/);
+  assert.match(app, /searchText: `\$\{company\.shown_name\} \$\{identityDiscriminator\}`/);
   assert.match(app, /Company no\. \$\{company\.company_number \?\? "not observed"\}/);
   assert.match(app, /Books from \$\{booksFrom\}/);
   assert.match(app, /GUID \$\{company\.guid \?\? "not observed"\}/);

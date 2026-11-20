@@ -1,0 +1,63 @@
+# fixture: agent/partial-landing-rows/partial-landing-r0-verification-after.utf16le.xml
+# parser: parse_import_verification_rows(STOCK_CREATE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(2),
+        "amounts": Array [
+            Object {
+                "amount": String("-21.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("A2 Expense"),
+            },
+            Object {
+                "amount": String("21.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("A1 Capital"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250414"),
+        "effective_date": String("20250414"),
+        "guid": String("bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-00000002"),
+        "is_invoice": Bool(false),
+        "master_id": String("2"),
+        "narration": String("Row 1108-P2 first"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-00000002"),
+        "voucher_number": String("2"),
+        "voucher_type": String("Journal"),
+    },
+    Object {
+        "alter_id": Number(3),
+        "amounts": Array [
+            Object {
+                "amount": String("-23.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("A2 Expense"),
+            },
+            Object {
+                "amount": String("23.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("A1 Capital"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250414"),
+        "effective_date": String("20250414"),
+        "guid": String("bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-00000003"),
+        "is_invoice": Bool(false),
+        "master_id": String("3"),
+        "narration": String("Row 1108-P2 third"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("bac2b5e9-ada9-43c0-b8f8-a2812a813fa1-00000003"),
+        "voucher_number": String("3"),
+        "voucher_type": String("Journal"),
+    },
+])

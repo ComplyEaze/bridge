@@ -1061,7 +1061,7 @@ impl Server {
             if line
                 .vouchers
                 .iter()
-                .any(|voucher| voucher.voucher_type.is_invoice())
+                .any(|voucher| voucher.voucher_type.invoice_class().is_some())
             {
                 let (evidence, plan) = Box::pin(self.recheck_sales_invoice(
                     &identity,
@@ -1230,7 +1230,7 @@ impl Server {
                     if line
                         .vouchers
                         .iter()
-                        .any(|voucher| voucher.voucher_type.is_invoice())
+                        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
                     {
                         // The catalogue read before the dialog is as old as the
                         // dialog: read it again, so the party's bill-wise flag
@@ -2313,8 +2313,20 @@ pub(super) fn attach_next_step(
     }
 }
 
-fn mark_reconciliation_required(payload: &mut Value) {
+/// Where to look when no answer to the post was kept (bridge#852). `egress_log`
+/// returns the most recent receipts; the sending `post_import` call's receipt is
+/// there only if recent enough. Its trail (`request_trail::RequestTrail`) holds
+/// the send durations and outcomes the batch record lacks, but no field identifies
+/// the import send. A later tool re-check leaves its own receipt and read-only
+/// trail. A receipt not returned may be older than the read window, or may never
+/// have been written: the process may have ended first.
+pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. egress_log returns the most recent receipts. The sending post_import call's receipt is there only if recent enough. Its request_trail lists the last 32 sends with held_ms, how long each send held the endpoint, and its outcome, but does not mark which send was the post. A later post_import or verify_import tool call on this batch does not post it again and also leaves a receipt; its request_trail lists only that call's reads. A receipt not returned may be older than egress_log reads, or may never have been written: the process may have ended first. Reconcile this original batch without resending it.";
+
+fn mark_reconciliation_required(payload: &mut Value, response: Option<&ledger::DispatchResponse>) {
     payload["result"]["error"] = json!({"code":"import_reconciliation_required", "message":"The saved attempt has not been confirmed as the intended new voucher. Reconcile this original batch without resending it."});
+    if response.is_none() {
+        payload["result"]["error"]["next_step"] = json!(RESPONSE_MISSING_NEXT_STEP);
+    }
 }
 
 /// A clean response creates exactly the batch's `voucher_count` vouchers and
@@ -2372,7 +2384,7 @@ pub(super) fn finalize_previous_attempt_reconciliation(
         "response": response,
     });
     if !name_verified {
-        mark_reconciliation_required(payload);
+        mark_reconciliation_required(payload, response);
     } else if let Some((code, message)) = doubt {
         payload["result"]["error"] = json!({"code": code, "message": message});
     }
@@ -2479,7 +2491,7 @@ pub(super) fn finalize_current_dispatch(
         "resent":false, "automatic_retry":false
     });
     if !clean || !verified {
-        mark_reconciliation_required(payload);
+        mark_reconciliation_required(payload, response);
     } else if let Some((code, message)) = masters_doubt {
         payload["result"]["error"] = json!({"code": code, "message": message});
     }
@@ -3176,7 +3188,7 @@ pub(super) fn admit_saved_voucher_integrity(
     // An invoice renders only from what its build observed in Tally: one saved
     // without that is not postable, and is never rendered as an empty message.
     if line.vouchers.iter().any(|voucher| {
-        voucher.voucher_type.is_invoice()
+        voucher.voucher_type.invoice_class().is_some()
             && voucher
                 .invoice
                 .as_ref()
@@ -3406,7 +3418,7 @@ fn review_text(
         return batch_review_text(line, company, &origin, &debit, &credit, footer, form);
     }
     let voucher = &line.vouchers[0];
-    if voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_some() {
         return invoice_review_preview(
             line,
             company,
@@ -3616,6 +3628,19 @@ fn invoice_review_preview(
     } else {
         format!("{legend}\n")
     };
+    // The e-invoice details, when the invoice carries them (#2162 item 9): the IRN on a line of
+    // its own under the customer's registration, and the acknowledgement after the bill
+    // allocation, so a five-leg invoice still fits the dialog. That line is at most 97
+    // characters: the longer allocation (46), two spaces, and an acknowledgement of a 20-digit
+    // number (49).
+    let (e_invoice_irn, e_invoice_ack) = detail
+        .e_invoice
+        .as_ref()
+        .map(|details| {
+            let [irn, ack] = details.review_lines();
+            (format!("{irn}\n"), format!("  {ack}"))
+        })
+        .unwrap_or_default();
     let warned = observed
         .hsn_warnings
         .iter()
@@ -3627,7 +3652,7 @@ fn invoice_review_preview(
     } else {
         invoice_checked_hsn_line(warned)
     };
-    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{checked}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\n{e_invoice_irn}Bill allocation: {allocation}{e_invoice_ack}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{checked}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         quoted(&company.name), company.guid, company.company_number, shown_date(company.books_from.as_str()),
         quoted(&detail.voucher_type_name), shown_date(voucher.date.as_str()), quoted(number),
         quoted(party), detail.place_of_supply, entries, line.batch_id);

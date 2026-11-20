@@ -7498,7 +7498,10 @@ macro_rules! pilot_queue_block {
 // restricted to the parents of the invoice's ledgers (with the HSN/SAC fields,
 // #691) cut to the invoice's six ledgers (`lab_invoice_rates_hsn`), because the
 // code now names those ledgers by GUID (#1331) and that six-GUID request was
-// never sent to the lab. They are paired here with the earlier answers of the same book (the 9 Oct listings,
+// never sent to the lab. The read-back `R` is also DERIVED: its registration
+// name and GSTIN are inserted by `with_registration` and are not part of the
+// capture. Those 21 Oct answers are paired here with the earlier answers of the
+// same book (the 9 Oct listings,
 // groups and tax units; the 12 Oct company object `O` and groups with HSN `G`;
 // the 16 Oct numbering answers `X` and `Y`, DERIVED above); the pairing was not
 // observed at one time. The order below is the order the
@@ -7589,7 +7592,7 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'w' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'W' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'C' => "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38", // r16-tax-units.xml
-        'R' => "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21", // R-0010.xml of the 2162-S1 sheet
+        'R' => "bd9717c7830df5217a21ef3d8f4fb1ffb1bc0bc150a7d66dc5cefe12ebe852b5", // RC-0010.xml of the 2464-GN sheet
         'Z' => "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e", // r14-invoice-post.xml
         'X' => "229f54c9de4cd51c2b76480129a9c6965314cd04b82d3d40d87f462167cce0d5", // r18-numbering-masters.xml
         'Y' => "e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276", // r19-numbering-series.xml
@@ -7731,6 +7734,11 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         Some(bytes) if matches!(letter, 'X' | 'Y') => {
             pilot_answer(pilot_types_as_of_the_round(&captured(bytes)))
         }
+        // DERIVED: answered before the request fetched the registration (see
+        // `with_registration`).
+        Some(bytes) if letter == 'R' => pilot_answer(
+            crate::agent::agent_import::invoice::with_registration(&captured(bytes)),
+        ),
         Some(bytes) => pilot_answer(captured(bytes)),
         None => status(),
     }
@@ -8847,7 +8855,7 @@ fn pilot_readback_uncertain() -> String {
         );
     }
     assert_ne!(answer, included);
-    answer
+    crate::agent::agent_import::invoice::with_registration(&answer)
 }
 
 /// A month read after a clean read-back that fails is a difference, never a

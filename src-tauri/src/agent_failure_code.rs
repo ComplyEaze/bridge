@@ -4,6 +4,12 @@
 //! builds its code from a string (`From<String>` for `ToolFailure`); `failure_code_sites_tests`
 //! counts those per file, and the count may only fall.
 
+use crate::tally::stock_item_create::{
+    CreateRenderRefusal, DraftRefusal, ItemNameNotAbsent, NotGoodsSibling, SiblingRefusal,
+    StockItemCatalogueError,
+};
+use crate::tally::stock_item_verified::{ReadBackVerdict, StockItemImportOutcome};
+
 /// A failure code made from a declared variant. Its constructor is private to this module, so
 /// every value is one of the strings the enums below declare.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -69,6 +75,33 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The differences an invoice's read-back names for a stock item Tally holds under one of its
+    /// ledger entries (#1379).
+    pub(crate) enum InvoiceItemLineCode {
+        /// An entry holds a stock item, and the build sent no item line.
+        NotSent = "invoice_line_item_not_sent",
+        /// An entry holds more than one stock item.
+        Several = "invoice_line_items_several",
+        /// The item's side or amount is not its entry's, or it carries a rate or a quantity.
+        Differs = "invoice_line_item_differs",
+        /// The item does not hold exactly one batch allocation, naming a godown and a batch, for
+        /// its amount.
+        Batch = "invoice_line_item_batch",
+    }
+}
+
+failure_codes! {
+    /// The differences an invoice's read-back names for the company registration Tally filed it
+    /// under (#2464).
+    pub(crate) enum InvoiceRegistrationCode {
+        /// The registration's name or its GSTIN did not come back, or came back empty.
+        Missing = "invoice_registration_missing",
+        /// The GSTIN is not a valid GSTIN of the company's state the build recorded.
+        Differs = "invoice_registration_differs",
+    }
+}
+
+failure_codes! {
     /// The differences of the number's month reads sent again after a clean read-back (#2162). Each
     /// is a read-back difference, so `posted_verified` is never given; `InAnotherType` is followed
     /// in the difference by the names of the Sales types that hold the number.
@@ -105,14 +138,6 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of `import_bank_statement` when it reads a proposals file.
-    pub(crate) enum BankStatementImportCode {
-        /// The proposals file does not hold what its parse would have written.
-        ProposalsFileInvalid = "proposals_file_invalid",
-    }
-}
-
-failure_codes! {
     /// Codes that several read tools write for the same failure, declared once.
     pub(crate) enum ReadCode {
         /// The window's `from` is after its `to`.
@@ -129,6 +154,65 @@ failure_codes! {
         CurrentDateInvalid = "current_date_invalid",
         /// No `as_of` was given and the host's current date, which stands in for it, is not a date.
         InvalidAsOf = "invalid_as_of",
+        /// The verified company's identity lacks a part the read needs.
+        CompanyIdentityIncomplete = "company_identity_incomplete",
+        /// A date is not a date.
+        InvalidDate = "invalid_date",
+        /// A voucher's entries do not sum to zero.
+        VoucherEntriesUnbalanced = "voucher_entries_unbalanced",
+    }
+}
+
+failure_codes! {
+    /// Codes about a saved proposals file, or the vouchers a tool is given, that several tools
+    /// write for the same failure.
+    pub(crate) enum ProposalsCode {
+        /// The proposals file does not read as the shape it was written in.
+        FileInvalid = "proposals_file_invalid",
+        /// No `proposals_id` was given.
+        IdRequired = "proposals_id_required",
+        /// No `vouchers` were given.
+        VouchersRequired = "vouchers_required",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `ledger_movement` itself.
+    pub(crate) enum MovementCode {
+        /// The vouchers changed between the reads the movement is built from.
+        VoucherSnapshotDrifted = "voucher_snapshot_drifted",
+        /// The ledger's opening balance was not observed, so the answer is partial.
+        OpeningBalanceNotObserved = "opening_balance_not_observed",
+        /// The ledger's movement read failed.
+        ReadFailed = "ledger_movement_read_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `voucher_presence` itself.
+    pub(crate) enum PresenceCode {
+        /// The ledger catalogue the check needs was not read whole.
+        LedgerCatalogueIncomplete = "ledger_catalogue_incomplete",
+        /// The numbering the check was given differs from the book's.
+        NumberingMethodDiffers = "presence_numbering_method_differs_from_book",
+        /// No `numbering` was given.
+        NumberingRequired = "numbering_required",
+        /// A voucher to check lacks a part of its import identity.
+        ImportIdentityIncomplete = "presence_import_identity_incomplete",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `statement_tie_out` itself.
+    pub(crate) enum TieOutCode {
+        /// A sum or difference of the tie-out's amounts is out of range.
+        ArithmeticOutOfRange = "tie_out_arithmetic_out_of_range",
+        /// The ledger's opening balance is not an exact decimal.
+        LedgerOpeningInvalid = "ledger_opening_invalid",
+        /// The ledger's opening balance is missing.
+        LedgerOpeningMissing = "ledger_opening_missing",
+        /// The ledger catalogue names the ledger more than once.
+        LedgerNameDuplicated = "ledger_name_duplicated_in_catalogue",
     }
 }
 
@@ -175,6 +259,155 @@ failure_codes! {
         InvalidDirection = "invalid_direction",
         /// A bill's amount is not an exact decimal.
         AmountInvalid = "outstandings_amount_invalid",
+    }
+}
+
+failure_codes! {
+    /// The typed refusals of the proposed stock-item Create flow (#1381).
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) enum StockItemCreateCode {
+        ReadUnreadable = "stock_item_read_unreadable",
+        NoItems = "stock_item_no_items",
+        NoNameEntry = "stock_item_name_entry_missing",
+        NameIndexInvalid = "stock_item_name_index_invalid",
+        NameUnchecked = "stock_item_name_unchecked",
+        NameTaken = "master_name_taken",
+        SiblingNotFound = "stock_item_sibling_not_found",
+        SiblingAmbiguous = "stock_item_sibling_ambiguous",
+        SiblingOnlyByFold = "stock_item_sibling_only_by_fold",
+        SiblingIncomplete = "stock_item_sibling_incomplete",
+        SiblingNotGoods = "stock_item_sibling_not_goods",
+        SiblingNotTaxable = "stock_item_sibling_not_taxable",
+        SiblingGstNotApplicable = "stock_item_sibling_gst_not_applicable",
+        CatalogueChanged = "stock_item_catalogue_changed",
+        GroupsUnreadable = "stock_item_groups_unreadable",
+        ParentNotInBook = "stock_item_parent_not_in_book",
+        UnitsUnreadable = "stock_item_units_unreadable",
+        UnitNotInBook = "stock_item_unit_not_in_book",
+        ShapeNotMeasured = "stock_item_shape_not_measured",
+        TextNotPlain = "stock_item_text_not_plain",
+        TextNeedsEscaping = "stock_item_text_needs_escaping",
+        ReviewLayoutText = "import_review_layout_text",
+        ReviewFormatText = "import_review_format_text",
+        ReviewTooLarge = "master_review_too_large",
+        CreateApplicationFailure = "stock_item_create_application_failure",
+        AlteredExisting = "stock_item_altered_existing",
+        CountersNotClean = "stock_item_counters_not_clean",
+        CountersUnreported = "stock_item_counters_unreported",
+        ReadBackDiffers = "stock_item_read_back_differs",
+        ReadBackNotFoundOnce = "stock_item_read_back_not_found_once",
+        ReadBackNotNew = "stock_item_read_back_not_new",
+        ReadBackOtherCompany = "stock_item_read_back_other_company",
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn stock_item_catalogue_refusal_code(
+    error: &StockItemCatalogueError,
+) -> StockItemCreateCode {
+    match error {
+        StockItemCatalogueError::Unreadable(_) => StockItemCreateCode::ReadUnreadable,
+        StockItemCatalogueError::NoItems => StockItemCreateCode::NoItems,
+        StockItemCatalogueError::NoNameEntry { .. } => StockItemCreateCode::NoNameEntry,
+        StockItemCatalogueError::Index(_) => StockItemCreateCode::NameIndexInvalid,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn item_name_refusal_code(error: &ItemNameNotAbsent) -> StockItemCreateCode {
+    match error {
+        ItemNameNotAbsent::Taken(_) => StockItemCreateCode::NameTaken,
+        ItemNameNotAbsent::Unchecked(_) => StockItemCreateCode::NameUnchecked,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn sibling_refusal_code(error: &SiblingRefusal) -> StockItemCreateCode {
+    match error {
+        SiblingRefusal::NotFound => StockItemCreateCode::SiblingNotFound,
+        SiblingRefusal::Ambiguous { .. } => StockItemCreateCode::SiblingAmbiguous,
+        SiblingRefusal::OnlyByFold { .. } => StockItemCreateCode::SiblingOnlyByFold,
+        SiblingRefusal::Incomplete(_) => StockItemCreateCode::SiblingIncomplete,
+        SiblingRefusal::Unchecked(_) => StockItemCreateCode::NameUnchecked,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn not_goods_refusal_code(error: &NotGoodsSibling) -> StockItemCreateCode {
+    match error {
+        NotGoodsSibling::NotGoods => StockItemCreateCode::SiblingNotGoods,
+        NotGoodsSibling::NotTaxable { .. } => StockItemCreateCode::SiblingNotTaxable,
+        NotGoodsSibling::GstNotApplicable => StockItemCreateCode::SiblingGstNotApplicable,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn draft_refusal_code(error: &DraftRefusal) -> StockItemCreateCode {
+    match error {
+        DraftRefusal::OtherCatalogue => StockItemCreateCode::CatalogueChanged,
+        DraftRefusal::GroupsUnreadable(_) => StockItemCreateCode::GroupsUnreadable,
+        DraftRefusal::ParentNotInBook => StockItemCreateCode::ParentNotInBook,
+        DraftRefusal::UnitsUnreadable(_) => StockItemCreateCode::UnitsUnreadable,
+        DraftRefusal::UnitNotInBook => StockItemCreateCode::UnitNotInBook,
+        DraftRefusal::GstEntriesNotMeasured { .. }
+        | DraftRefusal::GstSourceNotMeasured
+        | DraftRefusal::ItcNotMeasured
+        | DraftRefusal::StateNotAny
+        | DraftRefusal::DutyHeadNotMeasured { .. }
+        | DraftRefusal::ValuationNotMeasured { .. }
+        | DraftRefusal::RateNotMeasured { .. }
+        | DraftRefusal::HsnEntriesNotMeasured { .. }
+        | DraftRefusal::HsnNotMeasured => StockItemCreateCode::ShapeNotMeasured,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn create_render_refusal_code(error: &CreateRenderRefusal) -> StockItemCreateCode {
+    match error {
+        CreateRenderRefusal::TextNotPlain { .. } => StockItemCreateCode::TextNotPlain,
+        CreateRenderRefusal::TextNeedsEscaping { .. } => StockItemCreateCode::TextNeedsEscaping,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn stock_item_outcome_code(
+    outcome: &StockItemImportOutcome,
+) -> Option<StockItemCreateCode> {
+    match outcome {
+        StockItemImportOutcome::ApplicationFailure => {
+            Some(StockItemCreateCode::CreateApplicationFailure)
+        }
+        StockItemImportOutcome::CountersClean(_) => None,
+        StockItemImportOutcome::AlteredExisting { .. } => {
+            Some(StockItemCreateCode::AlteredExisting)
+        }
+        StockItemImportOutcome::NotClean { .. } => Some(StockItemCreateCode::CountersNotClean),
+        StockItemImportOutcome::Unreported => Some(StockItemCreateCode::CountersUnreported),
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn stock_item_read_back_code(verdict: &ReadBackVerdict) -> Option<StockItemCreateCode> {
+    match verdict {
+        ReadBackVerdict::Equal(_) => None,
+        ReadBackVerdict::Differs { .. } => Some(StockItemCreateCode::ReadBackDiffers),
+        ReadBackVerdict::NotFoundOnce { .. } => Some(StockItemCreateCode::ReadBackNotFoundOnce),
+        ReadBackVerdict::NotNew => Some(StockItemCreateCode::ReadBackNotNew),
+        ReadBackVerdict::OtherCompany => Some(StockItemCreateCode::ReadBackOtherCompany),
+    }
+}
+
+failure_codes! {
+    /// The differences an invoice's e-invoice read gives that name no element (#2162 item 9).
+    pub(crate) enum EInvoiceReadbackCode {
+        /// The read was not answered, or its request could not be built.
+        ReadFailed = "e_invoice_readback_failed",
+        /// The answer did not parse as a vouchers read.
+        Unreadable = "e_invoice_readback_unreadable",
+        /// No voucher of the invoice's date carries the GUID its read-back returned.
+        NotFound = "e_invoice_not_found",
+        /// More than one voucher carries that GUID.
+        NotUnique = "e_invoice_not_unique",
     }
 }
 

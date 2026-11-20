@@ -366,6 +366,68 @@ fn exact_readback_requires_a_clean_persisted_response_to_reconcile() {
     }
 }
 
+/// A batch with no response record points at the receipt of the call that sent
+/// it, and says what its absence means (bridge#852); a batch whose answer is on
+/// record gets no such step.
+#[test]
+fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
+    let clean = dispatch_response("success", 1, 0);
+    let altered = dispatch_response("success", 0, 1);
+    let unverified = || json!({"result": {"counts": {"posted_verified": 0}, "duplicates": []}});
+    for (response, pointed) in [(None, true), (Some(&altered), false), (Some(&clean), false)] {
+        let mut previous = unverified();
+        finalize_previous_attempt_reconciliation(&mut previous, response, None, 1);
+        let mut current = unverified();
+        finalize_current_dispatch(&mut current, response, None, 1);
+        for payload in [previous, current] {
+            let error = &payload["result"]["error"];
+            assert_eq!(error["code"], "import_reconciliation_required");
+            if pointed {
+                assert_eq!(error["next_step"], RESPONSE_MISSING_NEXT_STEP);
+            } else {
+                assert!(error.get("next_step").is_none());
+            }
+        }
+    }
+    let verified = || json!({"result": {"counts": {"posted_verified": 1}, "duplicates": []}});
+    let mut previous = verified();
+    finalize_previous_attempt_reconciliation(&mut previous, None, None, 1);
+    let mut current = verified();
+    finalize_current_dispatch(&mut current, None, None, 1);
+    for payload in [previous, current] {
+        let result = &payload["result"];
+        assert_eq!(result["dispatch"]["state"], "reconciliation_required");
+        assert_eq!(result["error"]["code"], "import_reconciliation_required");
+        assert_eq!(result["error"]["next_step"], RESPONSE_MISSING_NEXT_STEP);
+    }
+    let step = RESPONSE_MISSING_NEXT_STEP;
+    // The log returns only recent receipts, with the trail's two fields named.
+    for part in [
+        "egress_log returns the most recent receipts",
+        "The sending post_import call's receipt is there only if recent enough",
+        "request_trail",
+        "held_ms",
+        "how long each send held the endpoint",
+        "outcome",
+        "but does not mark which send was the post",
+        "A later post_import or verify_import tool call on this batch does not post it again and also leaves a receipt",
+        "its request_trail lists only that call's reads",
+        "A receipt not returned may be older than egress_log reads",
+        "or may never have been written: the process may have ended first",
+        "without resending it",
+    ] {
+        assert!(step.contains(part), "{part}");
+    }
+    assert!(!step.contains("the post's among them"));
+    // It promises no receipt and no cause, and reasons about neither.
+    // The cap the text names is the trail's own.
+    let cap = format!("the last {} sends", crate::request_trail::TRAIL_LAST);
+    assert!(step.contains(&cap), "{cap}");
+    for word in ["always", "will be", "because", "caused"] {
+        assert!(!step.contains(word), "{word}");
+    }
+}
+
 #[test]
 fn recovery_failure_retains_the_saved_dispatch_response() {
     let response = dispatch_response("success", 1, 0);
@@ -2804,6 +2866,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                 voucher_type_name: _,
                 place_of_supply: _,
                 round_off_ledger: _,
+                e_invoice: _,
                 observed:
                     Some(super::super::invoice::InvoiceObserved {
                         voucher_type_guid: _,
@@ -4694,6 +4757,42 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
         )
     );
     assert_eq!(preview.lines().count(), 23, "{preview}");
+    // E-invoice details add the IRN as one line under the registration and the acknowledgement
+    // after the bill allocation, so the five-leg invoice with a round off still fits (#2162
+    // item 9; the details are row 2162-IRN9's, as Tally stored them).
+    let mut detailed = line.clone();
+    detailed.vouchers[0].invoice.as_mut().unwrap().e_invoice = Some(
+        serde_json::from_value(json!({
+            "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+            "ack_no": "445566",
+            "ack_date": "2025-04-03"
+        }))
+        .unwrap(),
+    );
+    let with_details = review_preview_for(&detailed, &endpoint, PostScope::Vouchers)
+        .expect("a five-leg invoice with e-invoice details fits the dialog");
+    let mut expected = text(
+        [
+            "Dr 11200.40  \"Customer A\"",
+            "Cr 10000.00  \"Sales\"",
+            "Cr 600.00  \"Output CGST\"",
+            "Cr 600.00  \"Output SGST\"",
+            "Cr 0.40  \"Round Off\"",
+        ],
+        "",
+    );
+    let allocation = expected
+        .iter()
+        .position(|shown| shown == "Bill allocation: New Ref \"278\"")
+        .unwrap();
+    expected[allocation].push_str("  E-invoice ack: 445566 of 2025-04-03");
+    expected.insert(
+        allocation,
+        "E-invoice IRN: c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0"
+            .to_string(),
+    );
+    assert_eq!(with_details.lines().collect::<Vec<_>>(), expected);
+    assert_eq!(with_details.lines().count(), 24, "{with_details}");
     // A leg the batch records as approved On Account is marked on its own line
     // and on no other, and the legend takes the blank line's place: the dialog
     // still fits with a round off.
@@ -5984,7 +6083,7 @@ fn the_voucher_recheck_given_a_masters_admission_refuses_and_aims_nothing() {
     let error = recheck_voucher_queue(
         QueuedAdmission::Masters {
             batch: &crate::tally::ledger_create_item::LedgerCreateItem::new(
-                crate::tally::ledger_create_item::MasterName::new("Some Party").unwrap(),
+                crate::tally::master_name::MasterName::new("Some Party").unwrap(),
                 crate::tally::ledger_create_item::AdmittedLedgerKind::Suspense,
             )
             .into(),

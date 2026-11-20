@@ -54,8 +54,9 @@ use crate::tally::approved_import::{
 };
 use crate::tally::ledger_create_item::{
     AdmittedDutyHead, AdmittedLedgerKind, GstinError, LedgerCreateBatch, LedgerCreateBatchError,
-    LedgerCreateItem, MasterName, MasterNameError, PartySide, VerifiedGstin,
+    LedgerCreateItem, PartySide, VerifiedGstin,
 };
+use crate::tally::master_name::{MasterName, MasterNameError};
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 

@@ -619,3 +619,195 @@ fn the_e_invoice_sent_note_has_no_threshold_date_or_tally_listing_claim() {
     assert!(!lower.contains("list"));
     assert!(!lower.contains("gstr"));
 }
+
+// #2058: which rows of the window are listed as the invoice's same-figures
+// others, and which batches count as holding one invoice.
+
+fn other_entry(suffix: u32, number: &str) -> Value {
+    json!({"guid":format!("{GUID}-{suffix:08x}"), "master_id":suffix.to_string(),
+        "alter_id":suffix, "voucher_number":number})
+}
+
+fn invoice_row(suffix: u32, number: &str) -> ReadVoucher {
+    row(suffix, "Sales Invoice", Some(number), INVOICE)
+}
+
+fn tagged_invoice_row(number: &str) -> ReadVoucher {
+    let line = invoice_batch(number);
+    let mut tagged = invoice_row(0x50, number);
+    tagged.narration = Some(format!(
+        "[BRIDGE:{}]",
+        line.attribution_tag(&line.vouchers[0])
+    ));
+    tagged
+}
+
+#[test]
+fn a_figures_match_beside_an_unsettled_twin_needs_the_figures() {
+    let result = before_a_post(
+        "INV/26-27/002",
+        vec![row(
+            KEYED,
+            "Sales Invoice",
+            Some("INV/26-27/011"),
+            OTHER_FIGURES,
+        )],
+        InvoiceIdentity::ByNumberOrFigures,
+    );
+    assert!(absent(&result), "{result}");
+}
+
+#[test]
+fn the_plain_check_recognises_an_invoice_by_its_number_alone() {
+    let result = verify_batch(
+        &invoice_batch("INV/26-27/002"),
+        &ImportReadSource::admit(vec![invoice_row(KEYED, "INV/26-27/011")]).unwrap(),
+        Attribution::Tag,
+    )
+    .unwrap();
+    assert!(absent(&result), "{result}");
+}
+
+#[test]
+fn a_batch_of_two_invoices_is_matched_by_content_like_any_other() {
+    let mut line = invoice_batch("INV/26-27/001");
+    let mut second = line.vouchers[0].clone();
+    second.bridge_txn_id = "p-2".into();
+    second.voucher_number = Some("INV/26-27/002".into());
+    line.vouchers.push(second);
+    let result = verify_batch(
+        &line,
+        &ImportReadSource::admit(vec![invoice_row(KEYED, "INV/26-27/002")]).unwrap(),
+        Attribution::Tag,
+    )
+    .unwrap();
+    // The one row is the first voucher's, whatever number it carries.
+    assert_eq!(
+        result["vouchers"][0]["status"], "matching_content_observed",
+        "{result}"
+    );
+    assert_eq!(result["vouchers"][1]["status"], "not_found", "{result}");
+}
+
+#[test]
+fn the_same_figures_under_other_numbers_are_listed_by_alter_id_and_capped() {
+    let rows = vec![
+        invoice_row(0x45, "INV/26-27/045"),
+        invoice_row(0x43, "INV/26-27/043"),
+    ];
+    let result = before_a_post("INV/26-27/002", rows, InvoiceIdentity::ByNumber);
+    assert_eq!(
+        result["vouchers"][0]["same_figures_other_number"],
+        json!({"count":2, "attribution":"not_established", "entries":[
+            other_entry(0x43, "INV/26-27/043"), other_entry(0x45, "INV/26-27/045")]})
+    );
+    let many = (0x41..=0x46)
+        .map(|suffix| invoice_row(suffix, &format!("INV/26-27/{suffix:03}")))
+        .collect::<Vec<_>>();
+    let capped = before_a_post("INV/26-27/002", many, InvoiceIdentity::ByNumber);
+    let listed = &capped["vouchers"][0]["same_figures_other_number"];
+    assert_eq!(listed["count"], 6);
+    assert_eq!(listed["entries"].as_array().unwrap().len(), 5);
+    assert_eq!(listed["entries"][0], other_entry(0x41, "INV/26-27/065"));
+}
+
+#[test]
+fn only_an_effective_row_of_the_same_figures_and_another_number_is_listed() {
+    let mut cancelled = invoice_row(0x44, "INV/26-27/044");
+    cancelled.cancelled = Some(true);
+    let mut optional = invoice_row(0x45, "INV/26-27/045");
+    optional.optional = Some(true);
+    let rows = vec![
+        invoice_row(0x43, "INV/26-27/043"),
+        cancelled,
+        optional,
+        row(0x46, "Sales Invoice", Some("INV/26-27/046"), OTHER_FIGURES),
+    ];
+    let result = before_a_post("INV/26-27/002", rows, InvoiceIdentity::ByNumber);
+    assert_eq!(
+        result["vouchers"][0]["same_figures_other_number"],
+        json!({"count":1, "attribution":"not_established",
+            "entries":[other_entry(0x43, "INV/26-27/043")]})
+    );
+}
+
+#[test]
+fn an_invoice_that_is_found_lists_no_others_and_one_with_none_to_list_says_nothing() {
+    let others = vec![invoice_row(0x43, "INV/26-27/043")];
+    // Found by its tag: verified, so nothing is listed beside it.
+    let mut found = others.clone();
+    found.push(tagged_invoice_row("INV/26-27/002"));
+    let result = before_a_post("INV/26-27/002", found, InvoiceIdentity::ByNumber);
+    assert_eq!(
+        result["vouchers"][0]["status"], "posted_verified",
+        "{result}"
+    );
+    assert!(result["vouchers"][0]
+        .get("same_figures_other_number")
+        .is_none());
+    // Not found and nothing else with its figures: no empty list.
+    let none = before_a_post("INV/26-27/002", vec![], InvoiceIdentity::ByNumber);
+    assert!(none["vouchers"][0]
+        .get("same_figures_other_number")
+        .is_none());
+    // Read as optional, not as cancelled: nothing is listed either.
+    let mut optional = tagged_invoice_row("INV/26-27/002");
+    optional.optional = Some(true);
+    let mut with_others = others;
+    with_others.push(optional);
+    let result = before_a_post("INV/26-27/002", with_others, InvoiceIdentity::ByNumber);
+    assert_eq!(
+        result["vouchers"][0]["reason"], "voucher_optional",
+        "{result}"
+    );
+    assert!(result["vouchers"][0]
+        .get("same_figures_other_number")
+        .is_none());
+}
+
+#[test]
+fn a_cancelled_invoice_lists_the_other_numbers_but_not_a_row_under_its_own_number() {
+    let mut cancelled = tagged_invoice_row("INV/26-27/002");
+    cancelled.cancelled = Some(true);
+    let rows = vec![
+        invoice_row(0x43, "INV/26-27/043"),
+        invoice_row(0x44, "INV/26-27/002"),
+        cancelled,
+    ];
+    let result = before_a_post("INV/26-27/002", rows, InvoiceIdentity::ByNumber);
+    assert_eq!(
+        result["vouchers"][0]["reason"], "voucher_cancelled",
+        "{result}"
+    );
+    assert_eq!(
+        result["vouchers"][0]["same_figures_other_number"],
+        json!({"count":1, "attribution":"not_established",
+            "entries":[other_entry(0x43, "INV/26-27/043")]})
+    );
+}
+
+#[test]
+fn a_row_bound_to_another_voucher_is_not_listed_as_an_invoices_other_number() {
+    let mut line = invoice_batch("INV/26-27/002");
+    let mut second = line.vouchers[0].clone();
+    second.bridge_txn_id = "p-2".into();
+    second.voucher_number = None;
+    line.vouchers.push(second);
+    let bindings = vec![span_identity::PostedVoucherIdentity {
+        bridge_txn_id: "p-2".into(),
+        guid: format!("{GUID}-{:08x}", 0x43),
+        master_id: 0x43,
+    }];
+    let result = verify_batch(
+        &line,
+        &ImportReadSource::admit(vec![invoice_row(0x43, "INV/26-27/043")]).unwrap(),
+        Attribution::Span(Some(&bindings)),
+    )
+    .unwrap();
+    assert!(
+        result["vouchers"][0]
+            .get("same_figures_other_number")
+            .is_none(),
+        "{result}"
+    );
+}

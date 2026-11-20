@@ -1,16 +1,23 @@
-//! The text the ledger dialog shows.
+//! The text the master approval dialogs show.
 //!
-//! One request of ledger `Create`s, two lines for each master in the order
-//! they are sent, under the pinned company the voucher preview names. It is
+//! For ledgers: one request of ledger `Create`s, two lines for each master in
+//! the order they are sent, under the pinned company the voucher preview
+//! names. For a stock item: one `Create` with each copied field and its
+//! source. Values are shown JSON-quoted, so a backslash shows doubled. It is
 //! built from the typed items and the verified company, never from caller
 //! text, and it is refused rather than cut when it does not fit: a dialog
 //! that hides part of what will be created is not a review. The limits and the
 //! unsafe-character checks are the voucher preview's own.
+use super::super::failure_code::{create_render_refusal_code, StockItemCreateCode};
 use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
 };
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
+use crate::tally::stock_item_create::{
+    create_text_refusal, CreateRenderRefusal, MarkedConstant, StockItemDraft, GOODS,
+    SPECIFY_DETAILS_HERE, TAXABLE,
+};
 use crate::tally::VerifiedCompanyIdentity;
 
 /// The last line of the preview: what the person must not do while the post
@@ -169,6 +176,159 @@ fn review_lines(
     lines.push(String::new());
     lines.push(MASTER_REVIEW_WARNING.to_string());
     Ok(lines)
+}
+
+/// Why a stock-item preview was refused. Nothing was shown. Refusal codes for
+/// these come with the dialog that shows the preview.
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum StockItemReviewError {
+    /// The shared review checks refused the text.
+    Review(MasterReviewError),
+    /// The Create renderer would refuse this draft, so it is not shown for
+    /// approval.
+    NotRenderable(CreateRenderRefusal),
+}
+
+impl StockItemReviewError {
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn code(&self) -> StockItemCreateCode {
+        match self {
+            Self::Review(MasterReviewError::LayoutText) => StockItemCreateCode::ReviewLayoutText,
+            Self::Review(MasterReviewError::FormatText) => StockItemCreateCode::ReviewFormatText,
+            Self::Review(MasterReviewError::TooLarge) => StockItemCreateCode::ReviewTooLarge,
+            Self::NotRenderable(error) => create_render_refusal_code(error),
+        }
+    }
+}
+
+/// The complete preview of one stock-item draft, with every copied field shown
+/// and the exact row name or alias used to select its sibling named as source.
+/// Every shown value first passes the layout and format checks; then the draft
+/// must pass the renderer's own text rule, `create_text_refusal`.
+#[allow(dead_code)]
+pub(super) fn stock_item_review_text(
+    draft: &StockItemDraft<'_>,
+    origin: &str,
+) -> Result<String, StockItemReviewError> {
+    let sibling = draft.sibling().sibling();
+    let company = sibling.catalogue().company();
+    let source = sibling.source_name().as_str();
+    let gst = draft.gst();
+    let hsn = draft.hsn();
+    let applicability = MarkedConstant::Applicable.render();
+    let state = MarkedConstant::Any.render();
+    let mut shown = vec![
+        company.display_name(),
+        company.company_guid(),
+        company.company_number(),
+        company.books_from_yyyymmdd(),
+        origin,
+        draft.name().as_str(),
+        source,
+        draft.parent(),
+        draft.unit(),
+        applicability,
+        GOODS,
+        gst.applicable_from(),
+        TAXABLE,
+        SPECIFY_DETAILS_HERE,
+        state,
+        hsn.applicable_from(),
+        hsn.code(),
+        hsn.description(),
+    ];
+    for rate in gst.rates() {
+        shown.push(rate.duty_head());
+        shown.push(rate.valuation().render());
+        if let Some(value) = rate.rate() {
+            shown.push(value);
+        }
+    }
+    if shown
+        .iter()
+        .copied()
+        .any(has_unsafe_review_layout_character)
+    {
+        return Err(StockItemReviewError::Review(MasterReviewError::LayoutText));
+    }
+    if shown.iter().copied().any(has_unreviewable_format_character) {
+        return Err(StockItemReviewError::Review(MasterReviewError::FormatText));
+    }
+    create_text_refusal(draft).map_err(StockItemReviewError::NotRenderable)?;
+
+    let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+    let mut lines = vec![
+        format!(
+            "Create ONE stock item in {}",
+            quoted(company.display_name())
+        ),
+        format!("Company GUID: {}", company.company_guid()),
+        format!(
+            "Company number: {}  Books from: {}",
+            company.company_number(),
+            bridge_tally_core::TallyDate::parse(company.books_from_yyyymmdd()).map_or_else(
+                |_| company.books_from_yyyymmdd().to_string(),
+                |date| date.shown()
+            )
+        ),
+        format!("Tally: {origin}"),
+        String::new(),
+        format!("Create stock item {}", quoted(draft.name().as_str())),
+        format!(
+            "All six copied fields come from sibling stock item {}.",
+            quoted(source)
+        ),
+        format!(
+            "Parent (stock group): {} — source: {}",
+            quoted(draft.parent()),
+            quoted(source)
+        ),
+        format!(
+            "Base unit: {} — source: {}",
+            quoted(draft.unit()),
+            quoted(source)
+        ),
+        format!(
+            "GST applicability: {} — source: {}",
+            quoted(applicability),
+            quoted(source)
+        ),
+        format!(
+            "Type of supply: {} — source: {}",
+            quoted(GOODS),
+            quoted(source)
+        ),
+        format!("GST details entry 1 — source: {}", quoted(source)),
+        format!("  Applicable from: {}", quoted(gst.applicable_from())),
+        format!("  Taxability: {}", quoted(TAXABLE)),
+        format!("  Source of GST details: {}", quoted(SPECIFY_DETAILS_HERE)),
+        format!("  State row 1: {}", quoted(state)),
+    ];
+    for (index, rate) in gst.rates().iter().enumerate() {
+        let value = rate.rate().map_or_else(|| "absent".to_string(), &quoted);
+        lines.push(format!(
+            "  Rate row {}: {}; valuation: {}; rate: {value}",
+            index + 1,
+            quoted(rate.duty_head()),
+            quoted(rate.valuation().render())
+        ));
+    }
+    lines.extend([
+        "  GST slab rates: empty".to_string(),
+        format!("HSN details entry 1 — source: {}", quoted(source)),
+        format!("  Applicable from: {}", quoted(hsn.applicable_from())),
+        format!("  HSN code: {}", quoted(hsn.code())),
+        format!("  HSN description: {}", quoted(hsn.description())),
+        format!("  Source of HSN details: {}", quoted(SPECIFY_DETAILS_HERE)),
+        String::new(),
+        "Do not create or rename stock items in Tally until this is done.".to_string(),
+    ]);
+    if fits(&lines) {
+        Ok(lines.join("\n"))
+    } else {
+        Err(StockItemReviewError::Review(MasterReviewError::TooLarge))
+    }
 }
 
 #[cfg(test)]

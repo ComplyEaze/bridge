@@ -34,7 +34,9 @@ use crate::native_funds_flow::render_native_funds_flow_request;
 use crate::native_godown_summary::{
     render_native_godown_summary_request, render_native_stock_summary_exploded_request,
 };
-use crate::native_masters::{render_native_masters_request, NativeMasterKind};
+use crate::native_masters::{
+    render_candidate_stock_items_request, render_native_masters_request, NativeMasterKind,
+};
 use crate::native_month_register::{render_native_month_register_request, MonthRegisterKind};
 use crate::native_negative_ledgers::render_native_negative_ledgers_request;
 use crate::native_negative_stock::render_native_negative_stock_request;
@@ -127,6 +129,10 @@ const TABLE: &[(&str, &str)] = &[
     (
         "render_native_masters_request/CostCategories",
         "2152d00178228ce5857cac6266182b47a635c7b4c01c0b6832ec7490c37aba88",
+    ),
+    (
+        "render_candidate_stock_items_request",
+        "fcdd6a527ba17f195f52059534e80ab2912b22daf2553c655cbc35406c88883c",
     ),
     (
         "render_company_book_extent_v2",
@@ -534,6 +540,11 @@ fn built_requests() -> Vec<(String, String)> {
             render_native_masters_request(kind, COMPANY),
         );
     }
+    // #1381's candidate read, not yet sent by any release.
+    row(
+        "render_candidate_stock_items_request".into(),
+        render_candidate_stock_items_request(&company),
+    );
     // The same request as the `ReadOnlyProfile::CompanyBookExtentV2` row.
     row(
         "render_company_book_extent_v2".into(),

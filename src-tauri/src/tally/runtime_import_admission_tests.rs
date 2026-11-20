@@ -851,7 +851,8 @@ fn masters_queue_plans(
 }
 
 fn masters_item() -> crate::tally::ledger_create_item::LedgerCreateItem {
-    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
+    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+    use crate::tally::master_name::MasterName;
     LedgerCreateItem::new(
         MasterName::new("Queue Test Suspense").unwrap(),
         AdmittedLedgerKind::Suspense,
@@ -1188,7 +1189,8 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
 /// another: refused before any request is sent.
 #[tokio::test]
 async fn a_master_post_for_another_company_is_refused_before_any_request() {
-    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
+    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+    use crate::tally::master_name::MasterName;
     let companies = captured_companies();
     let other =
         VerifiedCompanyIdentity::test_fixture("Some Other Company", crate::synthetic_guid(0x1111));

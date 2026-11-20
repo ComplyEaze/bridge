@@ -187,7 +187,7 @@ pub(super) fn render_agent_named_vouchers_in_span(
     classes: bool,
 ) -> Result<String, String> {
     let mut fetch = AGENT_VOUCHER_FETCH.to_string();
-    if fields.e_invoice == EInvoiceFields::Asked {
+    if fields.e_invoice.asked() {
         fetch.push_str(AGENT_VOUCHER_E_INVOICE_WORDS);
     }
     if fields.gst == VoucherGstFields::Asked {
@@ -696,13 +696,16 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
 }
 
 /// Every voucher of one window (a calendar month of an invoice's financial
-/// year), with the measured per-row Sales-class compute, for the
+/// year), with the measured per-row compute of the invoice's class, for the
 /// duplicate-number check: the program compares the numbers (#2162 item 11).
 pub(super) fn invoice_window_numbers_read(
     company: &str,
+    class: agent_import::InvoiceClass,
     window: (&TallyDate, &TallyDate),
 ) -> ReadRequest {
-    ReadRequest(agent_import::invoice::render_invoice_window_numbers_request(company, window))
+    ReadRequest(
+        agent_import::invoice::render_invoice_window_numbers_request(company, class, window),
+    )
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.
@@ -715,6 +718,25 @@ pub(super) fn invoice_readback_read(
     ReadRequest(agent_import::invoice::render_invoice_readback_request(
         company, type_guid, number, window,
     ))
+}
+
+/// A posted invoice's e-invoice details, read over its one date by the window read with the
+/// e-invoice words: byte for byte the request a `vouchers` call with `include_e_invoice` sends for
+/// a window it reads whole (§8.2j, measured on `BRIDGE EINVOICE LAB`), so no new request shape is
+/// sent. Only an invoice that carries details sends it (#2162 item 9).
+pub(super) fn invoice_e_invoice_read(
+    company: &str,
+    date: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_named_vouchers_in_span(
+        company,
+        date,
+        date,
+        None,
+        NamedVoucherFields::E_INVOICE_ONLY,
+        false,
+    )
+    .map(ReadRequest)
 }
 
 /// The ledger listing with each ledger's GST rate and rounding, for the tax

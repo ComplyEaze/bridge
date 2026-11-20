@@ -674,19 +674,20 @@ async fn the_bundled_sqlite_has_the_fix_for_the_write_ahead_log_advisory() {
     pool.close().await;
 }
 
-/// A mirror written by release 0.7.0, the last release before #2432's bump (SQLCipher 4.10.0 on
-/// SQLite 3.50.4, all mirror migrations applied), opens and migrates under this build, as the app
-/// opens it: a wrong key is refused as SQLite code 26 and leaves the file unchanged; with the right
-/// key the mirror's migrations run, apply nothing, and leave the schema and the recorded versions
-/// equal to a mirror this build creates; the release's row reads back, and a row written now reads
-/// back after the mirror is reopened and migrated again. The file and how it was made are in
-/// `fixtures/PROVENANCE.md`.
 /// The versions release 0.7.0 recorded in the fixture, read from it when it was written
 /// (`PROVENANCE.md`). Versions 7 and 24 are never recorded on a new mirror.
 const RELEASE_0_7_0_VERSIONS: [i64; 25] = [
     2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27, 28,
 ];
 
+/// A mirror written by release 0.7.0, the last release before #2432's bump (SQLCipher 4.10.0 on
+/// SQLite 3.50.4, all mirror migrations applied), opens and migrates under this build, as the app
+/// opens it: a wrong key is refused as SQLite code 26 and leaves the file unchanged; with the right
+/// key the mirror records the versions 0.7.0 applied, and its migrations run and leave the schema
+/// and the recorded versions equal to a mirror this build creates (a migration added after 0.7.0
+/// applies here); the release's row reads back, and a row written now reads
+/// back after the mirror is reopened and migrated again. The file and how it was made are in
+/// `fixtures/PROVENANCE.md`.
 #[tokio::test]
 async fn a_mirror_written_by_release_0_7_0_opens_and_migrates_under_this_build() {
     // Stored as hex text: the merge gate admits no binary file without the owner's attestation.

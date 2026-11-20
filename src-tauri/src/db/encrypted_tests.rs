@@ -673,7 +673,7 @@ async fn the_bundled_sqlite_has_the_fix_for_the_write_ahead_log_advisory() {
     pool.close().await;
 }
 
-/// A mirror written by the release before #2432's bump (SQLCipher 4.10.0 on SQLite 3.50.4) opens
+/// A mirror written by the build before #2432's bump (SQLCipher 4.10.0 on SQLite 3.50.4) opens
 /// under this build: a wrong key is refused as SQLite code 26 and leaves the file unchanged, the
 /// right key reads the old row, and a row written now is read back after the mirror is reopened.
 /// The file and how it was made are in `fixtures/PROVENANCE.md`.

@@ -7,6 +7,14 @@ The hex text of an encrypted local mirror written by the build before #2432's li
 - **Content:** synthetic only. The key is 32 bytes of `0x5a`, a test key that protects nothing. One table, `upgrade_proof (id INTEGER PRIMARY KEY, value TEXT NOT NULL)`, holds one row, `WRITTEN_BY_SQLCIPHER_4_10`.
 - **The file:** stored as lowercase hex, 64 characters a line, because the merge gate admits no binary file without the owner's attestation. Decoded, it is 8,192 bytes, sha256 `deda6cd0485cbaf09e87afae267b15eb6921948c202967c04f0a33816fe236d8`. The pool was closed, so no `-wal` or `-shm` file remained. No plaintext occurs in it: a byte search for the row, the table name and `SQLite format` found none.
 
+The committed text file, as the fixture gates check it:
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `mirror-sqlcipher-4.10.0.db.hex` | 16,640 | `ebf1f8e0e8e8a4bbd9328349114542725ed4a6d2f4871d656e1fdf25a2de1873` |
+
+Do not edit or re-wrap the `.hex` file. This directory is covered by the fixture byte-integrity gate.
+
 ## How it was made
 
 The file is encrypted throughout, so nothing in it shows which library wrote it. The record of that is the run below. At b27ad20e6, this test was appended to `src-tauri/src/db/encrypted_tests.rs`; it was not committed:

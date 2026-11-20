@@ -567,6 +567,7 @@ mod windows_hook {
                         ShowWindow(window, SW_RESTORE);
                     }
                     RESTORING.with(|restoring| restoring.set(false));
+                    let _ = writeln!(std::io::stderr(), "box-fit: restored from minimised");
                 }
                 let fitted = fits(window);
                 remember(seen().after(fitted));

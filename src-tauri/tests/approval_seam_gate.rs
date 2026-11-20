@@ -2137,6 +2137,7 @@ mod windows_hook {
                         ShowWindow(window, SW_RESTORE);
                     }
                     RESTORING.with(|restoring| restoring.set(false));
+                    let _ = writeln!(std::io::stderr(), "box-fit: restored from minimised");
                 }
                 let fitted = fits(window);
                 remember(seen().after(fitted));
@@ -2220,8 +2221,8 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
         // or every box is restored rather than only an iconic one (#2569).
         source.replacen("                        ShowWindow(window, SW_RESTORE);\n", "", 1),
         source.replacen(
-            "                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                }\n                let fitted = fits(window);",
-            "                let fitted = fits(window);\n                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                }",
+            "                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                    let _ = writeln!(std::io::stderr(), \"box-fit: restored from minimised\");\n                }\n                let fitted = fits(window);",
+            "                let fitted = fits(window);\n                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                    let _ = writeln!(std::io::stderr(), \"box-fit: restored from minimised\");\n                }",
             1,
         ),
         source.replacen("if needs_restore(iconic) {", "if true {", 1),

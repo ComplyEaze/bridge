@@ -1191,7 +1191,7 @@ async fn a_failed_e_invoice_read_is_a_difference() {
 #[tokio::test]
 async fn an_e_invoice_answer_that_does_not_parse_is_a_difference() {
     let guid = pilot_lab_guid();
-    let other = "00000000-0000-4000-8000-000000000001";
+    let other = "00000000-0000-0000-0000-000000000000";
     let (differences, names_the_details, scripted_read) = read_back_with_e_invoice_answer(|body| {
         assert!(body.contains(&guid), "the answer names the company");
         scripted(body.replace(&guid, other))

@@ -1000,10 +1000,14 @@ fn observed_voucher() -> ImportVoucher {
     v
 }
 
-/// The invoice read-back sends the e-invoice read for a saved invoice with details, and an IRN
-/// that answer changes is a difference returned by the read-back itself.
-#[tokio::test]
-async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_back() {
+/// What the invoice read-back of a saved invoice with details returns when the e-invoice read
+/// is answered by `e_invoice` (given the captured day, its IRN changed): its differences, and
+/// for each request sent whether it named the three elements, beside where the script answers
+/// the e-invoice read. The script is not required to be answered to its end: a read-back that
+/// stops early sends fewer requests, and each test says how many it expects.
+async fn read_back_with_e_invoice_answer(
+    e_invoice: impl Fn(String) -> tally_protocol_simulator::ScenarioPlan,
+) -> (Vec<String>, Vec<bool>, Vec<bool>) {
     use bridge_tally_transport::TallyEndpointConfig;
     use tally_protocol_simulator::{
         Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
@@ -1052,7 +1056,7 @@ async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_b
             'R' => answer(with_registration(&utf16le(include_bytes!(
                 "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
             )))),
-            'D' => answer(e_invoice_answer.clone()),
+            'D' => e_invoice(e_invoice_answer.clone()),
             month => {
                 let index = if month == 'U' {
                     4
@@ -1124,7 +1128,6 @@ async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_b
         .read_back_sales_invoice(&identity, &company, &saved)
         .await
         .expect("a read-back after a post is never an error");
-    assert_eq!(differences, ["IRN"]);
 
     simulator.cancel();
     let requests = simulator
@@ -1133,9 +1136,6 @@ async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_b
         .into_iter()
         .filter(|request| !request.method.is_empty())
         .collect::<Vec<_>>();
-    assert_eq!(requests.len(), order.len());
-    // The e-invoice read is sent where the script answers it, over the invoice's one date, and
-    // no other request of the read-back names the three elements.
     let names_the_details = requests
         .iter()
         .map(|request| {
@@ -1146,7 +1146,59 @@ async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_b
         })
         .collect::<Vec<_>>();
     let scripted = order.chars().map(|kind| kind == 'D').collect::<Vec<_>>();
-    assert_eq!(names_the_details, scripted);
+    (differences, names_the_details, scripted)
+}
+
+/// A captured answer, as the scripted read-backs frame it.
+fn scripted(body: String) -> tally_protocol_simulator::ScenarioPlan {
+    tally_protocol_simulator::ScenarioPlan::new(tally_protocol_simulator::Fixture::SyntheticXml(
+        body,
+    ))
+    .with_encoding(tally_protocol_simulator::WireEncoding::Utf16LeNoBom)
+    .with_framing(tally_protocol_simulator::ResponseFraming::ContentLength)
+}
+
+/// The invoice read-back sends the e-invoice read for a saved invoice with details, and an IRN
+/// that answer changes is a difference returned by the read-back itself.
+#[tokio::test]
+async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_back() {
+    let (differences, names_the_details, scripted_read) =
+        read_back_with_e_invoice_answer(scripted).await;
+    assert_eq!(differences, ["IRN"]);
+    // The e-invoice read is sent where the script answers it, over the invoice's one date, and
+    // no other request of the read-back names the three elements.
+    assert_eq!(names_the_details, scripted_read);
+}
+
+/// An e-invoice read that fails, here Tally answering HTTP 500, is the difference
+/// `e_invoice_readback_failed`, never a pass or an empty match (AGENTS.md P5).
+#[tokio::test]
+async fn a_failed_e_invoice_read_is_a_difference() {
+    let (differences, names_the_details, scripted_read) =
+        read_back_with_e_invoice_answer(|body| scripted(body).with_http_status(500)).await;
+    assert_eq!(differences, ["e_invoice_readback_failed"]);
+    // The read-back stops at the failed answer: the script up to and including the first
+    // e-invoice read is sent, and nothing after it.
+    let first = scripted_read
+        .iter()
+        .position(|&read| read)
+        .expect("the script answers an e-invoice read");
+    assert_eq!(names_the_details, scripted_read[..=first]);
+}
+
+/// An e-invoice read answered for another company does not parse for this one: it is the
+/// difference `e_invoice_readback_unreadable`, never `e_invoice_not_found` or a pass.
+#[tokio::test]
+async fn an_e_invoice_answer_that_does_not_parse_is_a_difference() {
+    let guid = pilot_lab_guid();
+    let other = "00000000-0000-4000-8000-000000000001";
+    let (differences, names_the_details, scripted_read) = read_back_with_e_invoice_answer(|body| {
+        assert!(body.contains(&guid), "the answer names the company");
+        scripted(body.replace(&guid, other))
+    })
+    .await;
+    assert_eq!(differences, ["e_invoice_readback_unreadable"]);
+    assert_eq!(names_the_details, scripted_read);
 }
 
 fn differences(v: &ImportVoucher, xml: &str) -> Vec<String> {

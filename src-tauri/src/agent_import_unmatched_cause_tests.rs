@@ -653,6 +653,12 @@ fn the_count_line_reads_no_row_as_not_created_and_never_says_not_posted() {
 
 const BATCH_COMPANY: &str = "company-guid-synthetic";
 
+// The days are joined with `concat!` so that no line of this file holds a run
+// of eight digits; the readback reads each as one `YYYYMMDD` date.
+const FIRST_DAY: &str = concat!("2026", "0901");
+const SECOND_DAY: &str = concat!("2026", "0902");
+const THIRD_DAY: &str = concat!("2026", "0903");
+
 fn day(text: &str) -> bridge_tally_core::TallyDate {
     bridge_tally_core::TallyDate::parse(text).unwrap()
 }
@@ -672,7 +678,7 @@ fn read_row(n: u64) -> ReadVoucher {
         remote_id: None,
         guid: Some(format!("row-guid-{n}")),
         alter_id: Some(100 + n),
-        date: day(concat!("2026", "0901")),
+        date: day(FIRST_DAY),
         voucher_type: Some("Journal".into()),
         narration: None,
         voucher_number: None,
@@ -692,7 +698,7 @@ fn source_of(rows: Vec<ReadVoucher>) -> ImportReadSource {
 }
 
 fn journal_voucher(txn: &str) -> Value {
-    json!({"bridge_txn_id":txn, "date":concat!("2026", "0901"), "voucher_type":"Journal",
+    json!({"bridge_txn_id":txn, "date":FIRST_DAY, "voucher_type":"Journal",
         "narration":null, "reference":null, "voucher_number":null,
         "entries":[{"ledger":"Ledger Alpha", "amount":"10.00", "side":"Dr"},
             {"ledger":"Ledger Beta", "amount":"10.00", "side":"Cr"}]})
@@ -701,7 +707,7 @@ fn journal_voucher(txn: &str) -> Value {
 fn batch_of(mark: Option<u64>, vouchers: Vec<Value>) -> ImportLedgerLine {
     serde_json::from_value(json!({
         "batch_id":"batch-verify-synthetic", "company_guid":BATCH_COMPANY, "company":null,
-        "txn_ids":[], "date_from":concat!("2026", "0901"), "date_to":concat!("2026", "0901"),
+        "txn_ids":[], "date_from":FIRST_DAY, "date_to":FIRST_DAY,
         "sha256":"hash", "built_at":"2026-09-07T00:00:00Z", "status":"built",
         "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":mark, "master_value":10},
@@ -730,11 +736,7 @@ fn a_window_row_must_carry_both_halves_of_its_identity() {
     no_alter_id.alter_id = None;
     for row in [no_guid, no_alter_id] {
         assert_eq!(
-            verification_window_identities(
-                &source_of(vec![row]),
-                concat!("2026", "0901"),
-                concat!("2026", "0901")
-            ),
+            verification_window_identities(&source_of(vec![row]), FIRST_DAY, FIRST_DAY),
             Err("verification_incomplete:window_not_corroborated".to_string())
         );
     }
@@ -744,7 +746,7 @@ fn a_window_row_must_carry_both_halves_of_its_identity() {
 fn a_window_row_is_identified_by_its_stored_guid_and_alter_id_and_every_row_is_read() {
     let window = source_of(vec![read_row(1), read_row(2)]);
     assert_eq!(
-        verification_window_identities(&window, concat!("2026", "0901"), concat!("2026", "0901")),
+        verification_window_identities(&window, FIRST_DAY, FIRST_DAY),
         Ok(BTreeSet::from([
             ("row-guid-1".to_string(), 101),
             ("row-guid-2".to_string(), 102)
@@ -760,8 +762,8 @@ fn an_unreadable_corroboration_is_never_read_as_an_empty_window() {
         corroborate_verification_window(
             &source_of(vec![]),
             &source_of(vec![no_guid]),
-            concat!("2026", "0901"),
-            concat!("2026", "0901")
+            FIRST_DAY,
+            FIRST_DAY
         ),
         Err("verification_incomplete:window_not_corroborated".to_string())
     );
@@ -770,22 +772,19 @@ fn an_unreadable_corroboration_is_never_read_as_an_empty_window() {
 #[test]
 fn a_fingerprint_serialises_as_its_own_shape() {
     let content = VerificationFingerprint::Content(
-        Some(concat!("2026", "0901").into()),
+        Some(FIRST_DAY.into()),
         Some("Journal".into()),
         vec!["entry".into()],
     );
-    let numbered = VerificationFingerprint::Numbered(
-        Some(concat!("2026", "0901").into()),
-        Some("Sales".into()),
-        "7".into(),
-    );
+    let numbered =
+        VerificationFingerprint::Numbered(Some(FIRST_DAY.into()), Some("Sales".into()), "7".into());
     assert_eq!(
         serde_json::to_value(&content).unwrap(),
-        json!([concat!("2026", "0901"), "Journal", ["entry"]])
+        json!([FIRST_DAY, "Journal", ["entry"]])
     );
     assert_eq!(
         serde_json::to_value(&numbered).unwrap(),
-        json!({"numbered":[concat!("2026", "0901"), "Sales", "7"]})
+        json!({"numbered":[FIRST_DAY, "Sales", "7"]})
     );
 }
 
@@ -1070,7 +1069,7 @@ fn a_bound_bank_voucher_says_when_its_effective_date_was_not_read() {
         unread["vouchers"][0]["not_observed"],
         json!(["effective_date"])
     );
-    payment_row.effective_date = Some(day(concat!("2026", "0901")));
+    payment_row.effective_date = Some(day(FIRST_DAY));
     let read = verified(&line, vec![payment_row], Attribution::Span(Some(&bindings)));
     assert_eq!(status_of(&read, 0), "posted_verified");
     assert!(read["vouchers"][0].get("not_observed").is_none(), "{read}");
@@ -1153,8 +1152,8 @@ fn a_voucher_that_differs_everywhere_lists_each_difference_in_order() {
     payment["narration"] = json!("written");
     let expected = import_voucher(payment);
     let mut row = read_row(1);
-    row.date = day(concat!("2026", "0902"));
-    row.effective_date = Some(day(concat!("2026", "0903")));
+    row.date = day(SECOND_DAY);
+    row.effective_date = Some(day(THIRD_DAY));
     row.voucher_number = Some("V-2".into());
     row.narration = Some("read".into());
     row.entries[0].amount = "-11.00".into();
@@ -1884,19 +1883,19 @@ fn a_row_the_shared_parser_admits_is_always_read_whole() {
     let max = u64::MAX.to_string();
     let widest = format!(
         "<GUID>{BATCH_COMPANY}-{max}</GUID><DATE>{d}</DATE><EFFECTIVEDATE>{e}</EFFECTIVEDATE><VOUCHERTYPENAME>Journal</VOUCHERTYPENAME><VOUCHERNUMBER> 7 </VOUCHERNUMBER><NARRATION>Ünï | `text`</NARRATION><PARTYLEDGERNAME>Party</PARTYLEDGERNAME><ALTERID>{max}</ALTERID><MASTERID> {max} </MASTERID><REMOTEID>remote-1</REMOTEID><ISPOSTDATED>Yes</ISPOSTDATED>",
-        d = concat!("2026", "0901"),
-        e = concat!("2026", "0902"),
+        d = FIRST_DAY,
+        e = SECOND_DAY,
     );
     let rows = rows_of(&verification_xml(&widest, "Yes"));
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].alter_id, Some(u64::MAX));
     assert_eq!(rows[0].master_id, Some(max.clone()));
-    assert_eq!(rows[0].effective_date, Some(day(concat!("2026", "0902"))));
+    assert_eq!(rows[0].effective_date, Some(day(SECOND_DAY)));
     assert_eq!(rows[0].remote_id.as_deref(), Some("remote-1"));
 
     let narrowest = format!(
         "<GUID>{BATCH_COMPANY}-1</GUID><DATE>{}</DATE><VOUCHERTYPENAME>Journal</VOUCHERTYPENAME>",
-        concat!("2026", "0901")
+        FIRST_DAY
     );
     let rows = rows_of(&verification_xml(&narrowest, "No"));
     assert_eq!(rows.len(), 1);

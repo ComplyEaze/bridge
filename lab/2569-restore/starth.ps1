@@ -50,7 +50,9 @@ $si.hStdError = $errStream.SafeFileHandle.DangerousGetHandle()
 $cmd = New-Object System.Text.StringBuilder ('"' + $Exe + '" --confirm-journal')
 $pi = New-Object StartH+ProcessInfo
 # CREATE_NO_WINDOW (0x08000000): no console window, so no window but the box can take the foreground.
-if (-not [StartH]::CreateProcessW($Exe, $cmd, [IntPtr]::Zero, [IntPtr]::Zero, $true, 0x08000000, [IntPtr]::Zero, $null, [ref]$si, [ref]$pi)) {
+# lpCurrentDirectory must be a real null (inherit this shell's folder): PowerShell passes $null to a string
+# parameter as "", which CreateProcessW refuses with error 123.
+if (-not [StartH]::CreateProcessW($Exe, $cmd, [IntPtr]::Zero, [IntPtr]::Zero, $true, 0x08000000, [IntPtr]::Zero, [NullString]::Value, [ref]$si, [ref]$pi)) {
   throw ("CreateProcess failed: " + [System.Runtime.InteropServices.Marshal]::GetLastWin32Error())
 }
 "STARTED pid=" + $pi.dwProcessId + " show=" + $Show + " at " + [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')

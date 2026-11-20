@@ -638,3 +638,37 @@ fn only_verified_sqlite_codes_are_forwarded_from_encrypted_initialization() {
         );
     }
 }
+
+/// The SQLite compiled into the mirror is a release with the fix for
+/// RUSTSEC-2026-0459, which the advisory names as SQLite 3.54.0. The crate's
+/// version does not decide this: libsqlite3-sys 0.39 bundles a fixed SQLite,
+/// but its SQLCipher bundle, the one Bridge builds, is still on 3.53.4
+/// (#2432). Read from the running library, so a lock change that brings an
+/// older SQLCipher back fails here.
+#[tokio::test]
+async fn the_bundled_sqlite_has_the_fix_for_the_write_ahead_log_advisory() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let database = directory.path().join("mirror.db");
+    let key = Zeroizing::new(vec![0x22_u8; MIRROR_KEY_BYTES]);
+    let pool = connect_encrypted(&database, key)
+        .await
+        .expect("open encrypted mirror");
+    let cipher = sqlx::query_scalar::<_, String>("PRAGMA cipher_version;")
+        .fetch_one(&pool)
+        .await
+        .expect("read SQLCipher version");
+    assert!(!cipher.is_empty(), "the mirror must run on SQLCipher");
+    let version = sqlx::query_scalar::<_, String>("SELECT sqlite_version();")
+        .fetch_one(&pool)
+        .await
+        .expect("read SQLite version");
+    let parts = version
+        .split('.')
+        .map(|part| part.parse::<u32>().expect("numeric SQLite version part"))
+        .collect::<Vec<_>>();
+    assert!(
+        parts.as_slice() >= [3, 54, 0].as_slice(),
+        "bundled SQLite {version} predates 3.54.0, the release with the fix (#2432)"
+    );
+    pool.close().await;
+}

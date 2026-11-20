@@ -672,3 +672,74 @@ async fn the_bundled_sqlite_has_the_fix_for_the_write_ahead_log_advisory() {
     );
     pool.close().await;
 }
+
+/// A mirror written by the release before #2432's bump (SQLCipher 4.10.0 on SQLite 3.50.4) opens
+/// under this build: a wrong key is refused as SQLite code 26 and leaves the file unchanged, the
+/// right key reads the old row, and a row written now is read back after the mirror is reopened.
+/// The file and how it was made are in `fixtures/PROVENANCE.md`.
+#[tokio::test]
+async fn a_mirror_written_by_the_previous_sqlcipher_opens_under_this_build() {
+    // Stored as hex text: the merge gate admits no binary file without the owner's attestation.
+    let hex: String = include_str!("fixtures/mirror-sqlcipher-4.10.0.db.hex")
+        .split_whitespace()
+        .collect();
+    let fixture: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|at| u8::from_str_radix(&hex[at..at + 2], 16).expect("fixture is hex"))
+        .collect();
+    assert_eq!(
+        fixture.len(),
+        8192,
+        "the fixture is the whole 8,192-byte mirror"
+    );
+    let key = || Zeroizing::new(vec![0x5a_u8; MIRROR_KEY_BYTES]);
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let database = directory.path().join("mirror.db");
+    fs::write(&database, &fixture).expect("copy the old mirror");
+
+    let wrong_key_error =
+        connect_encrypted(&database, Zeroizing::new(vec![0x22_u8; MIRROR_KEY_BYTES]))
+            .await
+            .expect_err("a wrong key must refuse the old mirror");
+    let source = match wrong_key_error.downcast_ref::<EncryptedOpenError>() {
+        Some(EncryptedOpenError::UnreadableWithSuppliedKey { source }) => source,
+        _ => panic!("a wrong key must give the typed unreadable refusal: {wrong_key_error:?}"),
+    };
+    assert!(matches!(
+        source,
+        sqlx::Error::Database(error) if error.code().as_deref() == Some("26")
+    ));
+    assert_eq!(
+        fs::read(&database).expect("read the old mirror after the wrong key"),
+        fixture,
+        "a wrong-key attempt must not change the old mirror"
+    );
+
+    let pool = connect_encrypted(&database, key())
+        .await
+        .expect("the right key opens the old mirror");
+    let values = sqlx::query_scalar::<_, String>("SELECT value FROM upgrade_proof ORDER BY id;")
+        .fetch_all(&pool)
+        .await
+        .expect("read the old mirror");
+    assert_eq!(values, ["WRITTEN_BY_SQLCIPHER_4_10"]);
+    sqlx::query("INSERT INTO upgrade_proof (value) VALUES ('WRITTEN_BY_THIS_BUILD');")
+        .execute(&pool)
+        .await
+        .expect("write to the old mirror");
+    pool.close().await;
+    assert_no_plaintext_artifacts(&database);
+
+    let pool = connect_encrypted(&database, key())
+        .await
+        .expect("the right key reopens the mirror");
+    let values = sqlx::query_scalar::<_, String>("SELECT value FROM upgrade_proof ORDER BY id;")
+        .fetch_all(&pool)
+        .await
+        .expect("read the mirror after the write");
+    assert_eq!(
+        values,
+        ["WRITTEN_BY_SQLCIPHER_4_10", "WRITTEN_BY_THIS_BUILD"]
+    );
+    pool.close().await;
+}

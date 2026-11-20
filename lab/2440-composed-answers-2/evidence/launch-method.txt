@@ -1,0 +1,21 @@
+2440-CP sitting 2: how the one launch's exe was started, recorded at 2026-11-20 about 07:52Z on the run lead's request; nothing was changed.
+
+Process chain of the server, read by Win32_Process and Get-Process (MainWindowHandle 0 = no main window):
+- bridge_mcp.exe pid 7068, MainWindowHandle 0, command line: the build's exe path alone, no arguments.
+- its parent python.exe pid 1056, MainWindowHandle 0: run/client.py, started as
+  python -I -X utf8 client.py <lab folder>/sitting-2/run <exe path> <exe sha256>
+  client.py starts the exe by subprocess.Popen([EXE], stdin=PIPE, stdout=PIPE, stderr=<file>, env=<launch-env.json over the
+  process environment>), with no creationflags and no startupinfo (Python's defaults: no STARTF_USESHOWWINDOW, no window flag).
+- its parents: three Git Bash bash.exe processes (pids 19732, 10312, 17484), each MainWindowHandle 0, run by the operator's
+  shell tool as a background command with stdin from /dev/null;
+- their parent: the coding agent's CLI process (<desktop client> pid 6168, MainWindowHandle 0), a child of the <desktop client> desktop app
+  (pid 23004, the one process in the chain with a main window).
+
+Console window: none was seen. No process in the chain from the desktop app down to the exe has a main window, and no
+console window for bash, python or the exe showed on the whole-screen screenshot of about 07:45:20Z (step 8), taskbar
+included; windows of apps outside the operator's grant are masked on those screenshots, but none was masked there. Whether the exe holds a hidden console, and the show state its STARTUPINFO carried, were not read.
+
+The approval window's process: bridge_mcp.exe --confirm-journal 7068 (pid 4824 for invoice A's first call), the child of the
+server. Its window showed as a minimised title bar at the bottom-left of the screen above the taskbar, as in sitting 1.
+
+Sitting 1 used the same client.py, started the same way (the operator's background shell command).

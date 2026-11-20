@@ -4439,6 +4439,15 @@ gives a next step where there is one: only five statuses (`bound_not_in_window`,
 file imported by hand and a refusal before anything was sent carry none, because the batch can still be
 posted.
 
+A `posted_verified` Sales invoice row of `post_import` or `verify_import` carries `e_invoice_sent`, with
+`details` `none` and a `note`, only for a batch ComplyEaze Bridge posted itself; a file imported by hand does
+not carry it. The note says: "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no
+IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act;
+ComplyEaze Bridge does not generate one." ComplyEaze Bridge does not read whether e-invoicing applies, so the
+note is worded for either case. This field is not the `e_invoice` object of a `vouchers` row, and a proof saved
+by an earlier build does not carry it. No other row carries the field, and a row that stops reading
+`posted_verified` loses it.
+
 ## Protocol and migration notes
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported

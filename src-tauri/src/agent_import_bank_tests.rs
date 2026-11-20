@@ -3847,6 +3847,39 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
     assert!(contra.reversed_same_day);
 }
 
+/// A skipped row's instrument, the cheque or number its statement prints, is
+/// written into the batch's facts as it is for a Contra row.
+#[tokio::test]
+async fn a_skipped_rows_instrument_is_written_into_the_facts() {
+    let simulator = SequenceSimulator::spawn(two_bank_plans()).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let mut skip = skip_record_of("Cash");
+    skip["instrument"] = json!("000418");
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        json!({"from": "2026-08-02", "to": "2026-09-29"}),
+        json!([statement_contra()]),
+        json!([contra_record(), skip, outflow_skip_record()]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 1, "{response}");
+    simulator.finish().expect("requests");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    let facts = saved.statement.as_ref().expect("facts");
+    assert_eq!(facts["skip_rows"][0]["instrument"], "000418", "{facts}");
+    assert!(facts["skip_rows"][1].get("instrument").is_none(), "{facts}");
+}
+
 /// The statement's bank ledger and a skipped row's other ledger are held to the
 /// catalogue like a voucher's: one the book does not hold is refused as the
 /// masters are, and nothing is written.

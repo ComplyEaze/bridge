@@ -1,4 +1,12 @@
 use super::*;
+use crate::tally::stock_item_create::{
+    CreateRenderRefusal, DraftRefusal, DraftText, ItemNameNotAbsent, NotGoodsSibling, SiblingField,
+    SiblingRefusal, StockItemCatalogueError,
+};
+use crate::tally::stock_item_verified::{ReadBackVerdict, StockItemImportOutcome};
+use bridge_tally_core::master_name_index::{MasterKind, MasterNameIndexError, NameCollision, Via};
+use bridge_tally_protocol::native_masters::NativeMastersError;
+use bridge_tally_protocol::ImportCounters;
 
 /// Each declared variant beside the string its failure site wrote before it was typed, written out
 /// here rather than read from the enum, so a changed string fails a test (#1942).
@@ -161,6 +169,335 @@ const TIE_OUT: &[(TieOutCode, &str)] = &[
     ),
 ];
 
+const STOCK_ITEM_CREATE: &[(StockItemCreateCode, &str)] = &[
+    (
+        StockItemCreateCode::ReadUnreadable,
+        "stock_item_read_unreadable",
+    ),
+    (StockItemCreateCode::NoItems, "stock_item_no_items"),
+    (
+        StockItemCreateCode::NoNameEntry,
+        "stock_item_name_entry_missing",
+    ),
+    (
+        StockItemCreateCode::NameIndexInvalid,
+        "stock_item_name_index_invalid",
+    ),
+    (
+        StockItemCreateCode::NameUnchecked,
+        "stock_item_name_unchecked",
+    ),
+    (StockItemCreateCode::NameTaken, "master_name_taken"),
+    (
+        StockItemCreateCode::SiblingNotFound,
+        "stock_item_sibling_not_found",
+    ),
+    (
+        StockItemCreateCode::SiblingAmbiguous,
+        "stock_item_sibling_ambiguous",
+    ),
+    (
+        StockItemCreateCode::SiblingOnlyByFold,
+        "stock_item_sibling_only_by_fold",
+    ),
+    (
+        StockItemCreateCode::SiblingIncomplete,
+        "stock_item_sibling_incomplete",
+    ),
+    (
+        StockItemCreateCode::SiblingNotGoods,
+        "stock_item_sibling_not_goods",
+    ),
+    (
+        StockItemCreateCode::SiblingNotTaxable,
+        "stock_item_sibling_not_taxable",
+    ),
+    (
+        StockItemCreateCode::SiblingGstNotApplicable,
+        "stock_item_sibling_gst_not_applicable",
+    ),
+    (
+        StockItemCreateCode::CatalogueChanged,
+        "stock_item_catalogue_changed",
+    ),
+    (
+        StockItemCreateCode::GroupsUnreadable,
+        "stock_item_groups_unreadable",
+    ),
+    (
+        StockItemCreateCode::ParentNotInBook,
+        "stock_item_parent_not_in_book",
+    ),
+    (
+        StockItemCreateCode::UnitsUnreadable,
+        "stock_item_units_unreadable",
+    ),
+    (
+        StockItemCreateCode::UnitNotInBook,
+        "stock_item_unit_not_in_book",
+    ),
+    (
+        StockItemCreateCode::ShapeNotMeasured,
+        "stock_item_shape_not_measured",
+    ),
+    (
+        StockItemCreateCode::TextNotPlain,
+        "stock_item_text_not_plain",
+    ),
+    (
+        StockItemCreateCode::TextNeedsEscaping,
+        "stock_item_text_needs_escaping",
+    ),
+    (
+        StockItemCreateCode::ReviewLayoutText,
+        "import_review_layout_text",
+    ),
+    (
+        StockItemCreateCode::ReviewFormatText,
+        "import_review_format_text",
+    ),
+    (
+        StockItemCreateCode::ReviewTooLarge,
+        "master_review_too_large",
+    ),
+    (
+        StockItemCreateCode::CreateApplicationFailure,
+        "stock_item_create_application_failure",
+    ),
+    (
+        StockItemCreateCode::AlteredExisting,
+        "stock_item_altered_existing",
+    ),
+    (
+        StockItemCreateCode::CountersNotClean,
+        "stock_item_counters_not_clean",
+    ),
+    (
+        StockItemCreateCode::CountersUnreported,
+        "stock_item_counters_unreported",
+    ),
+    (
+        StockItemCreateCode::ReadBackDiffers,
+        "stock_item_read_back_differs",
+    ),
+    (
+        StockItemCreateCode::ReadBackNotFoundOnce,
+        "stock_item_read_back_not_found_once",
+    ),
+    (
+        StockItemCreateCode::ReadBackNotNew,
+        "stock_item_read_back_not_new",
+    ),
+    (
+        StockItemCreateCode::ReadBackOtherCompany,
+        "stock_item_read_back_other_company",
+    ),
+];
+
+#[test]
+fn stock_code_strings_match_addendum() {
+    let variants: Vec<StockItemCreateCode> =
+        STOCK_ITEM_CREATE.iter().map(|(code, _)| *code).collect();
+    assert_eq!(variants, StockItemCreateCode::ALL);
+    check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
+}
+
+#[test]
+fn every_stock_refusal_variant_has_exactly_one_code() {
+    let unreadable = NativeMastersError::CollectionAbsent;
+    let index = || MasterNameIndexError::NoNames { master: 0 };
+    let counters = ImportCounters {
+        created: 0,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+    };
+
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::Unreadable(unreadable)),
+        StockItemCreateCode::ReadUnreadable
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::NoItems),
+        StockItemCreateCode::NoItems
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::NoNameEntry { item: 0 }),
+        StockItemCreateCode::NoNameEntry
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::Index(index())),
+        StockItemCreateCode::NameIndexInvalid
+    );
+
+    assert_eq!(
+        item_name_refusal_code(&ItemNameNotAbsent::Taken(NameCollision {
+            kind: MasterKind::StockItem,
+            via: Via::Name,
+            guid: crate::synthetic_guid(1).to_string(),
+            name: "SC Existing".to_string(),
+        })),
+        StockItemCreateCode::NameTaken
+    );
+    assert_eq!(
+        item_name_refusal_code(&ItemNameNotAbsent::Unchecked(index())),
+        StockItemCreateCode::NameUnchecked
+    );
+
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::NotFound),
+        StockItemCreateCode::SiblingNotFound
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::Ambiguous { items: 1 }),
+        StockItemCreateCode::SiblingAmbiguous
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::OnlyByFold { items: 1 }),
+        StockItemCreateCode::SiblingOnlyByFold
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::Incomplete(SiblingField::Parent)),
+        StockItemCreateCode::SiblingIncomplete
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::Unchecked(index())),
+        StockItemCreateCode::NameUnchecked
+    );
+
+    assert_eq!(
+        not_goods_refusal_code(&NotGoodsSibling::NotGoods),
+        StockItemCreateCode::SiblingNotGoods
+    );
+    assert_eq!(
+        not_goods_refusal_code(&NotGoodsSibling::NotTaxable { entry: 0 }),
+        StockItemCreateCode::SiblingNotTaxable
+    );
+    assert_eq!(
+        not_goods_refusal_code(&NotGoodsSibling::GstNotApplicable),
+        StockItemCreateCode::SiblingGstNotApplicable
+    );
+
+    for (refusal, code) in [
+        (
+            DraftRefusal::OtherCatalogue,
+            StockItemCreateCode::CatalogueChanged,
+        ),
+        (
+            DraftRefusal::GroupsUnreadable(unreadable),
+            StockItemCreateCode::GroupsUnreadable,
+        ),
+        (
+            DraftRefusal::ParentNotInBook,
+            StockItemCreateCode::ParentNotInBook,
+        ),
+        (
+            DraftRefusal::UnitsUnreadable(unreadable),
+            StockItemCreateCode::UnitsUnreadable,
+        ),
+        (
+            DraftRefusal::UnitNotInBook,
+            StockItemCreateCode::UnitNotInBook,
+        ),
+        (
+            DraftRefusal::GstEntriesNotMeasured { entries: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::GstSourceNotMeasured,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::ItcNotMeasured,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::StateNotAny,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::DutyHeadNotMeasured { row: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::ValuationNotMeasured { row: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::RateNotMeasured { row: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::HsnEntriesNotMeasured { entries: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::HsnNotMeasured,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+    ] {
+        assert_eq!(draft_refusal_code(&refusal), code);
+    }
+
+    assert_eq!(
+        create_render_refusal_code(&CreateRenderRefusal::TextNotPlain {
+            field: DraftText::HsnDescription,
+        }),
+        StockItemCreateCode::TextNotPlain
+    );
+    assert_eq!(
+        create_render_refusal_code(&CreateRenderRefusal::TextNeedsEscaping {
+            field: DraftText::HsnDescription,
+        }),
+        StockItemCreateCode::TextNeedsEscaping
+    );
+
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::ApplicationFailure),
+        Some(StockItemCreateCode::CreateApplicationFailure)
+    );
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::AlteredExisting {
+            counters,
+            line_errors: 0,
+        }),
+        Some(StockItemCreateCode::AlteredExisting)
+    );
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::NotClean {
+            counters,
+            line_errors: 0,
+        }),
+        Some(StockItemCreateCode::CountersNotClean)
+    );
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::Unreported),
+        Some(StockItemCreateCode::CountersUnreported)
+    );
+
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::Differs {
+            fields: vec![SiblingField::Parent],
+        }),
+        Some(StockItemCreateCode::ReadBackDiffers)
+    );
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::NotFoundOnce { rows: 1 }),
+        Some(StockItemCreateCode::ReadBackNotFoundOnce)
+    );
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::NotNew),
+        Some(StockItemCreateCode::ReadBackNotNew)
+    );
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::OtherCompany),
+        Some(StockItemCreateCode::ReadBackOtherCompany)
+    );
+}
+
 /// Every pin of every enum, as the failure code its variant makes, beside the pinned string.
 fn pinned() -> Vec<(FailureCode, &'static str)> {
     fn of<C: Copy + Into<FailureCode>>(
@@ -182,6 +519,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(MOVEMENT),
         of(PRESENCE),
         of(TIE_OUT),
+        of(STOCK_ITEM_CREATE),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -206,6 +544,7 @@ fn declared() -> Vec<FailureCode> {
         of(MovementCode::ALL),
         of(PresenceCode::ALL),
         of(TieOutCode::ALL),
+        of(StockItemCreateCode::ALL),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -234,6 +573,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(MOVEMENT), MovementCode::ALL);
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
+    assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -274,6 +614,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(MOVEMENT, MovementCode::as_str);
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
+    check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
@@ -295,9 +636,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 43;
+    let expected = 75;
     #[cfg(feature = "lab-writes")]
-    let expected = 46;
+    let expected = 78;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

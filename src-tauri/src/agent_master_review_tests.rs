@@ -1,6 +1,7 @@
 //! The one-ledger dialog's text: exact for each admitted kind, unsafe text
 //! refused, and every limit a refusal, never a cut.
 use super::*;
+use crate::agent::failure_code::{stock_item_outcome_code, stock_item_read_back_code};
 use crate::tally::ledger_create_item::{
     AdmittedDutyHead, AdmittedLedgerKind, PartySide, VerifiedGstin,
 };
@@ -9,8 +10,10 @@ use crate::tally::stock_item_create::{
     render_stock_item_create, CreateRenderRefusal, DraftText, GoodsSibling, ShownDraft, SiblingGst,
     StockItemCatalogue, StockItemDraft,
 };
+use crate::tally::stock_item_verified::{ReadBackVerdict, StockItemImportOutcome};
 use bridge_tally_protocol::{
-    decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding, GstDutyHead,
+    decode_tally_xml_response_bytes_limited, parse_import_outcome, ExpectedTallyTextEncoding,
+    GstDutyHead,
 };
 
 /// The preview of a batch of `item` alone: the one-ledger text, through the
@@ -338,6 +341,12 @@ const STOCK_COMPANY: &str = "BRIDGE STOCK CREATE LAB";
 const STOCK_COMPANY_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
 const STOCK_BEFORE: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml"
+);
+const STOCK_CREATE_ANSWER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-create-answer.utf16le.xml"
+);
+const STOCK_AFTER_MARKED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-after-marked-create.utf16le.xml"
 );
 const STOCK_ALIAS: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-with-alias.utf16le.xml"
@@ -716,4 +725,57 @@ fn a_quote_or_backslash_in_the_company_name_is_shown_escaped() {
         preview.lines().next(),
         Some(r#"Create ONE stock item in "Bolt \"A\" \\ Lab""#)
     );
+}
+
+#[test]
+fn stock_item_review_refusals_use_addendum_codes() {
+    for (review, code) in [
+        (
+            MasterReviewError::LayoutText,
+            StockItemCreateCode::ReviewLayoutText,
+        ),
+        (
+            MasterReviewError::FormatText,
+            StockItemCreateCode::ReviewFormatText,
+        ),
+        (
+            MasterReviewError::TooLarge,
+            StockItemCreateCode::ReviewTooLarge,
+        ),
+    ] {
+        assert_eq!(StockItemReviewError::Review(review).code(), code);
+        assert_eq!(code.as_str(), review.code());
+    }
+    assert_eq!(
+        StockItemReviewError::NotRenderable(CreateRenderRefusal::TextNotPlain {
+            field: DraftText::HsnDescription,
+        })
+        .code(),
+        StockItemCreateCode::TextNotPlain
+    );
+    assert_eq!(
+        StockItemReviewError::NotRenderable(CreateRenderRefusal::TextNeedsEscaping {
+            field: DraftText::HsnDescription,
+        })
+        .code(),
+        StockItemCreateCode::TextNeedsEscaping
+    );
+}
+
+#[test]
+fn successful_outcome_and_equal_readback_have_no_refusal_code() {
+    let parsed = parse_import_outcome(&stock_decode(STOCK_CREATE_ANSWER))
+        .expect("the captured Create answer parses");
+    let outcome = StockItemImportOutcome::of(&parsed);
+    assert!(matches!(outcome, StockItemImportOutcome::CountersClean(_)));
+
+    let before = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_BEFORE));
+    let shown =
+        ShownDraft::from_draft(stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"));
+    let after = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_AFTER_MARKED));
+    let verdict = ReadBackVerdict::of(&shown, &after);
+    assert!(matches!(verdict, ReadBackVerdict::Equal(_)));
+
+    assert_eq!(stock_item_outcome_code(&outcome), None);
+    assert_eq!(stock_item_read_back_code(&verdict), None);
 }

@@ -4,6 +4,12 @@
 //! builds its code from a string (`From<String>` for `ToolFailure`); `failure_code_sites_tests`
 //! counts those per file, and the count may only fall.
 
+use crate::tally::stock_item_create::{
+    CreateRenderRefusal, DraftRefusal, ItemNameNotAbsent, NotGoodsSibling, SiblingRefusal,
+    StockItemCatalogueError,
+};
+use crate::tally::stock_item_verified::{ReadBackVerdict, StockItemImportOutcome};
+
 /// A failure code made from a declared variant. Its constructor is private to this module, so
 /// every value is one of the strings the enums below declare.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -253,6 +259,141 @@ failure_codes! {
         InvalidDirection = "invalid_direction",
         /// A bill's amount is not an exact decimal.
         AmountInvalid = "outstandings_amount_invalid",
+    }
+}
+
+failure_codes! {
+    /// The typed refusals of the proposed stock-item Create flow (#1381).
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) enum StockItemCreateCode {
+        ReadUnreadable = "stock_item_read_unreadable",
+        NoItems = "stock_item_no_items",
+        NoNameEntry = "stock_item_name_entry_missing",
+        NameIndexInvalid = "stock_item_name_index_invalid",
+        NameUnchecked = "stock_item_name_unchecked",
+        NameTaken = "master_name_taken",
+        SiblingNotFound = "stock_item_sibling_not_found",
+        SiblingAmbiguous = "stock_item_sibling_ambiguous",
+        SiblingOnlyByFold = "stock_item_sibling_only_by_fold",
+        SiblingIncomplete = "stock_item_sibling_incomplete",
+        SiblingNotGoods = "stock_item_sibling_not_goods",
+        SiblingNotTaxable = "stock_item_sibling_not_taxable",
+        SiblingGstNotApplicable = "stock_item_sibling_gst_not_applicable",
+        CatalogueChanged = "stock_item_catalogue_changed",
+        GroupsUnreadable = "stock_item_groups_unreadable",
+        ParentNotInBook = "stock_item_parent_not_in_book",
+        UnitsUnreadable = "stock_item_units_unreadable",
+        UnitNotInBook = "stock_item_unit_not_in_book",
+        ShapeNotMeasured = "stock_item_shape_not_measured",
+        TextNotPlain = "stock_item_text_not_plain",
+        TextNeedsEscaping = "stock_item_text_needs_escaping",
+        ReviewLayoutText = "import_review_layout_text",
+        ReviewFormatText = "import_review_format_text",
+        ReviewTooLarge = "master_review_too_large",
+        CreateApplicationFailure = "stock_item_create_application_failure",
+        AlteredExisting = "stock_item_altered_existing",
+        CountersNotClean = "stock_item_counters_not_clean",
+        CountersUnreported = "stock_item_counters_unreported",
+        ReadBackDiffers = "stock_item_read_back_differs",
+        ReadBackNotFoundOnce = "stock_item_read_back_not_found_once",
+        ReadBackNotNew = "stock_item_read_back_not_new",
+        ReadBackOtherCompany = "stock_item_read_back_other_company",
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn stock_item_catalogue_refusal_code(
+    error: &StockItemCatalogueError,
+) -> StockItemCreateCode {
+    match error {
+        StockItemCatalogueError::Unreadable(_) => StockItemCreateCode::ReadUnreadable,
+        StockItemCatalogueError::NoItems => StockItemCreateCode::NoItems,
+        StockItemCatalogueError::NoNameEntry { .. } => StockItemCreateCode::NoNameEntry,
+        StockItemCatalogueError::Index(_) => StockItemCreateCode::NameIndexInvalid,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn item_name_refusal_code(error: &ItemNameNotAbsent) -> StockItemCreateCode {
+    match error {
+        ItemNameNotAbsent::Taken(_) => StockItemCreateCode::NameTaken,
+        ItemNameNotAbsent::Unchecked(_) => StockItemCreateCode::NameUnchecked,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn sibling_refusal_code(error: &SiblingRefusal) -> StockItemCreateCode {
+    match error {
+        SiblingRefusal::NotFound => StockItemCreateCode::SiblingNotFound,
+        SiblingRefusal::Ambiguous { .. } => StockItemCreateCode::SiblingAmbiguous,
+        SiblingRefusal::OnlyByFold { .. } => StockItemCreateCode::SiblingOnlyByFold,
+        SiblingRefusal::Incomplete(_) => StockItemCreateCode::SiblingIncomplete,
+        SiblingRefusal::Unchecked(_) => StockItemCreateCode::NameUnchecked,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn not_goods_refusal_code(error: &NotGoodsSibling) -> StockItemCreateCode {
+    match error {
+        NotGoodsSibling::NotGoods => StockItemCreateCode::SiblingNotGoods,
+        NotGoodsSibling::NotTaxable { .. } => StockItemCreateCode::SiblingNotTaxable,
+        NotGoodsSibling::GstNotApplicable => StockItemCreateCode::SiblingGstNotApplicable,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn draft_refusal_code(error: &DraftRefusal) -> StockItemCreateCode {
+    match error {
+        DraftRefusal::OtherCatalogue => StockItemCreateCode::CatalogueChanged,
+        DraftRefusal::GroupsUnreadable(_) => StockItemCreateCode::GroupsUnreadable,
+        DraftRefusal::ParentNotInBook => StockItemCreateCode::ParentNotInBook,
+        DraftRefusal::UnitsUnreadable(_) => StockItemCreateCode::UnitsUnreadable,
+        DraftRefusal::UnitNotInBook => StockItemCreateCode::UnitNotInBook,
+        DraftRefusal::GstEntriesNotMeasured { .. }
+        | DraftRefusal::GstSourceNotMeasured
+        | DraftRefusal::ItcNotMeasured
+        | DraftRefusal::StateNotAny
+        | DraftRefusal::DutyHeadNotMeasured { .. }
+        | DraftRefusal::ValuationNotMeasured { .. }
+        | DraftRefusal::RateNotMeasured { .. }
+        | DraftRefusal::HsnEntriesNotMeasured { .. }
+        | DraftRefusal::HsnNotMeasured => StockItemCreateCode::ShapeNotMeasured,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn create_render_refusal_code(error: &CreateRenderRefusal) -> StockItemCreateCode {
+    match error {
+        CreateRenderRefusal::TextNotPlain { .. } => StockItemCreateCode::TextNotPlain,
+        CreateRenderRefusal::TextNeedsEscaping { .. } => StockItemCreateCode::TextNeedsEscaping,
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn stock_item_outcome_code(
+    outcome: &StockItemImportOutcome,
+) -> Option<StockItemCreateCode> {
+    match outcome {
+        StockItemImportOutcome::ApplicationFailure => {
+            Some(StockItemCreateCode::CreateApplicationFailure)
+        }
+        StockItemImportOutcome::CountersClean(_) => None,
+        StockItemImportOutcome::AlteredExisting { .. } => {
+            Some(StockItemCreateCode::AlteredExisting)
+        }
+        StockItemImportOutcome::NotClean { .. } => Some(StockItemCreateCode::CountersNotClean),
+        StockItemImportOutcome::Unreported => Some(StockItemCreateCode::CountersUnreported),
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn stock_item_read_back_code(verdict: &ReadBackVerdict) -> Option<StockItemCreateCode> {
+    match verdict {
+        ReadBackVerdict::Equal(_) => None,
+        ReadBackVerdict::Differs { .. } => Some(StockItemCreateCode::ReadBackDiffers),
+        ReadBackVerdict::NotFoundOnce { .. } => Some(StockItemCreateCode::ReadBackNotFoundOnce),
+        ReadBackVerdict::NotNew => Some(StockItemCreateCode::ReadBackNotNew),
+        ReadBackVerdict::OtherCompany => Some(StockItemCreateCode::ReadBackOtherCompany),
     }
 }
 

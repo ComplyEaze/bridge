@@ -33,6 +33,7 @@ fn detail() -> InvoiceDetail {
         voucher_type_name: "Sales".to_string(),
         place_of_supply: RAJ.to_string(),
         round_off_ledger: None,
+        e_invoice: None,
         observed: None,
     }
 }
@@ -698,6 +699,17 @@ fn observed() -> InvoiceObserved {
     }
 }
 
+/// The e-invoice details row 2162-IRN9 imported and Tally stored as sent
+/// (`lab/2162-irn-import-answers` at 9cb3ebd0).
+fn irn9_e_invoice() -> EInvoiceDetails {
+    serde_json::from_value(serde_json::json!({
+        "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+        "ack_no": "445566",
+        "ack_date": "2025-04-03"
+    }))
+    .unwrap()
+}
+
 /// The bytes the renderer writes, pinned. The rehearsal of 7 Oct 2026 posted
 /// two invoices the renderer wrote in this shape and Tally took both (section
 /// 9.16). Their import files are not committed, so the bytes pinned here are
@@ -725,6 +737,25 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     assert!(
         !xml.contains("ALLLEDGERENTRIES"),
         "an invoice view silently drops ALLLEDGERENTRIES"
+    );
+    // An invoice with e-invoice details carries the three elements right after `ISINVOICE`, as
+    // row 2162-IRN9 imported them and Tally stored them as sent; nothing else moves.
+    let mut with_details = v.clone();
+    with_details.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice());
+    let detailed = render_sales_invoice_xml(
+        &with_details,
+        id,
+        "20260310",
+        "<NARRATION>Invoice 278</NARRATION>",
+        VoucherAction::Create,
+    )
+    .unwrap();
+    assert_eq!(
+        detailed,
+        xml.replace(
+            "<ISINVOICE>Yes</ISINVOICE>",
+            "<ISINVOICE>Yes</ISINVOICE><IRN>c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0</IRN><IRNACKNO>445566</IRNACKNO><IRNACKDATE>20250403</IRNACKDATE>"
+        )
     );
     // A party that is not bill-wise gets no New Ref; and an unobserved voucher does not render.
     let mut not_bill_wise = v.clone();
@@ -967,6 +998,207 @@ fn observed_voucher() -> ImportVoucher {
     let mut v = voucher();
     v.invoice.as_mut().unwrap().observed = Some(observed());
     v
+}
+
+/// What the invoice read-back of a saved invoice with details returns when the e-invoice read
+/// is answered by `e_invoice` (given the captured day, its IRN changed): its differences, and
+/// for each request sent whether it named the three elements, beside where the script answers
+/// the e-invoice read. The script is not required to be answered to its end: a read-back that
+/// stops early sends fewer requests, and each test says how many it expects.
+async fn read_back_with_e_invoice_answer(
+    e_invoice: impl Fn(String) -> tally_protocol_simulator::ScenarioPlan,
+) -> (Vec<String>, Vec<bool>, Vec<bool>) {
+    use bridge_tally_transport::TallyEndpointConfig;
+    use tally_protocol_simulator::{
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+
+    let company_list = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"
+    ));
+    let guid = pilot_lab_guid();
+    let e_invoice_answer = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml"
+    ))
+    .replace("eb2f5190-292e-4ed8-bfd3-eace839fe699", &guid)
+    .replace(
+        &format!("<GUID>{guid}-00000001</GUID>"),
+        &format!("<GUID>{guid}-0000000b</GUID>"),
+    )
+    .replace(
+        "<IRN TYPE=\"String\">a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8</IRN>",
+        "<IRN TYPE=\"String\">c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0</IRN>",
+    );
+    let answer = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body))
+            .with_encoding(WireEncoding::Utf16LeNoBom)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let order = concat!(
+        "eMsMseeRsRse",
+        "e1s1see2s2see3s3see4s4seeUsUsee6s6see7s7see8s8se",
+        "e9s9seexsxseeysyseezszse",
+        "eDsDse"
+    );
+    let months = crate::agent::agent_import::tests::lab_number_months();
+    let mut plans = order
+        .chars()
+        .map(|kind| match kind {
+            'e' => answer(company_list.clone()),
+            's' => ScenarioPlan::new(Fixture::ProductStatus(
+                tally_protocol_simulator::ProductStatus::TallyPrime,
+            ))
+            .with_framing(ResponseFraming::ContentLength),
+            'M' => answer(utf16le(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"
+            ))),
+            // Captured before the read-back fetched the registration, which `with_registration` adds.
+            'R' => answer(with_registration(&utf16le(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
+            )))),
+            'D' => e_invoice(e_invoice_answer.clone()),
+            month => {
+                let index = if month == 'U' {
+                    4
+                } else {
+                    "123456789xyz".find(month).expect("a month letter")
+                };
+                answer(utf16le(months[index].3))
+            }
+        })
+        .collect::<Vec<_>>();
+    plans.push(answer(company_list.clone()));
+    let simulator = SequenceSimulator::spawn(plans).expect("the scripted read-back starts");
+    let directory = tempfile::tempdir().expect("a temporary data directory");
+    let server = super::super::super::Server::new(super::super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::super::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let companies = bridge_tally_protocol::parse_companies_from_collection(&company_list)
+        .expect("the captured company list parses");
+    let company = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(guid.as_str()))
+        .expect("the pilot company")
+        .clone();
+    let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
+        company.name.clone(),
+        crate::tally::test_company_guid(&guid),
+        company.company_number.clone().unwrap(),
+        company.books_from.clone().unwrap(),
+        &companies,
+    )
+    .expect("the captured company identity verifies");
+    let saved: ImportVoucher = serde_json::from_value(json!({
+        "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":"BP/26-27/0010",
+        "invoice":{
+            "voucher_type_name":"BRIDGE Sales", "place_of_supply":"Rajasthan", "round_off_ledger":"BRIDGE Round Off",
+            "observed":{
+                "voucher_type_guid":format!("{guid}-000000ce"), "party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer", "party_bill_wise":false,
+                "company_state":"Rajasthan", "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]
+            },
+            "e_invoice":{
+                "irn":"a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8",
+                "ack_no":"112233", "ack_date":"2025-04-03"
+            }
+        },
+        "entries":[
+            {"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"},
+            {"ledger":"BRIDGE Svc 998313 5%","amount":"600.40","side":"Cr"},
+            {"ledger":"BRIDGE Svc 998314 5%","amount":"400.40","side":"Cr"},
+            {"ledger":"BRIDGE CGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE SGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE Round Off","amount":"0.16","side":"Cr"}
+        ]
+    }))
+    .expect("the saved invoice parses");
+
+    let (differences, ..) = server
+        .read_back_sales_invoice(&identity, &company, &saved)
+        .await
+        .expect("a read-back after a post is never an error");
+
+    simulator.cancel();
+    let requests = simulator
+        .finish()
+        .expect("the scripted read-back finishes")
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .collect::<Vec<_>>();
+    let names_the_details = requests
+        .iter()
+        .map(|request| {
+            let body = utf16le(&request.request_body);
+            body.contains(",IRN,IRNACKNO,IRNACKDATE</FETCH>")
+                && body.contains("<SVFROMDATE TYPE=\"Date\">20260801</SVFROMDATE>")
+                && body.contains("<SVTODATE TYPE=\"Date\">20260801</SVTODATE>")
+        })
+        .collect::<Vec<_>>();
+    let scripted = order.chars().map(|kind| kind == 'D').collect::<Vec<_>>();
+    (differences, names_the_details, scripted)
+}
+
+/// A captured answer, as the scripted read-backs frame it.
+fn scripted(body: String) -> tally_protocol_simulator::ScenarioPlan {
+    tally_protocol_simulator::ScenarioPlan::new(tally_protocol_simulator::Fixture::SyntheticXml(
+        body,
+    ))
+    .with_encoding(tally_protocol_simulator::WireEncoding::Utf16LeNoBom)
+    .with_framing(tally_protocol_simulator::ResponseFraming::ContentLength)
+}
+
+/// The invoice read-back sends the e-invoice read for a saved invoice with details, and an IRN
+/// that answer changes is a difference returned by the read-back itself.
+#[tokio::test]
+async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_back() {
+    let (differences, names_the_details, scripted_read) =
+        read_back_with_e_invoice_answer(scripted).await;
+    assert_eq!(differences, ["IRN"]);
+    // The e-invoice read is sent where the script answers it, over the invoice's one date, and
+    // no other request of the read-back names the three elements.
+    assert_eq!(names_the_details, scripted_read);
+}
+
+/// An e-invoice read that fails, here Tally answering HTTP 500, is the difference
+/// `e_invoice_readback_failed`, never a pass or an empty match (AGENTS.md P5).
+#[tokio::test]
+async fn a_failed_e_invoice_read_is_a_difference() {
+    let (differences, names_the_details, scripted_read) =
+        read_back_with_e_invoice_answer(|body| scripted(body).with_http_status(500)).await;
+    assert_eq!(differences, ["e_invoice_readback_failed"]);
+    // The read-back stops at the failed answer: the script up to and including the first
+    // e-invoice read is sent, and nothing after it.
+    let first = scripted_read
+        .iter()
+        .position(|&read| read)
+        .expect("the script answers an e-invoice read");
+    assert_eq!(names_the_details, scripted_read[..=first]);
+}
+
+/// An e-invoice read answered for another company does not parse for this one: it is the
+/// difference `e_invoice_readback_unreadable`, never `e_invoice_not_found` or a pass.
+#[tokio::test]
+async fn an_e_invoice_answer_that_does_not_parse_is_a_difference() {
+    let guid = pilot_lab_guid();
+    let other = "00000000-0000-0000-0000-000000000000";
+    let (differences, names_the_details, scripted_read) = read_back_with_e_invoice_answer(|body| {
+        assert!(body.contains(&guid), "the answer names the company");
+        scripted(body.replace(&guid, other))
+    })
+    .await;
+    assert_eq!(differences, ["e_invoice_readback_unreadable"]);
+    assert_eq!(names_the_details, scripted_read);
 }
 
 fn differences(v: &ImportVoucher, xml: &str) -> Vec<String> {
@@ -1511,7 +1743,28 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
         Box::new(|v| v.invoice.as_mut().unwrap().place_of_supply = "Haryana".into()),
         Box::new(|v| v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into())),
         Box::new(|v| v.invoice.as_mut().unwrap().observed = None),
+        Box::new(|v| v.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice())),
     ];
+    for (key, value) in [
+        (
+            "irn",
+            "d3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+        ),
+        ("ack_no", "445567"),
+        ("ack_date", "2025-04-04"),
+    ] {
+        let with_details = {
+            let mut v = base.clone();
+            v.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice());
+            v
+        };
+        let mut changed = with_details.clone();
+        let mut details = serde_json::to_value(irn9_e_invoice()).unwrap();
+        details[key] = serde_json::json!(value);
+        changed.invoice.as_mut().unwrap().e_invoice =
+            Some(serde_json::from_value(details).unwrap());
+        assert_ne!(digest(&with_details), digest(&changed), "{key}");
+    }
     for field in 0..8 {
         changes.push(Box::new(move |v| {
             let seen = v.invoice.as_mut().unwrap().observed.as_mut().unwrap();
@@ -3327,6 +3580,7 @@ fn pilot_invoice(
                 .iter()
                 .find(|(ledger, _)| *ledger == "BRIDGE Round Off")
                 .map(|(ledger, _)| ledger.to_string()),
+            e_invoice: None,
             observed: Some(InvoiceObserved {
                 voucher_type_guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce".to_string(),
                 party_gstin: None,

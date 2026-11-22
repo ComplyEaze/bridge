@@ -377,8 +377,10 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     for (response, pointed) in [(None, true), (Some(&altered), false), (Some(&clean), false)] {
         let mut previous = unverified();
         finalize_previous_attempt_reconciliation(&mut previous, response, None, 1);
+        attach_response_missing_next_step(&mut previous, 200_000);
         let mut current = unverified();
         finalize_current_dispatch(&mut current, response, None, 1);
+        attach_response_missing_next_step(&mut current, 200_000);
         for payload in [previous, current] {
             let error = &payload["result"]["error"];
             assert_eq!(error["code"], "import_reconciliation_required");
@@ -392,8 +394,10 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     let verified = || json!({"result": {"counts": {"posted_verified": 1}, "duplicates": []}});
     let mut previous = verified();
     finalize_previous_attempt_reconciliation(&mut previous, None, None, 1);
+    attach_response_missing_next_step(&mut previous, 200_000);
     let mut current = verified();
     finalize_current_dispatch(&mut current, None, None, 1);
+    attach_response_missing_next_step(&mut current, 200_000);
     for payload in [previous, current] {
         let result = &payload["result"];
         assert_eq!(result["dispatch"]["state"], "reconciliation_required");
@@ -426,6 +430,47 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     for word in ["always", "will be", "because", "caused"] {
         assert!(!step.contains(word), "{word}");
     }
+}
+
+/// The step is attached at exactly the budget the largest page with it needs,
+/// and not one byte below (#2556).
+#[test]
+fn response_missing_step_is_attached_only_within_the_largest_pages_budget() {
+    let unverified = || json!({"result": {"counts": {"posted_verified": 0}, "duplicates": []}});
+    let mut with_step = unverified();
+    finalize_current_dispatch(&mut with_step, None, None, 1);
+    with_step["result"]["error"]["next_step"] = json!(RESPONSE_MISSING_NEXT_STEP);
+    let largest = super::super::verification::verification_response_page(
+        &with_step["result"],
+        &"0".repeat(64),
+        usize::MAX,
+    );
+    let needed = super::super::verification_page_essential_bytes(&largest);
+    for (max_bytes, attached) in [(needed, true), (needed - 1, false)] {
+        let mut payload = unverified();
+        finalize_current_dispatch(&mut payload, None, None, 1);
+        attach_response_missing_next_step(&mut payload, max_bytes);
+        let error = &payload["result"]["error"];
+        assert_eq!(error["code"], "import_reconciliation_required");
+        assert_eq!(
+            error.get("next_step").is_some(),
+            attached,
+            "max_bytes {max_bytes}"
+        );
+    }
+}
+
+#[test]
+fn response_missing_step_says_how_to_match_a_receipt_without_a_batch_id() {
+    assert!(RESPONSE_MISSING_NEXT_STEP
+        .contains("A receipt names no batch; match it by its time and company"));
+}
+
+#[test]
+fn response_missing_step_allows_a_receipt_without_a_trail() {
+    assert!(!RESPONSE_MISSING_NEXT_STEP.contains("Its request_trail lists the last 32 sends"));
+    assert!(RESPONSE_MISSING_NEXT_STEP
+        .contains("If its receipt has a request_trail, that lists the last 32 sends"));
 }
 
 #[test]

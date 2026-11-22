@@ -1,0 +1,1 @@
+- An invoice number written with the full-width full stop, low line or reverse solidus is now read as the same number as its ASCII form (#2557).

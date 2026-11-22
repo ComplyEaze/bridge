@@ -2072,6 +2072,15 @@ impl Server {
                     post::PostScope::Vouchers,
                     self.post_voucher_limit(post::PostScope::Vouchers),
                 ) {
+                    // The details' own lines can be what takes it over (#2574).
+                    if code == "import_review_too_large"
+                        && post::e_invoice_details_pushed_review_over(&line, &self.settings.endpoint)
+                    {
+                        return Err(
+                            crate::agent::failure_code::InvoiceBuildCode::ReviewTooLargeWithEInvoice
+                                .into(),
+                        );
+                    }
                     return Err(invoice_route_refusal(code).into());
                 }
             }
@@ -2446,10 +2455,7 @@ impl Server {
     /// text is not essential: the cap drops it first, so it is not counted.
     /// The size of those parts, for what may be added to the page.
     fn admit_verification_page(&self, page: &Value) -> Result<usize, ToolFailure> {
-        let mut essential = page.clone();
-        essential["items"] = json!([]);
-        super::drop_tally_line_error_text(&mut essential);
-        let size = essential.to_string().len();
+        let size = verification_page_essential_bytes(page);
         if size > self.settings.max_bytes {
             return Err("verification_too_large_to_report".to_string().into());
         }
@@ -2991,6 +2997,7 @@ impl Server {
             }
             // Marked before it is saved, so the proof holds the marks too.
             mark_verification_names(&mut payload["result"]);
+            post::attach_response_missing_next_step(&mut payload, self.settings.max_bytes);
             self.persist_import_verification(&payload["result"], &line, status, generation)?;
             Ok(ToolOutcome {
                 payload,
@@ -6389,6 +6396,16 @@ mod tests;
 #[cfg(test)]
 #[path = "agent_import_numbering_fixtures.rs"]
 pub(in crate::agent) mod numbering_fixtures;
+
+/// The bytes of a verification page's parts that are never cut: the page with
+/// no verified rows and without Tally's LINEERROR text, which the cap drops
+/// first (see `Server::admit_verification_page`).
+fn verification_page_essential_bytes(page: &Value) -> usize {
+    let mut essential = page.clone();
+    essential["items"] = json!([]);
+    super::drop_tally_line_error_text(&mut essential);
+    essential.to_string().len()
+}
 
 /// A verification page as it is served, from the saved proof's bytes: the
 /// proof, with every ledger name marked so the response's redaction applies,

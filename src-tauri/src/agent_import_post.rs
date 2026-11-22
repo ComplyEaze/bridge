@@ -2315,16 +2315,37 @@ pub(super) fn attach_next_step(
 
 /// Where to look when no answer to the post was kept (bridge#852). `egress_log`
 /// returns the most recent receipts; the sending `post_import` call's receipt is
-/// there only if recent enough. Its trail (`request_trail::RequestTrail`) holds
-/// the send durations and outcomes the batch record lacks, but no field identifies
-/// the import send. A later tool re-check leaves its own receipt and read-only
-/// trail. A receipt not returned may be older than the read window, or may never
-/// have been written: the process may have ended first.
-pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. egress_log returns the most recent receipts. The sending post_import call's receipt is there only if recent enough. Its request_trail lists the last 32 sends with held_ms, how long each send held the endpoint, and its outcome, but does not mark which send was the post. A later post_import or verify_import tool call on this batch does not post it again and also leaves a receipt; its request_trail lists only that call's reads. A receipt not returned may be older than egress_log reads, or may never have been written: the process may have ended first. Reconcile this original batch without resending it.";
+/// there only if recent enough. A receipt names no batch and is matched by time
+/// and company. Any trail (`request_trail::RequestTrail`) holds the send durations
+/// and outcomes the batch record lacks, but no field identifies the import send.
+/// A later tool re-check leaves its own receipt and read-only trail. A receipt not
+/// returned may be older than the read window, or may never have been written:
+/// the process may have ended first.
+pub(super) const RESPONSE_MISSING_NEXT_STEP: &str = "ComplyEaze Bridge has no record of Tally's answer to this post. egress_log returns the most recent receipts. The sending post_import call's receipt is there only if recent enough. A receipt names no batch; match it by its time and company. If its receipt has a request_trail, that lists the last 32 sends with held_ms, how long each send held the endpoint, and its outcome, but does not mark which send was the post. A later post_import or verify_import tool call on this batch does not post it again and also leaves a receipt; its request_trail lists only that call's reads. A receipt not returned may be older than egress_log reads, or may never have been written: the process may have ended first. Reconcile this original batch without resending it.";
 
-fn mark_reconciliation_required(payload: &mut Value, response: Option<&ledger::DispatchResponse>) {
+fn mark_reconciliation_required(payload: &mut Value) {
     payload["result"]["error"] = json!({"code":"import_reconciliation_required", "message":"The saved attempt has not been confirmed as the intended new voucher. Reconcile this original batch without resending it."});
-    if response.is_none() {
+}
+
+/// Attach the lost-response step only if every page's never-cut part fits it.
+pub(super) fn attach_response_missing_next_step(payload: &mut Value, max_bytes: usize) {
+    if payload["result"]["dispatch"]["response_state"] != "response_missing"
+        || payload["result"]["error"]["code"] != "import_reconciliation_required"
+    {
+        return;
+    }
+    let mut candidate = payload.clone();
+    candidate["result"]["error"]["next_step"] = json!(RESPONSE_MISSING_NEXT_STEP);
+    // Every page repeats the same never-cut parts; only its offset differs, and
+    // a later page's offset is the caller's, unchecked against the row count.
+    // The largest offset and a stand-in hash of a real hash's 64 characters
+    // make this page the largest any page of the proof can be.
+    let page = super::verification::verification_response_page(
+        &candidate["result"],
+        &"0".repeat(64),
+        usize::MAX,
+    );
+    if super::verification_page_essential_bytes(&page) <= max_bytes {
         payload["result"]["error"]["next_step"] = json!(RESPONSE_MISSING_NEXT_STEP);
     }
 }
@@ -2384,7 +2405,7 @@ pub(super) fn finalize_previous_attempt_reconciliation(
         "response": response,
     });
     if !name_verified {
-        mark_reconciliation_required(payload, response);
+        mark_reconciliation_required(payload);
     } else if let Some((code, message)) = doubt {
         payload["result"]["error"] = json!({"code": code, "message": message});
     }
@@ -2491,7 +2512,7 @@ pub(super) fn finalize_current_dispatch(
         "resent":false, "automatic_retry":false
     });
     if !clean || !verified {
-        mark_reconciliation_required(payload, response);
+        mark_reconciliation_required(payload);
     } else if let Some((code, message)) = masters_doubt {
         payload["result"]["error"] = json!({"code": code, "message": message});
     }
@@ -3336,6 +3357,24 @@ pub(super) fn review_preview_for_form(
             })
         }
     }
+}
+
+/// Whether an invoice's e-invoice details are what pushed its approval text
+/// past the window's limit: with them removed, the same batch fits (#2574).
+/// It measures as [`admit_saved_voucher`] does for an invoice's build, which
+/// takes no form: a single invoice's text has one form.
+pub(super) fn e_invoice_details_pushed_review_over(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+) -> bool {
+    let mut without_details = line.clone();
+    let mut had_details = false;
+    for voucher in &mut without_details.vouchers {
+        if let Some(detail) = voucher.invoice.as_mut() {
+            had_details |= detail.e_invoice.take().is_some();
+        }
+    }
+    had_details && review_preview_for(&without_details, endpoint, PostScope::Vouchers).is_ok()
 }
 
 /// [`review_preview_for_form`] of a post whose ledgers have line-break twins,

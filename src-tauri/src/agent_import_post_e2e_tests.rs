@@ -7995,6 +7995,70 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
     assert_eq!(server.import_invoice_stop(PILOT_GUID), Ok(None));
 }
 
+/// The pilot invoice's arguments with e-invoice details (#2574).
+fn pilot_args_with_e_invoice() -> Value {
+    let mut args = pilot_args("BRIDGE Walk-in", "25.02", "1051.00");
+    args["vouchers"][0]["invoice"]["e_invoice"] = json!({
+        "irn":"c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+        "ack_no":"445566", "ack_date":"2025-04-03"
+    });
+    args
+}
+
+/// `build_import_xml` called as a tool on the pilot lab's answers: its answer, and whether it
+/// wrote the import journal.
+async fn pilot_build(args: Value) -> (Value, bool) {
+    let (_simulator, server, directory) = pilot_lab();
+    let response = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(PILOT_QUALIFIED, server.call_tool("build_import_xml", args))
+        .await;
+    let journal = directory.path().join("agent-import-ledger.jsonl").exists();
+    (response, journal)
+}
+
+/// #2574: the pilot invoice's approval text is at the window's limit, and its e-invoice details
+/// take it over. The build refuses it, says the details are the cause and what to do, and writes
+/// no file. The same invoice without the details is built (the control).
+#[tokio::test]
+async fn an_invoice_its_e_invoice_details_take_over_the_window_is_refused_naming_them() {
+    let (response, journal) = pilot_build(pilot_args_with_e_invoice()).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(
+        error["code"], "invoice_review_too_large_with_e_invoice",
+        "{response}"
+    );
+    let remediation = error["remediation"].as_str().expect("a next step");
+    for needed in [
+        "because of its e-invoice details",
+        "no file was written",
+        "build the invoice again without e_invoice",
+        "Statutory Details",
+        "adding them to an invoice posted from here was not tried",
+    ] {
+        assert!(remediation.contains(needed), "{needed:?}: {remediation}");
+    }
+    assert!(!journal, "no batch is saved");
+
+    let (response, journal) = pilot_build(pilot_args("BRIDGE Walk-in", "25.02", "1051.00")).await;
+    let result = &response["structuredContent"]["result"];
+    assert!(result.get("error").is_none(), "{response}");
+    assert!(result["batch_id"].is_string(), "{response}");
+    assert!(journal, "the batch is saved");
+}
+
+/// #2574: an invoice whose approval text is over the window's limit without its e-invoice
+/// details too (a narration line longer than the window's 100 characters) keeps the invoice
+/// build's own refusal, which does not blame the details.
+#[tokio::test]
+async fn an_invoice_over_the_window_without_its_e_invoice_details_keeps_the_plain_refusal() {
+    let mut args = pilot_args_with_e_invoice();
+    args["vouchers"][0]["narration"] = json!("n".repeat(120));
+    let (response, journal) = pilot_build(args).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "invoice_review_too_large", "{response}");
+    assert!(!journal, "no batch is saved");
+}
+
 /// The walk-in ledger's row is spelled `BRIDGE Walk-in` in the pilot lab's
 /// catalogue. The earlier spelling, `Bridge Walk-in`, which the book once carried, is refused as
 /// a master that is not exact, before any admission read.

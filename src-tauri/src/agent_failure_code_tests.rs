@@ -111,6 +111,12 @@ const INVOICE_NUMBER_AFTER_POST: &[(InvoiceNumberAfterPostCode, &str)] = &[
     ),
 ];
 
+/// The invoice build's own refusal (#2574).
+const INVOICE_BUILD: &[(InvoiceBuildCode, &str)] = &[(
+    InvoiceBuildCode::ReviewTooLargeWithEInvoice,
+    "invoice_review_too_large_with_e_invoice",
+)];
+
 /// The lab master tool's refusals that name what they refused (#2499).
 #[cfg(feature = "lab-writes")]
 const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
@@ -520,6 +526,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(PRESENCE),
         of(TIE_OUT),
         of(STOCK_ITEM_CREATE),
+        of(INVOICE_BUILD),
         of(INVOICE_REGISTRATION),
         of(INVOICE_ITEM_LINE),
         of(COMPANY_READ),
@@ -556,6 +563,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("PresenceCode", PresenceCode::ALL),
         of("TieOutCode", TieOutCode::ALL),
         of("StockItemCreateCode", StockItemCreateCode::ALL),
+        of("InvoiceBuildCode", InvoiceBuildCode::ALL),
         of("InvoiceRegistrationCode", InvoiceRegistrationCode::ALL),
         of("InvoiceItemLineCode", InvoiceItemLineCode::ALL),
         of("CompanyReadCode", CompanyReadCode::ALL),
@@ -608,7 +616,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        18,
+        19,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -636,6 +644,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
     assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
+    assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -677,6 +686,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
     check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
+    check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
@@ -698,9 +708,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 75 + 4 + 2 + 1 + 1 + 4;
+    let expected = 76 + 4 + 2 + 1 + 1 + 4;
     #[cfg(feature = "lab-writes")]
-    let expected = 78 + 4 + 2 + 1 + 1 + 4;
+    let expected = 79 + 4 + 2 + 1 + 1 + 4;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

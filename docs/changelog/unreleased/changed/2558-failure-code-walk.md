@@ -1,0 +1,1 @@
+The failure-code uniqueness test now walks every enum the `failure_codes!` macro declares and fails when one is missing from its list, and tests hold the presence drift site and the movement amount and date-range sites.

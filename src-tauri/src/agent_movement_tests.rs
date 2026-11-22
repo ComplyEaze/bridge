@@ -678,3 +678,78 @@ fn a_refusal_carries_its_own_note_for_each_reason() {
         }
     }
 }
+
+/// A voucher amount that is not a decimal refuses the window by its own code, where the balance of
+/// each active voucher is summed (#2558).
+#[test]
+fn an_unparseable_amount_in_an_active_voucher_refuses_by_the_amount_code() {
+    let result = parse_movement_rows(
+        vec![json!({"date":"20260901","cancelled":false,"optional":false,
+            "amounts":[{"ledger":"Cash","amount":"not-a-number","is_deemed_positive":"Yes"}]})],
+        "20260901",
+        "20260902",
+    );
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some(ReadCode::VoucherAmountInvalid.as_str().to_string())
+    );
+}
+
+/// The day sums refuse an amount that is not a decimal by the same code (#2558).
+#[test]
+fn the_day_sums_refuse_an_unparseable_amount_by_the_amount_code() {
+    let vouchers: Vec<MovementVoucher> = serde_json::from_value(json!([
+        {"date":"20260901","cancelled":false,"optional":false,
+         "amounts":[{"ledger":"Cash","amount":"not-a-number","is_deemed_positive":"Yes"}]}
+    ]))
+    .unwrap();
+    assert_eq!(
+        day_moves_of(&vouchers, "Cash").err(),
+        Some(FailureCode::from(ReadCode::VoucherAmountInvalid))
+    );
+}
+
+/// The voucher read refuses a window that ends before it starts by the range code, before it sends
+/// anything: the tool refuses that first, so only a caller of this read reaches it (#2558).
+#[tokio::test]
+async fn the_voucher_read_refuses_a_reversed_window_by_the_range_code_and_sends_nothing() {
+    use tally_protocol_simulator::{Fixture, ProductStatus, ScenarioPlan, SequenceSimulator};
+    let simulator = SequenceSimulator::spawn(vec![ScenarioPlan::new(Fixture::ProductStatus(
+        ProductStatus::TallyPrime,
+    ))])
+    .unwrap();
+    let address = simulator.address();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let identity = VerifiedCompanyIdentity::test_fixture("Lab", crate::synthetic_guid(1));
+    let from = bridge_tally_core::TallyDate::parse("20260902").unwrap();
+    let to = bridge_tally_core::TallyDate::parse("20260901").unwrap();
+    let result = server
+        .read_movement_vouchers(
+            &identity,
+            "Lab",
+            WindowScope::Book,
+            (from, to),
+            WindowPlanSource::Estimate { known_marks: None },
+            None,
+        )
+        .await;
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some(ReadCode::InvalidDateRange.as_str().to_string())
+    );
+    assert_eq!(simulator.received(), 0, "no request reached the endpoint");
+}

@@ -308,6 +308,9 @@ impl Server {
                         // this entry belongs to a known, unselected ledger.
                         continue;
                     };
+                    // No input reaches this refusal: `parse_scoped_movement_rows` parsed every
+                    // amount of these vouchers with the same call and refused the read first, and
+                    // its test holds that site (#2558).
                     let amount = bridge_tally_core::ExactDecimal::parse(entry.amount.clone())
                         .map_err(|_| ReadCode::VoucherAmountInvalid)?;
                     let (is_debit, magnitude) =

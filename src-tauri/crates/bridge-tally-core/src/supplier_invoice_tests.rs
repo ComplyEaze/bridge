@@ -224,6 +224,28 @@ fn the_voucher_date_fallback_takes_the_year_before_from_april_to_november_only()
 }
 
 #[test]
+fn the_voucher_date_fallback_takes_the_year_after_in_march_only() {
+    // An invoice dated 5 April booked on 31 March as a year-end entry, with no invoice date.
+    let april_invoice = incoming("GS1/P/0001", "20260405");
+    for (voucher_date, expected) in [
+        ("20260331", InvoiceMatch::PossiblyBooked),
+        ("20260301", InvoiceMatch::PossiblyBooked),
+        ("20260228", InvoiceMatch::Different),
+        ("20250331", InvoiceMatch::Different),
+    ] {
+        assert_eq!(
+            compare(&april_invoice, &booked("GS1/P/0001", None, voucher_date)),
+            expected,
+            "{voucher_date}"
+        );
+    }
+    assert_eq!(
+        booked("GS1/P/0001", None, "20260331").financial_years(),
+        (vec![FinancialYear(2025), FinancialYear(2026)], true)
+    );
+}
+
+#[test]
 fn a_known_other_document_is_different_on_every_path() {
     let new = incoming("INV/01", "20251201");
     let mut note = booked("INV/1", Some("20251202"), "20251203");

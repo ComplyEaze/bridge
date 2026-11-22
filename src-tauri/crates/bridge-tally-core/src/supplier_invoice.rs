@@ -364,9 +364,11 @@ pub struct BookedInvoice {
 impl BookedInvoice {
     /// The financial years the copy can belong to. From the invoice date, one. From the voucher
     /// date, also the year before when the voucher falls between April and November: credit on an
-    /// invoice of the previous year can be taken until 30 November at the latest (s.16(4)). So a
-    /// copy with no invoice date and a voucher dated December to March is taken as its own year
-    /// only, and a copy booked later than that is not found by this fallback.
+    /// invoice of the previous year can be taken until 30 November at the latest (s.16(4)). Also
+    /// the year after when the voucher falls in March: a year-end entry may book an invoice dated
+    /// in April (#2557). So a copy with no invoice date and a voucher dated December to February
+    /// is taken as its own year only, and a copy booked later than that is not found by this
+    /// fallback.
     fn financial_years(&self) -> (Vec<FinancialYear>, bool) {
         match &self.invoice_date {
             Some(date) => (vec![FinancialYear::of(date)], false),
@@ -378,6 +380,9 @@ impl BookedInvoice {
                 let mut years = vec![year];
                 if (4..=11).contains(&month) && year.0 > 0 {
                     years.push(FinancialYear(year.0 - 1));
+                }
+                if month == 3 && year.0 < u16::MAX {
+                    years.push(FinancialYear(year.0 + 1));
                 }
                 (years, true)
             }

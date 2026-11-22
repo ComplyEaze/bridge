@@ -411,6 +411,15 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The build's own refusals of an invoice, where `post_import`'s code would not say the cause.
+    pub(crate) enum InvoiceBuildCode {
+        /// The approval text is over the window's limit, and the same invoice without its
+        /// e-invoice details fits (#2574).
+        ReviewTooLargeWithEInvoice = "invoice_review_too_large_with_e_invoice",
+    }
+}
+
 #[cfg(feature = "lab-writes")]
 failure_codes! {
     /// The refusals of `lab_import_masters` that name what they refused, each before any write.

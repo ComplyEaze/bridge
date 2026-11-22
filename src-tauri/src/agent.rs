@@ -2300,6 +2300,18 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              the narration or reference, then build the invoice again; do not offer to import \
              it by hand.",
         ),
+        // The details' route in Tally is the one TALLY_PROTOCOL_REFERENCE section 8.2j measured
+        // on invoices keyed there, not on one posted from here (#2574).
+        "invoice_review_too_large_with_e_invoice" => Some(
+            "The approval text for this invoice does not fit in one native dialog because of its \
+             e-invoice details: the IRN takes a line of its own. The same invoice without them \
+             fits. It cannot be approved or posted with them, and no file was written. Ask the \
+             user whether to build the invoice again without e_invoice, so ComplyEaze Bridge \
+             neither sends nor checks the IRN, ack number and ack date, and to enter them in \
+             Tally on the voucher's Statutory Details screen after the post. Tally took them \
+             there on an invoice keyed in Tally; adding them to an invoice posted from here was \
+             not tried. Do not offer to import it by hand.",
+        ),
         "invoice_post_not_enabled" => Some(
             "An invoice is posted by post_import and in no other way, and voucher posting is \
              switched off, so ComplyEaze Bridge built nothing and wrote no file. Tell the \

@@ -26,7 +26,7 @@
 //!   digit and so is treated as a placeholder.
 //! - The characters folded (separators, characters that draw nothing, and the listed digits and
 //!   Latin letters) are closed lists: Devanagari and full-width digits, full-width Latin letters,
-//!   and the dashes and slashes named in `SEPARATORS`. Every other letter is upper-cased with the
+//!   and the separators named in `SEPARATORS`. Every other letter is upper-cased with the
 //!   full Unicode rule, so `ß` becomes `SS`. Every Unicode whitespace character is read as a
 //!   separator. Anything else is kept as it is, so a number differing only there is not found as
 //!   the same.
@@ -124,7 +124,8 @@ impl SupplierInvoiceRef {
         &self.raw
     }
 
-    /// The number upper-cased with every run of whitespace and separators folded to one `/`.
+    /// The number with the characters that draw nothing dropped, the listed digits and letters
+    /// read as ASCII, upper-cased, and every run of whitespace and separators folded to one `/`.
     /// Equal exact forms are necessary for [`InvoiceMatch::Booked`] and for a possible match on
     /// the number itself, but not enough: `compare` decides `Booked` on the stricter form that
     /// keeps `-` and `/` as typed, and never for a placeholder.

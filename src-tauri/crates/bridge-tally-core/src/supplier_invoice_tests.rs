@@ -243,6 +243,14 @@ fn the_voucher_date_fallback_takes_the_year_after_in_march_only() {
         booked("GS1/P/0001", None, "20260331").financial_years(),
         (vec![FinancialYear(2025), FinancialYear(2026)], true)
     );
+    // An April voucher does not take the year after.
+    assert_eq!(
+        compare(
+            &incoming("GS1/P/0001", "20270405"),
+            &booked("GS1/P/0001", None, "20260430")
+        ),
+        InvoiceMatch::Different
+    );
 }
 
 #[test]

@@ -224,6 +224,36 @@ fn the_voucher_date_fallback_takes_the_year_before_from_april_to_november_only()
 }
 
 #[test]
+fn the_voucher_date_fallback_takes_the_year_after_in_march_only() {
+    // An invoice dated 5 April booked on 31 March as a year-end entry, with no invoice date.
+    let april_invoice = incoming("GS1/P/0001", "20260405");
+    for (voucher_date, expected) in [
+        ("20260331", InvoiceMatch::PossiblyBooked),
+        ("20260301", InvoiceMatch::PossiblyBooked),
+        ("20260228", InvoiceMatch::Different),
+        ("20250331", InvoiceMatch::Different),
+    ] {
+        assert_eq!(
+            compare(&april_invoice, &booked("GS1/P/0001", None, voucher_date)),
+            expected,
+            "{voucher_date}"
+        );
+    }
+    assert_eq!(
+        booked("GS1/P/0001", None, "20260331").financial_years(),
+        (vec![FinancialYear(2025), FinancialYear(2026)], true)
+    );
+    // An April voucher does not take the year after.
+    assert_eq!(
+        compare(
+            &incoming("GS1/P/0001", "20270405"),
+            &booked("GS1/P/0001", None, "20260430")
+        ),
+        InvoiceMatch::Different
+    );
+}
+
+#[test]
 fn a_known_other_document_is_different_on_every_path() {
     let new = incoming("INV/01", "20251201");
     let mut note = booked("INV/1", Some("20251202"), "20251203");
@@ -594,7 +624,10 @@ fn every_folded_character_reads_as_its_ascii_form() {
         ('\u{FE58}', "INV-12/A"),
         ('\u{FE63}', "INV-12/A"),
         ('\u{FF0D}', "INV-12/A"),
+        ('\u{FF0E}', "INV.12/A"),
         ('\u{FF0F}', "INV/12/A"),
+        ('\u{FF3C}', "INV\\12/A"),
+        ('\u{FF3F}', "INV_12/A"),
     ] {
         let copied = format!("INV{ch}12/A");
         assert_folded(&copied, ascii, "INV/12/A");
@@ -662,11 +695,6 @@ fn every_folded_character_reads_as_its_ascii_form() {
         (
             "INV-1\u{FF1A}2/A",
             "INV/1\u{FF1A}2/A",
-            InvoiceMatch::Different,
-        ),
-        (
-            "INV-1\u{FF0E}2/A",
-            "INV/1\u{FF0E}2/A",
             InvoiceMatch::Different,
         ),
         (
@@ -744,7 +772,6 @@ fn every_folded_character_reads_as_its_ascii_form() {
         ('\u{FE62}', "INV/1\u{FE62}2/A", InvoiceMatch::Different),
         ('\u{FE64}', "INV/1\u{FE64}2/A", InvoiceMatch::Different),
         ('\u{FF0C}', "INV/1\u{FF0C}2/A", InvoiceMatch::Different),
-        ('\u{FF0E}', "INV/1\u{FF0E}2/A", InvoiceMatch::Different),
         ('\u{FF0F}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
         ('\u{FF10}', "INV/102/A", InvoiceMatch::Different),
         // Below and above each folded digit and Latin-letter range.
@@ -774,4 +801,28 @@ fn a_number_with_multibyte_characters_is_kept_and_never_panics() {
     let kept = reference("INV-\u{1F4C4}-12\u{00C9}");
     assert!(kept.exact().contains('\u{1F4C4}'));
     assert!(!kept.fits_gstr1());
+}
+
+#[test]
+fn the_full_width_full_stop_low_line_and_reverse_solidus_fold_like_their_ascii_forms() {
+    for (wide, ascii) in [
+        ("INV\u{FF0E}12\u{FF0E}A", "INV.12.A"),
+        ("INV\u{FF3F}12\u{FF3F}A", "INV_12_A"),
+        ("INV\u{FF3C}12\u{FF3C}A", "INV\\12\\A"),
+    ] {
+        assert_eq!(
+            reference(wide).exact(),
+            reference(ascii).exact(),
+            "{wide:?}"
+        );
+        assert_eq!(reference(wide).exact(), "INV/12/A", "{wide:?}");
+        assert_eq!(
+            compare(
+                &incoming(ascii, "20251201"),
+                &booked(wide, Some("20251202"), "20251203")
+            ),
+            InvoiceMatch::Booked,
+            "{wide:?}"
+        );
+    }
 }

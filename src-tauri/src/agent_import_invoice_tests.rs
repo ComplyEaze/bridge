@@ -1959,8 +1959,8 @@ const REGISTRATION_EMPTY_GSTIN: &[u8] = include_bytes!(
 #[test]
 fn an_invoice_with_an_empty_gstin_as_tally_answered_it_reads_registration_missing() {
     let xml = utf16le(REGISTRATION_EMPTY_GSTIN);
-    // Counted by structure, not by substring: one voucher, and its two fields
-    // as the capture has them.
+    // The capture as Tally wrote it: one voucher, and its two fields with
+    // their attributes. The parse below counts them by structure.
     assert_eq!(xml.matches("<VOUCHER ").count(), 1);
     assert_eq!(
         xml.matches("<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>")
@@ -1977,6 +1977,9 @@ fn an_invoice_with_an_empty_gstin_as_tally_answered_it_reads_registration_missin
     };
     assert_eq!(read.fields["VOUCHERNUMBER"], "BP/26-27/0105");
     assert_eq!(read.fields["GSTREGISTRATION"], "Rajasthan Registration");
+    // An empty field is left out of the read, so the GSTIN reads as absent.
+    assert!(!read.fields.contains_key("CMPGSTIN"), "{:?}", read.fields);
+    assert_eq!(read.legs.len(), 6, "the invoice's six legs");
     assert_eq!(
         invoice_readback_differences(&pilot_posted("BP/26-27/0105"), &read, "20260801"),
         vec![

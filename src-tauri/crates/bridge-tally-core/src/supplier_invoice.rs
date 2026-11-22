@@ -20,9 +20,9 @@
 //! - A financial year written into a number (`2025-26`, `25/26`, `FY26`, a leading or trailing
 //!   `2025`) is left out of the loose form and the serial, so a copy keyed without it, or with the
 //!   year written another way, is still found.
-//! - A number with no digit but zero (`NA`, `Cash`, `0`) is a placeholder, not a supplier's
-//!   number: it is never [`InvoiceMatch::Booked`], and matches only as a loose form does. A number
-//!   whose only digits are of another script (Gujarati, Bengali, Tamil, Arabic-Indic) has no ASCII
+//! - A number with no non-zero digit outside a named year (`NA`, `Cash`, `0`, `NA/2025-26`) is a
+//!   placeholder, not a supplier's number: it is never
+//!   [`InvoiceMatch::Booked`], and matches only as a loose form does. A number whose only digits are of another script (Gujarati, Bengali, Tamil, Arabic-Indic) has no ASCII
 //!   digit and so is treated as a placeholder.
 //! - The characters folded (separators, characters that draw nothing, and the listed digits and
 //!   Latin letters) are closed lists: Devanagari and full-width digits, full-width Latin letters,
@@ -35,9 +35,10 @@ use crate::{ExactDecimal, TallyDate};
 /// The separators a supplier writes between the parts of a number, folded to one form: the ASCII
 /// ones, and the dashes, minus sign and full-width forms a number copied from a PDF or a word
 /// processor carries in their place.
-const SEPARATORS: [char; 18] = [
+const SEPARATORS: [char; 21] = [
     '-', '/', '\\', '.', '_', '\u{2010}', '\u{2011}', '\u{2012}', '\u{2013}', '\u{2014}',
-    '\u{2015}', '\u{2044}', '\u{2212}', '\u{2215}', '\u{FE58}', '\u{FE63}', '\u{FF0D}', '\u{FF0F}',
+    '\u{2015}', '\u{2044}', '\u{2212}', '\u{2215}', '\u{FE58}', '\u{FE63}', '\u{FF0D}', '\u{FF0E}',
+    '\u{FF0F}', '\u{FF3C}', '\u{FF3F}',
 ];
 /// Rule 46(b): at most sixteen characters.
 const GSTR1_MAX_CHARS: usize = 16;
@@ -123,7 +124,10 @@ impl SupplierInvoiceRef {
         &self.raw
     }
 
-    /// The form two numbers are the same invoice in.
+    /// The number upper-cased with every run of whitespace and separators folded to one `/`.
+    /// Equal exact forms are necessary for [`InvoiceMatch::Booked`] and for a possible match on
+    /// the number itself, but not enough: `compare` decides `Booked` on the stricter form that
+    /// keeps `-` and `/` as typed, and never for a placeholder.
     pub fn exact(&self) -> &str {
         &self.exact
     }

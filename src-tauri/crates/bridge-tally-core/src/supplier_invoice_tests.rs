@@ -616,7 +616,10 @@ fn every_folded_character_reads_as_its_ascii_form() {
         ('\u{FE58}', "INV-12/A"),
         ('\u{FE63}', "INV-12/A"),
         ('\u{FF0D}', "INV-12/A"),
+        ('\u{FF0E}', "INV.12/A"),
         ('\u{FF0F}', "INV/12/A"),
+        ('\u{FF3C}', "INV\\12/A"),
+        ('\u{FF3F}', "INV_12/A"),
     ] {
         let copied = format!("INV{ch}12/A");
         assert_folded(&copied, ascii, "INV/12/A");
@@ -684,11 +687,6 @@ fn every_folded_character_reads_as_its_ascii_form() {
         (
             "INV-1\u{FF1A}2/A",
             "INV/1\u{FF1A}2/A",
-            InvoiceMatch::Different,
-        ),
-        (
-            "INV-1\u{FF0E}2/A",
-            "INV/1\u{FF0E}2/A",
             InvoiceMatch::Different,
         ),
         (
@@ -766,7 +764,6 @@ fn every_folded_character_reads_as_its_ascii_form() {
         ('\u{FE62}', "INV/1\u{FE62}2/A", InvoiceMatch::Different),
         ('\u{FE64}', "INV/1\u{FE64}2/A", InvoiceMatch::Different),
         ('\u{FF0C}', "INV/1\u{FF0C}2/A", InvoiceMatch::Different),
-        ('\u{FF0E}', "INV/1\u{FF0E}2/A", InvoiceMatch::Different),
         ('\u{FF0F}', "INV/1/2/A", InvoiceMatch::PossiblyBooked),
         ('\u{FF10}', "INV/102/A", InvoiceMatch::Different),
         // Below and above each folded digit and Latin-letter range.
@@ -796,4 +793,28 @@ fn a_number_with_multibyte_characters_is_kept_and_never_panics() {
     let kept = reference("INV-\u{1F4C4}-12\u{00C9}");
     assert!(kept.exact().contains('\u{1F4C4}'));
     assert!(!kept.fits_gstr1());
+}
+
+#[test]
+fn the_full_width_full_stop_low_line_and_reverse_solidus_fold_like_their_ascii_forms() {
+    for (wide, ascii) in [
+        ("INV\u{FF0E}12\u{FF0E}A", "INV.12.A"),
+        ("INV\u{FF3F}12\u{FF3F}A", "INV_12_A"),
+        ("INV\u{FF3C}12\u{FF3C}A", "INV\\12\\A"),
+    ] {
+        assert_eq!(
+            reference(wide).exact(),
+            reference(ascii).exact(),
+            "{wide:?}"
+        );
+        assert_eq!(reference(wide).exact(), "INV/12/A", "{wide:?}");
+        assert_eq!(
+            compare(
+                &incoming(ascii, "20251201"),
+                &booked(wide, Some("20251202"), "20251203")
+            ),
+            InvoiceMatch::Booked,
+            "{wide:?}"
+        );
+    }
 }

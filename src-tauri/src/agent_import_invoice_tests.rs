@@ -1944,6 +1944,49 @@ fn the_pilot_labs_posted_invoice_reads_back_as_planned_on_its_captured_answer() 
     );
 }
 
+/// Tally's own answer to the request the build sends, for `BP/26-27/0105`: the
+/// invoice's `GSTREGISTRATION` named `Rajasthan Registration` and its `CMPGSTIN`
+/// empty (row 2464-RB; the pilot-lab PROVENANCE table). No registration is added
+/// to it: the pair is where and as Tally wrote it, after `VOUCHERTYPENAME`, the
+/// empty GSTIN a start and end pair with `TYPE="String"`.
+const REGISTRATION_EMPTY_GSTIN: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-registration-empty-gstin.utf16le.xml"
+);
+
+/// The empty `CMPGSTIN` of Tally's answer reads as a missing registration, with
+/// the other two codes that invoice reads: its sales lines' HSN/SAC unresolved
+/// and its GSTR-1 status uncertain at the time of the read (#2559).
+#[test]
+fn an_invoice_with_an_empty_gstin_as_tally_answered_it_reads_registration_missing() {
+    let xml = utf16le(REGISTRATION_EMPTY_GSTIN);
+    // Counted by structure, not by substring: one voucher, and its two fields
+    // as the capture has them.
+    assert_eq!(xml.matches("<VOUCHER ").count(), 1);
+    assert_eq!(
+        xml.matches("<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>")
+            .count(),
+        1
+    );
+    assert_eq!(
+        xml.matches("<CMPGSTIN TYPE=\"String\"></CMPGSTIN>").count(),
+        1
+    );
+    let read = match wire::parse_invoice_readback(&xml).unwrap() {
+        wire::Readback::One(read) => read,
+        other => panic!("one voucher expected, got {other:?}"),
+    };
+    assert_eq!(read.fields["VOUCHERNUMBER"], "BP/26-27/0105");
+    assert_eq!(read.fields["GSTREGISTRATION"], "Rajasthan Registration");
+    assert_eq!(
+        invoice_readback_differences(&pilot_posted("BP/26-27/0105"), &read, "20260801"),
+        vec![
+            "invoice_registration_missing",
+            "invoice_line_hsn_unresolved",
+            "gst_status_uncertain"
+        ]
+    );
+}
+
 // ---- A bill-wise customer's invoice (3 Nov 2026, the pilot lab, #2162 item 3) ----
 //
 // Each invoice below was imported raw, as the build renders it for a bill-wise

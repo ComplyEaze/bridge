@@ -1674,7 +1674,11 @@ fn registration_difference(
 /// and its GSTIN. They go last in the voucher and the GSTIN has no attribute,
 /// which is not how Tally writes them: its answer for `BP/26-27/0105` has the
 /// pair after `VOUCHERTYPENAME`, the empty GSTIN with `TYPE="String"` too
-/// (§9.16, row 2464-RB). The read takes fields by tag and keeps no attribute.
+/// (§9.16, row 2464-RB). The read takes fields by tag and keeps no attribute,
+/// so the position and the attribute change no result, and the helper keeps its
+/// own form: its tests replace the two fields by their text, and a filled GSTIN
+/// is held on the lab PC alone. The captured answer itself
+/// (`REGISTRATION_EMPTY_GSTIN` in the invoice tests) is read with no helper.
 #[cfg(test)]
 pub(super) fn with_registration(xml: &str) -> String {
     // By the whole tag: `<GSTREGISTRATIONTYPE>` begins with `<GSTREGISTRATION`.

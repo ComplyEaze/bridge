@@ -4569,6 +4569,91 @@ fn invoice_batch(entries: serde_json::Value) -> (ImportLedgerLine, TallyEndpoint
     (line, endpoint)
 }
 
+fn add_e_invoice_details(line: &mut ImportLedgerLine) {
+    line.vouchers[0].invoice.as_mut().unwrap().e_invoice = Some(
+        serde_json::from_value(json!({
+            "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+            "ack_no": "445566",
+            "ack_date": "2025-04-03"
+        }))
+        .unwrap(),
+    );
+}
+
+/// The detailed invoice is refused, and its details are what pushed it over.
+fn assert_details_pushed_it_over(line: &ImportLedgerLine, endpoint: &TallyEndpointConfig) {
+    assert_eq!(
+        review_preview_for_form(line, endpoint, PostScope::Vouchers, PreviewForm::Listed).err(),
+        Some("import_review_too_large".to_string())
+    );
+    assert!(e_invoice_details_pushed_review_over(line, endpoint));
+}
+
+#[test]
+fn the_e_invoice_details_push_a_six_leg_invoice_over_the_limit() {
+    let (plain, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1050.00","side":"Dr"},
+        {"ledger":"Sales - Consulting Services (SAC 998311)","amount":"500.00","side":"Cr"},
+        {"ledger":"Sales - Training Services (SAC 999293)","amount":"300.00","side":"Cr"},
+        {"ledger":"Sales - Other Services (SAC 999799)","amount":"200.00","side":"Cr"},
+        {"ledger":"Output CGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"},
+        {"ledger":"Output SGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"}
+    ]));
+    let accepted =
+        review_preview_for_form(&plain, &endpoint, PostScope::Vouchers, PreviewForm::Listed)
+            .expect("the six-leg invoice without details fits");
+    assert_eq!(accepted.text.lines().count(), 24);
+
+    let mut detailed = plain;
+    add_e_invoice_details(&mut detailed);
+    assert_details_pushed_it_over(&detailed, &endpoint);
+}
+
+#[test]
+fn the_e_invoice_details_push_an_on_account_invoice_over_the_limit() {
+    let (mut plain, endpoint) = invoice_batch(json!([
+        {"ledger":"Customer A","amount":"11200.40","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Round Off","amount":"0.40","side":"Cr"}
+    ]));
+    plain.on_account_approved =
+        serde_json::from_value(json!([{"ledger":"Sales","party_digest":"a".repeat(64)}])).unwrap();
+    let accepted =
+        review_preview_for_form(&plain, &endpoint, PostScope::Vouchers, PreviewForm::Listed)
+            .expect("the On Account invoice without details fits");
+    assert_eq!(accepted.text.lines().count(), 24);
+
+    let mut detailed = plain;
+    add_e_invoice_details(&mut detailed);
+    assert_details_pushed_it_over(&detailed, &endpoint);
+}
+
+/// An invoice over the limit without its details is not said to be pushed over
+/// by them, and one with no details at all is never said to be.
+#[test]
+fn e_invoice_details_are_named_only_when_removing_them_makes_the_text_fit() {
+    let (plain, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1150.00","side":"Dr"},
+        {"ledger":"Sales - Consulting Services (SAC 998311)","amount":"500.00","side":"Cr"},
+        {"ledger":"Sales - Training Services (SAC 999293)","amount":"300.00","side":"Cr"},
+        {"ledger":"Sales - Other Services (SAC 999799)","amount":"200.00","side":"Cr"},
+        {"ledger":"Sales - Extra Services (SAC 999799)","amount":"100.00","side":"Cr"},
+        {"ledger":"Output CGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"},
+        {"ledger":"Output SGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"}
+    ]));
+    assert_eq!(
+        review_preview_for_form(&plain, &endpoint, PostScope::Vouchers, PreviewForm::Listed).err(),
+        Some("import_review_too_large".to_string()),
+        "seven legs are over the limit without details"
+    );
+    assert!(!e_invoice_details_pushed_review_over(&plain, &endpoint));
+    let mut detailed = plain;
+    add_e_invoice_details(&mut detailed);
+    assert!(!e_invoice_details_pushed_review_over(&detailed, &endpoint));
+}
+
 /// An invoice of up to three sales legs (a customer, the sales ledgers and the
 /// two tax heads: the most the window holds, since the line under the entries is
 /// not printed when no ledger is marked) is shown whole, inside the caps, with

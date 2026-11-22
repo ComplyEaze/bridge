@@ -1869,6 +1869,40 @@ fn the_next_step_of_a_divergent_invoice_and_of_a_sent_voucher_reported_not_creat
         .contains("acknowledge_post_review with doubt not_created"));
 }
 
+/// Each e-invoice difference the read-back can give is named, in backticks, in the step a
+/// divergent invoice carries, beside where to check the details in Tally (#2574). The element
+/// names are the read-back's own (`readback_differences`); the other four come from their enum.
+#[test]
+fn the_divergent_next_step_names_each_e_invoice_difference() {
+    let typed = crate::agent::failure_code::EInvoiceReadbackCode::ALL
+        .iter()
+        .map(|code| code.as_str());
+    let codes = ["IRN", "IRNACKNO", "IRNACKDATE"]
+        .into_iter()
+        .chain(typed)
+        .collect::<Vec<_>>();
+    assert_eq!(codes.len(), 7, "{codes:?}");
+    for code in codes {
+        let mut result = json!({
+            "vouchers":[{"bridge_txn_id":"t1","status":"posted_verified"}],
+            "counts":{"posted_verified":1,"posted_divergent":0}
+        });
+        mark_invoice_readback(&mut result, "t1", &[code.to_string()], &[]);
+        assert_eq!(result["vouchers"][0]["diffs"][0]["invoice_fields"][0], code);
+        let step = result["vouchers"][0]["next_step"]
+            .as_str()
+            .expect("a divergent invoice has a next step");
+        assert!(
+            step.contains(&format!("`{code}`")),
+            "{code} is not named: {step}"
+        );
+    }
+    assert!(INVOICE_DIVERGENT_NEXT_STEP.contains(
+        "For these, check the IRN, ack number and ack date on the voucher's Statutory Details \
+         screen in Tally."
+    ));
+}
+
 #[test]
 fn a_row_the_shared_parser_admits_is_always_read_whole() {
     // The premise of the record's argument that the closure of

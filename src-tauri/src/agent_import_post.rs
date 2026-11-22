@@ -3338,6 +3338,24 @@ pub(super) fn review_preview_for_form(
     }
 }
 
+/// Whether an invoice's e-invoice details are what pushed its approval text
+/// past the window's limit: with them removed, the same batch fits (#2574).
+/// It measures as [`admit_saved_voucher`] does for an invoice's build, which
+/// takes no form: a single invoice's text has one form.
+pub(super) fn e_invoice_details_pushed_review_over(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+) -> bool {
+    let mut without_details = line.clone();
+    let mut had_details = false;
+    for voucher in &mut without_details.vouchers {
+        if let Some(detail) = voucher.invoice.as_mut() {
+            had_details |= detail.e_invoice.take().is_some();
+        }
+    }
+    had_details && review_preview_for(&without_details, endpoint, PostScope::Vouchers).is_ok()
+}
+
 /// [`review_preview_for_form`] of a post whose ledgers have line-break twins,
 /// which only the post's own catalogue read finds.
 fn review_preview_with_twins(

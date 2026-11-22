@@ -2072,6 +2072,15 @@ impl Server {
                     post::PostScope::Vouchers,
                     self.post_voucher_limit(post::PostScope::Vouchers),
                 ) {
+                    // The details' own lines can be what takes it over (#2574).
+                    if code == "import_review_too_large"
+                        && post::e_invoice_details_pushed_review_over(&line, &self.settings.endpoint)
+                    {
+                        return Err(
+                            crate::agent::failure_code::InvoiceBuildCode::ReviewTooLargeWithEInvoice
+                                .into(),
+                        );
+                    }
                     return Err(invoice_route_refusal(code).into());
                 }
             }

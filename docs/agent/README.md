@@ -4440,8 +4440,9 @@ file imported by hand and a refusal before anything was sent carry none, because
 posted.
 
 A `posted_verified` Sales invoice row of `post_import` or `verify_import` carries `e_invoice_sent`, with
-`details` `none` and a `note`, only for a batch ComplyEaze Bridge posted itself; a file imported by hand does
-not carry it. The note says: "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no
+`details` `none` and a `note`, only where the invoice was sent without e-invoice details and only for a batch
+ComplyEaze Bridge posted itself; an invoice sent with e-invoice details and a file imported by hand do not
+carry it. The note says: "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no
 IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act;
 ComplyEaze Bridge does not generate one." ComplyEaze Bridge does not read whether e-invoicing applies, so the
 note is worded for either case. This field is not the `e_invoice` object of a `vouchers` row, and a proof saved

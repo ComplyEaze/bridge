@@ -578,6 +578,12 @@ fn a_sales_invoice_without_native_dispatch_has_no_e_invoice_sent_field() {
     );
     let mut found_not_sent = result.clone();
     verification::mark_found_not_sent(&mut found_not_sent);
+    assert!(
+        found_not_sent["vouchers"][0]
+            .get("e_invoice_sent")
+            .is_none(),
+        "mark_found_not_sent alone removes the field"
+    );
     verification::mark_verification_names(&mut found_not_sent);
     assert!(found_not_sent["vouchers"][0]
         .get("e_invoice_sent")

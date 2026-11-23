@@ -1,0 +1,8 @@
+t11: expected Yes, got Yes, exit 0 (saved log b3-p1, count 1) OK
+t12: expected Yes, got Yes, exit 0 (saved log b3-p2, count 1) OK
+t13: expected No, got No, exit 1 (saved log b3-p2, count 2) OK
+t14: expected Yes, got Yes, exit 0 (saved log f-p1, count 3) OK
+t15: expected No, got No, exit 1 (saved log f-p1, count 1) OK
+t16: expected Yes, got Yes, exit 0 (saved log b1-p1, count 2) OK
+t16b: expected No, got No, exit 1 (saved log b1-p1, count 3) OK
+t19: expected No, got No, exit 2 (cut inside the WAITING line, never finished) OK

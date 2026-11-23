@@ -1,0 +1,12 @@
+
+
+Algorithm : SHA256
+Hash      : 1E3DD5402178D6AE5576D7C410CC54247E2FAF0864D291F6B56CBDC91FF76B59
+Path      : <lab root>\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+
+Algorithm : SHA256
+Hash      : 79D4676B656CFB1ABCEA88F9ADE3B4B0826C5200382DB5F4EC72A636C598C118
+Path      : <lab root>\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\pdfium.dll
+
+
+

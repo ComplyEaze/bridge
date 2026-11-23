@@ -1,0 +1,14 @@
+2026-11-23T11:16:09.598Z check of b4-p1 for batch bridge-089ae3ff-3608-4f63-865f-aa4991e55d7c, 3 vouchers (log read whole after 30 read(s))
+PASS box seen
+PASS title names 3 vouchers
+PASS Create 3 vouchers in "BRIDGE TRANSFER LAB"
+PASS one Create line
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Types: 1 Contra, 2 Receipt
+  | Dates: 1-Nov-2026 to 3-Nov-2026  Voucher numbers: Tally assigns them
+  | Total debit: 11413  Total credit: 11413
+  | Dr 11413  Cr 0  3 entries  "TLab Bank B"
+  | Dr 0  Cr 2409  2 entries  "TLab Clearing"
+2026-11-23T11:16:09.599Z answer file written: Yes

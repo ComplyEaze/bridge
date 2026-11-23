@@ -1,0 +1,15 @@
+verify_import secs 3.268 isError False rpc_error None
+result keys ['alter_id_delta', 'batch_id', 'batch_sha256', 'built_at', 'company', 'counts', 'dispatch', 'dispatch_response', 'duplicates', 'evidence', 'items', 'masters_after_post', 'offset', 'post_span_binding', 'pre_import_mark', 'proof', 'transfers', 'unrelated_duplicates_in_window', 'unverified_vouchers', 'verification_status', 'verified_at', 'verified_total']
+batch_id: "bridge-7a4528fe-47e6-4953-afdb-97b25a4c9e33"
+verification_status: "posted_verified"
+counts: {"bound_not_in_window": 0, "cancelled_with_effective_copy": 0, "duplicate_fingerprint": 0, "matching_content_observed": 0, "not_attributable": 0, "not_found": 0, "posted_divergent": 0, "posted_not_effective": 0, "posted_verified": 2}
+dispatch: {"resent": false, "response": {"bytes": 540, "outcome": {"application_status": "not_reported", "counters": {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 2, "deleted": 0, "errors": 0, "exceptions": 0, "ignored": 0, "line_error_count": 0}, "exceptions_were_reported": true, "last_vch_id": 16}, "request_sha256": "ffdc6e849bdd5280c991b796d9ddc92c245535df8213fde05b197bfe07f2cda3", "response_sha256": "024cffd8c18d6c80217a6ab720943eb58759217d085dd0d2a6a89b17771b8dad"}, "response_state": "response_clean", "state": "previous_attempt_reconciled"}
+transfers: {
+ "next_steps": {},
+ "open": [],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 0,
+ "skips_paired": 2,
+ "state": "computed"
+}

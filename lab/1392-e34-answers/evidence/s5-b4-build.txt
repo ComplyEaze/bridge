@@ -1,0 +1,16 @@
+build_import_xml secs 5.245 isError False rpc_error None
+result keys ['amendment', 'batch_id', 'bill_wise_response_sha256', 'cash_projection', 'endpoint_origin', 'hsn_warnings', 'identity_scheme', 'live_evidence', 'next_step', 'observed_profile', 'on_account_approved', 'path', 'path_state', 'sha256', 'statement_ledger_warnings', 'suspense_lines', 'total_credit', 'total_debit', 'transfers', 'verification_preflight', 'voucher_count', 'warnings']
+next_step: "Call post_import with this company_guid and batch_id; the local user must review and approve it before one posting attempt."
+sha256: "19837d803d888da22e6d1b271870bcd694082176cd0130b88714bd27d538a519"
+batch_id: "bridge-089ae3ff-3608-4f63-865f-aa4991e55d7c"
+voucher_count: 3
+warnings: ["No import XML was sent to Tally. To post this saved batch, call post_import; the local user approves it in a separate window first. Do not also import this file in Tally: an import after a post is not checked against it, and the vouchers would be booked twice. If this file was already imported in Tally, do not call post_import; call verify_import with this batch_id.", "The preflight observes the current verification window. The import or subsequent changes can make later readback exceed the source limits.", "Confirm the loaded company before importing. A mismatched SVCURRENTCOMPANY is verified to post into whatever company Tally has loaded, with CREATED=1 and no error, so naming a company does not aim the write. Compare the whole identity immediately before importing — endpoint origin, name, GUID, company number and books-from, all five. Not the GUID alone, because a year-end split gives the child its parent's GUID; and not the company fields alone, because a second local Tally can hold a copy of the same company and a hand import is never checked against the endpoint this batch was built from. The endpoint_origin this batch recorded is returned beside it. Prefer an instance with no other company loaded.", "Do not re-import or rebuild this business event if the outcome is uncertain, including a Journal. Preserve the original batch and saved file, then call verify_import for read-only reconciliation. A controlled repeat observation does not qualify unknown-outcome recovery." ...
+transfers: {
+ "next_steps": {},
+ "open": [],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 0,
+ "skips_paired": 1,
+ "state": "computed"
+}

@@ -1,0 +1,12 @@
+2026-11-23T11:13:22.654Z check of b3-p1 for batch bridge-90bc797e-30e5-4a60-865e-d6ae8ad19e06, 1 vouchers (log read whole after 30 read(s))
+PASS box seen
+PASS title names this voucher
+PASS Create ONE Contra in "BRIDGE TRANSFER LAB"
+PASS one Create line
+PASS Date: 29-Oct-2026
+PASS entry lines equal the built batch: Dr 7003.00 TLab Bank B; Cr 7003.00 TLab Bank A
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Total debit: 7003  Total credit: 7003
+2026-11-23T11:13:22.655Z answer file written: Yes

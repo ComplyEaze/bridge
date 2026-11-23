@@ -1,0 +1,8 @@
+
+
+ProcessId       : 10680
+ParentProcessId : 17556
+CommandLine     : <lab root>\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+
+
+

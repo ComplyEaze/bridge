@@ -1,0 +1,13 @@
+build_import_xml secs 0.673 isError False rpc_error None
+result keys ['record_id', 'skipped_rows', 'state', 'transfers']
+state: "skips_recorded"
+skipped_rows: 1
+transfers: {
+ "next_steps": {},
+ "open": [],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 0,
+ "skips_paired": 1,
+ "state": "computed"
+}

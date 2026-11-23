@@ -1,0 +1,10 @@
+M-marks.xml: 3398 bytes
+O-company.xml: 85570 bytes
+K-sales.xml: 39030 bytes
+K-customer.xml: 2994 bytes
+K-cgst.xml: 2994 bytes
+K-sgst.xml: 2994 bytes
+l	curl 0	39030 bytes
+22:35:41	K-customer.xml	a-s1-K-customer.xml	curl 0	2994 bytes
+22:35:41	K-cgst.xml	a-s1-K-cgst.xml	curl 0	2994 bytes
+22:35:42	K-sgst.xml	a-s1-K-sgst.xml	curl 0	2994 bytes

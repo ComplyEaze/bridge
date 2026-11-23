@@ -1,0 +1,14 @@
+Row 2569-R, Part A step 4 (row 2440-CP's step 4), BRIDGE CP CGST, Ledger Creation screen before its save (shots\s4-01-cgst-before-save.png, the whole window), every field as shown:
+Name: BRIDGE CP CGST
+(alias): (empty)
+Under: Duties & Taxes (Current Liabilities) (the new screen opened with Under already Duties & Taxes, Type of Duty/Tax Others, 0 %, Include in Assessable Value calculation Not Applicable)
+Type of Duty/Tax: GST (the Types of Duty/Tax list offered GST, Others)
+Tax type: CGST (the Tax Types list offered IGST, CGST, SGST/UTGST, Cess)
+Percentage of calculation: 9 %
+Rounding method: Not Applicable (the List of Rounding Methods offered Not Applicable, Downward Rounding, Normal Rounding, Upward Rounding)
+Mailing Details: Name (empty), Address (empty)
+Banking Details: Provide bank details: No
+Tax Registration Details: PAN/IT No. (empty)
+Opening Balance (on 1-Apr-25): (empty)
+Total Opening Balance panel: (empty)
+Keys: Gateway, Create (Enter), Down to Ledger, Enter; name typed in parts (BRIDGE, space, CP, space, CGST); Enter; alias Enter; Under list on Duties & Taxes, Enter; Types of Duty/Tax list Up to GST, Enter; Tax Types list Down to CGST, Enter; 9, Enter; Rounding list Not Applicable, Enter; cursor then at Provide bank details (No). Saved by Ctrl+A.

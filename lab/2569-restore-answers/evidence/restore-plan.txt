@@ -1,0 +1,11 @@
+restore plan, 2569-R step 12, written 2026-11-23T05:52:35Z
+folder: <lab folder>/backups/BK1 (one file)
+file: TDBK1800_<company number>.001
+bytes: 32101
+sha256: 6092110e7cdf985fd2ae5c14061aea9297fab55a7bb0f81151692cc29d238b0b
+company: BRIDGE EINVOICE LAB, number <company number> (its own data folder name)
+backup taken: 2026-11-20, 22:37 local (17:07:37Z); the Restore list should show 20-Nov-26 at that time
+Restore Data Path: Tally data folder <Tally data folder>
+source: Specify Path, <lab folder>/backups/BK1
+prompts expected: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace will overwrite the existing folder." = Replace
+before it: Company > Shut BRIDGE EINVOICE LAB

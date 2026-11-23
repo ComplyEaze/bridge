@@ -1,0 +1,5 @@
+K-cgst.xml: 34516 bytes
+K-sgst.xml: 34528 bytes
+M-marks.xml: 3398 bytes
+l	a-s4r-K-sgst.xml	curl 0	34528 bytes
+22:40:24	M-marks.xml	a-s4r-M-marks.xml	curl 0	3398 bytes

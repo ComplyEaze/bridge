@@ -1,0 +1,1 @@
+helper seen at 2026-11-23T05:44:40.425Z pid 10816 cmd ["<lab folder>\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal]

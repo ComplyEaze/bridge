@@ -1,0 +1,5 @@
+read at 2026-11-20T16:54:03.492Z pid 23160
+windows 1
+WINDOW handle=18024240 name=[TallyPrime:9001] class=Ganeshji iconic=False visible=True topmost=False rect=(0,0,1920,1030) visual_state=Maximized foreground=False
+FOREGROUND handle=459584 pid=18044
+FOCUS name=[] type=ControlType.Pane pid=18044

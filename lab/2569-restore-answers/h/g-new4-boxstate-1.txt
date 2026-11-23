@@ -1,0 +1,4 @@
+read at 2026-11-22T06:44:48.971Z pid 3904
+windows 0
+FOREGROUND handle=199340 pid=23004
+FOCUS name=[] type=ControlType.Pane pid=23004

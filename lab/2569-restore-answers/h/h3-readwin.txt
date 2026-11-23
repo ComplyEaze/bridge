@@ -1,0 +1,6 @@
+read at 2026-11-22T06:53:57.468Z windows 1
+WINDOW name=[ComplyEaze Bridge — post this voucher?] class=#32770
+ControlType.Pane | Yes
+ControlType.Pane | No
+ControlType.Pane | Cancel
+ControlType.Pane | Lab row 2569-R, a hand run of the approval helper. This box posts nothing, whatever the answer. Answer No.

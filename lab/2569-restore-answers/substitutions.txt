@@ -1,0 +1,23 @@
+The company number is X at equal length in Tally's raw answers (tally/), so sizes stand. company_number values go first in tool answers, by a JSON parser. Other replacements in text files and file names, with counts:
+<CI artifact id>: 1
+<CI run id>: 1
+<Tally data folder>: 5
+<company number>: 21
+<desktop client>: 4
+<lab folder>: 25
+<lab root name>: 3
+<lab root>: 2
+SCOPE CUT on the recorded word: 1
+label: "status=\1, bytes=\2": 1
+label: \1, \2: 3
+label: \1: : 2
+label: \1=: 11
+notes: neutral pronoun for the owner: 11
+notes: the BK1 path its writing had mangled, written plain: 1
+stop: 12
+the run lead: 6
+the run lead's: 5
+the run lead's RESTORE: 1
+the run lead's next step: 1
+the run lead's step: 1
+the run lead's word: 4

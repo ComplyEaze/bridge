@@ -1,0 +1,27 @@
+Row 2569-R, Part A step 5 (row 2440-CP's step 5), BRIDGE CP Sales, Voucher Type Creation screen before its save (shots\s5-01-before-save.png, the whole window), every field as shown:
+Name: BRIDGE CP Sales
+(alias): (empty)
+General:
+Select type of voucher: Sales (typed Sales into the list filter, which showed Sales and Sales Order; the field read Sales)
+Abbreviation: Sale (as Tally filled it)
+Activate this Voucher Type: Yes
+Method of Voucher Numbering: Manual (the list offered Automatic, Automatic (Manual Override), Manual, Multi-user Auto, None)
+  Prevent creating duplicate Voucher Nos.: Yes (shown No once Manual was chosen; set by y)
+Show unused vch nos. in transactions for Retain Original Voucher No. behaviour: No (greyed)
+Use effective dates for vouchers: No
+Allow zero-valued transactions: No
+Make this voucher type as 'Optional' by default: No
+Allow narration in voucher: Yes
+Provide narrations for each ledger in voucher: No
+Enable default accounting allocations: No
+WhatsApp voucher after saving: No
+Printing:
+Print voucher after saving: No
+Default template to print: Not Applicable
+Default title to print: (empty)
+Default bank: Not Applicable
+Default jurisdiction: (empty)
+Set/alter declaration: No
+Set/Alter Terms and Conditions: No
+Name of Class: (empty)
+Keys: Gateway, Create (Enter), Down 3 to Voucher Type, Enter; name typed in parts (BRIDGE, space, CP, space, Sales); Enter; alias Enter; Sales typed, Enter; Abbreviation Enter; Activate Enter; Methods list Down 2 to Manual, Enter; y, Enter; cursor then at Use effective dates for vouchers (No). Saved by Ctrl+A.

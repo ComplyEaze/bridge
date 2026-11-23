@@ -111,6 +111,12 @@ const INVOICE_NUMBER_AFTER_POST: &[(InvoiceNumberAfterPostCode, &str)] = &[
     ),
 ];
 
+/// The invoice build's own refusal (#2574).
+const INVOICE_BUILD: &[(InvoiceBuildCode, &str)] = &[(
+    InvoiceBuildCode::ReviewTooLargeWithEInvoice,
+    "invoice_review_too_large_with_e_invoice",
+)];
+
 /// The lab master tool's refusals that name what they refused (#2499).
 #[cfg(feature = "lab-writes")]
 const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
@@ -520,6 +526,12 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(PRESENCE),
         of(TIE_OUT),
         of(STOCK_ITEM_CREATE),
+        of(INVOICE_BUILD),
+        of(INVOICE_REGISTRATION),
+        of(INVOICE_ITEM_LINE),
+        of(COMPANY_READ),
+        of(CENSUS_REUSE),
+        of(E_INVOICE_READBACK),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -527,29 +539,87 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     pins
 }
 
+/// Every declared variant of every enum, as the failure code it makes, each enum under its name.
+fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
+    fn of<C: Copy + Into<FailureCode>>(
+        name: &'static str,
+        all: &[C],
+    ) -> (&'static str, Vec<FailureCode>) {
+        (name, all.iter().map(|code| (*code).into()).collect())
+    }
+    let enums = vec![
+        of("GstUncertainCode", GstUncertainCode::ALL),
+        of("ReadCode", ReadCode::ALL),
+        of("ProposalsCode", ProposalsCode::ALL),
+        of("GstStatusCode", GstStatusCode::ALL),
+        of("GstByLedgerCode", GstByLedgerCode::ALL),
+        of("RegisterCode", RegisterCode::ALL),
+        of("OutstandingsCode", OutstandingsCode::ALL),
+        of(
+            "InvoiceNumberAfterPostCode",
+            InvoiceNumberAfterPostCode::ALL,
+        ),
+        of("MovementCode", MovementCode::ALL),
+        of("PresenceCode", PresenceCode::ALL),
+        of("TieOutCode", TieOutCode::ALL),
+        of("StockItemCreateCode", StockItemCreateCode::ALL),
+        of("InvoiceBuildCode", InvoiceBuildCode::ALL),
+        of("InvoiceRegistrationCode", InvoiceRegistrationCode::ALL),
+        of("InvoiceItemLineCode", InvoiceItemLineCode::ALL),
+        of("CompanyReadCode", CompanyReadCode::ALL),
+        of("CensusReuseCode", CensusReuseCode::ALL),
+        of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
+    ];
+    #[cfg(feature = "lab-writes")]
+    let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
+    enums
+}
+
 /// Every declared variant of every enum, as the failure code it makes.
 fn declared() -> Vec<FailureCode> {
-    fn of<C: Copy + Into<FailureCode>>(all: &[C]) -> Vec<FailureCode> {
-        all.iter().map(|code| (*code).into()).collect()
+    declared_by_enum()
+        .into_iter()
+        .flat_map(|(_, codes)| codes)
+        .collect()
+}
+
+/// Every enum the `failure_codes!` macro declares in `agent_failure_code.rs` is in
+/// [`declared_by_enum`], so the uniqueness test walks it (#2558). The enum names are read from the
+/// source, counting an enum whether or not a `cfg` gates it, so a block added without a line in
+/// the list fails here.
+#[test]
+fn every_enum_the_macro_declares_is_walked_by_declared() {
+    let source = include_str!("agent_failure_code.rs");
+    let source = &source[..source
+        .find("#[cfg(test)]\n#[path")
+        .expect("the tests module")];
+    let mut in_declaration = false;
+    let mut found = Vec::new();
+    for line in source.lines() {
+        if line.starts_with("failure_codes! {") {
+            in_declaration = true;
+        } else if in_declaration {
+            if let Some(rest) = line.trim().strip_prefix("pub(crate) enum ") {
+                found.push(rest.trim_end_matches(" {").to_string());
+                in_declaration = false;
+            }
+        }
     }
-    let codes = [
-        of(GstUncertainCode::ALL),
-        of(ReadCode::ALL),
-        of(ProposalsCode::ALL),
-        of(GstStatusCode::ALL),
-        of(GstByLedgerCode::ALL),
-        of(RegisterCode::ALL),
-        of(OutstandingsCode::ALL),
-        of(InvoiceNumberAfterPostCode::ALL),
-        of(MovementCode::ALL),
-        of(PresenceCode::ALL),
-        of(TieOutCode::ALL),
-        of(StockItemCreateCode::ALL),
-    ]
-    .concat();
-    #[cfg(feature = "lab-writes")]
-    let codes = [codes, of(LabMastersCode::ALL)].concat();
-    codes
+    let mut walked: Vec<String> = declared_by_enum()
+        .into_iter()
+        .map(|(name, _)| name.to_string())
+        .collect();
+    // Declared in a build without `lab-writes` too, as source text.
+    #[cfg(not(feature = "lab-writes"))]
+    walked.push("LabMastersCode".to_string());
+    found.sort();
+    walked.sort();
+    assert_eq!(
+        found.len(),
+        19,
+        "the failure_codes! blocks found in the source"
+    );
+    assert_eq!(found, walked);
 }
 
 /// The pins cover every variant, once each and in declaration order, so a variant added without a
@@ -574,6 +644,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
     assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
+    assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -615,6 +686,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
     check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
+    check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
@@ -636,9 +708,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 75;
+    let expected = 76 + 4 + 2 + 1 + 1 + 4;
     #[cfg(feature = "lab-writes")]
-    let expected = 78;
+    let expected = 79 + 4 + 2 + 1 + 1 + 4;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();
@@ -723,10 +795,12 @@ fn the_item_line_codes_are_pinned_and_have_the_receipts_code_shape() {
 }
 
 /// The company-read code, pinned as above (#2433).
+const COMPANY_READ: &[(CompanyReadCode, &str)] =
+    &[(CompanyReadCode::NameInvalid, "company_name_invalid")];
+
 #[test]
 fn the_company_read_code_is_pinned() {
-    let pinned: &[(CompanyReadCode, &str)] =
-        &[(CompanyReadCode::NameInvalid, "company_name_invalid")];
+    let pinned = COMPANY_READ;
     assert_eq!(
         pinned.iter().map(|(code, _)| *code).collect::<Vec<_>>(),
         CompanyReadCode::ALL

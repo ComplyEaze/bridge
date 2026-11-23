@@ -3657,8 +3657,7 @@ const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
-const PILOT_LAB_READBACK: &str =
-    "a read-back answer of the pilot lab (9 and 10 Oct 2026), with no \
+const PILOT_LAB_READBACK: &str = "a read-back answer of the pilot lab, with no \
      row here: the app crate's invoice tests (src/agent_import_invoice_tests.rs, and the replay in \
      src/agent_import_post_e2e_tests.rs) parse it with the read-back's own parser and pin what it \
      returns; pilot-lab/PROVENANCE.md says what it is";
@@ -4054,6 +4053,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-registration-empty-gstin.utf16le.xml",
         PILOT_LAB_READBACK,
     ),
     (

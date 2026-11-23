@@ -1206,10 +1206,9 @@ fn an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitte
     let masters = observed(&ledgers, groups);
     let state = masters.classify("Retention Party");
     assert_eq!(state.state(), "not_established");
-    assert!(
-        state.detail().contains("no captured response exhibits"),
-        "unexpected detail: {}",
-        state.detail()
+    assert_eq!(
+        state.detail(),
+        "The group's reserved identity is one no captured response exhibits, so it establishes neither that the ledger holds money nor that it does not."
     );
     assert!(
         !LegRequirement::Counterparty.admits(&state),
@@ -3847,6 +3846,39 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
     assert!(contra.reversed_same_day);
 }
 
+/// A skipped row's instrument, the cheque or number its statement prints, is
+/// written into the batch's facts as it is for a Contra row.
+#[tokio::test]
+async fn a_skipped_rows_instrument_is_written_into_the_facts() {
+    let simulator = SequenceSimulator::spawn(two_bank_plans()).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let mut skip = skip_record_of("Cash");
+    skip["instrument"] = json!("000418");
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        json!({"from": "2026-08-02", "to": "2026-09-29"}),
+        json!([statement_contra()]),
+        json!([contra_record(), skip, outflow_skip_record()]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 1, "{response}");
+    simulator.finish().expect("requests");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    let facts = saved.statement.as_ref().expect("facts");
+    assert_eq!(facts["skip_rows"][0]["instrument"], "000418", "{facts}");
+    assert!(facts["skip_rows"][1].get("instrument").is_none(), "{facts}");
+}
+
 /// The statement's bank ledger and a skipped row's other ledger are held to the
 /// catalogue like a voucher's: one the book does not hold is refused as the
 /// masters are, and nothing is written.
@@ -4396,6 +4428,79 @@ fn a_reserved_identity_matches_whatever_its_case_and_padding() {
             "{spelling:?}"
         );
     }
+}
+
+#[track_caller]
+fn assert_unknown_reserved_identity(identity: &str) {
+    let mut groups = captured_demo_groups();
+    groups.push(TallyNamedMaster {
+        name: "Near Miss Probe Group".into(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Current Liabilities".into()),
+        reserved_name: Some(identity.into()),
+    });
+    let mut ledgers = captured_demo_ledger_parents();
+    ledgers.push((
+        "Near Miss Probe Ledger".into(),
+        Some("Near Miss Probe Group".into()),
+    ));
+    let state = observed(&ledgers, groups).classify("Near Miss Probe Ledger");
+    assert_eq!(
+        state,
+        CashBankState::NotEstablished {
+            reason: "The group's reserved identity is one no captured response exhibits, so it establishes neither that the ledger holds money nor that it does not."
+        },
+        "{identity:?}"
+    );
+    assert!(
+        !LegRequirement::Money.admits(&state),
+        "{identity:?} must not be admitted as money"
+    );
+    assert!(
+        !LegRequirement::Counterparty.admits(&state),
+        "{identity:?} must not be admitted as a counterparty"
+    );
+}
+
+/// Prefixes, suffixes, inner parts of money identities and identities that
+/// carry one with text before it, after it or on both sides remain unknown:
+/// only an exact normalized table entry establishes money.
+#[test]
+fn money_reserved_identities_do_not_match_by_partial_overlap() {
+    for identity in [
+        "Bank",
+        "OD A/c",
+        "Bank Accounts Escrow",
+        "Escrow Bank Accounts",
+        "ank Account",
+        "Escrow Bank Accounts Holdback",
+    ] {
+        assert_unknown_reserved_identity(identity);
+    }
+}
+
+/// The non-money table is exact for the same six overlap shapes; a partial
+/// match must not turn an unknown identity into an admitted counterparty.
+#[test]
+fn non_money_reserved_identities_do_not_match_by_partial_overlap() {
+    for identity in [
+        "Sundry",
+        "Debtors",
+        "Sundry Debtors Escrow",
+        "Escrow Sundry Debtors",
+        "undry Debtor",
+        "Escrow Sundry Debtors Holdback",
+    ] {
+        assert_unknown_reserved_identity(identity);
+    }
+}
+
+/// ASCII case folding deliberately leaves Kelvin sign unchanged, although
+/// Unicode lower-casing would make this spelling equal to Bank Accounts.
+#[test]
+fn unicode_case_folding_does_not_establish_a_money_reserved_identity() {
+    let identity = "Ban\u{212A} Accounts";
+    assert_eq!(identity.to_lowercase(), "bank accounts");
+    assert_unknown_reserved_identity(identity);
 }
 
 /// The production table classifies every captured predefined identity: three

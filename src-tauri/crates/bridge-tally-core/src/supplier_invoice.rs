@@ -20,13 +20,13 @@
 //! - A financial year written into a number (`2025-26`, `25/26`, `FY26`, a leading or trailing
 //!   `2025`) is left out of the loose form and the serial, so a copy keyed without it, or with the
 //!   year written another way, is still found.
-//! - A number with no digit but zero (`NA`, `Cash`, `0`) is a placeholder, not a supplier's
-//!   number: it is never [`InvoiceMatch::Booked`], and matches only as a loose form does. A number
-//!   whose only digits are of another script (Gujarati, Bengali, Tamil, Arabic-Indic) has no ASCII
+//! - A number with no non-zero digit outside a named year (`NA`, `Cash`, `0`, `NA/2025-26`) is a
+//!   placeholder, not a supplier's number: it is never
+//!   [`InvoiceMatch::Booked`], and matches only as a loose form does. A number whose only digits are of another script (Gujarati, Bengali, Tamil, Arabic-Indic) has no ASCII
 //!   digit and so is treated as a placeholder.
 //! - The characters folded (separators, characters that draw nothing, and the listed digits and
 //!   Latin letters) are closed lists: Devanagari and full-width digits, full-width Latin letters,
-//!   and the dashes and slashes named in `SEPARATORS`. Every other letter is upper-cased with the
+//!   and the separators named in `SEPARATORS`. Every other letter is upper-cased with the
 //!   full Unicode rule, so `ß` becomes `SS`. Every Unicode whitespace character is read as a
 //!   separator. Anything else is kept as it is, so a number differing only there is not found as
 //!   the same.
@@ -35,9 +35,10 @@ use crate::{ExactDecimal, TallyDate};
 /// The separators a supplier writes between the parts of a number, folded to one form: the ASCII
 /// ones, and the dashes, minus sign and full-width forms a number copied from a PDF or a word
 /// processor carries in their place.
-const SEPARATORS: [char; 18] = [
+const SEPARATORS: [char; 21] = [
     '-', '/', '\\', '.', '_', '\u{2010}', '\u{2011}', '\u{2012}', '\u{2013}', '\u{2014}',
-    '\u{2015}', '\u{2044}', '\u{2212}', '\u{2215}', '\u{FE58}', '\u{FE63}', '\u{FF0D}', '\u{FF0F}',
+    '\u{2015}', '\u{2044}', '\u{2212}', '\u{2215}', '\u{FE58}', '\u{FE63}', '\u{FF0D}', '\u{FF0E}',
+    '\u{FF0F}', '\u{FF3C}', '\u{FF3F}',
 ];
 /// Rule 46(b): at most sixteen characters.
 const GSTR1_MAX_CHARS: usize = 16;
@@ -123,7 +124,11 @@ impl SupplierInvoiceRef {
         &self.raw
     }
 
-    /// The form two numbers are the same invoice in.
+    /// The number with the characters that draw nothing dropped, the listed digits and letters
+    /// read as ASCII, upper-cased, and every run of whitespace and separators folded to one `/`.
+    /// Equal exact forms are necessary for [`InvoiceMatch::Booked`] and for a possible match on
+    /// the number itself, but not enough: `compare` decides `Booked` on the stricter form that
+    /// keeps `-` and `/` as typed, and never for a placeholder.
     pub fn exact(&self) -> &str {
         &self.exact
     }
@@ -364,9 +369,11 @@ pub struct BookedInvoice {
 impl BookedInvoice {
     /// The financial years the copy can belong to. From the invoice date, one. From the voucher
     /// date, also the year before when the voucher falls between April and November: credit on an
-    /// invoice of the previous year can be taken until 30 November at the latest (s.16(4)). So a
-    /// copy with no invoice date and a voucher dated December to March is taken as its own year
-    /// only, and a copy booked later than that is not found by this fallback.
+    /// invoice of the previous year can be taken until 30 November at the latest (s.16(4)). Also
+    /// the year after when the voucher falls in March: a year-end entry may book an invoice dated
+    /// in April (#2557). So a copy with no invoice date and a voucher dated December to February
+    /// is taken as its own year only, and a copy booked later than that is not found by this
+    /// fallback.
     fn financial_years(&self) -> (Vec<FinancialYear>, bool) {
         match &self.invoice_date {
             Some(date) => (vec![FinancialYear::of(date)], false),
@@ -378,6 +385,9 @@ impl BookedInvoice {
                 let mut years = vec![year];
                 if (4..=11).contains(&month) && year.0 > 0 {
                     years.push(FinancialYear(year.0 - 1));
+                }
+                if month == 3 && year.0 < u16::MAX {
+                    years.push(FinancialYear(year.0 + 1));
                 }
                 (years, true)
             }

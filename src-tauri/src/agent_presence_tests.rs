@@ -3043,3 +3043,54 @@ async fn numbering_rows_that_would_not_fit_come_back_as_counts_through_the_tool(
     assert_eq!(read["agreeing"], 1, "{response}");
     assert!(read.get("types").is_none(), "{response}");
 }
+
+/// A ledger renamed between the two catalogue reads refuses the report by the drift code (#2558).
+/// The second catalogue is the first with one ledger renamed, so the two name sets differ.
+#[tokio::test]
+async fn a_catalogue_that_changes_between_its_two_reads_refuses_as_drifted() {
+    let catalogue = catalogue_xml();
+    let renamed = catalogue.replace("WR2 Sales", "WR2 Sales Renamed");
+    assert_ne!(
+        renamed, catalogue,
+        "the capture names the ledger it renames"
+    );
+    let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
+    steps.extend(paired_read(&catalogue));
+    steps.extend(paired_read(&high_water_xml()));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&renamed));
+    let simulator = SequenceSimulator::spawn(with_book_numbering(plans(steps), &["Journal"]))
+        .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let response = server
+        .call_tool_response(
+            "voucher_presence",
+            json!({
+                "company_guid": CAPTURED_GUID,
+                "from": "20260901",
+                "to": "20260930",
+                "numbering": [{"voucher_type":"Journal","numbering_method":"manual"}],
+                "vouchers": [proposal("JV-1", "Bridge Nested Debtor WR4", "12.50")],
+            }),
+        )
+        .await;
+    assert_eq!(
+        response.value["structuredContent"]["result"]["error"]["code"],
+        ReadCode::LedgerSnapshotDrifted.as_str()
+    );
+}

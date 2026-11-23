@@ -377,8 +377,10 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     for (response, pointed) in [(None, true), (Some(&altered), false), (Some(&clean), false)] {
         let mut previous = unverified();
         finalize_previous_attempt_reconciliation(&mut previous, response, None, 1);
+        attach_response_missing_next_step(&mut previous, 200_000);
         let mut current = unverified();
         finalize_current_dispatch(&mut current, response, None, 1);
+        attach_response_missing_next_step(&mut current, 200_000);
         for payload in [previous, current] {
             let error = &payload["result"]["error"];
             assert_eq!(error["code"], "import_reconciliation_required");
@@ -392,8 +394,10 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     let verified = || json!({"result": {"counts": {"posted_verified": 1}, "duplicates": []}});
     let mut previous = verified();
     finalize_previous_attempt_reconciliation(&mut previous, None, None, 1);
+    attach_response_missing_next_step(&mut previous, 200_000);
     let mut current = verified();
     finalize_current_dispatch(&mut current, None, None, 1);
+    attach_response_missing_next_step(&mut current, 200_000);
     for payload in [previous, current] {
         let result = &payload["result"];
         assert_eq!(result["dispatch"]["state"], "reconciliation_required");
@@ -426,6 +430,47 @@ fn a_missing_response_points_at_the_calls_receipt_and_promises_none() {
     for word in ["always", "will be", "because", "caused"] {
         assert!(!step.contains(word), "{word}");
     }
+}
+
+/// The step is attached at exactly the budget the largest page with it needs,
+/// and not one byte below (#2556).
+#[test]
+fn response_missing_step_is_attached_only_within_the_largest_pages_budget() {
+    let unverified = || json!({"result": {"counts": {"posted_verified": 0}, "duplicates": []}});
+    let mut with_step = unverified();
+    finalize_current_dispatch(&mut with_step, None, None, 1);
+    with_step["result"]["error"]["next_step"] = json!(RESPONSE_MISSING_NEXT_STEP);
+    let largest = super::super::verification::verification_response_page(
+        &with_step["result"],
+        &"0".repeat(64),
+        usize::MAX,
+    );
+    let needed = super::super::verification_page_essential_bytes(&largest);
+    for (max_bytes, attached) in [(needed, true), (needed - 1, false)] {
+        let mut payload = unverified();
+        finalize_current_dispatch(&mut payload, None, None, 1);
+        attach_response_missing_next_step(&mut payload, max_bytes);
+        let error = &payload["result"]["error"];
+        assert_eq!(error["code"], "import_reconciliation_required");
+        assert_eq!(
+            error.get("next_step").is_some(),
+            attached,
+            "max_bytes {max_bytes}"
+        );
+    }
+}
+
+#[test]
+fn response_missing_step_says_how_to_match_a_receipt_without_a_batch_id() {
+    assert!(RESPONSE_MISSING_NEXT_STEP
+        .contains("A receipt names no batch; match it by its time and company"));
+}
+
+#[test]
+fn response_missing_step_allows_a_receipt_without_a_trail() {
+    assert!(!RESPONSE_MISSING_NEXT_STEP.contains("Its request_trail lists the last 32 sends"));
+    assert!(RESPONSE_MISSING_NEXT_STEP
+        .contains("If its receipt has a request_trail, that lists the last 32 sends"));
 }
 
 #[test]
@@ -4567,6 +4612,91 @@ fn invoice_batch(entries: serde_json::Value) -> (ImportLedgerLine, TallyEndpoint
         render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
     );
     (line, endpoint)
+}
+
+fn add_e_invoice_details(line: &mut ImportLedgerLine) {
+    line.vouchers[0].invoice.as_mut().unwrap().e_invoice = Some(
+        serde_json::from_value(json!({
+            "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+            "ack_no": "445566",
+            "ack_date": "2025-04-03"
+        }))
+        .unwrap(),
+    );
+}
+
+/// The detailed invoice is refused, and its details are what pushed it over.
+fn assert_details_pushed_it_over(line: &ImportLedgerLine, endpoint: &TallyEndpointConfig) {
+    assert_eq!(
+        review_preview_for_form(line, endpoint, PostScope::Vouchers, PreviewForm::Listed).err(),
+        Some("import_review_too_large".to_string())
+    );
+    assert!(e_invoice_details_pushed_review_over(line, endpoint));
+}
+
+#[test]
+fn the_e_invoice_details_push_a_six_leg_invoice_over_the_limit() {
+    let (plain, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1050.00","side":"Dr"},
+        {"ledger":"Sales - Consulting Services (SAC 998311)","amount":"500.00","side":"Cr"},
+        {"ledger":"Sales - Training Services (SAC 999293)","amount":"300.00","side":"Cr"},
+        {"ledger":"Sales - Other Services (SAC 999799)","amount":"200.00","side":"Cr"},
+        {"ledger":"Output CGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"},
+        {"ledger":"Output SGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"}
+    ]));
+    let accepted =
+        review_preview_for_form(&plain, &endpoint, PostScope::Vouchers, PreviewForm::Listed)
+            .expect("the six-leg invoice without details fits");
+    assert_eq!(accepted.text.lines().count(), 24);
+
+    let mut detailed = plain;
+    add_e_invoice_details(&mut detailed);
+    assert_details_pushed_it_over(&detailed, &endpoint);
+}
+
+#[test]
+fn the_e_invoice_details_push_an_on_account_invoice_over_the_limit() {
+    let (mut plain, endpoint) = invoice_batch(json!([
+        {"ledger":"Customer A","amount":"11200.40","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Round Off","amount":"0.40","side":"Cr"}
+    ]));
+    plain.on_account_approved =
+        serde_json::from_value(json!([{"ledger":"Sales","party_digest":"a".repeat(64)}])).unwrap();
+    let accepted =
+        review_preview_for_form(&plain, &endpoint, PostScope::Vouchers, PreviewForm::Listed)
+            .expect("the On Account invoice without details fits");
+    assert_eq!(accepted.text.lines().count(), 24);
+
+    let mut detailed = plain;
+    add_e_invoice_details(&mut detailed);
+    assert_details_pushed_it_over(&detailed, &endpoint);
+}
+
+/// An invoice over the limit without its details is not said to be pushed over
+/// by them, and one with no details at all is never said to be.
+#[test]
+fn e_invoice_details_are_named_only_when_removing_them_makes_the_text_fit() {
+    let (plain, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1150.00","side":"Dr"},
+        {"ledger":"Sales - Consulting Services (SAC 998311)","amount":"500.00","side":"Cr"},
+        {"ledger":"Sales - Training Services (SAC 999293)","amount":"300.00","side":"Cr"},
+        {"ledger":"Sales - Other Services (SAC 999799)","amount":"200.00","side":"Cr"},
+        {"ledger":"Sales - Extra Services (SAC 999799)","amount":"100.00","side":"Cr"},
+        {"ledger":"Output CGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"},
+        {"ledger":"Output SGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"}
+    ]));
+    assert_eq!(
+        review_preview_for_form(&plain, &endpoint, PostScope::Vouchers, PreviewForm::Listed).err(),
+        Some("import_review_too_large".to_string()),
+        "seven legs are over the limit without details"
+    );
+    assert!(!e_invoice_details_pushed_review_over(&plain, &endpoint));
+    let mut detailed = plain;
+    add_e_invoice_details(&mut detailed);
+    assert!(!e_invoice_details_pushed_review_over(&detailed, &endpoint));
 }
 
 /// An invoice of up to three sales legs (a customer, the sales ledgers and the

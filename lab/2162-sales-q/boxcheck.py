@@ -39,7 +39,12 @@
 #   ComplyEaze Bridge posts now or ... 15 min, ...   footer, agent_post_timing_lines :3292-3297 (APPROVAL_TTL 15 min)
 #   ---- The voucher's own text follows: ... ----    :3664, VOUCHER_TEXT_HEADING :3687
 #   Reference: <number>                              :3665
-#   Narration: <narration> | Narration: (none)       :3666-3671, the XML's NARRATION; the LAST line: a box text that
+#   Narration: <narration> | Narration: (none)       :3666-3671, posted_narration (agent_import.rs:5856): the voucher's own
+#                                                    narration, trimmed. The saved file's NARRATION is that text, a space
+#                                                    and the build's tag [BRIDGE:<id>] (render_voucher_xml, the Tagged
+#                                                    arm), or the tag alone when there is none; the box never shows the
+#                                                    tag (row 2162-SALES-Q's smoke box: marker-only XML, "(none)"). So
+#                                                    one tag at the end is taken off first. The LAST line: a box text that
 #                                                    does not end with it is a No (a cut box)
 # Names are quoted as JSON strings (:3585). A line the list does not hold, a line missing, a line twice or out of its place
 # is a No: the box's text must be exactly this list. Besides, each graded line (company, GUID, type/date/number, customer,
@@ -50,6 +55,7 @@ tag, batch, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
 D = 'C:/bridge-lab/2162-sales-q/box'; log = f'{D}/{tag}-box.txt'
 G = '6b43e498-430c-4d5c-bfef-d32e2ab93c85'; C = 'BRIDGE PILOT LAB'
 MON = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+TAG = re.compile(r'(?:^| )\[BRIDGE:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]$')  # the saved file's tag
 def now(): return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 def answer(ans, out):
     open(f'{D}/{tag}.answer', 'w', encoding='utf-8').write(ans)
@@ -121,7 +127,7 @@ try:
     else:
         d = datetime.strptime(v.findtext('DATE'), '%Y%m%d'); dt = f'{d.day}-{MON[d.month - 1]}-{d.year}'
         vt, num, party = v.findtext('VOUCHERTYPENAME'), v.findtext('VOUCHERNUMBER'), v.findtext('PARTYLEDGERNAME')
-        pos, gstin, narr = v.findtext('PLACEOFSUPPLY'), v.findtext('PARTYGSTIN'), (v.findtext('NARRATION') or '')
+        pos, gstin, narr = v.findtext('PLACEOFSUPPLY'), v.findtext('PARTYGSTIN'), TAG.sub('', v.findtext('NARRATION') or '', count=1)
         legs = v.findall('LEDGERENTRIES.LIST') + v.findall('ALLLEDGERENTRIES.LIST')
         ents = [f"{'Dr' if e.findtext('ISDEEMEDPOSITIVE') == 'Yes' else 'Cr'} {'%.2f' % abs(Decimal(e.findtext('AMOUNT')))}  {q(e.findtext('LEDGERNAME'))}" for e in legs]
         dr = sum(abs(Decimal(e.findtext('AMOUNT'))) for e in legs if e.findtext('ISDEEMEDPOSITIVE') == 'Yes')

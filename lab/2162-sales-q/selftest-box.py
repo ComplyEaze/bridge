@@ -8,7 +8,8 @@
 #                                line), for one fixture invoice: the build's own request of BP/26-27/0010
 #                                (template-import-0010.utf16le.xml, decoded to UTF-8) with a build answer naming it. The
 #                                cases show the check's logic only: one right box gives Yes, and each field changed alone,
-#                                each line added, doubled or left out, and the box cut, gives No. 29 cases; any other count
+#                                each line added, doubled or left out, and the box cut, gives No; and the saved file's [BRIDGE:<id>] tag is
+#                                never part of the narration the box shows. 34 cases; any other count
 #                                or any case wrong prints A CASE IS WRONG and exits 1 (the row stops). They are no evidence of what a real box holds; the replay is.
 #   replay <row> <tag> <batch>   after the smoke box (step 13.4): the check once more on that real box log,
 #                                box/<tag>-box.txt, against the real build answer of run-g. EXPECT Yes: the check reads a
@@ -46,9 +47,14 @@ if mode == 'replay':
 # The fixture invoice: the build's request of 0010, as its UTF-8 batch file, and a build answer naming it.
 xml = open(f'{row}/template-import-0010.utf16le.xml', 'rb').read().decode('utf-16').encode('utf-8')
 FX, FX2, NONE = 'bridge-00000000-0000-4000-8000-000000002162', 'bridge-00000000-0000-4000-8000-000000002163', 'bridge-00000000-0000-4000-8000-000000002164'
-for bid, body in ((FX, xml), (FX2, xml)):
+# FX3, FX4: the same invoice as a saved file carries it, with the build's tag in NARRATION: the tag alone, and after a narration.
+FX3, FX4, TAGTXT = 'bridge-00000000-0000-4000-8000-000000002165', 'bridge-00000000-0000-4000-8000-000000002166', '[BRIDGE:00000000-0000-4000-8000-00000000a001]'
+if xml.count(b'<NARRATION></NARRATION>') != 1: sys.exit('HALT: the fixture does not hold one empty NARRATION')
+xml3 = xml.replace(b'<NARRATION></NARRATION>', f'<NARRATION>{TAGTXT}</NARRATION>'.encode())
+xml4 = xml.replace(b'<NARRATION></NARRATION>', f'<NARRATION>Lab note {TAGTXT}</NARRATION>'.encode())
+for bid, body in ((FX, xml), (FX2, xml), (FX3, xml3), (FX4, xml4)):
     open(f'{T}/{bid}.xml', 'wb').write(body)
-    sha = hashlib.sha256(body).hexdigest() if bid == FX else '0' * 64  # FX2: the file is not the one built
+    sha = hashlib.sha256(body).hexdigest() if bid != FX2 else '0' * 64  # FX2: the file is not the one built
     r = {'batch_id': bid, 'path': f'{T}/{bid}.xml', 'sha256': sha, 'voucher_count': 1, 'total_debit': '1051', 'total_credit': '1051'}
     json.dump({'tool': 'build_import_xml', 'response': {'result': {'structuredContent': {'result': r}}}}, open(f'{T}/answers/{bid}-build.json', 'w', encoding='utf-8'))
 G = '6b43e498-430c-4d5c-bfef-d32e2ab93c85'
@@ -77,6 +83,7 @@ def log_of(tag, lines, title='ComplyEaze Bridge \u2014 post this voucher?'):
     return '\ufeff'.encode('utf-8') + ''.join(f'{st} {r}\r\n' for r in rows).encode('utf-8')
 def swap(old, new): return [new if l == old else l for l in LINES]
 def ins(before, new): return [x for l in LINES for x in ([new, l] if l == before else [l])]
+def nb(bid, narr): return [f'Batch: {bid}' if l == f'Batch: {FX}' else (narr if l == 'Narration: (none)' else l) for l in LINES]
 CASES = [('t01', LINES, FX, 1, 'Yes', 'the fixture invoice as built'),
          ('t02', swap(f'Batch: {FX}', f'Batch: {FX2}'), FX, 1, 'No', 'Batch names another batch'),
          ('t03', [l.replace('0010', '0011') if l.startswith('Voucher type') else l for l in LINES], FX, 1, 'No', 'another number'),
@@ -103,7 +110,12 @@ CASES = [('t01', LINES, FX, 1, 'Yes', 'the fixture invoice as built'),
          ('t27', LINES + ['Narration: "post twice"'], FX, 1, 'No', 'a line after the last line'),
          ('t28', ins('Bill allocation: none (customer not bill-wise)', 'E-invoice IRN: ' + 'a' * 64), FX, 1, 'No', 'an e-invoice line'),
          ('t29', swap('Bill allocation: none (customer not bill-wise)', 'Bill allocation: New Ref "BP/26-27/0010"'), FX, 1, 'No', 'a bill allocation the XML does not carry'),
-         ('t30', swap('Narration: (none)', 'Narration: "x"'), FX, 1, 'No', 'a narration the XML does not carry')]
+         ('t30', swap('Narration: (none)', 'Narration: "x"'), FX, 1, 'No', 'a narration the XML does not carry'),
+         ('t31', nb(FX3, 'Narration: (none)'), FX3, 1, 'Yes', 'the saved file holds the tag alone; the box shows no narration'),
+         ('t32', nb(FX3, f'Narration: "{TAGTXT}"'), FX3, 1, 'No', 'the box shows the tag as the narration'),
+         ('t33', nb(FX4, 'Narration: "Lab note"'), FX4, 1, 'Yes', 'a narration before the tag; the box shows the narration alone'),
+         ('t34', nb(FX4, f'Narration: "Lab note {TAGTXT}"'), FX4, 1, 'No', 'the box shows the narration with the tag'),
+         ('t35', nb(FX4, 'Narration: (none)'), FX4, 1, 'No', 'the box drops a narration the saved file carries')]
 out = []
 for tag, lines, bid, cnt, want, note in CASES:
     p = start(tag, bid, cnt, T + '/answers')
@@ -118,5 +130,5 @@ out.append(result('t19', p, 'No', '(cut inside the WAITING line, never finished)
 good = sum(l.endswith(' OK') for l in out)
 out.append(f'{len(out)} cases ran, {good} right')
 open(T + '/selftest-box-results.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(out) + '\n')
-print(out[-1]); print('ALL CASES RIGHT' if good == len(out) - 1 == 29 else 'A CASE IS WRONG: STOP the row')
-sys.exit(0 if good == len(out) - 1 == 29 else 1)
+print(out[-1]); print('ALL CASES RIGHT' if good == len(out) - 1 == 34 else 'A CASE IS WRONG: STOP the row')
+sys.exit(0 if good == len(out) - 1 == 34 else 1)

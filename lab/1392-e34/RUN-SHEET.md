@@ -41,7 +41,7 @@ The file is copied byte for byte, never retyped, and its sha256 is checked again
 `BRIDGE TRANSFER LAB`, GUID `d6e4c24f-8c7a-4797-93ec-e44bdff60bc9`, synthetic. TallyPrime 7.2 Silver, licensed.
 - **Ledgers:** `TLab Bank A`, `TLab Bank B`, `Cash`, `TLab Clearing` (under Suspense A/c) and `Profit & Loss A/c`.
 - **Last marks:** row 1392-E's m4 after its restore (5 Nov), **V 12, M 211**. It was left shut.
-- **Fallback:** row 1392-E's backup BK-E, `C:\bridge-lab\1392e\backups\bke\TDBK1800_<company number>.001`, 32,428 B, sha256 `29c2de73fe7d383f5c388d92ff193e39ea9f65b59a57c8f812891dabf457cbb5`. It is not this row's backup. This row takes its own, BK-E2, at step 2.
+- **Fallback:** row 1392-E's backup BK-E, `C:\bridge-lab\1392e\backups\bke\TDBK1800_<company number>.001`, 32,428 B, sha256 `29c2de73fe7d383f5c388d92ff193e39ea9f65b59a57c8f812891dabf457cbb5`. It is not this row's backup. This row takes its own, BK-E2, at step 1.
 - **Dates:** no day this row writes or reads (26 Oct to 3 Nov 2026) holds a voucher of the book's own.
 
 Not on the PC, or another GUID: stop, the row has no book; never rebuild it. Any prompt when it opens: press no key, screenshot, stop and report its words. Education mode: stop.
@@ -50,11 +50,11 @@ Not on the PC, or another GUID: stop, the row has no book; never rebuild it. Any
 `LAB-COMMON.md` in this folder applies in full. It is v3, byte-equal to row 1392-E's, sha256 `5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6`. THE COMPANY is BRIDGE TRANSFER LAB.
 
 Differences from LAB-COMMON, the stricter rule holding everywhere else:
-1. **Writes.** Four posts through Bridge's `post_import`, at steps 3, 5a and 5c: B3 (1 voucher), B4 (3) and A4 (2). Also BK-E2 (step 2) and its restore (step 8). Nothing else is written: no raw import, no keying, and K posts nothing.
+1. **Writes.** Four posts through Bridge's `post_import`, at steps 3, 5a and 5c: B3 (1 voucher), B4 (3) and A4 (2). Also BK-E2 (step 1) and its restore (step 8). Nothing else is written: no raw import, no keying, and K posts nothing.
 2. **Who answers the box.** No person. `box.ps1` clicks the button by mouse on the box's own control, and presses no key.
    - **In a post (P):** it clicks Yes only when `boxcheck.py` has written Yes. That needs the box's text to name this company, its GUID, this batch's id and this batch's voucher count, and, for a box of one voucher, the built voucher's type, date and every line. Anything else: No, and a stop.
    - **In K:** it clicks No, always.
-3. **No key is pressed and no window is touched while a box may be up.** That is from the start of any `post_import` call until its box log shows `CLICKED` or `NO BOX`. A key aimed at Tally can answer the box. Nobody keys in Tally from step 1 to step 7.
+3. **No key is pressed and no window is touched while a box may be up.** That is from the start of any `post_import` call until its box log shows `CLICKED` or `NO BOX`. A key aimed at Tally can answer the box. Nobody keys in Tally from step 2 to step 7: the backup of step 1 is taken before Bridge starts.
 4. **The lab's operator runs every command** from `C:\bridge-lab\1392e34\` in PowerShell, with its own tool. It never types into a console window that is open on the screen.
 
 ## Kit
@@ -107,11 +107,13 @@ Every log this row writes is bounded where it is written:
 - the server's error output is the product's own: record its size at step 7, and only its first 200 lines leave the PC.
 
 ### 0. Load and checks
-0.1 **Folders.** `Test-Path C:\bridge-lab\1392e34` must print False, else STOP. Make the folders listed under Lab folder, then fetch this branch's `lab/1392-e34/` into `run\`.
+0.1 **Folders.** `Test-Path C:\bridge-lab\1392e34` must print False, else STOP. Make the folders: `New-Item -ItemType Directory C:\bridge-lab\1392e34\run, C:\bridge-lab\1392e34\calls, C:\bridge-lab\1392e34\box, C:\bridge-lab\1392e34\evidence, C:\bridge-lab\1392e34\reads, C:\bridge-lab\1392e34\shots, C:\bridge-lab\1392e34\pdf, C:\bridge-lab\1392e34\backups\bke2, C:\bridge-lab\1392e34\agent-run\inbox, C:\bridge-lab\1392e34\agent-run\answers, C:\bridge-lab\1392e34\agent-run\evidence, C:\bridge-lab\1392e34\agent-data`, then `Set-Location C:\bridge-lab\1392e34`. Fetch this branch at its commit and copy its `lab/1392-e34/` into `run\` (`git archive -o run.tar <commit> lab/1392-e34`, then `tar -x -f run.tar --strip-components=2 -C run`, then `Remove-Item run.tar`).
 - Check the sheet: `python -I -X utf8 run\helpers\sumcheck.py run\SHA256.txt run evidence\s0-sha256.txt`. EXPECT the count line `N of N equal` and exit 0. Any other: STOP.
 - Copy the helpers: `Copy-Item run\helpers\* .` and `Copy-Item run\placeholder-helpers\* .`.
-- Fill in the data folder: in the root's `bk.py` and `restore-prep.py` only, replace `<Tally data folder>` with Tally's data folder, as the Data Path on Tally's own Select Company screen shows it, written with forward slashes. Use `python -I -X utf8 -c` with a check that each file held the placeholder exactly once. Keep both files' new sha256 in the notes.
-- Copy the configuration: `Copy-Item run\launch-env.json agent-run\launch-env.json`. Check its sha256 (`Get-FileHash`) against `SHA256.txt`'s line for `launch-env.json`. Different: STOP.
+- Fill in the data folder: in the root's `bk.py` and `restore-prep.py` only, replace the quoted `'<Tally data folder>'` (once in each; the header comment keeps its own copy) with Tally's data folder, as the Data Path on Tally's own Select Company screen shows it, written with forward slashes. With `<data path>` so written:
+  `python -I -X utf8 -c "import sys; q = chr(39); a = q + '<Tally data folder>' + q; b = q + sys.argv[1] + q; [open(f, 'w', encoding='utf-8', newline='\n').write(t.replace(a, b)) if t.count(a) == 1 else sys.exit('HALT: ' + f) for f in ('bk.py', 'restore-prep.py') for t in [open(f, encoding='utf-8').read()]]" "<data path>"`.
+  A `HALT`: STOP. Then `Get-FileHash bk.py, restore-prep.py | Format-List > evidence\s0-placeholders.txt`.
+- Copy the configuration: `Copy-Item run\launch-env.json agent-run\launch-env.json`, then `Get-FileHash agent-run\launch-env.json | Format-List > evidence\s0-launch-env.txt`. EXPECT the hash on `SHA256.txt`'s line for `launch-env.json`. Different: STOP.
 
 0.2 **C2.** With THE COMPANY loaded alone (C1), take the screenshot first: `python -I cap.py s0-start` (output in `shots\`, its hash printed). A dialog or a half-entered screen: STOP. Then `python -I -X utf8 c2.py s0`, which writes `evidence\s0-c2-*.txt`. EXPECT:
 - one `tally.exe`;
@@ -123,9 +125,8 @@ Record Tally's release and date and the PC's date. The PC's date must be on or a
 - Another GUID, or more than one row: STOP.
 - Other V or M: STOP and report. `p.py` checks M 211, so this row needs those marks.
 
-0.4 **The build.** `Get-FileHash` the NEW exe, saved to `evidence\s0-exe.txt`. EXPECT `1e3dd540...6b59`, the whole hash under Build. Different: STOP.
-- `Test-Path` the `pdfium.dll` beside it. EXPECT True; record its size and sha256.
-- `Get-Process bridge_mcp` must find none. Any found: STOP, kill nothing.
+0.4 **The build.** `Get-FileHash C:\bridge-lab\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe, C:\bridge-lab\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\pdfium.dll | Format-List > evidence\s0-exe.txt`. EXPECT the exe's hash `1e3dd540...6b59`, the whole hash under Build, and a hash for `pdfium.dll` (it is present). Different, or either missing: STOP.
+- `Get-Process bridge_mcp -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count > evidence\s0-bridge-procs.txt` must write `0`. Any other: STOP, kill nothing.
 
 0.5 **The box check's self-test.** `python -I -X utf8 selftest34.py C:/bridge-lab/1392e C:/bridge-lab/1392e34`, its output saved to `evidence\s0-selftest34.txt`. It runs this row's `boxcheck.py` on copies of row 1392-E's saved box logs of 5 Nov (`b3-p1`, `b3-p2`, `f-p1` and `b1-p1`, kept in `C:\bridge-lab\1392e\box\`). It reads B3's build answer of that day from `C:\bridge-lab\1392e\agent-run\answers\` and writes only to `box\selftest\`. It takes about 35 s.
 - EXPECT eight lines ending `OK`, then `ALL CASES RIGHT`, exit 0:
@@ -136,31 +137,37 @@ Record Tally's release and date and the PC's date. The PC's date must be on or a
   - t19: No, exit 2, on a log cut inside its WAITING line.
 - A `HALT` (a saved log missing) or any `WRONG`: STOP. No post is made with a box check that has not passed here.
 
-0.6 **The fallback.** `Get-FileHash` the one file in `C:\bridge-lab\1392e\backups\bke\`, saved to `evidence\s0-bke.txt`. EXPECT 32,428 B and `29c2de73...7cbb5`. Absent or different: STOP, because the row would have no way back but its own backup.
+0.6 **The fallback.** `Get-ChildItem C:\bridge-lab\1392e\backups\bke | Get-FileHash | Format-List > evidence\s0-bke.txt`, and record its size with `(Get-ChildItem C:\bridge-lab\1392e\backups\bke).Length`. EXPECT one file, 32,428 B and `29c2de73...7cbb5`. Absent or different: STOP, because the row would have no way back but its own backup.
 
-### 1. Kit, Bridge, the four parses
-1.1 **Statements.** `python -I run\make_statements.py C:\bridge-lab\1392e34\pdf`, then `python -I -X utf8 sumcheck.py run\statements.sha256 pdf evidence\s1-statements.txt`. EXPECT `7 of 7 equal`. Any other: STOP.
+### 1. BK-E2 (C5), before Bridge starts
+`Get-ChildItem backups\bke2 | Measure-Object | Select-Object -ExpandProperty Count > evidence\s1-bke2-before.txt` must write `0`.
+- Take the backup by Tally's Backup screen, to `C:\bridge-lab\1392e34\backups\bke2`, THE COMPANY only, as C5 says. Record the local time to the minute.
+- Then `python -I -X utf8 bk.py`, which writes `evidence\s1-bk.txt`. EXPECT one folder holding the book's name and one file, `TDBK1800_<company number>.001`, above 0 bytes. Record its bytes and sha256 in the notes: step 8 passes them to `restore-prep.py`.
+- Then `python -I -X utf8 marks.py m0b`. EXPECT as m0.
+
+### 2. Kit, Bridge, the four parses
+2.1 **Statements.** `python -I run\make_statements.py C:\bridge-lab\1392e34\pdf`, then `python -I -X utf8 sumcheck.py run\statements.sha256 pdf evidence\s2-statements.txt`. EXPECT `7 of 7 equal`. Any other: STOP.
 - `cmd /c "python -I -X utf8 run\make_statements.py --calls > calls\calls-printed.txt"`. EXPECT a JSON object with the keys `b1 a1 a2 b3 a3 b4 a4`.
 
-1.2 **Password file.** `python -I -X utf8 -c "import os; d = os.path.join(os.environ['USERPROFILE'], 'lab-1392e34-pw'); os.mkdir(d); open(os.path.join(d, 'pw.txt'), 'wb').write(b'lab-1392e-user\n'); print(os.path.getsize(os.path.join(d, 'pw.txt')))"`. EXPECT `15`. An error, because the folder exists: STOP.
-- Record the file's ACL by principal (`icacls`) in `evidence\s1-pw-acl.txt`, with the user's name written as `<user>`. EXPECT SYSTEM, Administrators and the user only, all inherited.
+2.2 **Password file.** `python -I -X utf8 -c "import os; d = os.path.join(os.environ['USERPROFILE'], 'lab-1392e34-pw'); os.mkdir(d); open(os.path.join(d, 'pw.txt'), 'wb').write(b'lab-1392e-user\n'); print(os.path.getsize(os.path.join(d, 'pw.txt')))"`. EXPECT `15`. An error, because the folder exists: STOP.
+- Record the file's ACL: `python -I -X utf8 -c "import os, subprocess; f = os.path.join(os.environ['USERPROFILE'], 'lab-1392e34-pw', 'pw.txt'); o = subprocess.run(['icacls', f], capture_output=True, text=True).stdout; open('evidence/s2-pw-acl.txt', 'w', encoding='utf-8', newline='\n').write(o.replace(f, '<pw file>').replace(os.environ['USERNAME'], '<user>'))"`. EXPECT in the file: SYSTEM, Administrators and `<user>` only, each `(I)(F)`, inherited.
 
-1.3 **Arguments.** `python -I -X utf8 args.py fixed`. EXPECT nine lines: `args-empty`, `-guid`, `-vt`, `-egress`, `args-parse-b3`, `-a3`, `-b4`, `-a4` and `args-build-k`, each with a hash. A `HALT`: STOP.
+2.3 **Arguments.** `python -I -X utf8 args.py fixed`. EXPECT nine lines: `args-empty`, `-guid`, `-vt`, `-egress`, `args-parse-b3`, `-a3`, `-b4`, `-a4` and `args-build-k`, each with a hash. A `HALT`: STOP.
 
-1.4 **Launch.**
-- Record the process list for `bridge_mcp` and `python` in `evidence\s1-procs.txt`.
-- Start the client in the background with no window: `Start-Process python -ArgumentList '-I','-X','utf8','C:\bridge-lab\1392e34\client.py','C:\bridge-lab\1392e34\agent-run','<NEW exe path>','1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59' -WindowStyle Hidden -RedirectStandardOutput evidence\client-out.txt -RedirectStandardError evidence\client-err.txt -PassThru`. Record the pid.
+2.4 **Launch.**
+- `Get-Process bridge_mcp, python -ErrorAction SilentlyContinue | Select-Object Id, ProcessName | Format-Table > evidence\s2-procs.txt`. EXPECT no `bridge_mcp`.
+- Start the client in the background with no window: `Start-Process python -ArgumentList '-I','-X','utf8','C:\bridge-lab\1392e34\client.py','C:\bridge-lab\1392e34\agent-run','C:\bridge-lab\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe','1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59' -WindowStyle Hidden -RedirectStandardOutput evidence\client-out.txt -RedirectStandardError evidence\client-err.txt -PassThru`. Record the pid.
 - EXPECT, within 60 s, `agent-run\client-log.txt` to show:
   - the exe sha256 ok and the launch file's sha256 (equal to 0.1's);
   - `BRIDGE_AGENT_ENABLE_WRITES present: True`;
   - `initialized` with version 0.7.0.
 - A `stop:` line, or no `initialized`: STOP.
 
-1.5 **Company and types.** `python -I -X utf8 call.py agent-run s1-companies list_companies calls\args-empty.json`. EXPECT this GUID, one company. Record `books_from`, which must be on or before 26 Oct 2026.
-- `call.py agent-run s1-status tally_status calls\args-empty.json`: record release, licence and mode.
-- `call.py agent-run s1-vt masters calls\args-vt.json`. Read the Receipt and Contra rows' `series_numbering` with `show.py`. EXPECT `method` automatic and `sub_method` auto_retain for both. Any other: STOP. This row alters no type.
+2.5 **Company and types.** `python -I -X utf8 call.py agent-run s2-companies list_companies calls\args-empty.json`. EXPECT this GUID, one company. Record `books_from`, which must be on or before 26 Oct 2026.
+- `call.py agent-run s2-status tally_status calls\args-empty.json`: record release, licence and mode.
+- `call.py agent-run s2-vt masters calls\args-vt.json`. Read the Receipt and Contra rows' `series_numbering` with `show.py`. EXPECT `method` automatic and `sub_method` auto_retain for both. Any other: STOP. This row alters no type.
 
-1.6 **The four parses, before any write.** Run `call.py agent-run <k>-parse parse_bank_statement calls\args-parse-<k>.json` for k = b3, a3, b4, a4, one at a time, then `show.py` on each answer. A parse sends nothing to Tally and writes only its proposals file to the data folder. EXPECT `reconciled` with the four controls equal, and:
+2.6 **The four parses, before any write.** Run `call.py agent-run <k>-parse parse_bank_statement calls\args-parse-<k>.json` for k = b3, a3, b4, a4, one at a time, then `show.py` on each answer. A parse sends nothing to Tally and writes only its proposals file to the data folder. EXPECT `reconciled` with the four controls equal, and:
 
 | k | EXPECT |
 |---|---|
@@ -170,15 +177,9 @@ Record Tally's release and date and the PC's date. The PC's date must be on or a
 | a4 | 3 rows: 2 `TLAB FILLER` to suspense and the transfer skipped, with no reference; `skipped` 1 |
 
 - A refusal `statement_password_file_permissions`: record it whole and STOP. On 5 Nov the folder under the user profile was accepted, so a refusal is a finding, not a step.
-- Any other refusal, or a figure that differs: STOP before step 2.
+- Any other refusal, or a figure that differs: STOP before step 3.
 
-1.7 **m1.** `python -I -X utf8 marks.py m1`. EXPECT as m0.
-
-### 2. BK-E2 (C5)
-`Get-ChildItem backups\bke2` must list nothing.
-- Take the backup by Tally's Backup screen, to `C:\bridge-lab\1392e34\backups\bke2`, THE COMPANY only, as C5 says. Record the local time to the minute.
-- Then `python -I -X utf8 bk.py`, which writes `evidence\s1-bk.txt`. EXPECT one folder holding the book's name and one file, `TDBK1800_<company number>.001`, above 0 bytes. Record its bytes and sha256 in the notes: step 8 passes them to `restore-prep.py`.
-- Then `marks.py m0b`. EXPECT as m0.
+2.7 **m2.** `python -I -X utf8 marks.py m2`. EXPECT as m0.
 
 ### 3. B3, the Contra of E3
 3.1 `python -I -X utf8 args.py build-from <the b3-parse answer file> b3`, then `call.py agent-run b3-build build_import_xml calls\args-build-b3.json`. EXPECT `voucher_count` 1, a Contra of 29 Oct 2026, `TLab Bank B` Dr and `TLab Bank A` Cr, 7,003.00, and a `batch_id`, B3. A refusal: STOP.
@@ -224,13 +225,13 @@ A batch of its own, built once, never posted. Each sub-step is one call. `p.py` 
   - `BOX SEEN`, title `post this voucher?`, naming K's batch;
   - `no valid answer file by 70 s`, then `CLICKED No`, then `box visible False`;
   - exit 0.
-- **The grade of K1:** the `CLICKED No` time must be later than the call's end (`evidence\tools-log.txt`: its sent time plus its seconds). Record both times.
+- **The grade of K1:** the `CLICKED No` time must be later than the call's end (`agent-run\evidence\tools-log.txt`: its sent time plus its seconds). Record both times.
 - If the call returned after the click, or answered anything but `pending`: K is not set up. Record it whole and go to step 7.
 
 6.2 **K2: the call that reads the kept No.** Within 5 minutes of the click:
 - `$b = Start-Process powershell -ArgumentList '-NoProfile','-File','C:\bridge-lab\1392e34\box.ps1','-RowDir','C:\bridge-lab\1392e34','-Tag','k-p2','-SeeWithin','20','-AnswerBy','20' -WindowStyle Hidden -RedirectStandardOutput box\k-p2-ps.out -PassThru`.
 - `Start-Sleep 2`, then `call.py agent-run k-p2 post_import calls\args-post-k.json`.
-- Within 3 s of its answer: `Get-CimInstance Win32_Process -Filter "Name='bridge_mcp.exe'" | Select-Object ProcessId,ParentProcessId,CommandLine | Format-List > evidence\s6-k2-procs.txt`.
+- Within 3 s of its answer: `Get-CimInstance Win32_Process | Where-Object Name -eq bridge_mcp.exe | Select-Object ProcessId,ParentProcessId,CommandLine | Format-List > evidence\s6-k2-procs.txt`.
 - Then `$b.WaitForExit()`.
 - EXPECT:
   - an answer at once, under 2 s, with `error.code` **`import_approval_declined`**, `error.cause` **`approval_answered_earlier`**, and an `error.next_step` beginning `This call showed no approval box.`;
@@ -241,9 +242,9 @@ A batch of its own, built once, never posted. Each sub-step is one call. `p.py` 
 
 6.3 **K3: the call after that, with the same batch.** At once after 6.2:
 - `$b = Start-Process powershell -ArgumentList '-NoProfile','-File','C:\bridge-lab\1392e34\box.ps1','-RowDir','C:\bridge-lab\1392e34','-Tag','k-p3','-SeeWithin','120','-AnswerBy','20' -WindowStyle Hidden -RedirectStandardOutput box\k-p3-ps.out -PassThru`.
+- The process read while the call waits, started now in the background because `call.py` blocks: `$c = Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep 10; Get-CimInstance Win32_Process | Where-Object Name -eq bridge_mcp.exe | Select-Object ProcessId,ParentProcessId,CommandLine | Format-List | Out-File -Encoding utf8 C:\bridge-lab\1392e34\evidence\s6-k3-procs.txt' -WindowStyle Hidden -PassThru`. It reads about 8 s after the call starts, inside the 20 s before the No.
 - `Start-Sleep 2`, then `call.py agent-run k-p3 post_import calls\args-post-k.json`.
-- While it waits, 5 s after `BOX SEEN` shows in `box\k-p3-box.txt` (or after 30 s, whichever is first): the same `Get-CimInstance` into `evidence\s6-k3-procs.txt`.
-- Then `$b.WaitForExit()`.
+- Then `$b.WaitForExit(); $c.WaitForExit()`.
 - **THE RECORD:** whether a new box shows. Yes means `BOX SEEN` in `k-p3-box.txt`, its handle and pid, its title and its `Batch:` line naming K, and a `--confirm-journal` child in the process list.
 - **EXPECT:**
   - a new box;
@@ -255,14 +256,14 @@ A batch of its own, built once, never posted. Each sub-step is one call. `p.py` 
 
 ### 7. End of Bridge
 - `call.py agent-run s7-egress egress_log calls\args-egress.json`, whole.
-- `marks.py m3`. EXPECT V = m0b's V + 6 after E4, + 1 without it, and M 211.
+- `python -I -X utf8 marks.py m3`. EXPECT V = m0b's V + 6 after E4, + 1 without it, and M 211.
 - Stop the client: `New-Item agent-run\inbox\stop`. EXPECT `session ended` in `client-log.txt` within 60 s and `Get-Process bridge_mcp` empty. If it is still running, record it and STOP; kill nothing.
 - Record the size of the server's error output, `agent-run\server-stderr-*.log`.
 
 ### 8. Restore BK-E2 (C6)
-`python -I -X utf8 restore-prep.py before <bytes> <sha256> "<the Restore list time>"`, using step 2's record. EXPECT `name, bytes and sha256 equal to the record: True` and the count line in `evidence\company-folder.txt`.
+`python -I -X utf8 restore-prep.py before <bytes> <sha256> "<the Restore list time>"`, using step 1's record. EXPECT `name, bytes and sha256 equal to the record: True` and the count line in `evidence\company-folder.txt`.
 - Then the restore, as C6 says, of BK-E2 only.
-- Then `restore-prep.py after`, then C6's screenshots, then `marks.py m4`. EXPECT the COMPANY row's GUID, V and M equal to m0b's (V 12, M 211).
+- Then `restore-prep.py after`, then C6's screenshots, then `marks.py m4`. EXPECT the COMPANY row's GUID, V and M equal to m0's, the first read, and to m0b's (V 12, M 211).
 - Anything else: STOP. The way back is then BK-E, restored only on the run coordinator's word.
 
 ### 9. Close (C10)
@@ -281,9 +282,9 @@ Shut THE COMPANY. Run `c2.py s9`. EXPECT one `tally.exe` on 9001 and `/status` 2
 | 6.1 | the No clicked after K1 returned `pending` | the set-up of 5 Nov's call 2, reproduced on purpose | verified |
 | 6.2 | `import_approval_declined`, cause `approval_answered_earlier`, no box, no `--confirm-journal` child | a kept No is returned once, at once, and says so (#2521) | verified |
 | 6.2 | no cause, or a box shows | #2521's kept-refusal answer is not on the build: a finding | verified, as a finding |
-| 6.3 | a new box, then a plain decline | **a repeat call after a kept No shows a new box**, as #2521's `next_step` says | verified |
-| 6.3 | no box | **a repeat call after a kept No shows no new box**: the `next_step` is wrong, a finding | verified, as a finding |
-| 6.3 | `pending` with no box seen | a box that `box.ps1` did not find; not graded | unverified |
+| 6.3 | `BOX SEEN` naming K, a `--confirm-journal` child in `s6-k3-procs.txt`, `CLICKED No`, then a decline with no cause | **a repeat call after a kept No shows a new box**, as #2521's `next_step` says | verified |
+| 6.3 | `NO BOX`, no `--confirm-journal` child, and an answer that is not a decline given to a waiting call | **a repeat call after a kept No shows no new box**: the `next_step` is wrong, a finding | verified, as a finding |
+| 6.3 | any other mix (for example `NO BOX` with a child, or `NO BOX` and a plain decline, or `pending` with no box seen) | the three records disagree; not graded | unverified |
 | any | a refusal before a write, or a stop rule | recorded whole; nothing after it runs | n/a |
 
 ## Stop rules
@@ -309,6 +310,7 @@ K posts nothing. The way back is BK-E2, then (on the run coordinator's word) BK-
 - One generated statement layout (HDFC), one book, one sitting, and k = 0 (`TRANSFER_K_DAYS`, agent_transfer_pairing.rs:276). Only the same printed day pairs by date.
 - K is one batch of one voucher. It times one No against a 40 s call budget and a 70 s click, both well inside the box's 120 s limit. It does not try a box left to time out, a No given after the 15 minutes an approval lasts, or a second kept No.
 - E1, E2 and the decoy are not repeated (What this row does not show).
+- K runs last, so that its batch cannot touch E3's and E4's posts. A stop in steps 3 to 5 therefore ends the row before K, and the kept-No record then waits for another sitting.
 
 ## Code admits the trigger (8c3fb9f2)
 1. **A skip comes only from a statement PDF.** `parse_bank_statement` (agent.rs:3562) reads an hdfc PDF, and `skip` is a mapping treatment. The password file must be private to the user (local_files/access.rs:338).

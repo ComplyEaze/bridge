@@ -1,7 +1,7 @@
 {
   "file": "src-tauri/src/agent_import_cash_bank.rs",
   "base_commit": "a8864cc9",
-  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file byte for byte as there. The test module was as at base_commit for the tool, hand and whole_set runs. The survivors_again run used the test module as the first commit of this change (5dfc8ba3) left it, before two assertions that a later commit of this change adds: that an admitted counterparty has no refusal, and that a ledger whose name starts with a space is found as spelled. By reading, those two assertions change no earlier verdict (they only read values); the thirty were not run again with them. C65 and C66 were written after the survivors_again run and are caught only by those two assertions: the later_hand run says how each was run, and its killer is the one test that was run, not the first of a whole run.",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run but the follow_up_hand run was on base_commit, with the file byte for byte as there. The test module was as at base_commit for the tool, hand and whole_set runs. The survivors_again run used the test module as the first commit of this change (5dfc8ba3) left it, before two assertions that a later commit of this change adds: that an admitted counterparty has no refusal, and that a ledger whose name starts with a space is found as spelled. By reading, those two assertions change no earlier verdict (they only read values); the thirty were not run again with them. C65 and C66 were written after the survivors_again run and are caught only by those two assertions: the later_hand run says how each was run, and its killer is the one test that was run, not the first of a whole run. C67 to C81 were added by a later change, from the review of the change that added this record and the review of that later change. Their runs are the follow_up_hand run: it was on d2d38a2b, not on base_commit, with the file byte for byte as at base_commit and the test module as at d2d38a2b; survived_at_base counts them on that footing. C67 is caught only by an assertion the later change adds to a test that exists at base. C68 to C76 and C78 to C81 are caught only by tests the later change adds, and for them this_commit means that later change. The killer named for each of C67 to C81 is the first test reported failing when the mutant was run against every bridge test with the test module as the later change leaves it. C77 is equivalent and is listed in accepted_survivors.",
   "runs": [
     {
       "run": "tool",
@@ -39,6 +39,14 @@
       "tests_run": 5065,
       "command": "for C65 and C66 only: each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge (every bridge test) with the test module as at base_commit, after the unmutated tree passed all 5065: neither was caught. Then, with the test module as this change leaves it, cargo nextest run --locked -p bridge -E 'test(<the killer's function name>)' for each: 1 test run, 1 failed. With the test module as at 5dfc8ba3 the same one-test run passed for each",
       "tree": "base_commit"
+    },
+    {
+      "run": "follow_up_hand",
+      "tests_at": "d2d38a2b, then this_commit",
+      "tests_run": 5421,
+      "command": "for C67 to C81 only: each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge (every bridge test) with the tree as at d2d38a2b, after the unmutated tree passed all 5421: none was caught (C78 to C81 in a later sitting, begun 2026-11-23T07:41:39Z). Then the same run for all fifteen with the test module as this change leaves it and nothing uncommitted, after the unmutated tree passed all 5424: C67 to C76 and C78 to C81 were each caught and C77 was not",
+      "time": "2026-11-23T05:07:37Z",
+      "tree": "d2d38a2b, where the file is byte for byte as at base_commit"
     }
   ],
   "summary": {
@@ -48,16 +56,16 @@
       "unviable": 1
     },
     "hand": {
-      "caught": 65,
-      "missed": 1
+      "caught": 79,
+      "missed": 2
     },
     "survived_at_base": {
       "tool": 0,
-      "hand": 32
+      "hand": 47
     },
     "equivalent": {
       "tool": 0,
-      "hand": 1
+      "hand": 2
     },
     "accepted_not_equivalent": {
       "tool": 0,
@@ -1113,12 +1121,224 @@
       "before_this_change": "missed",
       "killer": "agent::agent_import::tests::bank_tests::a_ledger_is_found_by_its_exact_catalogue_spelling",
       "killer_at": "this_commit"
+    },
+    "C67": {
+      "what": "unknown-identity reason says the ledger holds money",
+      "edits": [
+        {
+          "from": "so it establishes neither that the ledger holds money nor that it does not.",
+          "to": "so it establishes that the ledger holds money."
+        }
+      ],
+      "mutation": "d149b320b6cadc51a3752f1a1730c4af",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitted",
+      "killer_at": "base"
+    },
+    "C68": {
+      "what": "money table: a table name that starts with the identity matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalize(candidate).starts_with(&normalized))"
+        }
+      ],
+      "mutation": "e99c2e7c1fa4bdf354cbaedfd137c0aa",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C69": {
+      "what": "money table: an identity that starts with a table name matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalized.starts_with(&normalize(candidate)))"
+        }
+      ],
+      "mutation": "2274398d21b10f99bfdc93ee838ce5a5",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C70": {
+      "what": "money table: a table name that contains the identity matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalize(candidate).contains(&normalized))"
+        }
+      ],
+      "mutation": "d06cc1695cf98f4f1b88fdba1978df78",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C71": {
+      "what": "money table: an identity that contains a table name matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalized.contains(&normalize(candidate)))"
+        }
+      ],
+      "mutation": "f513f10aef85d6b1175cdf3ad9de3dfd",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C72": {
+      "what": "non-money table: a table name that starts with the identity matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalize(candidate).starts_with(&normalized)) =>"
+        }
+      ],
+      "mutation": "795a95cc9d47e594ce575872fd08d691",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C73": {
+      "what": "non-money table: an identity that starts with a table name matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalized.starts_with(&normalize(candidate))) =>"
+        }
+      ],
+      "mutation": "639f7da618c112652b8fe8dd59bffab9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C74": {
+      "what": "non-money table: a table name that contains the identity matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalize(candidate).contains(&normalized)) =>"
+        }
+      ],
+      "mutation": "98ead0741f7ec10fcaa1f3b8cd210f63",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C75": {
+      "what": "non-money table: an identity that contains a table name matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalized.contains(&normalize(candidate))) =>"
+        }
+      ],
+      "mutation": "c01e91c0639c4446a7d0e4f1504a458b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C76": {
+      "what": "normalize folds case by Unicode rules, not ASCII only",
+      "edits": [
+        {
+          "from": "value.trim().to_ascii_lowercase()",
+          "to": "value.trim().to_lowercase()"
+        }
+      ],
+      "mutation": "15de855706fd8b208c93d991004c4b30",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::unicode_case_folding_does_not_establish_a_money_reserved_identity",
+      "killer_at": "this_commit"
+    },
+    "C77": {
+      "what": "the gap text of an admitted group is not empty",
+      "edits": [
+        {
+          "from": "Self::Admitted => \"\",",
+          "to": "Self::Admitted => \"unreachable\","
+        }
+      ],
+      "mutation": "50a718fabc31234d28eaf0cbc01772c9",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "C78": {
+      "what": "money table: a table name that ends with the identity matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalize(candidate).ends_with(&normalized))"
+        }
+      ],
+      "mutation": "1d2f7ac6660863a89b6035106129d660",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C79": {
+      "what": "money table: an identity that ends with a table name matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalized.ends_with(&normalize(candidate)))"
+        }
+      ],
+      "mutation": "19456e29d1e08a87a0547f683e99a17d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C80": {
+      "what": "non-money table: a table name that ends with the identity matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalize(candidate).ends_with(&normalized)) =>"
+        }
+      ],
+      "mutation": "c419db9cae3dc713bc3719ed0ebb3ecd",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C81": {
+      "what": "non-money table: an identity that ends with a table name matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalized.ends_with(&normalize(candidate))) =>"
+        }
+      ],
+      "mutation": "c92b9daeb8682723c86e23b68e6e3087",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
     }
   },
   "accepted_survivors": {
     "C61": {
       "mutation": "edd07095b876f95b646d3aecaa2925f6",
       "reason": "equivalent, unreachable: GroupIndex::reserved_ancestor returns Exhausted only once its loop has run one hop more than the index holds group names. Each hop that goes on must find a group whose name it has not visited, so by then every name has been visited and the walk has already ended as GroupAbsent, Cycle or ReachedRoot; no input reaches the Exhausted arm of reason. A change to that walk that lets a hop go on without the visited check reopens it"
+    },
+    "C77": {
+      "mutation": "50a718fabc31234d28eaf0cbc01772c9",
+      "reason": "equivalent, unreachable: a search of src-tauri/src found only one Admission::gap call, in ObservedMasters::classify's Some((reserved_group, admission)) arm. The preceding Some((reserved_group, Admission::Admitted)) arm returns CashBankState::Established, so the gap call cannot receive Admission::Admitted"
     }
   }
 }

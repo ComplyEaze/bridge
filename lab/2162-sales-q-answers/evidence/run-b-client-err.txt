@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "<lab folder>\client.py", line 94, in <module>
+    with open(os.path.join(INBOX, fn), encoding='utf-8') as f:
+PermissionError: [Errno 13] Permission denied: '<lab folder>\\run-b\\inbox\\03-marks.json'

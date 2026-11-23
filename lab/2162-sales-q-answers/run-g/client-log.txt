@@ -1,0 +1,16 @@
+2026-11-23T13:58:29Z exe sha256=1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59 ok; launch-env.json sha256=99cada98aedf09085775d11674a6645f5ae4dc9309bf7ca53e6388a7c5362b63; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: True
+2026-11-23T13:58:29Z launched pid 6192; stderr to server-stderr-20261123T135829Z.log
+2026-11-23T13:58:29Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-23T13:58:31Z 01-list.json tool=list secs=0.013 isError=None error=None saved_sha256=113830540edb8d77f903aaabd3036a0cf6373ab131b06e03b41d53953adcda42
+2026-11-23T13:58:33Z 02-list_companies.json tool=list_companies secs=0.109 isError=False error=None saved_sha256=aa01df19825b0427c69e5f37c9916cbc0a6a056a0ce79f64d715af231da5f335
+2026-11-23T13:58:35Z 03-marks.json tool=ledger_masters secs=0.643 isError=False error=None saved_sha256=55a4be6f29a9e18dcf609c3c484a9399149f4132842895bdd7c44c61eec4a0d9
+2026-11-23T13:58:50Z 05-build-0074-0801.json tool=build_import_xml secs=14.418 isError=False error=None saved_sha256=fbcdd84a3b54d5dda3f928d13e1e06295040388b8f2b1a51b2526124b1f63fc7
+2026-11-23T13:59:40Z k2-post-1.json tool=post_import secs=39.010 isError=True error=None saved_sha256=c34b3c2fa434661849839487cc509b9bff8e8eb839a1768e0910f48ec4dbb8c3
+2026-11-23T13:59:50Z 07-marks.json tool=ledger_masters secs=0.653 isError=False error=None saved_sha256=9166927150756721478ec2602ff928d3077a7b0cae1469c78a97d4c68db5a580
+2026-11-23T14:01:28Z g05-build-0072.json tool=build_import_xml secs=14.786 isError=False error=None saved_sha256=bf28476d3f404d53ec0b03dac8a9111a00673433c55a26c7239805906f4d29c8
+2026-11-23T14:01:38Z g05m-marks.json tool=ledger_masters secs=0.711 isError=False error=None saved_sha256=8dcf41172a98bf578c8852cba4c1f14806028bc635d223cfc88f7fcfefac1873
+2026-11-23T14:02:33Z g06-post-1.json tool=post_import secs=42.463 isError=False error=None saved_sha256=07c6d2a24c814cd1f88b386ae53079562e8c1ef446ebbbca208082087bec0828
+2026-11-23T14:03:06Z g08-verify.json tool=verify_import secs=11.116 isError=False error=None saved_sha256=34a35dcfc468ea87651ef8e4a106dbb2486d7a2ba4d7cda2b6c41eb15c08fb42
+2026-11-23T14:03:13Z g09-status-aug.json tool=gst_status secs=1.297 isError=False error=None saved_sha256=e01fd6a069a21eba7f0705d60b39e72226e657ef452d8ecc9f5f01e7954cef17
+2026-11-23T14:03:22Z g10-marks.json tool=ledger_masters secs=0.705 isError=False error=None saved_sha256=8453bf9f57468651c29a3ff6c92d6a405db5c6e23ae0cee6514bfdcb4a28d876
+2026-11-23T14:03:30Z session ended; server pid 6192 exit code 0

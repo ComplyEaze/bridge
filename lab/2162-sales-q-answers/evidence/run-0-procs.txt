@@ -1,0 +1,9 @@
+
+ProcessId ParentProcessId Name          
+--------- --------------- ----          
+    23160           23268 tally.exe     
+     9468            6372 python.exe    
+    15504            9468 bridge_mcp.exe
+
+
+

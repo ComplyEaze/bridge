@@ -1,0 +1,10 @@
+restore plan R3 (2026-11-23T13:35:12Z)
+folder: <lab folder>/backup-1
+file: TDBK1800_<company number>.001
+bytes: 90051
+sha256: 1313f43967b2d93b6352162b4b930933c418fdf99e8de182db14508acd6cc8b0
+company number: <company number>
+Restore Data Path: <Tally data folder>
+list must show: BRIDGE PILOT LAB (<company number>), backup of 23-Nov-2026 18:06 (taken 12:36Z)
+prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace ..." = Replace
+after: load BRIDGE PILOT LAB alone (filter typed in pieces, one row, Enter); then s16 as the sheet's step 16 (the run lead's D3)

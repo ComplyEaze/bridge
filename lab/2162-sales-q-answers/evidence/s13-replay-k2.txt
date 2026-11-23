@@ -1,0 +1,35 @@
+r-k2: expected Yes, got Yes, exit 0 (the real box log k2-box.txt, the real build answer) OK
+2026-11-23T13:59:48.623Z check of r-k2 for batch bridge-63354bce-50d5-4bcd-b75b-8a94bf9cf1a8, 1 vouchers (log read whole after 1 read(s))
+PASS box seen
+PASS title names one voucher
+PASS the built XML: company, one party leg, its bill allocation known, a place of supply, no IRN
+PASS answer text, two lines and a blank
+PASS Create ONE Sales invoice in "BRIDGE PILOT LAB"
+PASS Company GUID
+PASS Company number and Books from (shape only)
+PASS Tally: http://127.0.0.1:9001
+PASS Voucher type: "BRIDGE Sales"  Date: 1-Aug-2026  Number: "BP/26-27/0074"
+PASS Customer: "BRIDGE Walk-in"
+PASS Unregistered, no GSTIN  Place of supply: Rajasthan
+PASS Bill allocation: none (customer not bill-wise)
+PASS entry lines equal the built invoice: Dr 1051.00  "BRIDGE Walk-in"; Cr 600.40  "BRIDGE Svc 998313 5%"; Cr 400.40  "BRIDGE Svc 998314 5%"; Cr 25.02  "BRIDGE CGST 2.5%"; Cr 25.02  "BRIDGE SGST 2.5%"; Cr 0.16  "BRIDGE Round Off"
+PASS totals equal the built invoice and the build answer: debit 1051.00 credit 1051.00
+PASS Checked line
+PASS Batch
+PASS the three fixed lines, the timing line, the heading
+PASS Reference: "BP/26-27/0074"
+PASS Narration, the last line
+PASS no line more and none less: the box holds 27 lines, the list 27
+PASS exactly one Create in the text (found 1)
+PASS exactly one Company GUID: in the text (found 1)
+PASS exactly one Voucher type: in the text (found 1)
+PASS exactly one Customer: in the text (found 1)
+PASS exactly one Place of supply in the text (found 1)
+PASS exactly one Number: " in the text (found 1)
+PASS exactly one Batch: in the text (found 1)
+PASS exactly one Reference: in the text (found 1)
+PASS exactly one Total debit in the text (found 1)
+ALL PASS
+  | Total debit: 1051  Total credit: 1051
+2026-11-23T13:59:48.623Z answer file written: Yes
+REPLAY ALL PASS

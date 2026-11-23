@@ -1,0 +1,5 @@
+18:18:28	N-0073.xml	a-s4-N-0073.xml	curl 0	5606 bytes
+18:18:28	R-0073.xml	a-s4-R-0073.xml	curl 0	65050 bytes
+18:18:28	V-0073.xml	a-s4-V-0073.xml	curl 0	52538 bytes
+18:18:28	R-0010.xml	a-s4-R-0010.xml	curl 0	94474 bytes
+18:18:28	M-marks.xml	a-s4-M-marks.xml	curl 0	3394 bytes

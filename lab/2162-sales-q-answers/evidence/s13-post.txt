@@ -1,0 +1,52 @@
+2026-11-23T14:01:50Z sent g06-post-1.json
+--- box log g06 (stamped lines only; box.ps1 exit 0)
+2026-11-23T14:01:48.791Z watch start: tally window 0x1130730; see within 120 s; answer by 70 s
+2026-11-23T14:02:07.551Z BOX SEEN 0xb80da0 pid 18416 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-11-23T14:02:07.606Z rect 688,143,1252,964 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 5 (lower = nearer the top); above tally True
+2026-11-23T14:02:07.627Z foreground 0xb80da0 pid 18416 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-23T14:02:07.858Z capture g06-open.png 1920x1080 397215 B sha256 b8537757e5acf1d627d9a51c49b26b6dd60f633793de1293ffc73b07843354b6
+2026-11-23T14:02:07.861Z WAITING for <lab folder>\box\g06.answer
+2026-11-23T14:02:08.163Z before click: foreground 0xb80da0 pid 18416 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-23T14:02:08.197Z CLICKED Yes at 951,924 (physical) 2026-11-23T14:02:08.177Z; seen-to-click 0.6 s
+2026-11-23T14:02:09.025Z after click: box visible False; foreground 0xb0d84 pid 11516 <desktop client> title '<desktop client>'
+--- check (exit 0)
+2026-11-23T14:02:07.979Z check of g06 for batch bridge-7db54960-38bb-4689-9d9c-e6985a09de16, 1 vouchers (log read whole after 68 read(s))
+PASS box seen
+PASS title names one voucher
+PASS the built XML: company, one party leg, its bill allocation known, a place of supply, no IRN
+PASS answer text, two lines and a blank
+PASS Create ONE Sales invoice in "BRIDGE PILOT LAB"
+PASS Company GUID
+PASS Company number and Books from (shape only)
+PASS Tally: http://127.0.0.1:9001
+PASS Voucher type: "BRIDGE Sales"  Date: 1-Aug-2026  Number: "BP/26-27/0072"
+PASS Customer: "BRIDGE Walk-in"
+PASS Unregistered, no GSTIN  Place of supply: Rajasthan
+PASS Bill allocation: none (customer not bill-wise)
+PASS entry lines equal the built invoice: Dr 1051.00  "BRIDGE Walk-in"; Cr 600.40  "BRIDGE Svc 998313 5%"; Cr 400.40  "BRIDGE Svc 998314 5%"; Cr 25.02  "BRIDGE CGST 2.5%"; Cr 25.02  "BRIDGE SGST 2.5%"; Cr 0.16  "BRIDGE Round Off"
+PASS totals equal the built invoice and the build answer: debit 1051.00 credit 1051.00
+PASS Checked line
+PASS Batch
+PASS the three fixed lines, the timing line, the heading
+PASS Reference: "BP/26-27/0072"
+PASS Narration, the last line
+PASS no line more and none less: the box holds 27 lines, the list 27
+PASS exactly one Create in the text (found 1)
+PASS exactly one Company GUID: in the text (found 1)
+PASS exactly one Voucher type: in the text (found 1)
+PASS exactly one Customer: in the text (found 1)
+PASS exactly one Place of supply in the text (found 1)
+PASS exactly one Number: " in the text (found 1)
+PASS exactly one Batch: in the text (found 1)
+PASS exactly one Reference: in the text (found 1)
+PASS exactly one Total debit in the text (found 1)
+ALL PASS
+  | Total debit: 1051  Total credit: 1051
+2026-11-23T14:02:07.980Z answer file written: Yes
+--- last answer (1 call(s))
+== g06-post-1.json: tool post_import, sent 2026-11-23T14:01:50Z, 42.463 s, isError False
+  evidence state complete, reason <absent>
+  approval "<absent>"
+  attempt_recorded <absent> dispatch state posted_verified counters {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 1, "deleted": 0, "errors": 0, "exceptions": 0, "ignored": 0, "line_error_count": 0}
+  verification_status posted_verified
+POST posted_verified, created 1

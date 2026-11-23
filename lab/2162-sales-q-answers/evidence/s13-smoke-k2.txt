@@ -1,0 +1,20 @@
+2026-11-23T13:59:01Z sent k2-post-1.json
+--- box log k2 (stamped lines only; box.ps1 exit 0)
+2026-11-23T13:59:00.405Z watch start: tally window 0x1130730; see within 120 s; answer by 20 s
+2026-11-23T13:59:19.908Z BOX SEEN 0xd30736 pid 20516 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-11-23T13:59:19.957Z rect 688,143,1252,964 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 5 (lower = nearer the top); above tally True
+2026-11-23T13:59:19.977Z foreground 0xd30736 pid 20516 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-23T13:59:20.256Z capture k2-open.png 1920x1080 399326 B sha256=4538cc14055bfc55e6b01d938cbe117fb93efc0c8107d81713b66aad02dc78df
+2026-11-23T13:59:20.259Z WAITING for <lab folder>\box\k2.answer
+2026-11-23T13:59:40.118Z no valid answer file by 20 s (read ''): No
+2026-11-23T13:59:40.141Z before click: foreground 0xd30736 pid 20516 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-23T13:59:40.187Z CLICKED No at 1061,924 (physical) 2026-11-23T13:59:40.161Z; seen-to-click 20.3 s
+2026-11-23T13:59:41.019Z after click: box visible False; foreground 0xb0d84 pid 11516 <desktop client> title '<desktop client>'
+--- last answer (1 call(s))
+== k2-post-1.json: tool post_import, sent 2026-11-23T13:59:01Z, 39.01 s, isError True
+  refused import_approval_declined
+  evidence state partial, reason import_approval_declined
+  approval "<absent>"
+  attempt_recorded False dispatch state <absent> counters "<absent>"
+  verification_status <absent>
+SMOKE declined, CLICKED No, box gone

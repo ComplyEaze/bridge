@@ -1,0 +1,5 @@
+== status-diff 04-status-aug.json -> g09-status-aug.json: total 32 -> 33
+  in B only: master_id 45: {"accepted_as_it_stands": false, "alter_id": "69", "date": "20260801", "gst_status": "included", "master_id": "45", "voucher_number": "BP/26-27/0072", "voucher_type": "BRIDGE Sales"}
+  counts A {"accepted_as_it_stands": 5, "cancelled": 1, "excluded": 0, "included": 25, "not_in_return": 0, "optional": 1, "post_dated": 0, "uncertain": 5, "unread": 0}
+  counts B {"accepted_as_it_stands": 5, "cancelled": 1, "excluded": 0, "included": 26, "not_in_return": 0, "optional": 1, "post_dated": 0, "uncertain": 5, "unread": 0}
+  items: A 32, B 33, in both 32

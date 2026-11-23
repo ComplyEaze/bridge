@@ -1,0 +1,36 @@
+t01: expected Yes, got Yes, exit 0 (the fixture invoice as built, count 1) OK
+t02: expected No, got No, exit 1 (Batch names another batch, count 1) OK
+t03: expected No, got No, exit 1 (another number, count 1) OK
+t04: expected No, got No, exit 1 (the date with a leading zero, count 1) OK
+t05: expected No, got No, exit 1 (one entry amount differs, count 1) OK
+t06: expected No, got No, exit 1 (one entry line more, count 1) OK
+t07: expected No, got No, exit 1 (the totals differ, count 1) OK
+t08: expected No, got No, exit 1 (another GUID, count 1) OK
+t09: expected No, got No, exit 1 (another company, count 1) OK
+t10: expected No, got No, exit 1 (another customer, count 1) OK
+t11: expected No, got No, exit 1 (another voucher type, count 1) OK
+t12: expected No, got No, exit 1 (a count of 2, count 2) OK
+t13: expected No, got No, exit 1 (the text of another type, count 1) OK
+t14: expected No, got No, exit 1 (the saved XML is not the one built, count 1) OK
+t15: expected No, got No, exit 1 (two Batch lines, count 1) OK
+t16: expected No, got No, exit 1 (no build answer names the batch, count 1) OK
+t20: expected No, got No, exit 1 (a graded line twice (Customer), count 1) OK
+t21: expected No, got No, exit 1 (a line missing (Bill allocation), count 1) OK
+t22: expected No, got No, exit 1 (an unknown line under the heading, count 1) OK
+t23: expected No, got No, exit 1 (the box cut after the Batch line, count 1) OK
+t24: expected No, got No, exit 1 (another place of supply, count 1) OK
+t25: expected No, got No, exit 1 (a GSTIN the XML does not carry, count 1) OK
+t26: expected No, got No, exit 1 (a second GUID line, count 1) OK
+t27: expected No, got No, exit 1 (a line after the last line, count 1) OK
+t28: expected No, got No, exit 1 (an e-invoice line, count 1) OK
+t29: expected No, got No, exit 1 (a bill allocation the XML does not carry, count 1) OK
+t30: expected No, got No, exit 1 (a narration the XML does not carry, count 1) OK
+t31: expected Yes, got Yes, exit 0 (the saved file holds the tag alone; the box shows no narration, count 1) OK
+t32: expected No, got No, exit 1 (the box shows the tag as the narration, count 1) OK
+t33: expected Yes, got Yes, exit 0 (a narration before the tag; the box shows the narration alone, count 1) OK
+t34: expected No, got No, exit 1 (the box shows the narration with the tag, count 1) OK
+t35: expected No, got No, exit 1 (the box drops a narration the saved file carries, count 1) OK
+t17: expected No, got No, exit 1 (the title of a batch of two) OK
+t19: expected No, got No, exit 2 (cut inside the WAITING line, never finished) OK
+34 cases ran, 34 right
+ALL CASES RIGHT

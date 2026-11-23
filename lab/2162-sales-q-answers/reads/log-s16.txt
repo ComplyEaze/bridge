@@ -1,0 +1,10 @@
+M-marks.xml: 3394 bytes
+U-taxunits.xml: 22636 bytes
+N-0072.xml: 3022 bytes
+N-0073.xml: 3022 bytes
+N-0074.xml: 3022 bytes
+R-0010.xml: 94474 bytes
+0072.xml	curl 0	3022 bytes
+19:08:10	N-0073.xml	a-s16-N-0073.xml	curl 0	3022 bytes
+19:08:10	N-0074.xml	a-s16-N-0074.xml	curl 0	3022 bytes
+19:08:10	R-0010.xml	a-s16-R-0010.xml	curl 0	94474 bytes

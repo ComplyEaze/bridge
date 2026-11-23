@@ -1,0 +1,6 @@
+18:06:40	U-taxunits.xml	a-s2-U-taxunits.xml	curl 0	22636 bytes
+18:06:40	N-0072.xml	a-s2-N-0072.xml	curl 0	3022 bytes
+18:06:40	N-0073.xml	a-s2-N-0073.xml	curl 0	3022 bytes
+18:06:40	N-0074.xml	a-s2-N-0074.xml	curl 0	3022 bytes
+18:06:40	R-0010.xml	a-s2-R-0010.xml	curl 0	94474 bytes
+18:06:40	M-marks.xml	a-s2-M-marks.xml	curl 0	3394 bytes

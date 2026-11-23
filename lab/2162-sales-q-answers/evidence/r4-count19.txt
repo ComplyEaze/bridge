@@ -1,0 +1,29 @@
+== --same-row a-s1 a-r4 M
+== a-r4-M-marks.xml against a-s1-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'68'", "'245'")
+  equal
+exit 0
+== --unit-diff a-s2 a-r4 U
+== --unit-diff a-s2-U-taxunits.xml a-r4-U-taxunits.xml: TAXUNIT names ['Default Tax Unit', 'Rajasthan Registration'] -> ['Default Tax Unit', 'Rajasthan Registration']
+   unit 'Default Tax Unit': 0 leaves differ
+   unit 'Rajasthan Registration': 0 leaves differ
+exit 0
+== plain N-0072
+== a-r4-N-0072.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+exit 0
+== plain N-0073
+== a-r4-N-0073.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+exit 0
+== plain N-0074
+== a-r4-N-0074.xml: 3022 bytes
+  STATUS '1'
+  VOUCHER rows: 0 of which with a VOUCHERNUMBER: 0 without one: 0
+exit 0
+== --diff a-s2 a-r4 R-0010
+== --diff a-s2-R-0010.xml a-r4-R-0010.xml
+   lists compared: 1
+   legs: 6 -> 6
+exit 0

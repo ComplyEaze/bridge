@@ -1,0 +1,55 @@
+Step 12 (Part G, the HSN summary before), screens as read on 23 Nov 2026, BRIDGE PILOT LAB at BK1's state (after R2).
+
+12.1 Go To label clicked; typed GSTR-1: List of Reports, GST Reports: GSTR-1, GSTR-1 Reconciliation, GSTR-1 Filed Summary - Downloaded; no line highlighted. Down once: GSTR-1 alone highlighted (zoom). Enter. No list of GST registrations showed.
+12.2 GSTR-1: GST Registration 08ZZZZZ0000Z1ZQ; Status Not Filed; period 1-Aug-26 to 31-Aug-26 (no period key pressed).
+12.3 Counts: Total Vouchers 39; Included in Return 27 (Ready for Upload 27, Modified in Books After Upload/Export 27); Not Relevant for This Return 7; Uncertain Transactions (Corrections needed) 5; Check Vouchers Having Potential Conflicts with Masters Yes.
+     B2C (Small) Invoices - 7: Vch Count 27 (2), Taxable 13,508.70, CGST 383.26, SGST/UTGST 383.24, Tax Amount 766.50. Total: 13,508.70 / 383.26 / 383.24 / 766.50.
+12.4 Down 10 (Credit or Debit Notes (Registered) - 9B), Down 12 (Amended Tax Liability (Advances Received) - 11A), Down 1 (Amendment of Adjusted Advances - 11B), Down 1: HSN Summary - 12 (B2B - B2C Supplies) alone highlighted (zoom). Enter.
+     GSTR-1 - HSN/SAC Summary (B2B - B2C Supplies), HSN/SAC Summary - HSN/SAC, one list headed B2C Supplies:
+     HSN/SAC | UQC | Total Amount | Tax Rate | Taxable Amount | IGST | CGST | SGST/UTGST | Cess | Tax Amount
+     847130 | OTH | 826.00 | 18 % | 700.00 | - | 63.00 | 63.00 | - | 126.00
+     9983 | NA | 105.00 | 5 % | 100.00 | - | 2.50 | 2.50 | - | 5.00
+     998313 | NA | 11,137.40 | 5 % | 10,607.00 | - | 265.21 | 265.19 | - | 530.40
+     998314 | NA | 1,366.70 | 5 % | 1,301.60 | - | 32.55 | 32.55 | - | 65.10
+     998315 | NA | 105.10 | 5 % | 100.10 | - | 2.50 | 2.50 | - | 5.00
+     998341 | NA | 210.00 | 5 % | 200.00 | - | 5.00 | 5.00 | - | 10.00
+     998342 | NA | 210.00 | 5 % | 200.00 | - | 5.00 | 5.00 | - | 10.00
+     998343 | NA | 105.00 | 5 % | 100.00 | - | 2.50 | 2.50 | - | 5.00
+     998344 | NA | 210.00 | 5 % | 200.00 | - | 5.00 | 5.00 | - | 10.00
+     Sub Total | 14,275.20 | | 13,508.70 | | 383.26 | 383.24 | | 766.50
+     Total | 14,275.20 | | 13,508.70 | | 383.26 | 383.24 | | 766.50
+     Quantity column empty on every line.
+12.5 Down 2 from 847130: 998313 alone highlighted (zoom). Enter: GSTR-1 - Voucher Register, Vouchers of 998313 (Date | Particulars | Vch Type | Vch No. | UQC | Total | Taxable | CGST | SGST):
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0001 | NA | 1,050.00 | 1,000.00 | 25.00 | 25.00
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0004 | NA | 1,051.06 | 1,001.00 | 25.03 | 25.03
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0005 | NA | 1,051.04 | 1,001.00 | 25.02 | 25.02
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0006 | NA | 1,050.02 | 1,000.00 | 25.01 | 25.01
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0007 | NA | 630.00 | 600.00 | 15.00 | 15.00
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0009 | NA | 630.00 | 600.00 | 15.00 | 15.00
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0011 | NA | 1,051.06 | 1,001.00 | 25.03 | 25.03
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0010 | NA | 630.42 | 600.40 | 15.01 | 15.01
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0012 | NA | 105.10 | 100.10 | 2.50 | 2.50
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0013 | NA | 105.22 | 100.20 | 2.51 | 2.51
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0014 | NA | 105.64 | 100.60 | 2.52 | 2.52
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0015 | NA | 210.44 | 200.40 | 5.02 | 5.02
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0016 | NA | 105.20 | 100.20 | 2.50 | 2.50
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0019 | NA | 105.00 | 100.00 | 2.50 | 2.50
+     2-Aug-26 | Bridge Walk-in | BRIDGE Sales Z1 | Z1/0001 | NA | (blank) | (blank) | (blank) | (blank)
+     5-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0021 | NA | 105.10 | 100.10 | 2.50 | 2.50
+     21-Aug-26 | BRIDGE Walk-in | BRIDGE Sales Two | BP2/0001 | NA | 1,050.00 | 1,000.00 | 25.00 | 25.00
+     22-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0043 | NA | 1,051.05 | 1,001.00 | 25.03 | 25.02
+     22-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0044 | NA | 1,051.05 | 1,001.00 | 25.03 | 25.02
+     Total | 11,137.40 | 10,607.00 | 265.21 | 265.19. 19 lines.
+     Esc once: the HSN/SAC Summary, highlight on 998313. Down once: 998314 alone highlighted (zoom). Enter: Vouchers of 998314:
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0007 | NA | 420.00 | 400.00 | 10.00 | 10.00
+     1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0010 | NA | 420.42 | 400.40 | 10.01 | 10.01
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0012 | NA | 105.10 | 100.10 | 2.50 | 2.50
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0013 | NA | 105.22 | 100.20 | 2.51 | 2.51
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0014 | NA | 105.64 | 100.60 | 2.52 | 2.52
+     2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0016 | NA | 105.22 | 100.20 | 2.51 | 2.51
+     5-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0021 | NA | 105.10 | 100.10 | 2.50 | 2.50
+     Total | 1,366.70 | 1,301.60 | 32.55 | 32.55. 7 lines.
+     Esc once: the HSN/SAC Summary, highlight on 998314.
+12.6 Esc once: GSTR-1 with the counts of 12.3, highlight on HSN Summary - 12. Esc once: the Gateway of Tally, BRIDGE PILOT LAB, current date Tuesday 15-Sep-2026, Create highlighted. No further Escape.
+Every count and line equal to HS's before (39/27/7/5; 27 (2); nine lines; Total 14,275.20 / 13,508.70 / 383.26 / 383.24 / 766.50; 19 and 7 voucher lines).
+Correction (written 23 Nov 2026 at step 15, from shots/s12-5-reg-998313.png): in 12.5's 998313 register the 0019 line's Particulars reads "Bridge Walk-in" (as the Z1/0001 line), not "BRIDGE Walk-in" as transcribed above; every amount as above.

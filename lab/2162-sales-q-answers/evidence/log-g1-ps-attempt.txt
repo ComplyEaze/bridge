@@ -1,0 +1,10 @@
+python : Traceback (most recent call last):
+At line:5 char:1
++ python -I run.py http://127.0.0.1:9001 g1 M-marks.xml *> log-g1.txt;  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "<lab folder>\run.py", line 18, in <module>
+    with open(here / f"log-{label}.txt", "a") as log:
+PermissionError: [Errno 13] Permission denied: '<lab folder>\\log-g1.txt'

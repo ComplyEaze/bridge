@@ -1206,10 +1206,9 @@ fn an_unknown_reserved_identity_is_refused_as_a_counterparty_rather_than_admitte
     let masters = observed(&ledgers, groups);
     let state = masters.classify("Retention Party");
     assert_eq!(state.state(), "not_established");
-    assert!(
-        state.detail().contains("no captured response exhibits"),
-        "unexpected detail: {}",
-        state.detail()
+    assert_eq!(
+        state.detail(),
+        "The group's reserved identity is one no captured response exhibits, so it establishes neither that the ledger holds money nor that it does not."
     );
     assert!(
         !LegRequirement::Counterparty.admits(&state),
@@ -4429,6 +4428,79 @@ fn a_reserved_identity_matches_whatever_its_case_and_padding() {
             "{spelling:?}"
         );
     }
+}
+
+#[track_caller]
+fn assert_unknown_reserved_identity(identity: &str) {
+    assert!(
+        !identity.trim().to_ascii_lowercase().is_empty(),
+        "the probe identity is not empty"
+    );
+
+    let mut groups = captured_demo_groups();
+    groups.push(TallyNamedMaster {
+        name: "Near Miss Probe Group".into(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Current Liabilities".into()),
+        reserved_name: Some(identity.into()),
+    });
+    let mut ledgers = captured_demo_ledger_parents();
+    ledgers.push((
+        "Near Miss Probe Ledger".into(),
+        Some("Near Miss Probe Group".into()),
+    ));
+    let state = observed(&ledgers, groups).classify("Near Miss Probe Ledger");
+    assert_eq!(
+        state,
+        CashBankState::NotEstablished {
+            reason: "The group's reserved identity is one no captured response exhibits, so it establishes neither that the ledger holds money nor that it does not."
+        },
+        "{identity:?}"
+    );
+    assert!(
+        !LegRequirement::Money.admits(&state),
+        "{identity:?} must not be admitted as money"
+    );
+    assert!(
+        !LegRequirement::Counterparty.admits(&state),
+        "{identity:?} must not be admitted as a counterparty"
+    );
+}
+
+/// Prefixes, extensions and inner or wrapped substrings of money identities
+/// remain unknown: only an exact normalized table entry establishes money.
+#[test]
+fn money_reserved_identities_do_not_match_by_partial_overlap() {
+    for identity in [
+        "Bank",
+        "Bank Accounts Escrow",
+        "ank Account",
+        "Escrow Bank Accounts Holdback",
+    ] {
+        assert_unknown_reserved_identity(identity);
+    }
+}
+
+/// The non-money table is exact for the same four overlap shapes; a partial
+/// match must not turn an unknown identity into an admitted counterparty.
+#[test]
+fn non_money_reserved_identities_do_not_match_by_partial_overlap() {
+    for identity in [
+        "Sundry",
+        "Sundry Debtors Escrow",
+        "undry Debtor",
+        "Escrow Sundry Debtors Holdback",
+    ] {
+        assert_unknown_reserved_identity(identity);
+    }
+}
+
+/// ASCII case folding deliberately leaves Kelvin sign unchanged, although
+/// Unicode lower-casing would make this spelling equal to Bank Accounts.
+#[test]
+fn unicode_case_folding_does_not_establish_a_money_reserved_identity() {
+    let identity = "Ban\u{212A} Accounts";
+    assert_eq!(identity.to_lowercase(), "bank accounts");
+    assert_unknown_reserved_identity(identity);
 }
 
 /// The production table classifies every captured predefined identity: three

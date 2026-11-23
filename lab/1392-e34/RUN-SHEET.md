@@ -126,7 +126,11 @@ Every log this row writes is bounded where it is written:
   A `HALT`: STOP. Then `Get-FileHash bk.py, restore-prep.py | Format-List > evidence\s0-placeholders.txt`.
 - Copy the configuration: `Copy-Item run\launch-env.json agent-run\launch-env.json`, then `Get-FileHash agent-run\launch-env.json | Format-List > evidence\s0-launch-env.txt`. EXPECT the hash on `SHA256.txt`'s line for `launch-env.json`. Different: STOP.
 
-0.2 **C2.** With THE COMPANY loaded alone (C1), take the screenshot first: `python -I cap.py s0-start` (output in `shots\`, its hash printed). A dialog or a half-entered screen: STOP. Then `python -I -X utf8 c2.py s0`, which writes `evidence\s0-c2-*.txt`. EXPECT:
+0.2 **No restart pending.** This check is read-only and comes first: `"RebootRequired $(Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'); RebootPending $(Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')" > evidence\s0-restart.txt`.
+- EXPECT both False, and no restart notice or countdown on the screen (record it on 0.2's first screenshot).
+- Either True, or a notice on the screen: STOP before step 1. A restart between step 3 and step 8 would leave posts in the book.
+
+Then **C2.** With THE COMPANY loaded alone (C1), take the screenshot first: `python -I cap.py s0-start` (output in `shots\`, its hash printed). A dialog or a half-entered screen: STOP. Then `python -I -X utf8 c2.py s0`, which writes `evidence\s0-c2-*.txt`. EXPECT:
 - one `tally.exe`;
 - 9001 LISTENING by that pid;
 - `/status` 200.
@@ -276,7 +280,9 @@ No Yes is clicked in a sitting where the helper could not see and close a box th
 - **If a box was left unclicked:** press no key and touch no window. Wait out Bridge's 120 s box limit, counted from the call's start in `agent-run\evidence\tools-log.txt`, plus 10 s. Then take the state reads once, as C8 allows: a screenshot (`cap.py s6-stop`), then `marks.py s6-stop-marks`. Then report.
 - **Findings, not stops:** a K3 that shows no box, and a K2 with no cause.
 
-Step 3 starts only when 6.3's box log shows `CLICKED` or `NO BOX`, and at least 130 s after 6.3's call started. A K box still open would make B3's call refused `post_approval_busy`.
+Step 3 starts only when the path K took has ended:
+- **If 6.3 ran:** 6.3's box log shows `CLICKED` or `NO BOX`, and at least 130 s have passed since 6.3's call started.
+- **If 6.2 and 6.3 were skipped (6.1):** K1's box log shows `CLICKED` and `box visible False`, and at least 130 s have passed since K1's call started. A K box still open would make B3's call refused `post_approval_busy`.
 
 ### 7. End of Bridge
 - `call.py agent-run s7-egress egress_log calls\args-egress.json`, whole.

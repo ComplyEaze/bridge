@@ -1,7 +1,7 @@
 {
   "file": "src-tauri/src/agent_import_cash_bank.rs",
   "base_commit": "a8864cc9",
-  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run but the follow_up_hand run was on base_commit, with the file byte for byte as there. The test module was as at base_commit for the tool, hand and whole_set runs. The survivors_again run used the test module as the first commit of this change (5dfc8ba3) left it, before two assertions that a later commit of this change adds: that an admitted counterparty has no refusal, and that a ledger whose name starts with a space is found as spelled. By reading, those two assertions change no earlier verdict (they only read values); the thirty were not run again with them. C65 and C66 were written after the survivors_again run and are caught only by those two assertions: the later_hand run says how each was run, and its killer is the one test that was run, not the first of a whole run. C67 to C77 were added by a later change, from the review of the change that added this record. Their runs are the follow_up_hand run: it was on d2d38a2b, not on base_commit, with the file byte for byte as at base_commit and the test module as at d2d38a2b; survived_at_base counts them on that footing. C67 is caught only by an assertion the later change adds to a test that exists at base. C68 to C76 are caught only by tests the later change adds, and for them this_commit means that later change. The killer named for each is the first test the second whole run of the follow_up_hand run reported failing. C77 is equivalent and is listed in accepted_survivors.",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed. Every run was on macOS; the file has no code compiled for one platform only. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run but the follow_up_hand run was on base_commit, with the file byte for byte as there. The test module was as at base_commit for the tool, hand and whole_set runs. The survivors_again run used the test module as the first commit of this change (5dfc8ba3) left it, before two assertions that a later commit of this change adds: that an admitted counterparty has no refusal, and that a ledger whose name starts with a space is found as spelled. By reading, those two assertions change no earlier verdict (they only read values); the thirty were not run again with them. C65 and C66 were written after the survivors_again run and are caught only by those two assertions: the later_hand run says how each was run, and its killer is the one test that was run, not the first of a whole run. C67 to C81 were added by a later change, from the review of the change that added this record and the review of that later change. Their runs are the follow_up_hand run: it was on d2d38a2b, not on base_commit, with the file byte for byte as at base_commit and the test module as at d2d38a2b; survived_at_base counts them on that footing. C67 is caught only by an assertion the later change adds to a test that exists at base. C68 to C76 and C78 to C81 are caught only by tests the later change adds, and for them this_commit means that later change. The killer named for each of C67 to C81 is the first test reported failing when the mutant was run against every bridge test with the test module as the later change leaves it. C77 is equivalent and is listed in accepted_survivors.",
   "runs": [
     {
       "run": "tool",
@@ -44,7 +44,7 @@
       "run": "follow_up_hand",
       "tests_at": "d2d38a2b, then this_commit",
       "tests_run": 5421,
-      "command": "for C67 to C77 only: each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge (every bridge test) with the tree as at d2d38a2b, after the unmutated tree passed all 5421: none was caught. Then the same run with the test module as this change leaves it, after the unmutated tree passed all 5424: C67 to C76 were each caught and C77 was not",
+      "command": "for C67 to C81 only: each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge (every bridge test) with the tree as at d2d38a2b, after the unmutated tree passed all 5421: none was caught (C78 to C81 in a later sitting, begun 2026-11-23T07:41:39Z). Then the same run for all fifteen with the test module as this change leaves it and nothing uncommitted, after the unmutated tree passed all 5424: C67 to C76 and C78 to C81 were each caught and C77 was not",
       "time": "2026-11-23T05:07:37Z",
       "tree": "d2d38a2b, where the file is byte for byte as at base_commit"
     }
@@ -56,12 +56,12 @@
       "unviable": 1
     },
     "hand": {
-      "caught": 75,
+      "caught": 79,
       "missed": 2
     },
     "survived_at_base": {
       "tool": 0,
-      "hand": 43
+      "hand": 47
     },
     "equivalent": {
       "tool": 0,
@@ -1273,6 +1273,62 @@
       "mutation": "50a718fabc31234d28eaf0cbc01772c9",
       "verdict": "missed",
       "equivalent": true
+    },
+    "C78": {
+      "what": "money table: a table name that ends with the identity matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalize(candidate).ends_with(&normalized))"
+        }
+      ],
+      "mutation": "1d2f7ac6660863a89b6035106129d660",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C79": {
+      "what": "money table: an identity that ends with a table name matches",
+      "edits": [
+        {
+          "from": ".find(|(candidate, _)| normalize(candidate) == normalized)",
+          "to": ".find(|(candidate, _)| normalized.ends_with(&normalize(candidate)))"
+        }
+      ],
+      "mutation": "19456e29d1e08a87a0547f683e99a17d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C80": {
+      "what": "non-money table: a table name that ends with the identity matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalize(candidate).ends_with(&normalized)) =>"
+        }
+      ],
+      "mutation": "c419db9cae3dc713bc3719ed0ebb3ecd",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
+    },
+    "C81": {
+      "what": "non-money table: an identity that ends with a table name matches",
+      "edits": [
+        {
+          "from": ".any(|candidate| normalize(candidate) == normalized) =>",
+          "to": ".any(|candidate| normalized.ends_with(&normalize(candidate))) =>"
+        }
+      ],
+      "mutation": "c92b9daeb8682723c86e23b68e6e3087",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::bank_tests::non_money_reserved_identities_do_not_match_by_partial_overlap",
+      "killer_at": "this_commit"
     }
   },
   "accepted_survivors": {

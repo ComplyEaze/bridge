@@ -11,14 +11,23 @@ The sitting's own note on #1392 asks for two things in the next sitting. First, 
 
 This row does those two things and nothing else:
 - **E3 and E4** as row 1392-E's steps 8 to 10. The box check is fixed: it reads the one-voucher box, and it reads the log only when the read is whole. Each post has its own new build.
-- **K, the kept No.** On a batch of its own, after E4, a No is left to land after the call has returned. The row then records what the next call answers, and whether the call after that shows a new box.
+- **K, the kept No.** On a batch of its own that is never posted, run before the first post, a No is left to land after the call has returned. The row then records what the next call answers, and whether the call after that shows a new box.
 
 Since row 1392-E ran, #2521 (8c6cc57a, in 8c3fb9f2) changed how a kept refusal is answered. It now carries `error.cause` `approval_answered_earlier`, and its `error.next_step` says that calling again with the same batch asks in a new box (Code, 5). K measures both on the build.
+
+K runs first for a second reason. `box.ps1`'s scripted click has never met this build's box: row 2569-R had a person click. So the sitting's first box is one that can post nothing, and no Yes is clicked unless the helper has seen that box and closed it (step 6, the smoke test).
 
 ## What this row does not show
 - **Not shown: E1, E2, F, B1 and the decoy.** They held on 5 Nov and are not run again. E3 pairs by reference, so it needs no statement to cover its day (Code, 3). E4 needs only B4's and A4's own cover.
 - **Not shown: the parser's fit to real bank PDFs.** The statements come from the generator below, which writes only the layout the parser was written for.
 - **Not shown: a box answered Yes after its call returned.** K answers No only, so nothing in K can post.
+- **K before the posts: what is shown from the code, and what is not.** Bridge keeps approval state in memory, per process (agent_import_approval.rs:411).
+  - Kept refusals are held per batch. `take_refusal` returns one only to a call with that same `batch_id` (:586 to :588), so K's refusal, kept or already taken, cannot answer a call for B3, B4 or A4.
+  - The one state shared across batches is the single held slot (:413). `settle` (:706) frees it once K's box has ended. If K's box were still open, B3's call would be refused `post_approval_busy` before anything is sent (`begin`, :690). That is a loud stop, not a changed post.
+  - A lapse note is written to the data folder only for an approval that was given (`lapse`, :1008), and it is named by its own batch (:1023). K gives none.
+  - The import journal is appended only after a dispatch has had Tally's answer (agent_import_post.rs:1557 to :1562). K never dispatches.
+  - K's pre-box reads do appear in `egress_log`.
+  - Not shown: these paths and their line order were read, not every branch of `post_import`, so "nothing K leaves changes B3's first post" is partial, not verified. Step 3's own EXPECTs, a box naming B3 and `posted_verified` 1 of 1, are what this sitting measures.
 
 ## Build
 **NEW**, the build of rows 2569-R (Part B) and 2440-CP:
@@ -96,6 +105,8 @@ Differences from LAB-COMMON, the stricter rule holding everywhere else:
 - `agent-data\`: Bridge's data folder, new and empty.
 
 ## Steps
+**Run order: 0, 1, 2, then 6 (K), then 3, 4, 5, then 7, 8, 9.** The step numbers are kept as written; K runs before any post.
+
 One at a time. Every command's output goes to a file, and the notes file `evidence\notes.txt` gets one line per step in UTC.
 
 A file with no answer is a failed step, not an empty one. `call.py` prints `isError` and `rpc` for each answer: an answer that is an error, a JSON-RPC error, or no answer is "the request failed", never "nothing found".
@@ -200,7 +211,7 @@ Any other: STOP. The box check writing No is a stop, not a retry.
 
 Keep the answer whole. Then `call.py agent-run s4-egress egress_log calls\args-egress.json`, whole. Then `marks.py s4-marks`. EXPECT V 13, M 211.
 
-**E4 runs only if step 4 gave `skips_paired` 1.** Otherwise go to step 6.
+**E4 runs only if step 4 gave `skips_paired` 1.** Otherwise go to step 7: K has already run.
 
 ### 5. E4
 5a **B4.** `args.py build-from <the b4-parse answer> b4`, then `call.py agent-run b4-build build_import_xml calls\args-build-b4.json`. EXPECT `voucher_count` 3: two Receipts (1 and 3 Nov) and a Contra (2 Nov, 9,004.00). Then P: `p.py b4 <B4> 3 13`. EXPECT as 3.2, with the title `post 3 vouchers?`, `created` 3 and `V 16 M 211`.
@@ -211,7 +222,9 @@ Keep the answer whole. Then `call.py agent-run s4-egress egress_log calls\args-e
 
 5c **A4's post.** P: `p.py a4 <A4> 2 16`. EXPECT as 3.2, with `created` 2 and `V 18 M 211`. Then `show.py` on the `a4-verify` answer, saved to `evidence\s5-a4-verify.txt`. EXPECT in its `transfers` **`skips_paired` 2** and `skips_open` 0.
 
-### 6. K: what a repeat call after a kept No shows
+### 6. K: what a repeat call after a kept No shows, and the box helper's smoke test
+**Run order: 0, 1, 2, then 6 (K), then 3, 4, 5, then 7, 8, 9.** The step numbers are kept as written; K runs before any post. Step 6 runs after 2.7 and before 3.1.
+
 A batch of its own, built once, never posted. Each sub-step is one call. `p.py` is not used here, because it calls again on `pending` and would join the open box. No key is pressed and nothing is sent to Bridge or Tally from 6.1's start to 6.3's end, except the calls named.
 
 6.0 **Build.** `call.py agent-run k-build build_import_xml calls\args-build-k.json`. EXPECT `voucher_count` 1, a Receipt of 26 Oct 2026, and a `batch_id`, K. Then `python -I -X utf8 args.py batch k <K>`.
@@ -226,7 +239,7 @@ A batch of its own, built once, never posted. Each sub-step is one call. `p.py` 
   - `no valid answer file by 70 s`, then `CLICKED No`, then `box visible False`;
   - exit 0.
 - **The grade of K1:** the `CLICKED No` time must be later than the call's end (`agent-run\evidence\tools-log.txt`: its sent time plus its seconds). Record both times.
-- If the call returned after the click, or answered anything but `pending`: K is not set up. Record it whole and go to step 7.
+- If the call returned after the click, or answered anything but `pending`: the kept-No record is not set up. Record it whole, skip 6.2 and 6.3, and go to 6.4. The smoke test below still decides whether step 3 runs.
 
 6.2 **K2: the call that reads the kept No.** Within 5 minutes of the click:
 - `$b = Start-Process powershell -ArgumentList '-NoProfile','-File','C:\bridge-lab\1392e34\box.ps1','-RowDir','C:\bridge-lab\1392e34','-Tag','k-p2','-SeeWithin','20','-AnswerBy','20' -WindowStyle Hidden -RedirectStandardOutput box\k-p2-ps.out -PassThru`.
@@ -252,7 +265,18 @@ A batch of its own, built once, never posted. Each sub-step is one call. `p.py` 
   - the call answers `import_approval_declined` with **no** `error.cause`, as a No given to a waiting call (Code, 5), and `attempt_recorded` false.
 - If no box shows: the call's answer recorded whole, `NO BOX seen within 120 s`, exit 3. Then no key is pressed for 130 s after the call started, because Bridge's box limit is 120 s. Nothing more is sent to the batch in either case.
 
-6.4 `marks.py s6-marks`. EXPECT V unchanged from step 5's (18 after E4, 13 without it), M 211. K posts nothing.
+6.4 `python -I -X utf8 marks.py s6-marks`. EXPECT V 12, M 211, the same as m2: no post has been made yet, and K posts nothing.
+
+6.5 **The smoke test.** STOP before step 3 if any one of these holds:
+- K1's box log `box\k-p1-box.txt` has no `BOX SEEN`;
+- it has no `CLICKED No` followed by `box visible False`;
+- 6.4's marks are not V 12, M 211.
+
+No Yes is clicked in a sitting where the helper could not see and close a box that posts nothing.
+- **If a box was left unclicked:** press no key and touch no window. Wait out Bridge's 120 s box limit, counted from the call's start in `agent-run\evidence\tools-log.txt`, plus 10 s. Then take the state reads once, as C8 allows: a screenshot (`cap.py s6-stop`), then `marks.py s6-stop-marks`. Then report.
+- **Findings, not stops:** a K3 that shows no box, and a K2 with no cause.
+
+Step 3 starts only when 6.3's box log shows `CLICKED` or `NO BOX`, and at least 130 s after 6.3's call started. A K box still open would make B3's call refused `post_approval_busy`.
 
 ### 7. End of Bridge
 - `call.py agent-run s7-egress egress_log calls\args-egress.json`, whole.
@@ -289,7 +313,7 @@ Shut THE COMPANY. Run `c2.py s9`. EXPECT one `tally.exe` on 9001 and `/status` 2
 
 ## Stop rules
 - Any dialog on Tally's screen, before or after a call.
-- Any refusal before an attempt is recorded, any parse refusal, and any refusal of a build.
+- Any refusal before an attempt is recorded, any parse refusal, and any refusal of a build. K's declines in step 6 are expected, not stops.
 - Any call with no answer in 10 minutes.
 - A box the check does not pass. `boxcheck.py` exits other than 0, or `p.py` exits other than 0.
 - The self-test of 0.5 not `ALL CASES RIGHT`.
@@ -297,12 +321,15 @@ Shut THE COMPANY. Run `c2.py s9`. EXPECT one `tally.exe` on 9001 and `/status` 2
 - A statement or sheet file whose sha256 differs from its list.
 - V not as expected after a step, or M other than 211: report before the next step.
 - A key pressed, or a window touched, while a box may be up (Rules, 3): record it and stop.
+- K's smoke test (6.5): no `BOX SEEN` in K1's box log, no `CLICKED No` followed by `box visible False`, or 6.4's marks other than V 12, M 211. STOP before step 3, and wait as 6.5 says. A K3 with no box, or a K2 with no cause, is a finding, not a stop.
 - Education mode.
 
-After a stop, nothing more is sent or keyed (C8). The book then holds whatever was posted before it:
-- B3's Contra from step 3;
-- B4's three vouchers from step 5a;
-- A4's two Receipts from step 5c.
+After a stop, nothing more is sent or keyed (C8). The book then holds whatever was posted before it.
+- **A stop in steps 0 to 2, or in step 6 (K, which runs before any post):** the book holds nothing of this row's, and m4 must still equal m0.
+- **Otherwise:**
+  - B3's Contra from step 3;
+  - B4's three vouchers from step 5a;
+  - A4's two Receipts from step 5c.
 
 K posts nothing. The way back is BK-E2, then (on the run coordinator's word) BK-E.
 
@@ -310,7 +337,7 @@ K posts nothing. The way back is BK-E2, then (on the run coordinator's word) BK-
 - One generated statement layout (HDFC), one book, one sitting, and k = 0 (`TRANSFER_K_DAYS`, agent_transfer_pairing.rs:276). Only the same printed day pairs by date.
 - K is one batch of one voucher. It times one No against a 40 s call budget and a 70 s click, both well inside the box's 120 s limit. It does not try a box left to time out, a No given after the 15 minutes an approval lasts, or a second kept No.
 - E1, E2 and the decoy are not repeated (What this row does not show).
-- K runs last, so that its batch cannot touch E3's and E4's posts. A stop in steps 3 to 5 therefore ends the row before K, and the kept-No record then waits for another sitting.
+- K runs first, after the parses and before any post, and its batch is never posted. Its refusals are kept per batch and returned only to a call with K's own `batch_id` (`take_refusal`, agent_import_approval.rs:586 to :588), so a kept or consumed refusal of K cannot reach B3, B4 or A4. A stop in K ends the row before any post.
 
 ## Code admits the trigger (8c3fb9f2)
 1. **A skip comes only from a statement PDF.** `parse_bank_statement` (agent.rs:3562) reads an hdfc PDF, and `skip` is a mapping treatment. The password file must be private to the user (local_files/access.rs:338).
@@ -338,8 +365,8 @@ K posts nothing. The way back is BK-E2, then (on the run coordinator's word) BK-
 | 0, 1, 2, P, 4, 6, 7, 8 | marks, raw | `marks.py`'s curl on 9001 | one COMPANY row; V is its ALTVCHID, so +n is n vouchers created; M its ALTMSTID |
 | 1 | company list, status, voucher types | `list_companies`, `tally_status`, `masters` | the rows named |
 | 1 | none to Tally | `parse_bank_statement` (agent.rs:3562) | rows, skipped, counterparties |
-| 3 to 6 | the build's reads; for a skip, the day reads | `build_import_xml` (agent.rs:3531) | `voucher_count`, `skipped_rows`, `transfers` |
-| P, 6 | reads, the one import, the read-back; or a refusal with nothing sent | `post_import` (agent.rs:3569) | `CREATED`, `posted_verified`; `error.code` and `error.cause` |
+| 6, then 3 to 5 | the build's reads; for a skip, the day reads | `build_import_xml` (agent.rs:3531) | `voucher_count`, `skipped_rows`, `transfers` |
+| 6, then P | reads, the one import, the read-back; or a refusal with nothing sent | `post_import` (agent.rs:3569) | `CREATED`, `posted_verified`; `error.code` and `error.cause` |
 | P | the verification reads | `verify_import` (agent.rs:3595) | `posted_verified`; `transfers` |
 | 4, 7 | none to Tally | `egress_log` (agent.rs:3537) | the log's lines |
 | 6 | none | `box.ps1`, `Get-CimInstance` | the box seen or not; the `--confirm-journal` child |

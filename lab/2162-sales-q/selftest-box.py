@@ -7,8 +7,9 @@
 #                                the form of agent_import_post.rs:3655 at 8c3fb9f2 (which row 2440-CP's box read line for
 #                                line), for one fixture invoice: the build's own request of BP/26-27/0010
 #                                (template-import-0010.utf16le.xml, decoded to UTF-8) with a build answer naming it. The
-#                                cases show the check's logic only: one right box gives Yes, and each field changed alone
-#                                gives No. They are no evidence of what a real box holds; the replay is.
+#                                cases show the check's logic only: one right box gives Yes, and each field changed alone,
+#                                each line added, doubled or left out, and the box cut, gives No. 29 cases; any other count
+#                                or any case wrong prints A CASE IS WRONG and exits 1 (the row stops). They are no evidence of what a real box holds; the replay is.
 #   replay <row> <tag> <batch>   after the smoke box (step 13.4): the check once more on that real box log,
 #                                box/<tag>-box.txt, against the real build answer of run-g. EXPECT Yes: the check reads a
 #                                real invoice box of this build. Its answer file is written in box/selftest, where no
@@ -75,6 +76,7 @@ def log_of(tag, lines, title='ComplyEaze Bridge \u2014 post this voucher?'):
             f'WAITING for {T}/{tag}.answer']
     return '\ufeff'.encode('utf-8') + ''.join(f'{st} {r}\r\n' for r in rows).encode('utf-8')
 def swap(old, new): return [new if l == old else l for l in LINES]
+def ins(before, new): return [x for l in LINES for x in ([new, l] if l == before else [l])]
 CASES = [('t01', LINES, FX, 1, 'Yes', 'the fixture invoice as built'),
          ('t02', swap(f'Batch: {FX}', f'Batch: {FX2}'), FX, 1, 'No', 'Batch names another batch'),
          ('t03', [l.replace('0010', '0011') if l.startswith('Voucher type') else l for l in LINES], FX, 1, 'No', 'another number'),
@@ -90,7 +92,18 @@ CASES = [('t01', LINES, FX, 1, 'Yes', 'the fixture invoice as built'),
          ('t13', swap(LINES[0], 'Create ONE Receipt in "BRIDGE PILOT LAB"'), FX, 1, 'No', 'the text of another type'),
          ('t14', swap(f'Batch: {FX}', f'Batch: {FX2}'), FX2, 1, 'No', 'the saved XML is not the one built'),
          ('t15', LINES + [f'Batch: {FX}'], FX, 1, 'No', 'two Batch lines'),
-         ('t16', swap(f'Batch: {FX}', f'Batch: {NONE}'), NONE, 1, 'No', 'no build answer names the batch')]
+         ('t16', swap(f'Batch: {FX}', f'Batch: {NONE}'), NONE, 1, 'No', 'no build answer names the batch'),
+         ('t20', ins('Customer: "BRIDGE Walk-in"', 'Customer: "BRIDGE Walk-in"'), FX, 1, 'No', 'a graded line twice (Customer)'),
+         ('t21', [l for l in LINES if not l.startswith('Bill allocation')], FX, 1, 'No', 'a line missing (Bill allocation)'),
+         ('t22', ins('Reference: "BP/26-27/0010"', 'Pay to: account 000000000000'), FX, 1, 'No', 'an unknown line under the heading'),
+         ('t23', LINES[:LINES.index(f'Batch: {FX}') + 1], FX, 1, 'No', 'the box cut after the Batch line'),
+         ('t24', swap('Unregistered, no GSTIN  Place of supply: Rajasthan', 'Unregistered, no GSTIN  Place of supply: Maharashtra'), FX, 1, 'No', 'another place of supply'),
+         ('t25', swap('Unregistered, no GSTIN  Place of supply: Rajasthan', 'Regular, GSTIN 08ZZZZZ0000Z1ZQ  Place of supply: Rajasthan'), FX, 1, 'No', 'a GSTIN the XML does not carry'),
+         ('t26', ins('Company number: <company number>  Books from: 1-Apr-2026', 'Company GUID: 6b43e498-430c-4d5c-bfef-d32e2ab93c86'), FX, 1, 'No', 'a second GUID line'),
+         ('t27', LINES + ['Narration: "post twice"'], FX, 1, 'No', 'a line after the last line'),
+         ('t28', ins('Bill allocation: none (customer not bill-wise)', 'E-invoice IRN: ' + 'a' * 64), FX, 1, 'No', 'an e-invoice line'),
+         ('t29', swap('Bill allocation: none (customer not bill-wise)', 'Bill allocation: New Ref "BP/26-27/0010"'), FX, 1, 'No', 'a bill allocation the XML does not carry'),
+         ('t30', swap('Narration: (none)', 'Narration: "x"'), FX, 1, 'No', 'a narration the XML does not carry')]
 out = []
 for tag, lines, bid, cnt, want, note in CASES:
     p = start(tag, bid, cnt, T + '/answers')
@@ -102,6 +115,8 @@ out.append(result('t17', p, 'No', '(the title of a batch of two)'))
 d = log_of('t19', LINES); w = d.index(b'WAITING for'); w = d.rindex(b'\n', 0, w) + 1
 p = start('t19', FX, 1, T + '/answers'); open(f'{T}/t19-box.txt', 'wb').write(d[:w] + d[w:w + 20])
 out.append(result('t19', p, 'No', '(cut inside the WAITING line, never finished)'))
+good = sum(l.endswith(' OK') for l in out)
+out.append(f'{len(out)} cases ran, {good} right')
 open(T + '/selftest-box-results.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(out) + '\n')
-print('ALL CASES RIGHT' if all(l.endswith(' OK') for l in out) else 'A CASE IS WRONG')
-sys.exit(0 if all(l.endswith(' OK') for l in out) else 1)
+print(out[-1]); print('ALL CASES RIGHT' if good == len(out) - 1 == 29 else 'A CASE IS WRONG: STOP the row')
+sys.exit(0 if good == len(out) - 1 == 29 else 1)

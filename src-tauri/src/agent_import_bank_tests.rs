@@ -4432,11 +4432,6 @@ fn a_reserved_identity_matches_whatever_its_case_and_padding() {
 
 #[track_caller]
 fn assert_unknown_reserved_identity(identity: &str) {
-    assert!(
-        !identity.trim().to_ascii_lowercase().is_empty(),
-        "the probe identity is not empty"
-    );
-
     let mut groups = captured_demo_groups();
     groups.push(TallyNamedMaster {
         name: "Near Miss Probe Group".into(),
@@ -4466,13 +4461,16 @@ fn assert_unknown_reserved_identity(identity: &str) {
     );
 }
 
-/// Prefixes, extensions and inner or wrapped substrings of money identities
-/// remain unknown: only an exact normalized table entry establishes money.
+/// Prefixes, suffixes, inner parts of money identities and identities that
+/// carry one with text before it, after it or on both sides remain unknown:
+/// only an exact normalized table entry establishes money.
 #[test]
 fn money_reserved_identities_do_not_match_by_partial_overlap() {
     for identity in [
         "Bank",
+        "OD A/c",
         "Bank Accounts Escrow",
+        "Escrow Bank Accounts",
         "ank Account",
         "Escrow Bank Accounts Holdback",
     ] {
@@ -4480,13 +4478,15 @@ fn money_reserved_identities_do_not_match_by_partial_overlap() {
     }
 }
 
-/// The non-money table is exact for the same four overlap shapes; a partial
+/// The non-money table is exact for the same six overlap shapes; a partial
 /// match must not turn an unknown identity into an admitted counterparty.
 #[test]
 fn non_money_reserved_identities_do_not_match_by_partial_overlap() {
     for identity in [
         "Sundry",
+        "Debtors",
         "Sundry Debtors Escrow",
+        "Escrow Sundry Debtors",
         "undry Debtor",
         "Escrow Sundry Debtors Holdback",
     ] {

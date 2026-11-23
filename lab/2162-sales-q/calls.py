@@ -9,7 +9,7 @@
 #                                 (isError true, with an error code) is an answer, printed as "refused <code>".
 #   calls.py status-diff A B      two gst_status answers: every item by master_id in one only, and every item whose
 #                                 fields differ, field by field; then the counts of each. Exit 2 as for show.
-#   calls.py post BUILD OUT       writes OUT, a post_import call with the company and batch id of the build answer
+#   calls.py post BUILD OUT       writes OUT (whole, then renamed in), a post_import call with the company and batch id of the build answer
 #                                 BUILD; refuses (exit 2) unless BUILD built exactly one voucher.
 #   calls.py verify BUILD OUT     the same, a verify_import call.
 #   calls.py batch BUILD DATADIR  finds <batch_id>.xml under DATADIR (the launch's data folder), and checks its sha256
@@ -154,8 +154,10 @@ def write_call(tool, build, out):
     out = pathlib.Path(out)
     if out.exists():
         stop(f"{out} exists: a call file is never rewritten")
-    out.write_text(json.dumps({"tool": tool, "arguments": {"company_guid": guid, "batch_id": r["batch_id"]}}) + "\n",
+    tmp = out.parent.parent / (out.name + ".tmp")  # written whole beside the inbox, then renamed in: client.py never reads half a file
+    tmp.write_text(json.dumps({"tool": tool, "arguments": {"company_guid": guid, "batch_id": r["batch_id"]}}) + "\n",
                    encoding="utf-8", newline="\n")
+    tmp.replace(out)
     print(f"{out.name}: {tool} batch_id {r['batch_id']}, sha256 {hashlib.sha256(out.read_bytes()).hexdigest()}")
 
 def batch(build, datadir):

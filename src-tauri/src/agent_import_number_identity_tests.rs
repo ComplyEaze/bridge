@@ -512,6 +512,179 @@ fn an_unsettled_twin_is_found_whatever_lexeme_its_figures_were_written_in() {
     );
 }
 
+fn verified_post(line: &ImportLedgerLine, observed: ReadVoucher) -> Value {
+    let bindings = [span_identity::PostedVoucherIdentity {
+        bridge_txn_id: line.vouchers[0].bridge_txn_id.clone(),
+        guid: observed.guid.clone().expect("observed GUID"),
+        master_id: observed
+            .master_id
+            .as_deref()
+            .expect("observed MasterID")
+            .parse()
+            .expect("numeric MasterID"),
+    }];
+    let result = verify_batch(
+        line,
+        &ImportReadSource::admit(vec![observed]).unwrap(),
+        Attribution::Span(Some(&bindings)),
+    )
+    .unwrap();
+    assert_eq!(result["vouchers"][0]["status"], "posted_verified");
+    result
+}
+
+#[test]
+fn a_posted_verified_sales_invoice_carries_the_e_invoice_sent_note() {
+    let result = verified_post(
+        &invoice_batch("INV/26-27/002"),
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    assert_eq!(
+        result["vouchers"][0]["e_invoice_sent"],
+        json!({"details":"none","note":"ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act; ComplyEaze Bridge does not generate one."})
+    );
+}
+
+#[test]
+fn a_posted_verified_sales_invoice_sent_with_e_invoice_details_has_no_e_invoice_sent_field() {
+    let mut line = invoice_batch("INV/26-27/002");
+    line.vouchers[0]
+        .invoice
+        .as_mut()
+        .expect("invoice detail")
+        .e_invoice = Some(
+        serde_json::from_value(json!({
+            "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+            "ack_no": "445566",
+            "ack_date": "2025-04-03"
+        }))
+        .unwrap(),
+    );
+    let result = verified_post(
+        &line,
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    assert!(
+        result["vouchers"][0].get("e_invoice_sent").is_none(),
+        "{result}"
+    );
+}
+
+#[test]
+fn a_sales_invoice_without_native_dispatch_has_no_e_invoice_sent_field() {
+    let result = verified_post(
+        &invoice_batch("INV/26-27/002"),
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    let mut found_not_sent = result.clone();
+    verification::mark_found_not_sent(&mut found_not_sent);
+    assert!(
+        found_not_sent["vouchers"][0]
+            .get("e_invoice_sent")
+            .is_none(),
+        "mark_found_not_sent alone removes the field"
+    );
+    verification::mark_verification_names(&mut found_not_sent);
+    assert!(found_not_sent["vouchers"][0]
+        .get("e_invoice_sent")
+        .is_none());
+
+    let mut partly_found = result;
+    verification::mark_verification_names(&mut partly_found);
+    assert!(partly_found["vouchers"][0].get("e_invoice_sent").is_none());
+}
+
+#[test]
+fn e_invoice_sent_requires_a_named_sent_dispatch_state() {
+    let result = verified_post(
+        &invoice_batch("INV/26-27/002"),
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    for state in [
+        "posted_verified",
+        "reconciliation_required",
+        "previous_attempt_reconciled",
+    ] {
+        let mut dispatched = result.clone();
+        dispatched["dispatch"] = json!({"state": state});
+        verification::mark_verification_names(&mut dispatched);
+        assert!(
+            dispatched["vouchers"][0].get("e_invoice_sent").is_some(),
+            "{state}"
+        );
+    }
+    for state in ["not_dispatched", "some_later_state"] {
+        let mut not_sent = result.clone();
+        not_sent["dispatch"] = json!({"state": state});
+        verification::mark_verification_names(&mut not_sent);
+        assert!(
+            not_sent["vouchers"][0].get("e_invoice_sent").is_none(),
+            "{state}"
+        );
+    }
+    let mut no_dispatch = result;
+    verification::mark_verification_names(&mut no_dispatch);
+    assert!(no_dispatch["vouchers"][0].get("e_invoice_sent").is_none());
+}
+
+#[test]
+fn a_posted_verified_batch_without_sales_has_no_e_invoice_sent_field() {
+    let result = verified_post(
+        &payment_batch("Rent", "500.00"),
+        row(0x31, "Payment", Some("7"), PAYMENT),
+    );
+    assert!(result["vouchers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|row| { row["status"] == "posted_verified" && row.get("e_invoice_sent").is_none() }));
+}
+
+#[test]
+fn a_sales_row_that_is_not_posted_verified_has_no_e_invoice_sent_field() {
+    // A Sales invoice seen in Tally but not attributed to this post.
+    let unattributed = before_a_post(
+        "INV/26-27/002",
+        vec![row(
+            KEYED,
+            "Sales Invoice",
+            Some("INV/26-27/002"),
+            OTHER_FIGURES,
+        )],
+        InvoiceIdentity::ByNumber,
+    );
+    assert_eq!(
+        unattributed["vouchers"][0]["status"],
+        "matching_content_observed"
+    );
+    assert!(unattributed["vouchers"][0].get("e_invoice_sent").is_none());
+
+    // A confirmed invoice whose later read-back differs loses the field.
+
+    let mut downgraded = verified_post(
+        &invoice_batch("INV/26-27/002"),
+        row(KEYED, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
+    );
+    verification::mark_invoice_readback(
+        &mut downgraded,
+        "p-1",
+        &["invoice_fields_differ".to_string()],
+        &[],
+    );
+    assert_eq!(downgraded["vouchers"][0]["status"], "posted_divergent");
+    assert!(downgraded["vouchers"][0].get("e_invoice_sent").is_none());
+}
+
+#[test]
+fn the_e_invoice_sent_note_has_no_threshold_date_or_tally_listing_claim() {
+    let note = verification::NO_E_INVOICE_DETAILS_NOTE;
+    assert!(!note.chars().any(|character| character.is_ascii_digit()));
+    let lower = note.to_ascii_lowercase();
+    assert!(!lower.contains("must"));
+    assert!(!lower.contains("list"));
+    assert!(!lower.contains("gstr"));
+}
+
 // #2058: which rows of the window are listed as the invoice's same-figures
 // others, and which batches count as holding one invoice.
 

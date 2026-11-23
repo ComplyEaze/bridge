@@ -711,6 +711,48 @@ pub(super) fn verify_batch_as(
     )
 }
 
+/// What a confirmed Sales invoice row of a native post says about e-invoicing.
+/// It states only what was sent: nothing here reads whether e-invoicing applies
+/// to the company or the customer, or whether the voucher holds an IRN in Tally
+/// (#2162).
+pub(super) const NO_E_INVOICE_DETAILS_NOTE: &str = "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act; ComplyEaze Bridge does not generate one.";
+
+/// Which e-invoice details the saved invoice detail records as sent. Only an
+/// invoice sent without them gets a value (`None`); one that carried them gets
+/// no note here, because the note would be false for it.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum EInvoiceDetailsSent {
+    None,
+}
+
+impl EInvoiceDetailsSent {
+    fn result(self) -> Value {
+        match self {
+            Self::None => json!({"details":self,"note":NO_E_INVOICE_DETAILS_NOTE}),
+        }
+    }
+}
+
+fn e_invoice_details_sent(expected: &ImportVoucher) -> Option<EInvoiceDetailsSent> {
+    if expected.voucher_type != VoucherType::Sales {
+        return None;
+    }
+    let detail = expected.invoice.as_ref()?;
+    // A new field must be looked at here, because it may be e-invoice details.
+    let invoice::InvoiceDetail {
+        voucher_type_name: _,
+        place_of_supply: _,
+        round_off_ledger: _,
+        observed: _,
+        e_invoice,
+    } = detail;
+    if e_invoice.is_some() {
+        return None;
+    }
+    Some(EInvoiceDetailsSent::None)
+}
+
 /// The status of a voucher attributed to `matched` by an identity (its
 /// narration tag, or the GUID its own POST was bound to), counted in `counts`.
 fn attributed_status(
@@ -741,7 +783,11 @@ fn attributed_status(
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true, narration),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
     } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
         count("posted_verified");
-        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+        let mut row = json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id});
+        if let Some(sent) = e_invoice_details_sent(expected) {
+            row["e_invoice_sent"] = sent.result();
+        }
+        row
     } else if diffs.is_empty() {
         count("posted_not_effective");
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_optional","voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
@@ -765,10 +811,34 @@ pub(super) fn mark_book_rolled_back(result: &mut Value) {
 /// journal of another computer, would not hold a post made elsewhere or since.
 pub(super) const NOT_SENT_BY_BRIDGE_SUMMARY: &str = "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status.";
 
+fn dispatch_state_is_sent(state: Option<&str>) -> bool {
+    matches!(
+        state,
+        Some("posted_verified")
+            | Some("reconciliation_required")
+            | Some("previous_attempt_reconciled")
+    )
+}
+
+fn remove_e_invoice_sent_without_native_dispatch(result: &mut Value) {
+    if dispatch_state_is_sent(result["dispatch"]["state"].as_str()) {
+        return;
+    }
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if let Some(fields) = voucher.as_object_mut() {
+                fields.remove("e_invoice_sent");
+            }
+        }
+    }
+}
+
 /// Beside the verdict, never instead of it, for a verified batch whose journal
 /// records no dispatch (the same record `local_data_report` counts as sent).
-/// A partly found batch is not marked.
+/// A partly found batch is not marked. No row says what Bridge sent when the
+/// batch has no native dispatch.
 pub(super) fn mark_found_not_sent(result: &mut Value) {
+    remove_e_invoice_sent_without_native_dispatch(result);
     result["dispatch_record"] =
         json!({"state":"none_on_record","summary":NOT_SENT_BY_BRIDGE_SUMMARY});
 }
@@ -937,6 +1007,9 @@ pub(super) fn mark_invoice_readback(
                 voucher["invoice_lines"] = json!(lines);
             }
             if !differences.is_empty() {
+                if let Some(fields) = voucher.as_object_mut() {
+                    fields.remove("e_invoice_sent");
+                }
                 voucher["status"] = json!("posted_divergent");
                 voucher["diffs"] = json!([{ "invoice_fields": differences }]);
                 voucher["next_step"] = json!(INVOICE_DIVERGENT_NEXT_STEP);
@@ -1148,8 +1221,11 @@ pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 8] = [
 /// the response's configured redaction applies to it. Names already marked are
 /// left as they are; a proof saved with plain names is marked the same way.
 /// A posted_under_changed_masters message is given its current text, which
-/// names no ledger.
+/// names no ledger. A result without a native dispatch carries no statement
+/// about the e-invoice details Bridge sent, including on a partly found batch
+/// that does not pass through `mark_found_not_sent`.
 pub(super) fn mark_verification_names(result: &mut Value) {
+    remove_e_invoice_sent_without_native_dispatch(result);
     fn mark_at(value: &mut Value, path: &[&str]) {
         match path.split_first() {
             None => {

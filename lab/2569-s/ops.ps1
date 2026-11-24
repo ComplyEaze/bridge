@@ -157,7 +157,7 @@ switch ($Op) {
     if (-not (Test-Path -LiteralPath $inbox -PathType Container)) { Fail ('inbox missing: ' + $inbox) }
     $s = Join-Path $inbox 'stop'
     if (Test-Path -LiteralPath $s) { $lines.Add('TARGET_EXISTS ' + $s); Finish 1 }
-    [System.IO.File]::WriteAllBytes($s, (New-Object byte[] 0))
+    [System.IO.File]::Create($s).Dispose()
     $lines.Add('STOP_FILE made ' + $Path[0] + '/inbox/stop')
   }
   'gone' {

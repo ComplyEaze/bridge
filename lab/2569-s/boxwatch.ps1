@@ -12,9 +12,6 @@
 # failed, or the server ended (each named in the log by a typed line; never reported as "no box").
 param([int]$ServerPid, [string]$Dir, [string]$Tag, [int]$WaitS = 90)
 $ErrorActionPreference = 'Stop'
-$Dir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Dir)
-$log = Join-Path $Dir ($Tag + '-watch.txt')
-if (Test-Path -LiteralPath $log) { Write-Output ('WATCH_FAILED log exists: ' + $log); exit 2 }
 trap {
   $m = [string]$_.Exception.Message
   if ($m.Length -gt 200) { $m = $m.Substring(0, 200) + '...' }
@@ -22,6 +19,9 @@ trap {
   Write-Output ('WATCH_FAILED ' + $_.Exception.GetType().Name + ': ' + $m)
   exit 2
 }
+$Dir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Dir)
+$log = Join-Path $Dir ($Tag + '-watch.txt')
+if (Test-Path -LiteralPath $log) { Write-Output ('WATCH_FAILED log exists: ' + $log); exit 2 }
 $shell = Join-Path $PSHOME 'powershell.exe'
 function Now { [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ') }
 function Log([string]$line) { Add-Content -LiteralPath $log -Value ((Now) + ' ' + $line) -Encoding Ascii }

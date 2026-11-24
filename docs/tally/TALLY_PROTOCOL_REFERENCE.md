@@ -518,9 +518,9 @@ base revision.
 <a id="12a31-after-two-service-codes-voucher-lists-were-opened-from-gstr-1s-hsn-summary-tallys-rate-answer-carried-zero-per-unit-fields-on-their-two-sales-ledgers-and-the-build-refused-both-and-shut-company-with-a-reload-cleared-it-partial"></a>
 
 [12a.31 After two service codes' voucher lists were opened from GSTR-1's HSN summary, Tally's rate answer carried zero per-unit fields on their two sales ledgers and the build refused both, and Shut Company with a reload cleared it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a31-after-two-service-codes-voucher-lists-were-opened-from-gstr-1s-hsn-summary-tallys-rate-answer-carried-zero-per-unit-fields-on-their-two-sales-ledgers-and-the-build-refused-both-and-shut-company-with-a-reload-cleared-it-partial)
-<a id="12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-ledger-vouchers-of-a-service-ledger-or-a-tax-ledger-grew-nothing-partial"></a>
+<a id="12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-two-ledger-vouchers-displays-of-another-period-grew-nothing-partial"></a>
 
-[12a.32 Either service code's voucher list alone grew both service ledgers' rate answer, and Ledger Vouchers of a service ledger or a tax ledger grew nothing (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-ledger-vouchers-of-a-service-ledger-or-a-tax-ledger-grew-nothing-partial)
+[12a.32 Either service code's voucher list alone grew both service ledgers' rate answer, and two Ledger Vouchers displays of another period grew nothing (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-two-ledger-vouchers-displays-of-another-period-grew-nothing-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

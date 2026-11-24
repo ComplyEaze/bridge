@@ -31,8 +31,10 @@
 #                                  byte-equal copies), and derives the identity of two batch ids and labels whose
 #                                  build-written import files are in the tree as fixtures (wa1-payment-import.xml and
 #                                  d3-batch-import.xml under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/,
-#                                  each holding its identity once at REMOTEID and once in the narration tag); prints one
-#                                  line per case and exits 0 only if every case is right.
+#                                  each holding its identity once at REMOTEID and once in the narration tag), and grades
+#                                  eleven answer shapes built in memory (nothing written): JSON that is not an answer
+#                                  must STOP, an admission whose state is refused and a refusal without a code are
+#                                  "other"; prints one line per case and exits 0 only if every case is right.
 # Example: python -I grade05.py grade run-g1/answers/05-build-0074-0801.json
 import difflib, hashlib, json, pathlib, sys
 
@@ -53,26 +55,39 @@ def answer(path):
         body = json.loads(p.read_text(encoding="utf-8"))
     except ValueError as e:
         stop(f"{path}: not JSON ({e})")
+    return parse(body, path)
+
+
+def parse(body, path):
+    # Every level is type-checked: valid JSON of another shape is a failed read (exit 2), never a traceback.
+    if not isinstance(body, dict):
+        stop(f"{path}: the answer is a JSON {type(body).__name__}, not an object")
     if body.get("tool") != "build_import_xml":
         stop(f"{path}: tool {body.get('tool')!r}, not build_import_xml")
-    response = body.get("response") or {}
+    response = body.get("response")
+    if not isinstance(response, dict):
+        stop(f"{path}: response is {type(response).__name__}, not an object")
     if "error" in response:
         stop(f"{path}: JSON-RPC error {response['error']!r}")
     result = response.get("result")
     if not isinstance(result, dict) or not isinstance(result.get("structuredContent"), dict):
-        stop(f"{path}: no structuredContent")
+        stop(f"{path}: no structuredContent object")
     sc = result["structuredContent"]
-    inner = sc.get("result") if isinstance(sc.get("result"), dict) else {}
+    inner = sc.get("result")
+    if not isinstance(inner, dict):
+        stop(f"{path}: structuredContent.result is {type(inner).__name__}, not an object")
     return body, result, sc, inner
 
 
 def verdict(inner, sc):
     refusals = inner.get("refusals")
     error = inner.get("error") if isinstance(inner.get("error"), dict) else sc.get("error")
-    if refusals is None and not error and inner.get("voucher_count") == 1 and inner.get("batch_id"):
+    if (refusals is None and not error and inner.get("state") != "refused" and inner.get("voucher_count") == 1
+            and isinstance(inner.get("batch_id"), str) and inner["batch_id"]):
         return "admitted voucher_count 1, no refusal"
-    if inner.get("state") == "refused" and isinstance(refusals, list) and refusals:
-        codes = ", ".join(f"{r.get('code')} ({r.get('detail')})" for r in refusals if isinstance(r, dict))
+    if (inner.get("state") == "refused" and isinstance(refusals, list) and refusals
+            and all(isinstance(r, dict) and isinstance(r.get("code"), str) and r["code"] for r in refusals)):
+        codes = ", ".join(f"{r['code']} ({r.get('detail')})" for r in refusals)
         return f"refused {inner.get('reason')}: {codes}"
     return "other"
 
@@ -118,8 +133,10 @@ def masked(build, datadir):
     body, _, sc, inner = answer(build)
     if verdict(inner, sc) != "admitted voucher_count 1, no refusal":
         stop(f"{build}: not an admitted build of exactly one voucher")
-    vouchers = (body.get("arguments") or {}).get("vouchers") or []
-    if len(vouchers) != 1 or not vouchers[0].get("bridge_txn_id"):
+    arguments = body.get("arguments")
+    vouchers = arguments.get("vouchers") if isinstance(arguments, dict) else None
+    if (not isinstance(vouchers, list) or len(vouchers) != 1 or not isinstance(vouchers[0], dict)
+            or not isinstance(vouchers[0].get("bridge_txn_id"), str) or not vouchers[0]["bridge_txn_id"]):
         stop(f"{build}: the call did not name exactly one voucher with a bridge_txn_id")
     batch_id = inner["batch_id"]
     d = pathlib.Path(datadir)
@@ -193,7 +210,33 @@ def selftest():
         ok = identity(batch_id, txn_id) == want
         right += ok
         print(f"case identity of {txn_id}: {'right' if ok else 'WRONG, expected ' + want}")
-    total = len(cases) + len(vectors)
+    # Shapes built in memory (nothing is written): valid JSON that is not an answer must STOP with exit 2, and the two
+    # verdicts must refuse a contradicting state or a refusal without a code.
+    def answer_of(inner):
+        return {"tool": "build_import_xml", "response": {"result": {"structuredContent": {"result": inner}}}}
+    admitted = {"voucher_count": 1, "batch_id": "b"}
+    shapes = [
+        ("null", None, "STOP"), ("[]", [], "STOP"), ("response a string", {"tool": "build_import_xml", "response": "x"}, "STOP"),
+        ("result a list", {"tool": "build_import_xml", "response": {"result": []}}, "STOP"),
+        ("structuredContent a string", {"tool": "build_import_xml", "response": {"result": {"structuredContent": "x"}}}, "STOP"),
+        ("structuredContent.result null", answer_of(None), "STOP"),
+        ("admitted", answer_of(admitted), "admitted voucher_count 1, no refusal"),
+        ("admitted but state refused", answer_of(dict(admitted, state="refused")), "other"),
+        ("refusal not an object", answer_of({"state": "refused", "reason": "r", "refusals": ["x"]}), "other"),
+        ("refusal without a code", answer_of({"state": "refused", "reason": "r", "refusals": [{"detail": "d"}]}), "other"),
+        ("refusal with a code", answer_of({"state": "refused", "reason": "r", "refusals": [{"code": "c", "detail": "d"}]}),
+         "refused r: c (d)"),
+    ]
+    for label, body, want in shapes:
+        try:
+            _, _, sc, inner = parse(body, label)
+            got = verdict(inner, sc)
+        except SystemExit as e:
+            got = "STOP" if e.code == 2 else f"exit {e.code}"
+        ok = got == want
+        right += ok
+        print(f"case shape {label}: {'right' if ok else 'WRONG, got ' + got + ', expected ' + want}")
+    total = len(cases) + len(vectors) + len(shapes)
     print(f"{total} cases, {right} right")
     return 0 if right == total else 1
 

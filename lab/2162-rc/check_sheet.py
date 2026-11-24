@@ -107,7 +107,7 @@ def arms():
         # The literal lines of the launch: its exe hash check, its launch file, and its client start command.
         for line in (f'echo "{sha}  {exe}" | sha256sum -c - > evidence/run-{tag}-hashes.txt',
                      f"cp launch/{name}-launch-env.json run-{tag}/launch-env.json && ",
-                     f'python -I client.py "C:/bridge-lab/2162-rc/run-{tag}" "{exe}" "{sha}" > '):
+                     f'( cd /c/bridge-lab/2162-rc && python -I -X utf8 client.py "C:/bridge-lab/2162-rc/run-{tag}" "{exe}" "{sha}" < /dev/null > evidence/run-{tag}-client-out.txt 2> evidence/run-{tag}-client-err.txt; echo "client exit $?" >> evidence/run-{tag}-launch.txt )'):
             if text.count(line) != 1:
                 errors.append(f"launch {name}: the sheet does not hold exactly once the line {line!r}")
         try:

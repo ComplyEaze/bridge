@@ -454,6 +454,23 @@ fn rate_milli(text: &str) -> Option<i128> {
     (milli > 0).then_some(milli)
 }
 
+/// One cess head of a sales ledger's rate row that charges no cess: valued
+/// `valued`, with the rate `cess_rate` its row's shape gives (none in a plain
+/// row, the text `0` in a zero per-unit row).
+fn no_cess(
+    head: &wire::HeadRate,
+    cess_rate: Option<&str>,
+    valued: &str,
+) -> Result<(), &'static str> {
+    if cess_rate.is_some() && head.rate.is_none() {
+        return Err("invoice_sales_ledger_rate_shape_unmeasured");
+    }
+    if head.rate.as_deref() != cess_rate || head.valuation.as_deref() != Some(valued) {
+        return Err("invoice_cess_rate_not_supported");
+    }
+    Ok(())
+}
+
 /// The state tax rate of a sales ledger in force on `as_of` (`YYYYMMDD`), in
 /// thousandths of a percent, from the rows the rate listing returned. Only
 /// what the lab measured is read: one dated row, in force, ledger-specified
@@ -461,6 +478,13 @@ fn rate_milli(text: &str) -> Option<i128> {
 /// all-states block that gives CGST, SGST/UTGST and IGST rates valued on value
 /// (the state heads equal, IGST twice one of them) and no cess. Each other
 /// shape is its own refusal, never a guess.
+///
+/// No cess reads two ways. In a plain row neither cess head has a rate. In a
+/// zero per-unit row (measured 24 Nov 2026, lab row 2162-RW, two service sales
+/// ledgers; protocol reference §12a.31) the row has one Cess head and one
+/// State Cess head, and both carry the rate `0`, as text, with the same
+/// valuations. A zero per-unit row without exactly one of each, or with a
+/// cess head that has no rate, was not seen, so it is unmeasured.
 fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'static str> {
     let [gst] = row.gst_rows.as_slice() else {
         return Err(match row.gst_rows.len() {
@@ -475,9 +499,12 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
     {
         return Err("invoice_sales_ledger_rate_not_in_force");
     }
-    if gst.unmeasured {
-        return Err("invoice_sales_ledger_rate_shape_unmeasured");
-    }
+    // The rate each cess head must carry in a row of this shape.
+    let cess_rate = match gst.shape {
+        wire::RowShape::Unmeasured => return Err("invoice_sales_ledger_rate_shape_unmeasured"),
+        wire::RowShape::Plain => None,
+        wire::RowShape::ZeroPerUnit => Some("0"),
+    };
     if gst.taxability.as_deref() != Some("Taxable") {
         return Err("invoice_sales_ledger_not_taxable");
     }
@@ -494,6 +521,8 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
     let mut cgst = None;
     let mut state = None;
     let mut igst = None;
+    // How many Cess heads, then State Cess heads, the block has.
+    let mut cess_heads = [0_usize; 2];
     for head in &block.heads {
         match head.head.as_str() {
             "CGST" | "SGST/UTGST" | "IGST" => {
@@ -515,16 +544,27 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
                 }
             }
             // No cess at all, as the lab's rows read: Cess "Not Applicable"
-            // and State Cess "Based on Value", neither with a rate. A head
-            // with a rate, or valued any other way, is a tax this build does
+            // and State Cess "Based on Value", with the shape's rate (none,
+            // or `0` in a zero per-unit row). A zero per-unit row whose cess
+            // head has no rate is a mix the lab did not see. A head with
+            // another rate, or valued any other way, is a tax this build does
             // not work out.
-            "Cess"
-                if head.rate.is_none() && head.valuation.as_deref() == Some("Not Applicable") => {}
-            "State Cess"
-                if head.rate.is_none() && head.valuation.as_deref() == Some("Based on Value") => {}
-            "Cess" | "State Cess" => return Err("invoice_cess_rate_not_supported"),
+            "Cess" => {
+                cess_heads[0] += 1;
+                no_cess(head, cess_rate, "Not Applicable")?;
+            }
+            "State Cess" => {
+                cess_heads[1] += 1;
+                no_cess(head, cess_rate, "Based on Value")?;
+            }
             _ => return Err(unreadable),
         }
+    }
+    // Each captured zero per-unit row has one head of each cess; a row of
+    // that shape with a cess head absent or repeated was not seen. A plain
+    // row is read as before, whichever cess heads it has.
+    if cess_rate.is_some() && cess_heads != [1, 1] {
+        return Err("invoice_sales_ledger_rate_shape_unmeasured");
     }
     let (Some(cgst), Some(state), Some(igst)) = (cgst, state, igst) else {
         return Err(unreadable);
@@ -550,7 +590,9 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
 /// no rate. No tax ledger in a capture has a rate in those rows, so how Tally
 /// reads one beside the ledger's own rate is not known; a row of elements the
 /// lab did not read could hold one. A ledger that reads anything else, or
-/// nothing, was not measured.
+/// nothing, was not measured. A zero per-unit row was measured on sales
+/// ledgers only (24 Nov 2026, lab row 2162-RW, two service sales ledgers), so
+/// on a tax ledger it is refused with the rows of unmeasured shape.
 fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'static str> {
     let own = row.rate_of_tax_calculation.as_deref().and_then(rate_milli);
     if own != Some(half_milli) {
@@ -562,7 +604,11 @@ fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'s
         return Some("invoice_tax_ledger_rounding_unsupported");
     }
     let rated = |gst: &wire::GstRow| {
-        gst.unmeasured
+        let measured = match gst.shape {
+            wire::RowShape::Plain => true,
+            wire::RowShape::ZeroPerUnit | wire::RowShape::Unmeasured => false,
+        };
+        !measured
             || gst
                 .states
                 .iter()

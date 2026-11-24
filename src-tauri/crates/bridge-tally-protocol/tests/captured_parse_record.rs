@@ -3703,6 +3703,12 @@ const PILOT_LAB_LEDGER_FILTER: &str = "an answer of the pilot lab's ledger-filte
      (src/agent_import_invoice_scope_tests.rs, and `rates_cut_to` in \
      src/agent_import_tests.rs) pin what each parse returns; the file is the answer whole as \
      received; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_ZERO_PER_UNIT: &str = "an answer of the pilot lab's rate read on 24 Nov 2026 \
+     (row 2162-RW), before or after the voucher lists of two HSN/SAC codes were opened, with no \
+     row here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs) and its \
+     tests (src/agent_import_invoice_wire_tests.rs and src/agent_import_invoice_tests.rs) pin what \
+     each parse returns; the file is the answer whole as received; pilot-lab/PROVENANCE.md says \
+     what it is";
 const PILOT_LAB_SCOPED_HSN: &str = "an answer of the pilot lab read on 21 Oct 2026, with no row \
      here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_admission_tests.rs, \
@@ -4110,6 +4116,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-none.utf16le.xml",
         PILOT_LAB_LEDGER_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml",
+        PILOT_LAB_ZERO_PER_UNIT,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml",
+        PILOT_LAB_ZERO_PER_UNIT,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-whole-10oct.utf16le.xml",

@@ -900,6 +900,27 @@ async fn a_customer_holding_the_companys_own_gstin_is_refused_and_another_regist
     );
 }
 
+/// Tally's own answers to the rate read the code sends for this invoice's six
+/// ledgers (lab row 2162-RW, 24 Nov 2026; protocol reference §12a.31), served
+/// in place of the derived `Q`: the answer of a fresh load, and the answer
+/// after the two service codes' voucher lists were opened from GSTR-1's HSN
+/// summary, whose two service sales ledgers carry zero per-unit fields. Every
+/// other answer is the 9 Oct set, so this is the later book's rate read beside
+/// the earlier book's other reads. The invoice is admitted on both.
+#[tokio::test]
+async fn the_captured_zero_per_unit_rate_answer_is_admitted_as_the_plain_one_is() {
+    let plain: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml");
+    let zero_per_unit: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml");
+    for (which, bytes) in [("plain", plain), ("zero per-unit", zero_per_unit)] {
+        let (seen, _, _) = admit_on(
+            pilot_lab_replacing('Q', utf16(bytes)),
+            pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+        )
+        .await;
+        assert_eq!(seen, Ok(()), "{which}");
+    }
+}
+
 /// A rate listing with no ledger row is a failed read under its own code, never
 /// "this ledger has no rate": the company's ledgers were listed just before it.
 /// The admission stops at that read (52 requests) and records no observation.

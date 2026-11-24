@@ -3156,9 +3156,10 @@ fn the_service_ledgers_rate_is_the_same_plain_and_zero_per_unit() {
     }
 }
 
-/// In a zero per-unit row each cess head must read the lab's valuation and the
-/// rate `0` as text; a cess head with no rate there is a mix the lab did not
-/// see. A plain row's cess heads still carry no rate, `0` included.
+/// A zero per-unit row must have one Cess head and one State Cess head, each
+/// reading the lab's valuation and the rate `0` as text; a cess head with no
+/// rate there, absent or repeated is a mix the lab did not see. A plain row's
+/// cess heads still carry no rate, `0` included.
 #[test]
 fn zero_per_unit_cess_heads_are_admitted_only_at_the_text_zero() {
     const CESS: usize = 3;
@@ -3209,6 +3210,31 @@ fn zero_per_unit_cess_heads_are_admitted_only_at_the_text_zero() {
         zero(&|h| h[CESS].valuation = None),
         Err("invoice_cess_rate_not_supported")
     );
+    // A missing rate is named before a wrong valuation.
+    assert_eq!(
+        zero(&|h| {
+            h[CESS].rate = None;
+            h[CESS].valuation = Some("Based on Value".into());
+        }),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+    // Each captured row has one head of each cess: a zero per-unit row with
+    // one absent, both absent or one repeated was not seen.
+    type Change<'a> = &'a dyn Fn(&mut Vec<wire::HeadRate>);
+    let unseen: [Change; 5] = [
+        &|h| drop(h.remove(CESS)),
+        &|h| drop(h.remove(STATE_CESS)),
+        &|h| h.truncate(CESS),
+        &|h| h.push(h[CESS].clone()),
+        &|h| h.push(h[STATE_CESS].clone()),
+    ];
+    for (case, change) in unseen.iter().enumerate() {
+        assert_eq!(
+            zero(change),
+            Err("invoice_sales_ledger_rate_shape_unmeasured"),
+            "case {case}"
+        );
+    }
     // The state heads are read as in a plain row.
     assert_eq!(
         zero(&|h| h[0].rate = Some("0".into())),
@@ -3226,6 +3252,15 @@ fn zero_per_unit_cess_heads_are_admitted_only_at_the_text_zero() {
     };
     assert_eq!(plain(CESS), Err("invoice_cess_rate_not_supported"));
     assert_eq!(plain(STATE_CESS), Err("invoice_cess_rate_not_supported"));
+    // A plain row with a cess head absent or repeated is read as before.
+    let plain_heads = |change: &dyn Fn(&mut Vec<wire::HeadRate>)| {
+        let mut row = sales_rates("2.5", "5");
+        change(&mut row.gst_rows[0].states[0].heads);
+        sales_rate_milli(&row, AS_OF)
+    };
+    assert_eq!(plain_heads(&|h| h.truncate(CESS)), Ok(2_500));
+    assert_eq!(plain_heads(&|h| drop(h.remove(STATE_CESS))), Ok(2_500));
+    assert_eq!(plain_heads(&|h| h.push(h[CESS].clone())), Ok(2_500));
     // An unmeasured row is refused before its heads are read.
     let mut unmeasured = sales_rates("2.5", "5");
     unmeasured.gst_rows[0].shape = wire::RowShape::Unmeasured;

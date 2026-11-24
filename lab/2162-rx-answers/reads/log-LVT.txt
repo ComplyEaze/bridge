@@ -1,0 +1,2 @@
+12:38:06	M-marks.xml	a-LVT-M-marks.xml	curl 0	3394 bytes
+12:38:08	rates.xml	a-LVT-rates.xml	curl 0	29114 bytes

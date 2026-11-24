@@ -1,0 +1,2 @@
+12:45:28	M-marks.xml	a-W2-M-marks.xml	curl 0	3394 bytes
+12:45:30	rates.xml	a-W2-rates.xml	curl 0	29114 bytes

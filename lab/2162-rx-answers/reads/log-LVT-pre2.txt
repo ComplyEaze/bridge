@@ -1,0 +1,1 @@
+12:36:39	rates.xml	a-LVT-pre2-rates.xml	curl 0	29114 bytes

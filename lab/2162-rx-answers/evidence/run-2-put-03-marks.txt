@@ -1,0 +1,6 @@
+2026-11-24T07:14:36.380Z placed calls/03-marks.json (590d0cd5cccd27fcb48a639e996f121f07c8961aa79085d494ff8d8488d87a09) into run-2\inbox (copy as .part, hash equal, renamed)
+2026-11-24T07:14:37Z 03-marks.json tool=ledger_masters secs=0.764 isError=False error=None saved_sha256=0c22b201b6a1de56e6aec0c59272a46c5b600c58c66b1fbc4905bc9c9235f5f2
+== 03-marks.json: tool ledger_masters, sent 2026-11-24T07:14:36Z, 0.764 s, isError False
+  evidence state complete, reason <absent>
+  M 245 V 68 reused False
+calls.py exit 0

@@ -1,0 +1,6 @@
+2026-11-24T07:11:20.052Z placed calls/05-build-0074-0801.json (bd546a9feb30724d3a3fdf805fb0ad6258a834c84a0865e5ac3354c4c1eba217) into run-1c\inbox (copy as .part, hash equal, renamed)
+2026-11-24T07:11:31Z 05-build-0074-0801.json tool=build_import_xml secs=11.476 isError=False error=None saved_sha256=84141eb8ad386da9accf18c2dbeed982e23259a68ae1d989ba91a92e05ed3e55
+== 05-build-0074-0801.json: tool build_import_xml, sent 2026-11-24T07:11:20Z, 11.476 s, isError False
+  evidence state complete, reason <absent>
+  batch_id <absent> sha256 <absent> voucher_count <absent> warnings <absent>
+calls.py exit 0

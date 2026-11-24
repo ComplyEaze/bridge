@@ -202,8 +202,8 @@ Raw reads use `python -I run.py http://127.0.0.1:9001 <label> <files>` (it sends
        - `powershell -NoProfile -File C:/bridge-lab/2569-s/ops.ps1 -Op refresh -From <sheet checkout>/lab/2569-s -To C:/bridge-lab/2569-s -Out C:/bridge-lab/2569-s/evidence/s0-refresh.txt`: EXPECT two `REFRESHED` lines, exit 0.
        - Run every self-check again, with the names in brackets. Then read the two lines below in the refreshed `RUN-SHEET.md`.
 
-     L1 RULING: `<to fill>`
-     L2 PATH: `<to fill>`
+     L1 RULING: `C:/bridge-lab/2440-cp/build/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe`
+     L2 PATH: `no`
 
      Each line holds `no` or the exact exe path allowed. While L1 RULING reads `<to fill>` or `no`, L1 does not run; while L2 PATH reads `<to fill>` or `no`, L2 does not run when paired with L1. L0, and L2 paired with L0 at `exe-new`, run either way once a reply has come.
 1. **Load and read** (row 2569-R's Part A step 1, keys from its notes). Load BRIDGE EINVOICE LAB alone from Select Company: click the filter; type `BRIDGE`, space, `EINVOICE`, space, `LAB`, a zoom after each part, until it is the one highlighted line; Enter. EXPECT the Gateway, period 1-Apr-25 to 31-Mar-26, current date 3-Apr-2025, no dialog. Send `s1`: `M-marks.xml O-company.xml K-sales.xml K-customer.xml K-cgst.xml K-sgst.xml`. EXPECT, as row 2569-R's `s1` (lab 2569-R): M one COMPANY row, `GUID is the book's: yes`, ALTVCHID 3, ALTMSTID 215; O the book's GUID, `ISGSTCLASSIFON` No, one `CMPGSTDETAILS.LIST` from 20250401 with `HSNSOURCEPRIORITY` Ledger and `HSNAPPLICABLESECTION` All Sections; K-sales `BRIDGE IRN Sales`, IGST 18, HSN 998313; K-customer, K-cgst, K-sgst 0 LEDGER rows each. Otherwise STOP before any write.

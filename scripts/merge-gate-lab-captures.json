@@ -2622,6 +2622,36 @@
       "size": 2994
     },
     {
+      "blob": "1f9567473a026a629397c00a0adb81251564c94e",
+      "capture_id": "pilot-lab-ledger-rates-svc.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-rw-answers at 58c3eb0f3482, file rates.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the zero per-unit round",
+      "sha256": "182f598aafaf333bc8284b6976e664cee00af1eadb5a29bd4f73c295f8601e08",
+      "size": 2874
+    },
+    {
+      "blob": "ca7b0eac02e6c71625b39bd69fccdeb2e51e9242",
+      "capture_id": "pilot-lab-ledger-rates-svc.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-rw-answers at 58c3eb0f3482, file reads/a-A0-rates.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the zero per-unit round",
+      "sha256": "a6197d9082955c5b3fc8fe9a95d2edf385b801b51a6f756c463b6cd3af215b62",
+      "size": 29114
+    },
+    {
+      "blob": "152fe2fd5fe52a7c032f8a2570fbe5c74a89c8f4",
+      "capture_id": "pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-rw-answers at 58c3eb0f3482, file reads/a-A1c-pre-rates.xml, equal to its line in that branch's SHA256.txt",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the zero per-unit round",
+      "sha256": "d7f5db99170ea9a643fab195a9465bd20d1f1af1102b76fbefaefe6673a12257",
+      "size": 30626
+    },
+    {
       "blob": "6edab57ba8c6986983092bbb284f16cdad7e140a",
       "capture_id": "stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
       "company": "BRIDGE SHAPE LAB",

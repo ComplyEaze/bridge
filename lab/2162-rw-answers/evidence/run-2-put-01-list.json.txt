@@ -1,0 +1,5 @@
+2026-11-24T06:00:37.462Z placed calls/01-list.json (18867045b2dce4e6391fbfa971fa4e3794e7376ccf265378e2ada91c70996d37) into run-2\inbox (copy as .part, hash equal, renamed)
+2026-11-24T06:00:37Z 01-list.json tool=list secs=0.019 isError=None error=None saved_sha256=506de417c0c2dad3f2724f09b79d092e2c30e1bfd959354ef377031c3ade97bc
+== 01-list.json: tool list, sent 2026-11-24T06:00:37Z, 0.019 s, isError None
+  tools: 37; missing of this row's: []
+calls.py exit 0

@@ -1,0 +1,7 @@
+2026-11-24T05:58:25.534Z placed calls/02-list_companies.json (788b29d0681e80f9d8850dea37220a7fa4dd2472f7ce01baaf75111d9d62b8dd) into run-1c\inbox (copy as .part, hash equal, renamed)
+2026-11-24T05:58:25Z 02-list_companies.json tool=list_companies secs=0.104 isError=False error=None saved_sha256=76124d3acd240ba26e68ffd10c7f35b34b1aa4536a85f2ee8ee08361a44fa973
+== 02-list_companies.json: tool list_companies, sent 2026-11-24T05:58:25Z, 0.104 s, isError False
+  evidence state complete, reason <absent>
+  companies: 1
+   'BRIDGE PILOT LAB' guid 6b43e498-430c-4d5c-bfef-d32e2ab93c85 is the book's: yes
+calls.py exit 0

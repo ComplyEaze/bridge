@@ -1,0 +1,17 @@
+Test-Path run-1c, data-1c: False, False
+launch file copy sha256 b102b1a81f347341a4a1c29d876f749f21af268d161f71212b8ad183785f8caf equal to SHA256.txt
+exe sha256=1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59 equal to the Build line
+bridge_mcp before: 0
+command: python -I <lab folder>\client.py <lab folder>\run-1c <lab root>\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe 1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59 (shell: Windows PowerShell 5.1.19041.6456)
+2026-11-24T05:58:13.049Z client.py pid 18488
+2026-11-24T05:58:13Z exe sha256=1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59 ok; launch-env.json sha256 b102b1a81f347341a4a1c29d876f749f21af268d161f71212b8ad183785f8caf; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: True
+2026-11-24T05:58:13Z launched pid 19916; stderr to server-stderr-20261124T055813Z.log
+2026-11-24T05:58:13Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+
+ProcessId ParentProcessId Name          
+--------- --------------- ----          
+    23160           23268 tally.exe     
+    18488           17160 python.exe    
+    19916           18488 bridge_mcp.exe
+
+

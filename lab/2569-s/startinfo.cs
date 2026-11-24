@@ -86,7 +86,7 @@ public static class StartInfo
         IntPtr threadAttributes, bool inheritHandles, uint creationFlags, IntPtr environment, string currentDirectory,
         ref StartupInfoW startup, out ProcessInformation info);
     // GetStartupInfoW fills pointers that Windows owns: read them as IntPtr, never as string (the marshaler
-    // would free them).
+    // would release them).
     [StructLayout(LayoutKind.Sequential)]
     struct StartupInfoRaw
     {

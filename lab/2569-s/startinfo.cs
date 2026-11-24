@@ -215,6 +215,24 @@ public static class StartInfo
         "USEFILLATTRIBUTE", "RUNFULLSCREEN", "FORCEONFEEDBACK", "FORCEOFFFEEDBACK", "USESTDHANDLES", "USEHOTKEY",
         "TITLEISLINKNAME", "TITLEISAPPID", "PREVENTPINNING", "UNTRUSTEDSOURCE" };
 
+    // The block keeps the image path as the parent gave it (a client may pass forward slashes); Windows reports
+    // it with backslashes. Two paths name the same image when they are equal after the slash direction, a
+    // \\?\ or \??\ prefix and the case are set aside.
+    public static string NormalImage(string path)
+    {
+        if (path == null) { return null; }
+        string t = path.Replace('/', '\\');
+        if (t.StartsWith("\\\\?\\") || t.StartsWith("\\??\\")) { t = t.Substring(4); }
+        return t.ToUpperInvariant();
+    }
+
+    public static bool SameImage(string block, string queried)
+    {
+        string a = NormalImage(block);
+        string b = NormalImage(queried);
+        return a != null && b != null && a.Length > 0 && a == b;
+    }
+
     public static string FlagText(uint flags)
     {
         List<string> names = new List<string>();
@@ -231,6 +249,8 @@ public static class StartInfo
     {
         return show < ShowNames.Length ? ShowNames[show] : "unknown";
     }
+
+    static string Chars(string s) { return s == null ? "<unread>" : s.Length.ToString(); }
 
     static string Cap(string s, int max)
     {
@@ -270,11 +290,11 @@ public static class StartInfo
             + p.StdErr.ToString("X"));
         if (!full)
         {
-            string leaf = p.ImagePath;
-            int cut = leaf.LastIndexOf('\\');
+            string leaf = p.ImagePath == null ? null : p.ImagePath.Replace('/', '\\');
+            int cut = leaf == null ? -1 : leaf.LastIndexOf('\\');
             if (cut >= 0) { leaf = leaf.Substring(cut + 1); }
             lines.Add("image_name=[" + Cap(leaf, 80) + "] (path, command line, folder and title not printed: chars "
-                + p.CommandLine.Length + ", " + p.CurrentDirectory.Length + ", " + p.WindowTitle.Length + ")");
+                + Chars(p.CommandLine) + ", " + Chars(p.CurrentDirectory) + ", " + Chars(p.WindowTitle) + ")");
             return lines;
         }
         lines.Add("image_path=[" + Cap(p.ImagePath, 260) + "]");
@@ -381,9 +401,7 @@ public static class StartInfo
             Params p = ParseParams(memory, I64(pointer, 0));
             if (p.Failure == null)
             {
-                string image = p.ImagePath;
-                if (image.StartsWith("\\??\\") || image.StartsWith("\\\\?\\")) { image = image.Substring(4); }
-                if (queried == null || !string.Equals(image, queried, StringComparison.OrdinalIgnoreCase))
+                if (!SameImage(p.ImagePath, queried))
                 {
                     p.Failure = "LAYOUT_CHECK_FAILED at=image_path block=[" + Cap(p.ImagePath, 200) + "] queried=["
                         + Cap(queried, 200) + "]";
@@ -625,12 +643,31 @@ public static class StartInfo
             + command.Length + ", 7, 14)") && !Array.Exists(brief.ToArray(), delegate(string l)
             { return l.StartsWith("command_line=") || l.StartsWith("image_path=") || l.StartsWith("current_directory="); });
         lines.Add("case brief-ancestor: " + (r8 ? "right" : "WRONG")); if (!r8) { failures++; }
-        lines.Add("parse cases 10, wrong " + failures);
+        bool r9 = SameImage("C:/lab/bridge_mcp.exe", "C:\\lab\\bridge_mcp.exe")
+            && SameImage("\\\\?\\C:\\Lab\\Bridge_MCP.exe", "c:\\lab\\bridge_mcp.exe")
+            && SameImage("\\??\\C:\\lab\\bridge_mcp.exe", "C:\\lab\\bridge_mcp.exe")
+            && !SameImage("C:/lab/other.exe", "C:\\lab\\bridge_mcp.exe")
+            && !SameImage(null, "C:\\lab\\bridge_mcp.exe") && !SameImage("", "")
+            && !SameImage("C:\\lab\\bridge_mcp.exe", null);
+        lines.Add("case same-image: " + (r9 ? "right" : "WRONG")); if (!r9) { failures++; }
+        bool r10;
+        try
+        {
+            List<string> unread = Describe(new Params(), false);
+            List<string> unreadFull = Describe(new Params(), true);
+            r10 = unread.Contains("image_name=[<unread>] (path, command line, folder and title not printed: chars <unread>, <unread>, <unread>)")
+                && unreadFull.Contains("image_path=[<unread>]");
+        }
+        catch (Exception) { r10 = false; }
+        lines.Add("case unread-strings: " + (r10 ? "right" : "WRONG")); if (!r10) { failures++; }
+        lines.Add("parse cases 12, wrong " + failures);
         return lines;
     }
 
-    // Live self-test (Windows only): this process against its own startup information, then two children of
-    // ping.exe started with known values; each child is read, then left to exit by itself (never ended).
+    // Live self-test (Windows only): this process against its own startup information, then three children of
+    // ping.exe started with known values; each child is read, then left to exit by itself (never ended). The
+    // third is started as Python's subprocess starts the server: no application name, and a command line that
+    // begins with the exe's path in forward slashes, so its read passes only if the image check accepts it.
     public static List<string> LiveSelfTest(out int failures)
     {
         List<string> lines = new List<string>();
@@ -646,7 +683,8 @@ public static class StartInfo
             + " show=" + si.wShowWindow + ")");
         if (!selfOk) { failures++; foreach (string l in self.Lines) { lines.Add("  " + l); } }
         string ping = System.IO.Path.Combine(Environment.SystemDirectory, "PING.EXE");
-        for (int c = 0; c < 2; c++)
+        string pingForward = ping.Replace('\\', '/');
+        for (int c = 0; c < 3; c++)
         {
             StartupInfoW start = new StartupInfoW();
             start.cb = Marshal.SizeOf(typeof(StartupInfoW));
@@ -656,10 +694,11 @@ public static class StartInfo
                 start.lpTitle = "startinfo-selftest-a";
             }
             ProcessInformation pi;
-            StringBuilder cmd = new StringBuilder("ping.exe -n 6 127.0.0.1");
-            bool made = CreateProcessW(ping, cmd, IntPtr.Zero, IntPtr.Zero, false, 0x08000000, IntPtr.Zero, null,
+            StringBuilder cmd = new StringBuilder(c == 2 ? (pingForward + " -n 6 127.0.0.1") : "ping.exe -n 6 127.0.0.1");
+            bool made = CreateProcessW(c == 2 ? null : ping, cmd, IntPtr.Zero, IntPtr.Zero, false, 0x08000000, IntPtr.Zero, null,
                 ref start, out pi);
-            string label = c == 0 ? "child-a (flags 0x5, show 7, x 11, y 22, title)" : "child-b (flags 0)";
+            string label = c == 0 ? "child-a (flags 0x5, show 7, x 11, y 22, title)"
+                : (c == 1 ? "child-b (flags 0)" : "child-c (no application name, forward-slash command line)");
             if (!made)
             {
                 lines.Add("case " + label + ": WRONG CreateProcess error=" + Marshal.GetLastWin32Error());
@@ -674,9 +713,14 @@ public static class StartInfo
                 right = r.Ok && (r.P.WindowFlags & 0x5) == 0x5 && r.P.ShowWindowFlags == 7 && r.P.StartingX == 11
                     && r.P.StartingY == 22 && r.P.WindowTitle == "startinfo-selftest-a";
             }
-            else
+            else if (c == 1)
             {
                 right = r.Ok && (r.P.WindowFlags & 0x1) == 0;
+            }
+            else
+            {
+                right = r.Ok;
+                if (r.P != null) { lines.Add("  child-c block image_path=[" + Cap(r.P.ImagePath, 120) + "]"); }
             }
             if (r.Ok) { lines.Add("  read window_flags=0x" + r.P.WindowFlags.ToString("X") + " show=" + r.P.ShowWindowFlags); }
             lines.Add("case " + label + ": " + (right ? "right" : "WRONG"));
@@ -689,7 +733,7 @@ public static class StartInfo
             CloseHandle(pi.hThread);
             CloseHandle(pi.hProcess);
         }
-        lines.Add("live cases 3, wrong " + failures);
+        lines.Add("live cases 4, wrong " + failures);
         return lines;
     }
 }

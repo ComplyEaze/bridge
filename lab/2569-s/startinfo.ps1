@@ -9,12 +9,21 @@
 #   powershell -NoProfile -File startinfo.ps1 -Mode console -ProcId <pid> -Out <new file>
 #       attaches to <pid>'s console, reads its console window (visible, iconic), detaches; writes nothing to it
 #   powershell -NoProfile -File startinfo.ps1 -Mode selftest -Out <new file>
-#       ten parse cases on synthetic blocks, then this process against its own start-up information and two
-#       ping.exe children started with known values (each left to exit by itself; never ended)
-# Exit: 0 read (or self-test passed); 2 the read failed (the file's RESULT line names how); 1 a self-test case wrong.
+#       twelve parse cases on synthetic blocks, then this process against its own start-up information and three
+#       ping.exe children started with known values, the third by a forward-slash path (each left to exit by
+#       itself; never ended)
+# Exit: 0 read (or self-test passed); 2 the read failed (the file's RESULT line names how; a failed window listing
+# is WINDOWS_ENUM_FAILED), or this script itself failed (one STARTINFO_FAILED line on standard output, and no file
+# if it failed before writing); 1 a self-test case wrong, never anything else.
 param([ValidateSet('process', 'chain', 'console', 'selftest')][string]$Mode = 'process', [int]$ProcId = 0,
       [string]$Out, [int]$Depth = 6)
 $ErrorActionPreference = 'Stop'
+trap {
+  $m = [string]$_.Exception.Message
+  if ($m.Length -gt 200) { $m = $m.Substring(0, 200) + '...' }
+  Write-Output ('STARTINFO_FAILED ' + $_.Exception.GetType().Name + ': ' + $m)
+  exit 2
+}
 $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 if (Test-Path -LiteralPath $Out) { throw "exists: $Out" }
 $source = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'startinfo.cs'), [System.Text.Encoding]::ASCII)
@@ -26,8 +35,10 @@ $rc = 0
 if ($Mode -eq 'process') {
   $r = [StartInfo]::ReadProcess($ProcId)
   $lines.AddRange($r.Lines)
-  $lines.AddRange([StartInfo]::Windows($ProcId, 20))
+  $w = [StartInfo]::Windows($ProcId, 20)
+  $lines.AddRange($w)
   if (-not $r.Ok) { $rc = 2 }
+  if (@($w | Where-Object { $_.StartsWith('WINDOWS_ENUM_FAILED') }).Count -gt 0) { $rc = 2 }
 } elseif ($Mode -eq 'chain') {
   $c = [StartInfo]::ReadChain($ProcId, $Depth)
   $lines.AddRange($c)

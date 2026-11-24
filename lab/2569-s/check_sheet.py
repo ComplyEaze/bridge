@@ -22,7 +22,21 @@ LAUNCHES = ("L1", "L0", "L2")
 GUID_SHAPE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 SEND = re.compile(r"`([A-Za-z0-9<>-]+)`: `([^`]+)`")
 ANSWER = re.compile(r"`(a-[^`\s]+)`|\b(a-[A-Za-z0-9<>-]+-(?:M-marks|F-0101|K-customer)\.xml)\b")
-HELPERS = ("ans.py", "postcall.py", "check_sheet.py", "startinfo.cs", "startinfo.ps1", "boxwatch.ps1", "exes.ps1")
+HELPERS = ("ans.py", "postcall.py", "check_sheet.py", "startinfo.cs", "startinfo.ps1", "boxwatch.ps1", "exes.ps1",
+           "ops.ps1")
+# What the sitting writes inside the row folder, skipped by the manifest check by name: these folders (the first
+# part of the path) and these files at the top level. Nothing else is skipped.
+OUTPUT_FOLDERS = ("evidence", "backups")
+OUTPUT_FOLDER_PREFIXES = ("run-", "data-", "reads-")
+OUTPUT_TOP_FILES = ("restore-plan.txt", "kept-local.txt")
+OUTPUT_TOP_PREFIXES = ("a-", "log-")
+
+
+def sitting_output(rel):
+    parts = rel.split("/")
+    if len(parts) > 1:
+        return parts[0] in OUTPUT_FOLDERS or parts[0].startswith(OUTPUT_FOLDER_PREFIXES)
+    return rel in OUTPUT_TOP_FILES or rel.startswith(OUTPUT_TOP_PREFIXES)
 
 
 def generated(name):
@@ -97,6 +111,29 @@ def launches():
     return answers, errors
 
 
+PLACED_ROW = re.compile(r"\| `((?:calls|launch)/[^`]+)` \| `([0-9a-f]{64})` \|")
+
+
+def placed_inputs(entries):
+    """Every call and launch file is in the sheet's placed-inputs table once, with its manifest SHA-256."""
+    text = (ROOT / "RUN-SHEET.md").read_text(encoding="utf-8")
+    errors = []
+    rows = {}
+    for name, digest in PLACED_ROW.findall(text):
+        if name in rows:
+            errors.append(f"placed-inputs table names {name} twice")
+        rows[name] = digest
+    wanted = sorted(name for name in entries if name.startswith(("calls/", "launch/")))
+    for name in wanted:
+        if name not in rows:
+            errors.append(f"placed-inputs table lacks {name}")
+        elif rows[name] != entries[name][0]:
+            errors.append(f"placed-inputs table hash differs from SHA256.txt: {name}")
+    for name in sorted(set(rows) - set(wanted)):
+        errors.append(f"placed-inputs table names a file not in SHA256.txt: {name}")
+    return len(rows), errors
+
+
 def ascii_helpers():
     errors = []
     for name in HELPERS + ("boxstate.ps1", "client.py", "run.py", "count8.py"):
@@ -124,11 +161,16 @@ def manifest():
             errors.append(f"duplicate or unsafe path: {name}")
             continue
         entries[name] = (digest, int(size))
-    actual = {
-        path.relative_to(ROOT).as_posix(): path
-        for path in ROOT.rglob("*")
-        if path.is_file() and path.name != "SHA256.txt"
-    }
+    actual = {}
+    skipped = 0
+    for path in ROOT.rglob("*"):
+        rel = path.relative_to(ROOT).as_posix()
+        if not path.is_file() or rel == "SHA256.txt":
+            continue
+        if sitting_output(rel):
+            skipped += 1
+            continue
+        actual[rel] = path
     for name in sorted(set(entries) - set(actual)):
         errors.append(f"manifest names missing file: {name}")
     for name in sorted(set(actual) - set(entries)):
@@ -140,14 +182,19 @@ def manifest():
         expected = (hashlib.sha256(raw).hexdigest(), len(raw))
         if entries[name] != expected:
             errors.append(f"hash or size differs: {name}")
-    return entries, errors
+    for name in sorted(entries):
+        if sitting_output(name):
+            errors.append(f"manifest names a sitting output: {name}")
+    return entries, errors, skipped
 
 
 def main():
     checked, missing = references()
-    entries, errors = manifest()
+    entries, errors, skipped = manifest()
     answers, launch_errors = launches()
     errors.extend(launch_errors)
+    placed, placed_errors = placed_inputs(entries)
+    errors.extend(placed_errors)
     errors.extend(ascii_helpers())
     errors.extend(f"RUN-SHEET.md names missing input: {name}" for name in missing)
     if errors:
@@ -157,9 +204,11 @@ def main():
             print(f"... {len(errors) - 100} errors not printed")
         return 1
     print(f"OK: {len(checked)} pre-sitting file references exist; generated names are declared; "
-          f"SHA256.txt matches all {len(entries)} other files")
+          f"SHA256.txt matches all {len(entries)} other files; {skipped} sitting outputs skipped by name "
+          f"(evidence/, backups/, run-*/, data-*/, reads-*/, top-level a-*, log-*, restore-plan.txt, kept-local.txt)")
     print(f"OK: launches {', '.join(LAUNCHES)} each in the table, Steps and Decides, each with a launch file; "
-          f"{answers} compared answers each sent; no GUID-shaped text")
+          f"{answers} compared answers each sent; {placed} placed inputs each with its manifest hash; "
+          f"no GUID-shaped text")
     print("OK: every helper is ASCII; the new Python helpers name their encoding")
     return 0
 

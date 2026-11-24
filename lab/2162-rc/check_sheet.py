@@ -104,9 +104,12 @@ def arms():
         errors.append(f"a build called old or new: {match.group(0)!r}")
     for name, (tag, (exe, sha)) in LAUNCHES.items():
         data = f"data-{tag}"
-        line = f"RUN={name}; DIR=run-{tag}; DATA={data}; EXE={exe}; EXE_SHA={sha}"
-        if text.count(line) != 1:
-            errors.append(f"launch {name}: the sheet does not name exactly once the line {line!r}")
+        # The literal lines of the launch: its exe hash check, its launch file, and its client start command.
+        for line in (f'echo "{sha}  {exe}" | sha256sum -c - > evidence/run-{tag}-hashes.txt',
+                     f"cp launch/{name}-launch-env.json run-{tag}/launch-env.json && ",
+                     f'python -I client.py "C:/bridge-lab/2162-rc/run-{tag}" "{exe}" "{sha}" > '):
+            if text.count(line) != 1:
+                errors.append(f"launch {name}: the sheet does not hold exactly once the line {line!r}")
         try:
             launch = json.loads((ROOT / "launch" / f"{name}-launch-env.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as e:
@@ -186,7 +189,7 @@ def main():
     print("OK: every pre-sitting file reference exists; generated names are declared; SHA256.txt matches every other file")
     print(f"OK: arms {', '.join(ARMS)} each in the table, Steps and Decides; {answers} compared answers each sent; "
           "no removed arm named; no build called old or new; no GUID-shaped text")
-    print(f"OK: launches {', '.join(LAUNCHES)} each with its five settings, its own data folder and its build's exe and hash")
+    print(f"OK: launches {', '.join(LAUNCHES)} each with its five settings, its own data folder, and its build's exe and hash in its literal hash check and client start line")
     return 0
 
 

@@ -28,7 +28,10 @@
 #                                  answer as above, not exactly one voucher built, no batch file or more than one, a
 #                                  sha256 that differs from the answer's, or the identity not exactly at its two places.
 #   grade05.py --selftest          grades the two answers under selftest/ (row 2162-RX's run-1c and run-2 answers,
-#                                  byte-equal copies) and checks the identity derivation on one fixed input; prints one
+#                                  byte-equal copies), and derives the identity of two batch ids and labels whose
+#                                  build-written import files are in the tree as fixtures (wa1-payment-import.xml and
+#                                  d3-batch-import.xml under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/,
+#                                  each holding its identity once at REMOTEID and once in the narration tag); prints one
 #                                  line per case and exits 0 only if every case is right.
 # Example: python -I grade05.py grade run-g1/answers/05-build-0074-0801.json
 import difflib, hashlib, json, pathlib, sys
@@ -180,16 +183,19 @@ def selftest():
         ok = got == want
         right += ok
         print(f"case {name}: {'right' if ok else 'WRONG, expected ' + want}")
-    # The derivation, checked against its own definition written out step by step.
-    text = b'["bridge.mcp.import.v1","batch-render","txn-001"]'
-    d = bytearray(hashlib.sha256(text).digest()[:16])
-    d[6], d[8] = (d[6] & 0x0F) | 0x80, (d[8] & 0x3F) | 0x80
-    want = "-".join((d[:4].hex(), d[4:6].hex(), d[6:8].hex(), d[8:10].hex(), d[10:].hex()))
-    ok = identity("batch-render", "txn-001") == want and want[14] == "8" and want[19] in "89ab"
-    right += ok
-    print(f"case identity derivation: {'right' if ok else 'WRONG'}")
-    print(f"{len(cases) + 1} cases, {right} right")
-    return 0 if right == len(cases) + 1 else 1
+    # The derivation against identities the build wrote: the batch ids and labels are agent_import_identity_tests.rs's,
+    # and each identity is in its fixture file at REMOTEID and in the narration tag.
+    vectors = [
+        ("bridge-78ce4328-9c2a-4827-8584-821d6d656b40", "W-A1-PAY", "fb9eac30-a125-8dcc-b70d-027a147ce3d1"),
+        ("bridge-1e5b2cd7-f5c6-4d51-adc9-53a4dfa370bb", "D3-001", "bdd61666-ccbb-8ca8-bf60-14f696193240"),
+    ]
+    for batch_id, txn_id, want in vectors:
+        ok = identity(batch_id, txn_id) == want
+        right += ok
+        print(f"case identity of {txn_id}: {'right' if ok else 'WRONG, expected ' + want}")
+    total = len(cases) + len(vectors)
+    print(f"{total} cases, {right} right")
+    return 0 if right == total else 1
 
 
 args = sys.argv[1:]

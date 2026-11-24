@@ -1,0 +1,28 @@
+startinfo mode selftest read at 2026-11-24T14:59:51.665Z pid 0 host_64bit True
+case parse-normalized: right
+case parse-offsets: right
+case short-length: right
+case odd-string-length: right
+case string-outside-memory: right
+case partial-block: right
+case unreadable-block: right
+case flag-names: right
+case pe-subsystem: right
+case brief-ancestor: right
+case same-image: right
+case unread-strings: right
+parse cases 12, wrong 0
+case self: right (startupinfo flags=0x100 show=0)
+  read window_flags=0x5 show=7
+case child-a (flags 0x5, show 7, x 11, y 22, title): right
+  child pid 3708 exited code 0
+  read window_flags=0x0 show=0
+case child-b (flags 0): right
+  child pid 3244 exited code 0
+  child-c block image_path=[<path>]
+  read window_flags=0x0 show=0
+case child-c (no application name, forward-slash command line): right
+  child pid 19248 exited code 0
+live cases 4, wrong 0
+selftest wrong 0
+exit 0

@@ -1,0 +1,7 @@
+2026-11-24T15:10:09.823Z watch start server pid 17448 wait 90 s
+2026-11-24T15:10:40.061Z HELPER pid 11748 created 2026-11-24T15:10:39.558Z polls 79 children 1 helpers 1 cmdline ["<lab root>\2440-cp\build\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal]
+2026-11-24T15:10:41.307Z L1-R1-1.txt windows 1 box_lines 1 lag_s 1.3 iconic=False visible=True
+2026-11-24T15:10:41.310Z R1 graded L1-R1-1.txt
+2026-11-24T15:10:42.238Z Q2h startinfo exit 0 file L1-Q2h.txt
+2026-11-24T15:10:43.198Z L1-R1b.txt windows 1 box_lines 1 lag_s 3.3 iconic=False visible=True
+2026-11-24T15:10:43.199Z FIRST READS DONE helper pid 11748

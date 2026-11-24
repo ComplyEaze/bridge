@@ -1,0 +1,5 @@
+read at 2026-11-24T15:11:00.308Z pid 11748
+windows 1
+WINDOW handle=24839188 name=[ComplyEaze Bridge — post this voucher?] class=#32770 iconic=True visible=True topmost=True rect=(0,996,199,1030) visual_state=Minimized foreground=False
+FOREGROUND handle=18024240 pid=23160
+FOCUS name=[TallyPrime:9001] type=ControlType.Window pid=23160

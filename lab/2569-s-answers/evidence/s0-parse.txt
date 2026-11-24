@@ -1,0 +1,7 @@
+ops parse at 2026-11-24T14:53:41.222Z
+PARSE boxstate.ps1 errors 0
+PARSE boxwatch.ps1 errors 0
+PARSE exes.ps1 errors 0
+PARSE ops.ps1 errors 0
+PARSE startinfo.ps1 errors 0
+exit 0

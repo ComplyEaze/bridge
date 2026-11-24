@@ -1,0 +1,45 @@
+startinfo mode chain read at 2026-11-24T15:09:34.875Z pid 17448 host_64bit True
+PROCESS pid=17448
+created=2026-11-24T15:09:11.013Z
+RESULT OK
+params length=2092 maximum=2092 flags=0x6001 normalized=True
+window_flags=0x100 (USESTDHANDLES)
+show_window_flags=0 (SW_HIDE) used_for_first_show=no (USESHOWWINDOW clear)
+starting x=0 y=0 size=0x0 chars=0x0 fill=0x0
+console_handle=0x54 console_flags=0x1 (read after start: the connection the process holds, not the creation flag)
+std_in=0x1D4 std_out=0x1DC std_err=0x1D8
+image_path=[<lab root>\2440-cp\build\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe]
+command_line=[<lab root>/2440-cp/build/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe]
+current_directory=[<lab folder>\]
+window_title=[<lab root>\2440-cp\build\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe] desktop=[WinSta0\Default] shell_info=[] runtime_data_bytes=0
+open_access=query|vm_read parent_pid=21872
+pe_subsystem=3 (WINDOWS_CUI)
+ANCESTOR level=1 of pid 17448
+PROCESS pid=21872
+created=2026-11-24T15:09:10.719Z
+RESULT OK
+params length=2584 maximum=2584 flags=0x6001 normalized=True
+window_flags=0x100 (USESTDHANDLES)
+show_window_flags=0 (SW_HIDE) used_for_first_show=no (USESHOWWINDOW clear)
+starting x=0 y=0 size=0x0 chars=0x0 fill=0x0
+console_handle=0x4C console_flags=0x1 (read after start: the connection the process holds, not the creation flag)
+std_in=0x208 std_out=0x16E8 std_err=0x240
+image_path=[<path>]
+command_line=[<path> -I -X utf8 client.py <lab folder>/run-L1 <lab root>/2440-cp/build/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe c437138a08dc10a8609e42d28104920401b4615daa69f3cdf404f6e37d6323dd]
+current_directory=[<lab folder>\]
+window_title=[<path>] desktop=[WinSta0\Default] shell_info=[] runtime_data_bytes=168
+open_access=query|vm_read parent_pid=12352
+pe_subsystem=3 (WINDOWS_CUI)
+ANCESTOR level=2 of pid 17448
+PROCESS pid=12352
+created=2026-11-24T15:09:10.683Z
+RESULT LAYOUT_CHECK_FAILED at=image_path block=[<path>] queried=[<path>]
+UNCALIBRATED params length=3818 maximum=3818 flags=0x6001 normalized=True
+UNCALIBRATED window_flags=0x0 (none)
+UNCALIBRATED show_window_flags=0 (SW_HIDE) used_for_first_show=no (USESHOWWINDOW clear)
+UNCALIBRATED starting x=0 y=0 size=0x0 chars=0x0 fill=0x0
+UNCALIBRATED console_handle=0x48 console_flags=0x1 (read after start: the connection the process holds, not the creation flag)
+UNCALIBRATED std_in=0x0 std_out=0x0 std_err=0x16E8
+UNCALIBRATED image_name=[bash.exe] (path, command line, folder and title not printed: chars 789, 21, 44)
+open_access=query|vm_read parent_pid=4140
+exit 0

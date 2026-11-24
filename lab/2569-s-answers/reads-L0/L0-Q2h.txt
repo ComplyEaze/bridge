@@ -1,0 +1,22 @@
+startinfo mode process read at 2026-11-24T15:17:52.079Z pid 18620 host_64bit True
+PROCESS pid=18620
+created=2026-11-24T15:17:50.067Z
+RESULT OK
+params length=2138 maximum=2138 flags=0x6001 normalized=True
+window_flags=0x100 (USESTDHANDLES)
+show_window_flags=0 (SW_HIDE) used_for_first_show=no (USESHOWWINDOW clear)
+starting x=0 y=0 size=0x0 chars=0x0 fill=0x0
+console_handle=0x54 console_flags=0x1 (read after start: the connection the process holds, not the creation flag)
+std_in=0x2C8 std_out=0x2B8 std_err=0x294
+image_path=[<lab root>\2569-r\exe-old\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe]
+command_line=["<lab root>\2569-r\exe-old\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal]
+current_directory=[<lab folder>\]
+window_title=[<lab root>\2569-r\exe-old\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe] desktop=[WinSta0\Default] shell_info=[] runtime_data_bytes=0
+open_access=query|vm_read parent_pid=16700
+pe_subsystem=3 (WINDOWS_CUI)
+windows 4 (top-level, hidden included)
+WINDOW handle=24904724 class=#32770 title=[ComplyEaze Bridge \u2014 post this voucher?] visible=True iconic=False topmost=True toolwindow=False rect=(550,130,1001,756) owner=27067832 owner_iconic=False owner_visible=False
+WINDOW handle=27067832 class=Static title=[] visible=False iconic=False topmost=True toolwindow=True rect=(0,0,0,0) owner=none
+WINDOW handle=30410872 class=MSCTFIME UI title=[MSCTFIME UI] visible=False iconic=False topmost=True toolwindow=False rect=(0,0,0,0) owner=5967090 owner_iconic=False owner_visible=False
+WINDOW handle=5967090 class=IME title=[Default IME] visible=False iconic=False topmost=True toolwindow=False rect=(0,0,0,0) owner=24904724 owner_iconic=False owner_visible=True
+exit 0

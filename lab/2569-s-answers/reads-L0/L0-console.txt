@@ -1,0 +1,3 @@
+startinfo mode console read at 2026-11-24T15:20:24.491Z pid 16700 host_64bit True
+CONSOLE pid=16700 attached window=none
+exit 0

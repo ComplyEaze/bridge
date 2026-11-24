@@ -1,0 +1,6 @@
+ops procs at 2026-11-24T15:16:15.545Z
+PROC tally.exe pid 23160 parent 23268 created 2026-11-12T06:00:00.571Z
+count tally.exe 1
+count bridge_mcp.exe 0
+count python.exe 0
+exit 0

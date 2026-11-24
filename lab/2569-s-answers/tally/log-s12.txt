@@ -1,0 +1,3 @@
+20:55:04	M-marks.xml	a-s12-M-marks.xml	curl 0	3398 bytes
+20:55:04	K-customer.xml	a-s12-K-customer.xml	curl 0	2994 bytes
+20:55:04	F-0101.xml	a-s12-F-0101.xml	curl 0	3022 bytes

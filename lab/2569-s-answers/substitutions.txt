@@ -1,0 +1,13 @@
+The company number is X at equal length in Tally's raw answers (tally/), so sizes stand. company_number values go first in tool answers, by a JSON parser. Other replacements in text files and file names, with counts:
+<Tally data folder>: 2
+<company number>: 1
+<lab folder>: 17
+<lab root name>: 6
+<lab root>: 32
+<path> (a folder outside the lab root, startinfo/boxstate reads): 1
+<path> (an exe outside the lab root, startinfo/boxstate reads): 15
+label: \1=: 13
+label: before-write mode: 3
+stop: 2
+stop_file: 2
+word: 3

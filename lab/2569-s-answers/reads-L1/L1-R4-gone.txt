@@ -1,0 +1,3 @@
+ops gone at 2026-11-24T15:13:03.788Z
+GONE pid 11748
+exit 0

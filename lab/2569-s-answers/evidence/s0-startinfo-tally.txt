@@ -1,0 +1,24 @@
+startinfo mode process read at 2026-11-24T14:57:06.484Z pid 23160 host_64bit True
+PROCESS pid=23160
+created=2026-11-12T06:00:00.571Z
+RESULT OK
+params length=1844 maximum=1844 flags=0x6001 normalized=True
+window_flags=0x0 (none)
+show_window_flags=5 (SW_SHOW) used_for_first_show=no (USESHOWWINDOW clear)
+starting x=0 y=0 size=0x0 chars=0x0 fill=0x0
+console_handle=0x0 console_flags=0x0 (read after start: the connection the process holds, not the creation flag)
+std_in=0x0 std_out=0x0 std_err=0x0
+image_path=[<path>]
+command_line=["<path>"]
+current_directory=[<path>]
+window_title=[<path>] desktop=[] shell_info=[] runtime_data_bytes=0
+open_access=query|vm_read parent_pid=23268
+pe_subsystem=2 (WINDOWS_GUI)
+windows 6 (top-level, hidden included)
+WINDOW handle=1115870 class=tooltips_class32 title=[] visible=False iconic=False topmost=True toolwindow=True rect=(1417,35,1471,54) owner=18024240 owner_iconic=False owner_visible=True
+WINDOW handle=18024240 class=Ganeshji title=[TallyPrime:9001] visible=True iconic=False topmost=False toolwindow=False rect=(0,0,1536,824) owner=none
+WINDOW handle=1639776 class=GDI+ Hook Window Class title=[GDI+ Window (tally.exe)] visible=False iconic=False topmost=False toolwindow=False rect=(0,0,1,1) owner=none
+WINDOW handle=11733514 class=MSCTFIME UI title=[MSCTFIME UI] visible=False iconic=False topmost=False toolwindow=False rect=(0,0,0,0) owner=1573546 owner_iconic=False owner_visible=False
+WINDOW handle=1573546 class=IME title=[Default IME] visible=False iconic=False topmost=False toolwindow=False rect=(0,0,0,0) owner=18024240 owner_iconic=False owner_visible=True
+WINDOW handle=5180028 class=IME title=[Default IME] visible=False iconic=False topmost=False toolwindow=False rect=(0,0,0,0) owner=1639776 owner_iconic=False owner_visible=False
+exit 0

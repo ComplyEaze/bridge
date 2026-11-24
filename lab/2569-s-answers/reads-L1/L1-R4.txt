@@ -1,0 +1,4 @@
+read at 2026-11-24T15:13:03.023Z pid 11748
+windows 0
+FOREGROUND handle=18024240 pid=23160
+FOCUS name=[TallyPrime:9001] type=ControlType.Window pid=23160

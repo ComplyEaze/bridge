@@ -1,0 +1,5 @@
+read at 2026-11-24T15:17:52.802Z pid 18620
+windows 1
+WINDOW handle=24904724 name=[ComplyEaze Bridge — post this voucher?] class=#32770 iconic=False visible=True topmost=True rect=(688,162,1252,945) visual_state=Normal foreground=True
+FOREGROUND handle=24904724 pid=18620
+FOCUS name=[No] type=ControlType.Pane pid=18620

@@ -26,7 +26,7 @@ HELPERS = ("ans.py", "postcall.py", "check_sheet.py", "startinfo.cs", "startinfo
            "ops.ps1")
 # What the sitting writes inside the row folder, skipped by the manifest check by name: these folders (the first
 # part of the path) and these files at the top level. Nothing else is skipped.
-OUTPUT_FOLDERS = ("evidence", "backups")
+OUTPUT_FOLDERS = ("evidence", "backups", "local")
 OUTPUT_FOLDER_PREFIXES = ("run-", "data-", "reads-")
 OUTPUT_TOP_FILES = ("restore-plan.txt", "kept-local.txt")
 OUTPUT_TOP_PREFIXES = ("a-", "log-")
@@ -205,7 +205,7 @@ def main():
         return 1
     print(f"OK: {len(checked)} pre-sitting file references exist; generated names are declared; "
           f"SHA256.txt matches all {len(entries)} other files; {skipped} sitting outputs skipped by name "
-          f"(evidence/, backups/, run-*/, data-*/, reads-*/, top-level a-*, log-*, restore-plan.txt, kept-local.txt)")
+          f"(evidence/, backups/, local/, run-*/, data-*/, reads-*/, top-level a-*, log-*, restore-plan.txt, kept-local.txt)")
     print(f"OK: launches {', '.join(LAUNCHES)} each in the table, Steps and Decides, each with a launch file; "
           f"{answers} compared answers each sent; {placed} placed inputs each with its manifest hash; "
           f"no GUID-shaped text")

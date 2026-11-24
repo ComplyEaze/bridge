@@ -1,0 +1,14 @@
+gh exit 0
+60692023
+dl/unsigned-bundle-smoke-windows-latest.zip: OK
+dl\unpacked\bridge-tally.mcpb
+dl\unpacked\mcpb-smoke.json
+dl/unpacked/bridge-tally.mcpb: OK
+archive_sha256=5a6b02433a670cb128495f45a1bd8a098f2a7d45d948d8e6f443423e9eb7f91f
+binary_sha256=9096eeedab9180d19c80b62ebe6c50917ddf7c9e9302a8e026f1b6b6679cc9cc
+platform win32
+server_version 0.7.0
+default_tool_count 35
+opt_in_tool_count 37
+unpack exit 0
+<lab folder>/exe-6f541ae4/bin/x86_64-pc-windows-msvc/bridge_mcp.exe: OK

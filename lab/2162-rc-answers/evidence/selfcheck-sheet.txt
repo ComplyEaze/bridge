@@ -1,0 +1,4 @@
+OK: every pre-sitting file reference exists; generated names are declared; SHA256.txt matches every other file
+OK: arms P, G, G1, G2, C each in the table, Steps and Decides; 92 compared answers each sent; no removed arm named; no build called old or new; no GUID-shaped text
+OK: launches LP, LG1, LG2, LC each with its five settings, its own data folder, and its build's exe and hash in its literal hash check and client start line
+exit 0

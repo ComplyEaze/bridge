@@ -1,0 +1,25 @@
+OK captured base: both targets SHAPE measured; 14 rows; 15 references removed; exit 0
+OK extra child in GST row: SHAPE unmeasured: EXTRA_GST_ROW; exit 0
+OK extra child in state block: SHAPE unmeasured: EXTRA_STATE_BLOCK; exit 0
+OK non-empty slab list: SHAPE unmeasured: non-empty GSTSLABRATES.LIST; exit 0
+OK extra child in rate detail: SHAPE unmeasured: EXTRA_RATE_DETAIL; exit 0
+OK second GSTDETAILS.LIST row: two rows; still SHAPE measured under the Rust loop; exit 0
+OK missing ledger: valid diff with removed ledger paths, not a failed read; exit 0
+OK answer is not a collection: exit 2: request failed, not no difference; exit 2
+OK UTF-16LE with BOM: SHAPE measured; encoding decoded; exit 0
+OK UTF-8: SHAPE measured; encoding decoded; exit 0
+OK extra &#4; reference: 16 references removed; shape unchanged; exit 0
+OK text changed: structural diff names the changed GSTRATE text; exit 0
+OK identical answers: no structural difference, exit 0; exit 0
+OK Tally status is failure: exit 2: unsuccessful answer; exit 2
+OK company GUID absent from one row: READ refused: company mismatch, on that ledger only; exit 0
+OK another company's GUID on one row: READ refused: company mismatch; exit 0
+OK TAXABILITY repeated in the GST row: READ refused: field repeated; exit 0
+OK one ledger's row twice: READ refused: name repeated; 15 rows; exit 0
+OK STATUS repeated in the header: exit 2: not one STATUS of 1; exit 2
+OK grown: 998313 only (C313, LVS): 998313 unmeasured, 998314 measured; 14 added; exit 0
+OK grown: 998314 only (C314): 998314 unmeasured, 998313 measured; 14 added; exit 0
+OK grown: both service ledgers (W1): both unmeasured; row 2162-RW's added 28; exit 0
+OK grown: the tax ledger only (LVT): CGST 2.5% unmeasured, both service ledgers measured; exit 0
+23 cases, 23 right
+exit 0

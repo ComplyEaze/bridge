@@ -1,0 +1,9 @@
+== A: run-p/answers/05-build-0074-0801.json
+  imports\bridge-80f628cc-e275-43ea-956a-72b8bcc5987a.xml: 2421 bytes, sha256 c2ded851d9ffc19f314ac7daaa3ea67d126f19187a688719893584faa7e04c64
+  encoding utf-8; identity derived from the answer's batch id and bridge_txn_id: REMOTEID 1, narration tag 1, anywhere 2
+== B: run-g2/answers/05-build-0074-0801.json
+  imports\bridge-24bdd2f8-1e68-422c-858e-7c0584d0a980.xml: 2421 bytes, sha256=1f27d015d0ed85e7678ecc141f954426062c83671168c7850a7db89824f7f9a8
+  encoding utf-8; identity derived from the answer's batch id and bridge_txn_id: REMOTEID 1, narration tag 1, anywhere 2
+  after the identity is set aside: A sha256=1c5ec4092ce745e70eb28288ae6af16703faad4fe41231659391ce577eaac706, B sha256=1c5ec4092ce745e70eb28288ae6af16703faad4fe41231659391ce577eaac706
+EQUAL once the identity is set aside
+exit 0

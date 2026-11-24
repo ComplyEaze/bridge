@@ -1,0 +1,3 @@
+a-P-post-rates.xml 29114
+a-P-post-rates.xml: OK
+exit 0

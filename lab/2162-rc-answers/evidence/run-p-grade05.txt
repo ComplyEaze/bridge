@@ -1,0 +1,7 @@
+== 05-build-0074-0801.json: sent 2026-11-24T16:02:58Z, isError False
+  state <absent> reason <absent>
+  refusals: <absent>
+  voucher_count 1 batch_id bridge-80f628cc-e275-43ea-956a-72b8bcc5987a sha256 c2ded851d9ffc19f314ac7daaa3ea67d126f19187a688719893584faa7e04c64
+  evidence state complete bytes 1974198 request 73e152f0d2a4fb891155e5b55ab14f0f5016a7812bde033b235be07d1a4243dd response 598e857614d99f2d5d2edb00c31fc7ea477c9b2973d680559eeb1d84e930189d
+VERDICT admitted voucher_count 1, no refusal
+exit 0

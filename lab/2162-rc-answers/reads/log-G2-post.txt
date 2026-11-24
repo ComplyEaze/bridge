@@ -1,0 +1,2 @@
+21:42:51	M-marks.xml	a-G2-post-M-marks.xml	curl 0	3394 bytes
+21:42:59	rates.xml	a-G2-post-rates.xml	curl 0	30626 bytes

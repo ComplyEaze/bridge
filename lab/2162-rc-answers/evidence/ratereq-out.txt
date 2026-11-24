@@ -1,0 +1,3 @@
+book GUID read: 36 characters
+rates.xml: 2874 bytes, sha256=182f598aafaf333bc8284b6976e664cee00af1eadb5a29bd4f73c295f8601e08
+exit 0

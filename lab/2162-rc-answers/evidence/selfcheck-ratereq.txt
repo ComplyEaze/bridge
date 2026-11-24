@@ -1,0 +1,3 @@
+96b41d40c58d9527da459219d4ea1b020b3c7e6688053ce3de7a42af892cb812
+equal to the pinned hash
+exit 0

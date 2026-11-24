@@ -1,0 +1,4 @@
+<lab folder>/exe-6f541ae4/bin/x86_64-pc-windows-msvc/bridge_mcp.exe: OK
+exit 0
+run-c/launch-env.json: OK
+exit 0

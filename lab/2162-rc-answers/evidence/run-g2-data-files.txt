@@ -1,0 +1,6 @@
+data-g2/agent-egress.jsonl
+data-g2/agent-import-admission.lock
+data-g2/agent-import-ledger.jsonl
+data-g2/imports/bridge-24bdd2f8-1e68-422c-858e-7c0584d0a980.xml
+data-g2/terms-acceptance.jsonl
+exit 0

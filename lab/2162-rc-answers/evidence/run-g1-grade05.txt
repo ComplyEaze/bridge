@@ -1,0 +1,9 @@
+== 05-build-0074-0801.json: sent 2026-11-24T16:09:40Z, isError False
+  state refused reason invoice_not_admitted
+  refusals: 2
+   code 'invoice_sales_ledger_rate_shape_unmeasured' detail 'BRIDGE Svc 998313 5%'
+   code 'invoice_sales_ledger_rate_shape_unmeasured' detail 'BRIDGE Svc 998314 5%'
+  voucher_count <absent> batch_id <absent> sha256 <absent>
+  evidence state complete bytes 62071 request 6d6404a2e22acbf8d4acfc2e8c1f7b4cee998157358aed8da1a787cfa367836e response 5db1811db4c0e7180ac7f8c763cff8e849b8f66512cbddb16a21509e32fd06e7
+VERDICT refused invoice_not_admitted: invoice_sales_ledger_rate_shape_unmeasured (BRIDGE Svc 998313 5%), invoice_sales_ledger_rate_shape_unmeasured (BRIDGE Svc 998314 5%)
+exit 0

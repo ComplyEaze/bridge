@@ -13,5 +13,7 @@
   the next day, and a transfer through a clearing ledger (#1392). It was then run once on a live TallyPrime 7.2, on one synthetic
   company, through a parsed bank statement: a row skipped as recorded from the other account's statement read `not_found`,
   with its three days read whole and no entry on the other ledger, and read `tally_unchecked`, never paired, once a Contra
-  was keyed in Tally on its day. A row paired by its reference, or by its date, with a Contra posted from the other
-  account's statement has not been run live.
+  was keyed in Tally on its day. A row paired with a Contra posted from the other
+  account's statement was run live once, on one synthetic company: one row whose two statement lines carry the same
+  reference paired once that Contra was verified, and one row whose skipped line carries no reference stayed
+  `matched_unconfirmed` until both statements were verified and then paired. A pair of rows on different days has not been run live.

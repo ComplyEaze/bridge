@@ -1811,7 +1811,7 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
   - The book was restored from the row's own backup, and every answer then equalled the one before the change.
   
   One run, one book, one release. Not measured: what Tally does with a tax invoice imported into such a company; what the status update did to the book's other vouchers. **What ComplyEaze Bridge does:** the Sales build refuses an invoice unless `ISGSTON` reads `Yes` after trimming, at the build and at the queue's re-read before a post: `invoice_company_gst_off` for `No`, `invoice_company_gst_unstated` for any other value, absent included. The refusal is a policy: it is not a measured Tally rejection. The answers are in the `pilot-lab-gy` fixtures, as copies with the company number replaced.
-- **Not measured:** a company with no registration; how Tally writes an inactive or composition registration, or a changed GSTIN; two loaded companies (whether `TaxUnit`, like `Company`, ignores `SVCURRENTCOMPANY`); several registrations; another company's units; a voucher type bound to a tax unit (`TAXUNITNAME`, `Any` on the lab's Sales type); Gold, Education, other releases; a real book (not a lab book).
+- **Not measured:** a company with no registration; how Tally writes a composition registration or a changed GSTIN (an inactive registration and a second registration were refused through the build once each, §12a.30, with their answers kept on the lab PC); two loaded companies (whether `TaxUnit`, like `Company`, ignores `SVCURRENTCOMPANY`); another company's units; a voucher type bound to a tax unit (`TAXUNITNAME`, `Any` on the lab's Sales type); Gold, Education, other releases; a real book (not a lab book).
 
 ### 12a.20 A ledger's input tax credit flag on the wire is the opposite of the screen's setting (PARTIAL)
 
@@ -1958,6 +1958,123 @@ Findings:
 - **The book across the row.** The voucher mark went from 12 to 18, six vouchers, and the master mark stayed 211 (`reads/m0b.xml`, `reads/m3.xml`). The book was then restored from the row's own backup, and the marks read after were byte-equal to the first read (`reads/m4.xml`, `reads/m0.xml`). Before that restore one Escape at Select Company raised Tally's `Quit ?` prompt, which was answered N with no company loaded (RESULTS.md, deviation 1), which also records that nothing was sent to Tally while the prompt was up.
 - **Not measured:** rows of one transfer on different days, by reference or by date; two Contras of the same day and amount as candidates for one row; a transfer with no reference on either line; E1, E2 and row 1392-E's other cases, which were not run again; any statement layout other than the generator's, and any bank's own PDF; an approval box left to run out of time, a No given after an approval had lapsed, and a box answered Yes after its call returned (K answered No only); a skip on the receiving account's statement (every transfer here ran from A to B); another book, sitting or release; the post on any build other than the one at `8c3fb9f2`.
 - **What Bridge does with it.** Nothing changes. `agent_transfer_pairing.rs` and `agent_import_approval.rs` are the same files at `8c3fb9f2` and at master `f86a4e11`.
+
+### 12a.30 Sales invoices through the build: a post-dated invoice in GST status, an inactive or a second registration refused, and a two-ledger invoice posted and read back as sent (PARTIAL)
+
+**Measured:** one synthetic book, `BRIDGE PILOT LAB`, loaded alone, on TallyPrime 7.2 Silver (licensed, by the build's `observed_profile`). One sitting on 23 November 2026, 12:20Z to 14:17Z. The build was `bridge_mcp.exe` 0.7.0, sha256 beginning `1e3dd540` (by RESULTS.md); §12a.29 records the same hash for the Windows bundle of a CI run on master `8c3fb9f2`. Every call went through one client to one server process per launch. Eleven launches were made, and each was a fresh server.
+- Results: `lab/2162-sales-q-answers` at 84b7caf4: RESULTS.md, with its eleven deviations; the tool answers under `run-*/answers/`; and Tally's raw answers under `reads/`.
+- Sheet: `lab/2162-sales-q-sheet` at 3bd08d02. The sitting began on 843fd68a, and the one later commit changed only the lab's own check of the approval box.
+- The lab's step-by-step notes and the raw tax-unit and buyer-block answers stay on the lab PC (`kept-local.txt`). Where a statement rests on them, the bullet says so.
+- The book was restored from the row's own backup four times: R1 after the inactive-registration launch, R2 after the two-registration launch, R3 between the first refused launches and the admitted ones, and R4 at the end (RESULTS.md, steps 8, 11 and 16, deviations 5 and 7).
+
+- **A post-dated invoice reads `post_dated` in `gst_status`, with its flags reported as included (verified, one voucher).**
+  - `BP/26-27/0073`, dated 25 August 2026, was keyed on Tally's voucher screen as post-dated. Tally's current date was 15-Sep-2026.
+  - The raw read-back answered `ISPOSTDATED` Yes, the included flag Yes, uncertain No and excluded No, on four legs (`reads/a-s4-R-0073.xml`).
+  - The build's `gst_status` for August on `BRIDGE Sales` answered 33 rows, where the launch before the keying answered 32. The one row only in the later answer is `0073`, with `gst_status` `post_dated` and `status_flags` `included`.
+  - Of the counts, `post_dated` went from 0 to 1 and every other count stayed the same, `included` at 25 in both (`run-0` and `run-1`, answer 04).
+  - This is §9.20's raw finding, now read through the tool, with the current date after the voucher's date.
+- **An inactive registration refuses an invoice dated after it, and admits one dated before (verified, one invoice on two dates).**
+  - Before any change, the test invoice `BP/26-27/0074` (1 August and 15 September 2026, six legs) was admitted at both dates in each of two launches, one voucher each (`run-0`, `run-1`, answers 05 and 06).
+  - The launch after the change admitted the 1 August invoice (one voucher). It refused the 15 September one with `invoice_not_admitted` and one refusal, `invoice_company_registration_inactive` (`run-b2`, 05 and 06; marks M 246, V 69).
+- **Two registrations in force refuse the invoice at both dates (verified, one invoice on two dates).** After R1, a second registration was keyed. The launch refused both dates with `invoice_not_admitted` and one refusal each, `invoice_company_registration_ambiguous`. Neither answer names a file (`run-c`, 05 and 06; marks M 246, V 68).
+- **What the two registration changes were (UNVERIFIED: RESULTS.md and a lab helper's parse of answers kept on the lab PC).**
+  - By RESULTS.md, the one registration was set inactive from 1-Sep-2026 on Tally's screen, as a dated row of its own.
+  - By the helper's parse (`evidence/s9-unit-diff.txt`), the second registration was a new tax unit, `Maharashtra Registration`: one dated row from 1 April 2026, `Regular`, not inactive. The first unit was unchanged.
+  - The tax-unit answers themselves are not committed, because they hold a GSTIN. So how Tally writes an inactive row is still not shown in a committed answer.
+- **The two-ledger invoice posts and Tally stores it as sent, byte for byte as row 2162-HS's raw import read back (verified, one invoice).**
+  - These steps ran after R3, with no GSTR-1 walk since that restore.
+  - The build of `BP/26-27/0072`, dated 1 August 2026, was admitted with one voucher. Its legs: `BRIDGE Walk-in` Dr 1051.00, and Cr 600.40 `BRIDGE Svc 998313 5%`, 400.40 `BRIDGE Svc 998314 5%`, 25.02 `BRIDGE CGST 2.5%`, 25.02 `BRIDGE SGST 2.5%` and 0.16 `BRIDGE Round Off`. The marks before were V 68, M 245 (`run-g`, g05 and g05m).
+  - The post answered `posted_verified`, with created 1 and every other counter 0, no line error and no resend (g06). `verify_import` then answered `posted_verified` for one voucher (g08). `gst_status` for August answered 33 rows: the one row not in the sitting's first answer is `0072`, `included`, and the included count went from 25 to 26 (g09). The marks after were V 69, M 245 (g10).
+  - Tally's raw read-back of the stored invoice (`reads/a-s14-R-0072.xml`, 94,478 bytes, sha256 beginning `8908800f`) carries the six legs as built, `ISPOSTDATED` No and the included flag Yes. It is byte-equal to row 2162-HS's read-back of its raw import of the same invoice (`lab/2162-hs-answers` at d7a1adf8, copied into the sheet as `a-hss4r-R-0072.xml`).
+- **How the approval box was answered (UNVERIFIED as to the box: the lab's box logs, `evidence/s13-*.txt`).**
+  - No person answered a box. Twice before the post, a lab helper answered No on a smoke box, and both `post_import` calls answered `import_approval_declined` with `attempt_recorded` false (`run-g-x1` and `run-g`, the k answers).
+  - On the post, the helper clicked Yes 0.6 s after the box was seen, once its check of the box's text against the built batch passed.
+  - The first sitting stopped before this. The lab's check compared the box's narration with the saved file's, which carries the build's `[BRIDGE:…]` tag that the box does not show. The check was corrected in the sheet (RESULTS.md, finding 2).
+- **GSTR-1's HSN summary gave each sales line to its own ledger's code (UNVERIFIED: a transcription of Tally's screens, `evidence/s12-screens.txt` and `s15-screens.txt`).**
+  - Against the reading before the post, `998313` moved by 630.42 total, 600.40 taxable, 15.01 CGST, 15.01 SGST/UTGST and 30.02 tax. `998314` moved by 420.42, 400.40, 10.01, 10.01 and 20.02. The Total line moved by 1,050.84, 1,000.80, 25.02, 25.02 and 50.04, which is the invoice less its 0.16 round off.
+  - The seven other lines read the same. The voucher counts went from 39 / 27 / 7 / 5 to 40 / 28 / 7 / 5, and each code's voucher list gained one line, `0072`.
+  - These are the deltas the sheet expected from row 2162-HS's raw import.
+  - Three limits. The "before" was read at step 12, after R2, one restore before the post (deviation 5). The "after" screens were read from the session's own views and not saved (deviation 10). One Particulars name in step 12's transcription was corrected from its capture, with no amount changed (deviation 9).
+- **The buyer and consignee block (UNVERIFIED: RESULTS.md only).** RESULTS.md states that the six block fields of the posted `0072` equal those of the keyed `0073`:
+  - the three names `BRIDGE Walk-in`;
+  - `CONSIGNEESTATENAME` Rajasthan;
+  - `CONSIGNEECOUNTRYNAME` India;
+  - `VATDEALERTYPE` Regular.
+
+  The two raw answers stay on the lab PC, and the two invoices differ in date, post-dated flag, lines and amounts as well as in who made them.
+- **After each GSTR-1 walk, the build refused the test invoice on both service ledgers (verified, three launches in two refused states; the cause is in §12a.31).**
+  - The first refused state came after R2, the registration launch and step 12's walk through GSTR-1. Two launches, at 13:27Z and 13:32Z, each refused `BP/26-27/0074` of 1 August with `invoice_not_admitted` and two refusals, `invoice_sales_ledger_rate_shape_unmeasured`, one naming `BRIDGE Svc 998313 5%` and one `BRIDGE Svc 998314 5%`. Both answers carried the same evidence: 62,071 bytes, request sha256 beginning `6d6404a2`, response beginning `5db1811d`.
+  - After R3, a reload with no walk, the same call was admitted in three launches at 13:39Z, 13:43Z and 13:58Z, one voucher each. Their evidence was 1,974,198 bytes, request `73e152f0`, response `598e8576`, the same three values as the sitting's first build at 12:37Z.
+  - After the post of `0072` and step 15's walk, one more launch at 14:09Z was refused again on the same two ledgers: 62,081 bytes, request `6d6404a2`, response `fc601128`. The marks then read V 69, so the posted invoice also separates this launch from the admitted ones.
+  - By the two transcriptions, each walk opened GSTR-1, its HSN summary and the voucher lists of `998313` and `998314`.
+- **The evidence of a refused build does not tell the refusals apart (verified, three refusals).** The inactive and the two ambiguous refusals above carry the same 62,071 bytes and the same request digest as the rate-shape refusals, with other response digests (beginning `0eb8788a` and `3d3063c5`). The digest marks the reads sent before a refusal, not its reason. The build keeps no response bytes, so the row could not show what in the rate read differed.
+- **The book at the end (verified).** After R4, the marks answer was byte-equal to the sitting's first (V 68, M 245), and the number reads for `0072`, `0073` and `0074` returned no voucher. The helper's tax-unit compare reported 0 leaves differing (`evidence/r4-count19.txt`; the tax-unit answers stay on the lab PC).
+- **Not measured:**
+  - a second sitting of any item;
+  - a composition registration;
+  - a changed GSTIN;
+  - an invoice filed under the second registration;
+  - a voucher type bound to one tax unit;
+  - a post-dated invoice posted by the build;
+  - a registered customer;
+  - three sales lines;
+  - the invoice with the block against without it, which the build cannot vary because its renderer writes all six on every invoice;
+  - whether R4 cleared the second refused state, since no launch ran after it;
+  - what in the build's rate read differed in the refused launches;
+  - another book or release.
+- **What Bridge does with it.** Nothing changes.
+  - `gst_status` decides the post-dated flag before the three status flags and reports those as `status_flags` without counting them (`status_of_voucher`, `src-tauri/src/agent_gst_status.rs`).
+  - The build refuses a date with no registration in force where a unit's latest dated row on or before it is inactive, as `invoice_company_registration_inactive`. It refuses one with more than one registration in force as `invoice_company_registration_ambiguous` (`parse_company_registration`, `src-tauri/src/agent_import_invoice_wire.rs`).
+  - Between `8c3fb9f2` and master `349abb32`, `agent_gst_status.rs` and `agent_import_invoice_wire.rs` are unchanged. `agent_import_invoice.rs` changed only in a comment on a test helper.
+
+### 12a.31 After two service codes' voucher lists were opened from GSTR-1's HSN summary, Tally's rate answer carried zero per-unit fields on their two sales ledgers and the build refused both, and Shut Company with a reload cleared it (PARTIAL)
+
+**Measured:** the book, release and build of §12a.30: `BRIDGE PILOT LAB`, loaded alone, on TallyPrime 7.2 Silver (licensed, by the build's `observed_profile`), and `bridge_mcp.exe` 0.7.0 with the same sha256 by RESULTS.md. One sitting on 24 November 2026, 05:40Z to 06:02Z. Nothing was posted and no restore was made.
+- The raw request is `rates.xml`: 2,874 bytes, sha256 beginning `182f598a`, UTF-16LE with a byte-order mark. It is the GUID-scoped rate read for the six ledgers of the test invoice, rendered by the sheet's `ratereq.py`, whose self-test reproduces the hash master's request-bytes test pins for `render_ledger_rates_request_for_ledgers`. The build keeps no request bytes, so its own request for this book was not compared byte for byte.
+- The lab sent the request one read at a time and wrote each answer to a file. Answers are UTF-16LE without a byte-order mark and were read by parsed structure after their `&#N;` references were removed. Every marks answer of the row read V 68, M 245.
+- Results: `lab/2162-rw-answers` at 58c3eb0f, RESULTS.md. Sheet: `lab/2162-rw-sheet` at 6b6c6915.
+
+- **Before any report was opened, the rate answer held still (verified, three reads).**
+  - Two reads with nothing between them, and a third after a launch of the build, each answered 29,114 bytes with sha256 beginning `a6197d90`. That answer holds six ledger rows and 264 elements.
+  - In each of the two service ledgers, the one state-wise block's five rate rows carry `GSTRATE` 2.50 (CGST), 2.50 (SGST/UTGST) and 5 (IGST). They carry no `GSTRATE` on the Cess row (valued Not Applicable) or the State Cess row (Based on Value), and no `GSTRATEPERUNIT` on any row.
+  - The build admitted the test invoice, `BP/26-27/0074` of 1 August 2026, with one voucher. Its evidence was 1,974,198 bytes, request beginning `73e152f0`, response `598e8576` (`run-0`, 05).
+- **Opening GSTR-1, then GSTR-1 and its HSN summary, changed nothing (verified, one read each).** Each read after the screens were closed was byte-equal to the first.
+- **After the voucher lists of both service codes were opened, the answer grew (verified, two reads).**
+  - The two reads, before and after the launch below, were byte-equal: 30,626 bytes, sha256 beginning `d7f5db99`, 278 elements.
+  - Against the first answer, 14 elements were added, each with a `TYPE` attribute `Number` and the text 0. None was removed and no text changed.
+  - In each of `BRIDGE Svc 998313 5%` and `BRIDGE Svc 998314 5%`, under `GSTDETAILS.LIST[1]/STATEWISEDETAILS.LIST[1]`, Tally added `GSTRATEPERUNIT` to all five `RATEDETAILS.LIST` rows. It also added `GSTRATE` to the Cess and State Cess rows, which had none.
+  - The CGST, SGST/UTGST and IGST rates were unchanged, and so were the other four ledgers.
+- **The build in that state refused the invoice on exactly those two ledgers (verified, one launch).** `05` answered `invoice_not_admitted` with two refusals, `invoice_sales_ledger_rate_shape_unmeasured`, one naming each service ledger, and no file. Its evidence was 62,071 bytes, request `6d6404a2`, response `5db1811d` (`run-1c`).
+- **Shut Company and a reload cleared it (verified, three reads and one launch).**
+  - Two reads after the load with nothing between them, and a third after the launch, were byte-equal to the first answer of the sitting.
+  - The build admitted the invoice again with one voucher, with the same evidence size, request and response digests as the first launch (`run-2`).
+  - No restart of Tally and no restore were made.
+- **What was opened between the reads (UNVERIFIED: the lab's notes, `evidence/notes.txt`, and the sheet's step list).**
+  - The first arm opened GSTR-1 for 1-Aug-26 to 31-Aug-26 without a period key, then pressed Escape.
+  - The second opened GSTR-1 and its `HSN Summary - 12 (B2B - B2C Supplies)` line, then pressed Escape twice.
+  - The third opened the summary, then `998313`'s voucher list (19 lines), Escape, then `998314`'s (7 lines), and Escape three times to the Gateway.
+  - Shut Company was Alt+K, Shut and Enter on the one listed company, and the load was by its name filter. No date or period key was pressed in the row.
+- **Which of the added elements the build refuses (UNVERIFIED as to the build's own read: a reading of the code).**
+  - The rate parse marks a GST row unmeasured when a rate row holds a child other than `GSTRATEDUTYHEAD`, `GSTRATEVALUATIONTYPE` and `GSTRATE` (`HEAD_RATE_CHILDREN`, `parse_ledger_rates_and_rows`, `src-tauri/src/agent_import_invoice_wire.rs`). The sales-rate check refuses such a row before it reads any rate (`sales_rate_milli`, `src-tauri/src/agent_import_invoice.rs`). So `GSTRATEPERUNIT` is the element that decides this refusal. The added `GSTRATE` is inside the set.
+  - Were the per-unit field admitted, the same check would still refuse these rows: a Cess or State Cess row that carries any `GSTRATE`, 0 included, is refused as `invoice_cess_rate_not_supported`.
+  - That the build's own read in the refused launch held these elements is inferred, not shown. The build keeps no response bytes, and the raw reads on either side of the launch were byte-equal.
+- **Beside §12a.30 (verified, as digests).**
+  - The refused launch's evidence (62,071 bytes, `6d6404a2`, `5db1811d`) is the same as that of §12a.30's first two refused launches. The admitted launches' evidence is the same as §12a.30's admitted builds'.
+  - The response digest is chained over the reads that make up the evidence (`combine_evidence`, `src-tauri/src/agent.rs`). Registration refusals carry the same size and request digest (§12a.30), so this equality does not show that the two sittings' builds read the same rate answer.
+  - §12a.30's refusals each followed a restore and then a walk. This row walked with no restore before it, so a restore is not needed for the state to appear.
+- **Not measured:**
+  - one code's voucher list without the other's;
+  - a goods ledger, or a ledger with a cess or a per-unit rate of its own;
+  - any other report that opens a voucher list;
+  - how long the state lasts in a session that is not shut;
+  - a restart of Tally, or a restore, as a cure in this row;
+  - whether the added fields reach what Tally stores on disk, which was not looked at (the marks did not move);
+  - the build's own response bytes;
+  - another book, release or sitting.
+- **What Bridge does with it.** Nothing changes.
+  - A Sales invoice on a ledger in this state is refused in the build's answer as `invoice_sales_ledger_rate_shape_unmeasured`, naming the ledger. No file is written and nothing is sent to Tally.
+  - The same check runs again in the endpoint queue's re-read before a post (§9.16).
+  - The refusal does not name the cause or the cure.
 
 ## 13. Open questions
 

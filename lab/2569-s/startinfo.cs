@@ -85,8 +85,18 @@ public static class StartInfo
     static extern bool CreateProcessW(string application, StringBuilder commandLine, IntPtr processAttributes,
         IntPtr threadAttributes, bool inheritHandles, uint creationFlags, IntPtr environment, string currentDirectory,
         ref StartupInfoW startup, out ProcessInformation info);
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    static extern void GetStartupInfoW(out StartupInfoW startup);
+    // GetStartupInfoW fills pointers that Windows owns: read them as IntPtr, never as string (the marshaler
+    // would free them).
+    [StructLayout(LayoutKind.Sequential)]
+    struct StartupInfoRaw
+    {
+        public int cb; public IntPtr lpReserved; public IntPtr lpDesktop; public IntPtr lpTitle;
+        public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+        public short wShowWindow; public short cbReserved2; public IntPtr lpReserved2;
+        public IntPtr hStdInput, hStdOutput, hStdError;
+    }
+    [DllImport("kernel32.dll")]
+    static extern void GetStartupInfoW(out StartupInfoRaw startup);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     static extern IntPtr GetCommandLineW();
     [DllImport("kernel32.dll")]
@@ -372,14 +382,23 @@ public static class StartInfo
             if (p.Failure == null)
             {
                 string image = p.ImagePath;
-                if (image.StartsWith("\\??\\")) { image = image.Substring(4); }
+                if (image.StartsWith("\\??\\") || image.StartsWith("\\\\?\\")) { image = image.Substring(4); }
                 if (queried == null || !string.Equals(image, queried, StringComparison.OrdinalIgnoreCase))
                 {
                     p.Failure = "LAYOUT_CHECK_FAILED at=image_path block=[" + Cap(p.ImagePath, 200) + "] queried=["
                         + Cap(queried, 200) + "]";
                 }
             }
-            r.Lines.AddRange(Describe(p, full || p.Failure != null));
+            if (p.Failure != null && p.Failure.StartsWith("LAYOUT_CHECK_FAILED at=image_path"))
+            {
+                // The block was read but its image path is not the process's: print its values, each marked.
+                string why = p.Failure;
+                p.Failure = null;
+                r.Lines.Add("RESULT " + why);
+                foreach (string l in Describe(p, full)) { if (!l.StartsWith("RESULT")) { r.Lines.Add("UNCALIBRATED " + l); } }
+                p.Failure = why;
+            }
+            else { r.Lines.AddRange(Describe(p, full || p.Failure != null)); }
             r.P = p;
             r.Ok = p.Failure == null;
             r.Lines.Add("open_access=" + (limited ? "query_limited|vm_read" : "query|vm_read") + " parent_pid=" + r.ParentPid);
@@ -618,7 +637,7 @@ public static class StartInfo
         failures = 0;
         int own = GetCurrentProcessId();
         Reading self = ReadProcess(own);
-        StartupInfoW si;
+        StartupInfoRaw si;
         GetStartupInfoW(out si);
         string commandLine = Marshal.PtrToStringUni(GetCommandLineW());
         bool selfOk = self.Ok && self.P.WindowFlags == (uint)si.dwFlags && self.P.ShowWindowFlags == (ushort)si.wShowWindow

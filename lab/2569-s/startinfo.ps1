@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 if (Test-Path -LiteralPath $Out) { throw "exists: $Out" }
 $source = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'startinfo.cs'), [System.Text.Encoding]::ASCII)
-Add-Type -TypeDefinition $source -Language CSharp
+Add-Type -TypeDefinition $source -Language CSharp -IgnoreWarnings
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('startinfo mode ' + $Mode + ' read at ' + [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ') + ' pid ' + $ProcId +
   ' host_64bit ' + [Environment]::Is64BitProcess)

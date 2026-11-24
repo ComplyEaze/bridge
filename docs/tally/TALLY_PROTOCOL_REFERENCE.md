@@ -509,6 +509,9 @@ base revision.
 <a id="12a28-a-bank-cash-withdrawal-answered-as-paid-to-someone-posts-as-a-contra-into-cash-and-a-cash-payment-and-reads-back-as-built-partial"></a>
 
 [12a.28 A bank cash withdrawal answered as paid to someone posts as a Contra into cash and a cash Payment, and reads back as built (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a28-a-bank-cash-withdrawal-answered-as-paid-to-someone-posts-as-a-contra-into-cash-and-a-cash-payment-and-reads-back-as-built-partial)
+<a id="12a29-a-skipped-transfer-row-pairs-with-a-contra-posted-from-the-other-accounts-statement-and-a-repeat-post-after-a-kept-no-opens-a-new-approval-box-partial"></a>
+
+[12a.29 A skipped transfer row pairs with a Contra posted from the other account's statement, and a repeat post after a kept No opens a new approval box (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a29-a-skipped-transfer-row-pairs-with-a-contra-posted-from-the-other-accounts-statement-and-a-repeat-post-after-a-kept-no-opens-a-new-approval-box-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

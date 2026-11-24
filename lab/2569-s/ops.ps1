@@ -17,13 +17,15 @@
 #   gone     -ProcId <pid>                 whether that process still runs
 #   list     -Path <folder>                every file under it: SHA-256, size, UTC write time, relative path
 #                                          (at most 200)
+#   dir      -Path <folder>                every file under it: size, UTC write time, relative path; no file is
+#                                          opened (for a folder whose files may be in use), at most 200
 #   now                                    the UTC time
 # With -Out, the lines also go to that new file (it must not exist).
 # Exit: 0 done, or the state the op checks for holds (hash equal, all absent, process gone, 0 parse errors);
 # 1 the op ran and the state differs (hash differs, a path present, process running, a parse error, a target
 # exists); 2 the op itself failed (a typed OPS_FAILED line names how). A failed query is never read as "gone".
 param([ValidateSet('copytree', 'refresh', 'parse', 'procs', 'hash', 'absent', 'mkdir', 'place', 'commit', 'stop',
-                   'gone', 'list', 'now')][string]$Op,
+                   'gone', 'list', 'dir', 'now')][string]$Op,
       [string[]]$Path, [string]$From, [string]$To, [string]$Expect, [int]$ProcId = 0, [string]$Out)
 $ErrorActionPreference = 'Stop'
 # powershell -File passes "a,b" as one string, so a list of paths is split here, on commas.
@@ -171,6 +173,20 @@ switch ($Op) {
     foreach ($f in $files) {
       if ($i -ge 200) { break }
       $lines.Add((Sha $f.FullName) + '  ' + $f.Length + '  ' + $f.LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ') + '  ' +
+        $f.FullName.Substring($root.TrimEnd('\').Length + 1).Replace('\', '/'))
+      $i++
+    }
+    $lines.Add('files ' + $files.Count)
+    if ($files.Count -gt 200) { $lines.Add('files omitted ' + ($files.Count - 200)) }
+  }
+  'dir' {
+    $root = Full $Path[0]
+    if (-not (Test-Path -LiteralPath $root -PathType Container)) { Fail ('folder missing: ' + $root) }
+    $files = @(Get-ChildItem -LiteralPath $root -Recurse -Force -File | Sort-Object FullName)
+    $i = 0
+    foreach ($f in $files) {
+      if ($i -ge 200) { break }
+      $lines.Add([string]$f.Length + '  ' + $f.LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ') + '  ' +
         $f.FullName.Substring($root.TrimEnd('\').Length + 1).Replace('\', '/'))
       $i++
     }

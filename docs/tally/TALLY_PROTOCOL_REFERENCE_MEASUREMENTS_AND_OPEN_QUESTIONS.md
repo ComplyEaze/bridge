@@ -2063,9 +2063,9 @@ Findings:
   - The response digest is chained over the reads that make up the evidence (`combine_evidence`, `src-tauri/src/agent.rs`). Registration refusals carry the same size and request digest (§12a.30), so this equality does not show that the two sittings' builds read the same rate answer.
   - §12a.30's refusals each followed a restore and then a walk. This row's sitting made no restore, before its walk or after. Whether Tally was started afresh between the two days is not recorded.
 - **Not measured:**
-  - one code's voucher list without the other's;
+  - one code's voucher list without the other's (measured afterwards: §12a.32);
   - a goods ledger, or a ledger with a cess or a per-unit rate of its own;
-  - any other report that opens a voucher list;
+  - any other report that opens a voucher list (two Ledger Vouchers displays were opened afterwards: §12a.32);
   - how long the state lasts in a session that is not shut;
   - the queue's re-read of this refusal before a post;
   - a restart of Tally, or a restore, as a cure in this row;
@@ -2078,6 +2078,39 @@ Findings:
   - On a sales ledger a zero per-unit row is read as the plain one, except that its Cess row (valued Not Applicable) and its State Cess row (Based on Value) must each carry the rate `0` as text (`sales_rate_milli`). Such a row without exactly one Cess row and one State Cess row, or with a cess row that has no rate, is refused `invoice_sales_ledger_rate_shape_unmeasured` (both captured rows had one of each), and a cess row with another rate or valuation `invoice_cess_rate_not_supported`. A plain row is read as before, whichever cess rows it has. On a tax ledger a zero per-unit row is refused `invoice_tax_ledger_gst_rate_unmeasured`: none was captured.
   - Both answers of this row are in the tree as captures (`pilot-lab-ledger-rates-svc.utf16le.xml` and `pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml`, with the request, under `src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/`). The tests parse both, read the same rate from both service ledgers in both, and admit an invoice on the same six ledgers with either served as the rate read, through the admission's reads in order (the other reads there are the book's answers of 9 October 2026).
   - By the code, the same check runs again in the endpoint queue's re-read before a post (`admit_queued_invoice`, `src-tauri/src/agent_import_invoice.rs`, called from the queue in `agent_import_post.rs`; §9.16). That path was not run in this row, and no test runs it on these answers.
+
+### 12a.32 Either service code's voucher list alone grew both service ledgers' rate answer, and Ledger Vouchers of a service ledger or a tax ledger grew nothing (PARTIAL)
+
+**Measured:** the book, release, build and raw request of §12a.31, in a second sitting on 24 November 2026, 06:44Z to 07:16Z. Nothing was posted and no restore was made. Every marks answer of the row read V 68, M 245.
+- The sitting loaded the book alone and read twice. The first voucher-list arm followed on that load. Every later arm began with Shut Company and a load of the book alone.
+- After each load, two reads with nothing between them were byte-equal to each other and to the plain answer of §12a.31: 29,114 bytes, sha256 beginning `a6197d90`. The grown answer of §12a.31 is 30,626 bytes, sha256 beginning `d7f5db99`.
+- Results: `lab/2162-rx-answers` at 3c0f4bd3, RESULTS.md. Sheet: `lab/2162-rx-sheet` at 6750ea49.
+
+- **One code's voucher list was enough, and either one did it (verified, one read each).**
+  - After GSTR-1, its HSN summary and the voucher list of `998313` only, the answer was byte-equal to the grown answer of §12a.31. Both service ledgers carried the added fields. `BRIDGE Svc 998314 5%` was one of them, and its code's list had not been opened.
+  - After a shut and a load, the same walk with the voucher list of `998314` only gave the same bytes.
+  - No build had been launched in the sitting before either arm.
+- **Ledger Vouchers of a service ledger, and of a tax ledger, grew nothing (verified, one read each).** After Ledger Vouchers of `BRIDGE Svc 998313 5%` was opened and closed, the answer was byte-equal to the plain one. In a separate load the same held for Ledger Vouchers of `BRIDGE CGST 2.5%`.
+- **Both codes' lists, the walk of §12a.31, gave the grown answer again (the two reads verified; the launches by RESULTS.md).**
+  - The reads before and after a launch of the build were byte-equal to the grown answer.
+  - That launch refused the test invoice with two `invoice_sales_ledger_rate_shape_unmeasured`, one for each service ledger, and wrote no file. Its evidence was 62,071 bytes, request `6d6404a2`, response `5db1811d`.
+  - After a shut and a load the answer was the plain one, and a launch admitted the invoice with one voucher: 1,974,198 bytes, request `73e152f0`, response `598e8576`. The read after that launch was plain too.
+  - Both launches' sizes and digests are those of §12a.31's refused and admitted launches. The build is §12a.31's, without the change that section describes.
+- **What was opened (UNVERIFIED: the lab's notes, `evidence/notes.txt`, and RESULTS.md).**
+  - The voucher list of `998313` showed 19 lines and that of `998314` 7. Each was opened from GSTR-1's HSN summary, and the lab went back to the Gateway by Escape.
+  - Each Ledger Vouchers display was for 1-Sep-26 to 15-Sep-26 and showed one voucher line. The way back from it differed from the sheet's and is RESULTS.md's deviation 4.
+  - No date or period key was pressed in the row.
+- **Reading (PARTIAL: one book, one release, one build, one sitting).**
+  - In these two rows the added fields follow the voucher list that GSTR-1's HSN summary opens. Two other displays that list a ledger's vouchers did not add them.
+  - One code's list changes the answer of a sales ledger of the other code. What the two ledgers share that makes them change together is not shown.
+- **Not measured:**
+  - a goods ledger, or a sales ledger whose code the summary does not list;
+  - a tax ledger in the grown state (none was seen), and so what the build does with one;
+  - any other report that opens a voucher list;
+  - how long the state lasts in a session that is not shut;
+  - a build with the change of §12a.31 launched in this state;
+  - another book, release or sitting.
+- **What Bridge does with it.** No code changes on this row. For a build without the change of §12a.31, one code's voucher list opened from GSTR-1's HSN summary was enough in this book to make it refuse a Sales invoice on either service ledger, until the company was shut and loaded again.
 
 ## 13. Open questions
 

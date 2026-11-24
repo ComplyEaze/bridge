@@ -15,5 +15,7 @@
   with its three days read whole and no entry on the other ledger, and read `tally_unchecked`, never paired, once a Contra
   was keyed in Tally on its day. A row paired with a Contra posted from the other
   account's statement was run live once, on one synthetic company: one row whose two statement lines carry the same
-  reference paired once that Contra was verified, and one row whose skipped line carries no reference stayed
-  `matched_unconfirmed` until both statements were verified and then paired. A pair of rows on different days has not been run live.
+  reference read as paired when its statement was built after that Contra was verified, and one row whose skipped line
+  was written without a reference stayed `matched_unconfirmed` until both statements were verified and then read as
+  paired. The answers count pairs and do not name the rule that made each. A pair of rows on different days has not
+  been run live.

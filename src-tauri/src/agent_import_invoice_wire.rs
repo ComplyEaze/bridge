@@ -1451,11 +1451,11 @@ pub(super) enum RowShape {
     /// A plain row but for one `GSTRATEPERUNIT` reading `0` (after cleaning)
     /// in every rate row of every state-wise block, and at least one rate row.
     /// The lab measured it on 24 Nov 2026 (row 2162-RW, two service sales
-    /// ledgers): after the voucher list of an HSN/SAC code is opened from
-    /// GSTR-1's HSN summary, Tally answers so for that code's sales ledgers
-    /// until the company is loaded again, and the Cess and State Cess rows
-    /// then carry a rate of `0`. No other field changed (protocol reference
-    /// §12a.31).
+    /// ledgers): after the voucher lists of their two HSN/SAC codes were
+    /// opened from GSTR-1's HSN summary, Tally answered so for both ledgers
+    /// until the company was shut and loaded again, and their Cess and State
+    /// Cess rows then carried a rate of `0`. No other field changed (protocol
+    /// reference §12a.31).
     ZeroPerUnit,
     /// Anything else: a child of the row, of a state-wise block or of a rate
     /// row outside the measured set, a slab-rate list that is not empty, or a

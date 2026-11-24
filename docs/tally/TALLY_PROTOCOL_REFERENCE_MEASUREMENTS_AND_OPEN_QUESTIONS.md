@@ -1961,7 +1961,7 @@ Findings:
 
 ### 12a.30 Sales invoices through the build: a post-dated invoice in GST status, an inactive or a second registration refused, and a two-ledger invoice posted and read back as sent (PARTIAL)
 
-**Measured:** one synthetic book, `BRIDGE PILOT LAB`, loaded alone, on TallyPrime 7.2 Silver (licensed, by the build's `observed_profile`). One day, 23 November 2026, 12:20Z to 14:17Z by RESULTS.md (the committed files run from 12:34Z), in two stretches: the post stopped once at the lab's own check of the approval box and was taken up again after the sheet's check was corrected. The build was `bridge_mcp.exe` 0.7.0, sha256 beginning `1e3dd540` (by RESULTS.md); §12a.29 records the same hash for the Windows bundle of a CI run on master `8c3fb9f2`. Every call went through one client to one server process per launch. Eleven launches were made, and each was a fresh server.
+**Measured:** one synthetic book, `BRIDGE PILOT LAB`, loaded alone, on TallyPrime 7.2 Silver (licensed, by the build's `observed_profile`). One day, 23 November 2026, 12:20Z to 14:17Z by RESULTS.md (the committed files run from 12:34Z), in two stretches: the first stopped twice, at a refused build and then at the lab's own check of the approval box, and the second began after the sheet's check was corrected. The build was `bridge_mcp.exe` 0.7.0, sha256 beginning `1e3dd540` (by RESULTS.md); §12a.29 records the same hash for the Windows bundle of a CI run on master `8c3fb9f2`. Every call went through one client to one server process per launch. Eleven launches were made, and each was a fresh server.
 - Results: `lab/2162-sales-q-answers` at 84b7caf4: RESULTS.md, with its eleven deviations; the tool answers under `run-*/answers/`; and Tally's raw answers under `reads/`.
 - Sheet: `lab/2162-sales-q-sheet` at 3bd08d02. The day began on 843fd68a, and the one later commit changed the lab's own check of the approval box and added the day's rulings to the sheet's notes.
 - The lab's step-by-step notes and the raw tax-unit and buyer-block answers stay on the lab PC (`kept-local.txt`). Where a statement rests on them, the bullet says so.
@@ -2058,7 +2058,7 @@ Findings:
   - The rate parse marks a GST row unmeasured when a rate row holds a child other than `GSTRATEDUTYHEAD`, `GSTRATEVALUATIONTYPE` and `GSTRATE` (`HEAD_RATE_CHILDREN`, `parse_ledger_rates_and_rows`, `src-tauri/src/agent_import_invoice_wire.rs`). The sales-rate check refuses such a row before it reads any rate (`sales_rate_milli`, `src-tauri/src/agent_import_invoice.rs`). So `GSTRATEPERUNIT` is the element that decides this refusal. The added `GSTRATE` is inside the set.
   - Were the per-unit field admitted, the same check would still refuse these rows: a Cess or State Cess row that carries any `GSTRATE`, 0 included, is refused as `invoice_cess_rate_not_supported`.
   - That the build's own read in the refused launch held these elements is inferred, not shown. The build keeps no response bytes, and the raw reads on either side of the launch were byte-equal.
-- **Beside §12a.30 (verified, as digests).**
+- **Beside §12a.30 (the digests verified; the last bullet is from the two rows' own records, not a digest).**
   - The refused launch's evidence (62,071 bytes, `6d6404a2`, `5db1811d`) is the same as that of §12a.30's first two refused launches. The admitted launches' evidence is the same as §12a.30's admitted builds'.
   - The response digest is chained over the reads that make up the evidence (`combine_evidence`, `src-tauri/src/agent.rs`). Registration refusals carry the same size and request digest (§12a.30), so this equality does not show that the two sittings' builds read the same rate answer.
   - §12a.30's refusals each followed a restore and then a walk. This row's sitting made no restore, before its walk or after. Whether Tally was started afresh between the two days is not recorded.
@@ -2075,7 +2075,7 @@ Findings:
 - **What Bridge does with it.** Nothing changes.
   - A Sales invoice on a ledger in this state is refused in the build's answer as `invoice_sales_ledger_rate_shape_unmeasured`, naming the ledger. No file is written and no import is sent to Tally; the reads behind the answer are sent.
   - By the code, the same check runs again in the endpoint queue's re-read before a post (`admit_queued_invoice`, `src-tauri/src/agent_import_invoice.rs`, called from the queue in `agent_import_post.rs`; §9.16). That path was not run in this row.
-  - The refusal does not name the cause or the cure.
+  - The refusal names the two ledgers and a general next step (fix the voucher, or the master it names in Tally, then build again). It names neither the walk nor Shut Company.
 
 ## 13. Open questions
 

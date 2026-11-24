@@ -91,7 +91,7 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
             applicable_from: Some("20250401".to_string()),
             taxability: Some("Taxable".to_string()),
             source: Some("Specify Details Here".to_string()),
-            unmeasured: false,
+            shape: wire::RowShape::Plain,
             empty: false,
             states: vec![wire::StateRates {
                 state: Some("Any".to_string()),
@@ -2932,7 +2932,7 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
     );
     // A row with an element or a slab list the lab's rows did not carry.
     assert_eq!(
-        with(&|r| r.gst_rows[0].unmeasured = true),
+        with(&|r| r.gst_rows[0].shape = wire::RowShape::Unmeasured),
         Err("invoice_sales_ledger_rate_shape_unmeasured")
     );
     assert_eq!(
@@ -3125,6 +3125,137 @@ fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
         check(&|r| r.rounding_limit = None),
         Some("invoice_tax_ledger_rounding_unsupported")
     );
+}
+
+/// The lab's two service sales ledgers give the same rate from the answer
+/// before lab row 2162-RW turned their rows zero per-unit and from the answer
+/// after (24 Nov 2026), on a day both rows are in force.
+#[test]
+fn the_service_ledgers_rate_is_the_same_plain_and_zero_per_unit() {
+    let read = |bytes: &[u8], name: &str| {
+        let mut rates = wire::parse_ledger_rates(
+            &utf16le(bytes),
+            "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+            &[name],
+        )
+        .unwrap();
+        rates.remove(name).unwrap()
+    };
+    let before = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml"
+    );
+    let after = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml"
+    );
+    for name in ["BRIDGE Svc 998313 5%", "BRIDGE Svc 998314 5%"] {
+        let (was, now) = (read(before, name), read(after, name));
+        assert_eq!(was.gst_rows[0].shape, wire::RowShape::Plain, "{name}");
+        assert_eq!(now.gst_rows[0].shape, wire::RowShape::ZeroPerUnit, "{name}");
+        assert_eq!(sales_rate_milli(&was, AS_OF_AUG), Ok(2_500), "{name}");
+        assert_eq!(sales_rate_milli(&now, AS_OF_AUG), Ok(2_500), "{name}");
+    }
+}
+
+/// In a zero per-unit row each cess head must read the lab's valuation and the
+/// rate `0` as text; a cess head with no rate there is a mix the lab did not
+/// see. A plain row's cess heads still carry no rate, `0` included.
+#[test]
+fn zero_per_unit_cess_heads_are_admitted_only_at_the_text_zero() {
+    const CESS: usize = 3;
+    const STATE_CESS: usize = 4;
+    let zero = |change: &dyn Fn(&mut Vec<wire::HeadRate>)| {
+        let mut row = sales_rates("2.5", "5");
+        row.gst_rows[0].shape = wire::RowShape::ZeroPerUnit;
+        let heads = &mut row.gst_rows[0].states[0].heads;
+        assert_eq!(
+            (heads[CESS].head.as_str(), heads[STATE_CESS].head.as_str()),
+            ("Cess", "State Cess")
+        );
+        heads[CESS].rate = Some("0".into());
+        heads[STATE_CESS].rate = Some("0".into());
+        change(heads);
+        sales_rate_milli(&row, AS_OF)
+    };
+    assert_eq!(zero(&|_| {}), Ok(2_500));
+    assert_eq!(
+        zero(&|h| h[CESS].rate = None),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+    assert_eq!(
+        zero(&|h| h[STATE_CESS].rate = None),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+    for rate in ["1", "0.00"] {
+        assert_eq!(
+            zero(&|h| h[CESS].rate = Some(rate.into())),
+            Err("invoice_cess_rate_not_supported"),
+            "Cess {rate}"
+        );
+        assert_eq!(
+            zero(&|h| h[STATE_CESS].rate = Some(rate.into())),
+            Err("invoice_cess_rate_not_supported"),
+            "State Cess {rate}"
+        );
+    }
+    assert_eq!(
+        zero(&|h| h[CESS].valuation = Some("Based on Value".into())),
+        Err("invoice_cess_rate_not_supported")
+    );
+    assert_eq!(
+        zero(&|h| h[STATE_CESS].valuation = Some("Not Applicable".into())),
+        Err("invoice_cess_rate_not_supported")
+    );
+    assert_eq!(
+        zero(&|h| h[CESS].valuation = None),
+        Err("invoice_cess_rate_not_supported")
+    );
+    // The state heads are read as in a plain row.
+    assert_eq!(
+        zero(&|h| h[0].rate = Some("0".into())),
+        Err("invoice_sales_ledger_rate_heads_unreadable")
+    );
+    assert_eq!(
+        zero(&|h| h[1].rate = Some("3".into())),
+        Err("invoice_sales_ledger_rate_heads_unequal")
+    );
+    // A plain row with a cess rate of `0`, as before.
+    let plain = |head: usize| {
+        let mut row = sales_rates("2.5", "5");
+        row.gst_rows[0].states[0].heads[head].rate = Some("0".into());
+        sales_rate_milli(&row, AS_OF)
+    };
+    assert_eq!(plain(CESS), Err("invoice_cess_rate_not_supported"));
+    assert_eq!(plain(STATE_CESS), Err("invoice_cess_rate_not_supported"));
+    // An unmeasured row is refused before its heads are read.
+    let mut unmeasured = sales_rates("2.5", "5");
+    unmeasured.gst_rows[0].shape = wire::RowShape::Unmeasured;
+    assert_eq!(
+        sales_rate_milli(&unmeasured, AS_OF),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+}
+
+/// No tax ledger with per-unit fields was captured: a tax ledger the check
+/// admits is refused once its GST row is zero per-unit, and once it is
+/// unmeasured.
+#[test]
+fn a_tax_ledger_with_a_zero_per_unit_row_is_refused() {
+    for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
+        let row = lab_row(name);
+        assert!(!row.gst_rows.is_empty(), "{name}");
+        assert_eq!(tax_ledger_refusal(&row, 2_500), None, "{name}");
+        for shape in [wire::RowShape::ZeroPerUnit, wire::RowShape::Unmeasured] {
+            let mut edited = row.clone();
+            for gst in &mut edited.gst_rows {
+                gst.shape = shape;
+            }
+            assert_eq!(
+                tax_ledger_refusal(&edited, 2_500),
+                Some("invoice_tax_ledger_gst_rate_unmeasured"),
+                "{name} {shape:?}"
+            );
+        }
+    }
 }
 
 /// Where a ledger's first GST row stands in the lab's listing.

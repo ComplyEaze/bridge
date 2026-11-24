@@ -1617,6 +1617,220 @@ fn a_nameless_ledger_row_fails_the_rate_read_and_the_captured_listing_has_none()
     assert_eq!(rates.keys().map(String::as_str).collect::<Vec<_>>(), named);
 }
 
+/// The two answers of lab row 2162-RW (24 Nov 2026), before and after the
+/// voucher list of an HSN/SAC code was opened from GSTR-1's HSN summary: the
+/// two service sales ledgers' rows go from plain to zero per-unit, their cess
+/// heads gain the rate `0`, and nothing else read changes.
+#[test]
+fn the_captured_rate_answers_turn_only_the_service_rows_zero_per_unit() {
+    const BEFORE: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml");
+    const AFTER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml");
+    let named = [
+        "BRIDGE CGST 2.5%",
+        "BRIDGE Round Off",
+        "BRIDGE SGST 2.5%",
+        "BRIDGE Svc 998313 5%",
+        "BRIDGE Svc 998314 5%",
+        "BRIDGE Walk-in",
+    ];
+    let before = parse_ledger_rates(&captured(BEFORE), &pilot_lab_guid(), &named).unwrap();
+    let after = parse_ledger_rates(&captured(AFTER), &pilot_lab_guid(), &named).unwrap();
+    assert_eq!(before.keys().map(String::as_str).collect::<Vec<_>>(), named);
+    assert_eq!(after.keys().map(String::as_str).collect::<Vec<_>>(), named);
+    for name in ["BRIDGE Svc 998313 5%", "BRIDGE Svc 998314 5%"] {
+        let [was] = before[name].gst_rows.as_slice() else {
+            panic!("{name}: one GST row before");
+        };
+        let [now] = after[name].gst_rows.as_slice() else {
+            panic!("{name}: one GST row after");
+        };
+        assert_eq!(was.shape, RowShape::Plain, "{name}");
+        assert_eq!(now.shape, RowShape::ZeroPerUnit, "{name}");
+        assert_eq!(
+            (
+                &now.applicable_from,
+                &now.taxability,
+                &now.source,
+                now.empty
+            ),
+            (
+                &was.applicable_from,
+                &was.taxability,
+                &was.source,
+                was.empty
+            ),
+            "{name}"
+        );
+        let ([was_block], [now_block]) = (was.states.as_slice(), now.states.as_slice()) else {
+            panic!("{name}: one state-wise block");
+        };
+        assert_eq!(now_block.state, was_block.state, "{name}");
+        let heads = |block: &StateRates| {
+            block
+                .heads
+                .iter()
+                .map(|head| head.head.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            heads(now_block),
+            ["CGST", "SGST/UTGST", "IGST", "Cess", "State Cess"],
+            "{name}"
+        );
+        assert_eq!(heads(was_block), heads(now_block), "{name}");
+        for (was_head, now_head) in was_block.heads.iter().zip(&now_block.heads) {
+            match now_head.head.as_str() {
+                "Cess" | "State Cess" => {
+                    assert_eq!(was_head.rate, None, "{name} {}", now_head.head);
+                    assert_eq!(
+                        now_head.rate.as_deref(),
+                        Some("0"),
+                        "{name} {}",
+                        now_head.head
+                    );
+                    assert_eq!(now_head.valuation, was_head.valuation, "{name}");
+                }
+                _ => assert_eq!(now_head, was_head, "{name}"),
+            }
+        }
+        // The whole ledger row, every other field included, is the plain one
+        // once the shape and the two cess rates are put back.
+        let mut undone = after[name].clone();
+        undone.gst_rows[0].shape = RowShape::Plain;
+        for head in &mut undone.gst_rows[0].states[0].heads {
+            if matches!(head.head.as_str(), "Cess" | "State Cess") {
+                head.rate = None;
+            }
+        }
+        assert_eq!(undone, before[name], "{name}");
+    }
+    for name in [
+        "BRIDGE CGST 2.5%",
+        "BRIDGE Round Off",
+        "BRIDGE SGST 2.5%",
+        "BRIDGE Walk-in",
+    ] {
+        assert_eq!(after[name], before[name], "{name}");
+    }
+}
+
+/// The shape of a one-row ledger built from inline parts: `heads` holds, for
+/// each state-wise block, one extra text for each of its CGST rate rows.
+fn inline_row_shape(
+    extra_row: &str,
+    extra_state: &str,
+    heads: &[&[&str]],
+    slabs: &str,
+) -> Result<RowShape, &'static str> {
+    let states: String = heads
+        .iter()
+        .map(|block| {
+            let rows: String = block
+                .iter()
+                .map(|extra| {
+                    format!(
+                        "<RATEDETAILS.LIST><GSTRATEDUTYHEAD>CGST</GSTRATEDUTYHEAD>\
+                         <GSTRATEVALUATIONTYPE>Based on Value</GSTRATEVALUATIONTYPE>\
+                         <GSTRATE>2.50</GSTRATE>{extra}</RATEDETAILS.LIST>"
+                    )
+                })
+                .collect();
+            format!(
+                "<STATEWISEDETAILS.LIST><STATENAME>Any</STATENAME>{extra_state}{rows}{slabs}\
+                 </STATEWISEDETAILS.LIST>"
+            )
+        })
+        .collect();
+    let inner = format!(
+        "<GSTDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><TAXABILITY>Taxable</TAXABILITY>\
+         <SRCOFGSTDETAILS>Specify Details Here</SRCOFGSTDETAILS>{extra_row}{states}</GSTDETAILS.LIST>"
+    );
+    parse_ledger_rates(&ledger_answer("L", &inner), &pilot_lab_guid(), &["L"])
+        .map(|rates| rates["L"].gst_rows[0].shape)
+}
+
+const ZERO: &str = "<GSTRATEPERUNIT>0</GSTRATEPERUNIT>";
+
+/// A row is zero per-unit only when every rate row of every state-wise block
+/// carries one per-unit field whose cleaned text is exactly `0`.
+#[test]
+fn zero_per_unit_needs_one_field_reading_zero_on_every_rate_row() {
+    let shape = |heads: &[&[&str]]| inline_row_shape("", "", heads, "");
+    assert_eq!(shape(&[&[ZERO, ZERO, ZERO]]), Ok(RowShape::ZeroPerUnit));
+    assert_eq!(shape(&[&[ZERO], &[ZERO, ZERO]]), Ok(RowShape::ZeroPerUnit));
+    // The field is cleaned first, as Tally writes ` 2.50`.
+    let spaced = "<GSTRATEPERUNIT> 0</GSTRATEPERUNIT>";
+    assert_eq!(shape(&[&[spaced, spaced]]), Ok(RowShape::ZeroPerUnit));
+    let typed = "<GSTRATEPERUNIT TYPE=\"Number\">0</GSTRATEPERUNIT>";
+    assert_eq!(shape(&[&[typed, ZERO]]), Ok(RowShape::ZeroPerUnit));
+    // No field anywhere, or no rate row at all, is plain.
+    assert_eq!(shape(&[&["", ""]]), Ok(RowShape::Plain));
+    assert_eq!(shape(&[&[]]), Ok(RowShape::Plain));
+    // The field on some rate rows but not all, in one block or across two.
+    assert_eq!(shape(&[&[ZERO, ZERO, ""]]), Ok(RowShape::Unmeasured));
+    assert_eq!(shape(&[&["", ZERO]]), Ok(RowShape::Unmeasured));
+    assert_eq!(shape(&[&[ZERO, ZERO], &[""]]), Ok(RowShape::Unmeasured));
+    assert_eq!(shape(&[&[ZERO], &[]]), Ok(RowShape::ZeroPerUnit));
+    // Any text but `0`, on every rate row.
+    for text in ["1", "0.00", "0.0", "00", "-0", "", "0 0"] {
+        let field = format!("<GSTRATEPERUNIT>{text}</GSTRATEPERUNIT>");
+        assert_eq!(
+            shape(&[&[field.as_str(), field.as_str()]]),
+            Ok(RowShape::Unmeasured),
+            "{text:?}"
+        );
+    }
+    // A field that holds an element, or the field twice in one rate row.
+    let nested = "<GSTRATEPERUNIT>0<RATE>0</RATE></GSTRATEPERUNIT>";
+    assert_eq!(shape(&[&[nested, nested]]), Ok(RowShape::Unmeasured));
+    let twice = "<GSTRATEPERUNIT>0</GSTRATEPERUNIT><GSTRATEPERUNIT>0</GSTRATEPERUNIT>";
+    assert_eq!(shape(&[&[twice, twice]]), Ok(RowShape::Unmeasured));
+    assert_eq!(shape(&[&[twice, ZERO]]), Ok(RowShape::Unmeasured));
+}
+
+/// A zero per-unit row that also carries what the lab's rows did not, at any
+/// of the three levels, or a slab-rate list that is not empty, is unmeasured.
+#[test]
+fn zero_per_unit_with_anything_else_unmeasured_is_unmeasured() {
+    let zeros: &[&[&str]] = &[&[ZERO, ZERO]];
+    let empty_slabs = "<GSTSLABRATES.LIST>       </GSTSLABRATES.LIST>";
+    assert_eq!(
+        inline_row_shape("", "", zeros, empty_slabs),
+        Ok(RowShape::ZeroPerUnit)
+    );
+    assert_eq!(
+        inline_row_shape(
+            "<ISREVERSECHARGEAPPLICABLE>Yes</ISREVERSECHARGEAPPLICABLE>",
+            "",
+            zeros,
+            empty_slabs
+        ),
+        Ok(RowShape::Unmeasured)
+    );
+    assert_eq!(
+        inline_row_shape("", "<ISMRPBASED>Yes</ISMRPBASED>", zeros, empty_slabs),
+        Ok(RowShape::Unmeasured)
+    );
+    let outside = "<GSTRATEPERUNIT>0</GSTRATEPERUNIT><ISMRPBASED>No</ISMRPBASED>";
+    assert_eq!(
+        inline_row_shape("", "", &[&[ZERO, outside]], empty_slabs),
+        Ok(RowShape::Unmeasured)
+    );
+    assert_eq!(
+        inline_row_shape(
+            "",
+            "",
+            zeros,
+            "<GSTSLABRATES.LIST><SLABFROM>1000</SLABFROM></GSTSLABRATES.LIST>"
+        ),
+        Ok(RowShape::Unmeasured)
+    );
+    assert_eq!(
+        inline_row_shape("", "", zeros, "<GSTSLABRATES.LIST>1000</GSTSLABRATES.LIST>"),
+        Ok(RowShape::Unmeasured)
+    );
+}
+
 /// One ledger row around `inner`, bound to the lab company.
 fn ledger_answer(name: &str, inner: &str) -> String {
     format!(
@@ -1640,42 +1854,50 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
              </RATEDETAILS.LIST>{slabs}</STATEWISEDETAILS.LIST></GSTDETAILS.LIST>"
         )
     };
-    let unmeasured = |inner: String| {
+    let shape = |inner: String| {
         let rates =
             parse_ledger_rates(&ledger_answer("L", &inner), &pilot_lab_guid(), &["L"]).unwrap();
-        rates["L"].gst_rows[0].unmeasured
+        rates["L"].gst_rows[0].shape
     };
-    assert!(!unmeasured(row(
-        "",
-        "",
-        "",
-        "<GSTSLABRATES.LIST></GSTSLABRATES.LIST>"
-    )));
-    assert!(unmeasured(row(
-        "<ISREVERSECHARGEAPPLICABLE>Yes</ISREVERSECHARGEAPPLICABLE>",
-        "",
-        "",
-        ""
-    )));
-    assert!(unmeasured(row("", "<ISMRPBASED>Yes</ISMRPBASED>", "", "")));
-    assert!(unmeasured(row(
-        "",
-        "",
-        "<GSTRATEPERUNIT>3</GSTRATEPERUNIT>",
-        ""
-    )));
-    assert!(unmeasured(row(
-        "",
-        "",
-        "",
-        "<GSTSLABRATES.LIST><SLABFROM>1000</SLABFROM></GSTSLABRATES.LIST>"
-    )));
-    assert!(unmeasured(row(
-        "",
-        "",
-        "",
-        "<GSTSLABRATES.LIST>1000</GSTSLABRATES.LIST>"
-    )));
+    assert_eq!(
+        shape(row("", "", "", "<GSTSLABRATES.LIST></GSTSLABRATES.LIST>")),
+        RowShape::Plain
+    );
+    assert_eq!(
+        shape(row(
+            "<ISREVERSECHARGEAPPLICABLE>Yes</ISREVERSECHARGEAPPLICABLE>",
+            "",
+            "",
+            ""
+        )),
+        RowShape::Unmeasured
+    );
+    assert_eq!(
+        shape(row("", "<ISMRPBASED>Yes</ISMRPBASED>", "", "")),
+        RowShape::Unmeasured
+    );
+    assert_eq!(
+        shape(row("", "", "<GSTRATEPERUNIT>3</GSTRATEPERUNIT>", "")),
+        RowShape::Unmeasured
+    );
+    assert_eq!(
+        shape(row(
+            "",
+            "",
+            "",
+            "<GSTSLABRATES.LIST><SLABFROM>1000</SLABFROM></GSTSLABRATES.LIST>"
+        )),
+        RowShape::Unmeasured
+    );
+    assert_eq!(
+        shape(row(
+            "",
+            "",
+            "",
+            "<GSTSLABRATES.LIST>1000</GSTSLABRATES.LIST>"
+        )),
+        RowShape::Unmeasured
+    );
     // An element that is present and empty is not an absent one.
     let present = parse_ledger_rates(
         &ledger_answer(

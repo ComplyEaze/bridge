@@ -461,6 +461,11 @@ fn rate_milli(text: &str) -> Option<i128> {
 /// all-states block that gives CGST, SGST/UTGST and IGST rates valued on value
 /// (the state heads equal, IGST twice one of them) and no cess. Each other
 /// shape is its own refusal, never a guess.
+///
+/// No cess reads two ways. In a plain row neither cess head has a rate. In a
+/// zero per-unit row (measured 24 Nov 2026, lab row 2162-RW, two service sales
+/// ledgers; protocol reference §12a.31) both carry the rate `0`, as text, and the same valuations; a cess
+/// head with no rate in such a row was not seen, so the row is unmeasured.
 fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'static str> {
     let [gst] = row.gst_rows.as_slice() else {
         return Err(match row.gst_rows.len() {
@@ -475,9 +480,12 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
     {
         return Err("invoice_sales_ledger_rate_not_in_force");
     }
-    if gst.unmeasured {
-        return Err("invoice_sales_ledger_rate_shape_unmeasured");
-    }
+    // The rate each cess head must carry in a row of this shape.
+    let cess_rate = match gst.shape {
+        wire::RowShape::Unmeasured => return Err("invoice_sales_ledger_rate_shape_unmeasured"),
+        wire::RowShape::Plain => None,
+        wire::RowShape::ZeroPerUnit => Some("0"),
+    };
     if gst.taxability.as_deref() != Some("Taxable") {
         return Err("invoice_sales_ledger_not_taxable");
     }
@@ -515,14 +523,24 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
                 }
             }
             // No cess at all, as the lab's rows read: Cess "Not Applicable"
-            // and State Cess "Based on Value", neither with a rate. A head
-            // with a rate, or valued any other way, is a tax this build does
+            // and State Cess "Based on Value", with the shape's rate (none,
+            // or `0` in a zero per-unit row). A zero per-unit row whose cess
+            // head has no rate is a mix the lab did not see. A head with
+            // another rate, or valued any other way, is a tax this build does
             // not work out.
-            "Cess"
-                if head.rate.is_none() && head.valuation.as_deref() == Some("Not Applicable") => {}
-            "State Cess"
-                if head.rate.is_none() && head.valuation.as_deref() == Some("Based on Value") => {}
-            "Cess" | "State Cess" => return Err("invoice_cess_rate_not_supported"),
+            "Cess" | "State Cess" => {
+                let valued = if head.head == "Cess" {
+                    "Not Applicable"
+                } else {
+                    "Based on Value"
+                };
+                if cess_rate.is_some() && head.rate.is_none() {
+                    return Err("invoice_sales_ledger_rate_shape_unmeasured");
+                }
+                if head.rate.as_deref() != cess_rate || head.valuation.as_deref() != Some(valued) {
+                    return Err("invoice_cess_rate_not_supported");
+                }
+            }
             _ => return Err(unreadable),
         }
     }
@@ -550,7 +568,9 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
 /// no rate. No tax ledger in a capture has a rate in those rows, so how Tally
 /// reads one beside the ledger's own rate is not known; a row of elements the
 /// lab did not read could hold one. A ledger that reads anything else, or
-/// nothing, was not measured.
+/// nothing, was not measured. A zero per-unit row was measured on sales
+/// ledgers only (24 Nov 2026, lab row 2162-RW, two service sales ledgers), so
+/// on a tax ledger it is refused with the rows of unmeasured shape.
 fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'static str> {
     let own = row.rate_of_tax_calculation.as_deref().and_then(rate_milli);
     if own != Some(half_milli) {
@@ -562,7 +582,11 @@ fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'s
         return Some("invoice_tax_ledger_rounding_unsupported");
     }
     let rated = |gst: &wire::GstRow| {
-        gst.unmeasured
+        let measured = match gst.shape {
+            wire::RowShape::Plain => true,
+            wire::RowShape::ZeroPerUnit | wire::RowShape::Unmeasured => false,
+        };
+        !measured
             || gst
                 .states
                 .iter()

@@ -1434,14 +1434,34 @@ pub(super) struct GstRow {
     pub(super) taxability: Option<String>,
     pub(super) source: Option<String>,
     pub(super) states: Vec<StateRates>,
-    /// The row carries an element or a value the lab's rows did not (a child
-    /// of the row, of a state-wise block or of a head's rate that is not in
-    /// the measured set, or a slab-rate list that is not empty).
-    pub(super) unmeasured: bool,
+    /// Which of the measured shapes the row has, decided here once.
+    pub(super) shape: RowShape,
     /// The row holds no attribute, no element and no text, as the lab's
     /// round-off ledger's row read (`BRIDGE Round Off`, the `pilot-lab` rate
     /// listing).
     pub(super) empty: bool,
+}
+
+/// The shape of a dated GST row, as the lab's rows read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RowShape {
+    /// Nothing but the elements the lab's rows carried (10 Oct 2026, fourteen
+    /// ledgers) and an empty slab-rate list.
+    Plain,
+    /// A plain row but for one `GSTRATEPERUNIT` reading `0` (after cleaning)
+    /// in every rate row of every state-wise block, and at least one rate row.
+    /// The lab measured it on 24 Nov 2026 (row 2162-RW, two service sales
+    /// ledgers): after the voucher list of an HSN/SAC code is opened from
+    /// GSTR-1's HSN summary, Tally answers so for that code's sales ledgers
+    /// until the company is loaded again, and the Cess and State Cess rows
+    /// then carry a rate of `0`. No other field changed (protocol reference
+    /// §12a.31).
+    ZeroPerUnit,
+    /// Anything else: a child of the row, of a state-wise block or of a rate
+    /// row outside the measured set, a slab-rate list that is not empty, or a
+    /// `GSTRATEPERUNIT` that is missing from some rate rows, repeated, holds
+    /// an element or reads anything but `0`.
+    Unmeasured,
 }
 
 /// What the rate listing says of one ledger. Each field is the text Tally
@@ -1473,6 +1493,8 @@ const GST_ROW_CHILDREN: &[&str] = &[
 ];
 const STATE_BLOCK_CHILDREN: &[&str] = &["GSTSLABRATES.LIST", "RATEDETAILS.LIST", "STATENAME"];
 const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALUATIONTYPE"];
+/// The rate row's per-unit field, admitted only as [`RowShape::ZeroPerUnit`].
+const PER_UNIT: &str = "GSTRATEPERUNIT";
 
 /// The rate listing by ledger name, for the ledgers an invoice names. Every
 /// row of the answer must carry the verified company's GUID (the
@@ -1558,6 +1580,8 @@ pub(super) fn parse_ledger_rates_and_rows(
                 .children
                 .iter()
                 .any(|child| !GST_ROW_CHILDREN.contains(&child.name.as_str()));
+            // Rate rows, and those of them with one zero per-unit field.
+            let (mut rate_rows, mut zero_per_unit_rows) = (0_usize, 0_usize);
             let mut states = Vec::new();
             for state in details.all("STATEWISEDETAILS.LIST") {
                 unmeasured |= state
@@ -1569,10 +1593,17 @@ pub(super) fn parse_ledger_rates_and_rows(
                     .any(|slabs| !slabs.children.is_empty() || !clean(&slabs.text).is_empty());
                 let mut heads = Vec::new();
                 for detail in state.all("RATEDETAILS.LIST") {
-                    unmeasured |= detail
-                        .children
-                        .iter()
-                        .any(|child| !HEAD_RATE_CHILDREN.contains(&child.name.as_str()));
+                    unmeasured |= detail.children.iter().any(|child| {
+                        child.name != PER_UNIT && !HEAD_RATE_CHILDREN.contains(&child.name.as_str())
+                    });
+                    rate_rows += 1;
+                    match detail.all(PER_UNIT).collect::<Vec<_>>().as_slice() {
+                        [] => {}
+                        [one] if one.children.is_empty() && clean(&one.text) == "0" => {
+                            zero_per_unit_rows += 1;
+                        }
+                        _ => unmeasured = true,
+                    }
                     heads.push(HeadRate {
                         head: detail
                             .text_of("GSTRATEDUTYHEAD")?
@@ -1591,7 +1622,15 @@ pub(super) fn parse_ledger_rates_and_rows(
                 taxability: details.text_of("TAXABILITY")?,
                 source: details.text_of("SRCOFGSTDETAILS")?,
                 states,
-                unmeasured,
+                shape: if unmeasured {
+                    RowShape::Unmeasured
+                } else if zero_per_unit_rows == 0 {
+                    RowShape::Plain
+                } else if zero_per_unit_rows == rate_rows {
+                    RowShape::ZeroPerUnit
+                } else {
+                    RowShape::Unmeasured
+                },
                 empty: details.attributes.is_empty()
                     && details.children.is_empty()
                     && clean(&details.text).is_empty(),

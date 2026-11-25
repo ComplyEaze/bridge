@@ -3,9 +3,9 @@
 complete three-column manifest. Python 3.10, standard library only; reads only, writes nothing.
 
 Row 1381-BX's check, in the shape of row 2162-PA's check_sheet.py (lab/2162-pa at f682a6aa), with this row's own
-checks: its four arms (LN, SN, SC, SY) each in the arm table, Steps and Decides; each arm's start line exactly once; the
-lines of box.ps1, boxcheck.py and arm.py that keep the box from being pressed but by a passed check, each exactly once,
-and box.ps1's old default No absent; arm.py's arms equal to the table's; no GUID-shaped text in the two rule files; and
+checks: its five arms (LN, SN, SC, SY, ST) each in the arm table, Steps and Decides; each arm's start line exactly once;
+the lines of box.ps1, boxcheck.py and arm.py that keep the box from being pressed but by a passed check, each exactly
+once, among them arm.py's line that gives ST no guard, no check and no answer file; box.ps1's old default No absent; arm.py's arms equal to the table's; no GUID-shaped text in the two rule files; and
 no value that names the build (BUILD.txt's hex fields but CODE COMMIT) in any file but BUILD.txt. Only local/ is skipped:
 any other file outside SHA256.txt is an error. While BUILD.txt holds <TO FILL> fields it says how many and still exits 0
 (the sheet is whole; build.py check is what stops the sitting).
@@ -19,9 +19,10 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent
 SUFFIXES = (".py", ".ps1", ".md", ".txt")
 ROW = re.compile(r"([0-9a-f]{64})  ([0-9]+)  (.+)")
-ARMS = ("LN", "SN", "SC", "SY")
+ARMS = ("LN", "SN", "SC", "SY", "ST")
 ARM_TABLE = {"LN": ("masters", "No", "in/ledger-input.txt"), "SN": ("stock", "No", "in/stock-input.txt"),
-             "SC": ("stock", "Cancel", "in/stock-input.txt"), "SY": ("stock", "Yes", "in/stock-input.txt")}
+             "SC": ("stock", "Cancel", "in/stock-input.txt"), "SY": ("stock", "Yes", "in/stock-input.txt"),
+             "ST": ("stock", "none", "in/stock-large-input.txt")}
 SKIP_DIRS = {"local"}
 # Names the sheet cites that are other rows' files or files the sitting writes, never this folder's.
 FOREIGN = {"pa.py", "starth.ps1", "requests/confirm-masters-input.txt", "copies.txt", "s3-listing.txt"}
@@ -37,7 +38,9 @@ HELD = (
     ("arm.py", "'-SeeWithin', '30', '-AnswerBy', '90'"),
     ("arm.py", "g.append(f'{utc()} GUARD PASSED: boxcheck.py started')"),
     ("arm.py", "ARMS = {'LN': ('masters', 'No', 'in/ledger-input.txt'), 'SN': ('stock', 'No', 'in/stock-input.txt'),\n"
-               "        'SC': ('stock', 'Cancel', 'in/stock-input.txt'), 'SY': ('stock', 'Yes', 'in/stock-input.txt')}\n"),
+               "        'SC': ('stock', 'Cancel', 'in/stock-input.txt'), 'SY': ('stock', 'Yes', 'in/stock-input.txt'),\n"
+               "        'ST': ('stock', None, 'in/stock-large-input.txt')}\n"),
+    ("arm.py", "    if ans is None:  # ST: no guard, no check, no answer file, whatever the box shows\n"),
 )
 # box.ps1's default No at its deadline, as row 2162-SALES-Q's copy has it; this row's copy must not.
 GONE = (("box.ps1", "$choice = 'No' }"),)

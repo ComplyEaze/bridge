@@ -1,6 +1,6 @@
 # Row 1381-BX: the stock-item approval box on Windows
 
-For #1381. Pull request 2596 (head 48a64965) adds the dialog child mode `--confirm-stock-item`: a Windows message box titled `ComplyEaze Bridge — create one stock item?` that shows the stock item's whole review text and answers Yes, No or Cancel. No row has opened it. This row opens it on the Windows lab PC from the real exe, with the real text, four times: once as a control on the unchanged ledger box, then the stock box answered No, Cancel and Yes. It records the box, the display it opened on, and what the child printed and returned. The child needs no Tally and no company. Nothing is sent to Tally.
+For #1381. Pull request 2596 (head 48a64965) adds the dialog child mode `--confirm-stock-item`: a Windows message box titled `ComplyEaze Bridge — create one stock item?` that shows the stock item's whole review text and answers Yes, No or Cancel. No row has opened it. This row opens it on the Windows lab PC from the real exe, with the real text, five times: once as a control on the unchanged ledger box, then the stock box answered No, Cancel and Yes, and last with a synthetic text too tall for the screen, which the child's fit guard must refuse unanswered. It records the box, the display it opened on, and what the child printed and returned. The child needs no Tally and no company. Nothing is sent to Tally.
 
 **How an EXPECT is marked.** **(code `file:line`)** is a rule read at commit 48a6496507132576a6be150c155192f647528e1e (all code lines cited are that commit's); **(lab `row`)** is an earlier observation; **(not shown)** is what this sitting measures. The build that runs is the master commit that merges pull request 2596. It is named in `BUILD.txt` only, filled by the run coordinator in one commit once the merge exists, and checked against this commit for the files cited (The build, below).
 
@@ -11,6 +11,7 @@ For #1381. Pull request 2596 (head 48a64965) adds the dialog child mode `--confi
 - **Q1.** Does the real stock box show the exact title, its answer lines and the whole 29-line preview the code makes, line for line, with three buttons Yes, No and Cancel, No the default, all inside the box, and the box wholly inside the work area?
 - **Q2.** Does each answer give what the code says: No and Cancel print nothing and exit 1; Yes prints the stock token for the arm's nonce and a line feed, nothing else, and exits 0?
 - **Q3.** Does the ledger box, whose code pull request 2596 does not change, still open and answer No as before (lab 1780-K)?
+- **Q4.** Is a stock box that cannot fit the work area refused by the fit guard, never answered: no click, nothing printed, exit 77?
 
 | arm | mode | input | answer | EXPECT |
 |---|---|---|---|---|
@@ -18,21 +19,23 @@ For #1381. Pull request 2596 (head 48a64965) adds the dialog child mode `--confi
 | SN | `stock` (`--confirm-stock-item`) | `in/stock-input.txt` | No | Q1 (not shown); standard output 0 bytes, exit 1 (code) |
 | SC | `stock` | `in/stock-input.txt` | Cancel | Q1 (not shown); standard output 0 bytes, exit 1 (code) |
 | SY | `stock` | `in/stock-input.txt` | Yes | Q1 (not shown); standard output exactly `bridge-create-stock-item:<the arm's nonce>` and one LF, exit 0 (code) |
+| ST | `stock` | `in/stock-large-input.txt` | none | no answer file is ever written, so `box.ps1` clicks nothing; at least one `box-fit` line `fits=false`; standard output 0 bytes; exit 77 (code `box_fit.rs`) |
 
-**The one variable.** Each arm is one launch of the same exe with a fresh nonce; the stock arms differ only in the button `box.ps1` clicks. LN differs from the stock arms only in its mode and its input.
+**The one variable.** Each arm is one launch of the same exe with a fresh nonce; SN, SC and SY differ only in the button `box.ps1` clicks. LN differs from the stock arms only in its mode and its input. ST differs from SN only in its input's text, and in having no answer.
 
-**Order.** LN first: if the unchanged ledger box does not behave as lab 1780-K saw, the stock arms are not run (STOP-CONTROL). Then SN, SC, SY. SY last, so that the one arm whose box prints a token comes after both refusals are on file.
+**Order.** LN first: if the unchanged ledger box does not behave as lab 1780-K saw, the stock arms are not run (STOP-CONTROL). Then SN, SC, SY, so that the one arm whose box prints a token comes after both refusals are on file. ST last: it is the one arm whose box is meant never to be answered, so a box it leaves up (STOP-UNANSWERED, B4) holds up no other arm.
 
 ## What the code says
 
 All at 48a64965.
 
 - **The argument.** `bridge_mcp.exe` with exactly one argument `--confirm-stock-item` runs `run_stock_item_confirmation`, and with `--confirm-masters` runs `run_masters_confirmation`; exit 0 when the dialog confirmed, else 1 (code `src-tauri/src/lib.rs:112-126`, `src-tauri/src/bin/bridge_mcp.rs`). With any second argument the exe starts as the server, so `startc.ps1` passes the one argument alone.
-- **The input.** The child reads at most 8,064 bytes of standard input (code `src-tauri/src/tally/approved_import.rs:3243-3269`), splits a nonce line, a count line and the text shown (`dialog_input`, :3273-3283): the nonce must be a UUID, the count canonical, the text non-empty, without NUL and at most 8,000 bytes (`MAX_PREVIEW_BYTES`, :14). An input refused there shows no box and exits 1 with nothing printed, the same as a No; so every arm needs `box.ps1`'s `BOX SEEN` and `CLICKED` lines and a `fits=true` line to count.
+- **The input.** The child reads at most 8,064 bytes of standard input (code `src-tauri/src/tally/approved_import.rs:3243-3269`), splits a nonce line, a count line and the text shown (`dialog_input`, :3273-3283): the nonce must be a UUID, the count canonical, the text non-empty, without NUL and at most 8,000 bytes (`MAX_PREVIEW_BYTES`, :14). An input refused there shows no box and exits 1 with nothing printed, the same as a No; so every answered arm needs `box.ps1`'s `BOX SEEN` and `CLICKED` lines and a `fits=true` line to count.
 - **The text shown.** The parent passes the child the whole text the box shows, answer lines first (`confirm_stock_item_dialog`, :3050-3054, through `displayed_text`, :2904); the child shows it as given (`show_create_stock_item`, :3884-3921). On Windows the answer lines are `answer_text` (:2764-2770) wrapped at 100 characters (:2792, :2798-2816) from the stock item's answer words (:2755-2758).
 - **The box.** `MessageBoxW` with `MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST | MB_SYSTEMMODAL`, owned by a hidden topmost window, inside `box_fit::guarded`; the title is `stock_item_words` (:99-104, `STOCK_ITEM_TITLE` :91); only `IDYES` is a confirmation (:3884-3921). The ledger box is the same call with its own title (`show_create_ledger`, :3820-3858; `MASTERS_TITLE` :60).
 - **The token.** Only a confirmation writes `dialog_token`: the prefix, the nonce and `\n` (:3154, :3243-3269). The stock prefix is `bridge-create-stock-item:` (:88), the ledger prefix `bridge-create-ledger:` (:57).
 - **The fit.** The child makes itself per-monitor DPI aware; at each activation of the box it measures the box's outer rectangle against the work area of the monitor nearest it and writes one line `box-fit: box=(l,t,r,b) work=(l,t,r,b) fits=true|false` to its error output; a box not wholly inside is cancelled and the child exits 77 (code `src-tauri/src/tally/box_fit.rs:38`, :530-575). A box that could not be measured or shown exits 0 with nothing printed (unavailable).
+- **Too large.** The hook posts a Cancel to a box not wholly inside the work area (`box_fit.rs:572-580`) and remembers it as not fitting; `guarded` then exits 77 whatever the box's result (`outcome`, :105-112; `guarded`, :127-162), so `answer_with_token` never writes a token. A box that cannot be measured writes `box-fit: not readable fits=false` (:549) and counts as not fitting. A box never measured, or not shown, exits 0 with nothing printed (unavailable, :97-99, :136-140, :161).
 - **No timeout here.** The 120 s limit and the nonce check belong to the parent (`nonce_bound_dialog`, :3104-3150). This row starts the child alone, so an unanswered box stays up until something answers it (STOP-UNANSWERED, below).
 
 ## The build
@@ -58,7 +61,7 @@ All at 48a64965.
 
 ## Shell
 
-Every command is typed in **Git Bash**, from `/c/bridge-lab/1381-bx`, exactly as written: each line begins `cd /c/bridge-lab/1381-bx && ` and depends on no shell variable set by an earlier line. The four arm start lines are not typed at the prompt: each is started whole as a background run of the operator's own shell tool. The interpreter is `python` (3.10) with `-I -X utf8`; `python3` is the Store alias and is never used. Every helper's output goes to a file under `local/evidence/` with its exit code, then is printed whole. A line that begins `#` is an instruction, not typed. A wait for a file is a loop of the line given, typed about every 5 s, at most the number of times the step names. `arm.py` starts Windows PowerShell 5.1 itself, hidden, for `screen.ps1`, `box.ps1`, `startc.ps1` and `boxstate.ps1`; step 0 also starts it for `screen.ps1` and the parse check.
+Every command is typed in **Git Bash**, from `/c/bridge-lab/1381-bx`, exactly as written: each line begins `cd /c/bridge-lab/1381-bx && ` and depends on no shell variable set by an earlier line. The five arm start lines are not typed at the prompt: each is started whole as a background run of the operator's own shell tool. The interpreter is `python` (3.10) with `-I -X utf8`; `python3` is the Store alias and is never used. Every helper's output goes to a file under `local/evidence/` with its exit code, then is printed whole. A line that begins `#` is an instruction, not typed. A wait for a file is a loop of the line given, typed about every 5 s, at most the number of times the step names. `arm.py` starts Windows PowerShell 5.1 itself, hidden, for `screen.ps1`, `box.ps1`, `startc.ps1` and `boxstate.ps1`; step 0 also starts it for `screen.ps1` and the parse check.
 
 ## The input
 
@@ -68,7 +71,11 @@ Every command is typed in **Git Bash**, from `/c/bridge-lab/1381-bx`, exactly as
 - **To make it again** on a checkout at 48a64965, from `src-tauri`: on Windows, `BRIDGE_STOCK_BOX_INPUT=<new file> cargo test --lib -- --ignored --exact agent::agent_import::master_review::tests::write_the_stock_item_box_input` writes these 1,494 bytes directly (`cmp` against `in/stock-input.txt` must be silent); on any other system the same test writes the Mac text, and `python -I -X utf8 geninput.py write <test file> <that output> <new file>` writes these bytes.
 - **At the sitting** step 0 runs `geninput.py check` against the test file from the lab's clone at 48a64965; `arm.py` then writes each stock arm's `local/run/<arm>-in.txt`: a fresh nonce (uuid4) in place of the first line and every byte after it unchanged (it checks), with its sha256 in `local/run/<arm>-in.sha256`.
 
-**`in/ledger-input.txt`: 476 bytes, sha256 `833ac1daa719973158f538a3599212b8da573ebea4f403dc82d235f6a4328377`**, byte-equal to the input lab 1780-K opened this ledger box with (`lab/1780-ledger-box-keyboard`, `requests/confirm-masters-input.txt`, blob 13be3bbb). Its text is synthetic (no real company) and ends with one LF; LN feeds it with a fresh first line, as above. It is a control on the unchanged ledger box, not a text the code makes at this commit; the ledger box shows whatever text it is given.
+**`in/ledger-input.txt`: 475 bytes, 13 LF, none at the end, sha256 `1ba480b8329af9375cab7fc416bff8776db5b1dbcd0d4cdffa5dfeec0dc00514`**: the input lab 1780-K opened this ledger box with (`lab/1780-ledger-box-keyboard`, `requests/confirm-masters-input.txt`, blob 13be3bbb, 476 bytes) without its last byte, the LF after its last line, so that every input of the row has the shape the product's own writer gives `in/stock-input.txt`: no line feed at the end. `geninput.py ledger` checks the derivation from the blob's own bytes (it hashes them as git does), at step 0 when the lab's clone holds the blob. Its text is synthetic (no real company); LN feeds it with a fresh first line, as above. It is a control on the unchanged ledger box, not a text the code makes at this commit; the ledger box shows whatever text it is given.
+
+**`in/stock-large-input.txt`, the too-large input: 2,568 bytes, 124 LF, none at the end, sha256 `4190800dbcfae8ea25410ef5fcbbcd9f6ca17849fb6b074b5fb4ecfcc7b3e2e7`.** The same 39-byte header, then the Windows stock answer's two lines (the same literal as above), a blank line, and 120 numbered synthetic lines `Lab line 001 of 120` to `Lab line 120 of 120`: 123 lines, 2,529 bytes, none typed. `geninput.py large-write` made it and `large-check` checks it: the line count, and the child's limits read from the code (not empty, no NUL, at most 8,000 bytes, code `approved_import.rs:14`, :3273-3283), all of which it meets, so the child shows it and does not refuse it as input.
+
+- **Why it cannot fit (estimate).** The basis is the lab measurement `box_fit.rs` records (code `src-tauri/src/tally/box_fit.rs:5-9`, at 1920x1080, 125%, work area 1030 high): 44 lines made a box 1,011 high, 48 lines 1,087, 60 lines 1,315. From 48 to 60 lines that is (1,315 - 1,087) / 12 = 19 px a line, and 1,011 - 44 x 19 = 175 px of title, icon and buttons. For 123 lines: 175 + 123 x 19 = 2,512 px, about 2.4 times the 1,030 px work area; any text past 44 lines of this kind already measured too tall. The estimate rests on that one recorded measurement and on these short lines not wrapping (each is 19 characters); a longer line would only add height.
 
 ## The box: read, guarded, checked, answered
 
@@ -79,6 +86,7 @@ All of it runs inside `arm.py`, started by the arm's one start line, so nothing 
 - **The guard.** At `WAITING`, `arm.py` passes only when: the box's process is the child `startc.ps1` started; `boxstate.ps1` on that process (into `local/box/<arm>-R1.txt`) exits 0 and holds exactly one `WINDOW` line named `[ComplyEaze Bridge…` with class `#32770`, `iconic=False`, `visible=True` and `topmost=True`; `box.ps1`'s rectangle of the box lies inside the work area `screen.ps1` read; the arm's button lies inside the box; and the box is first in the z-order. Its lines go to `local/box/<arm>-guard.txt`. Any miss: no check, no answer, nothing pressed (STOP-GUARD).
 - **The text check.** Only a passed guard starts `boxcheck.py`. It checks the title exactly, the class, the input's nonce and count, exactly three buttons Yes, No and Cancel, exactly one text child beginning `Press Y `, that text equal line for line to the arm's input after its two header lines, and the text and buttons inside the box with the buttons below the text. Every check passed: it writes the arm's answer to `local/box/<arm>.answer.tmp` and renames it to `local/box/<arm>.answer`; otherwise it writes none (STOP-CHECK). Its record is `local/box/<arm>-check.out`.
 - **The answer.** On the answer file `box.ps1` clicks that button at its centre by the mouse, logs `CLICKED <answer>` and whether the box is still visible. Without a valid answer file by 90 s after the box was seen it presses nothing and exits 6 (this row's change to `box.ps1`): the box stays up and the child keeps running (STOP-GUARD, STOP-CHECK or STOP-UNANSWERED, as `arm.py` names it). Nothing ends it (B4).
+- **ST, the arm with no answer.** `arm.py` runs no guard and no check for ST and writes no answer file, whatever the box shows (`check_sheet.py` holds that line), so `box.ps1` never clicks. EXPECT `box.ps1` to end with exit 3 (no box seen within 30 s, the child having cancelled it first) or 4 (seen, then gone before any click); `arm.py` then waits for `EXITED` and grades. **Deciding**: no `CLICKED` line; exit 77; standard output 0 bytes; the error output only `box-fit:` lines, at least one with `fits=false`. **Recorded**: W6 whether `box.ps1` saw a box at all (`BOX SEEN`), and W4. Exit 0 with nothing printed is recorded as `UNAVAILABLE`: too large refused, but not by the fit guard, and Q4 is not answered yes. `box.ps1` exit 6 means a box still up at 90 s: STOP-UNANSWERED, the box left up (B4).
 - **The grade.** After a click `arm.py` waits up to 60 s for `startc.ps1`'s `EXITED` line and grades from the files, into `local/evidence/<arm>-arm.txt`. **Deciding**: `CLICKED` once with the arm's answer; the box gone after it; the exit code (0 for Yes, 1 for No and Cancel); the standard output (exactly the token for the arm's nonce and one LF for Yes, 0 bytes otherwise); the error output only `box-fit:` lines, at least one, each `fits=true`. **Recorded, not deciding**: W1 the box not minimised and W2 in front at the first read; W3 the keyboard focus on No in the box's process (No is the default button); W4 each `box-fit` work area equal to `screen.ps1`'s; W5 the first `box-fit` box equal to `box.ps1`'s rectangle. `ARM <arm> AS THE CODE SAYS` and exit 0 only when every deciding line passed.
 - **By eye.** After the arm, with no `bridge_mcp.exe` running, the operator opens `local/box/<arm>-open.png` (`box.ps1`'s copy, kept on the lab PC) and records whether every text line is wholly visible, none cut at the box's edge, with no scroll bar (not shown).
 
@@ -92,7 +100,10 @@ Byte-equal to earlier rows' files (git blob ids):
 
 - `.gitattributes`: blob 79cd6402, as rows 2569-S (`lab/2569-s` at cd80f722) and 2162-PA (`lab/2162-pa` at f682a6aa).
 - `boxstate.ps1`: blob c3d6b747, row 2569-S's reader (cd80f722), also row 2162-PA's.
-- `in/ledger-input.txt`: blob 13be3bbb, row 1780-K's input (`lab/1780-ledger-box-keyboard` at 1f273633).
+
+Derived from an earlier row's file:
+
+- `in/ledger-input.txt`: row 1780-K's input (`lab/1780-ledger-box-keyboard` at 1f273633, blob 13be3bbb) without its last byte, the final LF (The input; `geninput.py ledger` checks it).
 
 Changed copies, each change marked `1381-BX` in the file:
 
@@ -101,11 +112,12 @@ Changed copies, each change marked `1381-BX` in the file:
 
 Written for this row, in the shape of row 2162-PA's files where named:
 
-- `arm.py` (shape of `pa.py`): one arm from its start line to its grade; `--selftest` grades 21 synthetic cases.
+- `arm.py` (shape of `pa.py`): one arm from its start line to its grade; `--selftest` grades 30 synthetic cases.
 - `boxcheck.py` and `selftest-box.py` (shape of 2162-PA's): the whole-text check, for both titles and all three answers; 26 synthetic cases, and `replay` on a real arm's log.
 - `check_sheet.py` (shape of 2162-PA's): the manifest, references, arms, start lines and held lines.
 - `build.py` and `BUILD.txt`: the build, checked, staged and restored; `--selftest` 17 cases.
-- `geninput.py`: the stock input, made and checked from the code (The input).
+- `geninput.py`: the two stock inputs, made and checked from the code, and the ledger input's derivation checked (The input).
+- `in/stock-input.txt` and `in/stock-large-input.txt`: made by `geninput.py` (The input).
 - `screen.ps1`: the display facts, read-only.
 - `LAB-COMMON-BX.md`: the row's rules. `SHA256.txt`: every other file's sha256, bytes and path.
 
@@ -120,16 +132,17 @@ cd /c/bridge-lab/1381-bx && python -I -X utf8 arm.py --selftest > local/evidence
 cd /c/bridge-lab/1381-bx && python -I -X utf8 build.py --selftest > local/evidence/selfcheck-build.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-build.txt; tail -n 2 local/evidence/selfcheck-build.txt
 cd /c/bridge-lab/1381-bx && python -I -X utf8 selftest-box.py cases C:/bridge-lab/1381-bx > local/evidence/selfcheck-box.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-box.txt; tail -n 3 local/evidence/selfcheck-box.txt
 cd /c/bridge-lab/1381-bx && python -I -X utf8 geninput.py check local/gen/agent_master_review_tests.rs in/stock-input.txt > local/evidence/selfcheck-input.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-input.txt; cat local/evidence/selfcheck-input.txt
+cd /c/bridge-lab/1381-bx && python -I -X utf8 geninput.py large-check local/gen/agent_master_review_tests.rs in/stock-large-input.txt > local/evidence/selfcheck-large.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-large.txt; cat local/evidence/selfcheck-large.txt
 cd /c/bridge-lab/1381-bx && python -I -c "import ast,sys;[ast.parse(open(f, encoding='utf-8').read()) for f in sys.argv[1:]]" *.py > local/evidence/selfcheck-parse.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-parse.txt; cat local/evidence/selfcheck-parse.txt
 cd /c/bridge-lab/1381-bx && powershell -NoProfile -Command 'foreach ($f in (Get-Item box.ps1, boxstate.ps1, startc.ps1, screen.ps1)) { $e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$e); Write-Output $f.Name, $e.Count }' > local/evidence/selfcheck-ps-parse.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-ps-parse.txt; cat local/evidence/selfcheck-ps-parse.txt
 cd /c/bridge-lab/1381-bx && python -I -X utf8 check_sheet.py > local/evidence/selfcheck-sheet.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-sheet.txt; cat local/evidence/selfcheck-sheet.txt
 ```
 
-EXPECT, in order: `21 cases, 21 right`, exit 0; `17 cases, 17 right`, exit 0; `26 cases ran, 26 right`, `ALL CASES RIGHT`, exit 0; three `PASS` lines and `EQUAL 1494 bytes, 33 LF, none at the end, sha256 c94ecf5c…`, exit 0; exit 0 alone; each of the four names followed by `0`, exit 0; three `OK` lines, exit 0. Any other: STOP-SELFCHECK.
+EXPECT, in order: `30 cases, 30 right`, exit 0; `17 cases, 17 right`, exit 0; `26 cases ran, 26 right`, `ALL CASES RIGHT`, exit 0; three `PASS` lines and `EQUAL 1494 bytes, 33 LF, none at the end, sha256 c94ecf5c…`, exit 0; four `PASS` lines and `EQUAL 2568 bytes, 124 LF, none at the end, sha256 4190800d…`, exit 0; exit 0 alone; each of the four names followed by `0`, exit 0; three `OK` lines, exit 0. Any other: STOP-SELFCHECK.
 
 ## Steps
 
-**Prompt rule.** No dialog is expected but the four boxes, and each is handled by `arm.py` alone. Any other dialog or message on the screen (a licence dialog above all, B1): copy its text, press no key, STOP-DIALOG. Never end a process (B4).
+**Prompt rule.** No dialog is expected but the five boxes, and each is handled by `arm.py` alone. Any other dialog or message on the screen (a licence dialog above all, B1): copy its text, press no key, STOP-DIALOG. Never end a process (B4).
 
 0. **Before the sitting.**
    - Make the row folder and copy this sheet's folder into it byte for byte from the lab's Bridge clone. In every line of steps 0 and 1, replace `<CLONE>` with the Git Bash path of the lab's Bridge clone; in the second line below, replace `<SHEET>` with the 40-character commit of this branch the run coordinator's GO names (the commit that filled `BUILD.txt`).
@@ -148,7 +161,12 @@ EXPECT, in order: `21 cases, 21 right`, exit 0; `17 cases, 17 right`, exit 0; `2
      cd /c/bridge-lab/1381-bx && git -C <CLONE> show 48a6496507132576a6be150c155192f647528e1e:src-tauri/src/agent_master_review_tests.rs > local/gen/agent_master_review_tests.rs; echo "exit $?"
      cd /c/bridge-lab/1381-bx && B=$(sed -n 's/^BUILD COMMIT: \([0-9a-f]\{40\}\)$/\1/p' BUILD.txt) && git -C <CLONE> diff --stat 48a6496507132576a6be150c155192f647528e1e "$B" -- src-tauri/src/tally/approved_import.rs src-tauri/src/tally/box_fit.rs src-tauri/src/lib.rs src-tauri/src/bin src-tauri/src/agent_master_review_tests.rs > local/evidence/s0-fill-check.txt 2>&1; echo "exit $?" >> local/evidence/s0-fill-check.txt; cat local/evidence/s0-fill-check.txt
      ```
-   - Run all seven Self-checks. Any miss: STOP-SELFCHECK.
+   - Run all eight Self-checks. Any miss: STOP-SELFCHECK.
+   - The ledger input's derivation, from row 1780-K's blob if the lab's clone holds it. EXPECT the first line `exit 0`, then three `PASS` lines and `EQUAL 475 bytes, 13 LF, none at the end, sha256 1ba480b8…`, exit 0; any `FAIL`: STOP-SELFCHECK. If the first line's exit is not 0 (the blob is not in the clone), record that and skip the second line; it is no STOP, the derivation stands as The input states it and `arm.py` still checks the file's sha256 against `SHA256.txt`.
+     ```bash
+     cd /c/bridge-lab/1381-bx && git -C <CLONE> cat-file blob 13be3bbb59fa9221de69323c7fbac301ef7e8e06 > local/gen/ledger-1780k.txt; echo "exit $?"
+     cd /c/bridge-lab/1381-bx && python -I -X utf8 geninput.py ledger local/gen/ledger-1780k.txt in/ledger-input.txt > local/evidence/s0-ledger.txt 2>&1; echo "exit $?" >> local/evidence/s0-ledger.txt; cat local/evidence/s0-ledger.txt
+     ```
    - `BUILD.txt` filled. EXPECT `BUILD.txt: 0 field(s) to fill: filled`, exit 0. Exit 1: STOP-BUILD-UNFILLED.
      ```bash
      cd /c/bridge-lab/1381-bx && python -I -X utf8 build.py check > local/evidence/s0-build-check.txt 2>&1; echo "exit $?" >> local/evidence/s0-build-check.txt; cat local/evidence/s0-build-check.txt
@@ -181,7 +199,7 @@ EXPECT, in order: `21 cases, 21 right`, exit 0; `17 cases, 17 right`, exit 0; `2
      cd /c/bridge-lab/1381-bx && python -I -X utf8 build.py stage > local/evidence/s1-stage.txt 2>&1; echo "exit $?" >> local/evidence/s1-stage.txt; cat local/evidence/s1-stage.txt; cat local/evidence/copies.txt
      ```
 2. **The arms.** Each arm: its start line as a background run; the wait; then its after-lines. Nobody at the PC and no screen-tool act from the start line to `arm exit` (B2).
-   - **After every arm**, typed with `<arm>` replaced by the arm's name and `<mode> <answer>` by its table row (`masters No`, `stock No`, `stock Cancel`, `stock Yes`):
+   - **After every arm**, typed with `<arm>` replaced by the arm's name and `<mode> <answer>` by its table row (`masters No`, `stock No`, `stock Cancel`, `stock Yes`); after ST the replay line is not typed (no check ran):
      ```bash
      cd /c/bridge-lab/1381-bx && cat local/evidence/<arm>-out.txt
      cd /c/bridge-lab/1381-bx && python -I -X utf8 selftest-box.py replay C:/bridge-lab/1381-bx <arm> <mode> <answer> > local/evidence/<arm>-replay.txt 2>&1; echo "exit $?" >> local/evidence/<arm>-replay.txt; cat local/evidence/<arm>-replay.txt
@@ -210,8 +228,13 @@ EXPECT, in order: `21 cases, 21 right`, exit 0; `17 cases, 17 right`, exit 0; `2
      ( cd /c/bridge-lab/1381-bx && if [ -e local/evidence/SY-out.txt ]; then echo "STOP: local/evidence/SY-out.txt exists"; else python -I -X utf8 arm.py SY < /dev/null > local/evidence/SY-out.txt 2>&1; echo "arm exit $?" >> local/evidence/SY-out.txt; fi )
      ```
      The token printed is the arm's own: it approves nothing, since no parent is waiting for it.
+   - **ST: the stock box too tall to fit, never answered.** Start:
+     ```bash
+     ( cd /c/bridge-lab/1381-bx && if [ -e local/evidence/ST-out.txt ]; then echo "STOP: local/evidence/ST-out.txt exists"; else python -I -X utf8 arm.py ST < /dev/null > local/evidence/ST-out.txt 2>&1; echo "arm exit $?" >> local/evidence/ST-out.txt; fi )
+     ```
+     EXPECT as the table. The by-eye read applies only if `box.ps1` saw the box (W6) and kept a copy `local/box/ST-open.png`; it then records how much of the box lay off the screen.
 3. **Close.**
-   - Only on the run coordinator's RESTORE word: put row 2569-R's exe back. EXPECT `RESTORED: …`, exit 0, and `copies.txt` with five lines. Without the word the row's exe stays on GRANTED PATH and the aside exe in `local/aside/`, both recorded.
+   - The GO says whether to restore. Only if it says RESTORE: put row 2569-R's exe back. EXPECT `RESTORED: …`, exit 0, and `copies.txt` with five lines. If it does not, the row's exe stays on GRANTED PATH and the aside exe in `local/aside/`, both recorded.
      ```bash
      cd /c/bridge-lab/1381-bx && python -I -X utf8 build.py restore > local/evidence/s3-restore.txt 2>&1; echo "exit $?" >> local/evidence/s3-restore.txt; cat local/evidence/s3-restore.txt; cat local/evidence/copies.txt
      ```
@@ -225,25 +248,25 @@ EXPECT, in order: `21 cases, 21 right`, exit 0; `17 cases, 17 right`, exit 0; `2
 
 ## Record
 
-For each arm: `local/evidence/<arm>-out.txt` (the whole of `arm.py`'s report), `<arm>-arm.txt`, `<arm>-replay.txt`; the box log, guard, R1 read and check (`local/box/`); the input fed and its hash, the screen read, `startc.ps1`'s lines, the child's standard output (`<arm>-out.bin`, its bytes) and error output (`local/run/`); the by-eye line. For the sitting: step 0's files, `copies.txt`, `s3-listing.txt`, the notes. Screen copies and screenshots stay on the lab PC, listed by name, size and sha256 (B8). The evidence branch carries `local/evidence/`, `local/box/` without its `.png` files, and `local/run/`.
+For each arm: `local/evidence/<arm>-out.txt` (the whole of `arm.py`'s report), `<arm>-arm.txt`, `<arm>-replay.txt` (none for ST); the box log, guard, R1 read and check (`local/box/`); the input fed and its hash, the screen read, `startc.ps1`'s lines, the child's standard output (`<arm>-out.bin`, its bytes) and error output (`local/run/`); the by-eye line. For the sitting: step 0's files, `copies.txt`, `s3-listing.txt`, the notes. Screen copies and screenshots stay on the lab PC, listed by name, size and sha256 (B8). The evidence branch carries `local/evidence/`, `local/box/` without its `.png` files, and `local/run/`.
 
 ## Decides
 
-- **Q1** by SN, SC and SY: `boxcheck.py`'s `ALL PASS` and the replay's `REPLAY ALL PASS` on each (title, three buttons, the text line for line), the guard (inside the work area, topmost, first in the z-order), each `fits=true`, and the by-eye read (no line cut); its "No the default" part by W3, read on each stock arm. A miss on any stock arm answers Q1 no, with the line that missed.
+- **Q1** by SN, SC and SY: `boxcheck.py`'s `ALL PASS` and the replay's `REPLAY ALL PASS` on each (title, three buttons, the text line for line), the guard (inside the work area, topmost, first in the z-order), each `fits=true`, and the by-eye read (no line cut); its "No the default" part by W3, read on each of the three. A miss on any of the three answers Q1 no, with the line that missed.
 - **Q2** by SN and SC (0 bytes, exit 1) and SY (the token for its nonce and one LF, exit 0): the deciding lines of `<arm>-arm.txt`.
 - **Q3** by LN: its deciding lines, against lab 1780-K's box and outcome; W5 compared with lab 1780-K's rectangle is recorded.
+- **Q4** by ST: its deciding lines (no click, exit 77, 0 bytes, `fits=false`). `UNAVAILABLE` answers that too large is refused, but not by the fit guard; Q4 is then open. W6 is recorded.
 - Every W line is recorded with its arm and stops no arm; W3 is the one that answers part of a question (Q1).
 
 ## Not covered
 
-- **Too large.** No arm makes the box not fit: that needs a smaller work area or a larger scale, and on this lab both are display settings a person changes. So exit 77 (the child's no-fit end) is not observed here; the code is cited only. A review's plan asked that a stock box that cannot be measured whole end as `master_review_too_large`: at 48a64965 that string is the ledger review's (code `src-tauri/src/agent_master_review.rs:48`); the stock parent maps a no-fit exit to `StockItemDialogRefusal::TooLarge` (code `src-tauri/src/tally/approved_import.rs:3074`), and the one caller of the stock dialog, `confirm_stock_item_draft`, is reached from tests only at this commit (code `src-tauri/src/agent_master_review.rs:349-358`, `#[cfg_attr(not(test), allow(dead_code))]`), so no answer string exists yet to measure.
+- **Too large, other ways.** ST makes the box too tall by its text alone, at the lab's one display. A box too wide, a smaller work area, a larger scale and the parent's reading of exit 77 are not run. The parent maps that exit to `StockItemDialogRefusal::TooLarge` (code `src-tauri/src/tally/approved_import.rs:3074`). A review's plan asked that such a box end as `master_review_too_large`: at 48a64965 that string is the ledger review's (code `src-tauri/src/agent_master_review.rs:48`), and the one caller of the stock dialog, `confirm_stock_item_draft`, is reached from tests only (code `src-tauri/src/agent_master_review.rs:349-358`, `#[cfg_attr(not(test), allow(dead_code))]`), so no answer string exists yet to measure.
 - **The parent.** The server path (the nonce check, the 120 s limit, the refusal on a wrong token) is not run: no tool reaches the stock dialog at this commit (above).
 - **Other displays.** One monitor at the lab's one scale. No second monitor, no other scale, no taskbar position, no smaller work area.
 - **Other ways to answer.** Only the Yes, No and Cancel buttons by the mouse. Not the Y and N keys the answer lines name, not Escape, not the close box.
 - **Between the guard and the click.** `box.ps1` clicks the button's centre without reading the box again; that nothing covers it in those seconds rests on B2 (nobody at the PC), not on a check.
 - **macOS.** The Mac alert is another arm on another machine, not this row.
-- **The trailing line break of the ledger input.** No earlier box log holds a text ending in a line break, so whether `box.ps1` reads LN's final LF back is not shown; a miss there stops LN at STOP-CHECK with the box up (B4), and is a finding about the reader, not the box.
 
 ## Close and evidence
 
-Step 3 leaves no box and no `bridge_mcp.exe`, Tally as found, and GRANTED PATH as the run coordinator's word says. Report to the run coordinator: each arm's `ARM` line and exit, every FAIL line, the W lines, the display facts, and any STOP with its name and files. The evidence branch is pushed only after the pre-push scan and the run coordinator's yes (B8).
+Step 3 leaves no box and no `bridge_mcp.exe`, Tally as found, and GRANTED PATH as the GO says. Report to the run coordinator: each arm's `ARM` line and exit, every FAIL line, the W lines, the display facts, and any STOP with its name and files. The evidence branch is pushed only after the pre-push scan and the run coordinator's yes (B8).

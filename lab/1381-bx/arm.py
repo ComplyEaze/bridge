@@ -20,16 +20,22 @@
 #   5. After box.ps1 has clicked, waits up to 60 s for startc.ps1's EXITED line, then grades the child's standard output,
 #      exit code and error output from the files (grade(), below). With no click (box.ps1 exit other than 0) it does not
 #      wait: the box is left up, the child running, and the arm is STOP-UNANSWERED.
-# Usage: python -I -X utf8 arm.py <LN|SN|SC|SY>      python -I -X utf8 arm.py --selftest   (grade() only; any OS)
+#   ST, the too-large arm, has no answer: no guard, no check, no answer file is ever written for it, so box.ps1 never
+#      clicks. The child is expected to cancel its own box (box_fit.rs) and exit 77; box.ps1 then ends with exit 3 (no
+#      box seen) or 4 (the box gone before any click), after which arm.py waits for EXITED and grades with grade_st().
+#      box.ps1 exit 6 (a box still up at 90 s) is STOP-UNANSWERED, the box left up.
+# Usage: python -I -X utf8 arm.py <LN|SN|SC|SY|ST>   python -I -X utf8 arm.py --selftest   (the grading only; any OS)
 # Exit 0: every deciding line as the code says (the W lines are recorded, not deciding); 1: anything else that was read (a named STOP or a FAIL to record);
 # 2: a failed read of this helper's own inputs (BUILD.txt, the exe, an input, a name already used).
 import hashlib, importlib.util, os, re, subprocess, sys, threading, time, uuid
 R = os.path.dirname(os.path.abspath(__file__)).replace('\\', '/')  # the row folder: C:/bridge-lab/1381-bx at the sitting
 L = R + '/local'; BOX, RUN, EV = L + '/box', L + '/run', L + '/evidence'
 ARMS = {'LN': ('masters', 'No', 'in/ledger-input.txt'), 'SN': ('stock', 'No', 'in/stock-input.txt'),
-        'SC': ('stock', 'Cancel', 'in/stock-input.txt'), 'SY': ('stock', 'Yes', 'in/stock-input.txt')}
+        'SC': ('stock', 'Cancel', 'in/stock-input.txt'), 'SY': ('stock', 'Yes', 'in/stock-input.txt'),
+        'ST': ('stock', None, 'in/stock-large-input.txt')}
 PREFIX = {'stock': 'bridge-create-stock-item:', 'masters': 'bridge-create-ledger:'}  # approved_import.rs:88 and :57
 FIT = re.compile(r'box-fit: box=\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\) work=\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\) fits=(true|false)')
+NOTREAD = 'box-fit: not readable fits=false'  # box_fit.rs:549: an unmeasured box counts as not fitting
 NOWIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 
 
@@ -55,6 +61,22 @@ def grade(mode, ans, nonce, out, code, err, blog):
             ('every box-fit line says fits=true', bool(lines) and all(m is not None and m.group(9) == 'true' for m in fits))]
 
 
+def grade_st(out, code, err, blog):
+    """The deciding lines of ST. Code at 48a64965: the fit hook measures the box at its activation; a box not wholly inside
+    the work area is sent a Cancel (box_fit.rs:572-580) and remembered as not fitting; guarded() then exits 77 whatever
+    the box's result (:105-112, :158-161), before answer_with_token can write a token. An unmeasured box writes
+    NOTREAD and counts as not fitting. A box never measured, or not shown, exits 0 with nothing printed (unavailable)."""
+    lines = err.splitlines()
+    ok_line = [l == NOTREAD or FIT.fullmatch(l) is not None for l in lines]
+    unfit = [l == NOTREAD or (FIT.fullmatch(l) is not None and FIT.fullmatch(l).group(9) == 'false') for l in lines]
+    clicked = re.findall(r'^\S+Z CLICKED (\S+) at ', blog, re.M)
+    return [(f'box.ps1 clicked nothing (clicked {clicked})', clicked == []),
+            (f'exit code 77, the fit guard\'s (read {code})', code == 77),
+            (f'standard output empty ({len(out)} bytes read)', out == b''),
+            (f'error output: only box-fit lines, at least one ({len(lines)} line(s))', bool(lines) and all(ok_line)),
+            ('at least one box-fit line says fits=false', any(unfit))]
+
+
 def cross(err, work, rect):
     """Recorded, not deciding: the child's own box-fit numbers against screen.ps1's work area and box.ps1's rectangle
     (all physical pixels). The child measures at activation (box_fit.rs on_activate), box.ps1 after the box is seen."""
@@ -71,6 +93,7 @@ def selftest():
               "2026-11-26T10:00:06.000Z after click: box visible False; foreground x\r\n")
     fit = 'box-fit: box=(688,162,1252,945) work=(0,0,1920,1030) fits=true\n'
     work, rect = (0, 0, 1920, 1030), (688, 162, 1252, 945)
+    unfit = 'box-fit: box=(688,0,1252,2512) work=(0,0,1920,1030) fits=false\n'
     tok = ('bridge-create-stock-item:' + n0 + '\n').encode()
     lg = lambda a: ok_log.format(a=a)
     cases = [  # (name, function, args, every line right?)
@@ -95,13 +118,22 @@ def selftest():
         ('cross: a work area other than screen.ps1\'s', cross, (fit, (0, 0, 1920, 1040), rect), False),
         ('cross: a box rectangle other than box.ps1\'s', cross, (fit, work, (688, 160, 1252, 945)), False),
         ('cross: no box-fit line', cross, ('', work, rect), False),
+        ('ST: refused by the fit guard, exit 77', grade_st, (b'', 77, unfit, ''), True),
+        ('ST: refused, the box not readable', grade_st, (b'', 77, NOTREAD + '\n', ''), True),
+        ('ST: seen not to fit, then measured again', grade_st, (b'', 77, unfit + fit, ''), True),
+        ('ST: exit 0, nothing printed (unavailable)', grade_st, (b'', 0, '', ''), False),
+        ('ST: exit 77 with every line fits=true', grade_st, (b'', 77, fit, ''), False),
+        ('ST: a click logged', grade_st, (b'', 77, unfit, lg('No')), False),
+        ('ST: a token printed', grade_st, (tok, 77, unfit, ''), False),
+        ('ST: no box-fit line', grade_st, (b'', 77, '', ''), False),
+        ('ST: exit 1', grade_st, (b'', 1, unfit, ''), False),
     ]
     right = 0
     for name, fn, args, want in cases:
         g = fn(*args); got = all(ok for _, ok in g); right += got == want
         print(f'{name}: expected {"all right" if want else "a line wrong"}, got {"all right" if got else "a line wrong"} '
               f'{"OK" if got == want else "WRONG"}')
-    print(f'{len(cases)} cases, {right} right'); return 0 if right == len(cases) == 21 else 1
+    print(f'{len(cases)} cases, {right} right'); return 0 if right == len(cases) == 30 else 1
 
 
 def fail(why): print('FAILED READ:', why, flush=True); sys.exit(2)
@@ -211,8 +243,11 @@ def main(tag):
                            stdout=subprocess.DEVNULL, stderr=open(f'{BOX}/{tag}-check.err', 'w'))
         guard['check'] = c.returncode
         g.append(f'{utc()} boxcheck.py exit {c.returncode}')
-    th = threading.Thread(target=run_guard); th.start()
-    th.join(); box.wait()
+    if ans is None:  # ST: no guard, no check, no answer file, whatever the box shows
+        guard['lines'].append(f'{utc()} {tag}: no guard, no check and no answer file for this arm; box.ps1 clicks nothing')
+    else:
+        th = threading.Thread(target=run_guard); th.start(); th.join()
+    box.wait()
     open(f'{BOX}/{tag}-guard.txt', 'x', encoding='utf-8', newline='\n').write('\n'.join(guard['lines']) + '\n')
     blog = open(f'{BOX}/{tag}-box.txt', encoding='utf-8-sig').read() if os.path.exists(f'{BOX}/{tag}-box.txt') else ''
     stamped = [l[:220] for l in blog.splitlines() if re.match(r'^\d{4}-\d\d-\d\dT\S+Z ', l) and ' child Static ' not in l]
@@ -221,7 +256,7 @@ def main(tag):
     if guard['check'] is not None and os.path.exists(f'{BOX}/{tag}-check.out'):
         report += [f'--- check (exit {guard["check"]})'] + open(f'{BOX}/{tag}-check.out', encoding='utf-8').read().splitlines()
     code = None
-    if box.returncode == 0:
+    if box.returncode == 0 or (ans is None and box.returncode in (3, 4)):
         end = time.monotonic() + 60
         while time.monotonic() < end:
             m = re.search(r'^EXITED code=(\d+) ', open(f'{RUN}/{tag}-startc.txt', encoding='utf-8', errors='replace').read(), re.M)
@@ -234,17 +269,32 @@ def main(tag):
     else:
         stop = {3: 'STOP-NO-BOX: no box seen within 30 s', 4: 'STOP-BOX-GONE: the box went before any click',
                 5: 'STOP-NO-BUTTON: the answer\'s button was not found, nothing clicked',
-                6: ('STOP-GUARD' if not guard['ok'] else 'STOP-CHECK' if guard['check'] != 0 else 'STOP-UNANSWERED')
+                6: ('STOP-UNANSWERED' if ans is None else 'STOP-GUARD' if not guard['ok'] else 'STOP-CHECK' if guard['check'] != 0 else 'STOP-UNANSWERED')
                    + ': no answer file by 90 s, nothing clicked, the box left up'}.get(box.returncode, 'STOP-BOX-HELPER: box.ps1 failed')
         report.append(f'{stop} (box.ps1 exit {box.returncode}); nothing ends the child; startc.ps1 is not waited on')
     report += ['--- startc'] + open(f'{RUN}/{tag}-startc.txt', encoding='utf-8', errors='replace').read().splitlines()[:6]
-    if box.returncode != 0:
+    if box.returncode != 0 and not (ans is None and box.returncode in (3, 4)):
         open(f'{EV}/{tag}-arm.txt', 'x', encoding='utf-8', newline='\n').write('\n'.join(report) + '\n')
         print('\n'.join(report)); sys.exit(1)
     out = open(f'{RUN}/{tag}-out.bin', 'rb').read() if os.path.exists(f'{RUN}/{tag}-out.bin') else None
     err = open(f'{RUN}/{tag}-err.txt', encoding='utf-8', errors='replace').read() if os.path.exists(f'{RUN}/{tag}-err.txt') else None
     if out is None or err is None: fail('the child\'s output or error file is missing')
     rect = re.search(r'^\S+Z rect (-?\d+),(-?\d+),(-?\d+),(-?\d+) ', blog, re.M)
+    if ans is None:
+        g = grade_st(out, code, err, blog)
+        w = [(f'W6 box.ps1 saw a box (BOX SEEN; box.ps1 exit {box.returncode}: 3 none seen, 4 gone before any click)',
+              seen_pid(blog) is not None),
+             cross(err, work, None)[0]]
+        report += [f'--- graded (child standard output {len(out)} bytes; error output {len(err.splitlines())} line(s))']
+        report += [l[:220] for l in err.splitlines()[:6]]
+        if code == 0 and out == b'':
+            report.append('UNAVAILABLE: exit 0 with nothing printed: too large refused, but not by the fit guard')
+        report += ['deciding:'] + [('PASS ' if ok else 'FAIL ') + n for n, ok in g]
+        report += ['recorded, not deciding:'] + [('PASS ' if ok else 'FAIL ') + n for n, ok in w]
+        ok = all(x for _, x in g)
+        report.append(f'ARM {tag} ' + ('AS THE CODE SAYS' if ok else 'NOT AS EXPECTED: record every FAIL line'))
+        open(f'{EV}/{tag}-arm.txt', 'x', encoding='utf-8', newline='\n').write('\n'.join(report) + '\n')
+        print('\n'.join(report)); sys.exit(0 if ok else 1)
     g = grade(mode, ans, nonce, out, code, err, blog)
     r1 = open(f'{BOX}/{tag}-R1.txt', encoding='utf-8-sig').read() if os.path.exists(f'{BOX}/{tag}-R1.txt') else ''
     line = next((l for l in r1.splitlines() if l.startswith('WINDOW ') and ' class=#32770 ' in l), '')
@@ -271,5 +321,5 @@ def seen_pid(blog):
 
 if __name__ == '__main__':
     if sys.argv[1:] == ['--selftest']: sys.exit(selftest())
-    if len(sys.argv) != 2 or sys.argv[1] not in ARMS: print('usage: arm.py <LN|SN|SC|SY> | --selftest'); sys.exit(2)
+    if len(sys.argv) != 2 or sys.argv[1] not in ARMS: print('usage: arm.py <LN|SN|SC|SY|ST> | --selftest'); sys.exit(2)
     main(sys.argv[1])

@@ -6,8 +6,9 @@ and row path); not product code. Python 3.10, standard library only. Reads only;
 
   measure.py state
       M1 alone, before any other read is sent: exactly one COMPANY row, the book's GUID, ALTMSTID 210 and no
-      ALTVCHID element, the state the latest answers branch recorded (lab/1381-o-answers at cffe006d). Prints
-      `BOOK STATE MET` (exit 0) or `STOP-BOOK-STATE: <what differs>` (exit 1).
+      ALTVCHID element, the state rows 1381-O and 1108-R3 recorded (lab/1381-o-answers at cffe006d;
+      lab/1108-r3-equal-voucher-answers at a64e8036, the latest to load the book). Prints `BOOK STATE MET` (exit 0)
+      or `STOP-BOOK-STATE: <what differs>` (exit 1).
   measure.py all [FIXTURES]
       the ten answers: for each, bytes and sha256 and its transport verdict; C1 and C2: COMPANY rows, and
       NUMSTOCKITEMS as reported or why it is unavailable; I1 and I2: STOCKITEM rows, bound to the book, and whether

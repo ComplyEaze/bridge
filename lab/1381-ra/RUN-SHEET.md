@@ -58,11 +58,11 @@ Each carries `SVEXPORTFORMAT` `$$SysName:XML` and `SVCURRENTCOMPANY` `BRIDGE STO
 
 `BRIDGE STOCK CREATE LAB`, synthetic; its GUID `bac2b5e9…` is listed in master's `scripts/merge-gate-synthetic-uuids.json`. Its provenance is `src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/PROVENANCE.md`.
 
-- **Its state now (lab 1381-O, `lab/1381-o-answers` at cffe006d, its `RESULTS.md` and `lab/1381-o-answers/evidence/notes.txt`).** Restored on 19 Nov 2026 to the state row 1381-R1 left (BK0), and the restore checked: the marks, item, group and unit reads after it byte-equal to those before the writes. One stock item `SC Sibling Goods`, one group `SC Goods Group`, one unit `Nos`; master mark ALTMSTID 210; no ALTVCHID element (no voucher). Gateway period 1-Apr-25 to 31-Mar-26, current date Tuesday 1-Apr-2025. That row ran on TallyPrime 7.2 Silver (ProductVersion 1.1.7.2).
-- **Since then.** No later row on the lab branches loaded this book: row 1381-BX loaded no company (lab 1381-BX), and row 2162-PA loaded another book. So the EXPECT for M1 is the state above; `measure.py state` checks it (R1) before any other read.
+- **Its stock state (lab 1381-O, `lab/1381-o-answers` at cffe006d, its `RESULTS.md` and `lab/1381-o-answers/evidence/notes.txt`).** Restored on 19 Nov 2026, after that row's writes, to the state it held before them (BK0), and the restore checked: the marks, item, group and unit reads after it byte-equal to those before the writes. One stock item `SC Sibling Goods`, one group `SC Goods Group`, one unit `Nos`; master mark ALTMSTID 210; no ALTVCHID element (no voucher). Gateway period 1-Apr-25 to 31-Mar-26, current date Tuesday 1-Apr-2025. That row ran on TallyPrime 7.2 Silver (ProductVersion 1.1.7.2).
+- **The latest answers branch to load it** is row 1108-R3's (`lab/1108-r3-equal-voucher-answers` at a64e8036, its `RESULTS.md` and `lab/1108-r3-equal-voucher-answers/evidence/notes.txt`), later the same day, licensed (`education_mode` false). It opened at ALTMSTID 210 with no voucher, backed the book up (BK-S), restored another state for its own test and posted one voucher there, then restored BK-S; its closing marks, ledger and voucher reads were byte-equal to its opening ones (ALTMSTID 210, ALTVCHID absent, no voucher, current date Tuesday 1-Apr-2025). It read no stock item, group or unit. Every lab branch updated since 19 Nov was searched for the book's name: no other row loaded it (row 1381-BX's input names it only as text in a box, and that row loaded no company). So the EXPECT for M1 is the state above; `measure.py state` checks it (R1) before any other read, and ALTMSTID 210 says no master was created or altered since.
 - **The answers recorded for it** (lab 1381-O, `kept-local.txt`, byte-equal to the stock-create-lab captures on master): marks 3,318 B sha256 `ed6554bc…`, items 8,270 B `92508c8e…`, groups 4,170 B `b57cf4dc…`, units 4,040 B `cb9d6933…`. `measure.py all` compares M1, I1, G1 and U1 with these.
-- **The backup that restores it** (not used by this row, R5): `C:\lab\1381-o\backup-1\TDBK1800_<company number>.001`, 24,219 bytes, sha256 `d23f881a6bac8e1f9bf53035e7f21a72234f9f57c3672a965bc23a3dd76d44eb` (lab 1381-O, S2 and S6). A restore is a separate act, by v3 C6, only on the run coordinator's word.
-- **Earlier loads of the CMPINFO block.** Rows on this lab saw the CMPINFO count lines above the collection differ between loads while the rows stayed equal (lab 1381-O). They are not rows and are never counted (R6); a byte difference in a pair that sits only there is reported as "byte-equal no; rows equal yes".
+- **The backups that restore it** (not used by this row, R5), both taken at ALTMSTID 210 with no voucher, each restored once and its reads checked: BK-S, the latest, `C:\bridge-lab\1108r3\backups\bks\TDBK1800_<company number>.001`, 24,219 bytes, sha256 `ecc8d4028b88b763e5a8a22014bc699b07db68c3eb32cff3c6c92052b373b0f4` (lab 1108-R3, steps 2 and 9: marks, ledgers and vouchers checked); and `C:\lab\1381-o\backup-1\TDBK1800_<company number>.001`, 24,219 bytes, sha256 `d23f881a6bac8e1f9bf53035e7f21a72234f9f57c3672a965bc23a3dd76d44eb` (lab 1381-O, S2 and S6: marks, items, groups and units checked). A restore is a separate act, by v3 C6, only on the run coordinator's word.
+- **The CMPINFO block.** The protocol reference records CMPINFO counters above the collection as request-scoped, differing between captures whose rows did not, and lists the byte-stability of two sends of one export as unmeasured (`docs/tally/TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md`). They are not rows and are never counted (R6); a byte difference in a pair that sits only there is reported as "byte-equal no; rows equal yes".
 
 ## Order and the one variable
 
@@ -82,7 +82,7 @@ Byte-equal to earlier rows' files (git blob ids):
 
 Changed copies, each change named in the file's own header:
 
-- `send.py`: row 1381-R1's sender (`lab/1381-r1-answers` at 7bda13fc, `scripts/send.py`, blob 1efae5a3). The label names its request, so nothing outside the ten reads can be sent; the order is fixed and each label is sent once in the row's life; a failed send refuses every later one; C1 needs `local/evidence/m1-state.txt` to hold `BOOK STATE MET` and `exit 0`; the answer, its headers and its transport record are three files, so a failed request never reads as an empty answer; everything goes under `local/`. `--selftest` runs 23 synthetic cases.
+- `send.py`: row 1381-R1's sender (`lab/1381-r1-answers/scripts/send.py` at 7bda13fc, blob 1efae5a3). The label names its request, so nothing outside the ten reads can be sent; the order is fixed and each label is sent once in the row's life; a failed send refuses every later one; C1 needs `local/evidence/m1-state.txt` to hold `BOOK STATE MET` and `exit 0`; the answer, its headers and its transport record are three files, so a failed request never reads as an empty answer; everything goes under `local/`. `--selftest` runs 23 synthetic cases.
 - `measure.py`: row 1381-R1's reader (`check_r1.py` at c76e23d6, blob 774b684e: its forbidden-character pattern, parse and canonical rows), with this row's two commands `state` and `all`. `--selftest` runs 27 cases on master's committed captures, each negative case a capture with one edit.
 - `check_sheet.py`: row 1381-BX's (`lab/1381-bx-sheet` at 92f48553, blob 92c4cdd2) with this row's checks: the ten send lines once each in Steps and in order, the state line between M1 and C1, the compute line after M2, the five request files' structure, `send.py`'s order, address and C1 rule held, no client timeout, and no GUID-shaped text in the two rule files. `--fresh` and STOP-PYCACHE as row 1381-BX's.
 
@@ -134,7 +134,7 @@ EXPECT, in order: `5 pins equal; 5 book requests each a read with no date window
      cd /c/bridge-lab/1381-ra && netstat -ano > local/s0-netstat.txt 2>&1; echo "exit $?" >> local/s0-netstat.txt; grep -c LISTENING local/s0-netstat.txt; grep -E ':9001 .*LISTENING' local/s0-netstat.txt
      ```
    - **The screen.** One screen-tool screenshot of the whole Tally window, `local/shots/s0-window.png`. EXPECT Select Company with no company loaded, the title band `TallyPrime EDU`, no dialog. A company loaded: STOP-OTHER-COMPANY, shut nothing. Another title: STOP-EDITION. A dialog or half-entered screen: STOP-DIALOG.
-   - GET `/status`, the last act of step 0. EXPECT a first line `exit 0` in its file and the `-w` line `200 <bytes>` (lab 1381-R1 and 1381-O: `200 51`). Any other: STOP-TALLY.
+   - GET `/status`, the last act of step 0. EXPECT a first line `exit 0` in its file and the `-w` line `200 <bytes>` (lab 1381-R1, 1381-O and 1108-R3: `200 51`). Any other: STOP-TALLY.
      ```bash
      cd /c/bridge-lab/1381-ra && curl.exe -sS -w "%{http_code} %{size_download}\n" -D local/evidence/s0-status.headers.txt http://127.0.0.1:9001/status -o local/evidence/s0-status.txt > local/evidence/s0-status-curl.txt 2>&1; echo "exit $?" >> local/evidence/s0-status-curl.txt; cat local/evidence/s0-status-curl.txt
      ```
@@ -193,7 +193,7 @@ For each read: `local/answers/a-<label>.xml` (the answer exactly as received), `
 `measure.py all` prints, from the files alone, per label: bytes, sha256 and the transport verdict, or `NOT READ` with its reason (never zero rows). Then:
 
 - C1 and C2: the number of `COMPANY` rows, each row's GUID by its first 8 characters, and `NUMSTOCKITEMS` as `reported <n> (as received '<text>')` or `unavailable: absent`, `unavailable: empty` or `unavailable: not plain digits`. `COMPANYNUMBER` is never printed.
-- I1 and I2: the number of `STOCKITEM` rows, how many are bound to the book (GUID prefix and `BRIDGECOMPANYGUID`), and whether the count equals its pair's `NUMSTOCKITEMS` (I1 with C1, I2 with C2).
+- I1 and I2: the number of `STOCKITEM` rows, how many are bound to the book (GUID prefix and `BRIDGECOMPANYGUID`), and whether the count equals `NUMSTOCKITEMS`, each item read against each count read (four lines).
 - G1, G2, U1, U2: the number of `STOCKGROUP` and `UNIT` rows, and how many are bound to the book.
 - M1 and M2: ALTMSTID, and ALTVCHID or `absent`; equal or not.
 - Each pair: `byte-equal yes|no`, and if no, `rows equal yes|no` (rows compared as canonical XML: tag, attributes, trimmed text, children in order).
@@ -201,7 +201,7 @@ For each read: `local/answers/a-<label>.xml` (the answer exactly as received), `
 
 ## Decides
 
-- **Q1** by C1, C2, I1 and I2: one company row in each count read, `NUMSTOCKITEMS` reported, and each item count equal to its pair's. EXPECT (not shown) one row, `reported 1`, one item.
+- **Q1** by C1, C2, I1 and I2: one company row in each count read, `NUMSTOCKITEMS` reported, and each item count equal to each count read's. EXPECT (not shown) one row, `reported 1`, one item.
 - **Q2** by the four pair lines. A pair not byte-equal but rows equal answers "stable rows, unstable bytes", and the bytes that differ are named from the files; rows not equal answers Q2 no.
 - **Q3** by the M1 against M2 line.
 - **Q4** by the four lines against the recorded answers, and the title band and Gateway lines. Rows not equal for I1, G1 or U1 while M1 met the state is a finding for the run coordinator (the book's masters differ though its mark does not), not a STOP after the fact.
@@ -211,7 +211,7 @@ For each read: `local/answers/a-<label>.xml` (the answer exactly as received), `
 
 - **The scoping report's step 6.** A master changed between the bind and the aim, and a proposed name added by a person after the first candidate read: separate restored sittings with a change made in each, so this row's no-change sitting is their baseline, not their measurement.
 - **The scoping report's step 7.** A book with no stock item: the eleven-field candidate pair and the count pair on a book with zero rows. This book has one item.
-- **A licensed edition.** Every read here is in Educational Mode. Silver answers for M, I, G and U exist (lab 1381-O); no count read has been sent to this book in any edition, so Silver and Educational Mode are not compared for C.
+- **A licensed edition.** Every read here is in Educational Mode. Licensed answers for M, I, G and U exist (lab 1381-O); no count read has been sent to this book in any edition, so Silver and Educational Mode are not compared for C.
 - **A Bridge build.** No build runs; the product refuses these reads in Educational Mode (Educational Mode and dates), and nothing in the product sends the candidate read or the stock-only recheck yet.
 - **Other books, releases and sittings**, a second company loaded, a book above the candidate read's mark limit, and the Create through Bridge's own tools (row 1381-B).
 - **Transport failure.** A cut or failed answer is not made on purpose; if one happens it is recorded apart from the answer (R4), and framed-protocol cases belong to the simulator tests.

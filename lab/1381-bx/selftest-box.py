@@ -1,38 +1,46 @@
 # Lab helper (row 1381-BX, in the shape of row 2162-PA's selftest-box.py at lab/2162-pa-sheet-draft f682a6aa; not product
 # code): the self-test of this row's boxcheck.py. It runs boxcheck.py as written but for one line: its row folder R becomes
-# <row>/local/selftest, so its box folder is <row>/local/selftest/local/box and its input folder <row>/local/selftest/local/run.
-# Nothing is written outside <row>/local/selftest/; the row's own box logs and inputs are only read.
-#   cases <row>                       before any box of the sitting (step 0), and on any machine. No box of this build was
+# <scratch>, so its box folder is <scratch>/local/box and its input folder <scratch>/local/run. <scratch> is named on the
+# command line: at the sitting <row>/local/selftest, elsewhere a folder outside the repository (1381-BX: a scratch inside the
+# sheet folder but outside its local/ is refused, so a run never adds a file the sheet would carry). Nothing is written
+# outside <scratch>; the row's own box logs and inputs are only read.
+#   cases <row> <scratch>             before any box of the sitting (step 0), and on any machine. No box of this build was
 #                                     ever logged by box.ps1, so the logs are WRITTEN here in box.ps1's log form, holding the
 #                                     row's own two inputs (in/stock-input.txt and in/ledger-input.txt, a fresh nonce on the
 #                                     first line as arm.py writes it). One right box gives the arm's answer; each change
 #                                     alone gives no answer file. 26 cases; any other count or any case wrong prints A CASE
 #                                     IS WRONG and exits 1 (the row stops). They are no evidence of what a real box holds.
-#   replay <row> <tag> <mode> <ans>   after an arm: the check once more on that arm's real box log and input. EXPECT <ans>.
-#                                     Its answer file is written under local/selftest, where no box.ps1 reads it.
-# Usage: python -I -X utf8 selftest-box.py cases C:/bridge-lab/1381-bx     (forward slashes)
+#   replay <row> <scratch> <tag> <mode> <ans>   after an arm: the check once more on that arm's real box log and input. EXPECT <ans>.
+#                                     Its answer file is written under <scratch>, where no box.ps1 reads it.
+# Usage: python -I -X utf8 selftest-box.py cases C:/bridge-lab/1381-bx C:/bridge-lab/1381-bx/local/selftest   (forward slashes)
 import os, shutil, subprocess, sys, uuid
 R_LINE = "R = os.path.dirname(os.path.abspath(__file__)).replace('\\\\', '/')  # the row folder: C:/bridge-lab/1381-bx at the sitting"
-if sys.argv[1] == 'one':  # one case, in its own process, as boxcheck.py runs: one <row> <tag> <mode> <answer>
-    row = sys.argv[2]
+if sys.argv[1] == 'one':  # one case, in its own process, as boxcheck.py runs: one <row> <scratch> <tag> <mode> <answer>
+    row, scratch = sys.argv[2], sys.argv[3]
     src = open(f'{row}/boxcheck.py', encoding='utf-8').read()
     if src.count(R_LINE) != 1: sys.exit('HALT: boxcheck.py does not hold its R line once')
-    src = src.replace(R_LINE, f"R = '{row}/local/selftest'")
-    sys.argv = ['boxcheck.py'] + sys.argv[3:]
+    src = src.replace(R_LINE, f"R = '{scratch}'")
+    sys.argv = ['boxcheck.py'] + sys.argv[4:]
     exec(compile(src, 'boxcheck.py', 'exec'))
-mode, row = sys.argv[1], sys.argv[2]; T = f'{row}/local/selftest/local'; B, RUN = f'{T}/box', f'{T}/run'
+if len(sys.argv) < 4 or sys.argv[1] not in ('cases', 'replay'):
+    sys.exit('usage: selftest-box.py cases <row> <scratch> | replay <row> <scratch> <tag> <mode> <ans>')
+mode, row, scratch = sys.argv[1], sys.argv[2].rstrip('/'), sys.argv[3].rstrip('/')
+_r, _s = os.path.abspath(row).replace('\\', '/'), os.path.abspath(scratch).replace('\\', '/')
+if (_s + '/').startswith(_r + '/') and not _s.startswith(_r + '/local/'):  # 1381-BX
+    sys.exit(f'HALT: the scratch {scratch} is inside the sheet folder but not under its local/: nothing written')
+T = f'{scratch}/local'; B, RUN = f'{T}/box', f'{T}/run'
 os.makedirs(B, exist_ok=True); os.makedirs(RUN, exist_ok=True)
 def start(tag, kind, ans):
     for x in ('-box.txt', '.answer', '.answer.tmp', '-check.out', '-check.err'):
         if os.path.exists(f'{B}/{tag}{x}'): os.remove(f'{B}/{tag}{x}')
-    return subprocess.Popen([sys.executable, '-I', '-X', 'utf8', os.path.abspath(__file__), 'one', row, tag, kind, ans],
+    return subprocess.Popen([sys.executable, '-I', '-X', 'utf8', os.path.abspath(__file__), 'one', row, scratch, tag, kind, ans],
                             stdout=subprocess.DEVNULL, stderr=open(f'{B}/{tag}-check.err', 'w'))
 def result(tag, p, want, note):
     rc = p.wait(); a = open(f'{B}/{tag}.answer').read() if os.path.exists(f'{B}/{tag}.answer') else '(none)'
     line = f'{tag}: expected {want}, got {a}, exit {rc} {note}' + (' OK' if a == want else ' WRONG')
     print(line, flush=True); return line
 if mode == 'replay':
-    tag, kind, ans = sys.argv[3], sys.argv[4], sys.argv[5]
+    tag, kind, ans = sys.argv[4], sys.argv[5], sys.argv[6]
     shutil.copyfile(f'{row}/local/run/{tag}-in.txt', f'{RUN}/r-{tag}-in.txt')
     p = start('r-' + tag, kind, ans); open(f'{B}/r-{tag}-box.txt', 'wb').write(open(f'{row}/local/box/{tag}-box.txt', 'rb').read())
     line = result('r-' + tag, p, ans, f'(the real box log {tag}-box.txt and the arm\'s real input)')

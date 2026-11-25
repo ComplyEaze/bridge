@@ -8,7 +8,9 @@ the lines of box.ps1, boxcheck.py and arm.py that keep the box from being presse
 once, among them arm.py's line that gives ST no guard, no check and no answer file; box.ps1's old default No absent; arm.py's arms equal to the table's; no GUID-shaped text in the two rule files; and
 no value that names the build (BUILD.txt's hex fields but CODE COMMIT) in any file but BUILD.txt. Only local/ is skipped:
 any other file outside SHA256.txt is an error, and a __pycache__ folder (bytecode a helper wrote) is named in its own
-STOP-PYCACHE line first; nothing is deleted. While BUILD.txt holds <TO FILL> fields it says how many and still exits 0
+STOP-PYCACHE line first; nothing is deleted. SHA256.txt may not list a path under local/.
+With --fresh (step 0's pre-sitting run, right after the copy): local/ may hold only step 0's own records made before it
+(FRESH); any other file there came with the copy or from an earlier sitting, and is STOP-LOCAL-PREFILLED. While BUILD.txt holds <TO FILL> fields it says how many and still exits 0
 (the sheet is whole; build.py check is what stops the sitting).
 """
 
@@ -25,6 +27,9 @@ ARM_TABLE = {"LN": ("masters", "No", "in/ledger-input.txt"), "SN": ("stock", "No
              "SC": ("stock", "Cancel", "in/stock-input.txt"), "SY": ("stock", "Yes", "in/stock-input.txt"),
              "ST": ("stock", "none", "in/stock-large-input.txt")}
 SKIP_DIRS = {"local"}
+# The files step 0 has written under local/ when it runs check_sheet.py --fresh (RUN-SHEET.md, step 0).
+FRESH = {"local/evidence/s0-made.txt", "local/evidence/s0-fetch-origin.txt", "local/evidence/s0-copy.txt",
+         "local/evidence/s0-fresh.txt"}
 # Names the sheet cites that are other rows' files or files the sitting writes, never this folder's.
 FOREIGN = {"pa.py", "starth.ps1", "requests/confirm-masters-input.txt", "copies.txt", "s3-listing.txt"}
 START = ('( cd /c/bridge-lab/1381-bx && if [ -e local/evidence/{a}-out.txt ]; then echo "STOP: local/evidence/{a}-out.txt '
@@ -68,7 +73,7 @@ def references():
             name = token.replace("\\", "/")
             if name.startswith(("/", "../", "src-tauri/", "lab/", "local/")) or name in FOREIGN:
                 continue
-            if not (name.endswith(SUFFIXES) or name == ".gitattributes"):
+            if not (name.endswith(SUFFIXES) or name in (".gitattributes", ".gitignore")):
                 continue
             checked.add(name)
             if not (ROOT / name).is_file():
@@ -133,6 +138,11 @@ def pycache_hits(paths):
     return sorted(hits)
 
 
+def prefilled(paths):
+    """The files under local/ (relative posix paths) that step 0 did not make before --fresh ran."""
+    return sorted(p for p in paths if p.startswith("local/") and p not in FRESH)
+
+
 def manifest():
     entries, errors = {}, []
     for line in (ROOT / "SHA256.txt").read_text(encoding="utf-8").splitlines():
@@ -164,8 +174,15 @@ def manifest():
     return sorted(actual), errors
 
 
-def main():
+def main(fresh=False):
     try:
+        if fresh:
+            early = prefilled([p.relative_to(ROOT).as_posix() for p in (ROOT / "local").rglob("*") if p.is_file()])
+            if early:
+                print(f"STOP-LOCAL-PREFILLED: local/ already holds {len(early)} file(s) step 0 did not make: "
+                      + ", ".join(early[:10]) + (" ..." if len(early) > 10 else "") + "; nothing is deleted")
+                return 1
+            print(f"OK: local/ holds only step 0's own records ({len(FRESH)} names allowed)")
         found = [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*")
                  if p.relative_to(ROOT).parts[0] not in SKIP_DIRS]
         hits = pycache_hits(found)
@@ -198,4 +215,7 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    if sys.argv[1:] not in ([], ["--fresh"]):
+        print("usage: check_sheet.py [--fresh]")
+        sys.exit(2)
+    sys.exit(main(sys.argv[1:] == ["--fresh"]))

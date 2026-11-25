@@ -219,13 +219,16 @@ def selftest():
         ('helpers: box.ps1 changed', helper_case, ({n: 'a' * 64 for n in HELPERS}, {'box.ps1': 'b' * 64}), False),
         ('loading build.py writes no __pycache__ into the row folder', bytecode_case, (), True),
         ('check_sheet.py names a __pycache__ found anyway', pycache_case, (), True),
+        ('check_sheet.py --fresh: only step 0\'s records under local/', prefilled_case, (['local/evidence/s0-made.txt'], []), True),
+        ('check_sheet.py --fresh: a committed self-test file under local/', prefilled_case,
+         (['local/evidence/s0-copy.txt', 'local/selftest/local/box/l-no-box.txt'], ['local/selftest/local/box/l-no-box.txt']), True),
     ]
     right = 0
     for name, fn, args, want in cases:
         g = fn(*args); got = all(ok for _, ok in g); right += got == want
         print(f'{name}: expected {"all right" if want else "a line wrong"}, got {"all right" if got else "a line wrong"} '
               f'{"OK" if got == want else "WRONG"}')
-    print(f'{len(cases)} cases, {right} right'); return 0 if right == len(cases) == 45 else 1
+    print(f'{len(cases)} cases, {right} right'); return 0 if right == len(cases) == 47 else 1
 
 
 def no_click_case(rc, startc_text, err, must):
@@ -241,6 +244,10 @@ def bytecode_case():
     load('build')
     return [('sys.dont_write_bytecode is set', sys.dont_write_bytecode is True),
             ('no __pycache__ in the row folder after loading build.py', not os.path.exists(R + '/__pycache__'))]
+
+
+def prefilled_case(paths, want):
+    return [(f'check_sheet.prefilled names {want}', load('check_sheet').prefilled(paths) == want)]
 
 
 def pycache_case():

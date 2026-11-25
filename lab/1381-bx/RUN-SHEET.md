@@ -117,9 +117,10 @@ Changed copies, each change marked `1381-BX` in the file:
 
 Written for this row, in the shape of row 2162-PA's files where named:
 
-- `arm.py` (shape of `pa.py`): one arm from its start line to its grade; `--selftest` runs 45 synthetic cases (grades, the guard, the no-click report, the helper hashes, no bytecode).
-- `boxcheck.py` and `selftest-box.py` (shape of 2162-PA's): the whole-text check, for both titles and all three answers; 26 synthetic cases, and `replay` on a real arm's log.
-- `check_sheet.py` (shape of 2162-PA's): the manifest, references, arms, start lines and held lines; a `__pycache__` in the row folder is named first (STOP-PYCACHE).
+- `arm.py` (shape of `pa.py`): one arm from its start line to its grade; `--selftest` runs 47 synthetic cases (grades, the guard, the no-click report, the helper hashes, no bytecode, the pre-sitting `local/` check).
+- `boxcheck.py` and `selftest-box.py` (shape of 2162-PA's): the whole-text check, for both titles and all three answers; 26 synthetic cases, and `replay` on a real arm's log. `selftest-box.py` writes only under the scratch folder its command names (`local/selftest` here); one inside the sheet folder but outside `local/` is refused.
+- `.gitignore`: `/local/`, so no sitting's or self-test's file under `local/` is committed with the sheet.
+- `check_sheet.py` (shape of 2162-PA's): the manifest (which may list nothing under `local/`), references, arms, start lines and held lines; a `__pycache__` in the row folder is named first (STOP-PYCACHE). With `--fresh`, its pre-sitting run in step 0, it also stops if `local/` holds any file but step 0's own records (STOP-LOCAL-PREFILLED).
 - `build.py` and `BUILD.txt`: the build, checked, staged and restored; `--selftest` 17 cases.
 - `geninput.py`: the two stock inputs, made and checked from the code, and the ledger input's derivation checked (The input).
 - `in/stock-input.txt` and `in/stock-large-input.txt`: made by `geninput.py` (The input).
@@ -135,7 +136,7 @@ Run from `/c/bridge-lab/1381-bx` at step 0. Nothing is launched and nothing is s
 ```bash
 cd /c/bridge-lab/1381-bx && python -I -X utf8 arm.py --selftest > local/evidence/selfcheck-arm.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-arm.txt; tail -n 2 local/evidence/selfcheck-arm.txt
 cd /c/bridge-lab/1381-bx && python -I -X utf8 build.py --selftest > local/evidence/selfcheck-build.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-build.txt; tail -n 2 local/evidence/selfcheck-build.txt
-cd /c/bridge-lab/1381-bx && python -I -X utf8 selftest-box.py cases C:/bridge-lab/1381-bx > local/evidence/selfcheck-box.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-box.txt; tail -n 3 local/evidence/selfcheck-box.txt
+cd /c/bridge-lab/1381-bx && python -I -X utf8 selftest-box.py cases C:/bridge-lab/1381-bx C:/bridge-lab/1381-bx/local/selftest > local/evidence/selfcheck-box.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-box.txt; tail -n 3 local/evidence/selfcheck-box.txt
 cd /c/bridge-lab/1381-bx && python -I -X utf8 geninput.py check local/gen/agent_master_review_tests.rs in/stock-input.txt > local/evidence/selfcheck-input.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-input.txt; cat local/evidence/selfcheck-input.txt
 cd /c/bridge-lab/1381-bx && python -I -X utf8 geninput.py large-check local/gen/agent_master_review_tests.rs in/stock-large-input.txt > local/evidence/selfcheck-large.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-large.txt; cat local/evidence/selfcheck-large.txt
 cd /c/bridge-lab/1381-bx && python -I -c "import ast,sys;[ast.parse(open(f, encoding='utf-8').read()) for f in sys.argv[1:]]" *.py > local/evidence/selfcheck-parse.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-parse.txt; cat local/evidence/selfcheck-parse.txt
@@ -143,7 +144,7 @@ cd /c/bridge-lab/1381-bx && powershell -NoProfile -Command 'foreach ($f in (Get-
 cd /c/bridge-lab/1381-bx && python -I -X utf8 check_sheet.py > local/evidence/selfcheck-sheet.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-sheet.txt; cat local/evidence/selfcheck-sheet.txt
 ```
 
-EXPECT, in order: `45 cases, 45 right`, exit 0; `17 cases, 17 right`, exit 0; `26 cases ran, 26 right`, `ALL CASES RIGHT`, exit 0; three `PASS` lines and `EQUAL 1494 bytes, 33 LF, none at the end, sha256 c94ecf5c…`, exit 0; four `PASS` lines and `EQUAL 2568 bytes, 124 LF, none at the end, sha256 4190800d…`, exit 0; exit 0 alone; each of the four names followed by `0`, exit 0; three `OK` lines, exit 0. Any other: STOP-SELFCHECK.
+EXPECT, in order: `47 cases, 47 right`, exit 0; `17 cases, 17 right`, exit 0; `26 cases ran, 26 right`, `ALL CASES RIGHT`, exit 0; three `PASS` lines and `EQUAL 1494 bytes, 33 LF, none at the end, sha256 c94ecf5c…`, exit 0; four `PASS` lines and `EQUAL 2568 bytes, 124 LF, none at the end, sha256 4190800d…`, exit 0; exit 0 alone; each of the four names followed by `0`, exit 0; three `OK` lines, exit 0. Any other: STOP-SELFCHECK.
 
 ## Steps
 
@@ -155,6 +156,10 @@ EXPECT, in order: `45 cases, 45 right`, exit 0; `17 cases, 17 right`, exit 0; `2
      if [ -e /c/bridge-lab/1381-bx ]; then echo "STOP: /c/bridge-lab/1381-bx exists"; else mkdir /c/bridge-lab/1381-bx /c/bridge-lab/1381-bx/local /c/bridge-lab/1381-bx/local/evidence /c/bridge-lab/1381-bx/local/gen && echo "made" > /c/bridge-lab/1381-bx/local/evidence/s0-made.txt; echo "exit $?" >> /c/bridge-lab/1381-bx/local/evidence/s0-made.txt; cat /c/bridge-lab/1381-bx/local/evidence/s0-made.txt; fi
      cd /c/bridge-lab/1381-bx && git -C <CLONE> fetch origin > local/evidence/s0-fetch-origin.txt 2>&1; echo "exit $?" >> local/evidence/s0-fetch-origin.txt; cat local/evidence/s0-fetch-origin.txt
      cd /c/bridge-lab/1381-bx && { git -C <CLONE> archive <SHEET> lab/1381-bx | tar -x -C /c/bridge-lab/1381-bx --strip-components=2; echo "exit ${PIPESTATUS[0]} ${PIPESTATUS[1]}"; } > local/evidence/s0-copy.txt 2>&1; cat local/evidence/s0-copy.txt
+     ```
+   - **The pre-sitting check**, right after the copy and before anything else writes under `local/`: the sheet whole, and `local/` holding nothing but the three records above and this check's own file, so nothing came with the copy (the sheet commits no `local/`; its `.gitignore` keeps it out) and nothing is left from an earlier sitting. EXPECT `OK: local/ holds only step 0's own records …` then the three `OK` lines, exit 0. `STOP-LOCAL-PREFILLED`: stop, delete nothing, report the names it prints. Any other miss: STOP-SELFCHECK.
+     ```bash
+     cd /c/bridge-lab/1381-bx && python -I -X utf8 check_sheet.py --fresh > local/evidence/s0-fresh.txt 2>&1; echo "exit $?" >> local/evidence/s0-fresh.txt; cat local/evidence/s0-fresh.txt
      ```
    - The two commits in the lab's clone. Master merges by squash, so 48a64965 is fetched by the pull request's own ref. EXPECT the fetch `exit 0`, then two lines `present`, one per commit; any `ABSENT`: STOP-CODE-COMMIT.
      ```bash
@@ -207,7 +212,7 @@ EXPECT, in order: `45 cases, 45 right`, exit 0; `17 cases, 17 right`, exit 0; `2
    - **After every arm**, typed with `<arm>` replaced by the arm's name and `<mode> <answer>` by its table row (`masters No`, `stock No`, `stock Cancel`, `stock Yes`); after ST the replay line is not typed (no check ran):
      ```bash
      cd /c/bridge-lab/1381-bx && cat local/evidence/<arm>-out.txt
-     cd /c/bridge-lab/1381-bx && python -I -X utf8 selftest-box.py replay C:/bridge-lab/1381-bx <arm> <mode> <answer> > local/evidence/<arm>-replay.txt 2>&1; echo "exit $?" >> local/evidence/<arm>-replay.txt; cat local/evidence/<arm>-replay.txt
+     cd /c/bridge-lab/1381-bx && python -I -X utf8 selftest-box.py replay C:/bridge-lab/1381-bx C:/bridge-lab/1381-bx/local/selftest <arm> <mode> <answer> > local/evidence/<arm>-replay.txt 2>&1; echo "exit $?" >> local/evidence/<arm>-replay.txt; cat local/evidence/<arm>-replay.txt
      cd /c/bridge-lab/1381-bx && tasklist //FI "IMAGENAME eq bridge_mcp.exe" //FO CSV //NH > local/evidence/<arm>-after-tasklist.txt 2>&1; echo "exit $?" >> local/evidence/<arm>-after-tasklist.txt; cat local/evidence/<arm>-after-tasklist.txt
      ```
      EXPECT `ARM <arm> AS THE CODE SAYS` and `arm exit 0`; `REPLAY ALL PASS`, exit 0; no `bridge_mcp.exe`. Then one screen-tool screenshot of the whole screen (no box, no dialog, Tally as at step 0), and the by-eye read of `local/box/<arm>-open.png` (read with the operator's own file-reading tool; no viewer window or program is opened). Any `arm exit` but 0, or a `bridge_mcp.exe` still running: STOP, as `arm.py` named it (else STOP-ARM); nothing further.

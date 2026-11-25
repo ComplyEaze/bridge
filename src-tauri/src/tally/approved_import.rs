@@ -2118,6 +2118,18 @@ pub(crate) mod test_seam {
                 "bridge-create-ledger:{NONCE}\n",
             ),
             (
+                "the stop release dialog's token for this nonce",
+                "bridge-stop-release-acknowledged:{NONCE}\n",
+            ),
+            (
+                "the settle dialog's token for this nonce",
+                "bridge-batch-settle-acknowledged:{NONCE}\n",
+            ),
+            (
+                "the row release dialog's token for this nonce",
+                "bridge-row-release-acknowledged:{NONCE}\n",
+            ),
+            (
                 "a log line, then the token",
                 "starting\nbridge-create-stock-item:{NONCE}\n",
             ),

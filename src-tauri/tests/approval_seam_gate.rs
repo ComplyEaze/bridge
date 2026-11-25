@@ -3295,10 +3295,28 @@ const CONFIRM_STOCK_ITEM: &str = r#"pub(crate) async fn confirm_stock_item<'a>(
     }))
 }"#;
 
-const STOCK_ITEM_CONFIRMATION: &str = r#"pub(crate) struct StockItemConfirmation<'a> {
+const STOCK_ITEM_CONFIRMATION: &str = r#"#[derive(Debug)]
+pub(crate) struct StockItemConfirmation<'a> {
     draft: StockItemDraft<'a>,
     shown: String,
 }"#;
+
+/// `ShownDraft` with its one derive: an added `Clone` or `Default` would let one
+/// approval stand for a second Create.
+const SHOWN_DRAFT_STRUCT: &str = r#"#[derive(Debug)]
+pub(crate) struct ShownDraft<'a> {
+    draft: StockItemDraft<'a>,
+    shown: String,
+}"#;
+
+/// The lines of `source` that begin an `impl` naming `name`: one inherent block
+/// each, and no trait impl (`Clone`, `Default`, `From`) that could make another.
+fn impl_lines_naming(source: &str, name: &str) -> usize {
+    source
+        .lines()
+        .filter(|line| line.trim_start().starts_with("impl") && line.contains(name))
+        .count()
+}
 
 const SHOWN_DRAFT_MAKERS: &str = r#"impl<'a> ShownDraft<'a> {
     pub(super) fn from_confirmed(confirmation: StockItemConfirmation<'a>) -> Self {
@@ -3380,6 +3398,12 @@ fn shown_draft_problems(
             "test confirmation use",
         ),
         (stock, SHOWN_DRAFT_MAKERS, 1, "ShownDraft makers"),
+        (
+            stock,
+            SHOWN_DRAFT_STRUCT,
+            1,
+            "ShownDraft and its one derive",
+        ),
         (stock, "ShownDraft {", 0, "stock construction"),
         (stock_tests, "ShownDraft {", 0, "stock test construction"),
         (
@@ -3393,6 +3417,12 @@ fn shown_draft_problems(
         if text.matches(pin).count() != expected {
             problems.push(format!("expected {expected} of {label}"));
         }
+    }
+    if impl_lines_naming(stock, "ShownDraft") != 1 {
+        problems.push("expected one impl naming ShownDraft".into());
+    }
+    if impl_lines_naming(approvals, "StockItemConfirmation") != 1 {
+        problems.push("expected one impl naming StockItemConfirmation".into());
     }
     let confirmed_elsewhere = others
         .iter()
@@ -3473,6 +3503,46 @@ fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
         &others,
     )
     .is_empty());
+
+    for (stock_text, approvals_text) in [
+        (
+            stock.replace(SHOWN_DRAFT_STRUCT, &SHOWN_DRAFT_STRUCT.replace("Debug", "Debug, Clone")),
+            approvals.clone(),
+        ),
+        (
+            format!("{stock}\nimpl Default for ShownDraft<'_> {{ fn default() -> Self {{ todo!() }} }}"),
+            approvals.clone(),
+        ),
+        (
+            format!("{stock}\nimpl<'b> ShownDraft<'b> {{ fn again(d: StockItemDraft<'b>) -> Self {{ Self {{ draft: d, shown: String::new() }} }} }}"),
+            approvals.clone(),
+        ),
+        (
+            stock.clone(),
+            approvals.replace(
+                STOCK_ITEM_CONFIRMATION,
+                &STOCK_ITEM_CONFIRMATION.replace("Debug", "Debug, Clone"),
+            ),
+        ),
+        (
+            stock.clone(),
+            format!("{approvals}\nimpl Clone for StockItemConfirmation<'_> {{ fn clone(&self) -> Self {{ todo!() }} }}"),
+        ),
+    ] {
+        assert!(
+            stock_text != stock || approvals_text != approvals,
+            "the mutation changed nothing"
+        );
+        assert!(!shown_draft_problems(
+            &approvals_text,
+            &approvals_tests,
+            &stock_text,
+            &stock_tests,
+            &review,
+            &others,
+        )
+        .is_empty());
+    }
 
     let second_maker = format!("{approvals}\nShownDraft::from_confirmed(");
     assert!(!shown_draft_problems(

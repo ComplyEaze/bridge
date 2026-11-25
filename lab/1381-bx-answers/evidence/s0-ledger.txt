@@ -1,0 +1,5 @@
+PASS the blob file is git blob 13be3bbb59fa9221de69323c7fbac301ef7e8e06 (read 13be3bbb59fa9221de69323c7fbac301ef7e8e06)
+PASS the blob ends with LF
+PASS the file is the blob without its last byte (475 bytes read, 475 expected)
+EQUAL 475 bytes, 13 LF, none at the end, sha256=1ba480b8329af9375cab7fc416bff8776db5b1dbcd0d4cdffa5dfeec0dc00514
+exit 0

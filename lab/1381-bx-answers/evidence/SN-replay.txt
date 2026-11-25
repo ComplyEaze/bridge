@@ -1,0 +1,16 @@
+r-SN: expected No, got No, exit 0 (the real box log SN-box.txt and the arm's real input) OK
+2026-11-25T19:44:51.667Z check of r-SN, mode stock, answer No (log read whole after 1 read(s); 1455 bytes of text fed; line breaks read as CR LF: 0)
+PASS box seen
+PASS title exactly 'ComplyEaze Bridge — create one stock item?'
+PASS class #32770
+PASS the input: a nonce line, the count 1, a text
+PASS exactly three buttons, Yes, No and Cancel (found ['Yes', 'No', 'Cancel'])
+PASS exactly one text child, beginning with the answer text (found 1)
+PASS the text is the input line for line: 32 lines read, 32 fed
+PASS the box rectangle was logged
+PASS the text child lies inside the box
+PASS every button lies inside the box, below the text
+ALL PASS
+2026-11-25T19:44:51.668Z answer file written: No
+REPLAY ALL PASS
+exit 0

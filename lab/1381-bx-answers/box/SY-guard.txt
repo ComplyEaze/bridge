@@ -1,0 +1,14 @@
+2026-11-25T19:45:47Z R1 boxstate.ps1 on pid 13240: exit 0
+PASS the box is the child's (box pid 13240, startc pid 13240)
+PASS boxstate.ps1 ended within 30 s
+PASS boxstate exit 0
+PASS exactly one box line (read 1)
+PASS iconic=False
+PASS visible=True
+PASS topmost=True
+PASS boxstate.ps1's rect (686, 152, 1252, 954) equals box.ps1's (686, 152, 1252, 954)
+PASS the box rect (686, 152, 1252, 954) inside the work area (0, 0, 1920, 1030)
+PASS the Yes button rect (901, 898, 1001, 931) inside the box
+PASS the box nearest the top of the z-order (place 0), so the click lands on it
+2026-11-25T19:45:47Z GUARD PASSED: boxcheck.py started
+2026-11-25T19:45:47Z boxcheck.py exit 0

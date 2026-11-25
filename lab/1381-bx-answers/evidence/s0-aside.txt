@@ -1,0 +1,2 @@
+<lab root>/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe: OK
+exit 0

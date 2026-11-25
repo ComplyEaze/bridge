@@ -1,0 +1,13 @@
+BUILD COMMIT: 6c9e6b33b531d0bd23bf6c4c62ba0d01a0aa4a1d
+CODE COMMIT: 48a6496507132576a6be150c155192f647528e1e
+CI RUN: <the CI run BUILD.txt names>
+ARTIFACT NAME: unsigned-bundle-smoke-windows-latest
+ARTIFACT ID: <the artifact id BUILD.txt names>
+ARTIFACT BYTES: 60688313
+ZIP DIGEST: 7e5357825ac356a409cd954d3ef7549e969024ae2aefea83b0786f3d2b9f3b47
+MCPB SHA256: e27b8c875ce3d94e57be0b9b55fdebc4c52c25ce922b4b9ce0a7a48edcb72263
+EXE SHA256: 71193ce40dabd7cb2b916a9ca5eb25b7e16aeb27cf9584cf783c7c2667dc2e05
+GRANTED PATH: <lab root>/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe
+ASIDE SHA256: 1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59
+BUILD.txt: 0 field(s) to fill: filled
+exit 0

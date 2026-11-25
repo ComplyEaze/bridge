@@ -1,0 +1,49 @@
+Yes, the token, exit 0: expected all right, got all right OK
+No, nothing printed, exit 1: expected all right, got all right OK
+Cancel, nothing printed, exit 1: expected all right, got all right OK
+the ledger control, No, two box-fit lines: expected all right, got all right OK
+Yes, the token of another nonce: expected a line wrong, got a line wrong OK
+Yes, the ledger token: expected a line wrong, got a line wrong OK
+Yes, the token with CR LF: expected a line wrong, got a line wrong OK
+Yes, the token twice: expected a line wrong, got a line wrong OK
+Yes, nothing printed, exit 0 (unavailable): expected a line wrong, got a line wrong OK
+No, a token printed: expected a line wrong, got a line wrong OK
+No, exit 0 (unavailable): expected a line wrong, got a line wrong OK
+exit 77, the box did not fit: expected a line wrong, got a line wrong OK
+no EXITED line: expected a line wrong, got a line wrong OK
+no box-fit line (an input refused before any box): expected a line wrong, got a line wrong OK
+another line in the error output: expected a line wrong, got a line wrong OK
+a box restored from minimised, then measured fitting: expected all right, got all right OK
+the restored line alone, no measurement: expected a line wrong, got a line wrong OK
+W7: no restored line: expected all right, got all right OK
+W7: the box was restored from minimised: expected a line wrong, got a line wrong OK
+No clicked where Cancel was the arm: expected a line wrong, got a line wrong OK
+no click logged: expected a line wrong, got a line wrong OK
+cross: the same work area and rectangle: expected all right, got all right OK
+cross: a work area other than screen.ps1's: expected a line wrong, got a line wrong OK
+cross: a box rectangle other than box.ps1's: expected a line wrong, got a line wrong OK
+cross: no box-fit line: expected a line wrong, got a line wrong OK
+ST: refused by the fit guard, exit 77: expected all right, got all right OK
+ST: refused, the box not readable: expected all right, got all right OK
+ST: seen not to fit, then measured again: expected all right, got all right OK
+ST: exit 0, nothing printed (unavailable): expected a line wrong, got a line wrong OK
+ST: exit 77 with every line fits=true: expected a line wrong, got a line wrong OK
+ST: a click logged: expected a line wrong, got a line wrong OK
+ST: a token printed: expected a line wrong, got a line wrong OK
+ST: no box-fit line: expected a line wrong, got a line wrong OK
+ST: exit 1: expected a line wrong, got a line wrong OK
+ST: restored from minimised, then not fitting: expected all right, got all right OK
+guard: every line as read: expected all right, got all right OK
+guard: boxstate.ps1's rect other than box.ps1's: expected a line wrong, got a line wrong OK
+guard: boxstate.ps1 not ended within 30 s: expected a line wrong, got a line wrong OK
+guard: the box another process's: expected a line wrong, got a line wrong OK
+no click: the child names a box never shown: expected all right, got all right OK
+no click: no EXITED line, the error file unreadable: expected all right, got all right OK
+helpers: each as SHA256.txt says: expected all right, got all right OK
+helpers: box.ps1 changed: expected a line wrong, got a line wrong OK
+loading build.py writes no __pycache__ into the row folder: expected all right, got all right OK
+check_sheet.py names a __pycache__ found anyway: expected all right, got all right OK
+check_sheet.py --fresh: only step 0's records under local/: expected all right, got all right OK
+check_sheet.py --fresh: a committed self-test file under local/: expected all right, got all right OK
+47 cases, 47 right
+exit 0

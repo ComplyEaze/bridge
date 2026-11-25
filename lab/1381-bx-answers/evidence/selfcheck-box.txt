@@ -1,0 +1,29 @@
+s-yes: expected Yes, got Yes, exit 0 (the right stock box, answer Yes) OK
+s-no: expected No, got No, exit 0 (the right stock box, answer No) OK
+s-cancel: expected Cancel, got Cancel, exit 0 (the right stock box, answer Cancel) OK
+l-no: expected No, got No, exit 0 (the right ledger box, answer No) OK
+s-crlf: expected Yes, got Yes, exit 0 (the right stock text read back with CR LF breaks) OK
+s-ledger-title: expected (none), got (none), exit 1 (the ledger title on the stock box) OK
+l-stock-title: expected (none), got (none), exit 1 (the stock title on the ledger box) OK
+s-title-hyphen: expected (none), got (none), exit 1 (a hyphen for the dash) OK
+s-class: expected (none), got (none), exit 1 (a window that is not a dialog) OK
+s-no-cancel: expected (none), got (none), exit 1 (two buttons only) OK
+s-four: expected (none), got (none), exit 1 (a fourth button) OK
+s-ok: expected (none), got (none), exit 1 (OK in place of Yes) OK
+s-rate: expected (none), got (none), exit 1 (one rate changed) OK
+s-hsn: expected (none), got (none), exit 1 (the HSN code changed) OK
+s-last-missing: expected (none), got (none), exit 1 (the last line missing (a cut box)) OK
+s-first-missing: expected (none), got (none), exit 1 (the first answer line missing) OK
+s-blank-missing: expected (none), got (none), exit 1 (the blank line under the answer missing) OK
+s-added: expected (none), got (none), exit 1 (a line added at the end) OK
+s-doubled: expected (none), got (none), exit 1 (a line doubled) OK
+s-swapped: expected (none), got (none), exit 1 (two rate rows swapped) OK
+s-two-texts: expected (none), got (none), exit 1 (two text children) OK
+s-text-outside: expected (none), got (none), exit 1 (the text child past the box edge) OK
+s-button-over: expected (none), got (none), exit 1 (buttons over the text) OK
+s-nobox: expected (none), got (none), exit 1 (no box seen) OK
+s-bad-nonce: expected (none), got (none), exit 1 (an input whose nonce is not a UUID) OK
+s-stock-on-ledger: expected (none), got (none), exit 1 (the ledger box showing the stock text) OK
+26 cases ran, 26 right
+ALL CASES RIGHT
+exit 0

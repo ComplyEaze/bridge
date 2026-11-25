@@ -1,0 +1,28 @@
+2026-11-25T19:46:12Z arm ST: mode stock, answer None, input in/stock-large-input.txt (2568 bytes fed, fresh nonce)
+screen.ps1 exit 0
+DPI_AWARE per_monitor_v2=True
+OS product=[Windows 10 Home Single Language] display_version=[22H2] build=19045.6466 osversion=10.0.19045.0
+MONITORS 1
+MONITOR 1 primary=True rect=(0,0,1920,1080) size=1920x1080 work=(0,0,1920,1030) dpi=120 scale_pct=125
+--- box log ST (stamped lines, the text child left out; box.ps1 exit 3)
+2026-11-25T19:46:16.077Z watch start: tally window 0x1130730; see within 30 s; answer by 90 s
+2026-11-25T19:46:46.318Z NO BOX seen within 30 s
+2026-11-25T19:46:46.511Z capture ST-nobox.png 1920x1080 211071 B sha256=482be53b9388ad3b909ed09ab2d37c79cf8c226ffe86742e78c6a5205fdb50a0
+--- guard
+2026-11-25T19:46:15Z ST: no guard, no check and no answer file for this arm; box.ps1 clicks nothing
+--- startc
+STARTED pid=16460 show=1 arg=--confirm-stock-item at 2026-11-25T19:46:16.508Z
+EXITED code=77 at 2026-11-25T19:46:16.821Z
+--- graded (child standard output 0 bytes; error output 1 line(s))
+box-fit: box=(620,0,1320,2512) work=(0,0,1920,1030) fits=false
+deciding:
+PASS box.ps1 clicked nothing (clicked [])
+PASS exit code 77, the fit guard's (read 77)
+PASS standard output empty (0 bytes read)
+PASS error output: only box-fit lines (1 line(s))
+PASS at least one box-fit line says fits=false
+recorded, not deciding:
+FAIL W6 box.ps1 saw a box (BOX SEEN; box.ps1 exit 3: 3 none seen, 4 gone before any click)
+PASS W4 every box-fit work area equals screen.ps1's (0, 0, 1920, 1030)
+PASS W7 the box not opened minimised (no 'box-fit: restored from minimised' line; read 0: with one, the child's hook restored it)
+ARM ST AS THE CODE SAYS

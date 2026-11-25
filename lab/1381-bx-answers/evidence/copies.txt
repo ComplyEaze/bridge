@@ -1,0 +1,5 @@
+2026-11-25T19:43:44Z	extract	local/download/artifact.zip!bridge-tally.mcpb!bin/x86_64-pc-windows-msvc/bridge_mcp.exe	local/build/bridge_mcp.exe	35942400	71193ce40dabd7cb2b916a9ca5eb25b7e16aeb27cf9584cf783c7c2667dc2e05
+2026-11-25T19:43:51Z	move-aside	<lab root>/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe	<lab folder>/local/aside/bridge_mcp.exe	35900928	1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59
+2026-11-25T19:43:51Z	copy-in	local/build/bridge_mcp.exe	<lab root>/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe	35942400	71193ce40dabd7cb2b916a9ca5eb25b7e16aeb27cf9584cf783c7c2667dc2e05
+2026-11-25T19:47:10Z	move-out	<lab root>/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe	<lab folder>/local/build/returned/bridge_mcp.exe	35942400	71193ce40dabd7cb2b916a9ca5eb25b7e16aeb27cf9584cf783c7c2667dc2e05
+2026-11-25T19:47:10Z	move-back	<lab folder>/local/aside/bridge_mcp.exe	<lab root>/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe	35900928	1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59

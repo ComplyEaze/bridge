@@ -1,0 +1,5 @@
+zip 60688313 bytes sha256=7e5357825ac356a409cd954d3ef7549e969024ae2aefea83b0786f3d2b9f3b47
+mcpb 16671515 bytes sha256 e27b8c875ce3d94e57be0b9b55fdebc4c52c25ce922b4b9ce0a7a48edcb72263; json archive_sha256 e27b8c875ce3d94e57be0b9b55fdebc4c52c25ce922b4b9ce0a7a48edcb72263 binary_sha256=71193ce40dabd7cb2b916a9ca5eb25b7e16aeb27cf9584cf783c7c2667dc2e05
+exe 35942400 bytes sha256=71193ce40dabd7cb2b916a9ca5eb25b7e16aeb27cf9584cf783c7c2667dc2e05
+VERIFIED: zip, mcpb and exe equal BUILD.txt and mcpb-smoke.json; exe written to local/build/bridge_mcp.exe
+exit 0

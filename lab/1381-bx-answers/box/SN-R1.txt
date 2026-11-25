@@ -1,0 +1,5 @@
+read at 2026-11-25T19:44:43.222Z pid 16436
+windows 1
+WINDOW handle=10554640 name=[ComplyEaze Bridge — create one stock item?] class=#32770 iconic=False visible=True topmost=True rect=(686,152,1252,954) visual_state=Normal foreground=True
+FOREGROUND handle=10554640 pid=16436
+FOCUS name=[No] type=ControlType.Pane pid=16436

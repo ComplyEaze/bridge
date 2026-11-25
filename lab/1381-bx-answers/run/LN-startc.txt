@@ -1,0 +1,2 @@
+STARTED pid=1708 show=1 arg=--confirm-masters at 2026-11-25T19:44:11.484Z
+EXITED code=1 at 2026-11-25T19:44:13.835Z

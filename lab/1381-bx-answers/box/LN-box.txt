@@ -1,0 +1,25 @@
+2026-11-25T19:44:10.361Z watch start: tally window 0x1130730; see within 30 s; answer by 90 s
+2026-11-25T19:44:11.865Z BOX SEEN 0x1a60c96 pid 1708 title 'ComplyEaze Bridge — create one ledger?' class #32770
+2026-11-25T19:44:11.935Z rect 688,342,1252,764 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 5 (lower = nearer the top); above tally True
+2026-11-25T19:44:11.996Z foreground 0x1a60c96 pid 1708 bridge_mcp title 38 chars sha256 e0cd607a97ca64c3368649322d83d16f45573dcfc4c9d9e4ef9a4333d997f506
+2026-11-25T19:44:12.001Z child Button rect 901,708,1001,741 text: &Yes
+2026-11-25T19:44:12.003Z child Button rect 1011,708,1111,741 text: &No
+2026-11-25T19:44:12.004Z child Button rect 1121,708,1221,741 text: Cancel
+2026-11-25T19:44:12.025Z child Static rect 725,413,765,453 text: 
+2026-11-25T19:44:12.027Z child Static rect 775,413,1203,662 text: Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to cancel. Nothing is
+created until you answer.
+
+Create ONE ledger in "BRIDGE BATCH LAB"
+Company GUID: <the all-zero GUID>
+Company number: 000000  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9001
+
+Create ledger "Lab Keyboard Suspense" under Suspense A/c
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.
+2026-11-25T19:44:12.307Z capture LN-open.png 1920x1080 204769 B sha256=0482c0654a2ad6bdd70ecb334ab40823ac65ff9e1d53a95bed84c1bb297dbae0
+2026-11-25T19:44:12.310Z WAITING for <lab folder>\local\box\LN.answer
+2026-11-25T19:44:13.723Z before click: foreground 0x1a60c96 pid 1708 bridge_mcp title 38 chars sha256 e0cd607a97ca64c3368649322d83d16f45573dcfc4c9d9e4ef9a4333d997f506
+2026-11-25T19:44:13.770Z CLICKED No at 1061,724 (physical) 2026-11-25T19:44:13.738Z; seen-to-click 1.9 s
+2026-11-25T19:44:14.600Z after click: box visible False; foreground 0xb0d84 pid 11516 <desktop client> title 6 chars sha256=0615570f9ea136946c5dc08a250010320707646f57f72cedab1dfb73d95eade6

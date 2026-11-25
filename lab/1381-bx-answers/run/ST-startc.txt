@@ -1,0 +1,2 @@
+STARTED pid=16460 show=1 arg=--confirm-stock-item at 2026-11-25T19:46:16.508Z
+EXITED code=77 at 2026-11-25T19:46:16.821Z

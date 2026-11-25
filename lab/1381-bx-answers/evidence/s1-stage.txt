@@ -1,0 +1,3 @@
+granted path before: sha256=1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59
+STAGED: the aside exe in local/aside, the row's exe on the granted path, both hashed
+exit 0

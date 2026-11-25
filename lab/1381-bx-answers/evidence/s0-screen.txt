@@ -1,0 +1,6 @@
+read at 2026-11-25T19:42:50.748Z
+DPI_AWARE per_monitor_v2=True
+OS product=[Windows 10 Home Single Language] display_version=[22H2] build=19045.6466 osversion=10.0.19045.0
+MONITORS 1
+MONITOR 1 primary=True rect=(0,0,1920,1080) size=1920x1080 work=(0,0,1920,1030) dpi=120 scale_pct=125
+RESULT exit 0

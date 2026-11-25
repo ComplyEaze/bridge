@@ -1,0 +1,5 @@
+OK: local/ holds only step 0's own records (4 names allowed)
+OK: 18 file references exist; SHA256.txt matches all 18 other files; only local/ skipped
+OK: arms LN, SN, SC, SY, ST each in the table (as arm.py runs them), Steps and Decides, each start line once; the box held to a passed check (8 lines once each, box.ps1's default No gone); no GUID-shaped text
+OK: no file but BUILD.txt names the build; BUILD.txt holds 0 field(s) <TO FILL>
+exit 0

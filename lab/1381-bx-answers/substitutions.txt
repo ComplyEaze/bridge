@@ -1,0 +1,13 @@
+Replacements in text files and file names, with counts:
+<desktop client>: 12
+<lab clone>: 2
+<lab folder>: 15
+<lab root name>: 3
+<lab root>: 7
+<the Bridge repository>: 1
+<the CI run BUILD.txt names>: 1
+<the all-zero GUID>: 2
+<the artifact id BUILD.txt names>: 2
+label: \1=: 56
+label: exit 0, 0: 2
+stop: 1

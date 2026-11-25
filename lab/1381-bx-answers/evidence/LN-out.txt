@@ -1,0 +1,69 @@
+2026-11-25T19:44:07Z arm LN: mode masters, answer No, input in/ledger-input.txt (475 bytes fed, fresh nonce)
+screen.ps1 exit 0
+DPI_AWARE per_monitor_v2=True
+OS product=[Windows 10 Home Single Language] display_version=[22H2] build=19045.6466 osversion=10.0.19045.0
+MONITORS 1
+MONITOR 1 primary=True rect=(0,0,1920,1080) size=1920x1080 work=(0,0,1920,1030) dpi=120 scale_pct=125
+--- box log LN (stamped lines, the text child left out; box.ps1 exit 0)
+2026-11-25T19:44:10.361Z watch start: tally window 0x1130730; see within 30 s; answer by 90 s
+2026-11-25T19:44:11.865Z BOX SEEN 0x1a60c96 pid 1708 title 'ComplyEaze Bridge — create one ledger?' class #32770
+2026-11-25T19:44:11.935Z rect 688,342,1252,764 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 5 (lower = nearer the top); above tally True
+2026-11-25T19:44:11.996Z foreground 0x1a60c96 pid 1708 bridge_mcp title 38 chars sha256 e0cd607a97ca64c3368649322d83d16f45573dcfc4c9d9e4ef9a4333d997f506
+2026-11-25T19:44:12.001Z child Button rect 901,708,1001,741 text: &Yes
+2026-11-25T19:44:12.003Z child Button rect 1011,708,1111,741 text: &No
+2026-11-25T19:44:12.004Z child Button rect 1121,708,1221,741 text: Cancel
+2026-11-25T19:44:12.307Z capture LN-open.png 1920x1080 204769 B sha256=0482c0654a2ad6bdd70ecb334ab40823ac65ff9e1d53a95bed84c1bb297dbae0
+2026-11-25T19:44:12.310Z WAITING for <lab folder>\local\box\LN.answer
+2026-11-25T19:44:13.723Z before click: foreground 0x1a60c96 pid 1708 bridge_mcp title 38 chars sha256 e0cd607a97ca64c3368649322d83d16f45573dcfc4c9d9e4ef9a4333d997f506
+2026-11-25T19:44:13.770Z CLICKED No at 1061,724 (physical) 2026-11-25T19:44:13.738Z; seen-to-click 1.9 s
+2026-11-25T19:44:14.600Z after click: box visible False; foreground 0xb0d84 pid 11516 <desktop client> title 6 chars sha256=0615570f9ea136946c5dc08a250010320707646f57f72cedab1dfb73d95eade6
+--- guard
+2026-11-25T19:44:13Z R1 boxstate.ps1 on pid 1708: exit 0
+PASS the box is the child's (box pid 1708, startc pid 1708)
+PASS boxstate.ps1 ended within 30 s
+PASS boxstate exit 0
+PASS exactly one box line (read 1)
+PASS iconic=False
+PASS visible=True
+PASS topmost=True
+PASS boxstate.ps1's rect (688, 342, 1252, 764) equals box.ps1's (688, 342, 1252, 764)
+PASS the box rect (688, 342, 1252, 764) inside the work area (0, 0, 1920, 1030)
+PASS the No button rect (1011, 708, 1111, 741) inside the box
+PASS the box nearest the top of the z-order (place 0), so the click lands on it
+2026-11-25T19:44:13Z GUARD PASSED: boxcheck.py started
+2026-11-25T19:44:13Z boxcheck.py exit 0
+--- check (exit 0)
+2026-11-25T19:44:13.462Z check of LN, mode masters, answer No (log read whole after 1 read(s); 436 bytes of text fed; line breaks read as CR LF: 0)
+PASS box seen
+PASS title exactly 'ComplyEaze Bridge — create one ledger?'
+PASS class #32770
+PASS the input: a nonce line, the count 1, a text
+PASS exactly three buttons, Yes, No and Cancel (found ['Yes', 'No', 'Cancel'])
+PASS exactly one text child, beginning with the answer text (found 1)
+PASS the text is the input line for line: 12 lines read, 12 fed
+PASS the box rectangle was logged
+PASS the text child lies inside the box
+PASS every button lies inside the box, below the text
+ALL PASS
+2026-11-25T19:44:13.464Z answer file written: No
+--- startc
+STARTED pid=1708 show=1 arg=--confirm-masters at 2026-11-25T19:44:11.484Z
+EXITED code=1 at 2026-11-25T19:44:13.835Z
+--- graded (child standard output 0 bytes: b''; error output 1 line(s))
+box-fit: box=(688,342,1252,764) work=(0,0,1920,1030) fits=true
+deciding:
+PASS box.ps1 clicked No, once (clicked ['No'])
+PASS box.ps1 read the box as gone after the click
+PASS exit code 1 (read 1)
+PASS standard output empty (0 bytes read)
+PASS error output: only box-fit lines, at least one measurement (1 line(s), 1 measurement(s))
+PASS every box-fit measurement says fits=true
+recorded, not deciding:
+PASS W1 the box not minimised at its first read (iconic=False)
+PASS W2 the box in front at its first read (foreground=True)
+PASS W3 the keyboard focus on No, the default button, in the box's process
+PASS W4 every box-fit work area equals screen.ps1's (0, 0, 1920, 1030)
+PASS W5 the first box-fit box equals box.ps1's rectangle (688, 342, 1252, 764)
+PASS W7 the box not opened minimised (no 'box-fit: restored from minimised' line; read 0: with one, the child's hook restored it)
+ARM LN AS THE CODE SAYS; recorded lines: 6 of 6 PASS
+arm exit 0

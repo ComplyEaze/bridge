@@ -1,0 +1,68 @@
+2026-11-25T19:45:42Z arm SY: mode stock, answer Yes, input in/stock-input.txt (1494 bytes fed, fresh nonce)
+screen.ps1 exit 0
+DPI_AWARE per_monitor_v2=True
+OS product=[Windows 10 Home Single Language] display_version=[22H2] build=19045.6466 osversion=10.0.19045.0
+MONITORS 1
+MONITOR 1 primary=True rect=(0,0,1920,1080) size=1920x1080 work=(0,0,1920,1030) dpi=120 scale_pct=125
+--- box log SY (stamped lines, the text child left out; box.ps1 exit 0)
+2026-11-25T19:45:45.385Z watch start: tally window 0x1130730; see within 30 s; answer by 90 s
+2026-11-25T19:45:46.532Z BOX SEEN 0x1fd0496 pid 13240 title 'ComplyEaze Bridge — create one stock item?' class #32770
+2026-11-25T19:45:46.565Z rect 686,152,1252,954 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 5 (lower = nearer the top); above tally True
+2026-11-25T19:45:46.607Z foreground 0x1fd0496 pid 13240 bridge_mcp title 42 chars sha256=29621a975da5df9c6cc1bd8b94c75105f1689d2135411faa401d1ea7035b7785
+2026-11-25T19:45:46.611Z child Button rect 901,898,1001,931 text: &Yes
+2026-11-25T19:45:46.612Z child Button rect 1011,898,1111,931 text: &No
+2026-11-25T19:45:46.613Z child Button rect 1121,898,1221,931 text: Cancel
+2026-11-25T19:45:46.820Z capture SY-open.png 1920x1080 247803 B sha256=650cbe6cbc8cd08f2ddf14a5f4bd76e373662b78cdc073db3fb10edcc13a3b82
+2026-11-25T19:45:46.824Z WAITING for <lab folder>\local\box\SY.answer
+2026-11-25T19:45:47.912Z before click: foreground 0x1fd0496 pid 13240 bridge_mcp title 42 chars sha256=29621a975da5df9c6cc1bd8b94c75105f1689d2135411faa401d1ea7035b7785
+2026-11-25T19:45:47.939Z CLICKED Yes at 951,914 (physical) 2026-11-25T19:45:47.926Z; seen-to-click 1.4 s
+2026-11-25T19:45:48.769Z after click: box visible False; foreground 0xb0d84 pid 11516 <desktop client> title 6 chars sha256=0615570f9ea136946c5dc08a250010320707646f57f72cedab1dfb73d95eade6
+--- guard
+2026-11-25T19:45:47Z R1 boxstate.ps1 on pid 13240: exit 0
+PASS the box is the child's (box pid 13240, startc pid 13240)
+PASS boxstate.ps1 ended within 30 s
+PASS boxstate exit 0
+PASS exactly one box line (read 1)
+PASS iconic=False
+PASS visible=True
+PASS topmost=True
+PASS boxstate.ps1's rect (686, 152, 1252, 954) equals box.ps1's (686, 152, 1252, 954)
+PASS the box rect (686, 152, 1252, 954) inside the work area (0, 0, 1920, 1030)
+PASS the Yes button rect (901, 898, 1001, 931) inside the box
+PASS the box nearest the top of the z-order (place 0), so the click lands on it
+2026-11-25T19:45:47Z GUARD PASSED: boxcheck.py started
+2026-11-25T19:45:47Z boxcheck.py exit 0
+--- check (exit 0)
+2026-11-25T19:45:47.793Z check of SY, mode stock, answer Yes (log read whole after 1 read(s); 1455 bytes of text fed; line breaks read as CR LF: 0)
+PASS box seen
+PASS title exactly 'ComplyEaze Bridge — create one stock item?'
+PASS class #32770
+PASS the input: a nonce line, the count 1, a text
+PASS exactly three buttons, Yes, No and Cancel (found ['Yes', 'No', 'Cancel'])
+PASS exactly one text child, beginning with the answer text (found 1)
+PASS the text is the input line for line: 32 lines read, 32 fed
+PASS the box rectangle was logged
+PASS the text child lies inside the box
+PASS every button lies inside the box, below the text
+ALL PASS
+2026-11-25T19:45:47.795Z answer file written: Yes
+--- startc
+STARTED pid=13240 show=1 arg=--confirm-stock-item at 2026-11-25T19:45:46.187Z
+EXITED code=0 at 2026-11-25T19:45:47.983Z
+--- graded (child standard output 62 bytes: b'bridge-create-stock-item:21ef1077-44df-4d6f-a0e1-cb75d2148f16\n'; error output 1 line(s))
+box-fit: box=(686,152,1252,954) work=(0,0,1920,1030) fits=true
+deciding:
+PASS box.ps1 clicked Yes, once (clicked ['Yes'])
+PASS box.ps1 read the box as gone after the click
+PASS exit code 0 (read 0)
+PASS standard output exactly the token for this nonce and a line feed (62 bytes read)
+PASS error output: only box-fit lines, at least one measurement (1 line(s), 1 measurement(s))
+PASS every box-fit measurement says fits=true
+recorded, not deciding:
+PASS W1 the box not minimised at its first read (iconic=False)
+PASS W2 the box in front at its first read (foreground=True)
+PASS W3 the keyboard focus on No, the default button, in the box's process
+PASS W4 every box-fit work area equals screen.ps1's (0, 0, 1920, 1030)
+PASS W5 the first box-fit box equals box.ps1's rectangle (686, 152, 1252, 954)
+PASS W7 the box not opened minimised (no 'box-fit: restored from minimised' line; read 0: with one, the child's hook restored it)
+ARM SY AS THE CODE SAYS; recorded lines: 6 of 6 PASS

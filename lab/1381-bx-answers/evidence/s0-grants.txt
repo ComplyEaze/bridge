@@ -1,0 +1,7 @@
+list_granted_applications at step 0 (2026-11-25 about 19:42Z), typed from the tool's answer; paths outside <lab root> written as <path>:
+TallyPrime  <path>  tier full
+Bridge  <path>  tier full
+Bridge_mcp  c:\<lab root name>\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe  tier full
+Bridge_mcp  c:\<lab root name>\2569-r\exe-old\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe  tier full
+grant flags: clipboardRead false, clipboardWrite false, systemKeyCombos false
+GRANTED PATH (c:\<lab root name>\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe) is among them.

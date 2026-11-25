@@ -1,0 +1,5 @@
+read at 2026-11-25T19:44:12.990Z pid 1708
+windows 1
+WINDOW handle=27659414 name=[ComplyEaze Bridge — create one ledger?] class=#32770 iconic=False visible=True topmost=True rect=(688,342,1252,764) visual_state=Normal foreground=True
+FOREGROUND handle=27659414 pid=1708
+FOCUS name=[No] type=ControlType.Pane pid=1708

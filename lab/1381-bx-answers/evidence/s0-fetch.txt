@@ -1,0 +1,3 @@
+From <the Bridge repository>
+ * branch                refs/pull/2596/head -> FETCH_HEAD
+exit 0

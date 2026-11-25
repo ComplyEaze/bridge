@@ -1,0 +1,1 @@
+2026-11-25T19:46:15Z ST: no guard, no check and no answer file for this arm; box.ps1 clicks nothing

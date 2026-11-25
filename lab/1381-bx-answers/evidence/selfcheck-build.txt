@@ -1,0 +1,19 @@
+a filled BUILD.txt checks: expected exit 0, got 0 OK
+a field still <TO FILL> stops the row: expected exit 1, got 1 OK
+a field out of its shape is a failed read: expected exit 2, got 2 OK
+a field twice is a failed read: expected exit 2, got 2 OK
+a zip whose digest differs stops: expected exit 1, got 1 OK
+a .mcpb whose hash differs stops: expected exit 1, got 1 OK
+an exe whose hash differs stops: expected exit 1, got 1 OK
+the right artifact verifies and writes the exe: expected exit 0, got 0 OK
+a second verify never overwrites the exe: expected exit 1, got 1 OK
+stage refuses while a bridge_mcp.exe runs: expected exit 1, got 1 OK
+stage refuses when tasklist fails: expected exit 2, got 2 OK
+stage moves aside and copies in: expected exit 0, got 0 OK
+the granted path then holds the row's exe: expected exit 0, got 0 OK
+a second stage refuses: the granted path is not the aside exe: expected exit 1, got 1 OK
+restore puts the aside exe back: expected exit 0, got 0 OK
+the granted path then holds the aside exe: expected exit 0, got 0 OK
+copies.txt holds the five acts (found 5): expected exit 0, got 0 OK
+17 cases, 17 right
+exit 0

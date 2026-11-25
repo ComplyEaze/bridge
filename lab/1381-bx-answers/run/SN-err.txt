@@ -1,0 +1,2 @@
+box-fit: box=(686,152,1252,954) work=(0,0,1920,1030) fits=true
+box-fit: box=(686,152,1252,954) work=(0,0,1920,1030) fits=true

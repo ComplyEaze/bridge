@@ -16,8 +16,9 @@
 //! `VerifiedItem` does not prove:
 //! - that the fresh read was taken after the Create was posted (the caller's
 //!   job);
-//! - that a window showed the draft (`ShownDraft::from_draft` is a plain
-//!   constructor);
+//! - that the window showed text describing this draft: `ShownDraft` holds the
+//!   preview the approving window showed, and its one non-test maker is asked
+//!   with a preview built from the same draft, but nothing here compares the two;
 //! - that the fresh read is the whole book (size and count admission are the
 //!   caller's, as the module doc of `stock_item_create.rs` says);
 //! - that the answer was Tally's answer to this draft's Create: it takes the

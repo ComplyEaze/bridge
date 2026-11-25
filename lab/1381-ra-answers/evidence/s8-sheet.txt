@@ -1,0 +1,4 @@
+OK: 14 file references exist; SHA256.txt matches all 13 other files; only local/ skipped
+OK: the ten send lines once each in Steps, in the order M1 C1 C2 I1 I2 G1 G2 U1 U2 M2; the state line between M1 and C1; the compute line after M2; send.py held to the row's reads (5 lines once each, no timeout)
+OK: 5 requests, each one Export of a Collection, no SVFROMDATE or SVTODATE, no import; no GUID-shaped text in the rule files
+exit 0

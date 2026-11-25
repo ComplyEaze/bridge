@@ -1,0 +1,3 @@
+From <the Bridge repository>
+ * [new branch]          feat/1381-stock-admitted-reads -> origin/feat/1381-stock-admitted-reads
+exit 0

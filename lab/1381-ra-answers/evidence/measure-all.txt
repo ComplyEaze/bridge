@@ -1,0 +1,46 @@
+M1: 3318 B sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1; 1 COMPANY row(s) at BODY/DATA/COLLECTION
+  GUID bac2b5e9... (the book's: yes), ALTMSTID 210, ALTVCHID absent
+C1: 4830 B sha256=6552677a10bdb179ae0fc5d61bd5615ecb6aceb37c175bbac0ff5b91d6553979; 1 COMPANY row(s) at BODY/DATA/COLLECTION
+  GUID bac2b5e9... (the book's: yes); NUMSTOCKITEMS reported 1 (as received ' 1')
+C2: 4830 B sha256=6552677a10bdb179ae0fc5d61bd5615ecb6aceb37c175bbac0ff5b91d6553979; 1 COMPANY row(s) at BODY/DATA/COLLECTION
+  GUID bac2b5e9... (the book's: yes); NUMSTOCKITEMS reported 1 (as received ' 1')
+I1: 8270 B sha256=92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4; 1 STOCKITEM row(s) at BODY/DATA/COLLECTION
+  'SC Sibling Goods' (16 characters): GUID bac2b5e9...-000000d0, bound to the book: yes
+  rows bound to the book (GUID prefix and BRIDGECOMPANYGUID): 1 of 1
+I2: 8270 B sha256=92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4; 1 STOCKITEM row(s) at BODY/DATA/COLLECTION
+  'SC Sibling Goods' (16 characters): GUID bac2b5e9...-000000d0, bound to the book: yes
+  rows bound to the book (GUID prefix and BRIDGECOMPANYGUID): 1 of 1
+G1: 4170 B sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a; 1 STOCKGROUP row(s) at BODY/DATA/COLLECTION
+  'SC Goods Group' (14 characters): GUID bac2b5e9...-000000cf, bound to the book: yes
+  rows bound to the book (GUID prefix and BRIDGECOMPANYGUID): 1 of 1
+G2: 4170 B sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a; 1 STOCKGROUP row(s) at BODY/DATA/COLLECTION
+  'SC Goods Group' (14 characters): GUID bac2b5e9...-000000cf, bound to the book: yes
+  rows bound to the book (GUID prefix and BRIDGECOMPANYGUID): 1 of 1
+U1: 4040 B sha256 cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39; 1 UNIT row(s) at BODY/DATA/COLLECTION
+  'Nos' (3 characters): GUID bac2b5e9...-000000ce, bound to the book: yes
+  rows bound to the book (GUID prefix and BRIDGECOMPANYGUID): 1 of 1
+U2: 4040 B sha256 cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39; 1 UNIT row(s) at BODY/DATA/COLLECTION
+  'Nos' (3 characters): GUID bac2b5e9...-000000ce, bound to the book: yes
+  rows bound to the book (GUID prefix and BRIDGECOMPANYGUID): 1 of 1
+M2: 3318 B sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1; 1 COMPANY row(s) at BODY/DATA/COLLECTION
+  GUID bac2b5e9... (the book's: yes), ALTMSTID 210, ALTVCHID absent
+-- pairs
+C1/C2: byte-equal yes; rows equal yes
+I1/I2: byte-equal yes; rows equal yes
+G1/G2: byte-equal yes; rows equal yes
+U1/U2: byte-equal yes; rows equal yes
+M1/M2: byte-equal yes; rows equal yes
+-- the count against the rows
+I1 rows against C1's NUMSTOCKITEMS: 1 and 1: equal
+I2 rows against C1's NUMSTOCKITEMS: 1 and 1: equal
+I1 rows against C2's NUMSTOCKITEMS: 1 and 1: equal
+I2 rows against C2's NUMSTOCKITEMS: 1 and 1: equal
+-- marks between M1 and M2
+M1 ALTMSTID 210, ALTVCHID absent; M2 ALTMSTID 210, ALTVCHID absent: equal
+-- against the answers recorded for the book at BK0 (1381-O; committed as the stock-create-lab captures)
+M1 against stock-create-lab-marks.utf16le.xml: byte-equal yes; rows equal yes
+I1 against stock-create-lab-items-before.utf16le.xml: byte-equal yes; rows equal yes
+G1 against stock-create-lab-groups.utf16le.xml: byte-equal yes; rows equal yes
+U1 against stock-create-lab-units.utf16le.xml: byte-equal yes; rows equal yes
+ALL 10 ANSWERS READ
+exit 0

@@ -1,0 +1,16 @@
+PIN EQUAL render_native_masters_request/Units f770f30291db013086e095699575da543aaa67ad11430cf8342eb92a0deedea0
+PIN EQUAL render_native_masters_request/StockGroups 28870e661f3033d826cba42bb0ec5913a577ff414cf0b236f5214571150b3c32
+PIN EQUAL render_candidate_stock_items_request fcdd6a527ba17f195f52059534e80ab2912b22daf2553c655cbc35406c88883c
+PIN EQUAL render_company_inventory_flags_request 17117b83acbbb905dd3436fd891f23aa2e14b168415d8e581059f6dc4b8ee924
+PIN EQUAL render_agent_company_high_water 3ebd4c55a69823a2980947db575bdb50dbbfb542b4ddc7507f4ecf2984be8264
+READ, NO DATES requests/marks.utf16le.xml
+READ, NO DATES requests/count.utf16le.xml
+READ, NO DATES requests/items.utf16le.xml
+READ, NO DATES requests/groups.utf16le.xml
+READ, NO DATES requests/units.utf16le.xml
+CONTROL FIRED: a pin, for a company one character different
+CONTROL FIRED: the structure check, on the marks read with a date window added
+CONTROL FIRED: the structure check, on the marks read made an Import
+CONTROL FIRED: the structure check, on the marks read with no byte-order mark
+5 pins equal; 5 book requests each a read with no date window; 4 controls fired
+exit 0

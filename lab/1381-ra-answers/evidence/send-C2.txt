@@ -1,0 +1,2 @@
+2026-11-25T20:41:07.473Z C2 requests/count.utf16le.xml 1654 B sha256=55f751fed504974e3ba084bbfd8831c62edd1fcc3b574d8af35666c49a00823c | curl exit 0 status 200 CONTENT-LENGTH 4830 answer 4830 B sha256=6552677a10bdb179ae0fc5d61bd5615ecb6aceb37c175bbac0ff5b91d6553979 | first byte 0.004758 s total 0.023024 s | VERDICT SENT-OK
+exit 0

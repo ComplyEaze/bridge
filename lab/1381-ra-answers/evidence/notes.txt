@@ -1,0 +1,19 @@
+Row 1381-RA notes. Times UTC, 2026-11-25. One sitting. Tally: TallyPrime 7.2, Educational Mode, pid 23160, port 9001.
+
+20:38:09Z  before step 0: the sheet branch fetched, head 30f5c820d6601765f3bc680301dfb2f2b2ec3a96 as the GO names; its folder read whole with LAB-COMMON-RA.md.
+20:38:34Z  step 0: the folder made (made, exit 0); fetch exit 0; copy exit 0, 0; check_sheet.py --fresh four OK lines, exit 0; 6c9e6b33 present; fixtures exit 0, 0 (20:38:38Z).
+20:38:47Z  step 0: the six self-checks, each exit 0 (to 20:38:50Z); their scratch under local/selftest/.
+20:38:51Z  step 0: no bridge_mcp.exe running; tally.exe one line, pid 23160; netstat: 40 LISTENING lines, :9001 on 0.0.0.0 and [::] owned by pid 23160.
+20:38:54Z  step 0: screenshot local/shots/s0-window.jpg: Select Company, no company loaded, title band TallyPrime EDU, no dialog.
+20:39:02Z  step 0: GET /status: 200, 51 bytes, curl exit 0 (the last act of step 0).
+20:39:09Z  step 1 (load): one click in the Select Company filter box; typed BRIDGE, then a space and STOCK: three rows left.
+20:40:23Z  step 1: typed a space and CREATE: one row left, BRIDGE STOCK CREATE LAB, highlighted; screenshot local/shots/s1-select.jpg, title band EDU.
+20:40:34Z  step 1: Enter. Screenshot local/shots/s1-gateway.jpg: Gateway of Tally, BRIDGE STOCK CREATE LAB the one company, No Vouchers Entered, title band EDU, no dialog. Period 1-Apr-25 to 31-Mar-26; current date Tuesday, 1-Apr-2025.
+20:40:48Z  step 2: M1 sent, VERDICT SENT-OK, exit 0. 20:40:52Z measure.py state: BOOK STATE MET (ALTMSTID 210, ALTVCHID absent), exit 0.
+20:40:56Z  step 3: C1 sent, VERDICT SENT-OK, exit 0. 20:40:58Z screenshot local/shots/s3-after-c1.jpg: the Gateway as at step 1, title band EDU, no dialog. 20:41:07Z C2 sent, VERDICT SENT-OK, exit 0.
+20:41:07Z  step 4: I1, I2, G1, G2, U1 and U2 sent in that order, each VERDICT SENT-OK and exit 0 (to 20:41:09Z).
+20:41:10Z  step 5: M2 sent, VERDICT SENT-OK, exit 0. 20:41:12Z screenshot local/shots/s5-after-m2.jpg: the Gateway as at step 1, title band EDU, no dialog.
+20:41:20Z  step 6: measure.py all: ALL 10 ANSWERS READ, exit 0.
+20:41:24Z  step 7 (close): one click on the Gateway's left panel; Alt+K (the Company menu opened); 20:41:29Z one click on SHut (the Shut Company list showed the one row); 20:41:36Z Enter on BRIDGE STOCK CREATE LAB. Select Company followed directly: no renewal dialog and no License screen came, so no licence key or click was made.
+20:41:48Z  step 7: screenshot local/shots/s7-select.jpg: Select Company, no company loaded, title band EDU, no dialog.
+20:41:50Z  step 7: tally.exe one line, pid 23160; netstat: 40 LISTENING lines, :9001 on 0.0.0.0 and [::] owned by pid 23160; GET /status: 200, 51 bytes, curl exit 0. No XML request after the shut. A further tasklist found no bridge_mcp.exe (printed, not filed).

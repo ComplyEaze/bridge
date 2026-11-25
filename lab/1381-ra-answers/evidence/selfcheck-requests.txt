@@ -1,0 +1,7 @@
+5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b  990  requests/marks.utf16le.xml
+55f751fed504974e3ba084bbfd8831c62edd1fcc3b574d8af35666c49a00823c  1654  requests/count.utf16le.xml
+581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1  1330  requests/items.utf16le.xml
+d79503503a31c4fee4195b2e03308c2833aa2e9c3072bd4cc0ed1f73d9121245  1144  requests/groups.utf16le.xml
+3f79503b5480a6e3a23ec6fb8fc8fd5ca8200d4f0889590c994d1240ed299d0c  1174  requests/units.utf16le.xml
+5 requests equal to the render; each one Export of a Collection, no date window, no import
+exit 0

@@ -1,0 +1,7 @@
+FIXTURE EQUAL masters_stock_groups_request.utf16le.xml 1130 B: groups for BRIDGE SHAPE LAB (native_masters_tests.rs:152-160)
+FIXTURE EQUAL masters_units_request.utf16le.xml 1160 B: units for BRIDGE SHAPE LAB (native_masters_tests.rs:152-160)
+FIXTURE EQUAL company_inventory_flags_request.utf16le.xml 1640 B: count for BRIDGE SHAPE LAB and its GUID (native_stock_summary_tests.rs:278-283)
+FIXTURE EQUAL agent/stock-create-lab/stock-create-lab-items.request.utf16le.xml 1330 B: items for this book (tests/stock_item_candidate_request.rs:17-28)
+FIXTURE EQUAL note-days/shape_lab_company_marks_request.utf16le.xml 976 B: marks for BRIDGE SHAPE LAB (a committed request; no Rust test reads it, the pin above is the code's check)
+5 fixtures, all byte-equal
+exit 0

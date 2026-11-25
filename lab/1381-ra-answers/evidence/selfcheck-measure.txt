@@ -1,0 +1,29 @@
+RIGHT state, the recorded marks: []
+RIGHT state, ALTMSTID 211: ["ALTMSTID '211', not '210'"]
+RIGHT state, a voucher mark: ["an ALTVCHID element ('1'); the recorded state has none"]
+RIGHT state, a second company loaded: ['2 COMPANY rows, not 1 (a company other than the book is loaded, or none)']
+RIGHT state, no company row (CMPINFO's COMPANY line is not a row): ['0 COMPANY rows, not 1 (a company other than the book is loaded, or none)']
+RIGHT state, another GUID: ["the row's GUID is ffffffff..., not the book's"]
+RIGHT state, an answer cut short: True
+RIGHT state, an empty answer: 'NOT READ: empty answer'
+RIGHT state, Tally's error envelope: 'NOT READ: HEADER/STATUS is not 1'
+RIGHT count, the edited capture: [('bac2b5e9', "reported 1 (as received ' 1')")]
+RIGHT count, the capture as kept, SHAPE LAB's row: [('3a6bd6e1', "reported 11 (as received ' 11')")]
+RIGHT count, NUMSTOCKITEMS removed: [('bac2b5e9', 'unavailable: absent')]
+RIGHT count, NUMSTOCKITEMS empty: [('bac2b5e9', 'unavailable: empty')]
+RIGHT count, NUMSTOCKITEMS grouped: [('bac2b5e9', 'unavailable: not plain digits (5 characters)')]
+RIGHT all, the captures: exit: 0
+RIGHT all, the captures: the line C1/C2: byte-equal yes; rows equal yes...: True
+RIGHT all, the captures: the line I1 rows against C1's NUMSTOCKITEMS: 1 an...: True
+RIGHT all, the captures: the line M1 ALTMSTID 210, ALTVCHID absent; M2 ALT...: True
+RIGHT all, the captures: the line I1 against stock-create-lab-items-before...: True
+RIGHT all, the captures: the line rows bound to the book (GUID prefix and ...: True
+RIGHT all, I2 two rows and M2 moved: exit (still a measurement): 0
+RIGHT all, a changed pair: the line I1/I2: byte-equal no; rows equal no...: True
+RIGHT all, a changed pair: the line I2 rows against C2's NUMSTOCKITEMS: 2 an...: True
+RIGHT all, a changed pair: the line M1 ALTMSTID 210, ALTVCHID absent; M2 ALT...: True
+RIGHT all, G2 differing outside its rows only: True
+RIGHT all, C2's send failed: exit: 2
+RIGHT all, C2's send failed: never zero rows: True
+27 cases, 27 right
+exit 0

@@ -1,0 +1,7 @@
+Replacements in text files and file names, with counts:
+<the Bridge repository>: 1
+label: 'status=\1, bytes=\2, first byte=\3, total=\4': 10
+label: \1=: 40
+label: exit 0, 0: 2
+label: status=\1, bytes=\2: 2
+stop: 2

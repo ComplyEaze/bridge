@@ -1,0 +1,25 @@
+RIGHT verdict, a whole answer: []
+RIGHT verdict, connection refused: ['curl exit 7', 'status 000', 'no CONTENT-LENGTH', 'empty answer']
+RIGHT verdict, status 500: ['status 500']
+RIGHT verdict, a cut answer: ['curl exit 18', 'CONTENT-LENGTH 4 but 2 bytes written']
+RIGHT verdict, an empty 200: ['empty answer']
+RIGHT verdict, no CONTENT-LENGTH: ['no CONTENT-LENGTH']
+RIGHT verdict, curl's size differs: ["curl's size 5 but 4 bytes written"]
+RIGHT verdict, above the bound: ['2000002 bytes, above the 2000000-byte bound: kept, not used']
+RIGHT order, M1 first: admitted
+RIGHT order, C1 before M1: refused: the log holds [], not ['M1']: out of order
+RIGHT order, C1 after M1, state met: admitted
+RIGHT order, C1 after M1, no state file: refused: local/evidence/m1-state.txt does not hold `BOOK STATE MET` and `exit 0` (measure.py state)
+RIGHT order, C1 after M1, state without exit 0: refused: local/evidence/m1-state.txt does not hold `BOOK STATE MET` and `exit 0` (measure.py state)
+RIGHT order, C1 after M1, state a stop: refused: local/evidence/m1-state.txt does not hold `BOOK STATE MET` and `exit 0` (measure.py state)
+RIGHT order, M1 again: refused: M1 is in the send log already: a read is sent once in the row's life
+RIGHT order, I1 before C2: refused: the log holds ['M1', 'C1'], not ['M1', 'C1', 'C2']: out of order
+RIGHT order, U2 in turn: admitted
+RIGHT order, M2 last: admitted
+RIGHT order, anything after M2: refused: M1 is in the send log already: a read is sent once in the row's life
+RIGHT order, C2 after C1 failed: refused: C1 failed: nothing more is sent (stop-REQUEST-FAILED)
+RIGHT order, a label not in the row: refused: 'X1' is not one of M1 C1 C2 I1 I2 G1 G2 U1 U2 M2
+RIGHT log reader, one SENT-OK line
+RIGHT log reader, a stray line refuses
+23 cases, 23 right
+exit 0

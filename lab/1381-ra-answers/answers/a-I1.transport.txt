@@ -1,0 +1,11 @@
+label I1
+request requests/items.utf16le.xml 1330 B sha256=581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1
+start 2026-11-25T20:41:07.870Z
+end 2026-11-25T20:41:07.959Z
+curl exit 0
+curl -w line: 'status=200, bytes=8270, first byte=0.064297, total=0.065622'
+last status line: HTTP/1.1 200 OK
+CONTENT-LENGTH: 8270
+answer file: present, 8270 B sha256=92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4
+curl error output (0 characters): ''
+VERDICT SENT-OK

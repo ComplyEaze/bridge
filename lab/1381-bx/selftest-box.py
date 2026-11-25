@@ -46,7 +46,7 @@ S = '2026-11-26T10:00:0{}.000Z '
 BUTTONS = [('&Yes', (840, 900, 928, 926)), ('&No', (938, 900, 1026, 926)), ('Cancel', (1036, 900, 1124, 926))]
 def log(kind, title=None, cls='#32770', buttons=BUTTONS, lines=None, text_rect=(760, 220, 1230, 880), box=(688, 162, 1252, 945),
         crlf=False, extra_text=False, nobox=False):
-    # box.ps1's log form (box.ps1:57-68): BOX SEEN, rect, foreground, one line per child, capture, WAITING; Add-Content
+    # box.ps1's log form (box.ps1:76-83): BOX SEEN, rect, foreground (title as length and sha256), one line per child, capture, WAITING; Add-Content
     # writes CRLF after each logged line and the child's own text keeps the line breaks it holds.
     if nobox:
         return (S.format(0) + 'watch start\r\n' + S.format(9) + 'NO BOX seen within 30 s\r\n').encode('utf-8-sig')
@@ -55,7 +55,7 @@ def log(kind, title=None, cls='#32770', buttons=BUTTONS, lines=None, text_rect=(
     out = [S.format(0) + 'watch start: tally window 0x0; see within 30 s; answer by 90 s',
            S.format(1) + f"BOX SEEN 0x1a2b pid 4242 title '{title if title is not None else TITLE[kind]}' class {cls}",
            S.format(1) + f'rect {box[0]},{box[1]},{box[2]},{box[3]} (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally -1 (lower = nearer the top); above tally False',
-           S.format(1) + 'foreground 0x1a2b pid 4242 bridge_mcp title \'x\'']
+           S.format(1) + 'foreground 0x1a2b pid 4242 bridge_mcp title 1 chars sha256 ' + '2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881']
     out += [S.format(1) + f'child Button rect {r[0]},{r[1]},{r[2]},{r[3]} text: {b}' for b, r in buttons]
     out.append(S.format(1) + 'child Static rect 700,220,732,252 text: ')
     out.append(S.format(1) + f'child Static rect {text_rect[0]},{text_rect[1]},{text_rect[2]},{text_rect[3]} text: {body}')

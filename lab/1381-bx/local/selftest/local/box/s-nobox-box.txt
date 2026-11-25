@@ -1,0 +1,2 @@
+﻿2026-11-26T10:00:00.000Z watch start
+2026-11-26T10:00:09.000Z NO BOX seen within 30 s

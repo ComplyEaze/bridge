@@ -1,5 +1,6 @@
-# Row 1381-BX's copy of row 2162-SALES-Q's box.ps1 (blob b105f7cc), with three changes, each marked 1381-BX: Cancel is a
-# third answer; no valid answer file by -AnswerBy presses nothing (exit 6, the box left up); no running Tally is no error.
+# Row 1381-BX's copy of row 2162-SALES-Q's box.ps1 (blob b105f7cc), with four changes, each marked 1381-BX: Cancel is a
+# third answer; no valid answer file by -AnswerBy presses nothing (exit 6, the box left up); no running Tally is no error;
+# the foreground window's title is written only to a local-only file, the log carrying its length and sha256.
 # Lab helper (0.7.0 RC sitting, not product code): waits for one ComplyEaze Bridge box, records it, and clicks the button
 # the lab names. DPI-aware. From the start it polls every 0.25 s for a visible top-level window whose title starts with
 # "ComplyEaze Bridge" owned by a bridge_mcp.exe; when seen it logs the time, its rect, its extended style (topmost bit),
@@ -50,7 +51,17 @@ function Shot([string]$name) {
     $out = Join-Path $boxDir "$Tag-$name.png"; $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
     $hash = (Get-FileHash $out).Hash.ToLower(); Log "capture $Tag-$name.png ${sw}x${sh} $((Get-Item $out).Length) B sha256 $hash"
 }
-function FgText { $fg = [BX]::GetForegroundWindow(); $fgPid = [BX]::PidOf($fg); $fgName = (Get-Process -Id $fgPid -ErrorAction SilentlyContinue).ProcessName; "foreground 0x$($fg.ToInt64().ToString('x')) pid $fgPid $fgName title '$([BX]::Txt($fg))'" }
+# 1381-BX: the foreground window's title goes only to <RowDir>\private\<Tag>-foreground.txt, kept on the lab PC (B8); the
+# box log, which is pushed, carries its length in characters and the sha256 of its UTF-8 bytes.
+$privDir = Join-Path $RowDir 'private'; if (-not (Test-Path $privDir)) { New-Item -ItemType Directory $privDir | Out-Null }
+$fgFile = Join-Path $privDir "$Tag-foreground.txt"
+function FgText([string]$where) {
+    $fg = [BX]::GetForegroundWindow(); $fgPid = [BX]::PidOf($fg); $fgName = (Get-Process -Id $fgPid -ErrorAction SilentlyContinue).ProcessName
+    $t = [string]([BX]::Txt($fg)); $hx = "0x$($fg.ToInt64().ToString('x'))"
+    Add-Content -Encoding utf8 $fgFile "$(Stamp) $where foreground $hx pid $fgPid $fgName title '$t'"
+    $h = -join ([System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($t)) | ForEach-Object { $_.ToString('x2') })
+    "foreground $hx pid $fgPid $fgName title $($t.Length) chars sha256 $h"
+}
 $bridgePids = @(); $tallyProc = Get-Process tally -ErrorAction SilentlyContinue | Select-Object -First 1  # 1381-BX
 $tallyHandle = if ($tallyProc) { [IntPtr][int64]$tallyProc.MainWindowHandle } else { [IntPtr]::Zero }  # 1381-BX: 0x0 = no Tally
 Log "watch start: tally window 0x$($tallyHandle.ToInt64().ToString('x')); see within $SeeWithin s; answer by $AnswerBy s"
@@ -66,7 +77,7 @@ $seenAt = Get-Date; Log "BOX SEEN 0x$($boxHandle.ToInt64().ToString('x')) pid $(
 $r = [BX]::Rect($boxHandle); $ex = [BX]::GetWindowLong($boxHandle, -20)
 $tops = [BX]::Tops(); $boxPlace = $tops.IndexOf($boxHandle); $tallyPlace = $tops.IndexOf($tallyHandle)
 Log "rect $($r.L),$($r.T),$($r.R),$($r.B) (screen $([BX]::GetSystemMetrics(0))x$([BX]::GetSystemMetrics(1))); exstyle 0x$($ex.ToString('x')) topmost $([int](($ex -band 8) -ne 0)); z-order place box $boxPlace tally $tallyPlace (lower = nearer the top); above tally $($boxPlace -lt $tallyPlace)"
-Log (FgText)
+Log (FgText 'seen')
 foreach ($kid in [BX]::Kids($boxHandle)) { $kr = [BX]::Rect($kid); Log "child $([BX]::Cls($kid)) rect $($kr.L),$($kr.T),$($kr.R),$($kr.B) text: $([BX]::Txt($kid))" }
 Shot 'open'
 Log "WAITING for $answerFile"
@@ -80,9 +91,9 @@ if ($choice -ne 'Yes' -and $choice -ne 'No' -and $choice -ne 'Cancel') { Log "NO
 $btn = [IntPtr]::Zero; foreach ($kid in [BX]::Kids($boxHandle)) { if ([BX]::Cls($kid) -eq 'Button' -and ([BX]::Txt($kid) -replace '&', '') -eq $choice) { $btn = $kid } }
 if ($btn -eq [IntPtr]::Zero) { Log "button $choice not found: no click"; Shot 'nobutton'; exit 5 }
 $br = [BX]::Rect($btn); $cx = [int](($br.L + $br.R) / 2); $cy = [int](($br.T + $br.B) / 2)
-Log "before click: $(FgText)"
+Log "before click: $(FgText 'before click')"
 [BX]::LeftAt($cx, $cy); $clickAt = Get-Date
 Log "CLICKED $choice at $cx,$cy (physical) $(Stamp); seen-to-click $([Math]::Round(($clickAt - $seenAt).TotalSeconds, 1)) s"
 Start-Sleep -Milliseconds 800
-Log "after click: box visible $([BX]::IsWindowVisible($boxHandle)); $(FgText)"
+Log "after click: box visible $([BX]::IsWindowVisible($boxHandle)); $(FgText 'after click')"
 exit 0

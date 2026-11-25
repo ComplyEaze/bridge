@@ -7,7 +7,8 @@ checks: its five arms (LN, SN, SC, SY, ST) each in the arm table, Steps and Deci
 the lines of box.ps1, boxcheck.py and arm.py that keep the box from being pressed but by a passed check, each exactly
 once, among them arm.py's line that gives ST no guard, no check and no answer file; box.ps1's old default No absent; arm.py's arms equal to the table's; no GUID-shaped text in the two rule files; and
 no value that names the build (BUILD.txt's hex fields but CODE COMMIT) in any file but BUILD.txt. Only local/ is skipped:
-any other file outside SHA256.txt is an error. While BUILD.txt holds <TO FILL> fields it says how many and still exits 0
+any other file outside SHA256.txt is an error, and a __pycache__ folder (bytecode a helper wrote) is named in its own
+STOP-PYCACHE line first; nothing is deleted. While BUILD.txt holds <TO FILL> fields it says how many and still exits 0
 (the sheet is whole; build.py check is what stops the sitting).
 """
 
@@ -40,6 +41,7 @@ HELD = (
     ("arm.py", "ARMS = {'LN': ('masters', 'No', 'in/ledger-input.txt'), 'SN': ('stock', 'No', 'in/stock-input.txt'),\n"
                "        'SC': ('stock', 'Cancel', 'in/stock-input.txt'), 'SY': ('stock', 'Yes', 'in/stock-input.txt'),\n"
                "        'ST': ('stock', None, 'in/stock-large-input.txt')}\n"),
+    ("arm.py", "import sys\nsys.dont_write_bytecode = True  # 1381-BX"),
     ("arm.py", "    if ans is None:  # ST: no guard, no check, no answer file, whatever the box shows\n"),
 )
 # box.ps1's default No at its deadline, as row 2162-SALES-Q's copy has it; this row's copy must not.
@@ -121,6 +123,16 @@ def build_values(files):
     return len(re.findall(r"^[A-Z0-9 ]+: <TO FILL", text, re.M)), errors
 
 
+def pycache_hits(paths):
+    """The __pycache__ folders among relative paths (posix), each named once, outermost."""
+    hits = set()
+    for name in paths:
+        parts = pathlib.PurePosixPath(name).parts
+        if "__pycache__" in parts:
+            hits.add("/".join(parts[: parts.index("__pycache__") + 1]))
+    return sorted(hits)
+
+
 def manifest():
     entries, errors = {}, []
     for line in (ROOT / "SHA256.txt").read_text(encoding="utf-8").splitlines():
@@ -154,6 +166,12 @@ def manifest():
 
 def main():
     try:
+        found = [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*")
+                 if p.relative_to(ROOT).parts[0] not in SKIP_DIRS]
+        hits = pycache_hits(found)
+        if hits:
+            print(f"STOP-PYCACHE: {', '.join(hits)} in the row folder: bytecode a helper wrote there; nothing is deleted, "
+                  "record it and stop")
         checked, missing = references()
         files, errors = manifest()
         errors.extend(arms())
@@ -163,6 +181,8 @@ def main():
         print(f"FAILED READ: {type(e).__name__}: {e}")
         return 2
     errors.extend(f"a rule file names a missing file: {name}" for name in missing)
+    if hits and not errors:
+        errors.append("a __pycache__ folder is present (STOP-PYCACHE above)")
     if errors:
         for error in errors[:100]:
             print("ERROR", error)

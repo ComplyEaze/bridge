@@ -1,0 +1,34 @@
+not-a-nonce
+1
+Press Y (or click Yes) to create this stock item in Tally. Press N (or click No) to cancel. Nothing
+is created until you answer.
+
+Create ONE stock item in "BRIDGE STOCK CREATE LAB"
+Company GUID: bac2b5e9-ada9-43c0-b8f8-a2812a813fa1
+Company number: 1  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9000
+
+Create stock item "SC Copied Marked"
+All six copied fields come from sibling stock item "SC Sibling Goods".
+Parent (stock group): "SC Goods Group" — source: "SC Sibling Goods"
+Base unit: "Nos" — source: "SC Sibling Goods"
+GST applicability: "&#4; Applicable" — source: "SC Sibling Goods"
+Type of supply: "Goods" — source: "SC Sibling Goods"
+GST details entry 1 — source: "SC Sibling Goods"
+  Applicable from: "20250401"
+  Taxability: "Taxable"
+  Source of GST details: "Specify Details Here"
+  State row 1: "&#4; Any"
+  Rate row 1: "CGST"; valuation: "Based on Value"; rate: "9"
+  Rate row 2: "SGST/UTGST"; valuation: "Based on Value"; rate: "9"
+  Rate row 3: "IGST"; valuation: "Based on Value"; rate: "18"
+  Rate row 4: "Cess"; valuation: "&#4; Not Applicable"; rate: absent
+  Rate row 5: "State Cess"; valuation: "Based on Value"; rate: absent
+  GST slab rates: empty
+HSN details entry 1 — source: "SC Sibling Goods"
+  Applicable from: "20250401"
+  HSN code: "39239090"
+  HSN description: "Plastic Articles for Conveyance"
+  Source of HSN details: "Specify Details Here"
+
+Do not create or rename stock items in Tally until this is done.

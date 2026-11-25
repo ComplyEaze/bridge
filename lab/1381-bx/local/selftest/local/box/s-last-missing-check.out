@@ -1,0 +1,14 @@
+2026-11-25T19:24:36.304Z check of s-last-missing, mode stock, answer Yes (log read whole after 1 read(s); 1455 bytes of text fed; line breaks read as CR LF: 0)
+PASS box seen
+PASS title exactly 'ComplyEaze Bridge — create one stock item?'
+PASS class #32770
+PASS the input: a nonce line, the count 1, a text
+PASS exactly three buttons, Yes, No and Cancel (found ['Yes', 'No', 'Cancel'])
+PASS exactly one text child, beginning with the answer text (found 1)
+FAIL the text is the input line for line: 31 lines read, 32 fed
+PASS the box rectangle was logged
+PASS the text child lies inside the box
+PASS every button lies inside the box, below the text
+FAIL (first differing line: 32)
+NOT ALL PASS
+2026-11-25T19:24:36.305Z no answer file written: nothing is pressed, the box is left up (STOP-CHECK)

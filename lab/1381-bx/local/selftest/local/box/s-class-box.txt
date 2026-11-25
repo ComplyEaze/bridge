@@ -1,0 +1,42 @@
+﻿2026-11-26T10:00:00.000Z watch start: tally window 0x0; see within 30 s; answer by 90 s
+2026-11-26T10:00:01.000Z BOX SEEN 0x1a2b pid 4242 title 'ComplyEaze Bridge — create one stock item?' class Static
+2026-11-26T10:00:01.000Z rect 688,162,1252,945 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally -1 (lower = nearer the top); above tally False
+2026-11-26T10:00:01.000Z foreground 0x1a2b pid 4242 bridge_mcp title 1 chars sha256 2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
+2026-11-26T10:00:01.000Z child Button rect 840,900,928,926 text: &Yes
+2026-11-26T10:00:01.000Z child Button rect 938,900,1026,926 text: &No
+2026-11-26T10:00:01.000Z child Button rect 1036,900,1124,926 text: Cancel
+2026-11-26T10:00:01.000Z child Static rect 700,220,732,252 text: 
+2026-11-26T10:00:01.000Z child Static rect 760,220,1230,880 text: Press Y (or click Yes) to create this stock item in Tally. Press N (or click No) to cancel. Nothing
+is created until you answer.
+
+Create ONE stock item in "BRIDGE STOCK CREATE LAB"
+Company GUID: bac2b5e9-ada9-43c0-b8f8-a2812a813fa1
+Company number: 1  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9000
+
+Create stock item "SC Copied Marked"
+All six copied fields come from sibling stock item "SC Sibling Goods".
+Parent (stock group): "SC Goods Group" — source: "SC Sibling Goods"
+Base unit: "Nos" — source: "SC Sibling Goods"
+GST applicability: "&#4; Applicable" — source: "SC Sibling Goods"
+Type of supply: "Goods" — source: "SC Sibling Goods"
+GST details entry 1 — source: "SC Sibling Goods"
+  Applicable from: "20250401"
+  Taxability: "Taxable"
+  Source of GST details: "Specify Details Here"
+  State row 1: "&#4; Any"
+  Rate row 1: "CGST"; valuation: "Based on Value"; rate: "9"
+  Rate row 2: "SGST/UTGST"; valuation: "Based on Value"; rate: "9"
+  Rate row 3: "IGST"; valuation: "Based on Value"; rate: "18"
+  Rate row 4: "Cess"; valuation: "&#4; Not Applicable"; rate: absent
+  Rate row 5: "State Cess"; valuation: "Based on Value"; rate: absent
+  GST slab rates: empty
+HSN details entry 1 — source: "SC Sibling Goods"
+  Applicable from: "20250401"
+  HSN code: "39239090"
+  HSN description: "Plastic Articles for Conveyance"
+  Source of HSN details: "Specify Details Here"
+
+Do not create or rename stock items in Tally until this is done.
+2026-11-26T10:00:02.000Z capture x-open.png 1920x1080 1 B sha256 0
+2026-11-26T10:00:02.000Z WAITING for answer

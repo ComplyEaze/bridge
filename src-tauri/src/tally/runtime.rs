@@ -48,7 +48,10 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 
 #[path = "runtime_masters.rs"]
 mod masters;
-pub(crate) use masters::{MastersKind, MastersReadError, MastersRows, VoucherNumberingRead};
+pub(crate) use masters::{
+    AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits, MastersKind, MastersReadError,
+    MastersRows, StockItemReadKind, VoucherNumberingRead,
+};
 
 #[cfg(test)]
 #[path = "runtime_masters_tests.rs"]

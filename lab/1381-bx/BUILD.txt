@@ -1,0 +1,14 @@
+# Row 1381-BX: the one build this row runs, and the exe it moves aside. The only file that names the build.
+# Every <TO FILL> is filled by the run coordinator in one commit, from the CI run and the artifact; until then build.py
+# check exits 1 and no step after step 0 runs. Nothing else in the row carries these values: build.py and arm.py read them here.
+BUILD COMMIT: <TO FILL: the master commit that merges pull request 2596>
+CODE COMMIT: 48a6496507132576a6be150c155192f647528e1e
+CI RUN: <TO FILL: the Bridge CI run on BUILD COMMIT that made the Windows bundle>
+ARTIFACT NAME: unsigned-bundle-smoke-windows-latest
+ARTIFACT ID: <TO FILL: that run's artifact id>
+ARTIFACT BYTES: <TO FILL: the artifact's size in bytes>
+ZIP DIGEST: <TO FILL: the artifact's sha256 digest>
+MCPB SHA256: <TO FILL: archive_sha256 of bridge-tally.mcpb in that artifact's mcpb-smoke.json>
+EXE SHA256: <TO FILL: binary_sha256 in the same mcpb-smoke.json>
+GRANTED PATH: C:/bridge-lab/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe
+ASIDE SHA256: 1e3dd5402178d6ae5576d7c410cc54247e2faf0864d291f6b56cbdc91ff76b59

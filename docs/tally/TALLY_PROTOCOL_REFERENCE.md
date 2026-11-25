@@ -521,6 +521,9 @@ base revision.
 <a id="12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-two-ledger-vouchers-displays-of-another-period-grew-nothing-partial"></a>
 
 [12a.32 Either service code's voucher list alone grew both service ledgers' rate answer, and two Ledger Vouchers displays of another period grew nothing (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-two-ledger-vouchers-displays-of-another-period-grew-nothing-partial)
+<a id="12a33-in-one-grown-state-of-tallys-rate-answer-the-build-without-the-rate-row-change-refused-the-test-invoice-and-the-build-with-it-admitted-it-partial"></a>
+
+[12a.33 In one grown state of Tally's rate answer, the build without the rate-row change refused the test invoice and the build with it admitted it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a33-in-one-grown-state-of-tallys-rate-answer-the-build-without-the-rate-row-change-refused-the-test-invoice-and-the-build-with-it-admitted-it-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

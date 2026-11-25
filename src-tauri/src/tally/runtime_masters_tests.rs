@@ -2223,6 +2223,32 @@ fn support_reads_are_paired_sized_company_bound_and_of_their_own_kind() {
     )
     .expect_err("a group token admits no units");
     assert!(cause::<StockItemReadKindError>(&wrong_unit_token).is_some());
+    // The candidate read takes only its own token, and neither support read
+    // takes the candidate's.
+    for kind in [StockItemReadKind::StockGroups, StockItemReadKind::Units] {
+        let wrong_candidate_token = admit_candidate_stock_item_read(
+            StockItemReadSize::new(kind, 489).unwrap(),
+            &shape_identity(),
+            stable_admission_pair(admission_capture(SHAPE_ITEMS_BASELINE)),
+            stable_admission_pair(admission_capture(SHAPE_COUNT)),
+        )
+        .expect_err("a support token admits no candidate read");
+        assert!(cause::<StockItemReadKindError>(&wrong_candidate_token).is_some());
+    }
+    let candidate_token_groups = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 210).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("a candidate token admits no groups");
+    assert!(cause::<StockItemReadKindError>(&candidate_token_groups).is_some());
+    let candidate_token_units = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 210).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("a candidate token admits no units");
+    assert!(cause::<StockItemReadKindError>(&candidate_token_units).is_some());
 
     // These AlterID and byte faults are constructed admission vectors, not new
     // captures. Both support reads use the same shared premise reasons.

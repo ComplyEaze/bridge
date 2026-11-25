@@ -1016,6 +1016,9 @@ fn stock_recheck_refuses_a_name_taken_since_approval() {
 
 #[test]
 fn stock_recheck_does_not_treat_a_stock_group_or_unit_name_as_an_item_collision() {
+    // Measured, PARTIAL: Creates named like the book's stock group and unit each
+    // answered CREATED 1 and left the group and unit rows unchanged (§12a.13,
+    // the near-name Creates entry).
     for proposed in ["SC Goods Group", "Nos"] {
         let mut case = stock_recheck_case();
         case.proposed = proposed.to_string();
@@ -1375,4 +1378,44 @@ fn stock_recheck_takes_the_binding_mark_from_the_named_target_not_a_same_guid_si
             }
         )
     });
+}
+
+#[test]
+fn an_admitted_draft_refuses_support_reads_of_another_company() {
+    // The recheck's own company check runs first, so this calls the draft
+    // maker directly to reach its check.
+    let own = stock_identity_from_capture();
+    let other = VerifiedCompanyIdentity::test_fixture("BRIDGE STOCK CREATE LAB OTHER", STOCK_GUID);
+    let catalogue = crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
+        &own,
+        &stock_capture(STOCK_BEFORE),
+    )
+    .unwrap();
+    let complete = CompleteStockItemCatalogue::from_catalogue_for_test(catalogue, 210);
+    let proposed = MasterName::new(STOCK_PROPOSED).unwrap();
+    let source = MasterName::new(STOCK_SOURCE).unwrap();
+    let groups_body = stock_capture(STOCK_GROUPS);
+    let units_body = stock_capture(STOCK_UNITS);
+    for (groups_identity, units_identity) in [(&other, &own), (&own, &other)] {
+        let groups =
+            AdmittedStockGroups::from_capture_for_test(groups_identity, &groups_body, 210).unwrap();
+        let units =
+            AdmittedStockUnits::from_capture_for_test(units_identity, &units_body, 210).unwrap();
+        let name = complete.name_absent(&proposed).unwrap();
+        let sibling =
+            GoodsSibling::from_sibling(SiblingGst::named(complete.catalogue(), &source).unwrap())
+                .unwrap();
+        assert!(matches!(
+            StockItemDraft::new_admitted(name, sibling, &groups, &units),
+            Err(crate::tally::stock_item_create::DraftRefusal::OtherCatalogue)
+        ));
+    }
+    // The same reads under the target's identity build the draft.
+    let groups = AdmittedStockGroups::from_capture_for_test(&own, &groups_body, 210).unwrap();
+    let units = AdmittedStockUnits::from_capture_for_test(&own, &units_body, 210).unwrap();
+    let name = complete.name_absent(&proposed).unwrap();
+    let sibling =
+        GoodsSibling::from_sibling(SiblingGst::named(complete.catalogue(), &source).unwrap())
+            .unwrap();
+    assert!(StockItemDraft::new_admitted(name, sibling, &groups, &units).is_ok());
 }

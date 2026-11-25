@@ -1,0 +1,37 @@
+== 05-refused.json: sent 2026-11-24T07:11:20Z, isError False
+  state refused reason invoice_not_admitted
+  refusals: 2
+   code 'invoice_sales_ledger_rate_shape_unmeasured' detail 'BRIDGE Svc 998313 5%'
+   code 'invoice_sales_ledger_rate_shape_unmeasured' detail 'BRIDGE Svc 998314 5%'
+  voucher_count <absent> batch_id <absent> sha256 <absent>
+  evidence state complete bytes 62071 request 6d6404a2e22acbf8d4acfc2e8c1f7b4cee998157358aed8da1a787cfa367836e response 5db1811db4c0e7180ac7f8c763cff8e849b8f66512cbddb16a21509e32fd06e7
+VERDICT refused invoice_not_admitted: invoice_sales_ledger_rate_shape_unmeasured (BRIDGE Svc 998313 5%), invoice_sales_ledger_rate_shape_unmeasured (BRIDGE Svc 998314 5%)
+case 05-refused.json: right
+== 05-admitted.json: sent 2026-11-24T07:14:43Z, isError False
+  state <absent> reason <absent>
+  refusals: <absent>
+  voucher_count 1 batch_id bridge-c27cfaa4-2b0e-454c-a4b4-7a0b57ff5bf5 sha256 c5b0dfcb9e89b4605f554f6ff0f9c61c30499a22c58b39c5900e72ee181d4272
+  evidence state complete bytes 1974198 request 73e152f0d2a4fb891155e5b55ab14f0f5016a7812bde033b235be07d1a4243dd response 598e857614d99f2d5d2edb00c31fc7ea477c9b2973d680559eeb1d84e930189d
+VERDICT admitted voucher_count 1, no refusal
+case 05-admitted.json: right
+case identity of W-A1-PAY: right
+case identity of D3-001: right
+stop: null: the answer is a JSON NoneType, not an object
+case shape null: right
+stop: []: the answer is a JSON list, not an object
+case shape []: right
+stop: response a string: response is str, not an object
+case shape response a string: right
+stop: result a list: no structuredContent object
+case shape result a list: right
+stop: structuredContent a string: no structuredContent object
+case shape structuredContent a string: right
+stop: structuredContent.result null: structuredContent.result is NoneType, not an object
+case shape structuredContent.result null: right
+case shape admitted: right
+case shape admitted but state refused: right
+case shape refusal not an object: right
+case shape refusal without a code: right
+case shape refusal with a code: right
+15 cases, 15 right
+exit 0

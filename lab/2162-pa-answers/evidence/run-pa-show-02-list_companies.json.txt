@@ -1,0 +1,5 @@
+== 02-list_companies.json: tool list_companies, sent 2026-11-25T17:47:35Z, 0.079 s, isError False
+  evidence state complete, reason <absent>
+  companies: 1
+   'BRIDGE PILOT LAB' guid 6b43e498-430c-4d5c-bfef-d32e2ab93c85 is the book's: yes
+exit 0

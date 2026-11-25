@@ -1,0 +1,1 @@
+23:13:40	rates.xml	a-G-pre2-rates.xml	curl 0	29114 bytes

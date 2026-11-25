@@ -1,0 +1,13 @@
+company_number values go first in tool answers, by a JSON parser. The company number would be X at equal length in Tally's raw answers (reads/), so sizes stand. Other replacements in text files and file names, with counts:
+<company number>: 1
+<eight zeros>: 8
+<lab clone>: 3
+<lab folder>: 3
+<lab root name>: 3
+<lab root>: 6
+its before-write mode: 2
+label: \1, \2: 1
+label: \1=: 5
+label: exit 0, 0: 1
+stop: 20
+word: 7

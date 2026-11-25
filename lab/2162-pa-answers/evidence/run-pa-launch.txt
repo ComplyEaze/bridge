@@ -1,0 +1,6 @@
+placed 01-list.json
+placed 02-list_companies.json
+placed 03-marks.json
+placed 05-build-0074-0801.json
+stop file placed
+client exit 0

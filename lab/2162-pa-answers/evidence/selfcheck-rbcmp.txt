@@ -1,0 +1,22 @@
+c01 the same answer twice, the post verified: exit 0 (want 0) OK
+c02 +60 reads uncertain: exit 1 (want 1) OK
+c03 a flag stands twice at +5: exit 1 (want 1) OK
+c04 two rows at +60: exit 1 (want 1) OK
+c05 no row at +5: exit 1 (want 1) OK
+c06 the post reports another ALTERID: exit 1 (want 1) OK
+c07 the post reports another GUID: exit 1 (want 1) OK
+c08 the post created 2: exit 1 (want 1) OK
+c15 the post reports another voucher number: exit 1 (want 1) OK
+c09 ISPOSTDATED absent at +60: exit 1 (want 1) OK
+c10 overridden at +5: exit 1 (want 1) OK
+c11 the post divergent uncertain, both raw reads uncertain: exit 0 (want 0) OK
+c12 the post divergent uncertain, the raw reads included: exit 1 (want 1) OK
+c13 the post did not read back (posted_unverified): exit 1 (want 1) OK
+c14 a GSTIN differs at +60 (value never printed): exit 0 (want 0) OK
+f01 an empty +5 answer: exit 2 (want 2) OK
+f02 +5 not XML: exit 2 (want 2) OK
+f03 +5 with STATUS 0: exit 2 (want 2) OK
+f04 +5 with no COLLECTION: exit 2 (want 2) OK
+f05 a post answer that is a JSON-RPC error: exit 2 (want 2) OK
+20 cases, 20 right
+exit 0

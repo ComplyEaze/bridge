@@ -1,0 +1,4 @@
+OK: every pre-sitting file reference exists; generated names are declared; SHA256.txt matches every other file
+OK: arms P0, G, PA, R each in the table, Steps and Decides; 77 compared answers each sent; no removed arm named; no build called old or new; no GUID-shaped text
+OK: launch LPA with its five settings, its own data folder, and its build's exe and hash in its literal hash check and client start line; the post helper's start line once, after the premise read; the box held to a passed check
+exit 0

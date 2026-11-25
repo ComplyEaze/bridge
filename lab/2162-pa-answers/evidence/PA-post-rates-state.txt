@@ -1,0 +1,3 @@
+a-PA-post-rates.xml 30626
+d7f5db99170ea9a643fab195a9465bd20d1f1af1102b76fbefaefe6673a12257 *a-PA-post-rates.xml
+exit 0

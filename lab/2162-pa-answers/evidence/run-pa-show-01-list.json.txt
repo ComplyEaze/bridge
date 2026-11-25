@@ -1,0 +1,3 @@
+== 01-list.json: tool list, sent 2026-11-25T17:47:24Z, 0.01 s, isError None
+  tools: 37; missing of this row's: []
+exit 0

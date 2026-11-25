@@ -1,0 +1,3 @@
+a-G-pre2-rates.xml 29114
+a-G-pre2-rates.xml: OK
+exit 0

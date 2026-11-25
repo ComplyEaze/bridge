@@ -1,0 +1,3 @@
+a-A0-first-rates.xml 29114
+a-A0-first-rates.xml: OK
+exit 0

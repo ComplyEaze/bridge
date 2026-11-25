@@ -1,0 +1,8 @@
+== 05-build-0074-0801.json: sent 2026-11-25T17:47:59Z, isError True
+  state <absent> reason <absent>
+  refusals: <absent>
+  error code 'window_part_boundary_unsupported_in_education'
+  voucher_count <absent> batch_id <absent> sha256 <absent>
+  evidence state partial bytes 124154 request f1c5d5442e36e25e3b9ff0dcb152c196187e1351f3558409de9c3667cdf8eb81 response 5084fbab19b6e93e3f52d9dad98509446a382bf11687a1fca67382de28550938
+VERDICT other
+exit 0

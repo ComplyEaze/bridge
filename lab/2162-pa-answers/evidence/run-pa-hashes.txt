@@ -1,0 +1,4 @@
+<lab root>/2162-rc/exe-6f541ae4/bin/x86_64-pc-windows-msvc/bridge_mcp.exe: OK
+exit 0
+run-pa/launch-env.json: OK
+exit 0

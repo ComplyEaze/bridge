@@ -1,0 +1,9 @@
+list_granted_applications before the request, 2026-11-25T17:29:27Z, no Bridge process running, no box open (typed from the tool's answer; every path outside <lab root> written as <path>):
+1 TallyPrime, <path>, tier full
+2 Bridge, <path>, tier full
+3 Bridge_mcp, c:\<lab root name>\2569-r\exe-new\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe, tier full
+4 Bridge_mcp, c:\<lab root name>\2569-r\exe-old\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe, tier full
+grant flags: clipboardRead false, clipboardWrite false, systemKeyCombos false
+<lab root>/2162-rc/exe-6f541ae4/bin/x86_64-pc-windows-msvc/bridge_mcp.exe: not on the list.
+request_access, once, at about 2026-11-25T17:29:51Z: apps ["<lab root>\2162-rc\exe-6f541ae4\bin\x86_64-pc-windows-msvc\bridge_mcp.exe"]. Answer: granted none, denied none; notInstalled: the path "doesn't match any installed or running application. The request was NOT shown to the user", with the suggestion "Bridge" (the desktop app's bridge.exe, another exe; not asked for). Outcome: not offered. No second request.
+list_granted_applications after it: the same four entries as before, unchanged; the 6f541ae4 exe path still not on it.

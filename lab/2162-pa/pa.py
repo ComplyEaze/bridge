@@ -47,7 +47,7 @@ def rb_ok():
     except (OSError, IndexError) as e: return False, f'{type(e).__name__}'
     return have == want, have
 if not rb_ok()[0]: fail('rb.xml missing, or its sha256 differs from local/rb.sha256')
-for p in [f'{R}/box/{tag}{x}' for x in ('-box.txt', '.answer', '-check.out', '-R1.txt', '-guard.txt')] + \
+for p in [f'{R}/box/{tag}{x}' for x in ('-box.txt', '.answer', '.answer.tmp', '-check.out', '-R1.txt', '-guard.txt')] + \
          [f'{R}/a-R5-rb.xml', f'{R}/a-R60-rb.xml', f'{R}/evidence/pa-times.txt']:
     if os.path.exists(p): fail(f'{p} exists; a name is used once')
 os.makedirs(f'{R}/box', exist_ok=True)
@@ -76,7 +76,7 @@ def run_guard():
     rect = tuple(int(scr.group(i)) for i in range(1, 5))
     yr = tuple(int(x) for x in re.search(r'rect (-?\d+),(-?\d+),(-?\d+),(-?\d+)', yes[0]).groups())
     out = f'{R}/box/{tag}-R1.txt'
-    p = subprocess.run(['powershell', '-NoProfile', '-File', R + '/boxstate.ps1', '-ProcId', pid, '-Out', out], capture_output=True, text=True)
+    p = subprocess.run(['powershell', '-NoProfile', '-File', R + '/boxstate.ps1', '-ProcId', pid, '-Out', out], capture_output=True, text=True, encoding='utf-8', errors='replace')
     try: read = open(out, encoding='utf-8-sig').read()
     except OSError: read = ''
     lines = [l for l in read.splitlines() if l.startswith('WINDOW ') and ' name=[ComplyEaze Bridge' in l and ' class=#32770 ' in l]
@@ -134,7 +134,7 @@ if created == 1 and status in ('posted_verified', 'posted_divergent'):
         if not ok:
             times.append(f'rb.xml\ta-{label}-rb.xml\tnot sent: sha256 {have} differs from local/rb.sha256'); break
         s = time.monotonic() - t0
-        p = subprocess.run([sys.executable, '-I', 'run.py', URL, label, 'rb.xml'], cwd=R, capture_output=True, text=True)
+        p = subprocess.run([sys.executable, '-I', 'run.py', URL, label, 'rb.xml'], cwd=R, capture_output=True, text=True, encoding='utf-8', errors='replace')
         e = time.monotonic() - t0; sent[label] = p.returncode
         times.append(f'rb.xml\ta-{label}-rb.xml\tsent +{s:.3f}s\treturned +{e:.3f}s\trun.py {p.returncode}\t{(p.stdout + p.stderr).strip()[:200]}')
         if p.returncode != 0: break

@@ -6,7 +6,7 @@
 # to box/<tag>.answer; otherwise it writes NO answer file and exits 1 (a stop with nothing pressed: box.ps1 is started with
 # -AnswerBy past the build's 120 s limit, so the build's own timeout closes the box first). Writes its checks to
 # box/<tag>-check.out, which never holds the box's company-number line. Row 2162-PA's one change of behaviour: 2162-SALES-Q
-# wrote No on a failed check, which box.ps1 then pressed.
+# wrote No on a failed check, which box.ps1 then pressed; and the Yes file is renamed in whole.
 # Usage: python -I -X utf8 boxcheck.py <tag> <batch_id> <count>
 # Kept from 1392-E34 as they were: the log is read as bytes and taken only when it decodes whole as UTF-8, ends with a line
 # break, and its WAITING line is whole; a refused or cut read is read again, for at most 30 s of such reads in a row, after
@@ -64,9 +64,13 @@ MON = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'No
 TAG = re.compile(r'(?:^| )\[BRIDGE:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]$')  # the saved file's tag
 def now(): return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 def answer(ans, out):
-    # Only Yes is ever written; any other outcome leaves no answer file, so nothing is pressed.
+    # Only Yes is ever written; any other outcome leaves no answer file, so nothing is pressed. The file is written whole
+    # under another name and then renamed in, so box.ps1 never reads it empty (box.ps1 reads the file as soon as it
+    # exists, and presses No at once for any text but Yes or No, an empty read included).
     if ans == 'Yes':
-        open(f'{D}/{tag}.answer', 'w', encoding='utf-8').write(ans)
+        with open(f'{D}/{tag}.answer.tmp', 'w', encoding='utf-8') as f:
+            f.write(ans)
+        os.replace(f'{D}/{tag}.answer.tmp', f'{D}/{tag}.answer')
         out.append(f'{now()} answer file written: {ans}')
     else:
         out.append(f'{now()} no answer file written (the box is left to the build\'s own timeout)')

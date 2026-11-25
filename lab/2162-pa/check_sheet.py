@@ -6,7 +6,9 @@ one launch LPA, and the arms and launches of row 2162-RC it does not run; the fo
 row's sitting writes (box/, run-pa/, data-pa/, rb.xml and its a-<label>-rb.xml answers) skipped by name; the post
 helper's start line, which must stand exactly once; and three lines of the helpers that keep the approval box from
 being pressed by anything but a passed check (box.ps1's answer deadline past the build's 120 s limit, boxcheck.py
-writing only Yes, and pa.py's guard before the check), each exactly once.
+writing only Yes, renamed in whole, and pa.py's guard before the check), each exactly once; and the raw rate read of
+the grown state just before the post (PA-pre), exactly once and before the post line. Its answer, a-PA-pre-rates.xml,
+is skipped by the a-<label>-rates.xml pattern below.
 
 Row 2162-RC's text, kept: row 2162-RX's check_sheet.py with five changes for row 2162-RC: this row's arms and removed names; the folders the
 lab itself adds (local/) and the sitting's own output folders are skipped by name, and so are the top-level files the
@@ -45,7 +47,11 @@ POST_LINE = ('( cd /c/bridge-lab/2162-pa && python -I -X utf8 pa.py pa1 05-build
              '> evidence/pa-out.txt 2>&1; echo "pa exit $?" >> evidence/pa-out.txt )')
 HELD = (("pa.py", "'-SeeWithin', '120', '-AnswerBy', '150'"),
         ("pa.py", "GUARD PASSED: boxcheck.py started"),
-        ("boxcheck.py", "    if ans == 'Yes':\n        open(f'{D}/{tag}.answer', 'w', encoding='utf-8').write(ans)\n"))
+        ("boxcheck.py", "    if ans == 'Yes':\n        with open(f'{D}/{tag}.answer.tmp', 'w', encoding='utf-8') as f:\n"
+                        "            f.write(ans)\n        os.replace(f'{D}/{tag}.answer.tmp', f'{D}/{tag}.answer')\n"))
+# The premise read just before the post (part 6c): its send line once, and before the post line.
+PRE_LINE = ('cd /c/bridge-lab/2162-pa && sha256sum -c local/rates.sha256 && python -I run.py http://127.0.0.1:9001 '
+            'PA-pre rates.xml')
 SETTINGS = {"BRIDGE_AGENT_ENABLE_WRITES": "true", "BRIDGE_TERMS_ACCEPTED": "true",
             "BRIDGE_TALLY_HOST": "127.0.0.1", "BRIDGE_TALLY_PORT": "9001"}
 GUID_SHAPE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -131,6 +137,8 @@ def arms():
             errors.append(f"launch {name}: settings differ from the five this row allows")
     if text.count(POST_LINE) != 1:
         errors.append("the sheet does not hold exactly once the post helper's start line")
+    if text.count(PRE_LINE) != 1 or (POST_LINE in text and text.find(PRE_LINE) > text.find(POST_LINE)):
+        errors.append("the sheet does not hold the premise read's send line exactly once, before the post line")
     for name, line in HELD:
         try:
             held = (ROOT / name).read_text(encoding="utf-8").count(line)
@@ -210,7 +218,7 @@ def main():
     print(f"OK: arms {', '.join(ARMS)} each in the table, Steps and Decides; {answers} compared answers each sent; "
           "no removed arm named; no build called old or new; no GUID-shaped text")
     print(f"OK: launch {', '.join(LAUNCHES)} with its five settings, its own data folder, and its build's exe and hash in its literal hash check and client start line; "
-          "the post helper's start line once; the box held to a passed check")
+          "the post helper's start line once, after the premise read; the box held to a passed check")
     return 0
 
 

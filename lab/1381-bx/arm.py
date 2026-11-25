@@ -131,7 +131,11 @@ def main(tag):
             [f'{RUN}/{tag}{x}' for x in ('-in.txt', '-in.sha256', '-screen.txt', '-startc.txt', '-out.bin', '-err.txt')] + [f'{EV}/{tag}-arm.txt']
     for p in names:
         if os.path.exists(p): fail(f'{p} exists; a name is used once')
-    if build.running(build.tasklist):
+    try:
+        stray = build.running(build.tasklist)
+    except build.Fail as e:
+        print('FAILED READ: ' + str(e)); sys.exit(2)
+    if stray:
         print('STOP-STRAY: a bridge_mcp.exe is already running; nothing launched'); sys.exit(1)
     for d in (BOX, RUN, EV): os.makedirs(d, exist_ok=True)
     committed = open(f'{R}/{rel}', 'rb').read(); nonce = str(uuid.uuid4())
@@ -147,6 +151,7 @@ def main(tag):
     mons = re.findall(r'^MONITOR \d+ .* work=\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\) dpi=', st, re.M)
     report += [f'screen.ps1 exit {sc.returncode}'] + [l for l in st.splitlines() if l.startswith(('OS ', 'DPI_AWARE', 'MONITOR'))]
     if sc.returncode != 0 or len(mons) != 1:
+        report += [l[:220] for l in (sc.stdout + sc.stderr).splitlines() if l.startswith(('FAILED', 'RESULT'))][:10]
         report.append('STOP-MONITORS: screen.ps1 failed or read other than one monitor; nothing launched')
         print('\n'.join(report)); sys.exit(1)
     work = tuple(int(x) for x in mons[0])
@@ -222,6 +227,10 @@ def main(tag):
             m = re.search(r'^EXITED code=(\d+) ', open(f'{RUN}/{tag}-startc.txt', encoding='utf-8', errors='replace').read(), re.M)
             if m: code = int(m.group(1)); break
             time.sleep(0.5)
+        try:  # startc.ps1 holds the child's output files unshared until it ends, just after its EXITED line
+            child.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            report.append('startc.ps1 had not ended 30 s after the wait for EXITED; its files are read as they are')
     else:
         stop = {3: 'STOP-NO-BOX: no box seen within 30 s', 4: 'STOP-BOX-GONE: the box went before any click',
                 5: 'STOP-NO-BUTTON: the answer\'s button was not found, nothing clicked',

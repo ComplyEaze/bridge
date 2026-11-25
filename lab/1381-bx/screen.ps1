@@ -1,5 +1,5 @@
 # Lab helper (row 1381-BX; not product code). ASCII. Read-only: the display facts of the lab PC, in the units the
-# dialog child measures its box in. Before anything else it makes this process per-monitor DPI aware (version 2), as
+# dialog child measures its box in. Before anything else it makes this process (else this thread) per-monitor DPI aware (v2), as
 # the child does (src-tauri/src/tally/box_fit.rs, make_dpi_aware, at 48a64965), so each monitor's rectangle and work
 # area are physical pixels. Prints the Windows release (registry ProductName, DisplayVersion, CurrentBuild, UBR, and
 # the runtime's OSVersion), then every monitor: primary or not, its rectangle, its work area and its effective DPI
@@ -21,6 +21,7 @@ public static class ScreenFacts {
   [StructLayout(LayoutKind.Sequential)] public struct MonitorInfo { public int cbSize; public Rect rcMonitor; public Rect rcWork; public uint dwFlags; }
   public delegate bool MonitorEnum(IntPtr monitor, IntPtr hdc, IntPtr rect, IntPtr data);
   [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr context);
+  [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
   [DllImport("user32.dll")] public static extern IntPtr GetThreadDpiAwarenessContext();
   [DllImport("user32.dll")] public static extern bool AreDpiAwarenessContextsEqual(IntPtr a, IntPtr b);
   [DllImport("user32.dll")] public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, MonitorEnum f, IntPtr data);
@@ -38,7 +39,10 @@ $lines.Add('read at ' + [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))
 $code = 0
 # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 is the pseudo handle -4.
 $v2 = [IntPtr](-4)
+# The process call is refused when the process already has an awareness; the thread call then sets this thread,
+# the one every call below runs on. The check reads the thread, so either way it reads what the calls use.
 [void][ScreenFacts]::SetProcessDpiAwarenessContext($v2)
+[void][ScreenFacts]::SetThreadDpiAwarenessContext($v2)
 $aware = [ScreenFacts]::AreDpiAwarenessContextsEqual([ScreenFacts]::GetThreadDpiAwarenessContext(), $v2)
 $lines.Add('DPI_AWARE per_monitor_v2=' + $aware)
 if (-not $aware) { $lines.Add('FAILED not per-monitor DPI aware: rectangles below are not physical pixels'); $code = 2 }

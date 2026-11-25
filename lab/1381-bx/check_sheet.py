@@ -54,8 +54,10 @@ def section(text, title):
 def references():
     missing, checked = [], set()
     for doc in ("RUN-SHEET.md", "LAB-COMMON-BX.md"):
-        text = (ROOT / doc).read_text(encoding="utf-8")
-        for token in re.findall(r"`([^`]+)`", text):
+        # Inline code only, read line by line, with fenced blocks left out: a fence's three backticks would
+        # otherwise pair with the next inline one and hide every name after it.
+        text = re.sub(r"(?ms)^\s*```.*?^\s*```[ \t]*$", "", (ROOT / doc).read_text(encoding="utf-8"))
+        for token in (t for line in text.splitlines() for t in re.findall(r"`([^`]+)`", line)):
             if any(mark in token for mark in ("*", "<", ">", ":", "…")) or any(c.isspace() for c in token):
                 continue
             name = token.replace("\\", "/")

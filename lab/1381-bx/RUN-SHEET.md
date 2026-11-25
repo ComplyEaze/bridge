@@ -41,6 +41,17 @@ All at 48a64965.
 
 **The fill check.** Before that commit, and again at step 0 from the lab's clone, the cited code must be the same at BUILD COMMIT as at 48a64965: the line in step 0 must print nothing and exit 0. Any output: STOP-BUILD-DIFFERS; the input and the citations would have to be made again from BUILD COMMIT.
 
+**The fill, one commit, by the run coordinator** (not lab lines; each typed from the root of a checkout of this branch that also holds BUILD COMMIT and 48a64965):
+
+1. Replace each `<TO FILL: …>` in `lab/1381-bx/BUILD.txt` with its value, in the shape `build.py` names for its field; change nothing else.
+2. Rewrite the one `BUILD.txt` row of `SHA256.txt` (every other row stays as it is), then run the two checks. EXPECT `check_sheet.py` exit 0 with `0 field(s) <TO FILL>`, and `build.py check` exit 0 ending `0 field(s) to fill: filled`.
+   ```bash
+   ( cd lab/1381-bx && python3 -I -c "import hashlib; b = open('BUILD.txt', 'rb').read(); rows = open('SHA256.txt', encoding='utf-8').read().splitlines(); rows = [hashlib.sha256(b).hexdigest() + '  ' + str(len(b)) + '  BUILD.txt' if r.endswith('  BUILD.txt') else r for r in rows]; open('SHA256.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(rows) + '\n')"; echo "exit $?" )
+   ( cd lab/1381-bx && python3 -I -X utf8 check_sheet.py; echo "exit $?"; python3 -I -X utf8 build.py check; echo "exit $?" )
+   ```
+3. The fill check, with BUILD COMMIT in place of `"$B"` in step 0's line: nothing printed.
+4. One commit changing those two files only. Its id is the `<SHEET>` the GO names.
+
 **Where it runs.** On `GRANTED PATH`, `C:/bridge-lab/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe`, the path the screen tool's grant names (lab 2569-R). The exe there now is row 2569-R's (its hash is `BUILD.txt`'s ASIDE SHA256). `build.py stage` moves it to `local/aside/`, copies the row's exe in, and records each act with its hash in `local/evidence/copies.txt`; `build.py restore` does the reverse at the close. Nothing is deleted.
 
 **The download.** The one network act of the row, on the run coordinator's word: the artifact's zip, saved unchanged as `local/download/artifact.zip`. GitHub keeps the artifact 7 days from its run; after that the row needs a new run and a new fill.
@@ -121,11 +132,16 @@ EXPECT, in order: `21 cases, 21 right`, exit 0; `17 cases, 17 right`, exit 0; `2
 **Prompt rule.** No dialog is expected but the four boxes, and each is handled by `arm.py` alone. Any other dialog or message on the screen (a licence dialog above all, B1): copy its text, press no key, STOP-DIALOG. Never end a process (B4).
 
 0. **Before the sitting.**
-   - Make the row folder and copy this sheet's folder into it byte for byte from the lab's Bridge clone. In the second line, replace `<CLONE>` with the Git Bash path of the lab's Bridge clone and `<SHEET>` with the 40-character commit of this branch the run coordinator's GO names (the commit that filled `BUILD.txt`).
+   - Make the row folder and copy this sheet's folder into it byte for byte from the lab's Bridge clone. In every line of steps 0 and 1, replace `<CLONE>` with the Git Bash path of the lab's Bridge clone; in the second line below, replace `<SHEET>` with the 40-character commit of this branch the run coordinator's GO names (the commit that filled `BUILD.txt`).
      ```bash
      if [ -e /c/bridge-lab/1381-bx ]; then echo "STOP: /c/bridge-lab/1381-bx exists"; else mkdir /c/bridge-lab/1381-bx && echo "made /c/bridge-lab/1381-bx"; fi
      git -C <CLONE> fetch origin && git -C <CLONE> archive <SHEET> lab/1381-bx | tar -x -C /c/bridge-lab/1381-bx --strip-components=2; echo "exit ${PIPESTATUS[0]} ${PIPESTATUS[1]}"
      cd /c/bridge-lab/1381-bx && if [ -e local ]; then echo "STOP: local exists"; else mkdir local local/evidence local/gen && echo "made local"; fi
+     ```
+   - The two commits in the lab's clone. Master merges by squash, so 48a64965 is fetched by the pull request's own ref. EXPECT the fetch `exit 0`, then two lines `present`, one per commit; any `ABSENT`: STOP-CODE-COMMIT.
+     ```bash
+     cd /c/bridge-lab/1381-bx && git -C <CLONE> fetch origin refs/pull/2596/head > local/evidence/s0-fetch.txt 2>&1; echo "exit $?" >> local/evidence/s0-fetch.txt; cat local/evidence/s0-fetch.txt
+     cd /c/bridge-lab/1381-bx && B=$(sed -n 's/^BUILD COMMIT: \([0-9a-f]\{40\}\)$/\1/p' BUILD.txt); for c in 48a6496507132576a6be150c155192f647528e1e "$B"; do if git -C <CLONE> cat-file -e "$c^{commit}" 2>/dev/null; then echo "present $c"; else echo "ABSENT [$c]"; fi; done > local/evidence/s0-commits.txt 2>&1; cat local/evidence/s0-commits.txt
      ```
    - The test file at 48a64965, for the input check, and the fill check (The build). EXPECT the first line `exit 0`; the second line prints nothing above its `exit 0`. Any output: STOP-BUILD-DIFFERS.
      ```bash
@@ -136,6 +152,10 @@ EXPECT, in order: `21 cases, 21 right`, exit 0; `17 cases, 17 right`, exit 0; `2
    - `BUILD.txt` filled. EXPECT `BUILD.txt: 0 field(s) to fill: filled`, exit 0. Exit 1: STOP-BUILD-UNFILLED.
      ```bash
      cd /c/bridge-lab/1381-bx && python -I -X utf8 build.py check > local/evidence/s0-build-check.txt 2>&1; echo "exit $?" >> local/evidence/s0-build-check.txt; cat local/evidence/s0-build-check.txt
+     ```
+   - The exe now on GRANTED PATH, read only: row 2569-R's, as `BUILD.txt`'s ASIDE SHA256 says. EXPECT `: OK`, exit 0. `FAILED` or no file: STOP-ASIDE; nothing is staged.
+     ```bash
+     cd /c/bridge-lab/1381-bx && A=$(sed -n 's/^ASIDE SHA256: \([0-9a-f]\{64\}\)$/\1/p' BUILD.txt) && echo "$A  C:/bridge-lab/2569-r/exe-new/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe" | sha256sum -c - > local/evidence/s0-aside.txt 2>&1; echo "exit $?" >> local/evidence/s0-aside.txt; cat local/evidence/s0-aside.txt
      ```
    - Processes. EXPECT for `bridge_mcp.exe` the one line `INFO: No tasks are running which match the specified criteria.`, exit 0 (else STOP-STRAY); for `tally.exe`, record what is there (none, or one line with its PID).
      ```bash

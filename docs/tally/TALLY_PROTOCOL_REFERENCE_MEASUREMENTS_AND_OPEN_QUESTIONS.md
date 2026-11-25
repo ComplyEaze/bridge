@@ -2125,15 +2125,15 @@ Findings:
   - After Shut Company, a load, two plain reads and the walk of §12a.31, the answer was byte-equal to the grown answer of §12a.31: 30,626 bytes, sha256 beginning `d7f5db99`.
   - The build without the change then refused the test invoice with two `invoice_sales_ledger_rate_shape_unmeasured`, one for each service ledger, and wrote no file. Its evidence was 62,071 bytes, request `6d6404a2`, response `5db1811d`.
   - The read after it was the same grown bytes. The build with the change then admitted the same invoice with one voucher and no refusal. Its evidence was 1,983,638 bytes, request `73e152f0`, response `b409ba85`.
-  - The read after that launch was the same grown bytes again. No Shut Company or load came between the three reads (see the lab's notes below).
+  - The read after that launch was the same grown bytes again. That no Shut Company or load came between the three reads rests on the lab's notes (UNVERIFIED, below); the answer files show only the equal bytes.
 - **In the plain state the build with the change admitted the invoice (verified, two launches).**
   - On the sitting's first load, after two plain reads, it admitted the invoice with one voucher. The read after it was plain.
   - After Shut Company, a load and two plain reads, it admitted the invoice again with one voucher. The read after it was plain.
   - Both launches' evidence was 1,974,198 bytes, request `73e152f0`, response `598e8576`.
-  - Every plain read of the sitting, eight in all, was the plain answer of §12a.31: 29,114 bytes, sha256 beginning `a6197d90`.
+  - Every plain read of the sitting by the row's rate request, eight in all, was the plain answer of §12a.31: 29,114 bytes, sha256 beginning `a6197d90`. The row's setup read of the six ledgers' GUIDs gave the same bytes.
 - **The batch file did not change with the state (verified: one comparison by the lab's `grade05.py importeq`; the two files stay on the lab PC).**
   - The build with the change wrote a 2,421-byte batch file in the plain state and one in the grown state.
-  - Each holds the voucher identity derived from its batch id twice: once as `REMOTEID` and once in the narration.
+  - Each holds the voucher identity derived from its batch id and the call's `bridge_txn_id` twice: once as `REMOTEID` and once in the narration.
   - With that identity set aside, the two files were byte-equal (sha256 beginning `1c5ec409`).
 - **Beside §12a.31 and §12a.32 (the digests verified).**
   - The refused launch's evidence (62,071 bytes, `6d6404a2`, `5db1811d`) is that of the refused launches of §12a.31 and §12a.32.
@@ -2144,9 +2144,9 @@ Findings:
   - From the first grown read (16:08Z) to the last (16:13Z), Tally had no Shut Company, load, key or screen act. Only screenshots were taken.
   - No date or period key was pressed in the row.
 - **Reading (PARTIAL: one book, one release, one sitting, one invoice, one way of growing the answer).**
-  - In one grown state, read byte-equal before and after each launch, the build without the change of §12a.31 refused and the build with it admitted. So the change admits, on a live Tally, the shape that §12a.31 captured.
-  - The two builds differ by 16 master commits, not by #2593 alone. #2593 is the only one of them that changes non-test code in the two files that hold the rate parse and the sales rate rule.
-  - That each build's own rate read held the grown elements is inferred from the reads on either side, not shown.
+  - In one grown state, read byte-equal before and after each launch, the build without the change of §12a.31 refused and the build with it admitted. So a build with the change admits, on a live Tally, the shape that §12a.31 captured.
+  - The two builds differ by 16 master commits, not by #2593 alone. By `git log`, the rate parse and the sales rate rule live in `src-tauri/src/agent_import_invoice_wire.rs` and `src-tauri/src/agent_import_invoice.rs`; of the 16, #2593 is the only one that changes the first, and the only other one that changes the second, #2584, changes a doc comment on a test helper. Others change `agent.rs`, `agent_import.rs`, `agent_import_post.rs` and `agent_import_verification.rs` (among them #2585, a build refusal for long e-invoice details, which the test invoice does not carry).
+  - That each build's own rate read held the grown elements is inferred from the reads on either side, not shown. As in §12a.31, the builds keep no request bytes, so their own rate request was not compared byte for byte with the row's `rates.xml`.
 - **Not measured:**
   - the queue's re-read before a post (`admit_queued_invoice`);
   - a post, its approval box and the read-back of a posted invoice;
@@ -2155,7 +2155,7 @@ Findings:
   - any other screen that grows the answer;
   - how long the grown state lasts in a session that is not shut;
   - another book, release or sitting.
-- **What Bridge does with it.** No code changes on this row. It is the live evidence for #2593, the change §12a.31 describes: a build with that change, launched in the grown state, admitted the invoice that the build without it refused.
+- **What Bridge does with it.** No code changes on this row. It is the live evidence for #2593, the change §12a.31 describes: a build with that change, launched in the grown state, admitted the invoice that the build without it refused. It measures what §12a.31's "What Bridge does with it" marks UNVERIFIED against Tally and what §12a.32 lists as not measured; both sections are left as recorded.
 
 ## 13. Open questions
 

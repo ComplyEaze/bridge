@@ -57,6 +57,12 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
             "#[cfg(not(test))]",
         ),
         ("use test_seam::approve_masters;", "#[cfg(test)]"),
+        // The stock-item dialog (#1381), gated the same way.
+        (
+            "use confirm_stock_item_dialog as approve_stock_item;",
+            "#[cfg(not(test))]",
+        ),
+        ("use test_seam::approve_stock_item;", "#[cfg(test)]"),
         // What a post dialog's own task runs under (#725), gated the same way.
         (
             "use carry_nothing as carry_approval_scope;",
@@ -79,6 +85,7 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         "approve(count, preview).await?;\n        Ok(Self {",
         "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
         "approve_masters(preview).await?;\n        Ok(Self {\n            kind: ApprovedKind::Masters(",
+        "approve_stock_item(&preview).await?;\n    Ok(ShownDraft::from_confirmed(",
     ] {
         if source.matches(call_site).count() != 1 {
             problems.push(format!("expected exactly one call site `{call_site}`"));
@@ -88,6 +95,7 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         "approve(count, preview)",
         "approve_review(kind, count, preview)",
         "approve_masters(preview)",
+        "approve_stock_item(&preview)",
     ] {
         if source.matches(call).count() != 1 {
             problems.push(format!("`{call}` must be called exactly once"));
@@ -595,6 +603,22 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "#[cfg(test)]\nuse test_seam::approve_masters;",
             "use test_seam::approve_masters;",
         ),
+        source.replace(
+            "#[cfg(not(test))]\nuse confirm_stock_item_dialog as approve_stock_item;",
+            "#[cfg(not(debug_assertions))]\nuse confirm_stock_item_dialog as approve_stock_item;",
+        ),
+        source.replace(
+            "#[cfg(test)]\nuse test_seam::approve_stock_item;",
+            "use test_seam::approve_stock_item;",
+        ),
+        source.replace(
+            "approve_stock_item(&preview).await?;",
+            "confirm_stock_item_dialog(&preview).await?;",
+        ),
+        source.replace(
+            "approve_stock_item(&preview).await?;\n    Ok(ShownDraft::from_confirmed(",
+            "approve(ONE_STOCK_ITEM, &preview).await?;\n    Ok(ShownDraft::from_confirmed(",
+        ),
         // A master approval must never be answered by the post dialog, nor a
         // post by the one-ledger dialog.
         source.replace(
@@ -724,6 +748,7 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
         "Some(\"--confirm-release\") => agent::run_release_confirmation,",
         "Some(\"--confirm-settle\") => agent::run_settle_confirmation,",
         "Some(\"--confirm-row-release\") => agent::run_release_rows_confirmation,",
+        "Some(\"--confirm-stock-item\") => agent::run_stock_item_confirmation,",
     ] {
         if lib.matches(arm).count() != 1 {
             problems.push(format!("expected exactly one `{arm}`"));
@@ -783,6 +808,15 @@ fn each_dialog_mode_runs_its_own_dialog() {
             "Some(\"--confirm-review\") => agent::run_masters_confirmation,",
         ),
         lib.replace("\"--confirm-masters\"", "\"--confirm-ledger\""),
+        lib.replace(
+            "agent::run_stock_item_confirmation,",
+            "agent::run_masters_confirmation,",
+        ),
+        lib.replace(
+            "Some(\"--confirm-masters\") => agent::run_masters_confirmation,",
+            "Some(\"--confirm-masters\") => agent::run_stock_item_confirmation,",
+        ),
+        lib.replace("\"--confirm-stock-item\"", "\"--confirm-stock\""),
     ] {
         assert_ne!(broken, lib);
         assert!(!dialog_mode_problems(&broken).is_empty());
@@ -878,6 +912,16 @@ const MASTERS_ENTRY: &str = "pub fn run_masters_confirmation() -> bool {
     )
 }";
 
+/// The stock-item child's whole entry point, as [`POST_ENTRY`] (#1381).
+const STOCK_ITEM_ENTRY: &str = "pub fn run_stock_item_confirmation() -> bool {
+    answer_with_token(
+        STOCK_ITEM_TOKEN_PREFIX,
+        show_create_stock_item,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}";
+
 /// The settle child's whole entry point, as [`POST_ENTRY`] (#1709).
 const SETTLE_ENTRY: &str = "pub fn run_settle_confirmation() -> bool {
     answer_with_token(
@@ -928,13 +972,14 @@ fn dialog_token_problems(source: &str) -> Vec<String> {
         SETTLE_ENTRY,
         RELEASE_ROWS_ENTRY,
         MASTERS_ENTRY,
+        STOCK_ITEM_ENTRY,
     ] {
         if source.matches(entry).count() != 1 {
             problems.push(format!("expected exactly one `{entry}`"));
         }
     }
-    if source.matches("answer_with_token(").count() != 7 {
-        problems.push("expected the six entry points and the definition only".into());
+    if source.matches("answer_with_token(").count() != 8 {
+        problems.push("expected the seven entry points and the definition only".into());
     }
     problems
 }
@@ -1008,6 +1053,15 @@ fn each_dialog_answers_with_its_own_token() {
         source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("POST_TOKEN_PREFIX", "MASTERS_TOKEN_PREFIX")),
         source.replace(REVIEW_ENTRY, &REVIEW_ENTRY.replace("show_review_acknowledgement,", "show_create_ledger,")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("STOCK_ITEM_TOKEN_PREFIX", "MASTERS_TOKEN_PREFIX")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("STOCK_ITEM_TOKEN_PREFIX", "POST_TOKEN_PREFIX")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("show_create_stock_item,", "show_create_ledger,")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("show_create_stock_item,", "|_, _| true,")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
+        source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("show_create_ledger,", "show_create_stock_item,")),
+        format!(
+            "{source}\nfn extra() -> bool {{ answer_with_token(STOCK_ITEM_TOKEN_PREFIX, |_, _| true, std::io::stdin(), std::io::stdout()) }}\n"
+        ),
         format!(
             "{source}\nfn extra() -> bool {{ answer_with_token(MASTERS_TOKEN_PREFIX, |_, _| true, std::io::stdin(), std::io::stdout()) }}\n"
         ),
@@ -1136,6 +1190,65 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
                 // As for the post's box (`show_review`): topmost with
                 // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
                 // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}"#;
+
+/// The stock-item dialog (#1381), for one item only.
+const STOCK_ITEM_DIALOG: &str = r#"#[cfg(not(windows))]
+fn show_create_stock_item(count: VoucherCount, preview: &str) -> bool {
+    let Some((title, button)) = stock_item_words(count) else {
+        return false;
+    };
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(title)
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        // The Cancel label supplies the native Escape action. Creating
+        // requires the explicitly matched positive button.
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            button.clone(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(button)
+}"#;
+
+const STOCK_ITEM_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
+fn show_create_stock_item(count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    // As for the ledger dialog: No is the default, Escape and close are Cancel.
+    let Some((title, _)) = stock_item_words(count) else {
+        return false;
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
+    // As for `show_create_ledger`: measured when it opens, never returning if
+    // it is not wholly on the screen, and brought to the front once it appears.
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button.
                 MB_YESNOCANCEL
                     | MB_DEFBUTTON2
                     | MB_ICONWARNING
@@ -1496,6 +1609,10 @@ const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCoun
             },
             "Nothing is created until you answer.",
         ),
+        Shown::StockItem => (
+            "create this stock item in Tally".into(),
+            "Nothing is created until you answer.",
+        ),
     }
 }"#;
 
@@ -1509,6 +1626,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Settle => SETTLE_BUTTON.to_string(),
         Shown::RowRelease => RELEASE_ROWS_BUTTON.to_string(),
         Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
+        Shown::StockItem => stock_item_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -2276,7 +2394,49 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 58] = [
+const STOCK_ITEM_WORDS: &str = r#"fn stock_item_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((STOCK_ITEM_TITLE.into(), STOCK_ITEM_BUTTON.into())),
+        Some(_) => None,
+    }
+}"#;
+
+const CONFIRM_STOCK_ITEM_DIALOG: &str = r#"async fn confirm_stock_item_dialog(preview: &str) -> Result<(), StockItemDialogRefusal> {
+    let executable = std::env::current_exe().map_err(|_| StockItemDialogRefusal::Unavailable)?;
+    let shown = displayed_text(Shown::StockItem, ONE_STOCK_ITEM, preview);
+    confirm_stock_item_with(&executable, &shown).await
+}"#;
+
+const CONFIRM_STOCK_ITEM_WITH: &str = r#"async fn confirm_stock_item_with(
+    executable: &std::path::Path,
+    preview: &str,
+) -> Result<(), StockItemDialogRefusal> {
+    if preview.len() > MAX_PREVIEW_BYTES {
+        return Err(StockItemDialogRefusal::TooLarge);
+    }
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-stock-item",
+        STOCK_ITEM_TOKEN_PREFIX,
+        ONE_STOCK_ITEM,
+        preview,
+    )
+    .await
+    {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the ledger's box.
+        Ok(answer) if answer.box_did_not_fit => Err(StockItemDialogRefusal::TooLarge),
+        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
+        // A person's decline is no token and exit 1. A clean exit without the
+        // token is an executable that is not this dialog.
+        Ok(answer) if answer.exited_cleanly => Err(StockItemDialogRefusal::Unavailable),
+        Ok(_) => Err(StockItemDialogRefusal::Declined),
+        Err(DialogFailure::Unavailable) => Err(StockItemDialogRefusal::Unavailable),
+        Err(DialogFailure::TimedOut) => Err(StockItemDialogRefusal::TimedOut),
+    }
+}"#;
+
+const DIALOG_ANSWER_PINS: [(&str, usize); 67] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2385,6 +2545,24 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 58] = [
         1,
     ),
     (CONFIRM_MASTERS_WITH, 1),
+    (
+        "const STOCK_ITEM_TOKEN_PREFIX: &str = \"bridge-create-stock-item:\";",
+        1,
+    ),
+    (
+        "const STOCK_ITEM_TITLE: &str = \"ComplyEaze Bridge — create one stock item?\";",
+        1,
+    ),
+    ("const STOCK_ITEM_BUTTON: &str = \"Create stock item\";", 1),
+    (
+        "const ONE_STOCK_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);",
+        1,
+    ),
+    (STOCK_ITEM_WORDS, 1),
+    (STOCK_ITEM_DIALOG, 1),
+    (STOCK_ITEM_DIALOG_WINDOWS, 1),
+    (CONFIRM_STOCK_ITEM_DIALOG, 1),
+    (CONFIRM_STOCK_ITEM_WITH, 1),
     ("const RELEASE_BUTTON: &str = \"Release the stop\";", 1),
     ("const SETTLE_BUTTON: &str = \"Close the batch\";", 1),
     ("const RELEASE_ROWS_BUTTON: &str = \"Release the rows\";", 1),
@@ -2437,8 +2615,10 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // each arm of its own.
     // #1780 added one more, the test-only accessor for what a review shows.
     // The ledger batch made the one-item count test-only (#690).
-    ("#[cfg(test)]", 9),
-    ("#[cfg(not(test))]", 5),
+    // The stock-item dialog (#1381) added one test seam arm and one accessor.
+    ("#[cfg(test)]", 11),
+    // The stock-item dialog (#1381) added one non-test seam arm.
+    ("#[cfg(not(test))]", 6),
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
     // The one-ledger dialog added one Windows dialog, one non-Windows dialog
@@ -2447,14 +2627,17 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // its title, dialog and button on a Mac. #1709: the same for the settle
     // window, and #1038 for the row release window. The ledger batch moved the
     // Mac ledger button into the count's words, used on both systems (#690).
-    ("#[cfg(windows)]", 14),
+    // The stock-item dialog (#1381) added one Windows box.
+    ("#[cfg(windows)]", 15),
     // #1780's Mac check (c2): the seven measured figures, the screen span,
     // where the top sits, the comparison, the fit on every screen, the child's
     // exit and their two tests;
     // and four `cfg(target_os = "macos")` items (the text's height, the screens,
     // the two together, and the height's test) with one other-platform arm.
-    ("#[cfg(not(windows))]", 33),
-    ("cfg", 67),
+    // The stock-item dialog (#1381) added one non-Windows box.
+    ("#[cfg(not(windows))]", 34),
+    // The stock-item dialog (#1381) added five bare-text occurrences.
+    ("cfg", 72),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2770,6 +2953,185 @@ fn each_dialog_answers_only_on_its_positive_button() {
             ),
             1,
         ),
+        // The stock-item dialog approves only on its own positive button, in
+        // its own mode, with its own token, for one item and a fitting box.
+        source.replacen(
+            STOCK_ITEM_DIALOG,
+            &STOCK_ITEM_DIALOG.replacen(
+                "== rfd::MessageDialogResult::Custom(button)",
+                "!= rfd::MessageDialogResult::Custom(button)",
+                1,
+            ),
+            1,
+        ),
+        source.replacen("\"Create stock item\"", "\"Cancel\"", 1),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replacen("answer == IDYES", "answer != IDNO", 1),
+            1,
+        ),
+        source.replacen(
+            "const STOCK_ITEM_TITLE: &str = \"ComplyEaze Bridge — create one stock item?\";",
+            "const STOCK_ITEM_TITLE: &str = \"ComplyEaze Bridge — approve one voucher\";",
+            1,
+        ),
+        source.replacen(
+            "const STOCK_ITEM_TOKEN_PREFIX: &str = \"bridge-create-stock-item:\";",
+            "const STOCK_ITEM_TOKEN_PREFIX: &str = \"bridge-create-ledger:\";",
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG,
+            &STOCK_ITEM_DIALOG.replacen(
+                "stock_item_words(count)",
+                "stock_item_words(ONE_STOCK_ITEM)",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replacen(
+                "stock_item_words(count)",
+                "stock_item_words(ONE_STOCK_ITEM)",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_WORDS,
+            &STOCK_ITEM_WORDS.replacen(
+                "Some(_) => None,",
+                "Some(_) => Some((STOCK_ITEM_TITLE.into(), STOCK_ITEM_BUTTON.into())),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_DIALOG,
+            &CONFIRM_STOCK_ITEM_DIALOG.replacen(
+                "confirm_stock_item_with(&executable, &shown).await\n}",
+                "let _ = (executable, shown);\n    Ok(())\n}",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_DIALOG,
+            &CONFIRM_STOCK_ITEM_DIALOG.replacen(
+                "displayed_text(Shown::StockItem, ONE_STOCK_ITEM, preview)",
+                "preview.to_string()",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),",
+                "Ok(answer) if answer.exited_cleanly => Ok(()),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "Ok(answer) if answer.exited_cleanly => Err(StockItemDialogRefusal::Unavailable),",
+                "Ok(answer) if answer.exited_cleanly => Ok(()),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "\"--confirm-stock-item\"",
+                "\"--confirm-masters\"",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "STOCK_ITEM_TOKEN_PREFIX",
+                "MASTERS_TOKEN_PREFIX",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "        ONE_STOCK_ITEM,\n",
+                "        VoucherCount(NonZeroUsize::MAX),\n",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen("MAX_PREVIEW_BYTES", "usize::MAX", 1),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "        Ok(answer) if answer.box_did_not_fit => Err(StockItemDialogRefusal::TooLarge),\n",
+                "",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &format!(
+                "#[cfg(not(windows))]\n{CONFIRM_STOCK_ITEM_WITH}\n#[cfg(windows)]\nasync fn confirm_stock_item_with(_: &std::path::Path, _: &str) -> Result<(), StockItemDialogRefusal> {{\n    Ok(())\n}}"
+            ),
+            1,
+        ),
+        source.replacen(STOCK_ITEM_DIALOG, &discard_answer(STOCK_ITEM_DIALOG), 1),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &discard_answer(STOCK_ITEM_DIALOG_WINDOWS),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG,
+            &STOCK_ITEM_DIALOG.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replacen(
+                "super::box_fit::guarded(|owner| {",
+                "(|owner| {",
+                1,
+            ),
+            1,
+        ),
+        // The two replace_last rows above now reach the stock boxes. Keep an
+        // explicit mutation for each ledger box as well.
+        source.replacen(
+            MASTERS_DIALOG,
+            &MASTERS_DIALOG.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
+            1,
+        ),
+        source.replacen(
+            MASTERS_DIALOG_WINDOWS,
+            &MASTERS_DIALOG_WINDOWS.replacen(
+                "super::box_fit::guarded(|owner| {",
+                "(|owner| {",
+                1,
+            ),
+            1,
+        ),
         // The post and review dialogs asked in the one-ledger mode.
         source.replacen(
             CONFIRM_WITH,
@@ -2920,6 +3282,333 @@ fn each_dialog_answers_only_on_its_positive_button() {
         assert_ne!(broken, source);
         assert!(!dialog_answer_problems(&broken).is_empty());
     }
+}
+
+const CONFIRM_STOCK_ITEM: &str = r#"pub(crate) async fn confirm_stock_item<'a>(
+    draft: StockItemDraft<'a>,
+    preview: String,
+) -> Result<ShownDraft<'a>, StockItemDialogRefusal> {
+    approve_stock_item(&preview).await?;
+    Ok(ShownDraft::from_confirmed(StockItemConfirmation {
+        draft,
+        shown: preview,
+    }))
+}"#;
+
+const STOCK_ITEM_CONFIRMATION: &str = r#"#[derive(Debug)]
+pub(crate) struct StockItemConfirmation<'a> {
+    draft: StockItemDraft<'a>,
+    shown: String,
+}"#;
+
+/// `ShownDraft` with its one derive: an added `Clone` or `Default` would let one
+/// approval stand for a second Create.
+const SHOWN_DRAFT_STRUCT: &str = r#"#[derive(Debug)]
+pub(crate) struct ShownDraft<'a> {
+    draft: StockItemDraft<'a>,
+    shown: String,
+}"#;
+
+/// The lines of `source` that begin an `impl` naming `name`: one inherent block
+/// each, and no trait impl (`Clone`, `Default`, `From`) that could make another.
+fn impl_lines_naming(source: &str, name: &str) -> usize {
+    source
+        .lines()
+        .filter(|line| line.trim_start().starts_with("impl") && line.contains(name))
+        .count()
+}
+
+const SHOWN_DRAFT_MAKERS: &str = r#"impl<'a> ShownDraft<'a> {
+    pub(super) fn from_confirmed(confirmation: StockItemConfirmation<'a>) -> Self {
+        let (draft, shown) = confirmation.into_parts();
+        Self { draft, shown }
+    }
+
+    /// A draft marked as shown without any window, for tests that render or
+    /// verify it. It holds no shown text.
+    #[cfg(test)]
+    pub(crate) fn from_draft(draft: StockItemDraft<'a>) -> Self {
+        Self {
+            draft,
+            shown: String::new(),
+        }
+    }
+
+    pub(crate) fn draft(&self) -> &StockItemDraft<'a> {
+        &self.draft
+    }
+
+    /// The preview the approving window showed under its answer lines; empty
+    /// for a draft a test made.
+    pub(crate) fn shown_text(&self) -> &str {
+        &self.shown
+    }
+}"#;
+
+const CONFIRM_STOCK_ITEM_DRAFT: &str = r#"#[cfg_attr(not(test), allow(dead_code))]
+pub(super) async fn confirm_stock_item_draft<'a>(
+    draft: StockItemDraft<'a>,
+    origin: &str,
+) -> Result<ShownDraft<'a>, StockItemConfirmError> {
+    let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
+    confirm_stock_item(draft, preview)
+        .await
+        .map_err(StockItemConfirmError::Dialog)
+}"#;
+
+fn shown_draft_problems(
+    approvals: &str,
+    approvals_tests: &str,
+    stock: &str,
+    stock_tests: &str,
+    review: &str,
+    others: &[(String, String)],
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (text, pin, expected, label) in [
+        (approvals, CONFIRM_STOCK_ITEM, 1, "confirm_stock_item"),
+        (
+            approvals,
+            STOCK_ITEM_CONFIRMATION,
+            1,
+            "StockItemConfirmation",
+        ),
+        (
+            approvals,
+            "StockItemConfirmation {",
+            1,
+            "its one construction",
+        ),
+        (
+            approvals,
+            "ShownDraft::from_confirmed(",
+            1,
+            "its one confirmed maker",
+        ),
+        (
+            approvals_tests,
+            "StockItemConfirmation {",
+            0,
+            "test construction",
+        ),
+        (
+            approvals_tests,
+            "from_confirmed(",
+            0,
+            "test confirmation use",
+        ),
+        (stock, SHOWN_DRAFT_MAKERS, 1, "ShownDraft makers"),
+        (
+            stock,
+            SHOWN_DRAFT_STRUCT,
+            1,
+            "ShownDraft and its one derive",
+        ),
+        (stock, "ShownDraft {", 0, "stock construction"),
+        (stock_tests, "ShownDraft {", 0, "stock test construction"),
+        (
+            stock_tests,
+            "from_confirmed(",
+            0,
+            "stock test confirmation use",
+        ),
+        (review, CONFIRM_STOCK_ITEM_DRAFT, 1, "the coordinator"),
+    ] {
+        if text.matches(pin).count() != expected {
+            problems.push(format!("expected {expected} of {label}"));
+        }
+    }
+    if impl_lines_naming(stock, "ShownDraft") != 1 {
+        problems.push("expected one impl naming ShownDraft".into());
+    }
+    if impl_lines_naming(approvals, "StockItemConfirmation") != 1 {
+        problems.push("expected one impl naming StockItemConfirmation".into());
+    }
+    let confirmed_elsewhere = others
+        .iter()
+        .filter(|(path, _)| !path.ends_with("approved_import.rs"))
+        .map(|(_, text)| text.matches("ShownDraft::from_confirmed(").count())
+        .sum::<usize>();
+    let confirmed_in_approvals = others
+        .iter()
+        .filter(|(path, _)| path.ends_with("approved_import.rs"))
+        .map(|(_, text)| text.matches("ShownDraft::from_confirmed(").count())
+        .sum::<usize>();
+    if confirmed_elsewhere != 0 || confirmed_in_approvals != 1 {
+        problems.push("ShownDraft::from_confirmed must be called only in approved_import".into());
+    }
+    let stock_calls = others
+        .iter()
+        .map(|(_, text)| text.matches("confirm_stock_item(").count())
+        .sum::<usize>();
+    let review_calls = others
+        .iter()
+        .filter(|(path, _)| path.ends_with("agent_master_review.rs"))
+        .map(|(_, text)| text.matches("confirm_stock_item(").count())
+        .sum::<usize>();
+    if stock_calls != 1 || review_calls != 1 {
+        problems.push("confirm_stock_item must be called only by its coordinator".into());
+    }
+    problems
+}
+
+#[test]
+fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
+    let approvals = read("src-tauri/src/tally/approved_import.rs");
+    let approvals_tests = read("src-tauri/src/tally/approved_import_tests.rs");
+    let stock = read("src-tauri/src/tally/stock_item_create.rs");
+    let stock_tests = read("src-tauri/src/tally/stock_item_create_tests.rs");
+    let review = read("src-tauri/src/agent_master_review.rs");
+    let others = other_sources();
+    // This scan skips agent_import_approval.rs and files named *_tests.rs,
+    // *_tests_* or tests.rs, rather than literally every non-test source.
+    assert_eq!(
+        shown_draft_problems(
+            &approvals,
+            &approvals_tests,
+            &stock,
+            &stock_tests,
+            &review,
+            &others,
+        ),
+        Vec::<String>::new()
+    );
+
+    let without_approval = approvals.replace(
+        CONFIRM_STOCK_ITEM,
+        &CONFIRM_STOCK_ITEM.replace("    approve_stock_item(&preview).await?;\n", ""),
+    );
+    assert_ne!(without_approval, approvals);
+    assert!(!shown_draft_problems(
+        &without_approval,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    let ungated_test_maker = stock.replace(
+        SHOWN_DRAFT_MAKERS,
+        &SHOWN_DRAFT_MAKERS.replacen("    #[cfg(test)]\n", "", 1),
+    );
+    assert_ne!(ungated_test_maker, stock);
+    assert!(!shown_draft_problems(
+        &approvals,
+        &approvals_tests,
+        &ungated_test_maker,
+        &stock_tests,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    for (stock_text, approvals_text) in [
+        (
+            stock.replace(SHOWN_DRAFT_STRUCT, &SHOWN_DRAFT_STRUCT.replace("Debug", "Debug, Clone")),
+            approvals.clone(),
+        ),
+        (
+            format!("{stock}\nimpl Default for ShownDraft<'_> {{ fn default() -> Self {{ todo!() }} }}"),
+            approvals.clone(),
+        ),
+        (
+            format!("{stock}\nimpl<'b> ShownDraft<'b> {{ fn again(d: StockItemDraft<'b>) -> Self {{ Self {{ draft: d, shown: String::new() }} }} }}"),
+            approvals.clone(),
+        ),
+        (
+            stock.clone(),
+            approvals.replace(
+                STOCK_ITEM_CONFIRMATION,
+                &STOCK_ITEM_CONFIRMATION.replace("Debug", "Debug, Clone"),
+            ),
+        ),
+        (
+            stock.clone(),
+            format!("{approvals}\nimpl Clone for StockItemConfirmation<'_> {{ fn clone(&self) -> Self {{ todo!() }} }}"),
+        ),
+    ] {
+        assert!(
+            stock_text != stock || approvals_text != approvals,
+            "the mutation changed nothing"
+        );
+        assert!(!shown_draft_problems(
+            &approvals_text,
+            &approvals_tests,
+            &stock_text,
+            &stock_tests,
+            &review,
+            &others,
+        )
+        .is_empty());
+    }
+
+    let second_maker = format!("{approvals}\nShownDraft::from_confirmed(");
+    assert!(!shown_draft_problems(
+        &second_maker,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    let child_confirmation = format!(
+        "{approvals_tests}\nfn f(d: StockItemDraft<'_>) {{ let _ = StockItemConfirmation {{ draft: d, shown: String::new() }}; }}"
+    );
+    assert!(!shown_draft_problems(
+        &approvals,
+        &child_confirmation,
+        &stock,
+        &stock_tests,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    let child_shown =
+        format!("{stock_tests}\nlet _ = ShownDraft {{ draft, shown: String::new() }};");
+    assert!(!shown_draft_problems(
+        &approvals,
+        &approvals_tests,
+        &stock,
+        &child_shown,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    let mut elsewhere = others.clone();
+    elsewhere.push((
+        "src/elsewhere.rs".into(),
+        "confirm_stock_item(draft, text)".into(),
+    ));
+    assert!(!shown_draft_problems(
+        &approvals,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &review,
+        &elsewhere,
+    )
+    .is_empty());
+
+    let caller_preview = review.replace(
+        "stock_item_review_text(&draft, origin)",
+        "Ok::<String, StockItemReviewError>(origin.to_string())",
+    );
+    assert_ne!(caller_preview, review);
+    assert!(!shown_draft_problems(
+        &approvals,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &caller_preview,
+        &others,
+    )
+    .is_empty());
 }
 
 #[test]
@@ -3414,8 +4103,8 @@ fn message_box_calls_are_system_modal(source: &str) -> Vec<bool> {
 fn every_windows_message_box_is_system_modal() {
     let calls = message_box_calls_are_system_modal(&read("src-tauri/src/tally/approved_import.rs"));
     assert!(
-        calls.len() >= 6,
-        "fewer MessageBoxW calls than the six known boxes: {calls:?}"
+        calls.len() >= 7,
+        "fewer MessageBoxW calls than the seven known boxes: {calls:?}"
     );
     assert!(
         calls.iter().all(|system_modal| *system_modal),

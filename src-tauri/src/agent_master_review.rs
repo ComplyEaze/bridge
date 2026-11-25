@@ -13,7 +13,9 @@ use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
 };
+use crate::tally::approved_import::{confirm_stock_item, StockItemDialogRefusal};
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
+use crate::tally::stock_item_create::ShownDraft;
 use crate::tally::stock_item_create::{
     create_text_refusal, CreateRenderRefusal, MarkedConstant, StockItemDraft, GOODS,
     SPECIFY_DETAILS_HERE, TAXABLE,
@@ -329,6 +331,30 @@ pub(super) fn stock_item_review_text(
     } else {
         Err(StockItemReviewError::Review(MasterReviewError::TooLarge))
     }
+}
+
+/// Why a stock-item draft was not confirmed. Nothing was created.
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum StockItemConfirmError {
+    /// The preview could not be built, so no one was asked.
+    Review(StockItemReviewError),
+    /// The dialog approved nothing.
+    Dialog(StockItemDialogRefusal),
+}
+
+/// Shows the preview of `draft` in the stock-item dialog and, only on the
+/// person's approval, returns the draft as shown. The preview is built here,
+/// from the draft itself, so the window shows what this draft creates.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) async fn confirm_stock_item_draft<'a>(
+    draft: StockItemDraft<'a>,
+    origin: &str,
+) -> Result<ShownDraft<'a>, StockItemConfirmError> {
+    let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
+    confirm_stock_item(draft, preview)
+        .await
+        .map_err(StockItemConfirmError::Dialog)
 }
 
 #[cfg(test)]

@@ -58,6 +58,7 @@
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
 
+use super::approved_import::StockItemConfirmation;
 use super::master_name::MasterName;
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
@@ -853,21 +854,41 @@ pub(super) fn measured_shape<'a>(
     Ok((gst, hsn))
 }
 
-/// Marks a draft that the approval window of the later change displays before
-/// anything is built from it. Nothing in this module shows a draft to anyone;
-/// the only caller of `from_draft` is meant to be that window.
+/// A draft the stock-item approval window showed and the person approved, with
+/// the preview that window showed under its answer lines. Outside this crate's
+/// tests the only way to make one is `from_confirmed`, which takes the
+/// confirmation that only `approved_import::confirm_stock_item` makes, after its
+/// dialog approved.
 #[derive(Debug)]
 pub(crate) struct ShownDraft<'a> {
     draft: StockItemDraft<'a>,
+    shown: String,
 }
 
 impl<'a> ShownDraft<'a> {
+    pub(super) fn from_confirmed(confirmation: StockItemConfirmation<'a>) -> Self {
+        let (draft, shown) = confirmation.into_parts();
+        Self { draft, shown }
+    }
+
+    /// A draft marked as shown without any window, for tests that render or
+    /// verify it. It holds no shown text.
+    #[cfg(test)]
     pub(crate) fn from_draft(draft: StockItemDraft<'a>) -> Self {
-        Self { draft }
+        Self {
+            draft,
+            shown: String::new(),
+        }
     }
 
     pub(crate) fn draft(&self) -> &StockItemDraft<'a> {
         &self.draft
+    }
+
+    /// The preview the approving window showed under its answer lines; empty
+    /// for a draft a test made.
+    pub(crate) fn shown_text(&self) -> &str {
+        &self.shown
     }
 }
 

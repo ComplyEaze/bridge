@@ -779,3 +779,144 @@ fn successful_outcome_and_equal_readback_have_no_refusal_code() {
     assert_eq!(stock_item_outcome_code(&outcome), None);
     assert_eq!(stock_item_read_back_code(&verdict), None);
 }
+
+#[tokio::test]
+async fn a_confirmed_stock_item_draft_holds_the_preview_it_was_shown() {
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+
+    let before = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_BEFORE));
+    let scripted = ScriptedApproval::approving();
+    let recording = scripted.clone();
+    let shown = SCRIPTED_APPROVAL
+        .scope(scripted, async {
+            confirm_stock_item_draft(
+                stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
+                ORIGIN,
+            )
+            .await
+        })
+        .await
+        .expect("the scripted dialog approves");
+    assert_eq!(shown.shown_text(), STOCK_ITEM_PREVIEW);
+    assert_eq!(recording.stock_items(), [STOCK_ITEM_PREVIEW]);
+    assert!(recording.previews().is_empty());
+    assert!(recording.reviews().is_empty());
+    assert!(recording.masters().is_empty());
+
+    let rendered = render_stock_item_create(&shown).expect("the confirmed draft renders");
+    let expected = render_stock_item_create(&ShownDraft::from_draft(stock_draft(
+        &before,
+        "SC Copied Marked",
+        "SC Sibling Goods",
+    )))
+    .expect("the same draft renders");
+    assert_eq!(rendered, expected);
+
+    let after = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_AFTER_MARKED));
+    assert!(matches!(
+        ReadBackVerdict::of(&shown, &after),
+        ReadBackVerdict::Equal(_)
+    ));
+}
+
+#[tokio::test]
+async fn a_declined_or_unscoped_stock_item_dialog_makes_no_shown_draft() {
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+
+    let before = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_BEFORE));
+    let scripted = ScriptedApproval::declining();
+    let recording = scripted.clone();
+    let declined = SCRIPTED_APPROVAL
+        .scope(scripted, async {
+            confirm_stock_item_draft(
+                stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
+                ORIGIN,
+            )
+            .await
+        })
+        .await
+        .err();
+    assert_eq!(
+        declined,
+        Some(StockItemConfirmError::Dialog(
+            StockItemDialogRefusal::Declined,
+        ))
+    );
+    assert_eq!(recording.stock_items(), [STOCK_ITEM_PREVIEW]);
+
+    let unscoped = confirm_stock_item_draft(
+        stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
+        ORIGIN,
+    )
+    .await
+    .err();
+    assert_eq!(
+        unscoped,
+        Some(StockItemConfirmError::Dialog(
+            StockItemDialogRefusal::Declined,
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_refused_stock_item_preview_asks_no_one() {
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+
+    let before = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_BEFORE));
+    let scripted = ScriptedApproval::approving();
+    let recording = scripted.clone();
+    let refused = SCRIPTED_APPROVAL
+        .scope(scripted, async {
+            confirm_stock_item_draft(
+                stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
+                "http://127.0.0.1:9000\nTally: other",
+            )
+            .await
+        })
+        .await
+        .err();
+    assert_eq!(
+        refused,
+        Some(StockItemConfirmError::Review(StockItemReviewError::Review(
+            MasterReviewError::LayoutText
+        ),))
+    );
+    assert!(recording.stock_items().is_empty());
+}
+
+#[cfg(not(windows))]
+const STOCK_ITEM_ANSWER: &str = "Click \"Create stock item\" to create this stock item in Tally. Click Cancel to cancel. Nothing is created until you answer.";
+#[cfg(windows)]
+const STOCK_ITEM_ANSWER: &str = "Press Y (or click Yes) to create this stock item in Tally. Press N (or click No) to cancel. Nothing\nis created until you answer.";
+
+#[test]
+fn the_stock_item_dialog_shows_its_answer_then_the_whole_preview() {
+    let shown = crate::tally::approved_import::stock_item_dialog_text(STOCK_ITEM_PREVIEW);
+    assert_eq!(
+        shown,
+        format!("{STOCK_ITEM_ANSWER}\n\n{STOCK_ITEM_PREVIEW}")
+    );
+    #[cfg(not(windows))]
+    {
+        assert_eq!(shown.lines().count(), 31);
+        assert_eq!(shown.len(), 1_449);
+    }
+    #[cfg(windows)]
+    {
+        assert_eq!(shown.lines().count(), 32);
+        assert_eq!(shown.len(), 1_455);
+    }
+}
+
+#[test]
+#[ignore = "lab tool: writes the stock-item box input for row 1381-B; not a check"]
+fn write_the_stock_item_box_input() {
+    let path = std::env::var("BRIDGE_STOCK_BOX_INPUT")
+        .expect("BRIDGE_STOCK_BOX_INPUT must name the lab output path");
+    let input = format!(
+        "{}\n1\n{}",
+        crate::synthetic_guid(0),
+        crate::tally::approved_import::stock_item_dialog_text(STOCK_ITEM_PREVIEW)
+    );
+    std::fs::write(path, input).expect("the lab box input is writable");
+}

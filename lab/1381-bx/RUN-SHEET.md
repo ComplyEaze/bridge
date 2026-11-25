@@ -248,13 +248,13 @@ EXPECT, in order: `30 cases, 30 right`, exit 0; `17 cases, 17 right`, exit 0; `2
 
 ## Record
 
-For each arm: `local/evidence/<arm>-out.txt` (the whole of `arm.py`'s report), `<arm>-arm.txt`, `<arm>-replay.txt` (none for ST); the box log, guard, R1 read and check (`local/box/`); the input fed and its hash, the screen read, `startc.ps1`'s lines, the child's standard output (`<arm>-out.bin`, its bytes) and error output (`local/run/`); the by-eye line. For the sitting: step 0's files, `copies.txt`, `s3-listing.txt`, the notes. Screen copies and screenshots stay on the lab PC, listed by name, size and sha256 (B8). The evidence branch carries `local/evidence/`, `local/box/` without its `.png` files, and `local/run/`.
+For each arm: `local/evidence/<arm>-out.txt` (the whole of `arm.py`'s report), `<arm>-arm.txt`, `<arm>-replay.txt` (none for ST); the box log, guard, R1 read and check (`local/box/`; for ST the box log and guard only); the input fed and its hash, the screen read, `startc.ps1`'s lines, the child's standard output (`<arm>-out.bin`, its bytes) and error output (`local/run/`); the by-eye line. For the sitting: step 0's files, `copies.txt`, `s3-listing.txt`, the notes. Screen copies and screenshots stay on the lab PC, listed by name, size and sha256 (B8). The evidence branch carries `local/evidence/`, `local/box/` without its `.png` files, and `local/run/`.
 
 ## Decides
 
 - **Q1** by SN, SC and SY: `boxcheck.py`'s `ALL PASS` and the replay's `REPLAY ALL PASS` on each (title, three buttons, the text line for line), the guard (inside the work area, topmost, first in the z-order), each `fits=true`, and the by-eye read (no line cut); its "No the default" part by W3, read on each of the three. A miss on any of the three answers Q1 no, with the line that missed.
 - **Q2** by SN and SC (0 bytes, exit 1) and SY (the token for its nonce and one LF, exit 0): the deciding lines of `<arm>-arm.txt`.
-- **Q3** by LN: its deciding lines, against lab 1780-K's box and outcome; W5 compared with lab 1780-K's rectangle is recorded.
+- **Q3** by LN: its deciding lines, against lab 1780-K's box and outcome; W5 compared with lab 1780-K's rectangle is recorded. LN's text lacks the final LF 1780-K's had, so a different box height is first read as that input change, not as a finding.
 - **Q4** by ST: its deciding lines (no click, exit 77, 0 bytes, `fits=false`). `UNAVAILABLE` answers that too large is refused, but not by the fit guard; Q4 is then open. W6 is recorded.
 - Every W line is recorded with its arm and stops no arm; W3 is the one that answers part of a question (Q1).
 

@@ -497,6 +497,9 @@ def selftest(fx, scratch):
     case("grade, CREATED 2", graded(one(w, "<CREATED>1<", "<CREATED>2<")), "UNCLEAR")
     case("grade, CREATED missing", graded(one(w, "<CREATED>1</CREATED>", "")), "UNCLEAR")
     case("grade, CREATED empty (not zero)", graded(one(w, "<CREATED>1</CREATED>", "<CREATED></CREATED>")), "UNCLEAR")
+    case("grade, CREATED a digit that is not ASCII", graded(one(w, "<CREATED>1<", "<CREATED>\u0661<")), "UNCLEAR")
+    case("grade, the counters under a root that is not RESPONSE",
+         graded(one(one(w, "<RESPONSE>", "<RESPONSX>"), "</RESPONSE>", "</RESPONSX>")), "UNCLEAR")
     case("grade, CREATED repeated", graded(one(w, "<CREATED>1</CREATED>", "<CREATED>1</CREATED><CREATED>1</CREATED>")),
          "UNCLEAR")
     case("grade, a refusal with ALTERED missing", graded(one(cap["refused"], "<ALTERED>0</ALTERED>", "")), "UNCLEAR")

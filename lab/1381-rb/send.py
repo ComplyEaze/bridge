@@ -16,8 +16,9 @@ as an empty answer (AGENTS.md P5); everything goes under local/. Not product cod
 
   python -I -X utf8 send.py LABEL         LABEL is one of M1 I1 G1 U1 W M2 I2 M3 I3 G3 U3, sent in that order
   python -I -X utf8 send.py --selftest SCRATCH
-      the verdict, order, gate and request rules on synthetic cases and on the five request files, in SCRATCH
-      (under local/, or outside the row folder); sends nothing
+      the verdict, order, gate and request rules on synthetic cases and on the five request files, and send()
+      itself on a scratch row folder by a program that does not exist, in SCRATCH (under local/, or outside the
+      row folder); sends nothing
 
 Before a send: the request's sha256 and size must equal its line in SHA256.txt (and, for W, WRITE_SHA and
 WRITE_BYTES); the request must parse as an export (or, for W, an import); the send log must hold exactly the labels
@@ -172,8 +173,10 @@ def records_for(label, local):
     return records
 
 
-def send(label):
-    local = ROOT / "local"
+def send(label, root=ROOT, curl="curl.exe"):
+    """Send LABEL's request from the row folder by curl (the self-test passes a scratch folder and a program that
+    does not exist, so that it sends nothing)."""
+    local = root / "local"
     answers, evidence = local / "answers", local / "evidence"
     request = dict(ORDER).get(label)
     try:  # Everything before curl starts: a failure here sends nothing.
@@ -181,8 +184,8 @@ def send(label):
         reason = admit(label, log_entries(evidence / "send-log.txt"), records_for(label, local), started)
         if reason:
             raise Refused(reason)
-        body = (ROOT / request).read_bytes()
-        reason = check_request(label, body, listed(ROOT).get(request))
+        body = (root / request).read_bytes()
+        reason = check_request(label, body, listed(root).get(request))
         if reason:
             raise Refused(f"{request}: {reason}")
         digest = hashlib.sha256(body).hexdigest()
@@ -191,7 +194,7 @@ def send(label):
         record = answers / f"a-{label}.transport.txt"
         for path in (answer, headers, record):
             if path.exists():
-                raise Refused(f"{path.relative_to(ROOT).as_posix()} exists: never overwritten")
+                raise Refused(f"{path.relative_to(root).as_posix()} exists: never overwritten")
         answers.mkdir(parents=True, exist_ok=True)
         evidence.mkdir(parents=True, exist_ok=True)
         start = utc()
@@ -200,12 +203,12 @@ def send(label):
     except (OSError, UnicodeDecodeError) as error:
         raise Refused(f"{type(error).__name__}: {error}")
     try:  # curl.exe that cannot start has sent nothing; the start marker says it was tried.
-        done = subprocess.run(["curl.exe", "-sS", "-w", "%{http_code} %{size_download} %{time_starttransfer} %{time_total}",
-                               "--data-binary", f"@{ROOT / request}", "-H", "Content-Type: text/xml; charset=utf-16",
+        done = subprocess.run([curl, "-sS", "-w", "%{http_code} %{size_download} %{time_starttransfer} %{time_total}",
+                               "--data-binary", f"@{root / request}", "-H", "Content-Type: text/xml; charset=utf-16",
                                "-D", str(headers), URL, "-o", str(answer)], capture_output=True, text=True)
         code, written, said_err = done.returncode, done.stdout.strip(), done.stderr
     except OSError as error:
-        code, written, said_err = -1, "", f"curl.exe did not start ({type(error).__name__}: {error})"
+        code, written, said_err = -1, "", f"{curl} did not start ({type(error).__name__}: {error})"
     end = utc()
     got = answer.read_bytes() if answer.exists() else b""
     head = headers.read_text(encoding="latin-1") if headers.exists() else ""
@@ -369,6 +372,22 @@ def selftest(scratch):
     got = records_for("M2", local)
     case("records, the screenshot as .jpg: present; the grade read", (got["shots/s3-write"], got["evidence/w-grade.txt"])
          == ("", "WRITE ADMITTED: x\nexit 0\n"))
+    # send() itself, on a scratch row folder, by a program that does not exist: nothing can be sent, and a curl that
+    # cannot start is recorded as a failed request (a start marker, a transport record and a REQUEST-FAILED log line).
+    row = next(scratch / f"row-{n}" for n in range(1, 1000) if not (scratch / f"row-{n}").exists())  # never reused
+    (row / "requests").mkdir(parents=True, exist_ok=True)
+    (row / "requests/marks.utf16le.xml").write_bytes(marks)
+    (row / "SHA256.txt").write_text(f"{line(marks)[0]}  {len(marks)}  requests/marks.utf16le.xml\n", encoding="utf-8")
+    try:
+        code = send("M1", row, curl=str(scratch / "no-such-program-for-the-self-test.exe"))
+    except (OSError, Refused) as error:
+        code = f"raised {type(error).__name__}"
+    shown = (row / "local/answers/a-M1.transport.txt")
+    shown = shown.read_text(encoding="utf-8").splitlines() if shown.exists() else []
+    case(f"send, a curl that cannot start: exit 1, curl exit -1, REQUEST-FAILED ({code})",
+         (code, "curl exit -1" in shown, (shown[-1:] or [""])[0].startswith("VERDICT REQUEST-FAILED"),
+          (row / "local/answers/a-M1.started.txt").is_file(),
+          log_entries(row / "local/evidence/send-log.txt")) == (1, True, True, True, [("M1", "REQUEST-FAILED")]))
     # The log reader, on lines written as send() writes them, and on a line that is not a send line.
     log = scratch / "send-log.txt"
     tail = (" sha256 x | curl exit 0 status 200 CONTENT-LENGTH 4 answer 4 B sha256 y | first byte 0.01 s total 0.01 s"

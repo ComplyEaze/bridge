@@ -3398,21 +3398,44 @@ pub(super) fn show_stock_item_draft(
     Ok(ShownStockItem { prepared, preview })
 }"#;
 
-/// The one caller of `ask_stock_item`, which asks about what was shown, read
-/// in the queue with the stock marks parser.
+/// The one caller of `ask_stock_item`, with the stock marks parser; it builds
+/// the binding and the held request from the same item.
 const SHOWN_ASK: &str = r#"    pub(super) fn ask(
         self,
+        endpoint_origin: &str,
         company_marks_request: AgentReadRequest,
         batch_id: String,
-    ) -> PendingPostApproval {
-        PendingPostApproval::ask_stock_item(
+    ) -> AskedStockItem {
+        let binding = ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview);
+        let held = HeldRequest::StockItem(Box::new(self.prepared.clone()));
+        let dialog = PendingPostApproval::ask_stock_item(
             self.prepared,
             self.preview,
             company_marks_request,
             super::master_post::stock_company_marks,
             batch_id,
-        )
+        );
+        AskedStockItem {
+            binding,
+            dialog,
+            held,
+        }
     }"#;
+
+/// The fresh binding of what was shown, for the take.
+const SHOWN_BINDING: &str = r#"    pub(super) fn binding(&self, endpoint_origin: &str) -> ApprovalBinding {
+        ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview)
+    }"#;
+
+/// [`other_sources`] and the approvals holder, which that scan skips.
+fn sources_with_approvals() -> Vec<(String, String)> {
+    let mut sources = other_sources();
+    sources.push((
+        "src-tauri/src/agent_import_approval.rs".into(),
+        read("src-tauri/src/agent_import_approval.rs"),
+    ));
+    sources
+}
 
 fn stock_approval_problems(
     approvals: &str,
@@ -3533,12 +3556,18 @@ fn stock_approval_problems(
     problems
 }
 
-/// `ShownStockItem`: private fields, its one attribute and no derive, one
-/// inherent impl, and one literal, in `show_stock_item_draft`; its tests build
-/// none.
+/// `ShownStockItem` and `AskedStockItem`: private fields, their one attribute
+/// and no derive, one inherent impl each, and one literal each, in
+/// `show_stock_item_draft` and in `ShownStockItem::ask`; their tests build none.
 const SHOWN_STRUCT: &str = r#"pub(super) struct ShownStockItem {
     prepared: PreparedStockItem,
     preview: String,
+}"#;
+
+const ASKED_STRUCT: &str = r#"pub(super) struct AskedStockItem {
+    binding: ApprovalBinding,
+    dialog: PendingPostApproval,
+    held: HeldRequest,
 }"#;
 
 fn shown_stock_item_problems(
@@ -3547,33 +3576,146 @@ fn shown_stock_item_problems(
     others: &[(String, String)],
 ) -> Vec<String> {
     let mut problems = Vec::new();
-    if review.matches(SHOWN_STRUCT).count() != 1
-        || attributes_above(review, SHOWN_STRUCT) != ["#[cfg_attr(not(test), allow(dead_code))]"]
+    for (name, pin, maker) in [
+        (
+            "ShownStockItem",
+            SHOWN_STRUCT,
+            "pub(super) fn show_stock_item_draft(",
+        ),
+        ("AskedStockItem", ASKED_STRUCT, "    pub(super) fn ask("),
+    ] {
+        if review.matches(pin).count() != 1
+            || attributes_above(review, pin) != ["#[cfg_attr(not(test), allow(dead_code))]"]
+        {
+            problems.push(format!(
+                "{name}'s fields are private and it derives nothing"
+            ));
+        }
+        let impls: usize = (others.iter())
+            .map(|(_, text)| impl_lines_naming(text, name))
+            .sum();
+        if impls != 1 || impl_lines_naming(review_tests, name) != 0 {
+            problems.push(format!("{name} has one inherent impl and no trait impl"));
+        }
+        let literals: usize = (others.iter())
+            .map(|(_, text)| literals_of(text, name))
+            .sum();
+        let maker = fn_body(review, maker);
+        if literals != 1 || literals_of(maker, name) != 1 || literals_of(review_tests, name) != 0 {
+            problems.push(format!("{name} is built only by its one maker"));
+        }
+    }
+    problems
+}
+
+/// A stock binding is built only in `ShownStockItem`'s impl, in `ask` and in
+/// `binding`, and a stock held request only in `ask`: nowhere else, the
+/// approvals holder included, builds either.
+fn stock_ask_parts_problems(others: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let text_of = |source: &str| {
+        let found = others.iter().find(|(path, _)| is_source(path, source));
+        found.map_or(String::new(), |(_, text)| text.clone())
+    };
+    let (review, holder) = (
+        text_of("src/agent_master_review.rs"),
+        text_of("src/agent_import_approval.rs"),
+    );
+    let count = |needle: &str| -> usize {
+        others
+            .iter()
+            .map(|(_, text)| text.matches(needle).count())
+            .sum()
+    };
+    let shown = fn_body(&review, "impl ShownStockItem {");
+    if review.matches(SHOWN_ASK).count() != 1 || review.matches(SHOWN_BINDING).count() != 1 {
+        problems.push("ask and binding build from the shown item itself".into());
+    }
+    if count("ApprovalBinding::stock_item") != 2
+        || shown.matches("ApprovalBinding::stock_item(").count() != 2
+        || holder.matches("stock_item(").count() != 1
     {
-        problems.push("ShownStockItem's fields are private and it derives nothing".into());
+        problems.push("a stock binding is built only by ShownStockItem".into());
     }
-    let name = "ShownStockItem";
-    let impls: usize = (others.iter())
-        .map(|(_, text)| impl_lines_naming(text, name))
-        .sum();
-    if impls != 1 || impl_lines_naming(review_tests, name) != 0 {
-        problems.push("ShownStockItem has one inherent impl and no trait impl".into());
-    }
-    let literals: usize = (others.iter())
-        .map(|(_, text)| literals_of(text, name))
-        .sum();
-    let maker = fn_body(review, "pub(super) fn show_stock_item_draft(");
-    if literals != 1 || literals_of(maker, name) != 1 || literals_of(review_tests, name) != 0 {
-        problems.push("ShownStockItem is built only by show_stock_item_draft".into());
+    let ask = fn_body(&review, "    pub(super) fn ask(");
+    let held_patterns = holder.matches("HeldRequest::StockItem(").count()
+        + holder.matches("Self::StockItem(").count();
+    if count("StockItem(Box::new(") != 1
+        || ask
+            .matches("HeldRequest::StockItem(Box::new(self.prepared.clone()))")
+            .count()
+            != 1
+        || count("HeldRequest::StockItem(") != 2
+        || held_patterns != 2
+    {
+        problems.push("a stock held request is built only by ShownStockItem::ask".into());
     }
     problems
 }
 
 #[test]
-fn a_shown_stock_item_is_made_once_and_asked_once() {
+fn one_ask_builds_the_stock_binding_and_held_request_and_nothing_else_does() {
+    let sources = sources_with_approvals();
+    assert_eq!(stock_ask_parts_problems(&sources), Vec::<String>::new());
+    let edit = |source: &str, from: &str, to: &str| {
+        let mut mutated = sources.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let elsewhere = |text: &str| {
+        let mut mutated = sources.clone();
+        mutated.push(("src/elsewhere.rs".into(), text.into()));
+        mutated
+    };
+    let review = "src/agent_master_review.rs";
+    let holder = "src/agent_import_approval.rs";
+    let tail = "\nfn approved(\n";
+    let mutations = [
+        // A binding built elsewhere, or in the approvals holder.
+        elsewhere("let b = ApprovalBinding::stock_item(origin, &prepared, preview);"),
+        edit(
+            holder,
+            tail,
+            "\nfn other(p: &PreparedStockItem) -> ApprovalBinding { ApprovalBinding::stock_item(\"o\", p, \"x\") }\nfn approved(\n",
+        ),
+        edit(
+            holder,
+            "    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+            "    fn other(p: &PreparedStockItem) -> Self {\n        Self::stock_item(\"o\", p, \"x\")\n    }\n\n    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+        ),
+        // A binding in `ask` built from another prepared value.
+        edit(
+            review,
+            "        let binding = ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview);\n",
+            "        let binding = ApprovalBinding::stock_item(endpoint_origin, &other, &self.preview);\n",
+        ),
+        // A held request built outside `ask`, or from another value in it.
+        elsewhere("let held = HeldRequest::StockItem(Box::new(prepared));"),
+        elsewhere("let held = HeldRequest::StockItem(boxed);"),
+        edit(
+            review,
+            "HeldRequest::StockItem(Box::new(self.prepared.clone()))",
+            "HeldRequest::StockItem(Box::new(other.clone()))",
+        ),
+    ];
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert_ne!(mutated, &sources, "mutation {at} changed nothing");
+        assert!(
+            !stock_ask_parts_problems(mutated).is_empty(),
+            "mutation {at}"
+        );
+    }
+}
+
+#[test]
+fn shown_and_asked_stock_items_have_private_fields_no_derive_one_impl_and_one_literal() {
     let review = read("src-tauri/src/agent_master_review.rs");
     let review_tests = read("src-tauri/src/agent_master_review_tests.rs");
-    let others = other_sources();
+    let others = sources_with_approvals();
     assert_eq!(
         shown_stock_item_problems(&review, &review_tests, &others),
         Vec::<String>::new()
@@ -3605,6 +3747,15 @@ fn a_shown_stock_item_is_made_once_and_asked_once() {
             "\n#[cfg(test)]\n#[path",
             "\nfn again(prepared: PreparedStockItem) -> ShownStockItem {\n    ShownStockItem { prepared, preview: String::new() }\n}\n#[cfg(test)]\n#[path",
         ),
+        in_review("    held: HeldRequest,\n}", "    pub(super) held: HeldRequest,\n}"),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct AskedStockItem {",
+            "#[cfg_attr(not(test), allow(dead_code))]\n#[derive(Default)]\npub(super) struct AskedStockItem {",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(binding: ApprovalBinding, dialog: PendingPostApproval, held: HeldRequest) -> AskedStockItem {\n    AskedStockItem { binding, dialog, held }\n}\n#[cfg(test)]\n#[path",
+        ),
     ];
     let mut elsewhere = others.clone();
     elsewhere.push((
@@ -3632,9 +3783,9 @@ fn a_stock_item_approval_is_made_only_after_the_stock_item_dialog_approves() {
     let stock = read("src-tauri/src/tally/stock_item_create.rs");
     let stock_tests = read("src-tauri/src/tally/stock_item_create_tests.rs");
     let review = read("src-tauri/src/agent_master_review.rs");
-    let others = other_sources();
-    // This scan skips agent_import_approval.rs and files named *_tests.rs,
-    // *_tests_* or tests.rs, rather than literally every non-test source.
+    let others = sources_with_approvals();
+    // This scan skips files named *_tests.rs, *_tests_* or tests.rs, rather
+    // than literally every non-test source; the approvals holder is read.
     assert_eq!(
         stock_approval_problems(
             &approvals,
@@ -3758,7 +3909,18 @@ fn a_stock_item_approval_is_made_only_after_the_stock_item_dialog_approves() {
     };
     let review_path = "src/agent_master_review.rs";
     let approvals_path = "src/tally/approved_import.rs";
+    let holder_path = "src/agent_import_approval.rs";
     let mut asks = vec![
+        in_others(
+            holder_path,
+            "\nfn approved(\n",
+            "\nfn again() { PendingPostApproval::ask_stock_item(p, t, m, f, b); }\nfn approved(\n",
+        ),
+        in_others(
+            holder_path,
+            "\nfn approved(\n",
+            "\nfn again() { ApprovedImport::confirm_stock_item(p, t, m, f, b); }\nfn approved(\n",
+        ),
         in_others(
             review_path,
             "\n#[cfg(test)]\n#[path",
@@ -3775,6 +3937,12 @@ fn a_stock_item_approval_is_made_only_after_the_stock_item_dialog_approves() {
             "                .map_err(|_| \"import_approval_declined\".to_string())\n",
         ),
     ];
+    // A second Create made from a draft in the coordinator.
+    asks.push(in_others(
+        review_path,
+        "\n#[cfg(test)]\n#[path",
+        "\nfn twice(d: StockItemDraft<'_>) { let _ = PreparedStockItem::from_draft(d); }\n#[cfg(test)]\n#[path",
+    ));
     for elsewhere_text in [
         "PendingPostApproval::ask_stock_item(prepared, preview, marks, parse, batch)",
         "let ask = PendingPostApproval::ask_stock_item;",
@@ -3802,23 +3970,6 @@ fn a_stock_item_approval_is_made_only_after_the_stock_item_dialog_approves() {
             "ask mutation {at}"
         );
     }
-    // A second Create made from a draft in the coordinator.
-    let second_prepared = format!("{review}\nlet _ = PreparedStockItem::from_draft(draft);");
-    let mut second_prepared_others = others.clone();
-    let entry = (second_prepared_others.iter_mut())
-        .find(|(path, _)| is_source(path, review_path))
-        .expect("the coordinator is scanned");
-    entry.1 = second_prepared.clone();
-    assert!(!stock_approval_problems(
-        &approvals,
-        &approvals_tests,
-        &stock,
-        &stock_tests,
-        &second_prepared,
-        &second_prepared_others,
-    )
-    .is_empty());
-
     let caller_preview = review.replace(
         "stock_item_review_text(&draft, origin)",
         "Ok::<String, StockItemReviewError>(origin.to_string())",

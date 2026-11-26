@@ -289,3 +289,472 @@ async fn a_read_refused_past_the_size_edge_answers_its_typed_code_and_records_no
     assert_eq!(run.sent, expected_sent);
     assert_eq!(run.journal, None, "nothing is recorded");
 }
+
+// --- post_stock_item: the batch, the book read again, the ask, the dispatch ---
+
+mod post {
+    use super::super::super::super::master_ledger::stock_item_journal::record_stock_item_intent;
+    use super::super::super::super::master_ledger::{read_journal, ExclusiveAdmission};
+    use super::super::super::super::master_post::tests::coordinator::{
+        approved_stock, import_answer, imports, minted, rebound_before, stock_answers, QUEUE_READS,
+    };
+    use super::super::super::super::master_review::tests::{
+        approved_stock_item_for, stock_approvals, taken_stock_approval,
+    };
+    use super::*;
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+    use std::time::Duration;
+    use tally_protocol_simulator::ObservedRequest;
+
+    const A: u16 = 0xa1;
+    const B: u16 = 0xb2;
+
+    fn id(serial: u16) -> &'static str {
+        crate::synthetic_batch_id(serial)
+    }
+
+    /// A server over a double answering `plans`, in a data folder of its own.
+    struct PostRun {
+        server: Server,
+        simulator: SequenceSimulator,
+        origin: String,
+        directory: tempfile::TempDir,
+    }
+
+    fn posting(plans: Vec<ScenarioPlan>, redaction: Redaction) -> PostRun {
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let endpoint = TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let origin = crate::agent::canonical_loopback_origin(&endpoint).unwrap();
+        let server = Server::new(Settings {
+            endpoint,
+            data_dir: directory.path().to_path_buf(),
+            max_rows: 10,
+            max_bytes: 200_000,
+            redaction,
+            import_enabled: true,
+            posting: Posting::On,
+            master_writes_enabled: true,
+            audit_enabled: false,
+        });
+        PostRun {
+            server,
+            simulator,
+            origin,
+            directory,
+        }
+    }
+
+    impl PostRun {
+        fn dir(&self) -> &std::path::Path {
+            self.directory.path()
+        }
+
+        async fn post(
+            &self,
+            scripted: &ScriptedApproval,
+            batch_id: &str,
+        ) -> Result<ToolOutcome, ToolFailure> {
+            SCRIPTED_APPROVAL
+                .scope(scripted.clone(), self.server.post_stock_item(batch_id))
+                .await
+        }
+
+        /// The record types of the stock journal.
+        fn records(&self) -> Vec<String> {
+            let journal = std::fs::read(self.dir().join(STOCK_JOURNAL)).unwrap_or_default();
+            (journal_lines(&journal).iter())
+                .map(|line| line["record_type"].as_str().unwrap().to_string())
+                .collect()
+        }
+
+        fn finish(self) -> Vec<ObservedRequest> {
+            self.simulator.finish().unwrap()
+        }
+
+        /// The requests received before the double is stopped, its unused
+        /// answer left out.
+        fn cancelled(self) -> Vec<ObservedRequest> {
+            self.simulator.cancel();
+            let observed = self.simulator.finish().unwrap();
+            observed
+                .into_iter()
+                .filter(|request| !request.method.is_empty())
+                .collect()
+        }
+    }
+
+    /// The batch of the rebound draft shown at `origin`, as the prepare
+    /// records it, under the id of `serial`.
+    fn shape_batch(serial: u16, origin: &str) -> StockItemBatch {
+        rebound_shown(&shape_identity(), origin)
+            .batch(id(serial).to_string())
+            .unwrap()
+    }
+
+    fn record(dir: &std::path::Path, batch: &StockItemBatch) {
+        let lock = ExclusiveAdmission::acquire(dir).unwrap();
+        append(dir, &lock, JournalRecord::Batch(batch.clone())).unwrap();
+    }
+
+    /// `batch` with the hand edit `edit` made to its line.
+    fn hand_edited(batch: &StockItemBatch, edit: impl FnOnce(&mut Value)) -> StockItemBatch {
+        let mut line = serde_json::to_value(batch).unwrap();
+        edit(&mut line);
+        serde_json::from_value(line).unwrap()
+    }
+
+    /// The post's own reads: the identity read, then the stock reads.
+    fn post_reads() -> Vec<ScenarioPlan> {
+        let mut plans = identity_answers(false);
+        plans.extend(standalone(passing_answers()));
+        plans
+    }
+
+    /// The queue's reads after the approval, then Tally's answer to the Create.
+    fn dispatch() -> Vec<ScenarioPlan> {
+        let mut plans = passing_answers();
+        plans.push(import_answer());
+        plans
+    }
+
+    fn refused_code(outcome: &Result<ToolOutcome, ToolFailure>) -> &str {
+        match outcome {
+            Ok(outcome) => panic!("the post answered: {}", outcome.payload),
+            Err(failure) => &failure.code,
+        }
+    }
+
+    /// The Create's bytes as the renderer gives the rebound draft.
+    fn create_bytes() -> String {
+        render_stock_item_create(&rebound_prepared(&shape_identity()))
+    }
+
+    /// Prepare, then post: one dialog, the stored bytes sent once, one intent,
+    /// the approval used and gone, and an answer that says NOT verified. Under
+    /// `mask_parties` the answer's preview is masked as the prepare masks it,
+    /// and the dialog shows the whole names.
+    #[tokio::test]
+    async fn a_prepared_stock_item_is_asked_once_and_its_stored_bytes_are_sent_once_unverified() {
+        for redaction in [Redaction::None, Redaction::MaskParties] {
+            let mut plans = passing_run();
+            let prepared_at = plans.len();
+            plans.extend(post_reads());
+            let posted_at = plans.len() + passing_answers().len();
+            plans.extend(dispatch());
+            let run = posting(plans, redaction);
+            let prepared = run
+                .server
+                .prepare_stock_item(SHAPE_GUID, STOCK_PROPOSED, STOCK_SOURCE);
+            let prepared = prepared.await.expect("the prepare records a batch");
+            let batch_id = prepared.payload["result"]["batch_id"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            let scripted = ScriptedApproval::approving();
+            let outcome = run
+                .post(&scripted, &batch_id)
+                .await
+                .expect("the post answers");
+            let result = &outcome.payload["result"];
+            assert_eq!(result["state"], "posted_unverified", "{result}");
+            assert_eq!(result["verification"]["attempted"], false);
+            assert_eq!(result["dispatch"]["state"], "dispatched");
+            assert_eq!(result["counters"]["created"], 1);
+            assert!(result["note"].as_str().unwrap().contains("NOT verified"));
+            let step = result["next_step"].as_str().unwrap();
+            assert!(
+                !step.contains("post_") && !step.contains("prepare_"),
+                "{step}"
+            );
+            let shown = rebound_shown(&shape_identity(), &run.origin);
+            let (dialogs, preview) = (scripted.stock_items(), result["preview"].as_str().unwrap());
+            assert_eq!(dialogs.len(), 1, "asked once");
+            assert!(
+                dialogs[0].contains(STOCK_PROPOSED),
+                "the dialog shows the whole name"
+            );
+            if redaction == Redaction::MaskParties {
+                assert_eq!(preview, shown.masked_preview());
+                assert!(!preview.contains(STOCK_PROPOSED) && !preview.contains(STOCK_SOURCE));
+            } else {
+                assert_eq!(preview, shown.preview());
+            }
+            assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+            assert!(
+                !run.server.post_approvals.holds(&batch_id),
+                "nothing is held"
+            );
+            let stored = journal_lines(&std::fs::read(run.dir().join(STOCK_JOURNAL)).unwrap());
+            // Posted again: the recorded intent answers, nothing is asked or sent.
+            let again = run.post(&scripted, &batch_id).await.expect("an answer");
+            let again = &again.payload["result"];
+            assert_eq!(
+                again["error"]["code"],
+                UnderLockRefusal::AlreadyAttempted.code()
+            );
+            assert_eq!(again["attempt_recorded"], true);
+            assert!(again["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("NOT verified"));
+            assert_eq!(scripted.stock_items().len(), 1);
+            let observed = run.finish();
+            assert_eq!(
+                observed.len(),
+                posted_at + 1,
+                "nothing after the one import"
+            );
+            assert_eq!(sent(&observed[..prepared_at]), every_request());
+            assert_eq!(
+                sent(&observed[prepared_at..posted_at]),
+                [every_request(), QUEUE_READS.to_vec()].concat()
+            );
+            let sent_imports = imports(&observed);
+            assert_eq!(
+                sent_imports,
+                [create_bytes()],
+                "exactly the stored request, once"
+            );
+            assert_eq!(
+                stored[0]["batch_sha256"].as_str(),
+                Some(bridge_tally_protocol::sha256_hex(sent_imports[0].as_bytes()).as_str())
+            );
+        }
+    }
+
+    /// An id the stock journal does not hold, and a malformed one, are refused
+    /// before any request, and nothing is asked.
+    #[tokio::test]
+    async fn an_unknown_or_malformed_batch_id_is_refused_before_anything() {
+        // One answer the post must not use, so the double stays up.
+        let run = posting(vec![health()], Redaction::None);
+        let scripted = ScriptedApproval::approving();
+        let unknown = run.post(&scripted, id(A)).await;
+        assert_eq!(refused_code(&unknown), "master_batch_not_found");
+        let malformed = run.post(&scripted, "not-a-batch").await;
+        assert_eq!(refused_code(&malformed), "import_batch_identifier_invalid");
+        assert!(scripted.stock_items().is_empty());
+        assert!(run.cancelled().is_empty(), "no request is sent");
+    }
+
+    /// A batch whose stored company is not the one verified now: a hand edit
+    /// of the stored company name.
+    #[tokio::test]
+    async fn another_company_identity_is_refused_after_the_identity_read() {
+        let run = posting(identity_answers(false), Redaction::None);
+        let batch = hand_edited(&shape_batch(A, &run.origin), |line| {
+            line["company"]["name"] = json!("Another Company");
+        });
+        record(run.dir(), &batch);
+        let scripted = ScriptedApproval::approving();
+        let outcome = run.post(&scripted, id(A)).await;
+        assert_eq!(refused_code(&outcome), "company_identity_mismatch");
+        assert!(scripted.stock_items().is_empty());
+        assert_eq!(run.records(), ["master_batch"]);
+        assert_eq!(sent(&run.finish()), IDENTITY_READ);
+    }
+
+    /// The book as it stands makes another batch than the stored one: the
+    /// sibling's GST rate changed (the digest differs), or only its GUID
+    /// changed (the digest is the same, the stored writes are not), or the
+    /// stored digest is not the batch's (a hand edit of the line). Each is
+    /// refused before the ask, and nothing is recorded or imported.
+    #[tokio::test]
+    async fn a_book_that_makes_another_batch_is_refused_before_the_ask() {
+        let rate = "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>";
+        let changed_rate =
+            rebound_before().replacen(rate, "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>", 1);
+        let sibling = format!("{SHAPE_GUID}-000000d0");
+        assert_eq!(rebound_before().matches(&sibling).count(), 1);
+        let changed_guid = rebound_before().replace(&sibling, &format!("{SHAPE_GUID}-000000d9"));
+        let tampered = |batch: &StockItemBatch| {
+            hand_edited(batch, |line| line["batch_sha256"] = json!("e".repeat(64)))
+        };
+        type Edit = fn(&StockItemBatch) -> StockItemBatch;
+        let cases: [(String, Edit); 3] = [
+            (changed_rate, Clone::clone),
+            (changed_guid, Clone::clone),
+            (rebound_before(), tampered),
+        ];
+        for (candidate, edit) in cases {
+            let mut plans = identity_answers(false);
+            plans.extend(standalone(stock_answers(candidate, 1, marks_at(289))));
+            let run = posting(plans, Redaction::None);
+            record(run.dir(), &edit(&shape_batch(A, &run.origin)));
+            let scripted = ScriptedApproval::approving();
+            let outcome = run.post(&scripted, id(A)).await;
+            assert_eq!(refused_code(&outcome), "import_batch_changed");
+            assert!(scripted.stock_items().is_empty(), "nothing is asked");
+            assert_eq!(run.records(), ["master_batch"]);
+            assert_eq!(sent(&run.finish()), every_request(), "no import");
+        }
+    }
+
+    /// A batch prepared in licensed mode and posted in Education: refused by
+    /// the stock read, before any stock request and before the ask, with the
+    /// prepare's code.
+    #[tokio::test]
+    async fn a_batch_posted_in_education_is_refused_before_the_ask_with_the_prepares_code() {
+        let mut plans = identity_answers(true);
+        plans.extend([health(), answer(shape_companies(true))]);
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let scripted = ScriptedApproval::approving();
+        let outcome = run.post(&scripted, id(A)).await;
+        assert_eq!(refused_code(&outcome), "master_writes_need_licensed_mode");
+        assert!(scripted.stock_items().is_empty());
+        assert_eq!(run.records(), ["master_batch"]);
+        let mut expected = IDENTITY_READ.to_vec();
+        expected.extend([Sent::Health, Sent::Companies]);
+        assert_eq!(sent(&run.finish()), expected);
+    }
+
+    /// Records batch `b`'s intent in `dir`, as a post that sent it leaves it:
+    /// an open stock dispatch.
+    async fn dispatch_open(dir: &std::path::Path, b: &StockItemBatch) {
+        let holder = tempfile::tempdir().unwrap();
+        let approvals = stock_approvals(holder.path());
+        let taken = taken_stock_approval(&approvals, b.batch_id()).await;
+        let lock = ExclusiveAdmission::acquire(dir).unwrap();
+        let token = minted(b.batch_id()).await;
+        let _recorded =
+            record_stock_item_intent(dir, &lock, b, token, &taken).expect("the intent is recorded");
+    }
+
+    /// An open stock dispatch of the same name refuses before the ask and
+    /// names its batch; an open ledger dispatch of the name does not, and the
+    /// ledger post's own check does not see the open stock dispatch.
+    #[tokio::test]
+    async fn an_open_stock_dispatch_of_the_name_refuses_before_the_ask_and_a_ledgers_does_not() {
+        let run = posting(post_reads(), Redaction::None);
+        let (a, b) = (shape_batch(A, &run.origin), shape_batch(B, &run.origin));
+        record(run.dir(), &a);
+        record(run.dir(), &b);
+        dispatch_open(run.dir(), &b).await;
+        let scripted = ScriptedApproval::approving();
+        let outcome = run
+            .post(&scripted, id(A))
+            .await
+            .expect("the refusal answers");
+        let error = &outcome.payload["result"]["error"];
+        assert_eq!(error["code"], OVERLAP_CODE);
+        assert_eq!(error["blocking_batch_ids"], json!([id(B)]));
+        assert!(error["message"].as_str().unwrap().contains("stock item"));
+        assert_eq!(outcome.payload["result"]["attempt_recorded"], false);
+        assert!(scripted.stock_items().is_empty(), "nothing is asked");
+        // The ledger post's hold check, on the same folder: a ledger batch of
+        // the name (its own intent aside) is not held by the stock dispatch.
+        let ledger_dir = tempfile::tempdir().unwrap();
+        let ledger = super::super::super::tests::dispatched_batch_in(
+            ledger_dir.path(),
+            STOCK_PROPOSED,
+            SHAPE_GUID,
+        );
+        let lock = ExclusiveAdmission::acquire(run.dir()).unwrap();
+        append(run.dir(), &lock, JournalRecord::Batch(ledger.clone())).unwrap();
+        drop(lock);
+        let ledgers = read_journal(run.dir()).unwrap();
+        assert_eq!(
+            overlap_view(Some(&ledgers), &ledger.batch_id, SHAPE_GUID),
+            OverlapView::Settled
+        );
+        assert_eq!(sent(&run.finish()), every_request());
+
+        // An open ledger dispatch of the same name: the stock post asks.
+        let run = posting(post_reads(), Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        super::super::super::tests::dispatched_batch_in(run.dir(), STOCK_PROPOSED, SHAPE_GUID);
+        let declined = ScriptedApproval::declining();
+        let outcome = run.post(&declined, id(A)).await;
+        assert_ne!(refused_code(&outcome), OVERLAP_CODE);
+        assert_eq!(
+            declined.stock_items().len(),
+            1,
+            "the stock item is asked about"
+        );
+        assert_eq!(run.records(), ["master_batch"]);
+        assert_eq!(sent(&run.finish()), every_request());
+    }
+
+    /// An approval held with the fresh binding but for another item: the
+    /// holder's take admits it (its bytes are its held item's), and the post's
+    /// own check of the held item refuses it, before the owed digest check
+    /// and with nothing recorded or imported.
+    #[tokio::test]
+    async fn an_approval_held_for_another_item_is_refused_at_the_take() {
+        let run = posting(post_reads(), Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let fresh = rebound_shown(&shape_identity(), &run.origin).binding();
+        // The R1 book's own item, asked for this batch: another company's.
+        let (_, held, approved, answered) =
+            approved_stock_item_for(STOCK_PROPOSED, id(A).to_string()).await;
+        (run.server.post_approvals)
+            .hold_approved(id(A), fresh, approved, held, answered)
+            .unwrap();
+        let scripted = ScriptedApproval::approving();
+        let outcome = run.post(&scripted, id(A)).await;
+        assert_eq!(refused_code(&outcome), "import_approval_binding_changed");
+        assert!(
+            scripted.stock_items().is_empty(),
+            "the held approval is redeemed, not asked"
+        );
+        assert_eq!(run.records(), ["master_batch"]);
+        assert_eq!(sent(&run.finish()), every_request(), "no import");
+    }
+
+    /// The owed check: an approval whose bytes digest to another value than
+    /// the batch's is refused. Through the tool it cannot be reached with the
+    /// rebuild check and the held-item check in place (the take ties the
+    /// approved bytes to the held item, and the held item to the stored
+    /// writes), so it is tested here, on a hand edit of the stored digest.
+    #[tokio::test]
+    async fn the_owed_check_refuses_an_approval_of_other_bytes_than_the_batch() {
+        let approved = approved_stock(id(A)).await;
+        let batch = shape_batch(A, "http://127.0.0.1:9000");
+        assert!(owed_digest(&approved, &batch).is_ok());
+        let other = hand_edited(&batch, |line| line["batch_sha256"] = json!("e".repeat(64)));
+        let refused = owed_digest(&approved, &other).expect_err("other bytes");
+        assert_eq!(refused.code, "import_batch_changed");
+    }
+
+    async fn until_answered(server: &Server, batch_id: &str) {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !server.post_approvals.answered_for_test(batch_id) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("the held dialog's answer was stamped");
+    }
+
+    /// A dialog left open by one call and clicked while no call waits is
+    /// posted by the next call: its first pass joins the answered dialog and
+    /// hands it to a redeem-only pass, which reads the book again and sends,
+    /// as the ledger post's test of the same flow shows. One dialog in all.
+    #[tokio::test]
+    async fn a_click_after_the_call_returned_is_redeemed_by_the_next_call() {
+        let mut plans = post_reads();
+        let first = plans.len();
+        plans.extend(post_reads());
+        plans.extend(dispatch());
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let scripted = ScriptedApproval::held();
+        let pending = run.post(&scripted, id(A)).await.expect("pending");
+        assert_eq!(pending.payload["result"]["approval"]["state"], "pending");
+        assert_eq!(run.records(), ["master_batch"]);
+        scripted.answer(true);
+        until_answered(&run.server, id(A)).await;
+        let posted = run.post(&scripted, id(A)).await.expect("posted");
+        assert_eq!(posted.payload["result"]["state"], "posted_unverified");
+        assert_eq!(scripted.stock_items().len(), 1, "one dialog, asked once");
+        assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+        let observed = run.finish();
+        assert_eq!(sent(&observed[..first]), every_request());
+        assert_eq!(imports(&observed), [create_bytes()]);
+    }
+}

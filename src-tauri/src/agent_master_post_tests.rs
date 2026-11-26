@@ -1252,14 +1252,25 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
         // The stock prepare: its definition and its module's title, no caller.
         ("prepare_stock_item", &[("agent_master_stock_tools.rs", 2)]),
-        // The in-queue stock recheck and the stock intent writer: no caller.
+        // The stock post: its definition, its pass, the module's notes and the
+        // tool it names in the approval answer, no caller.
+        ("post_stock_item", &[("agent_master_stock_tools.rs", 5)]),
+        // The in-queue stock recheck and the stock intent writer: their one
+        // caller is the stock post, which has none.
         (
             "recheck_stock_item_for_dispatch",
-            &[("agent_master_post.rs", 2), ("tally/approved_import.rs", 1)],
+            &[
+                ("agent_master_post.rs", 2),
+                ("agent_master_stock_tools.rs", 2),
+                ("tally/approved_import.rs", 1),
+            ],
         ),
         (
             "record_stock_item_intent",
-            &[("agent_master_stock_item_journal.rs", 3)],
+            &[
+                ("agent_master_stock_item_journal.rs", 3),
+                ("agent_master_stock_tools.rs", 2),
+            ],
         ),
         (
             "StockItemRecheckReads",
@@ -1964,7 +1975,7 @@ pub(crate) mod coordinator {
     /// company list and binding marks, the coordinator's four pairs, the
     /// closing mode and company list, and the aim marks last.
     #[rustfmt::skip]
-    const QUEUE_READS: [Sent; 24] = [
+    pub(crate) const QUEUE_READS: [Sent; 24] = [
         Health, Companies, Companies, Marks,
         Candidate, Health, Candidate, Health, Count, Health, Count, Health,
         StockGroups, Health, StockGroups, Health, Units, Health, Units, Health,
@@ -2332,7 +2343,7 @@ pub(crate) mod coordinator {
     /// companies and binding marks (289), `candidate`, the shape lab's count
     /// of 11 items made `items` (a hand edit), the R1 group and unit reads
     /// rebound to the shape lab's GUID (hand edits), and aim marks at `aim`.
-    fn stock_answers(candidate: String, items: usize, aim: String) -> Vec<ScenarioPlan> {
+    pub(crate) fn stock_answers(candidate: String, items: usize, aim: String) -> Vec<ScenarioPlan> {
         let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
         let count = stock_capture(SHAPE_COUNT);
         let reported = "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>";
@@ -2352,7 +2363,7 @@ pub(crate) mod coordinator {
 
     /// The R1 candidate read before the creates, one item, rebound to the
     /// shape lab's GUID (a hand edit).
-    fn rebound_before() -> String {
+    pub(crate) fn rebound_before() -> String {
         stock_capture(STOCK_BEFORE).replace(STOCK_GUID, SHAPE_GUID)
     }
 

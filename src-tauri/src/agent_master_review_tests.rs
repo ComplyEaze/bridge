@@ -993,7 +993,7 @@ async fn approved_stock_item(
 }
 
 /// [`approved_stock_item`], asked for `batch`.
-async fn approved_stock_item_for(
+pub(in crate::agent::agent_import) async fn approved_stock_item_for(
     new_name: &str,
     batch: String,
 ) -> (ApprovalBinding, HeldRequest, ApprovedImport, Answered) {

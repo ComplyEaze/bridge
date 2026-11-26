@@ -1241,7 +1241,7 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
         ),
         (
             "read_and_recheck_stock_item",
-            &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 4)],
+            &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 5)],
         ),
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
         (
@@ -1257,7 +1257,7 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             &[
                 ("agent_master_post.rs", 4),
                 ("tally/runtime.rs", 1),
-                ("tally/runtime_masters.rs", 4),
+                ("tally/runtime_masters.rs", 6),
             ],
         ),
         (

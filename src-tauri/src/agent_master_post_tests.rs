@@ -1476,10 +1476,10 @@ fn an_admitted_draft_refuses_support_reads_of_another_company() {
 /// gives is the shape lab's baseline short stock-item read, not the HSN/GST
 /// list `render_candidate_stock_items_request` asks for (the request bytes are
 /// that builder's; the answer is not its shape), so that response shape is
-/// never answered in these tests. No draft can be built from the short read:
-/// every run that reaches the recheck refuses at its sibling step, after the
-/// company, aim, sized-mark and name checks have passed on the coordinator's
-/// own reads.
+/// never answered in these tests. No draft can be built from the short read,
+/// so no run here passes the recheck: a run whose reads all admit and whose aim
+/// matches refuses at the recheck's sibling step, after its company, aim,
+/// sized-mark and name checks; every other run refuses where its test says.
 mod coordinator {
     use super::*;
     use crate::tally::connection::PairedReadValidationError;

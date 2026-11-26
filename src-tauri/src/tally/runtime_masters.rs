@@ -910,7 +910,9 @@ impl TallyRuntime {
     /// pair, back to back; the stock-group
     /// pair; the unit pair; the closing identity and mode brackets; and the
     /// marks again, last, the aim. Only `recheck`, local work, follows the aim.
-    /// Nothing here sends an import, and no shipped caller reaches it.
+    /// Nothing here sends an import, and no shipped caller reaches it. The
+    /// runtime trusts the rows `parse_marks` returns; the check on them is the
+    /// recheck's own re-derivation of the mark from the binding text.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) async fn read_and_recheck_stock_item<P, R>(
         &self,

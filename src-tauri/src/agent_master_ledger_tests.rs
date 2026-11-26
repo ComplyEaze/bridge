@@ -2217,3 +2217,173 @@ fn confirmed_absent_after_change_is_admitted_as_the_other_absent_state() {
     records.push(MasterRecord::Verdict(after_change(&first)));
     assert!(read(&journal_text(&[records, again].concat())).is_ok());
 }
+
+/// The ledger journal's bytes, as the build before the journal was made generic
+/// over its batch kind wrote them from these helpers, with the identifiers put
+/// back in at run time: two batches, one verified and one confirmed absent.
+const GOLDEN_LEDGER_JOURNAL: &[&str] = &[
+    "{\"record_type\":\"master_batch\",\"batch_id\":\"@A@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"class\":\"ledger_create\",\"company\":{\"guid\":\"@COMPANY@\",\"name\":\"Synthetic Company\",\"number\":\"1\",\"books_from\":\"20260401\"},\"items\":[{\"name\":\"Synthetic Debtor\",\"kind\":\"party_sundry_debtors\",\"bill_wise\":false,\"party_gstin\":null,\"gst_duty_head\":null},{\"name\":\"Synthetic Duty\",\"kind\":\"gst_duty\",\"bill_wise\":false,\"party_gstin\":null,\"gst_duty_head\":\"Integrated Tax\"}]}\n",
+    "{\"record_type\":\"master_dispatch_intent\",\"batch_id\":\"@A@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"native_request_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"items\":[{\"name\":\"Synthetic Debtor\",\"canonical_key\":\"synthetic debtor\",\"absence_key\":\"synthetic debtor\"},{\"name\":\"Synthetic Duty\",\"canonical_key\":\"synthetic duty\",\"absence_key\":\"synthetic duty\"}],\"pre_image_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"pre_image_count\":2,\"pre_post_master_marks\":[{\"company_guid\":\"@COMPANY@\",\"altmstid\":7}]}\n",
+    "{\"record_type\":\"master_dispatch_response\",\"batch_id\":\"@A@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"response_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"counters\":{\"created\":2,\"altered\":0,\"deleted\":0,\"ignored\":0,\"errors\":0,\"cancelled\":0,\"exceptions\":0}}\n",
+    "{\"record_type\":\"master_verdict\",\"batch_id\":\"@A@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"posted_verified\",\"items\":[{\"name\":\"Synthetic Debtor\",\"guid\":\"@GUID0@\",\"reason\":null},{\"name\":\"Synthetic Duty\",\"guid\":\"@GUID1@\",\"reason\":null}]}\n",
+    "{\"record_type\":\"master_batch\",\"batch_id\":\"@B@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"class\":\"ledger_create\",\"company\":{\"guid\":\"@COMPANY@\",\"name\":\"Synthetic Company\",\"number\":\"1\",\"books_from\":\"20260401\"},\"items\":[{\"name\":\"Synthetic Debtor\",\"kind\":\"party_sundry_debtors\",\"bill_wise\":false,\"party_gstin\":null,\"gst_duty_head\":null},{\"name\":\"Synthetic Duty\",\"kind\":\"gst_duty\",\"bill_wise\":false,\"party_gstin\":null,\"gst_duty_head\":\"Integrated Tax\"}]}\n",
+    "{\"record_type\":\"master_dispatch_intent\",\"batch_id\":\"@B@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"native_request_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"items\":[{\"name\":\"Synthetic Debtor\",\"canonical_key\":\"synthetic debtor\",\"absence_key\":\"synthetic debtor\"},{\"name\":\"Synthetic Duty\",\"canonical_key\":\"synthetic duty\",\"absence_key\":\"synthetic duty\"}],\"pre_image_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"pre_image_count\":2,\"pre_post_master_marks\":[{\"company_guid\":\"@COMPANY@\",\"altmstid\":7}]}\n",
+    "{\"record_type\":\"master_dispatch_response\",\"batch_id\":\"@B@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"response_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"counters\":{\"created\":0,\"altered\":0,\"deleted\":0,\"ignored\":0,\"errors\":0,\"cancelled\":0,\"exceptions\":0}}\n",
+    "{\"record_type\":\"master_verdict\",\"batch_id\":\"@B@\",\"batch_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"state\":\"confirmed_absent\",\"items\":[{\"name\":\"Synthetic Debtor\",\"guid\":null,\"reason\":null},{\"name\":\"Synthetic Duty\",\"guid\":null,\"reason\":null}]}\n",
+];
+
+#[test]
+fn the_ledger_journal_keeps_its_bytes_through_read_and_append() {
+    let (a, b) = (
+        batch(&sentinel_batch_id(0x61)),
+        batch(&sentinel_batch_id(0x62)),
+    );
+    // `verdict_for`'s GUIDs.
+    let guid = |index: u8| format!("0000000{index}-aaaa-bbbb-cccc-dddddddddddd");
+    let golden: String = GOLDEN_LEDGER_JOURNAL
+        .concat()
+        .replace("@A@", &a.batch_id)
+        .replace("@B@", &b.batch_id)
+        .replace("@COMPANY@", COMPANY_GUID)
+        .replace("@GUID0@", &guid(0))
+        .replace("@GUID1@", &guid(1));
+    // The helpers still write these bytes.
+    let mut written = journal_text(&full_records(&a));
+    written.push_str(&quiet_prefix(&b));
+    written.push_str(&line(&MasterRecord::Verdict(verdict_for(
+        &b,
+        MasterVerdictState::ConfirmedAbsent,
+    ))));
+    assert_eq!(written, golden);
+    // Read whole, then each line parsed and appended again in order, the file
+    // holds the same bytes.
+    let journal = read(&golden).unwrap();
+    assert_eq!(
+        journal.summary(),
+        MasterSummary {
+            batches: 2,
+            dispatched: 2,
+            not_settled: 0,
+        }
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let lock = lock();
+    for text in golden.lines() {
+        put(directory.path(), &lock, parse_record(text).unwrap()).unwrap();
+    }
+    assert_eq!(
+        std::fs::read_to_string(directory.path().join("agent-master-ledger.jsonl")).unwrap(),
+        golden
+    );
+}
+
+/// A second batch kind, for these tests only: a file and a batch line of its own.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProbeBatch {
+    batch_id: String,
+    batch_sha256: String,
+    company_guid: String,
+    names: Vec<String>,
+}
+
+impl JournalBatch for ProbeBatch {
+    const JOURNAL_FILE: &'static str = "agent-master-probe.jsonl";
+
+    fn validate(&self) -> Result<(), Invalid> {
+        check_ids(&self.batch_id, &self.batch_sha256)
+    }
+
+    fn batch_id(&self) -> &str {
+        &self.batch_id
+    }
+
+    fn batch_sha256(&self) -> &str {
+        &self.batch_sha256
+    }
+
+    fn company_guid(&self) -> &str {
+        &self.company_guid
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.names.iter().map(String::as_str).collect()
+    }
+}
+
+#[test]
+fn a_second_batch_kind_has_its_own_file_and_neither_journal_reads_the_other() {
+    assert_eq!(JOURNAL_FILE, "agent-master-ledger.jsonl");
+    let directory = tempfile::tempdir().unwrap();
+    let (ledger_path, probe_path) = (
+        directory.path().join("agent-master-ledger.jsonl"),
+        directory.path().join("agent-master-probe.jsonl"),
+    );
+    let lock = lock();
+    let probe = ProbeBatch {
+        batch_id: sentinel_batch_id(0x72),
+        batch_sha256: digest('e'),
+        company_guid: COMPANY_GUID.into(),
+        names: vec!["Synthetic Item".into()],
+    };
+    append(directory.path(), &lock, JournalRecord::Batch(probe.clone())).unwrap();
+    assert!(probe_path.exists());
+    assert!(!ledger_path.exists());
+    let ledger = batch(&sentinel_batch_id(0x71));
+    for record in full_records(&ledger) {
+        put(directory.path(), &lock, record).unwrap();
+    }
+    let ledger_text = std::fs::read_to_string(&ledger_path).unwrap();
+    let probe_text = std::fs::read_to_string(&probe_path).unwrap();
+    assert_eq!(ledger_text, journal_text(&full_records(&ledger)));
+    assert_eq!(probe_text.lines().count(), 1);
+    // Each journal holds its own batch only.
+    let ledger_journal = read_journal(directory.path()).unwrap();
+    assert!(ledger_journal.state(&ledger.batch_id).is_some());
+    assert!(ledger_journal.state(&probe.batch_id).is_none());
+    let probe_journal = read_kind_journal::<ProbeBatch>(directory.path()).unwrap();
+    assert_eq!(probe_journal.state(&probe.batch_id).unwrap().batch, probe);
+    assert!(probe_journal.state(&ledger.batch_id).is_none());
+    // Neither kind reads the other's lines.
+    assert_eq!(
+        MasterJournal::read(Cursor::new(probe_text.as_bytes())).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+    assert_eq!(
+        Journal::<ProbeBatch>::read(Cursor::new(ledger_text.as_bytes())).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+}
+
+#[test]
+fn a_corrupt_journal_of_one_kind_does_not_stop_the_other() {
+    let directory = tempfile::tempdir().unwrap();
+    let lock = lock();
+    let probe = ProbeBatch {
+        batch_id: sentinel_batch_id(0x73),
+        batch_sha256: digest('f'),
+        company_guid: COMPANY_GUID.into(),
+        names: vec!["Synthetic Item".into()],
+    };
+    std::fs::write(directory.path().join(JOURNAL_FILE), "garbage\n").unwrap();
+    assert_eq!(
+        read_journal(directory.path()).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+    append(directory.path(), &lock, JournalRecord::Batch(probe.clone())).unwrap();
+    let probe_journal = read_kind_journal::<ProbeBatch>(directory.path()).unwrap();
+    assert_eq!(probe_journal.state(&probe.batch_id).unwrap().batch, probe);
+
+    let other = tempfile::tempdir().unwrap();
+    std::fs::write(other.path().join("agent-master-probe.jsonl"), "garbage\n").unwrap();
+    assert_eq!(
+        read_kind_journal::<ProbeBatch>(other.path()).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+    let ledger = batch(&sentinel_batch_id(0x74));
+    put(other.path(), &lock, MasterRecord::Batch(ledger.clone())).unwrap();
+    assert!(read_journal(other.path())
+        .unwrap()
+        .state(&ledger.batch_id)
+        .is_some());
+}

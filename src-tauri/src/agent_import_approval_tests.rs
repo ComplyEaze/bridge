@@ -3249,6 +3249,64 @@ mod masters {
         assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
     }
 
+    /// A stock-item approval is redeemed only for the writes it was shown: a
+    /// fresh binding whose parent, unit or one GST rate differs is refused, as
+    /// a changed binding, and the approval lapses.
+    #[tokio::test]
+    async fn a_stock_item_approval_is_refused_for_changed_writes() {
+        use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+        use crate::tally::stock_item_create::tests::captured_prepared;
+        use crate::tally::stock_item_create::{PlainStockItemWrites, StockItemWrites};
+        let prepared = captured_prepared("SC Copied Marked");
+        let bind = |writes: &StockItemWrites| {
+            ApprovalBinding::stock_item(SHA, ORIGIN, prepared.company(), writes, PREVIEW)
+        };
+        // Each changed value is constructed by hand from the captured writes.
+        let changed = |edit: fn(&mut PlainStockItemWrites)| {
+            let mut plain = prepared.writes().to_plain();
+            edit(&mut plain);
+            StockItemWrites::rebuild(&plain).expect("the constructed values rebuild")
+        };
+        let batch = crate::synthetic_batch_id(0xb1);
+        let directory = tempfile::tempdir().unwrap();
+        let approvals = PostApprovals::new(directory.path());
+        for fresh in [
+            None,
+            Some(changed(|plain| plain.parent = "SC Other Group".into())),
+            Some(changed(|plain| plain.unit = "box".into())),
+            Some(changed(|plain| plain.rates[2].rate = Some("12".into()))),
+        ] {
+            let approved = SCRIPTED_APPROVAL
+                .scope(
+                    ScriptedApproval::approving(),
+                    ApprovedImport::confirm_stock_item(prepared.clone(), PREVIEW.into(), marks()),
+                )
+                .await
+                .expect("the scripted dialog approves");
+            let held = MasterPostRequest::stock_item(prepared.clone());
+            let shown = bind(prepared.writes());
+            approvals
+                .hold_approved(batch, shown, approved, held, answered())
+                .unwrap();
+            let redeemed = approvals
+                .take_for_dispatch(batch, &bind(fresh.as_ref().unwrap_or(prepared.writes())));
+            if fresh.is_some() {
+                assert_eq!(
+                    redeemed.err().as_deref(),
+                    Some("import_approval_binding_changed")
+                );
+                continue;
+            }
+            let (taken, approved, held) = redeemed.expect("the unchanged writes redeem");
+            let HeldRequest::Masters(held) = held else {
+                panic!("a stock-item approval comes back with its master request");
+            };
+            assert!(approved.sends_exactly(held.xml()));
+            assert_eq!(held.xml(), prepared.render());
+            drop(taken);
+        }
+    }
+
     /// The binding of the two kinds is never equal, even for the same batch
     /// digest, endpoint and preview.
     #[tokio::test]

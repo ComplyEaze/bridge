@@ -190,6 +190,10 @@ const STOCK_ITEM_CREATE: &[(StockItemCreateCode, &str)] = &[
         "stock_item_name_index_invalid",
     ),
     (
+        StockItemCreateCode::GuidNotLowercase,
+        "stock_item_guid_not_lowercase",
+    ),
+    (
         StockItemCreateCode::NameUnchecked,
         "stock_item_name_unchecked",
     ),
@@ -337,6 +341,10 @@ fn every_stock_refusal_variant_has_exactly_one_code() {
     assert_eq!(
         stock_item_catalogue_refusal_code(&StockItemCatalogueError::Index(index())),
         StockItemCreateCode::NameIndexInvalid
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::GuidNotLowercase { item: 0 }),
+        StockItemCreateCode::GuidNotLowercase
     );
 
     assert_eq!(

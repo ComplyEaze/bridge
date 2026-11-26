@@ -13,12 +13,12 @@ use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
 };
-use crate::tally::approved_import::{confirm_stock_item, StockItemDialogRefusal};
+use crate::tally::agent_read_request::AgentReadRequest;
+use crate::tally::approved_import::{ApprovedImport, StockItemDialogRefusal};
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
-use crate::tally::stock_item_create::ShownDraft;
 use crate::tally::stock_item_create::{
-    create_text_refusal, CreateRenderRefusal, MarkedConstant, StockItemDraft, GOODS,
-    SPECIFY_DETAILS_HERE, TAXABLE,
+    create_text_refusal, CreateRenderRefusal, MarkedConstant, PreparedStockItem, StockItemDraft,
+    GOODS, SPECIFY_DETAILS_HERE, TAXABLE,
 };
 use crate::tally::VerifiedCompanyIdentity;
 
@@ -344,15 +344,20 @@ pub(super) enum StockItemConfirmError {
 }
 
 /// Shows the preview of `draft` in the stock-item dialog and, only on the
-/// person's approval, returns the draft as shown. The preview is built here,
-/// from the draft itself, so the window shows what this draft creates.
+/// person's approval, returns the approval of the Create made from it. The
+/// preview is built here, from the draft itself, so the window shows what this
+/// draft creates.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(super) async fn confirm_stock_item_draft<'a>(
-    draft: StockItemDraft<'a>,
+pub(super) async fn confirm_stock_item_draft(
+    draft: StockItemDraft<'_>,
     origin: &str,
-) -> Result<ShownDraft<'a>, StockItemConfirmError> {
+    company_marks_request: AgentReadRequest,
+) -> Result<ApprovedImport, StockItemConfirmError> {
     let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
-    confirm_stock_item(draft, preview)
+    let prepared = PreparedStockItem::from_draft(draft).map_err(|refusal| {
+        StockItemConfirmError::Review(StockItemReviewError::NotRenderable(refusal))
+    })?;
+    ApprovedImport::confirm_stock_item(prepared, preview, company_marks_request)
         .await
         .map_err(StockItemConfirmError::Dialog)
 }

@@ -5,7 +5,7 @@
 //! whose helpers are private to that module.
 
 use super::*;
-use crate::tally::stock_item_create::{ShownDraft, StockItemCatalogueError, StockItemDraft};
+use crate::tally::stock_item_create::{StockItemCatalogueError, StockItemDraft};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::native_masters::NativeMastersError;
 use bridge_tally_protocol::{
@@ -70,16 +70,15 @@ fn name(value: &str) -> MasterName {
     MasterName::new(value).expect("the test name is admitted")
 }
 
-/// The draft named `new_name`, copied from `SC Sibling Goods` in `before`, as shown.
-fn shown<'c>(before: &'c StockItemCatalogue, new_name: &str) -> ShownDraft<'c> {
+/// The draft named `new_name`, copied from `SC Sibling Goods` in `before`.
+fn shown<'c>(before: &'c StockItemCatalogue, new_name: &str) -> StockItemDraft<'c> {
     let absent = before
         .name_absent(&name(new_name))
         .expect("the new name is absent");
     let sibling = SiblingGst::named(before, &name(SIBLING)).expect("the sibling is complete");
     let sibling = GoodsSibling::from_sibling(sibling).expect("the sibling is the Goods case");
-    let draft = StockItemDraft::new(absent, sibling, &decode(GROUPS), &decode(UNITS))
-        .expect("the sibling drafts");
-    ShownDraft::from_draft(draft)
+    StockItemDraft::new(absent, sibling, &decode(GROUPS), &decode(UNITS))
+        .expect("the sibling drafts")
 }
 
 /// The GUIDs of a read, as the set taken before a Create.
@@ -89,27 +88,22 @@ fn guids(read: &StockItemCatalogue) -> BTreeSet<String> {
 
 /// `ReadBackVerdict::of` for `shown`'s writes, with the company and GUIDs of
 /// the catalogue its sibling was found in.
-fn verdict(shown: &ShownDraft<'_>, fresh: &StockItemCatalogue) -> ReadBackVerdict {
-    let before = shown.draft().sibling().sibling().catalogue();
-    ReadBackVerdict::of(
-        before.company(),
-        shown.draft().writes(),
-        &guids(before),
-        fresh,
-    )
+fn verdict(shown: &StockItemDraft<'_>, fresh: &StockItemCatalogue) -> ReadBackVerdict {
+    let before = shown.sibling().sibling().catalogue();
+    ReadBackVerdict::of(before.company(), shown.writes(), &guids(before), fresh)
 }
 
 /// `VerifiedItem::new` with the same arguments as `verdict`.
 fn verified(
     outcome: StockItemImportOutcome,
-    shown: &ShownDraft<'_>,
+    shown: &StockItemDraft<'_>,
     fresh: &StockItemCatalogue,
 ) -> Result<VerifiedItem, NotVerified> {
-    let before = shown.draft().sibling().sibling().catalogue();
+    let before = shown.sibling().sibling().catalogue();
     VerifiedItem::new(
         outcome,
         before.company(),
-        shown.draft().writes(),
+        shown.writes(),
         &guids(before),
         fresh,
     )
@@ -660,7 +654,7 @@ fn a_draft_is_judged_against_the_read_it_is_given() {
 /// draft and its catalogue gone.
 fn rebuilt_marked_writes() -> StockItemWrites {
     let before = catalogue(&decode(BEFORE));
-    let plain = shown(&before, MARKED_NAME).draft().writes().to_plain();
+    let plain = shown(&before, MARKED_NAME).writes().to_plain();
     StockItemWrites::rebuild(&plain).expect("the stored values admit")
 }
 

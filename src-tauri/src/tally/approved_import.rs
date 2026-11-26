@@ -1,7 +1,7 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
 use super::ledger_create_item::{LedgerCreateBatch, RenderedLedgerCreate, MAX_LEDGERS_PER_BATCH};
-use super::stock_item_create::{ShownDraft, StockItemDraft};
+use super::stock_item_create::PreparedStockItem;
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
@@ -298,15 +298,41 @@ impl VoucherAdmission {
     }
 }
 
-/// A master post's admission: one request of ledger `Create`s, rendered once.
+/// A master post's admission: one request of ledger `Create`s, or one stock
+/// item `Create`, rendered once, and the journal batch it is bound to.
 ///
-/// `rendered` is produced once, when the admission is built, and never again,
+/// The bytes are produced once, when the admission is built, and never again,
 /// so the bytes the POST sends are the bytes whose digest the dispatch intent
-/// records. The only production constructor is [`ApprovedImport::confirm_masters`],
-/// which builds it before the dialog and holds it only if the person approves,
-/// so no code holds an approved masters kind without that answer (P2).
+/// records. The only production constructors are [`ApprovedImport::confirm_masters`]
+/// and [`ApprovedImport::confirm_stock_item`], which build it before the dialog
+/// and hold it only if the person approves, so no code holds an approved
+/// masters kind without that answer (P2).
 #[derive(Clone)]
 pub(super) struct MasterAdmission {
+    writes: MasterWrites,
+    /// The master journal batch this approval is for, once the tool binds it
+    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
+    /// batch is licensed by no intent.
+    batch_id: Option<String>,
+}
+
+/// What a master admission creates: ledgers, or one stock item with the bytes
+/// its one renderer gave. Nothing sends a stock item yet: see [`MasterAdmission::ledgers`].
+#[derive(Clone)]
+enum MasterWrites {
+    Ledgers(LedgerAdmission),
+    StockItem {
+        // Read by the queued send, which is not built yet.
+        #[allow(dead_code)]
+        prepared: PreparedStockItem,
+        rendered: String,
+    },
+}
+
+/// One request of ledger `Create`s, rendered once, with the two index reads
+/// the queue rechecks it on.
+#[derive(Clone)]
+pub(super) struct LedgerAdmission {
     batch: LedgerCreateBatch,
     rendered: RenderedLedgerCreate,
     /// The ledger name index read (the V3 catalogue request).
@@ -314,13 +340,49 @@ pub(super) struct MasterAdmission {
     /// The group name index read (the group snapshot request).
     group_index_request: AgentReadRequest,
     company: VerifiedCompanyIdentity,
-    /// The master journal batch this approval is for, once the tool binds it
-    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
-    /// batch is licensed by no intent.
-    batch_id: Option<String>,
 }
 
 impl MasterAdmission {
+    /// The ledger admission, rendered once, with the two index reads.
+    fn new(
+        batch: LedgerCreateBatch,
+        company: &VerifiedCompanyIdentity,
+    ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
+        Ok(Self {
+            writes: MasterWrites::Ledgers(LedgerAdmission::new(batch, company)?),
+            batch_id: None,
+        })
+    }
+
+    /// The stock-item admission, rendered once.
+    fn stock_item(prepared: PreparedStockItem) -> Self {
+        let rendered = prepared.render();
+        Self {
+            writes: MasterWrites::StockItem { prepared, rendered },
+            batch_id: None,
+        }
+    }
+
+    /// The ledger admission, or, for a stock item, the typed refusal: no stock
+    /// item Create is sent yet, so the runtime refuses one before any read.
+    pub(super) fn ledgers(&self) -> Result<&LedgerAdmission, ApprovedImportAdmissionError> {
+        match &self.writes {
+            MasterWrites::Ledgers(ledgers) => Ok(ledgers),
+            MasterWrites::StockItem { .. } => {
+                Err(ApprovedImportAdmissionError::AdmissionInconsistent)
+            }
+        }
+    }
+
+    fn xml(&self) -> &str {
+        match &self.writes {
+            MasterWrites::Ledgers(ledgers) => ledgers.rendered.xml(),
+            MasterWrites::StockItem { rendered, .. } => rendered,
+        }
+    }
+}
+
+impl LedgerAdmission {
     /// Renders the request once, with the two index reads for the company.
     fn new(
         batch: LedgerCreateBatch,
@@ -346,7 +408,6 @@ impl MasterAdmission {
                 ),
             )?,
             company: company.clone(),
-            batch_id: None,
         })
     }
 
@@ -482,6 +543,24 @@ impl ApprovedImport {
         })
     }
 
+    /// The stock-item Create's approval: the stock-item dialog, answered only
+    /// by its own token. On the person's approval this holds `prepared` as the
+    /// masters kind; any other answer is a typed refusal and holds nothing. The
+    /// request is rendered before the dialog. `preview` is built from the
+    /// draft `prepared` was made from, by the caller's review builder.
+    pub(crate) async fn confirm_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, StockItemDialogRefusal> {
+        let admission = MasterAdmission::stock_item(prepared);
+        approve_stock_item(&preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Masters(Box::new(admission)),
+            company_marks_request,
+        })
+    }
+
     /// Which request this approval is for.
     pub(crate) fn post_kind(&self) -> PostKind {
         match &self.kind {
@@ -496,7 +575,7 @@ impl ApprovedImport {
     pub(super) fn xml(&self) -> &str {
         match &self.kind {
             ApprovedKind::Vouchers(vouchers) => &vouchers.xml,
-            ApprovedKind::Masters(masters) => masters.rendered.xml(),
+            ApprovedKind::Masters(masters) => masters.xml(),
         }
     }
 
@@ -636,7 +715,7 @@ pub(crate) struct PendingPostApproval {
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
     /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there but the masters twin below and the one
+    /// task. Nothing else can be run there but the two master twins below and the one
     /// note of a box that did not fit, which the caller gives and only the dialog
     /// task calls.
     #[allow(clippy::too_many_arguments)]
@@ -685,6 +764,26 @@ impl PendingPostApproval {
             async move {
                 ApprovedImport::confirm_masters(batch, &company, &preview, company_marks_request)
                     .await
+            },
+            None,
+        )
+    }
+
+    /// The same for the stock-item dialog: [`ApprovedImport::confirm_stock_item`]
+    /// with exactly these arguments, on its own task, its refusal stamped as
+    /// its code.
+    // Asked by the stock-item tool, which is not built yet.
+    #[allow(dead_code)]
+    pub(crate) fn ask_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_stock_item(prepared, preview, company_marks_request)
+                    .await
+                    .map_err(|refusal| refusal.code().to_string())
             },
             None,
         )
@@ -1144,32 +1243,16 @@ pub(crate) enum StockItemDialogRefusal {
     TooLarge,
 }
 
-/// The stock-item dialog's approval of one draft, with the preview it showed.
-/// Only [`confirm_stock_item`] makes one, after the dialog approved, and only
-/// `ShownDraft::from_confirmed` takes it apart.
-#[derive(Debug)]
-pub(crate) struct StockItemConfirmation<'a> {
-    draft: StockItemDraft<'a>,
-    shown: String,
-}
-
-impl<'a> StockItemConfirmation<'a> {
-    pub(super) fn into_parts(self) -> (StockItemDraft<'a>, String) {
-        (self.draft, self.shown)
+impl StockItemDialogRefusal {
+    /// The code a refusal is stamped with when the dialog runs on its own task.
+    fn code(self) -> &'static str {
+        match self {
+            Self::Declined => "stock_item_approval_declined",
+            Self::Unavailable => "stock_item_approval_unavailable",
+            Self::TimedOut => "stock_item_approval_timed_out",
+            Self::TooLarge => "master_review_too_large",
+        }
     }
-}
-
-/// Asks the person, in the stock-item dialog, to create `draft` as `preview`
-/// describes it. Only on their approval is the draft returned as shown.
-pub(crate) async fn confirm_stock_item<'a>(
-    draft: StockItemDraft<'a>,
-    preview: String,
-) -> Result<ShownDraft<'a>, StockItemDialogRefusal> {
-    approve_stock_item(&preview).await?;
-    Ok(ShownDraft::from_confirmed(StockItemConfirmation {
-        draft,
-        shown: preview,
-    }))
 }
 
 /// A scripted answer to the native approval, for this crate's unit tests only

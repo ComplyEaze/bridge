@@ -433,4 +433,4 @@ impl AskedStockItem {
 
 #[cfg(test)]
 #[path = "agent_master_review_tests.rs"]
-mod tests;
+pub(super) mod tests;

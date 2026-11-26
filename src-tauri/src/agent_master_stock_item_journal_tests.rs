@@ -432,16 +432,19 @@ fn only_the_basis_judges_a_stock_item_read_back() {
 }
 
 /// The stock intent writer on tokens the stock recheck minted in the queue, on
-/// the constructed answers of `coordinator::passing_answers`.
+/// the constructed answers of `coordinator::passing_answers`, spending stock
+/// approvals asked, held and taken as the approvals holder takes them.
 mod writer {
+    use super::super::super::super::approval::{PostApprovals, Redemption};
     use super::super::super::super::master_post::recheck_stock_item_for_dispatch;
     use super::super::super::super::master_post::tests::coordinator::{
         approved_stock, import_answer, imports, minted, passing_answers, post_stock_through,
         rebound_prepared, shape_identity,
     };
+    use super::super::super::super::master_review::tests::{stock_approvals, taken_stock_approval};
     use super::super::super::TEST_FAULTS;
     use super::*;
-    use crate::tally::approved_import::{BeforeDispatchError, DispatchLicense};
+    use crate::tally::approved_import::{BeforeDispatchError, DispatchLicense, PostKind};
 
     const A: u16 = 0xa1;
     const B: u16 = 0xb2;
@@ -466,6 +469,14 @@ mod writer {
         directory
     }
 
+    /// An approvals holder over a folder of its own, so the note a lapse
+    /// leaves is not in the journal's folder. It holds one approval at a time.
+    fn holder() -> (tempfile::TempDir, PostApprovals) {
+        let directory = tempfile::tempdir().unwrap();
+        let approvals = stock_approvals(directory.path());
+        (directory, approvals)
+    }
+
     /// Whether the journal in `dir` shows `batch` dispatched, and whether its
     /// sidecar is there.
     fn written(dir: &Path, batch: &StockItemBatch) -> (bool, bool) {
@@ -474,17 +485,26 @@ mod writer {
         (journal.dispatched(&batch.batch_id), sidecar.exists())
     }
 
-    /// Records `batch` on `passed`, counting the approval's spends.
+    /// Records `batch` on `passed`, spending `taken`.
     fn record(
         dir: &Path,
         batch: &StockItemBatch,
         passed: StockItemRecheckPassed,
-        spends: &std::cell::Cell<u32>,
+        taken: &Redemption<'_>,
     ) -> Result<RecordedIntent, StockIntentRefusal> {
-        record_stock_item_intent(dir, &lock(), batch, passed, || {
-            spends.set(spends.get() + 1);
-            Ok(())
-        })
+        record_stock_item_intent(dir, &lock(), batch, passed, taken)
+    }
+
+    /// The approval `taken` was spent: its slot is empty, so spending it again
+    /// is refused.
+    fn spent(taken: &Redemption<'_>) -> bool {
+        taken.spend() == Err(UnderLockRefusal::ApprovalRevoked)
+    }
+
+    /// The approval `taken` was not spent: spending it now succeeds. This
+    /// spends it.
+    fn unspent(taken: &Redemption<'_>) -> bool {
+        taken.spend() == Ok(())
     }
 
     #[tokio::test]
@@ -492,47 +512,69 @@ mod writer {
         let batch = shape_batch(A);
         let directory = folder(&[&batch]);
         let dir = directory.path();
-        let spends = std::cell::Cell::new(0);
-        let recorded = record(dir, &batch, minted(id(A)).await, &spends).unwrap();
-        assert_eq!(spends.get(), 1);
+        let (_held, approvals) = holder();
+        let taken = taken_stock_approval(&approvals, id(A)).await;
+        let recorded = record(dir, &batch, minted(id(A)).await, &taken).unwrap();
+        assert!(spent(&taken), "the approval is spent once");
         assert_eq!(written(dir, &batch), (true, true));
         assert_eq!(recorded.batch_id(), id(A));
         assert!(recorded.licenses(&approved_stock(id(A)).await));
         let journal = read_kind_journal::<StockItemBatch>(dir).unwrap();
         StockItemReadBackBasis::from_journal(dir, &journal, id(A), &shape_identity())
             .expect("the basis builds for the recorded batch");
-        // A second token for the same batch: the journal already holds its
-        // intent, and nothing is spent.
-        let again = record(dir, &batch, minted(id(A)).await, &spends);
+        // A second token and approval for the same batch: the journal already
+        // holds its intent, and nothing is spent.
+        let again_taken = taken_stock_approval(&approvals, id(A)).await;
+        let again = record(dir, &batch, minted(id(A)).await, &again_taken);
         assert_eq!(
             again.unwrap_err(),
             StockIntentRefusal::Refused(UnderLockRefusal::AlreadyAttempted)
         );
-        assert_eq!(spends.get(), 1);
+        assert!(unspent(&again_taken));
         // An intent of batch A licenses no approval of batch B.
         let (a, b) = (shape_batch(A), shape_batch(B));
         let other = folder(&[&a, &b]);
-        let recorded = record(other.path(), &a, minted(id(A)).await, &spends).unwrap();
+        let (_held, approvals) = holder();
+        let taken = taken_stock_approval(&approvals, id(A)).await;
+        let recorded = record(other.path(), &a, minted(id(A)).await, &taken).unwrap();
         assert!(!recorded.licenses(&approved_stock(id(B)).await));
     }
 
     #[tokio::test]
     async fn a_token_for_another_batch_or_digest_writes_nothing() {
-        let spends = std::cell::Cell::new(0);
         let b = shape_batch(B);
         let directory = folder(&[&b]);
-        let refused = record(directory.path(), &b, minted(id(A)).await, &spends);
+        let (_held, approvals) = holder();
+        // The approval is batch B's own: only the token's batch differs.
+        let taken = taken_stock_approval(&approvals, id(B)).await;
+        let refused = record(directory.path(), &b, minted(id(A)).await, &taken);
         assert_eq!(refused.unwrap_err(), StockIntentRefusal::OtherBatch);
         assert_eq!(written(directory.path(), &b), (false, false));
+        assert!(unspent(&taken));
         // A hand edit: batch A's stored digest made another, so only the
         // digest differs from the token's.
         let mut r1 = shape_batch(A);
         r1.batch_sha256 = "f".repeat(64);
         let directory = folder(&[&r1]);
-        let refused = record(directory.path(), &r1, minted(id(A)).await, &spends);
+        let taken = taken_stock_approval(&approvals, id(A)).await;
+        let refused = record(directory.path(), &r1, minted(id(A)).await, &taken);
         assert_eq!(refused.unwrap_err(), StockIntentRefusal::OtherDigest);
         assert_eq!(written(directory.path(), &r1), (false, false));
-        assert_eq!(spends.get(), 0);
+        assert!(unspent(&taken));
+    }
+
+    /// The token and the batch are A's, and the approval is batch B's: refused
+    /// as another batch before it is spent, and nothing is written.
+    #[tokio::test]
+    async fn an_approval_of_another_batch_writes_nothing_and_is_not_spent() {
+        let a = shape_batch(A);
+        let directory = folder(&[&a]);
+        let (_held, approvals) = holder();
+        let taken = taken_stock_approval(&approvals, id(B)).await;
+        let refused = record(directory.path(), &a, minted(id(A)).await, &taken);
+        assert_eq!(refused.unwrap_err(), StockIntentRefusal::OtherBatch);
+        assert_eq!(written(directory.path(), &a), (false, false));
+        assert!(unspent(&taken));
     }
 
     #[tokio::test]
@@ -540,21 +582,26 @@ mod writer {
         let (a, b) = (shape_batch(A), shape_batch(B));
         let directory = folder(&[&a, &b]);
         let dir = directory.path();
-        let spends = std::cell::Cell::new(0);
-        let _recorded = record(dir, &a, minted(id(A)).await, &spends).unwrap();
-        let overlap = record(dir, &b, minted(id(B)).await, &spends);
+        let (_held_a, approvals_a) = holder();
+        let (_held_b, approvals_b) = holder();
+        let taken_a = taken_stock_approval(&approvals_a, id(A)).await;
+        let taken_b = taken_stock_approval(&approvals_b, id(B)).await;
+        let _recorded = record(dir, &a, minted(id(A)).await, &taken_a).unwrap();
+        let overlap = record(dir, &b, minted(id(B)).await, &taken_b);
         assert_eq!(
             overlap.unwrap_err(),
             StockIntentRefusal::Refused(UnderLockRefusal::MasterOverlapsOpenDispatch)
         );
-        assert_eq!(spends.get(), 1);
+        assert!(spent(&taken_a));
+        assert!(unspent(&taken_b));
         assert_eq!(written(dir, &b), (false, false));
-        // A spend that refuses writes no sidecar and no intent.
+        // A spend that refuses writes no sidecar and no intent: the approval
+        // was withdrawn after it was taken, as a cancelled call withdraws it.
         let fresh = folder(&[&a]);
-        let revoked =
-            record_stock_item_intent(fresh.path(), &lock(), &a, minted(id(A)).await, || {
-                Err(UnderLockRefusal::ApprovalRevoked)
-            });
+        let (_held, approvals) = holder();
+        let taken = taken_stock_approval(&approvals, id(A)).await;
+        approvals.revoke_of(PostKind::Masters, id(A), "request_cancelled");
+        let revoked = record(fresh.path(), &a, minted(id(A)).await, &taken);
         assert_eq!(
             revoked.unwrap_err(),
             StockIntentRefusal::Refused(UnderLockRefusal::ApprovalRevoked)
@@ -567,16 +614,17 @@ mod writer {
         let a = shape_batch(A);
         let directory = folder(&[&a]);
         let passed = minted(id(A)).await;
-        let spends = std::cell::Cell::new(0);
+        let (_held, approvals) = holder();
+        let taken = taken_stock_approval(&approvals, id(A)).await;
         let refused = TEST_FAULTS.sync_scope(
             std::cell::RefCell::new(vec!["master_dispatch_intent"]),
-            || record(directory.path(), &a, passed, &spends),
+            || record(directory.path(), &a, passed, &taken),
         );
         assert_eq!(
             refused.unwrap_err(),
             StockIntentRefusal::Refused(UnderLockRefusal::MasterJournalRefused)
         );
-        assert_eq!(spends.get(), 1);
+        assert!(spent(&taken));
         assert_eq!(written(directory.path(), &a), (false, false));
     }
 
@@ -588,6 +636,8 @@ mod writer {
         let a = shape_batch(A);
         let directory = folder(&[&a]);
         let dir = directory.path();
+        let (_held, approvals) = holder();
+        let taken = taken_stock_approval(&approvals, id(A)).await;
         let mut plans = passing_answers();
         let reads = plans.len();
         plans.push(import_answer());
@@ -598,13 +648,14 @@ mod writer {
                     (false, false),
                     "nothing before the writer"
                 );
-                record_stock_item_intent(dir, &lock(), &a, passed, || Ok(()))
+                record_stock_item_intent(dir, &lock(), &a, passed, &taken)
                     .map_err(|refusal| BeforeDispatchError::Other(format!("{refusal:?}")))
             })
             .await;
         result.expect("the post is sent");
         assert_eq!(at_dispatch, Some(reads), "the writer ran before the POST");
         assert_eq!(written(dir, &a), (true, true));
+        assert!(spent(&taken));
         let approved = approved_stock(id(A)).await;
         let sent = imports(&observed);
         assert_eq!(sent.len(), 1, "exactly one import");

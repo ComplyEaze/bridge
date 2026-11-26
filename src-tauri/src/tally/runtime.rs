@@ -50,7 +50,7 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 mod masters;
 pub(crate) use masters::{
     AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits, MastersKind, MastersReadError,
-    MastersRows, StockItemReadKind, VoucherNumberingRead,
+    MastersRows, StockItemReadKind, StockItemRecheckReads, VoucherNumberingRead,
 };
 
 #[cfg(test)]

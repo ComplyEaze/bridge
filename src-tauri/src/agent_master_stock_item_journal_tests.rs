@@ -226,6 +226,10 @@ fn the_basis_refuses_each_loose_pairing() {
         "\"parent\":\"SC Other\"",
     );
     assert_eq!(refused(&edited, &own), BasisRefusal::DigestMismatch);
+    // Hand edit: the stored IGST rate `18` made `18.0`, a plain decimal that
+    // `rebuild` keeps as stored, so the line is admitted and the digest refuses.
+    let edited = hand_edit(&text, "\"rate\":\"18\"", "\"rate\":\"18.0\"");
+    assert_eq!(refused(&edited, &own), BasisRefusal::DigestMismatch);
     // A sidecar whose bytes are not the ones the intent's digest was taken from.
     let other = serde_json::to_vec(&pre_image_of(&catalogue(MARKED))).unwrap();
     std::fs::write(dir.join(format!("master-pre-image-{id}.json")), other).unwrap();

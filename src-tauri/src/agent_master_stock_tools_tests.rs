@@ -814,6 +814,29 @@ mod post {
         assert!(imports(&run.finish()).is_empty(), "no import");
     }
 
+    /// The book makes another draft between the ask and the dispatch (the
+    /// sibling's GST rate 9 made 10 in the queue's read, the constructed edit
+    /// of the rebound capture the same-company test uses): the queue's stock
+    /// recheck refuses it, and the answer is the code the post gives a changed
+    /// batch before the ask, with nothing imported, recorded or held.
+    #[tokio::test]
+    async fn a_draft_changed_after_the_ask_is_refused_in_the_queue_as_a_changed_batch() {
+        let rate = "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>";
+        let changed = rebound_before().replacen(rate, "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>", 1);
+        assert_ne!(changed, rebound_before());
+        let mut plans = post_reads();
+        plans.extend(stock_answers(changed, 1, marks_at(289)));
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let scripted = ScriptedApproval::approving();
+        let outcome = run.post(&scripted, id(A)).await;
+        assert_eq!(refused_code(&outcome), "import_batch_changed");
+        assert_eq!(scripted.stock_items().len(), 1, "asked once");
+        assert_eq!(run.records(), ["master_batch"]);
+        assert!(!run.server.post_approvals.holds(id(A)));
+        assert!(imports(&run.finish()).is_empty(), "no import");
+    }
+
     /// The create is lost after the intent is recorded: the answer is that a
     /// send is recorded and NOT verified, through the tool.
     #[tokio::test]

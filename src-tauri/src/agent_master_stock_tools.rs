@@ -470,12 +470,14 @@ fn stock_hold_refusal(
 }
 
 /// The refusal a failed stock dispatch becomes: a stock recheck refused in the
-/// queue answers the code the prepare gives the same condition, and anything
-/// else is mapped as the ledger post maps it.
+/// queue answers the code the prepare gives the same condition, a draft the
+/// book now makes differently the code the post gives it before the ask, and
+/// anything else is mapped as the ledger post maps it.
 fn stock_post_failure(error: anyhow::Error) -> ToolFailure {
-    use StockItemRecheckError::{Catalogue, Draft, NameNotAbsent, NotGoods, Sibling};
+    use StockItemRecheckError::{Catalogue, Draft, DraftChanged, NameNotAbsent, NotGoods, Sibling};
     let refused = (error.chain()).find_map(|cause| cause.downcast_ref::<StockItemRecheckError>());
     let code = match refused {
+        Some(DraftChanged) => return MasterPostCode::BatchChanged.into(),
         Some(NameNotAbsent(refusal)) => item_name_refusal_code(refusal),
         Some(Sibling(refusal)) => sibling_refusal_code(refusal),
         Some(NotGoods(refusal)) => not_goods_refusal_code(refusal),

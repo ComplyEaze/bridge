@@ -294,17 +294,20 @@ async fn a_read_refused_past_the_size_edge_answers_its_typed_code_and_records_no
 
 mod post {
     use super::super::super::super::master_ledger::stock_item_journal::record_stock_item_intent;
-    use super::super::super::super::master_ledger::{read_journal, ExclusiveAdmission};
+    use super::super::super::super::master_ledger::{
+        read_journal, ExclusiveAdmission, TEST_FAULTS,
+    };
     use super::super::super::super::master_post::tests::coordinator::{
-        approved_stock, import_answer, imports, minted, rebound_before, stock_answers, QUEUE_READS,
+        approved_stock, import_answer, imports, minted, rebound_after, rebound_before,
+        rebound_shown_from, stock_answers, QUEUE_READS,
     };
     use super::super::super::super::master_review::tests::{
-        approved_stock_item_for, stock_approvals, taken_stock_approval,
+        approved_shown_for, approved_stock_item_for, stock_approvals, taken_stock_approval,
     };
     use super::*;
     use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
     use std::time::Duration;
-    use tally_protocol_simulator::ObservedRequest;
+    use tally_protocol_simulator::{Delivery, ObservedRequest};
 
     const A: u16 = 0xa1;
     const B: u16 = 0xb2;
@@ -635,6 +638,8 @@ mod post {
         record(run.dir(), &a);
         record(run.dir(), &b);
         dispatch_open(run.dir(), &b).await;
+        // An approval held for A: the refusal withdraws it.
+        hold_for(&run, id(A)).await;
         let scripted = ScriptedApproval::approving();
         let outcome = run
             .post(&scripted, id(A))
@@ -642,12 +647,27 @@ mod post {
             .expect("the refusal answers");
         let error = &outcome.payload["result"]["error"];
         assert_eq!(error["code"], OVERLAP_CODE);
+        assert_eq!(error["hold"], "held");
         assert_eq!(error["blocking_batch_ids"], json!([id(B)]));
         assert!(error["message"].as_str().unwrap().contains("stock item"));
+        assert!(!error["next_step"].as_str().unwrap().contains("post_"));
         assert_eq!(outcome.payload["result"]["attempt_recorded"], false);
+        assert_eq!(
+            outcome.payload["result"]["dispatch"]["state"],
+            "not_dispatched"
+        );
         assert!(scripted.stock_items().is_empty(), "nothing is asked");
-        // The ledger post's hold check, on the same folder: a ledger batch of
-        // the name (its own intent aside) is not held by the stock dispatch.
+        assert!(
+            !run.server.post_approvals.holds(id(A)),
+            "the approval is withdrawn"
+        );
+        // The ledger post's hold check, on this same folder, which holds B's
+        // open stock dispatch: a ledger batch of the name (its own intent
+        // aside) is not held by it.
+        assert_eq!(
+            run.records(),
+            ["master_batch", "master_batch", "master_dispatch_intent"]
+        );
         let ledger_dir = tempfile::tempdir().unwrap();
         let ledger = super::super::super::tests::dispatched_batch_in(
             ledger_dir.path(),
@@ -702,8 +722,182 @@ mod post {
             scripted.stock_items().is_empty(),
             "the held approval is redeemed, not asked"
         );
+        assert!(!run.server.post_approvals.holds(id(A)), "it is withdrawn");
         assert_eq!(run.records(), ["master_batch"]);
         assert_eq!(sent(&run.finish()), every_request(), "no import");
+    }
+
+    /// An approval held with the fresh binding for this company's item, but
+    /// for other writes (the sibling's GST rate 10, a constructed edit of the
+    /// rebound capture): the company is the same, so the writes are what
+    /// refuses it, before the owed digest check and with nothing recorded,
+    /// imported or left held.
+    #[tokio::test]
+    async fn an_approval_held_for_other_writes_of_this_company_is_refused_at_the_take() {
+        let run = posting(post_reads(), Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let identity = shape_identity();
+        let fresh = rebound_shown(&identity, &run.origin).binding();
+        let rate = "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>";
+        let changed = rebound_before().replacen(rate, "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>", 1);
+        let other = rebound_shown_from(&identity, &run.origin, &changed);
+        let marks = stock_marks(&identity).unwrap_or_else(|_| panic!("the marks parse"));
+        let (_, held, approved, answered) =
+            approved_shown_for(other, marks, id(A).to_string()).await;
+        let HeldRequest::StockItem(item) = &held else {
+            panic!("a stock item is held")
+        };
+        assert_eq!(item.prepared().company(), &identity, "the same company");
+        (run.server.post_approvals)
+            .hold_approved(id(A), fresh, approved, held, answered)
+            .unwrap();
+        let scripted = ScriptedApproval::approving();
+        let outcome = run.post(&scripted, id(A)).await;
+        assert_eq!(refused_code(&outcome), "import_approval_binding_changed");
+        assert!(scripted.stock_items().is_empty());
+        assert!(!run.server.post_approvals.holds(id(A)));
+        assert_eq!(run.records(), ["master_batch"]);
+        assert_eq!(sent(&run.finish()), every_request(), "no import");
+    }
+
+    /// Holds an approved stock approval for `batch_id` under the fresh
+    /// binding, as a click the post has not yet redeemed leaves it.
+    async fn hold_for(run: &PostRun, batch_id: &str) {
+        let fresh = rebound_shown(&shape_identity(), &run.origin).binding();
+        let (_, held, approved, answered) =
+            approved_stock_item_for(STOCK_PROPOSED, batch_id.to_string()).await;
+        (run.server.post_approvals)
+            .hold_approved(batch_id, fresh, approved, held, answered)
+            .unwrap();
+        assert!(run.server.post_approvals.holds(batch_id));
+    }
+
+    /// A batch whose send is recorded, with an approval held for it: the
+    /// answer says sent and not verified, nothing is sent, and the approval
+    /// is withdrawn.
+    #[tokio::test]
+    async fn an_approval_held_for_a_sent_batch_is_withdrawn() {
+        let run = posting(vec![health()], Redaction::None);
+        let a = shape_batch(A, &run.origin);
+        record(run.dir(), &a);
+        dispatch_open(run.dir(), &a).await;
+        hold_for(&run, id(A)).await;
+        let outcome = run.post(&ScriptedApproval::approving(), id(A)).await;
+        let result = outcome.expect("the answer").payload["result"].clone();
+        assert_eq!(
+            result["error"]["code"],
+            UnderLockRefusal::AlreadyAttempted.code()
+        );
+        assert_eq!(result["attempt_recorded"], true);
+        assert!(!run.server.post_approvals.holds(id(A)));
+        assert!(run.cancelled().is_empty(), "no request is sent");
+    }
+
+    /// The name appears in the book between the ask and the dispatch: the
+    /// queue's stock recheck refuses it, and the answer is the prepare's
+    /// name-taken code, with nothing imported and no intent.
+    #[tokio::test]
+    async fn a_name_taken_after_the_ask_is_refused_in_the_queue_with_the_prepares_code() {
+        let mut plans = post_reads();
+        plans.extend(stock_answers(rebound_after(), 3, marks_at(289)));
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let scripted = ScriptedApproval::approving();
+        let outcome = run.post(&scripted, id(A)).await;
+        assert_eq!(refused_code(&outcome), "master_name_taken");
+        assert_eq!(scripted.stock_items().len(), 1, "asked once");
+        assert_eq!(run.records(), ["master_batch"]);
+        assert!(imports(&run.finish()).is_empty(), "no import");
+    }
+
+    /// The create is lost after the intent is recorded: the answer is that a
+    /// send is recorded and NOT verified, through the tool.
+    #[tokio::test]
+    async fn a_send_lost_after_the_intent_answers_sent_and_not_verified() {
+        let mut plans = post_reads();
+        plans.extend(passing_answers());
+        plans.push(
+            import_answer().with_delivery(Delivery::ResetAfterRequestProcessed {
+                delay: Duration::from_millis(0),
+            }),
+        );
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let outcome = run.post(&ScriptedApproval::approving(), id(A)).await;
+        let result = outcome.expect("the answer").payload["result"].clone();
+        assert_eq!(result["attempt_recorded"], true, "{result}");
+        assert_eq!(result["dispatch"]["state"], "reconciliation_required");
+        assert_eq!(result["error"]["code"], "import_dispatch_outcome_unknown");
+        assert!(result["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("NOT verified"));
+        assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+        assert!(!run.server.post_approvals.holds(id(A)));
+        assert_eq!(imports(&run.finish()), [create_bytes()], "sent once");
+    }
+
+    /// The writer's refusals through the tool, by the journal faults the
+    /// ledger tests arm: one refused before any byte of the intent (nothing
+    /// recorded, nothing sent), and one written and then reported failed (the
+    /// intent stands, so the answer is a recorded send, NOT verified).
+    #[tokio::test]
+    async fn the_writers_refusals_reach_the_answer_through_the_queue() {
+        for (point, recorded) in [
+            ("master_dispatch_intent", false),
+            ("master_dispatch_intent_lost_after_write", true),
+        ] {
+            let mut plans = post_reads();
+            plans.extend(passing_answers());
+            let run = posting(plans, Redaction::None);
+            record(run.dir(), &shape_batch(A, &run.origin));
+            let outcome = TEST_FAULTS
+                .scope(
+                    std::cell::RefCell::new(vec![point]),
+                    run.post(&ScriptedApproval::approving(), id(A)),
+                )
+                .await;
+            if recorded {
+                let result = outcome.expect("the answer").payload["result"].clone();
+                assert_eq!(result["attempt_recorded"], true, "{result}");
+                assert_eq!(result["error"]["code"], "import_dispatch_outcome_unknown");
+                assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+            } else {
+                assert_eq!(
+                    refused_code(&outcome),
+                    UnderLockRefusal::MasterJournalRefused.code()
+                );
+                assert_eq!(run.records(), ["master_batch"]);
+            }
+            assert!(imports(&run.finish()).is_empty(), "{point}: nothing sent");
+        }
+    }
+
+    /// The writer's refusals as the queue takes them: a token or approval of
+    /// another batch, or another digest, is a changed batch; the rest pass
+    /// through.
+    #[test]
+    fn the_writers_refusal_maps_to_the_queues_refusal() {
+        use BeforeDispatchError::{Other, Refused};
+        for refusal in [
+            StockIntentRefusal::OtherBatch,
+            StockIntentRefusal::OtherDigest,
+        ] {
+            assert!(matches!(
+                stock_intent_refusal(refusal),
+                Refused(UnderLockRefusal::BatchChanged)
+            ));
+        }
+        assert!(matches!(
+            stock_intent_refusal(StockIntentRefusal::Refused(
+                UnderLockRefusal::AlreadyAttempted
+            )),
+            Refused(UnderLockRefusal::AlreadyAttempted)
+        ));
+        assert!(matches!(
+            stock_intent_refusal(StockIntentRefusal::Other("x_y".into())),
+            Other(code) if code == "x_y"
+        ));
     }
 
     /// The owed check: an approval whose bytes digest to another value than

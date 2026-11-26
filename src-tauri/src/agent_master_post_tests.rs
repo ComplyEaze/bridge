@@ -2367,6 +2367,12 @@ pub(crate) mod coordinator {
         stock_capture(STOCK_BEFORE).replace(STOCK_GUID, SHAPE_GUID)
     }
 
+    /// The R1 candidate read after the marked create, rebound as
+    /// [`rebound_before`] is: the proposed name is in the book.
+    pub(crate) fn rebound_after() -> String {
+        stock_capture(STOCK_AFTER_MARKED).replace(STOCK_GUID, SHAPE_GUID)
+    }
+
     /// [`stock_answers`] for the R1 draft unchanged: the recheck passes.
     pub(crate) fn passing_answers() -> Vec<ScenarioPlan> {
         stock_answers(rebound_before(), 1, marks_at(289))
@@ -2399,8 +2405,17 @@ pub(crate) mod coordinator {
         identity: &VerifiedCompanyIdentity,
         origin: &str,
     ) -> super::super::super::master_review::ShownStockItem {
+        rebound_shown_from(identity, origin, &rebound_before())
+    }
+
+    /// [`rebound_shown`], drafted from the candidate read `candidate`.
+    pub(crate) fn rebound_shown_from(
+        identity: &VerifiedCompanyIdentity,
+        origin: &str,
+        candidate: &str,
+    ) -> super::super::super::master_review::ShownStockItem {
         let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
-        let catalogue = StockItemCatalogue::from_candidate_read(identity, &r1(STOCK_BEFORE))
+        let catalogue = StockItemCatalogue::from_candidate_read(identity, candidate)
             .expect("the rebound R1 read catalogues");
         let draft = stock_test_draft(
             &catalogue,

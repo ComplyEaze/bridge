@@ -3322,8 +3322,8 @@ const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(
 /// one approval is redeemed once because `take_for_dispatch` removes the held
 /// approval by value, `RecordedIntent` is neither `Clone` nor `Default` and the
 /// send takes it by value, and the journal admits one intent per batch; until
-/// the stock send exists, the queue reads for a stock item and no recheck
-/// admits it.
+/// the stock send exists, only the stock recheck, which nothing shipped calls,
+/// admits a queued stock item.
 const PREPARED_STRUCT: &str = r#"    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) struct PreparedStockItem {
         company: VerifiedCompanyIdentity,
@@ -4028,19 +4028,13 @@ fn stock_queue_problems(
             problems.push(format!("`{needle}` must be named only by the queue"));
         }
     }
-    // (in the file, in the recheck's body) for each scanned master post.
-    let in_recheck: Vec<(usize, usize)> = others
-        .iter()
+    let posts: Vec<&str> = (others.iter())
         .filter(|(path, _)| is_source(path, "src/agent_master_post.rs"))
-        .map(|(_, text)| {
-            let body = fn_body(text, "fn recheck_stock_item_for_dispatch(");
-            (
-                text.matches("QueuedAdmission::StockItem").count(),
-                body.matches("QueuedAdmission::StockItem").count(),
-            )
-        })
+        .map(|(_, text)| text.as_str())
         .collect();
-    if in_recheck != [(1, 1)] {
+    let admits = |text: &str| text.matches("QueuedAdmission::StockItem").count();
+    let recheck = |text| fn_body(text, "fn recheck_stock_item_for_dispatch(");
+    if posts.len() != 1 || admits(posts[0]) != 1 || admits(recheck(posts[0])) != 1 {
         problems.push("the stock recheck must admit a queued stock item once, itself".into());
     }
     // The variant is named in full, so the counts above see every use: no
@@ -4169,27 +4163,20 @@ fn the_queue_reads_a_stock_approval_for_its_own_company_and_never_rebinds_it() {
         "src-tauri/src/agent/runtime.rs".into(),
         "let _ = QueuedStockItem::new(a, c, g, u, b, m);".into(),
     ));
-    let in_another_recheck = |path: &str, text: &str| {
-        let mut mutated = others.clone();
-        mutated.push((path.into(), text.into()));
-        mutated
-    };
-    let admitted_in_tools = in_another_recheck(
-        "src-tauri/src/agent_master_tools.rs",
-        "let QueuedAdmission::StockItem(stock) = queued else { todo!() };",
-    );
-    let mut aliases = vec![admitted_in_tools];
+    // Another file admitting a queued stock item, or reaching the variant by
+    // an import, an alias or an impl of its own.
+    let mut aliases = Vec::new();
     for text in [
+        "let QueuedAdmission::StockItem(stock) = queued else { todo!() };",
         "use crate::tally::approved_import::QueuedAdmission::{StockItem};",
         "use crate::tally::approved_import::QueuedAdmission::*;",
         "use crate::tally::approved_import::QueuedAdmission as Queued;",
         "type Queued<'a> = crate::tally::approved_import::QueuedAdmission<'a>;",
         "impl<'a> QueuedAdmission<'a> { fn f(self) { let Self::StockItem(_) = self; } }",
     ] {
-        aliases.push(in_another_recheck(
-            "src-tauri/src/agent_master_tools.rs",
-            text,
-        ));
+        let mut mutated = others.clone();
+        mutated.push(("src-tauri/src/agent_master_tools.rs".into(), text.into()));
+        aliases.push(mutated);
     }
     let read_twice = runtime.replacen(
         "masters::read_stock_item_admission(",
@@ -4231,12 +4218,8 @@ const STOCK_TOKEN: &str = "#[must_use]
 pub(super) struct StockItemRecheckPassed {";
 
 /// The token's fields, each private.
-const STOCK_TOKEN_FIELDS: [&str; 4] = [
-    "create_sha256: String,",
-    "pre_image: PreImage,",
-    "marks: Vec<MasterMark>,",
-    "batch_id: String,",
-];
+const STOCK_TOKEN_FIELDS: &str =
+    "create_sha256: String, pre_image: PreImage, marks: Vec<MasterMark>, batch_id: String,";
 
 /// Problems with how the stock recheck's token is made and spent: one literal,
 /// in `recheck_stock_item_for_dispatch`; one spend, and one stock intent
@@ -4259,9 +4242,9 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
             .map(str::trim)
             .filter(|line| !line.is_empty() && !line.starts_with("//"))
             .collect::<Vec<_>>()
+            .join(" ")
     });
-    if post.matches(STOCK_TOKEN).count() != 1 || fields.as_deref() != Some(&STOCK_TOKEN_FIELDS[..])
-    {
+    if post.matches(STOCK_TOKEN).count() != 1 || fields.as_deref() != Some(STOCK_TOKEN_FIELDS) {
         problems.push("the token's derive line and private fields are pinned".into());
     }
     let count = |needle: &str| -> usize {
@@ -4279,10 +4262,13 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
     let literals = count("StockItemRecheckPassed {")
         - count("struct StockItemRecheckPassed {")
         - count("impl StockItemRecheckPassed {");
-    let minted = fn_body(&post, "fn recheck_stock_item_for_dispatch(")
-        .matches("StockItemRecheckPassed {")
-        .count();
-    if literals != 1 || minted != 1 {
+    let mint = fn_body(&post, "fn recheck_stock_item_for_dispatch(");
+    // Its one literal, after the digest of the bytes the POST sends is required.
+    let digest = "sent_digest(stock.prepared(), stock.xml_sha256())?;";
+    if literals != 1
+        || mint.matches("StockItemRecheckPassed {").count() != 1
+        || mint.matches(digest).count() != 1
+    {
         problems.push("the token is built once, in recheck_stock_item_for_dispatch".into());
     }
     let writer = fn_body(&journal, "fn record_stock_item_intent(");
@@ -4340,6 +4326,12 @@ fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
         post,
         "    create_sha256: String,",
         "    pub(super) create_sha256: String,",
+    ));
+    // The digest check dropped from the mint.
+    mutations.push(edit(
+        post,
+        "    let create_sha256 = sent_digest(stock.prepared(), stock.xml_sha256())?;",
+        "    let create_sha256 = stock.xml_sha256().to_owned();",
     ));
     // A second mint, in the standalone recheck.
     mutations.push(edit(

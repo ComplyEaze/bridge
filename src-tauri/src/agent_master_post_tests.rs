@@ -1244,8 +1244,7 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 3)],
         ),
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
-        // The in-queue stock recheck and the stock intent writer: definitions
-        // and doc links, no caller (the seam gate pins the token between them).
+        // The in-queue stock recheck and the stock intent writer: no caller.
         (
             "recheck_stock_item_for_dispatch",
             &[("agent_master_post.rs", 2), ("tally/approved_import.rs", 1)],
@@ -1556,9 +1555,9 @@ fn an_admitted_draft_refuses_support_reads_of_another_company() {
 /// list `render_candidate_stock_items_request` asks for (the request bytes are
 /// that builder's; the answer is not its shape), so that response shape is
 /// never answered in these tests. No draft can be built from the short read,
-/// so no run here passes the recheck: a run whose reads all admit and whose aim
-/// matches refuses at the recheck's sibling step, after its company, aim,
-/// sized-mark and name checks; every other run refuses where its test says.
+/// so no run on these answers alone passes the recheck: one whose reads all
+/// admit and whose aim matches refuses at the recheck's sibling step; the
+/// passing runs ([`passing_answers`]) mix in rebound R1 reads.
 pub(crate) mod coordinator {
     use super::*;
     use crate::tally::approved_import::{BeforeDispatchError, DispatchLicense, UnderLockRefusal};
@@ -2325,7 +2324,7 @@ pub(crate) mod coordinator {
     /// companies and binding marks (289), `candidate`, the shape lab's count
     /// of 11 items made `items` (a hand edit), the R1 group and unit reads
     /// rebound to the shape lab's GUID (hand edits), and aim marks at `aim`.
-    fn stock_answers(candidate: String, items: usize, aim: u64) -> Vec<ScenarioPlan> {
+    fn stock_answers(candidate: String, items: usize, aim: String) -> Vec<ScenarioPlan> {
         let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
         let count = stock_capture(SHAPE_COUNT);
         let reported = "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>";
@@ -2339,12 +2338,7 @@ pub(crate) mod coordinator {
             plans.extend(pair(read.clone(), read));
         }
         let companies = answer(stock_capture(SHAPE_COMPANIES));
-        plans.extend([
-            health(),
-            companies.clone(),
-            companies,
-            answer(marks_at(aim)),
-        ]);
+        plans.extend([health(), companies.clone(), companies, answer(aim)]);
         plans
     }
 
@@ -2356,7 +2350,7 @@ pub(crate) mod coordinator {
 
     /// [`stock_answers`] for the R1 draft unchanged: the recheck passes.
     pub(crate) fn passing_answers() -> Vec<ScenarioPlan> {
-        stock_answers(rebound_before(), 1, 289)
+        stock_answers(rebound_before(), 1, marks_at(289))
     }
 
     /// The R1 import answer to the marked create, CREATED 1, for the POST.
@@ -2446,21 +2440,29 @@ pub(crate) mod coordinator {
 
     #[tokio::test]
     async fn the_stock_recheck_mints_its_token_from_the_queues_own_reads() {
+        // The aim with the R1 book's captured row loaded beside the target (a
+        // constructed pairing), so the aim's marks are not the binding's.
+        let (r1, aim) = (stock_capture(STOCK_MARKS), marks_at(289));
+        let row = |text: &str| {
+            let start = text.find("<COMPANY NAME=").unwrap();
+            (
+                start,
+                start + text[start..].find("</COMPANY>").unwrap() + "</COMPANY>".len(),
+            )
+        };
+        let ((start, end), (_, after)) = (row(&r1), row(&aim));
+        let aim = format!("{}{}{}", &aim[..after], &r1[start..end], &aim[after..]);
         let batch = crate::synthetic_batch_id(0xa1);
-        let (result, sent, passed) = mint_in_queue(batch, passing_answers()).await;
-        let error = result.expect_err("the keeping closure refuses");
-        assert_eq!(
-            error
-                .chain()
-                .find_map(|cause| cause.downcast_ref::<UnderLockRefusal>()),
-            Some(&UnderLockRefusal::ApprovalRevoked)
-        );
+        let plans = stock_answers(rebound_before(), 1, aim.clone());
+        let (result, sent, passed) = mint_in_queue(batch, plans).await;
+        result.expect_err("the keeping closure refuses");
         assert_eq!(sent, QUEUE_READS, "every request an export, no POST");
         let (digest, pre_image, marks, batch_id) = passed.expect("minted").into_intent_parts();
         assert_eq!(digest, approved_stock(batch).await.xml_sha256());
         let item = format!("{SHAPE_GUID}-000000d0");
         assert_eq!(pre_image.entries(), &BTreeMap::from([(item, 210)]));
-        assert_eq!(marks, aim_master_marks(&marks_at(289)).unwrap());
+        assert_ne!(marks, aim_master_marks(&marks_at(289)).unwrap());
+        assert_eq!(marks, aim_master_marks(&aim).unwrap());
         assert_eq!(batch_id, batch);
     }
 
@@ -2474,13 +2476,19 @@ pub(crate) mod coordinator {
         let changed = rebound_before().replacen(rate, "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>", 1);
         assert_ne!(changed, rebound_before());
         for (plans, expected) in [
-            (stock_answers(after, 3, 289), "NameNotAbsent(Taken("),
-            (stock_answers(changed, 1, 289), "DraftChanged"),
             (
-                stock_answers(stock_capture(SHAPE_ITEMS), 11, 289),
+                stock_answers(after, 3, marks_at(289)),
+                "NameNotAbsent(Taken(",
+            ),
+            (stock_answers(changed, 1, marks_at(289)), "DraftChanged"),
+            (
+                stock_answers(stock_capture(SHAPE_ITEMS), 11, marks_at(289)),
                 "Sibling(NotFound)",
             ),
-            (stock_answers(rebound_before(), 1, 290), "MastersMoved"),
+            (
+                stock_answers(rebound_before(), 1, marks_at(290)),
+                "MastersMoved",
+            ),
         ] {
             let batch = crate::synthetic_batch_id(0xa1);
             let (result, sent, passed) = mint_in_queue(batch, plans).await;

@@ -87,12 +87,10 @@ pub(crate) enum StockItemRecheckError {
     PreImage(PreImageError),
 }
 
-/// Proof that the queue's stock recheck passed, for the one stock intent
-/// writer to spend under the exclusive lock in the same queued execution as the
-/// POST. Only [`recheck_stock_item_for_dispatch`] makes one, and only from a
-/// queued stock item, which only the queue makes. It is neither
-/// `Clone` nor `Default` and is consumed by [`Self::into_intent_parts`], so one
-/// recheck licenses at most one intent.
+/// Proof that the queue's stock recheck passed, spent by the stock intent writer
+/// in the same queued execution as the POST. Only
+/// [`recheck_stock_item_for_dispatch`] makes one, from a queued stock item; it
+/// is not `Clone`, and [`Self::into_intent_parts`] consumes it.
 #[must_use]
 #[derive(Debug)]
 pub(super) struct StockItemRecheckPassed {

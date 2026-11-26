@@ -316,8 +316,8 @@ pub(super) struct MasterAdmission {
 }
 
 /// What a master admission creates: ledgers, or one stock item with the bytes
-/// its one renderer gave. Nothing sends a stock item yet: the queue reads for
-/// one, and no recheck admits it.
+/// its one renderer gave. Nothing shipped sends a stock item yet: only the
+/// stock recheck admits one, and it has no shipped caller.
 #[derive(Clone)]
 enum MasterWrites {
     Ledgers(LedgerAdmission),

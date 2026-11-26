@@ -308,12 +308,9 @@ pub(super) enum StockIntentRefusal {
 }
 
 /// The stock twin of the ledger post's `record_master_intent`, under the
-/// exclusive admission lock: the journal is read, the batch must be there,
-/// undispatched and equal to `batch`, the recheck's token must be for that batch
-/// and carry its digest, and the journal must admit the intent; only then is the
-/// approval spent, the pre-image sidecar written and the intent appended. A
-/// sidecar written for an intent the journal then refuses is removed. Nothing
-/// shipped calls it yet.
+/// exclusive lock and in its order: the batch undispatched and unchanged, the
+/// token of that batch and digest, the journal's admission, then the spend, the
+/// sidecar and the intent. Nothing shipped calls it yet.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn record_stock_item_intent(
     data_dir: &Path,

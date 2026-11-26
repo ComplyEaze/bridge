@@ -431,9 +431,8 @@ fn only_the_basis_judges_a_stock_item_read_back() {
     assert_eq!(callers("VerifiedItem::new("), [basis]);
 }
 
-/// The stock intent writer on tokens the stock recheck minted in the queue,
-/// for the R1 draft rebound to the shape lab (a hand edit of each capture; see
-/// `coordinator::passing_answers`).
+/// The stock intent writer on tokens the stock recheck minted in the queue, on
+/// the constructed answers of `coordinator::passing_answers`.
 mod writer {
     use super::super::super::super::master_post::recheck_stock_item_for_dispatch;
     use super::super::super::super::master_post::tests::coordinator::{
@@ -525,10 +524,10 @@ mod writer {
         let refused = record(directory.path(), &b, minted(id(A)).await, &spends);
         assert_eq!(refused.unwrap_err(), StockIntentRefusal::OtherBatch);
         assert_eq!(written(directory.path(), &b), (false, false));
-        // Batch A of the captured R1 book: its digest is not the rebound
-        // draft's the token carries.
-        let r1 = StockItemBatch::new(id(A).into(), &identity(COMPANY), &marked_writes()).unwrap();
-        assert_ne!(r1.batch_sha256, shape_batch(A).batch_sha256);
+        // A hand edit: batch A's stored digest made another, so only the
+        // digest differs from the token's.
+        let mut r1 = shape_batch(A);
+        r1.batch_sha256 = "f".repeat(64);
         let directory = folder(&[&r1]);
         let refused = record(directory.path(), &r1, minted(id(A)).await, &spends);
         assert_eq!(refused.unwrap_err(), StockIntentRefusal::OtherDigest);

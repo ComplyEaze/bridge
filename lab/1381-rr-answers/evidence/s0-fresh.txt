@@ -1,0 +1,5 @@
+OK: local/ holds only step 0's own records (5 names and one s0-window screenshot allowed)
+OK: 13 file references exist; SHA256.txt matches all 12 other files; only local/ skipped
+OK: Steps holds exactly its 26 command lines, once each, in order (among them M1, its state, the restore precheck, plan and after, M2, its state, I, G, U, the compute); the 4 self-check lines; measure.py's RA pins the sheet's; send.py and restore.py held (7 lines once each, BK-S's sha256 and bytes the sheet's, no timeout)
+OK: 4 requests, each one Export of a Collection, no SVFROMDATE or SVTODATE, no import, each sha256 in the sheet; no GUID-shaped text in the rule files
+exit 0

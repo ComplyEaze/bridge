@@ -1,0 +1,30 @@
+RIGHT verdict, a whole answer: []
+RIGHT verdict, connection refused: ['curl exit 7', 'status 000', 'no CONTENT-LENGTH', 'empty answer']
+RIGHT verdict, status 500: ['status 500']
+RIGHT verdict, a cut answer: ['curl exit 18', 'CONTENT-LENGTH 4 but 2 bytes written']
+RIGHT verdict, an empty 200: ['empty answer']
+RIGHT verdict, no CONTENT-LENGTH: ['no CONTENT-LENGTH']
+RIGHT verdict, curl's size differs: ["curl's size 5 but 4 bytes written"]
+RIGHT verdict, above the bound: ['2000002 bytes, above the 2000000-byte bound: kept, not used']
+RIGHT order, M1 first: admitted
+RIGHT order, M2 before M1: refused: the log holds [], not ['M1']: out of order
+RIGHT order, M2 after M1, state met and the restore recorded: admitted
+RIGHT order, M2 after M1, no state file: refused: local/evidence/m1-state.txt does not hold a line `BOOK STATE MET` (or `BOOK STATE MET: ...`) and `exit 0`
+RIGHT order, M2 after M1, state without exit 0: refused: local/evidence/m1-state.txt does not hold a line `BOOK STATE MET` (or `BOOK STATE MET: ...`) and `exit 0`
+RIGHT order, M2 after M1, state a stop: refused: local/evidence/m1-state.txt does not hold a line `BOOK STATE MET` (or `BOOK STATE MET: ...`) and `exit 0`
+RIGHT order, M2 after M1, no restore record: refused: local/evidence/r-after.txt does not hold a line `AFTER RECORDED` (or `AFTER RECORDED: ...`) and `exit 0`
+RIGHT order, M2 after M1, the restore a stop: refused: local/evidence/r-after.txt does not hold a line `AFTER RECORDED` (or `AFTER RECORDED: ...`) and `exit 0`
+RIGHT order, M1 again: refused: M1 is in the send log already: a read is sent once in the row's life
+RIGHT order, I after M2, its state met: admitted
+RIGHT order, I after M2, its state a stop: refused: local/evidence/m2-state.txt does not hold a line `BOOK STATE MET` (or `BOOK STATE MET: ...`) and `exit 0`
+RIGHT order, I after M2, no state file: refused: local/evidence/m2-state.txt does not hold a line `BOOK STATE MET` (or `BOOK STATE MET: ...`) and `exit 0`
+RIGHT order, G before I: refused: the log holds ['M1', 'M2'], not ['M1', 'M2', 'I']: out of order
+RIGHT order, U last: admitted
+RIGHT order, anything after U: refused: M1 is in the send log already: a read is sent once in the row's life
+RIGHT order, G after I failed: refused: I failed: nothing more is sent (stop-REQUEST-FAILED)
+RIGHT order, a label not in the row: refused: 'C1' is not one of M1 M2 I G U
+RIGHT log reader, three SENT-OK lines, one with a one-letter label
+RIGHT log reader then order: G admitted after M1 M2 I
+RIGHT log reader, a stray line refuses
+28 cases, 28 right
+exit 0

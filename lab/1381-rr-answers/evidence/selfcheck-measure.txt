@@ -1,0 +1,32 @@
+RIGHT state, the recorded marks: []
+RIGHT state, ALTMSTID 211: ["ALTMSTID '211', not '210'"]
+RIGHT state, a voucher mark: ["an ALTVCHID element ('1'); the recorded state has none"]
+RIGHT state, a second company loaded: ['2 COMPANY rows, not 1 (a company other than the book is loaded, or none)']
+RIGHT state, no company row (CMPINFO's COMPANY line is not a row): ['0 COMPANY rows, not 1 (a company other than the book is loaded, or none)']
+RIGHT state, another GUID: ["the row's GUID is ffffffff..., not the book's"]
+RIGHT state, an answer cut short: True
+RIGHT state, an empty answer: 'NOT READ: empty answer'
+RIGHT state, Tally's error envelope: 'NOT READ: HEADER/STATUS is not 1'
+RIGHT all, RA's answers: exit: 0
+RIGHT all, RA's answers: the line M1 state: BOOK STATE MET...: True
+RIGHT all, RA's answers: the line M2 state: BOOK STATE MET...: True
+RIGHT all, RA's answers: the line M1/M2: byte-equal yes; rows equal yes...: True
+RIGHT all, RA's answers: the line I against a-I1.xml: byte-equal yes; rows...: True
+RIGHT all, RA's answers: the line G against a-G1.xml: byte-equal yes; rows...: True
+RIGHT all, RA's answers: the line U against a-U1.xml: byte-equal yes; rows...: True
+RIGHT all, RA's answers: the line rows bound to the book (GUID prefix and ...: True
+RIGHT all, RA's answers: the line ALL 5 ANSWERS READ...: True
+RIGHT state M2 on RA's marks: exit: 0
+RIGHT all, I two rows and M2 moved: exit (still a measurement): 0
+RIGHT all, a changed answer: the line I against a-I1.xml: byte-equal no; rows ...: True
+RIGHT all, a changed answer: the line M1/M2: byte-equal no; rows equal no...: True
+RIGHT all, a changed answer: the line M2 state: stop-RESTORED-STATE: ALTMSTID ...: True
+RIGHT state M2 moved: exit and stop name: (1, "stop-RESTORED-STATE: ALTMSTID '211', not '210'")
+RIGHT all, G differing outside its rows only: True
+RIGHT all, U's send failed: exit: 2
+RIGHT all, U's send failed: never zero rows: True
+RIGHT all, RA's units answer not the pinned one: exit: 2
+RIGHT all, RA's units answer not the pinned one: NOT READ, not 'differs': True
+RIGHT all, RA's units answer missing: NOT READ: (True, 2)
+30 cases, 30 right
+exit 0

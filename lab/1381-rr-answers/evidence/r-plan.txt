@@ -1,0 +1,2 @@
+PLAN WRITTEN: the source folder holds one file, 24219 B, sha256 ecc8d4028b88b763e5a8a22014bc699b07db68c3eb32cff3c6c92052b373b0f4 (equal to recorded), modified 2026-11-19, 19:40:11 local; the company's data folder 18 entries (local/r-before-listing.txt); local/restore-plan.txt
+exit 0

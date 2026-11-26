@@ -1,0 +1,2 @@
+PRECHECK MET: the source folder holds one file, 24219 B, sha256 equal to recorded; the fallback folder holds one file, 24219 B, sha256 equal to recorded; the same company number in both; the company's data folder present and listed, 21 entries; local/precheck.txt
+exit 0

@@ -1118,9 +1118,10 @@ fn answered_now() -> Answered {
 /// The request held beside an approval must be the one it sends: a stock
 /// approval held with another stock item or a ledger request, and a ledger
 /// approval held with a stock item, are refused with an equal binding. A held
-/// ledger approval is refused for a stock binding, after its own takes it.
+/// ledger approval is refused for a stock binding, after its own takes it, and
+/// the refusal lapses it as a changed binding and asks again.
 #[tokio::test]
-async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() {
+async fn held_requests_of_other_bytes_and_a_held_ledger_approval_for_a_stock_binding_are_refused() {
     let directory = tempfile::tempdir().unwrap();
     let approvals = stock_approvals(directory.path());
     let batch = stock_batch();
@@ -1209,6 +1210,11 @@ async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() 
         Some("import_approval_binding_changed"),
         "a held ledger approval, a stock binding"
     );
+    assert_eq!(
+        approvals.lapse_note(&batch).unwrap()["reason"],
+        "approval_binding_changed"
+    );
+    assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
 }
 
 /// Asked, then held while its dialog is open: on the scripted approval the

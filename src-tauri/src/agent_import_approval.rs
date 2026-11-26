@@ -224,12 +224,11 @@ impl ApprovalBinding {
         }
     }
 
-    /// The binding of one stock item `Create`: the batch digest, the endpoint,
-    /// the verified company tuple the item was prepared for, every value it
-    /// writes, and the preview the person was shown.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// The binding of one stock item `Create`: the digest of the bytes its one
+    /// renderer gives, the endpoint, the verified company tuple the item was
+    /// prepared for, every value it writes, and the preview the person was
+    /// shown. The digest is the prepared value's own, so no caller supplies it.
     pub(super) fn stock_item(
-        batch_sha256: &str,
         endpoint_origin: &str,
         prepared: &PreparedStockItem,
         preview: &str,
@@ -237,7 +236,7 @@ impl ApprovalBinding {
         Self {
             // One item has the one form: its box shows every copied field.
             form: PreviewForm::Listed,
-            batch_sha256: batch_sha256.to_string(),
+            batch_sha256: sha256_hex(render_stock_item_create(prepared).as_bytes()),
             endpoint_origin: Some(endpoint_origin.to_string()),
             preview_sha256: sha256_hex(preview.as_bytes()),
             subject: BindingSubject::StockItem {
@@ -271,7 +270,8 @@ pub(super) enum HeldRequest {
     Masters(MasterPostRequest),
     /// One stock item `Create`, held as prepared: its bytes are rendered from
     /// it by the one renderer whenever they are compared. Boxed, as the
-    /// binding's writes are.
+    /// binding's writes are. It has no `From`: only `ShownStockItem::ask`
+    /// builds one, beside the binding and the dialog of the same item.
     StockItem(Box<PreparedStockItem>),
 }
 
@@ -293,12 +293,6 @@ impl From<NativePostRequest> for HeldRequest {
 impl From<MasterPostRequest> for HeldRequest {
     fn from(request: MasterPostRequest) -> Self {
         Self::Masters(request)
-    }
-}
-
-impl From<PreparedStockItem> for HeldRequest {
-    fn from(prepared: PreparedStockItem) -> Self {
-        Self::StockItem(Box::new(prepared))
     }
 }
 

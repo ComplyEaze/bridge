@@ -814,7 +814,9 @@ async fn a_confirmed_stock_item_draft_is_approved_for_the_create_it_was_shown() 
                 ORIGIN,
             )
             .expect("the captured draft is shown")
-            .ask(stock_marks(), stock_batch())
+            .ask(ORIGIN, stock_marks(), stock_batch())
+            .into_parts()
+            .1
         })
         .await;
     let shown = stock_answer(asked)
@@ -875,17 +877,25 @@ async fn a_declined_or_unscoped_stock_item_dialog_makes_no_approval() {
     };
     let asked = SCRIPTED_APPROVAL
         .scope(scripted, async {
-            shown().ask(stock_marks(), stock_batch())
+            shown()
+                .ask(ORIGIN, stock_marks(), stock_batch())
+                .into_parts()
+                .1
         })
         .await;
     let declined = stock_answer(asked).await.0.err();
     assert_eq!(declined.as_deref(), Some("master_approval_declined"));
     assert_eq!(recording.stock_items(), [STOCK_ITEM_PREVIEW]);
 
-    let unscoped = stock_answer(shown().ask(stock_marks(), stock_batch()))
-        .await
-        .0
-        .err();
+    let unscoped = stock_answer(
+        shown()
+            .ask(ORIGIN, stock_marks(), stock_batch())
+            .into_parts()
+            .1,
+    )
+    .await
+    .0
+    .err();
     assert_eq!(unscoped.as_deref(), Some("master_approval_declined"));
 }
 
@@ -902,7 +912,7 @@ async fn a_refused_stock_item_preview_asks_no_one() {
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 "http://127.0.0.1:9000\nTally: other",
             )
-            .map(|shown| shown.ask(stock_marks(), stock_batch()))
+            .map(|shown| shown.ask(ORIGIN, stock_marks(), stock_batch()))
         })
         .await
         .err();
@@ -957,11 +967,9 @@ fn shown_stock_item(new_name: &str) -> ShownStockItem {
         .expect("the captured draft is shown")
 }
 
-/// The digest of the journal batch a stock binding names.
-const STOCK_BATCH_SHA: &str = "5d1c0f3e9a7b2c4d6e8f0a1b3c5d7e9f1a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d";
-
-fn stock_binding(shown: &ShownStockItem) -> ApprovalBinding {
-    ApprovalBinding::stock_item(STOCK_BATCH_SHA, ORIGIN, shown.prepared(), shown.preview())
+/// The digest a stock binding names: of the bytes its item renders to.
+fn stock_digest(prepared: &PreparedStockItem) -> String {
+    bridge_tally_protocol::sha256_hex(render_stock_item_create(prepared).as_bytes())
 }
 
 /// A ledger `Create` in the stock lab's company, for the cross-kind cases.
@@ -980,48 +988,45 @@ fn stock_approvals(directory: &std::path::Path) -> PostApprovals {
 }
 
 /// The stock item `new_name` asked under an approving scripted dialog and
-/// answered: its binding, its prepared item, the approval and its answer.
+/// answered: the binding and held request its one ask made, the approval and
+/// its answer.
 async fn approved_stock_item(
     new_name: &str,
-) -> (ApprovalBinding, PreparedStockItem, ApprovedImport, Answered) {
+) -> (ApprovalBinding, HeldRequest, ApprovedImport, Answered) {
     let shown = shown_stock_item(new_name);
-    let binding = stock_binding(&shown);
-    let prepared = shown.prepared().clone();
     let asked = SCRIPTED_APPROVAL
         .scope(ScriptedApproval::approving(), async {
-            shown.ask(stock_marks(), stock_batch())
+            shown.ask(ORIGIN, stock_marks(), stock_batch())
         })
         .await;
-    let (approved, answered) = stock_answer(asked).await;
+    let (binding, dialog, held) = asked.into_parts();
+    let (approved, answered) = stock_answer(dialog).await;
     (
         binding,
-        prepared,
+        held,
         approved.expect("the scripted dialog approves"),
         answered,
     )
 }
 
-/// Held, then taken for dispatch with an equal binding: the redemption gives
-/// back the stock approval, of the masters kind, with the prepared item it was
-/// asked about, which renders to the bytes it sends, bound to its batch.
+/// The binding, the approval and the held request one ask made are held, then
+/// taken with the fresh binding of an equal draft: the redemption gives back
+/// the stock approval, of the masters kind, with the item asked about, which
+/// renders to the bytes it sends, bound to its batch. The fresh binding of
+/// another draft is refused.
 #[tokio::test]
-async fn a_held_stock_item_approval_is_taken_with_an_equal_binding() {
+async fn one_asks_binding_approval_and_held_request_are_taken_with_a_fresh_binding() {
     let directory = tempfile::tempdir().unwrap();
     let approvals = stock_approvals(directory.path());
     let batch = stock_batch();
-    let (binding, prepared, approved, answered) = approved_stock_item("SC Copied Marked").await;
+    let prepared = shown_stock_item("SC Copied Marked").prepared;
+    let (binding, held, approved, answered) = approved_stock_item("SC Copied Marked").await;
     assert_eq!(binding.kind(), PostKind::Masters);
     approvals
-        .hold_approved(
-            &batch,
-            binding.clone(),
-            approved,
-            prepared.clone(),
-            answered,
-        )
+        .hold_approved(&batch, binding.clone(), approved, held, answered)
         .unwrap();
     assert!(matches!(approvals.begin(&batch), Begin::Redeem(_)));
-    let fresh = stock_binding(&shown_stock_item("SC Copied Marked"));
+    let fresh = shown_stock_item("SC Copied Marked").binding(ORIGIN);
     assert_eq!(fresh, binding);
     let (taken, redeemed, held) = approvals.take_for_dispatch(&batch, &fresh).unwrap();
     assert_eq!(redeemed.post_kind(), PostKind::Masters);
@@ -1035,12 +1040,24 @@ async fn a_held_stock_item_approval_is_taken_with_an_equal_binding() {
     assert_eq!(render_stock_item_create(&held), marked);
     assert!(redeemed.sends_exactly(&marked));
     drop(taken);
+
+    let (binding, held, approved, answered) = approved_stock_item("SC Copied Marked").await;
+    approvals
+        .hold_approved(&batch, binding, approved, held, answered)
+        .unwrap();
+    let other = shown_stock_item("SC Copied Other").binding(ORIGIN);
+    assert_eq!(
+        approvals.take_for_dispatch(&batch, &other).err().as_deref(),
+        Some("import_approval_binding_changed")
+    );
+    assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
 }
 
 /// A held stock approval taken with a binding for anything else is refused as
 /// a changed binding, and lapses with a note that is not an approval: other
-/// writes under the same preview, the same writes under another preview, and
-/// a ledger binding with the same digest, endpoint, company and preview.
+/// writes under the same preview, the same writes under another preview or at
+/// another endpoint, and a ledger binding with the same digest, endpoint,
+/// company and preview.
 #[tokio::test]
 async fn a_held_stock_item_approval_is_refused_for_another_binding() {
     let directory = tempfile::tempdir().unwrap();
@@ -1048,34 +1065,35 @@ async fn a_held_stock_item_approval_is_refused_for_another_binding() {
     let batch = stock_batch();
     let base = shown_stock_item("SC Copied Marked");
     let other = shown_stock_item("SC Copied Other");
-    assert_ne!(other.prepared().writes(), base.prepared().writes());
-    let company = base.prepared().company().clone();
+    assert_ne!(other.prepared.writes(), base.prepared.writes());
+    let company = base.prepared.company().clone();
     let fresh_bindings = [
         (
             "writes",
-            ApprovalBinding::stock_item(STOCK_BATCH_SHA, ORIGIN, other.prepared(), base.preview()),
+            ApprovalBinding::stock_item(ORIGIN, &other.prepared, &base.preview),
         ),
         (
             "preview",
-            ApprovalBinding::stock_item(STOCK_BATCH_SHA, ORIGIN, base.prepared(), other.preview()),
+            ApprovalBinding::stock_item(ORIGIN, &base.prepared, &other.preview),
         ),
+        ("endpoint", base.binding("http://127.0.0.1:1")),
         (
             "ledger",
             ApprovalBinding::masters(
-                STOCK_BATCH_SHA,
+                &stock_digest(&base.prepared),
                 ORIGIN,
                 &company,
                 &stock_company_ledger(),
-                base.preview(),
+                &base.preview,
             ),
         ),
     ];
     for (case, fresh) in fresh_bindings {
-        let (binding, prepared, approved, answered) = approved_stock_item("SC Copied Marked").await;
-        assert_eq!(binding, stock_binding(&base), "{case}");
+        let (binding, held, approved, answered) = approved_stock_item("SC Copied Marked").await;
+        assert_eq!(binding, base.binding(ORIGIN), "{case}");
         assert_ne!(fresh, binding, "{case} must differ from the base");
         approvals
-            .hold_approved(&batch, binding, approved, prepared, answered)
+            .hold_approved(&batch, binding, approved, held, answered)
             .unwrap();
         assert_eq!(
             approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
@@ -1089,51 +1107,6 @@ async fn a_held_stock_item_approval_is_refused_for_another_binding() {
     }
 }
 
-/// A stock binding is refused against a held ledger approval, though both are
-/// of the masters kind and share the digest, endpoint, company and preview.
-#[tokio::test]
-async fn a_held_ledger_approval_is_refused_for_a_stock_binding() {
-    let directory = tempfile::tempdir().unwrap();
-    let approvals = stock_approvals(directory.path());
-    let batch = stock_batch();
-    let shown = shown_stock_item("SC Copied Marked");
-    let company = shown.prepared().company().clone();
-    let ledger = stock_company_ledger();
-    let ledger_binding =
-        ApprovalBinding::masters(STOCK_BATCH_SHA, ORIGIN, &company, &ledger, shown.preview());
-    let hold_ledger = || {
-        approvals
-            .hold_approved(
-                &batch,
-                ledger_binding.clone(),
-                ApprovedImport::approved_masters_for_test(ledger.clone(), &company, stock_marks()),
-                MasterPostRequest::render(ledger.clone(), &company),
-                answered_now(),
-            )
-            .unwrap();
-    };
-    // The control: the ledger approval is taken with its own binding.
-    hold_ledger();
-    let (taken, _, _) = approvals
-        .take_for_dispatch(&batch, &ledger_binding)
-        .unwrap();
-    drop(taken);
-
-    hold_ledger();
-    let stock = stock_binding(&shown);
-    assert_eq!(stock.kind(), ledger_binding.kind());
-    assert_ne!(stock, ledger_binding);
-    assert_eq!(
-        approvals.take_for_dispatch(&batch, &stock).err().as_deref(),
-        Some("import_approval_binding_changed")
-    );
-    assert_eq!(
-        approvals.lapse_note(&batch).unwrap()["reason"],
-        "approval_binding_changed"
-    );
-    assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
-}
-
 fn answered_now() -> Answered {
     Answered {
         approved: true,
@@ -1143,16 +1116,16 @@ fn answered_now() -> Answered {
 }
 
 /// The request held beside an approval must be the one it sends: a stock
-/// approval held with another stock item, whose bytes differ, or with a ledger
-/// request, is refused with an equal binding; and so is a ledger approval held
-/// with a stock item.
+/// approval held with another stock item or a ledger request, and a ledger
+/// approval held with a stock item, are refused with an equal binding. A held
+/// ledger approval is refused for a stock binding, after its own takes it.
 #[tokio::test]
 async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() {
     let directory = tempfile::tempdir().unwrap();
     let approvals = stock_approvals(directory.path());
     let batch = stock_batch();
-    let other = shown_stock_item("SC Copied Other").prepared().clone();
-    let (_, prepared, _, _) = approved_stock_item("SC Copied Marked").await;
+    let other = shown_stock_item("SC Copied Other").prepared;
+    let prepared = shown_stock_item("SC Copied Marked").prepared;
     assert_ne!(
         render_stock_item_create(&other),
         render_stock_item_create(&prepared)
@@ -1160,7 +1133,10 @@ async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() 
     let company = prepared.company().clone();
     let ledger = stock_company_ledger();
     let other_held: [(&str, HeldRequest); 2] = [
-        ("another stock item", other.clone().into()),
+        (
+            "another stock item",
+            HeldRequest::StockItem(Box::new(other)),
+        ),
         (
             "a ledger request",
             MasterPostRequest::render(ledger.clone(), &company).into(),
@@ -1182,14 +1158,19 @@ async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() 
         assert!(matches!(approvals.begin(&batch), Begin::Ask(_)), "{case}");
     }
 
-    let ledger_binding =
-        ApprovalBinding::masters(STOCK_BATCH_SHA, ORIGIN, &company, &ledger, "Ledger preview");
+    let ledger_binding = ApprovalBinding::masters(
+        &stock_digest(&prepared),
+        ORIGIN,
+        &company,
+        &ledger,
+        "Ledger preview",
+    );
     approvals
         .hold_approved(
             &batch,
             ledger_binding.clone(),
-            ApprovedImport::approved_masters_for_test(ledger, &company, stock_marks()),
-            prepared,
+            ApprovedImport::approved_masters_for_test(ledger.clone(), &company, stock_marks()),
+            HeldRequest::StockItem(Box::new(prepared)),
             answered_now(),
         )
         .unwrap();
@@ -1200,6 +1181,33 @@ async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() 
             .as_deref(),
         Some("import_approval_binding_changed"),
         "a ledger approval held with a stock item"
+    );
+    let hold_ledger = || {
+        let approved =
+            ApprovedImport::approved_masters_for_test(ledger.clone(), &company, stock_marks());
+        let held = MasterPostRequest::render(ledger.clone(), &company);
+        (approvals.hold_approved(
+            &batch,
+            ledger_binding.clone(),
+            approved,
+            held,
+            answered_now(),
+        ))
+        .unwrap();
+    };
+    hold_ledger();
+    drop(
+        approvals
+            .take_for_dispatch(&batch, &ledger_binding)
+            .unwrap(),
+    );
+    hold_ledger();
+    let stock = shown_stock_item("SC Copied Marked").binding(ORIGIN);
+    assert_eq!(stock.kind(), ledger_binding.kind());
+    assert_eq!(
+        approvals.take_for_dispatch(&batch, &stock).err().as_deref(),
+        Some("import_approval_binding_changed"),
+        "a held ledger approval, a stock binding"
     );
 }
 
@@ -1213,20 +1221,19 @@ async fn a_held_stock_item_dialog_is_approved_or_refused_by_its_answer() {
         let approvals = stock_approvals(directory.path());
         let batch = stock_batch();
         let shown = shown_stock_item("SC Copied Marked");
-        let binding = stock_binding(&shown);
-        let prepared = shown.prepared().clone();
         let scripted = if approve {
             ScriptedApproval::approving()
         } else {
             ScriptedApproval::declining()
         };
-        let dialog = SCRIPTED_APPROVAL
+        let asked = SCRIPTED_APPROVAL
             .scope(scripted.clone(), async {
-                shown.ask(stock_marks(), stock_batch())
+                shown.ask(ORIGIN, stock_marks(), stock_batch())
             })
             .await;
+        let (binding, dialog, held) = asked.into_parts();
         approvals
-            .hold_pending(&batch, binding.clone(), dialog, prepared)
+            .hold_pending(&batch, binding.clone(), dialog, held)
             .unwrap();
         tokio::time::timeout(std::time::Duration::from_secs(120), async {
             while !approvals.answered_for_test(&batch) {

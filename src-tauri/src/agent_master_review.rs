@@ -9,6 +9,7 @@
 //! that hides part of what will be created is not a review. The limits and the
 //! unsafe-character checks are the voucher preview's own.
 use super::super::failure_code::{create_render_refusal_code, StockItemCreateCode};
+use super::approval::{ApprovalBinding, HeldRequest};
 use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
@@ -358,32 +359,53 @@ pub(super) fn show_stock_item_draft(
 
 #[cfg_attr(not(test), allow(dead_code))]
 impl ShownStockItem {
-    /// The Create the person is asked about, for its binding and the request
-    /// held beside the approval.
-    pub(super) fn prepared(&self) -> &PreparedStockItem {
-        &self.prepared
-    }
-
-    /// The text the person is shown, for its binding.
-    pub(super) fn preview(&self) -> &str {
-        &self.preview
+    /// The binding of what was shown, reached at `endpoint_origin`: at the
+    /// take, the fresh binding of a fresh draft.
+    pub(super) fn binding(&self, endpoint_origin: &str) -> ApprovalBinding {
+        ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview)
     }
 
     /// Shows the preview in the stock-item dialog, on its own task, and on the
     /// person's approval holds the approval of this Create for `batch_id`,
-    /// read in the queue with the stock marks parser.
+    /// read in the queue with the stock marks parser. The binding and the held
+    /// request are built here from the same item, so all three agree.
     pub(super) fn ask(
         self,
+        endpoint_origin: &str,
         company_marks_request: AgentReadRequest,
         batch_id: String,
-    ) -> PendingPostApproval {
-        PendingPostApproval::ask_stock_item(
+    ) -> AskedStockItem {
+        let binding = ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview);
+        let held = HeldRequest::StockItem(Box::new(self.prepared.clone()));
+        let dialog = PendingPostApproval::ask_stock_item(
             self.prepared,
             self.preview,
             company_marks_request,
             super::master_post::stock_company_marks,
             batch_id,
-        )
+        );
+        AskedStockItem {
+            binding,
+            dialog,
+            held,
+        }
+    }
+}
+
+/// One ask of a shown stock item: its binding, its open dialog and the request
+/// held beside it, all made by [`ShownStockItem::ask`] from the one item.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct AskedStockItem {
+    binding: ApprovalBinding,
+    dialog: PendingPostApproval,
+    held: HeldRequest,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl AskedStockItem {
+    /// The three parts, for the approvals holder to hold together.
+    pub(super) fn into_parts(self) -> (ApprovalBinding, PendingPostApproval, HeldRequest) {
+        (self.binding, self.dialog, self.held)
     }
 }
 

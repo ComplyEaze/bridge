@@ -247,6 +247,12 @@ impl ApprovalBinding {
         }
     }
 
+    /// The digest this binding names, for tests that tie it to the bytes.
+    #[cfg(test)]
+    pub(super) fn digest_for_test(&self) -> &str {
+        &self.batch_sha256
+    }
+
     pub(super) fn kind(&self) -> PostKind {
         match self.subject {
             BindingSubject::Vouchers { .. } => PostKind::Vouchers,

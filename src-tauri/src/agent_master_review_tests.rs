@@ -1217,6 +1217,19 @@ async fn held_requests_of_other_bytes_and_a_held_ledger_approval_for_a_stock_bin
     assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
 }
 
+/// One prepared item has one digest: its binding's, its approval's and the
+/// one its writes give for its company are the same.
+#[tokio::test]
+async fn a_stock_items_binding_digest_is_its_approvals_and_its_writes_digest() {
+    let shown = shown_stock_item("SC Copied Marked");
+    let prepared = shown.prepared.clone();
+    let digest = shown.binding().digest_for_test().to_string();
+    let (_, _, approved, _) = approved_stock_item("SC Copied Marked").await;
+    assert_eq!(digest, approved.xml_sha256());
+    let writes = prepared.writes().create_sha256(prepared.company());
+    assert_eq!(digest, writes.expect("the captured item renders"));
+}
+
 /// Asked, then held while its dialog is open: on the scripted approval the
 /// held dialog is joined, approved and taken; on the scripted decline its
 /// refusal is kept and returned once, as the ledger dialog's code.

@@ -6,10 +6,11 @@ row 1108-R3's c6prep.py (lab/1108-r3-equal-voucher, placeholder-helpers/): the s
 company number taken from the backup's own file name, Tally's data folder given on the command line, and an
 after-record that lists the data folder again and prints the difference. Changed from RR's: the precheck runs before
 the write, which it gates (send.py W needs it), since the write, not the shut, is this row's point of no return; and
-`plan` also refuses without the write's grade (local/evidence/w-grade.txt, measure.py write) and after a write graded
-`WRITE REFUSED`, which left nothing to undo. Any other grade (ADMITTED, UNCLEAR, or NOT READ: the write may have
-landed) admits the plan, so a restore the run coordinator orders after a STOP is not made impossible. Not product code. Python 3.10, standard library only. Reads Tally's files
-only; changes none. Writes only the record files named below (and, for the self-test, its SCRATCH).
+`plan` also refuses unless the write was graded `WRITE ADMITTED` (local/evidence/w-grade.txt, measure.py write) and
+the aim showed it (`AIM SHOWN`, local/evidence/aim.txt, measure.py aim), each record ending `exit 0`. After any other
+outcome a restore is made only on the run coordinator's word and needs a new sheet, since this one's later reads
+cannot run after it (the run coordinator's ruling, 26 Nov 2026). Not product code. Python 3.10, standard library
+only. Reads Tally's files only; changes none. Writes only the record files named below (and, for the self-test, its SCRATCH).
 
   restore.py precheck DATA before the write, with the book loaded: BK-S as `plan` checks it; the fallback
                            folder (row 1381-O's backup-1) holds exactly one file TDBK1800_<n>.001 of its recorded
@@ -17,8 +18,8 @@ only; changes none. Writes only the record files named below (and, for the self-
                            can be listed. Writes local/precheck.txt. Prints `PRECHECK MET: ...` (exit 0).
   restore.py plan DATA     before the restore, after the shut, and only after a precheck that met (local/precheck.txt
                            present, local/evidence/r-precheck.txt holding `PRECHECK MET:` and ending `exit 0`, the
-                           same company number as now), and only after the write's grade, when it is not
-                           `WRITE REFUSED`: the source folder holds exactly one file, named
+                           same company number as now), and only after `WRITE ADMITTED` and `AIM SHOWN`, each
+                           ending `exit 0`: the source folder holds exactly one file, named
                            TDBK1800_<company number>.001, of the recorded bytes and sha256 (BK-S, row 1108-R3);
                            the company's data folder DATA/<company number> exists. Writes local/restore-plan.txt and
                            local/r-before-listing.txt. Prints `PLAN WRITTEN: ...` (exit 0).
@@ -34,7 +35,7 @@ the company's data folder, `<file|dir> <bytes> <modified, local, to the second> 
 Exit 0: written. Exit 1: STOP-RESTORE-SOURCE (a backup folder absent or not as recorded, the two numbers differing,
 or the data folder absent before the restore) or STOP-RESTORE (the company's data folder absent after the restore).
 "Absent" is only FileNotFoundError or NotADirectoryError on the path itself. Exit 2: REFUSED (a record exists, or the
-precheck, the write's grade or the plan is missing, or the write was refused), or FAILED READ (any other error reading a folder or file, or writing a record, or a data path that
+precheck, the write's grade, the aim or the plan is missing, or either is not ADMITTED or SHOWN), or FAILED READ (any other error reading a folder or file, or writing a record, or a data path that
 is not a directory): never reported as "nothing found" or as a restore that did not complete. Printed text never holds the company
 number or DATA: each is replaced by `<company number>` and `<DATA>`; the plan and the two listings stay on the lab PC.
 """
@@ -147,6 +148,16 @@ def precheck(data, local, source=SOURCE, want_sha=WANT_SHA, want_bytes=WANT_BYTE
             f"data folder present and listed, {len(lines)} entries; local/precheck.txt"), number
 
 
+def shown_met(path, word):
+    """None when the record PATH holds a line `WORD: ...` and its last line is `exit 0`; else what it lacks."""
+    if not path.exists():
+        return "is missing"
+    shown = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not any(line.startswith(word + ": ") for line in shown) or shown[-1] != "exit 0":
+        return f"holds no {word} line ending exit 0"
+    return None
+
+
 def plan(data, local, source=SOURCE, want_sha=WANT_SHA, want_bytes=WANT_BYTES):
     plan_file, before = local / "restore-plan.txt", local / "r-before-listing.txt"
     for path in (plan_file, before):
@@ -161,11 +172,11 @@ def plan(data, local, source=SOURCE, want_sha=WANT_SHA, want_bytes=WANT_BYTES):
     if not any(line.startswith("PRECHECK MET:") for line in shown) or shown[-1] != "exit 0":
         raise Stop("REFUSED", "local/evidence/r-precheck.txt holds no PRECHECK MET line ending exit 0: "
                    "restore.py precheck first", 2)
-    graded = local / "evidence" / "w-grade.txt"
-    if not graded.exists():
-        raise Stop("REFUSED", "local/evidence/w-grade.txt is missing: measure.py write first", 2)
-    if any(line.strip().startswith("WRITE REFUSED: ") for line in graded.read_text(encoding="utf-8").splitlines()):
-        raise Stop("REFUSED", "the write was refused in-band (local/evidence/w-grade.txt): nothing to undo, no restore", 2)
+    for name, word, step in (("w-grade.txt", "WRITE ADMITTED", "measure.py write"), ("aim.txt", "AIM SHOWN", "measure.py aim")):
+        why = shown_met(local / "evidence" / name, word)
+        if why:
+            raise Stop("REFUSED", f"local/evidence/{name} {why} ({step}): this sheet restores only after WRITE ADMITTED "
+                       "and AIM SHOWN; any other restore is on the run coordinator's word, by a new sheet", 2)
     name, number, size, modified = source_file(source, want_sha, want_bytes)
     checked = re.search(r"(?m)^Company: BRIDGE STOCK CREATE LAB, number ([0-9]+) \(both files\)$",
                         record.read_text(encoding="utf-8"))
@@ -240,7 +251,8 @@ def selftest(scratch):
     fsha, fsize = hashlib.sha256(fbody).hexdigest(), len(fbody)
     right = total = 0
 
-    def lay(n, prechecked=True, grade="WRITE ADMITTED: synthetic\nexit 0\n"):
+    def lay(n, prechecked=True, grade="WRITE ADMITTED: synthetic\nexit 0\n",
+            aim="I2: 2 STOCKITEM row(s)\nAIM SHOWN: 'SC Copied Goods' in I2, bound to the book\nexit 0\n"):
         base = scratch / f"case{n}"
         src, data, local = base / "src", base / "data", base / "local"
         for folder in (src, data / number):
@@ -257,6 +269,8 @@ def selftest(scratch):
         if prechecked and grade is not None:  # as step 3's line: measure.py write's lines, then `exit <code>`
             (local / "evidence").mkdir(parents=True, exist_ok=True)
             (local / "evidence" / "w-grade.txt").write_text(grade, encoding="utf-8")
+        if prechecked and aim is not None:  # as step 4's aim line: measure.py aim's lines, then `exit <code>`
+            (local / "evidence" / "aim.txt").write_text(aim, encoding="utf-8")
         return src, data.as_posix(), local
 
     def go(command, src, data, local):
@@ -438,22 +452,31 @@ def selftest(scratch):
     code, text = go("plan", src, data, local)
     case("plan, the company number not the precheck's: STOP-RESTORE-SOURCE", (code, text.strip()),
          (1, "STOP-RESTORE-SOURCE: the source's company number is not the precheck's"))
-    # plan only after the write's grade, and never after a write refused in-band.
-    src, data, local = lay(25, grade=None)
-    code, text = go("plan", src, data, local)
-    case("plan, the write not graded: refused", (code, text.strip()),
-         (2, "REFUSED: local/evidence/w-grade.txt is missing: measure.py write first"))
-    src, data, local = lay(26, grade="W: 704 B\n  LINEERROR 'x'\nWRITE REFUSED: CREATED, ALTERED, DELETED and COMBINED "
-                                     "all 0: nothing imported\nexit 0\n")
-    code, text = go("plan", src, data, local)
-    case("plan, the write refused in-band: refused, no restore", (code, text.split(":")[0]), (2, "REFUSED"))
-    src, data, local = lay(27, grade="WRITE UNCLEAR: a change counter above 0\nexit 0\n")
-    code, text = go("plan", src, data, local)
-    case("plan, the write unclear (a restore on the run coordinator's word): written", (code, text.split(":")[0]),
-         (0, "PLAN WRITTEN"))
-    src, data, local = lay(28, grade="NOT READ: W: the request failed\nexit 2\n")
-    code, text = go("plan", src, data, local)
-    case("plan, the write's answer not read (it may have landed): written", (code, text.split(":")[0]), (0, "PLAN WRITTEN"))
+    # plan only after WRITE ADMITTED and AIM SHOWN, each ending exit 0; any other outcome is refused.
+    refusal = ("this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run "
+               "coordinator's word, by a new sheet")
+    for n, what, kw, why in (
+            (25, "the write not graded", {"grade": None}, "local/evidence/w-grade.txt is missing (measure.py write)"),
+            (26, "the write refused in-band", {"grade": "W: 704 B\nWRITE REFUSED: nothing imported\nexit 0\n"},
+             "local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write)"),
+            (27, "the write unclear", {"grade": "WRITE UNCLEAR: a change counter above 0\nexit 0\n"},
+             "local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write)"),
+            (28, "the write's send failed", {"grade": "NOT READ: W: the request failed\nexit 2\n"},
+             "local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write)"),
+            (29, "the write's answer not parsed", {"grade": "WRITE NOT PARSED: x (STOP-WRITE-ANSWER)\nexit 0\n"},
+             "local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write)"),
+            (30, "WRITE ADMITTED not ending exit 0", {"grade": "WRITE ADMITTED: synthetic\nexit 1\n"},
+             "local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write)"),
+            (31, "no aim record", {"aim": None}, "local/evidence/aim.txt is missing (measure.py aim)"),
+            (32, "the aim a STOP", {"aim": "STOP-AIM-STATE: not shown\nexit 1\n"},
+             "local/evidence/aim.txt holds no AIM SHOWN line ending exit 0 (measure.py aim)"),
+            (33, "the aim not read", {"aim": "NOT READ: I2: the request failed\nexit 2\n"},
+             "local/evidence/aim.txt holds no AIM SHOWN line ending exit 0 (measure.py aim)"),
+            (34, "AIM SHOWN not ending exit 0", {"aim": "AIM SHOWN: x\nexit 0\nexit 1\n"},
+             "local/evidence/aim.txt holds no AIM SHOWN line ending exit 0 (measure.py aim)")):
+        src, data, local = lay(n, **kw)
+        code, text = go("plan", src, data, local)
+        case(f"plan, {what}: refused", (code, text.strip()), (2, f"REFUSED: {why}: {refusal}"))
     print(f"{total} cases, {right} right")
     return 0 if right == total else 1
 

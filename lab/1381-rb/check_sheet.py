@@ -12,7 +12,7 @@ window, no write); the write file one Import Data of All Masters for the book, o
 ACTION="Create", whose NAME is measure.py's WRITE_ITEM, and no date window; send.py's WRITE_SHA and WRITE_BYTES the write
 file's own, its line in the sheet's table and The write's; send.py's order, address, gates and once-only line held
 exactly once each, and no client timeout in it; measure.py's two marks held; restore.py held to BK-S's and the
-fallback's folder, sha256 and bytes and to the write's grade; no GUID-shaped text and no unfilled @@ token in the two
+fallback's folder, sha256 and bytes and to the plan's two records (WRITE ADMITTED, AIM SHOWN); no GUID-shaped text and no unfilled @@ token in the two
 rule files. Only local/ is skipped: any other file outside SHA256.txt is an error, and a __pycache__ folder is named in
 its own STOP-PYCACHE line first; nothing is deleted. SHA256.txt may not list a path under local/. With --fresh (step 0's
 pre-sitting run, right after the copy): local/ may hold only step 0's own records made before it (FRESH) and one
@@ -220,20 +220,22 @@ HELD = (
     ("send.py", 'GATES = {"I1": (("evidence/m1-state.txt", ("BOOK STATE MET",)),),\n'
                 '         "W": (("evidence/bind.txt", ("BIND MET",)), ("evidence/r-precheck.txt", ("PRECHECK MET",)),\n'
                 '               ("precheck.txt", None)),\n'
-                '         "M2": (("evidence/w-grade.txt", ("WRITE ADMITTED", "WRITE REFUSED", "WRITE UNCLEAR")), '
-                '("shots/s3-write", None)),\n'
+                '         "M2": (("evidence/w-grade.txt", ("WRITE ADMITTED", "WRITE REFUSED", "WRITE UNCLEAR", '
+                '"WRITE NOT PARSED")),\n'
+                '                ("shots/s3-write", None)),\n'
                 '         "I2": (("evidence/w-grade.txt", ("WRITE ADMITTED",)), ("evidence/m2-state.txt", '
                 '("BOOK STATE MET",))),\n'
-                '         "M3": (("evidence/w-grade.txt", ("WRITE ADMITTED",)), ("evidence/r-after.txt", '
-                '("AFTER RECORDED",))),\n'
+                '         "M3": (("evidence/w-grade.txt", ("WRITE ADMITTED",)), ("evidence/aim.txt", ("AIM SHOWN",)),\n'
+                '                ("evidence/r-after.txt", ("AFTER RECORDED",))),\n'
                 '         "I3": (("evidence/m3-state.txt", ("BOOK STATE MET",)),)}\n'),
     ("send.py", '        return f"{label} was sent already: a request is sent once in the row\'s life"\n'),
     ("measure.py", 'BOOK_MARK = "210"'),
     ("measure.py", 'AIM_MARK = "211"'),
     ("restore.py", 'SOURCE = "C:/bridge-lab/1108r3/backups/bks"\n'),
     ("restore.py", 'FALLBACK = "C:/lab/1381-o/backup-1"\n'),
-    ("restore.py", '    if any(line.strip().startswith("WRITE REFUSED: ") for line in '
-                   'graded.read_text(encoding="utf-8").splitlines()):\n'),
+    ("restore.py", '    for name, word, step in (("w-grade.txt", "WRITE ADMITTED", "measure.py write"), ("aim.txt", '
+                   '"AIM SHOWN", "measure.py aim")):\n'),
+    ("restore.py", '    if not any(line.startswith(word + ": ") for line in shown) or shown[-1] != "exit 0":\n'),
 )
 GONE = (("send.py", "--max-time"), ("send.py", "-m "), ("send.py", "--connect-timeout"))
 GUID_SHAPE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")

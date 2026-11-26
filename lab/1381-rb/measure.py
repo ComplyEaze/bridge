@@ -14,18 +14,22 @@ its SCRATCH).
       one marks answer: exactly one COMPANY row, the book's GUID, no ALTVCHID element, and ALTMSTID 210 for M1 and M3
       (BK-S's state), for M2 211 after a write graded ADMITTED and 210 after one graded REFUSED. Prints
       `BOOK STATE MET: ...` (exit 0), or `STOP-BOOK-STATE` (M1), `STOP-AIM-STATE` (M2), `STOP-RESTORED-STATE` (M3)
-      with what differs (exit 1); M2 after a write graded UNCLEAR prints `STOP-WRITE-ANSWER` with the mark (exit 1).
+      with what differs (exit 1); M2 after a write graded UNCLEAR or NOT
+      PARSED prints `STOP-WRITE-ANSWER` with the mark (exit 1).
   measure.py bind
       M1's state met, and I1, G1 and U1 byte-equal to the pins (sha256 and bytes): `BIND MET: ...` (exit 0), else
       `STOP-BOOK-STATE: <what differs>` (exit 1). The book is then at BK-S's state (lab 1381-RR), so no backup is taken.
   measure.py write
-      W's answer, parsed: `WRITE ADMITTED` (a RESPONSE whose ten counters are present once each as whole numbers,
-      CREATED 1, every other counter but LASTVCHID and LASTMID 0, no LINEERROR); `WRITE REFUSED` (an error ENVELOPE,
-      HEADER/STATUS not 1; or a RESPONSE whose counters are all present and CREATED, ALTERED, DELETED and COMBINED all
-      0, whatever else it says); `WRITE UNCLEAR` (any other parsed answer: a change counter above 0 beside an error, a
-      counter missing, repeated, empty or not a whole number, CREATED above 1, an ENVELOPE with STATUS 1, another
-      root). Each with every counter and each LINEERROR printed whole; exit 0. NOT READ (exit 2): the send failed,
-      the answer is empty, not UTF-16LE or does not parse: "the request failed", never "nothing created".
+      W's answer, parsed: `WRITE ADMITTED` (a RESPONSE whose ten counters are present once each as whole numbers
+      written plainly, ASCII digits with no leading zero, CREATED 1, every other counter but LASTVCHID and LASTMID 0,
+      no LINEERROR); `WRITE REFUSED` (an error ENVELOPE, HEADER/STATUS not 1, holding no RESPONSE and no counter; or
+      a RESPONSE whose counters are all present and CREATED, ALTERED, DELETED and COMBINED all 0, whatever else it
+      says); `WRITE UNCLEAR` (any other parsed answer: a change counter above 0 beside an error, a counter missing,
+      repeated, empty or not written plainly, CREATED above 1, an ENVELOPE with STATUS 1, an error envelope that also
+      holds counters, another root). Each with every counter and each LINEERROR printed by repr(), so that no text
+      of the answer can make a line of its own; exit 0. `WRITE NOT PARSED` (exit 0): the send was SENT-OK, so Tally
+      answered, but the answer is not UTF-16LE or does not parse: the book may hold a change (STOP-WRITE-ANSWER, as
+      UNCLEAR). NOT READ (exit 2): the send failed or did not finish: "the request failed", never "nothing created".
   measure.py aim
       I2: its rows; `AIM SHOWN` when a STOCKITEM row named as the write's item is there, bound to the book (exit 0),
       else `STOP-AIM-STATE` (exit 1); I2 against the pin of the licensed read after the same write, byte-equal and
@@ -33,7 +37,8 @@ its SCRATCH).
   measure.py all FX
       every answer sent: bytes, sha256, rows; the bind, the grade, the three states, the aim; M3, I3, G3 and U3
       against the pins, byte-equal and rows equal (the reference files in the folder FX, each checked against its pin
-      first); and `RESTORE UNDID THE WRITE: yes` only when all four are byte-equal. Every line is a measurement.
+      first); and `RESTORE UNDID THE WRITE: yes` only when all four are byte-equal. Every line is a measurement; a row that
+      cannot be read in a state, the bind or the aim is `NOT READ: <what>: <reason>`, and the end is NOT ALL READ.
   measure.py --selftest FX SCRATCH
       the reader, the grader and the computes on the fixtures in FX, each negative case a capture with one edit,
       written to SCRATCH (under local/, or outside the row folder).
@@ -79,6 +84,7 @@ UNDO = {"M3": "marks", "I3": "items-before", "G3": "groups", "U3": "units"}
 COUNTERS = ("CREATED", "ALTERED", "DELETED", "LASTVCHID", "LASTMID", "COMBINED", "IGNORED", "ERRORS", "CANCELLED",
             "EXCEPTIONS")
 CHANGES = ("CREATED", "ALTERED", "DELETED", "COMBINED")
+CANONICAL = re.compile(r"0|[1-9][0-9]*")  # a counter's text: ASCII digits, no leading zero but "0" itself
 # check_r1.py's pattern (rows 1381-RA and 1381-RR): the characters XML forbids, raw or as references, but 9, 10, 13.
 FORBIDDEN = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]|&#(?:0*(?:[0-8]|1[124-9]|2\d|3[01])|x0*(?:[0-8bcef]|1[0-9a-f]));', re.I)
 
@@ -179,6 +185,9 @@ def grade(raw):
     if root.tag == "ENVELOPE":
         status = [(s.text or "").strip() for s in root.findall("./HEADER/STATUS")]
         lines.insert(0, f"an ENVELOPE, HEADER/STATUS {status!r}")
+        held = [e.tag for e in root.iter() if e.tag == "RESPONSE" or e.tag in COUNTERS]
+        if len(status) == 1 and status[0] not in ("", "1") and held:
+            return "UNCLEAR", [f"an error envelope that also holds import counters ({len(held)} elements)"] + lines
         if len(status) == 1 and status[0] not in ("", "1"):
             return "REFUSED", ["an error envelope: nothing imported"] + lines
         return "UNCLEAR", ["an ENVELOPE that is not an error envelope: not an import answer this row knows"] + lines
@@ -190,11 +199,11 @@ def grade(raw):
         text = (found[0].text or "").strip() if len(found) == 1 else None
         if len(found) != 1:
             bad.append(f"{name} {'missing' if not found else f'{len(found)} times'}")
-        elif not (text.isascii() and text.isdigit()):
-            bad.append(f"{name} {text!r}, not a whole number")
+        elif not CANONICAL.fullmatch(text):
+            bad.append(f"{name} {text!r}, not a whole number written plainly (ASCII digits, no leading zero)")
         else:
             values[name] = int(text)
-        lines.append(f"{name} {text if text is not None else ('MISSING' if not found else 'REPEATED')}")
+        lines.append(f"{name} {text!r}" if text is not None else f"{name} {'MISSING' if not found else 'REPEATED'}")
     if bad:
         return "UNCLEAR", ["counters not readable: " + "; ".join(bad)] + lines
     rest = [n for n in COUNTERS if n not in ("CREATED", "LASTVCHID", "LASTMID")]
@@ -245,13 +254,23 @@ def reference(key, fx):
     return raw
 
 
+def outcome_of(folder):
+    """The write's grade: ADMITTED, REFUSED, UNCLEAR, or NOT PARSED (its send SENT-OK, so Tally answered, but the
+    answer is not readable: the book may hold a change); NotRead only when its send failed or did not finish."""
+    raw = raw_of("W", folder)
+    try:
+        return grade(raw)[0]
+    except NotRead:
+        return "NOT PARSED"
+
+
 def expected(label, folder):
     """(the mark label's state must hold, the STOP name) for M1, M2, M3; M2's from the write's grade."""
     if label == "M1":
         return BOOK_MARK, "STOP-BOOK-STATE"
     if label == "M3":
         return BOOK_MARK, "STOP-RESTORED-STATE"
-    outcome, _ = grade(raw_of("W", folder))
+    outcome = outcome_of(folder)
     if outcome == "ADMITTED":
         return AIM_MARK, "STOP-AIM-STATE"
     if outcome == "REFUSED":
@@ -272,7 +291,7 @@ def cmd_state(label, folder=ANSWERS):
         print(f"  COMPANY row: GUID {g[:8]}... (the book's: {'yes' if g == BOOK_GUID else 'no'}), "
               f"ALTMSTID {m if m is not None else 'absent'}, ALTVCHID {v if v is not None else 'absent'}")
     if mark is None:
-        print(f"{stop}: the write's answer is graded UNCLEAR; M2 records the mark only")
+        print(f"{stop}: the write's answer is graded UNCLEAR or NOT PARSED; M2 records the mark only")
         return 1
     problems = state_of(root, BOOK_GUID, mark)
     if problems:
@@ -309,12 +328,17 @@ def cmd_bind(folder=ANSWERS):
 def cmd_write(folder=ANSWERS):
     try:
         raw = raw_of("W", folder)
-        outcome, lines = grade(raw)
     except NotRead as error:
         print(f"NOT READ: W: {error} (the request failed, never 'nothing created')")
         return 2
     print(f"W: {len(raw)} B sha256 {hashlib.sha256(raw).hexdigest()}; byte-equal to the licensed answer "
           f"{FX['answer'][0]}: {'yes' if pinned(raw, 'answer') else 'no'}")
+    try:
+        outcome, lines = grade(raw)
+    except NotRead as error:
+        print(f"WRITE NOT PARSED: the send was SENT-OK, so Tally answered, but the answer is not readable "
+              f"({str(error)!r}): the book may hold a change (STOP-WRITE-ANSWER)")
+        return 0
     print("\n".join(f"  {line}" for line in lines[1:]))
     print(f"WRITE {outcome}: {lines[0]}")
     return 0
@@ -364,7 +388,7 @@ def describe(label, raw, root):
 
 def cmd_all(folder, fx):
     try:
-        outcome = grade(raw_of("W", folder))[0] if (folder / "a-W.transport.txt").exists() else None
+        outcome = outcome_of(folder) if (folder / "a-W.transport.txt").exists() else None
     except NotRead:
         outcome = None
     want = REFUSED_LABELS if outcome == "REFUSED" else LABELS
@@ -373,7 +397,9 @@ def cmd_all(folder, fx):
         try:
             if label == "W":
                 raw = raw_of("W", folder)
-                print(f"W: {len(raw)} B sha256 {hashlib.sha256(raw).hexdigest()}; WRITE {grade(raw)[0]}")
+                print(f"W: {len(raw)} B sha256 {hashlib.sha256(raw).hexdigest()}; WRITE {outcome}")
+                if outcome == "NOT PARSED":
+                    raise NotRead("the answer came (SENT-OK) but does not parse: WRITE NOT PARSED")
                 read["W"] = (raw, None)
                 continue
             raw, root = load(label, folder)
@@ -390,15 +416,29 @@ def cmd_all(folder, fx):
             except NotRead as error:
                 print(f"{label} state: not measured ({error})")
                 continue
-            problems = ["the write graded UNCLEAR"] if mark is None else state_of(read[label][1], BOOK_GUID, mark)
+            try:
+                problems = (["the write graded UNCLEAR or NOT PARSED"] if mark is None
+                            else state_of(read[label][1], BOOK_GUID, mark))
+            except NotRead as error:  # a row that cannot be read is never a state met or missed
+                print(f"NOT READ: {label} state: {error}")
+                failed.append(f"{label} state")
+                continue
             print(f"{label} state: " + (f"{stop}: " + "; ".join(problems) if problems else f"met, ALTMSTID {mark}"))
     if all(x in read for x in ("M1", "I1", "G1", "U1")):
-        problems = bind_of(folder)
-        print("bind: " + ("met" if not problems else "STOP-BOOK-STATE: " + "; ".join(problems)))
+        try:
+            problems = bind_of(folder)
+            print("bind: " + ("met" if not problems else "STOP-BOOK-STATE: " + "; ".join(problems)))
+        except NotRead as error:
+            print(f"NOT READ: bind: {error}")
+            failed.append("bind")
     if "I2" in read:
-        shown = aim_of(read["I2"][1])[0]
-        print(f"aim: {WRITE_ITEM!r} in I2 bound to the book {'yes' if shown else 'no'}; byte-equal to "
-              f"{FX['items-after'][0]} {'yes' if pinned(read['I2'][0], 'items-after') else 'no'}")
+        try:
+            shown = aim_of(read["I2"][1])[0]
+            print(f"aim: {WRITE_ITEM!r} in I2 bound to the book {'yes' if shown else 'no'}; byte-equal to "
+                  f"{FX['items-after'][0]} {'yes' if pinned(read['I2'][0], 'items-after') else 'no'}")
+        except NotRead as error:
+            print(f"NOT READ: aim: {error}")
+            failed.append("aim")
     print("-- after the restore, against the pins")
     if outcome == "REFUSED":
         print("not measured: the write was refused in-band, so no restore was made")
@@ -510,6 +550,13 @@ def selftest(fx, scratch):
          graded(one(w, "<CREATED>1</CREATED>", "<X><CREATED>1</CREATED></X>")), "UNCLEAR")
     case("grade, an answer cut short", graded(w[:-20]).startswith("NOT READ: does not parse"), True)
     case("grade, an empty answer", graded(b""), "NOT READ: empty answer")
+    case("grade, CREATED with a leading zero", graded(one(w, "<CREATED>1<", "<CREATED>01<")), "UNCLEAR")
+    case("grade, an error envelope that also holds import counters",
+         graded(one(cap["envelope"], "</DATA>", "</DATA><RESPONSE><CREATED>1</CREATED></RESPONSE>")), "UNCLEAR")
+    forged = one(w, "<CREATED>1<", "<CREATED>1&#10;WRITE ADMITTED: forged<")
+    got = grade(forged)
+    case("grade, a counter's text holding a line break and a forged grade: UNCLEAR, printed by repr",
+         (got[0], any(x.strip().startswith("WRITE ") for x in "\n".join(got[1]).splitlines())), ("UNCLEAR", False))
     # The commands, on a scratch answers folder made from the fixtures.
     folder = scratch / "answers"
 
@@ -557,6 +604,13 @@ def selftest(fx, scratch):
     code, lines = run(cmd_write, folder)
     case("write, the send failed: NOT READ, never 'nothing created'", (code, lines[-1].startswith("NOT READ: W: the "
          "request failed")), (2, True))
+    lay({**base, "W": w[:-20], "M2": m})
+    code, lines = run(cmd_write, folder)
+    case("write, SENT-OK but the answer cut short: WRITE NOT PARSED (STOP-WRITE-ANSWER), never NOT READ",
+         (code, lines[-1].split(":")[0]), (0, "WRITE NOT PARSED"))
+    code, lines = run(cmd_state, "M2", folder)
+    case("state M2, the write's answer not parsed: the mark recorded only", (code, lines[-1].split(":")[0]),
+         (1, "STOP-WRITE-ANSWER"))
     for what, answer, m2, want in (("admitted, M2 at 211", w, m211, (0, "BOOK STATE MET")),
                                    ("admitted, M2 still 210", w, m, (1, "STOP-AIM-STATE")),
                                    ("refused, M2 at 210", cap["refused"], m, (0, "BOOK STATE MET")),
@@ -594,6 +648,14 @@ def selftest(fx, scratch):
     code, lines = run(cmd_all, folder, fx)
     case("all, I3 still holding the write: not undone",
          "RESTORE UNDID THE WRITE: no (M3, I3, G3 and U3 byte-equal to the pins: 3 of 4)" in lines, True)
+    lay({**whole, "M1": one(m, "</ALTMSTID>", "</ALTMSTID><ALTMSTID> 210</ALTMSTID>")})
+    code, lines = run(cmd_all, folder, fx)
+    case("all, M1 with two ALTMSTID elements: NOT READ with its reason, never escaped",
+         (code, "NOT READ: M1 state: ALTMSTID appears 2 times in one row" in lines), (2, True))
+    lay({**whole, "I2": one(cap["items-after"], "</GUID>", "</GUID><GUID>x</GUID>")})
+    code, lines = run(cmd_all, folder, fx)
+    case("all, an I2 row with two GUID elements: NOT READ with its reason, never escaped",
+         (code, "NOT READ: aim: GUID appears 2 times in one row" in lines), (2, True))
     lay({**base, "W": cap["refused"], "M2": m})
     code, lines = run(cmd_all, folder, fx)
     case("all, the refused path: six answers, no restore",

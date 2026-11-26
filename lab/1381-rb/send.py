@@ -6,8 +6,9 @@ Row 1381-RB, from row 1381-RR's send.py (lab/1381-rr-sheet at 62858add, lab/1381
 eleven labels M1 I1 G1 U1 W M2 I2 M3 I3 G3 U3 in place of RR's five; the one write W, its file pinned here by sha256
 and bytes (master's fixture, byte-identical) as well as by SHA256.txt, and parsed before it is sent: W's file must be
 an import and every other label's an export (nothing else may import); RR's gates replaced by GATES below (the write
-only after the bind and a met precheck; M2 only after the write's grade and the screenshot taken straight after it;
-I2 and M3 only after a write graded ADMITTED); a record line `exit 0` counts only as the record's last line; and a
+only after the bind and a met precheck; M2 only after the write's grade, WRITE NOT PARSED included (Tally answered:
+v3 C8's one state read), and the screenshot taken straight after it; I2 only after a write graded ADMITTED; M3 only
+after that, the aim shown and the restore recorded); a record line `exit 0` counts only as the record's last line; and a
 start marker, a-<LABEL>.started.txt, made before curl starts, so that a send whose answer never came still counts as
 sent: that label is never sent again, and nothing is sent after it. Everything else is RR's: the label names its
 request (no file argument); each label is sent once in the row's life, whatever happened to it; a failed send stops
@@ -64,9 +65,11 @@ WRITE_BYTES = 3646
 GATES = {"I1": (("evidence/m1-state.txt", ("BOOK STATE MET",)),),
          "W": (("evidence/bind.txt", ("BIND MET",)), ("evidence/r-precheck.txt", ("PRECHECK MET",)),
                ("precheck.txt", None)),
-         "M2": (("evidence/w-grade.txt", ("WRITE ADMITTED", "WRITE REFUSED", "WRITE UNCLEAR")), ("shots/s3-write", None)),
+         "M2": (("evidence/w-grade.txt", ("WRITE ADMITTED", "WRITE REFUSED", "WRITE UNCLEAR", "WRITE NOT PARSED")),
+                ("shots/s3-write", None)),
          "I2": (("evidence/w-grade.txt", ("WRITE ADMITTED",)), ("evidence/m2-state.txt", ("BOOK STATE MET",))),
-         "M3": (("evidence/w-grade.txt", ("WRITE ADMITTED",)), ("evidence/r-after.txt", ("AFTER RECORDED",))),
+         "M3": (("evidence/w-grade.txt", ("WRITE ADMITTED",)), ("evidence/aim.txt", ("AIM SHOWN",)),
+                ("evidence/r-after.txt", ("AFTER RECORDED",))),
          "I3": (("evidence/m3-state.txt", ("BOOK STATE MET",)),)}
 SHOT_TYPES = (".png", ".jpg")  # a screenshot record is shots/<name> with one of these (the screen tool's format)
 LOG_LINE = re.compile(r"\S+ (?P<label>[A-Z][0-9]?) \S+ .* \| VERDICT (?P<verdict>SENT-OK|REQUEST-FAILED)\b.*")
@@ -290,7 +293,8 @@ def selftest(scratch):
             "exit 0\n", "precheck.txt": ""}
     graded = lambda word: {"evidence/w-grade.txt": f"W: 538 B\nWRITE {word}: synthetic\nexit 0\n", "shots/s3-write": ""}
     admitted = "WRITE ADMITTED: synthetic\nexit 0\n"
-    after = {"evidence/w-grade.txt": admitted, "evidence/r-after.txt": "AFTER RECORDED: synthetic\nexit 0\n"}
+    after = {"evidence/w-grade.txt": admitted, "evidence/aim.txt": "AIM SHOWN: synthetic\nexit 0\n",
+             "evidence/r-after.txt": "AFTER RECORDED: synthetic\nexit 0\n"}
     sent = [(name, "SENT-OK") for name, _ in ORDER]
     upto = lambda label: sent[: [n for n, _ in ORDER].index(label)]
     for what, label, entries, records, allowed in (
@@ -310,6 +314,7 @@ def selftest(scratch):
         ("M2 after W graded ADMITTED, the shot taken", "M2", upto("M2"), graded("ADMITTED"), True),
         ("M2 after W graded REFUSED", "M2", upto("M2"), graded("REFUSED"), True),
         ("M2 after W graded UNCLEAR (v3 C8's one state read)", "M2", upto("M2"), graded("UNCLEAR"), True),
+        ("M2 after W SENT-OK but not parsed (v3 C8's one state read)", "M2", upto("M2"), graded("NOT PARSED"), True),
         ("M2, the write's answer NOT READ", "M2", upto("M2"),
          {**graded("ADMITTED"), "evidence/w-grade.txt": "NOT READ: W: x\nexit 2\n"}, False),
         ("M2, no screenshot after the write", "M2", upto("M2"), {**graded("ADMITTED"), "shots/s3-write": None}, False),
@@ -320,7 +325,10 @@ def selftest(scratch):
         ("I2, M2 a STOP", "I2", upto("I2"),
          {"evidence/w-grade.txt": admitted, "evidence/m2-state.txt": "STOP-AIM-STATE: x\nexit 1\n"}, False),
         ("M3 after I2, the restore recorded", "M3", upto("M3"), after, True),
-        ("M3, no restore record", "M3", upto("M3"), {"evidence/w-grade.txt": admitted}, False),
+        ("M3, no restore record", "M3", upto("M3"), {k: v for k, v in after.items() if k != "evidence/r-after.txt"},
+         False),
+        ("M3, no aim record", "M3", upto("M3"), {k: v for k, v in after.items() if k != "evidence/aim.txt"}, False),
+        ("M3, the aim a STOP", "M3", upto("M3"), {**after, "evidence/aim.txt": "STOP-AIM-STATE: x\nexit 1\n"}, False),
         ("M3, the write unclear", "M3", upto("M3"), {**after, "evidence/w-grade.txt": "WRITE UNCLEAR: x\nexit 0\n"}, False),
         ("I3 after M3, its state met", "I3", upto("I3"), {"evidence/m3-state.txt": met}, True),
         ("I3 after M3, its state a STOP", "I3", upto("I3"), {"evidence/m3-state.txt": "STOP-RESTORED-STATE: x\nexit 1\n"},

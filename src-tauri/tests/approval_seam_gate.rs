@@ -3581,6 +3581,23 @@ const HELD_STRUCT: &str = r#"pub(super) struct HeldStockItem {
     prepared: Box<PreparedStockItem>,
 }"#;
 
+/// `literals_of` counts `HeldStockItem {`; it sees neither `Self {` nor a
+/// renamed type. So the held item's one impl is pinned whole, the coordinator
+/// writes no `Self {` at all, and no source renames the type.
+const HELD_IMPL: &str = r#"impl HeldStockItem {
+    /// The item held, for the comparison with the approved bytes.
+    pub(super) fn prepared(&self) -> &PreparedStockItem {
+        &self.prepared
+    }
+}"#;
+
+fn held_stock_item_aliases(others: &[(String, String)]) -> bool {
+    others.iter().any(|(_, text)| {
+        let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        flat.contains("= HeldStockItem") || flat.contains("HeldStockItem as ")
+    })
+}
+
 fn shown_stock_item_problems(
     review: &str,
     review_tests: &str,
@@ -3616,6 +3633,13 @@ fn shown_stock_item_problems(
         if literals != 1 || literals_of(maker, name) != 1 || literals_of(review_tests, name) != 0 {
             problems.push(format!("{name} is built only by its one maker"));
         }
+    }
+    if review.matches(HELD_IMPL).count() != 1
+        || review.contains("Self {")
+        || review.contains("Self{")
+        || held_stock_item_aliases(others)
+    {
+        problems.push("HeldStockItem's impl only reads it, and nothing renames it".into());
     }
     problems
 }
@@ -3806,7 +3830,28 @@ fn shown_asked_and_held_stock_items_have_private_fields_no_derive_one_impl_and_o
             "\n#[cfg(test)]\n#[path",
             "\nfn again(prepared: Box<PreparedStockItem>) -> HeldRequest {\n    HeldRequest::StockItem(HeldStockItem { prepared })\n}\n#[cfg(test)]\n#[path",
         ),
+        // A second maker inside the one impl, written as `Self {`.
+        in_review(
+            "        &self.prepared\n    }\n}",
+            "        &self.prepared\n    }\n\n    pub(super) fn make(prepared: Box<PreparedStockItem>) -> Self {\n        Self { prepared }\n    }\n}",
+        ),
+        // The same, written as `Self{`.
+        in_review(
+            "        &self.prepared\n    }\n}",
+            "        &self.prepared\n    }\n\n    pub(super) fn make(prepared: Box<PreparedStockItem>) -> Self {\n        Self{ prepared }\n    }\n}",
+        ),
+        // A renamed type, built under its other name.
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\ntype Held = HeldStockItem;\nfn again(prepared: Box<PreparedStockItem>) -> Held {\n    Held { prepared }\n}\n#[cfg(test)]\n#[path",
+        ),
     ];
+    let mut renamed = others.clone();
+    renamed.push((
+        "src/elsewhere.rs".into(),
+        "use super::master_review::{\n    HeldStockItem\n    as Held,\n};".into(),
+    ));
+    mutations.push((review.clone(), renamed));
     let mut elsewhere = others.clone();
     elsewhere.push((
         "src/elsewhere.rs".into(),

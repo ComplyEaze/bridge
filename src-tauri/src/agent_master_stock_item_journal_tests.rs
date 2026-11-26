@@ -109,7 +109,15 @@ fn intent_for<B: JournalBatch>(
     batch: &B,
     read: &StockItemCatalogue,
 ) -> MasterDispatchIntent {
-    let written = write_pre_image(directory, &lock(), batch, &pre_image_of(read)).unwrap();
+    intent_with(directory, batch, &pre_image_of(read))
+}
+
+fn intent_with<B: JournalBatch>(
+    directory: &Path,
+    batch: &B,
+    pre_image: &PreImage,
+) -> MasterDispatchIntent {
+    let written = write_pre_image(directory, &lock(), batch, pre_image).unwrap();
     MasterDispatchIntent::new(
         batch,
         batch.batch_sha256().to_owned(),
@@ -204,6 +212,19 @@ fn the_basis_refuses_each_loose_pairing() {
     let batch_only = line(&JournalRecord::Batch(batch.clone()));
     assert_eq!(refused(&batch_only, &own), BasisRefusal::NoIntent);
     let text = dispatched_text(dir, &batch);
+    let unknown = sentinel_batch_id(0x8a);
+    let no_batch = basis_of(dir, &text, &unknown, &own).unwrap_err();
+    assert_eq!(no_batch, BasisRefusal::NoBatch);
+    // Hand edit: another canonical company GUID stored, in the batch and in
+    // the intent's mark, so the journal still admits both.
+    let stored = format!("\"{COMPANY_GUID}\"");
+    assert_eq!(
+        text.matches(&stored).count(),
+        2,
+        "the edit starts in two places"
+    );
+    let edited = text.replace(&stored, "\"00000000-0000-4000-8000-000000000002\"");
+    assert_eq!(refused(&edited, &own), BasisRefusal::OtherCompanyGuid);
     // Hand edit: another company number stored.
     let edited = hand_edit(&text, "\"number\":\"1\"", "\"number\":\"2\"");
     assert_eq!(refused(&edited, &own), BasisRefusal::OtherCompanyNumber);
@@ -230,6 +251,22 @@ fn the_basis_refuses_each_loose_pairing() {
     // `rebuild` keeps as stored, so the line is admitted and the digest refuses.
     let edited = hand_edit(&text, "\"rate\":\"18\"", "\"rate\":\"18.0\"");
     assert_eq!(refused(&edited, &own), BasisRefusal::DigestMismatch);
+    // Hand edit: the intent's request digest made another digest.
+    let edited = hand_edit(
+        &text,
+        &format!("\"native_request_sha256\":\"{}\"", batch.batch_sha256),
+        &format!("\"native_request_sha256\":\"{}\"", "f".repeat(64)),
+    );
+    assert_eq!(refused(&edited, &own), BasisRefusal::RequestDigestMismatch);
+    // Hand edit: the intent's sidecar count raised by one.
+    let count = pre_image_of(&catalogue(BEFORE)).len();
+    let edited = hand_edit(
+        &text,
+        &format!("\"pre_image_count\":{count}"),
+        &format!("\"pre_image_count\":{}", count + 1),
+    );
+    let mismatch = BasisRefusal::PreImage(PreImageError::CountMismatch);
+    assert_eq!(refused(&edited, &own), mismatch);
     // A sidecar whose bytes are not the ones the intent's digest was taken from.
     let other = serde_json::to_vec(&pre_image_of(&catalogue(MARKED))).unwrap();
     std::fs::write(dir.join(format!("master-pre-image-{id}.json")), other).unwrap();
@@ -237,6 +274,32 @@ fn the_basis_refuses_each_loose_pairing() {
         refused(&text, &own),
         BasisRefusal::PreImage(PreImageError::ShaMismatch)
     );
+    // The sidecar deleted.
+    std::fs::remove_file(dir.join(format!("master-pre-image-{id}.json"))).unwrap();
+    let missing = BasisRefusal::PreImage(PreImageError::Missing);
+    assert_eq!(refused(&text, &own), missing);
+}
+
+#[test]
+fn a_sidecar_of_another_company_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let dir = directory.path();
+    let batch = stock_batch(0x8b);
+    // Hand edit: one GUID of the BEFORE map given another company's part, the
+    // sidecar written so its digest and count are those of the intent.
+    let mut entries = pre_image_of(&catalogue(BEFORE)).entries().clone();
+    let (guid, alter_id) = entries.pop_first().unwrap();
+    let master = guid.strip_prefix(COMPANY_GUID).unwrap();
+    entries.insert(
+        format!("00000000-0000-4000-8000-000000000002{master}"),
+        alter_id,
+    );
+    let pre_image = PreImage::new(entries).unwrap();
+    let intent =
+        JournalRecord::<StockItemBatch>::DispatchIntent(intent_with(dir, &batch, &pre_image));
+    let text = line(&JournalRecord::Batch(batch.clone())) + &line(&intent);
+    let refused = basis_of(dir, &text, &batch.batch_id, &identity(COMPANY)).unwrap_err();
+    assert_eq!(refused, BasisRefusal::BeforeOfOtherCompany);
 }
 
 /// A data folder holding `batch` and its intent, its sidecar taken from `read`.

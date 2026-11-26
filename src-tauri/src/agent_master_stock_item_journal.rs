@@ -192,7 +192,19 @@ pub(super) enum BasisRefusal {
     /// The stored writes, rendered for the company as verified now, do not
     /// give the batch's digest.
     DigestMismatch,
+    /// The intent records another request digest than the batch's.
+    RequestDigestMismatch,
     PreImage(PreImageError),
+    /// A sidecar GUID that is not one of the batch's company.
+    BeforeOfOtherCompany,
+}
+
+/// Whether `guid` is a master GUID of the company `company_guid`: the company's
+/// GUID, a hyphen, then the master's own part. Both are lower-case canonical
+/// here, the sidecar's by `PreImage::new` and the batch's by its admission.
+fn of_company(guid: &str, company_guid: &str) -> bool {
+    guid.strip_prefix(company_guid)
+        .is_some_and(|rest| rest.starts_with('-'))
 }
 
 /// The company, the writes and the before GUIDs of one stock-item read-back,
@@ -239,6 +251,9 @@ impl StockItemReadBackBasis {
         if digest != state.batch.batch_sha256 {
             return Err(BasisRefusal::DigestMismatch);
         }
+        if intent.native_request_sha256() != state.batch.batch_sha256 {
+            return Err(BasisRefusal::RequestDigestMismatch);
+        }
         let pre_image = read_pre_image(
             data_dir,
             batch_id,
@@ -246,6 +261,12 @@ impl StockItemReadBackBasis {
             intent.pre_image_count(),
         )
         .map_err(BasisRefusal::PreImage)?;
+        // A sidecar built from another company's read would leave this
+        // company's item of the same name out of the before set, so a row that
+        // is not new could read as new.
+        if !(pre_image.entries().keys()).all(|guid| of_company(guid, &company.guid)) {
+            return Err(BasisRefusal::BeforeOfOtherCompany);
+        }
         Ok(Self {
             company: identity.clone(),
             writes,

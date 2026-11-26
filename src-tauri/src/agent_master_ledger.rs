@@ -301,9 +301,11 @@ pub(super) struct MasterDispatchIntent {
 
 impl MasterDispatchIntent {
     /// The intent of `batch`, bound to the sidecar `pre_image` was written for.
-    /// Its items are the batch's names, in order.
-    pub(super) fn new<B: JournalBatch>(
-        batch: &B,
+    /// Its items are the batch's names, in order. Ledger batches only: an intent
+    /// is appended to the ledger journal ([`append_intent`]), so another kind's
+    /// intent waits for that kind's own intent and sidecar.
+    pub(super) fn new(
+        batch: &MasterBatch,
         native_request_sha256: String,
         pre_image: WrittenPreImage,
         pre_post_master_marks: Vec<MasterMark>,
@@ -1519,10 +1521,10 @@ impl WrittenPreImage {
 /// A sidecar the reader would refuse for its size is never written. One already
 /// there with the same bytes is the same write repeated; with other bytes it is
 /// left alone and refused.
-pub(super) fn write_pre_image<B: JournalBatch>(
+pub(super) fn write_pre_image(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
-    batch: &B,
+    batch: &MasterBatch,
     pre_image: &PreImage,
 ) -> Result<WrittenPreImage, PreImageError> {
     write_pre_image_syncing(data_dir, lock, batch, pre_image, sync_directory)
@@ -1532,10 +1534,10 @@ pub(super) fn write_pre_image<B: JournalBatch>(
 /// fails when the sync after a new placement fails, but a sidecar already there
 /// may be an earlier attempt's whose sync failed, so the directory is synced
 /// here as well, whether the sidecar was just placed or was there already.
-fn write_pre_image_syncing<B: JournalBatch>(
+fn write_pre_image_syncing(
     data_dir: &Path,
     _lock: &ExclusiveAdmission,
-    batch: &B,
+    batch: &MasterBatch,
     pre_image: &PreImage,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<WrittenPreImage, PreImageError> {

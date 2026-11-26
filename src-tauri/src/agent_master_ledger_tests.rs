@@ -2354,3 +2354,36 @@ fn a_second_batch_kind_has_its_own_file_and_neither_journal_reads_the_other() {
         invalid(Invalid::Parse)
     );
 }
+
+#[test]
+fn a_corrupt_journal_of_one_kind_does_not_stop_the_other() {
+    let directory = tempfile::tempdir().unwrap();
+    let lock = lock();
+    let probe = ProbeBatch {
+        batch_id: sentinel_batch_id(0x73),
+        batch_sha256: digest('f'),
+        company_guid: COMPANY_GUID.into(),
+        names: vec!["Synthetic Item".into()],
+    };
+    std::fs::write(directory.path().join(JOURNAL_FILE), "garbage\n").unwrap();
+    assert_eq!(
+        read_journal(directory.path()).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+    append(directory.path(), &lock, JournalRecord::Batch(probe.clone())).unwrap();
+    let probe_journal = read_kind_journal::<ProbeBatch>(directory.path()).unwrap();
+    assert_eq!(probe_journal.state(&probe.batch_id).unwrap().batch, probe);
+
+    let other = tempfile::tempdir().unwrap();
+    std::fs::write(other.path().join("agent-master-probe.jsonl"), "garbage\n").unwrap();
+    assert_eq!(
+        read_kind_journal::<ProbeBatch>(other.path()).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+    let ledger = batch(&sentinel_batch_id(0x74));
+    put(other.path(), &lock, MasterRecord::Batch(ledger.clone())).unwrap();
+    assert!(read_journal(other.path())
+        .unwrap()
+        .state(&ledger.batch_id)
+        .is_some());
+}

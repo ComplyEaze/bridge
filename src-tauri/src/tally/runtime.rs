@@ -3555,7 +3555,7 @@ impl TallyRuntime {
                         // request names it, and the identity brackets check this one.
                         // A mismatch is a wiring fault, refused before any request.
                         if let super::approved_import::ApprovedKind::Masters(masters) = &request.kind {
-                            if masters.company() != &identity {
+                            if masters.ledgers()?.company() != &identity {
                                 return Err(anyhow::Error::from(
                                     super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent,
                                 ));
@@ -3690,7 +3690,7 @@ impl TallyRuntime {
                                 let (ledgers_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledger_index_request(),
+                                    masters.ledgers()?.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3698,7 +3698,7 @@ impl TallyRuntime {
                                 let (ledgers_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledger_index_request(),
+                                    masters.ledgers()?.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3706,7 +3706,7 @@ impl TallyRuntime {
                                 let (groups_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.group_index_request(),
+                                    masters.ledgers()?.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3714,7 +3714,7 @@ impl TallyRuntime {
                                 let (groups_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.group_index_request(),
+                                    masters.ledgers()?.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3838,8 +3838,8 @@ impl TallyRuntime {
                                 },
                                 None,
                             ) => super::approved_import::QueuedAdmission::Masters {
-                                batch: masters.batch(),
-                                company: masters.company(),
+                                batch: masters.ledgers()?.batch(),
+                                company: masters.ledgers()?.company(),
                                 ledgers_first,
                                 ledgers_second,
                                 groups_first,

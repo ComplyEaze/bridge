@@ -7,7 +7,7 @@ use crate::tally::ledger_create_item::{
 };
 use crate::tally::master_name::MasterName;
 use crate::tally::stock_item_create::{
-    render_stock_item_create, CreateRenderRefusal, DraftText, GoodsSibling, ShownDraft, SiblingGst,
+    render_stock_item_create, CreateRenderRefusal, DraftText, GoodsSibling, SiblingGst,
     StockItemCatalogue, StockItemDraft,
 };
 use crate::tally::stock_item_verified::{ReadBackVerdict, StockItemImportOutcome};
@@ -358,6 +358,10 @@ const STOCK_UNITS: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml"
 );
 
+const STOCK_MARKED_REQUEST: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-marked-create.request.utf16le.xml"
+);
+
 const STOCK_ITEM_PREVIEW: &str = concat!(
     "Create ONE stock item in \"BRIDGE STOCK CREATE LAB\"\n",
     "Company GUID: bac2b5e9-ada9-43c0-b8f8-a2812a813fa1\n",
@@ -644,8 +648,9 @@ fn the_preview_shows_what_the_create_renderer_sends_for_the_same_draft() {
         let catalogue = stock_catalogue(STOCK_COMPANY, &xml);
         let draft = stock_draft(&catalogue, new_name, source_name);
         let preview = stock_item_review_text(&draft, ORIGIN).expect("the draft has a review");
-        let request =
-            render_stock_item_create(&ShownDraft::from_draft(draft)).expect("the draft renders");
+        let request = render_stock_item_create(
+            &PreparedStockItem::from_draft(draft).expect("the draft renders"),
+        );
         // The captured company name needs no XML escape, so the envelope holds
         // it as shown.
         assert_eq!(
@@ -764,14 +769,14 @@ fn stock_item_review_refusals_use_addendum_codes() {
 
 /// The read-back verdict of `shown`'s writes, with the company and GUIDs of
 /// the catalogue its sibling was found in.
-fn shown_read_back(shown: &ShownDraft<'_>, fresh: &StockItemCatalogue) -> ReadBackVerdict {
-    let before = shown.draft().sibling().sibling().catalogue();
+fn shown_read_back(shown: &StockItemDraft<'_>, fresh: &StockItemCatalogue) -> ReadBackVerdict {
+    let before = shown.sibling().sibling().catalogue();
     let guids = before
         .items()
         .iter()
         .map(|item| item.guid.clone())
         .collect();
-    ReadBackVerdict::of(before.company(), shown.draft().writes(), &guids, fresh)
+    ReadBackVerdict::of(before.company(), shown.writes(), &guids, fresh)
 }
 
 #[test]
@@ -782,8 +787,7 @@ fn successful_outcome_and_equal_readback_have_no_refusal_code() {
     assert!(matches!(outcome, StockItemImportOutcome::CountersClean(_)));
 
     let before = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_BEFORE));
-    let shown =
-        ShownDraft::from_draft(stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"));
+    let shown = stock_draft(&before, "SC Copied Marked", "SC Sibling Goods");
     let after = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_AFTER_MARKED));
     let verdict = shown_read_back(&shown, &after);
     assert!(matches!(verdict, ReadBackVerdict::Equal(_)));
@@ -793,7 +797,7 @@ fn successful_outcome_and_equal_readback_have_no_refusal_code() {
 }
 
 #[tokio::test]
-async fn a_confirmed_stock_item_draft_holds_the_preview_it_was_shown() {
+async fn a_confirmed_stock_item_draft_is_approved_for_the_create_it_was_shown() {
     use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 
     let before = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_BEFORE));
@@ -804,35 +808,37 @@ async fn a_confirmed_stock_item_draft_holds_the_preview_it_was_shown() {
             confirm_stock_item_draft(
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 ORIGIN,
+                stock_marks(),
             )
             .await
         })
         .await
         .expect("the scripted dialog approves");
-    assert_eq!(shown.shown_text(), STOCK_ITEM_PREVIEW);
     assert_eq!(recording.stock_items(), [STOCK_ITEM_PREVIEW]);
     assert!(recording.previews().is_empty());
     assert!(recording.reviews().is_empty());
     assert!(recording.masters().is_empty());
 
-    let rendered = render_stock_item_create(&shown).expect("the confirmed draft renders");
-    let expected = render_stock_item_create(&ShownDraft::from_draft(stock_draft(
-        &before,
-        "SC Copied Marked",
-        "SC Sibling Goods",
-    )))
-    .expect("the same draft renders");
-    assert_eq!(rendered, expected);
+    // The one prepared value the dialog was shown is the one sent: the preview
+    // above, and the captured marked-create request here.
+    let marked = bridge_tally_protocol::decode_xml_bytes(STOCK_MARKED_REQUEST)
+        .expect("the captured request decodes");
+    assert!(shown.sends_exactly(&marked));
+    assert_eq!(
+        shown.post_kind(),
+        crate::tally::approved_import::PostKind::Masters
+    );
+}
 
-    let after = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_AFTER_MARKED));
-    assert!(matches!(
-        shown_read_back(&shown, &after),
-        ReadBackVerdict::Equal(_)
-    ));
+fn stock_marks() -> AgentReadRequest {
+    AgentReadRequest::parse(
+        crate::agent::read_profiles::render_agent_company_high_water(STOCK_COMPANY),
+    )
+    .expect("the marks request is admitted")
 }
 
 #[tokio::test]
-async fn a_declined_or_unscoped_stock_item_dialog_makes_no_shown_draft() {
+async fn a_declined_or_unscoped_stock_item_dialog_makes_no_approval() {
     use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 
     let before = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_BEFORE));
@@ -843,6 +849,7 @@ async fn a_declined_or_unscoped_stock_item_dialog_makes_no_shown_draft() {
             confirm_stock_item_draft(
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 ORIGIN,
+                stock_marks(),
             )
             .await
         })
@@ -859,6 +866,7 @@ async fn a_declined_or_unscoped_stock_item_dialog_makes_no_shown_draft() {
     let unscoped = confirm_stock_item_draft(
         stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
         ORIGIN,
+        stock_marks(),
     )
     .await
     .err();
@@ -882,6 +890,7 @@ async fn a_refused_stock_item_preview_asks_no_one() {
             confirm_stock_item_draft(
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 "http://127.0.0.1:9000\nTally: other",
+                stock_marks(),
             )
             .await
         })

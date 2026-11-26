@@ -977,6 +977,54 @@ async fn a_master_post_whose_book_turns_to_education_is_refused_at_the_closing_o
     assert_eq!(simulator.finish().unwrap().len(), 31);
 }
 
+/// A stock-item Create is not sent yet: the runtime refuses it with the typed
+/// refusal before any request, so nothing is read, rechecked, recorded or sent.
+#[tokio::test]
+async fn a_stock_item_create_is_refused_before_any_request() {
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+    let prepared = crate::tally::stock_item_create::tests::captured_prepared("SC Copied Marked");
+    // The approval's own company, so a company mismatch cannot be the refusal.
+    let identity = prepared.company().clone();
+    let marks = marks_request(identity.display_name());
+    let approved = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            ApprovedImport::confirm_stock_item(prepared, "Create stock".into(), marks),
+        )
+        .await
+        .expect("the scripted dialog approves");
+    let simulator = SequenceSimulator::spawn(vec![status_plan()]).unwrap();
+    let rechecked = Arc::new(AtomicBool::new(false));
+    let dispatched = Arc::new(AtomicBool::new(false));
+    let (recheck_flag, dispatch_flag) = (rechecked.clone(), dispatched.clone());
+    let error = TallyRuntime::default()
+        .post_approved_import(
+            TallyConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            &identity,
+            approved,
+            move |_: QueuedAdmission<'_>| {
+                recheck_flag.store(true, Ordering::Release);
+                Ok(())
+            },
+            move || {
+                dispatch_flag.store(true, Ordering::Release);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("a stock-item Create is not sent yet");
+    assert!(error.chain().any(|cause| matches!(
+        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+    )));
+    assert!(!rechecked.load(Ordering::Acquire));
+    assert!(!dispatched.load(Ordering::Acquire));
+    assert_eq!(simulator.received(), 0);
+}
+
 fn master_batch() -> &'static str {
     crate::synthetic_batch_id(0xa1)
 }

@@ -270,6 +270,7 @@ failure_codes! {
         NoItems = "stock_item_no_items",
         NoNameEntry = "stock_item_name_entry_missing",
         NameIndexInvalid = "stock_item_name_index_invalid",
+        GuidNotLowercase = "stock_item_guid_not_lowercase",
         NameUnchecked = "stock_item_name_unchecked",
         NameTaken = "master_name_taken",
         SiblingNotFound = "stock_item_sibling_not_found",
@@ -310,6 +311,7 @@ pub(crate) fn stock_item_catalogue_refusal_code(
         StockItemCatalogueError::NoItems => StockItemCreateCode::NoItems,
         StockItemCatalogueError::NoNameEntry { .. } => StockItemCreateCode::NoNameEntry,
         StockItemCatalogueError::Index(_) => StockItemCreateCode::NameIndexInvalid,
+        StockItemCatalogueError::GuidNotLowercase { .. } => StockItemCreateCode::GuidNotLowercase,
     }
 }
 

@@ -937,13 +937,14 @@ fn run_stock_recheck(case: StockRecheckCase) -> anyhow::Result<()> {
         &case.shown_candidate,
     )
     .expect("the shown candidate catalogues");
-    let shown = ShownDraft::from_draft(stock_test_draft(
+    let shown = PreparedStockItem::from_draft(stock_test_draft(
         &shown_catalogue,
         &case.proposed,
         &case.source,
         &case.groups,
         &case.units,
-    ));
+    ))
+    .expect("the shown draft renders");
     let fresh_catalogue = crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
         &case.fresh_identity,
         &case.fresh_candidate,
@@ -966,7 +967,7 @@ fn run_stock_recheck(case: StockRecheckCase) -> anyhow::Result<()> {
     )
     .expect("the captured units parse for the fresh identity");
     recheck_stock_item_admission(StockItemRecheckInput {
-        shown: &shown,
+        prepared: &shown,
         candidate: &candidate,
         groups: &groups,
         units: &units,
@@ -1717,13 +1718,14 @@ mod coordinator {
         let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
         let catalogue = StockItemCatalogue::from_candidate_read(&identity, &r1(STOCK_BEFORE))
             .expect("the rebound R1 read catalogues");
-        let shown = ShownDraft::from_draft(stock_test_draft(
+        let shown = PreparedStockItem::from_draft(stock_test_draft(
             &catalogue,
             STOCK_PROPOSED,
             STOCK_SOURCE,
             &r1(STOCK_GROUPS),
             &r1(STOCK_UNITS),
-        ));
+        ))
+        .expect("the rebound draft renders");
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let config = TallyConfig {
             host: simulator.address().ip().to_string(),

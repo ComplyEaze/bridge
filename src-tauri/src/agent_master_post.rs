@@ -31,7 +31,7 @@ use crate::tally::runtime::{
 };
 use crate::tally::stock_item_create::{
     CompleteStockItemCatalogue, DraftRefusal, GoodsSibling, ItemNameNotAbsent, NotGoodsSibling,
-    ShownDraft, SiblingGst, SiblingRefusal, StockItemCatalogueError, StockItemDraft,
+    PreparedStockItem, SiblingGst, SiblingRefusal, StockItemCatalogueError, StockItemDraft,
 };
 use crate::tally::{TallyConfig, VerifiedCompanyIdentity};
 use bridge_tally_core::master_name_index::{
@@ -44,9 +44,9 @@ use bridge_tally_protocol::{parse_ledger_name_index, StandardLedgerCatalogError}
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-/// The fresh stock reads and marks for one already approved stock draft.
-struct StockItemRecheckInput<'a, 'draft> {
-    shown: &'a ShownDraft<'draft>,
+/// The fresh stock reads and marks for one approved stock-item Create.
+struct StockItemRecheckInput<'a> {
+    prepared: &'a PreparedStockItem,
     candidate: &'a CompleteStockItemCatalogue,
     groups: &'a AdmittedStockGroups,
     units: &'a AdmittedStockUnits,
@@ -79,7 +79,7 @@ pub(crate) enum StockItemRecheckError {
     },
 }
 
-/// Reads the stock reads for `shown` in one queued execution
+/// Reads the stock reads for `prepared` in one queued execution
 /// ([`TallyRuntime::read_and_recheck_stock_item`]) and rechecks it on them
 /// ([`recheck_stock_item_admission`]). This module supplies only the parse of
 /// the marks answer; the runtime chooses the target's own binding mark among
@@ -89,9 +89,9 @@ pub(crate) enum StockItemRecheckError {
 pub(crate) async fn recheck_shown_stock_item(
     runtime: &TallyRuntime,
     config: TallyConfig,
-    shown: &ShownDraft<'_>,
+    prepared: &PreparedStockItem,
 ) -> anyhow::Result<()> {
-    let company = shown.draft().sibling().sibling().catalogue().company();
+    let company = prepared.company();
     let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
         crate::agent::read_profiles::render_agent_company_high_water(company.display_name()),
     )?;
@@ -105,7 +105,7 @@ pub(crate) async fn recheck_shown_stock_item(
         let candidate = CompleteStockItemCatalogue::from_admitted(candidate)
             .map_err(StockItemRecheckError::Catalogue)?;
         recheck_stock_item_admission(StockItemRecheckInput {
-            shown,
+            prepared,
             candidate: &candidate,
             groups: &groups,
             units: &units,
@@ -129,14 +129,14 @@ fn master_marks(rows: &[LoadedCompanyMarks]) -> Vec<CompanyMasterMark> {
         .collect()
 }
 
-/// Applies the ledger path's unchanged aim check, then rebuilds the shown stock
-/// draft from fresh admitted stock reads sized at the target's own binding
+/// Applies the ledger path's unchanged aim check, then rebuilds the approved
+/// stock draft from fresh admitted stock reads sized at the target's own binding
 /// mark. Step 1 compares the full
 /// `VerifiedCompanyIdentity` values the reads carry, which the coordinator
 /// attached; the parsers bind rows by GUID only.
-fn recheck_stock_item_admission(input: StockItemRecheckInput<'_, '_>) -> anyhow::Result<()> {
-    let shown = input.shown.draft();
-    let company = shown.sibling().sibling().catalogue().company();
+fn recheck_stock_item_admission(input: StockItemRecheckInput<'_>) -> anyhow::Result<()> {
+    let writes = input.prepared.writes();
+    let company = input.prepared.company();
     if input.candidate.catalogue().company() != company
         || input.groups.company() != company
         || input.units.company() != company
@@ -171,17 +171,14 @@ fn recheck_stock_item_admission(input: StockItemRecheckInput<'_, '_>) -> anyhow:
 
     let name = input
         .candidate
-        .name_absent(shown.name())
+        .name_absent(writes.name())
         .map_err(StockItemRecheckError::NameNotAbsent)?;
-    let sibling = SiblingGst::named(
-        input.candidate.catalogue(),
-        shown.sibling().sibling().source_name(),
-    )
-    .map_err(StockItemRecheckError::Sibling)?;
+    let sibling = SiblingGst::named(input.candidate.catalogue(), writes.sibling_source_name())
+        .map_err(StockItemRecheckError::Sibling)?;
     let sibling = GoodsSibling::from_sibling(sibling).map_err(StockItemRecheckError::NotGoods)?;
     let fresh = StockItemDraft::new_admitted(name, sibling, input.groups, input.units)
         .map_err(StockItemRecheckError::Draft)?;
-    if fresh.writes() != shown.writes() {
+    if fresh.writes() != writes {
         return Err(StockItemRecheckError::DraftChanged.into());
     }
     Ok(())

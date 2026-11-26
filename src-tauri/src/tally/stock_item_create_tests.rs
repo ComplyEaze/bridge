@@ -219,6 +219,24 @@ fn the_row_name_is_indexed_when_no_language_name_holds_it() {
 }
 
 #[test]
+fn a_row_whose_guid_is_not_lowercase_gives_no_catalogue() {
+    // A hand edit of the capture, not a captured state: one hex letter of the
+    // sibling's GUID in upper case. Whether Tally sends one is unmeasured.
+    let upper = edited(
+        &decode(BEFORE),
+        &format!(">{SIBLING_GUID}<"),
+        &format!(">{}<", SIBLING_GUID.replace("000000d0", "000000D0")),
+    );
+    assert_eq!(
+        StockItemCatalogue::from_candidate_read(&company(), &upper).unwrap_err(),
+        StockItemCatalogueError::GuidNotLowercase { item: 0 }
+    );
+    for capture in [BEFORE, PLAIN, MARKED, ALIAS] {
+        catalogue(&decode(capture));
+    }
+}
+
+#[test]
 fn a_read_that_cannot_show_every_name_gives_no_catalogue() {
     assert_eq!(
         StockItemCatalogue::from_candidate_read(
@@ -1557,9 +1575,10 @@ fn an_hsn_entry_other_than_the_measured_shape_is_refused() {
     }
 }
 
-fn render_captured_create(proposed_name: &str) -> String {
+/// The Create made from the captured draft named `proposed_name`.
+pub(crate) fn captured_prepared(proposed_name: &str) -> PreparedStockItem {
     let before = catalogue(&decode(BEFORE));
-    let shown = ShownDraft::from_draft(
+    PreparedStockItem::from_draft(
         draft(
             &before,
             proposed_name,
@@ -1568,14 +1587,17 @@ fn render_captured_create(proposed_name: &str) -> String {
             &decode(UNITS),
         )
         .expect("the captured values draft"),
-    );
-    render_stock_item_create(&shown).expect("the captured values render")
+    )
+    .expect("the captured values render")
+}
+
+fn render_captured_create(proposed_name: &str) -> String {
+    render_stock_item_create(&captured_prepared(proposed_name))
 }
 
 fn assert_create_text_refusal(built: Result<StockItemDraft<'_>, DraftRefusal>, field: DraftText) {
-    let shown = ShownDraft::from_draft(built.expect("the edited value still drafts"));
     assert_eq!(
-        render_stock_item_create(&shown),
+        PreparedStockItem::from_draft(built.expect("the edited value still drafts")),
         Err(CreateRenderRefusal::TextNeedsEscaping { field })
     );
 }
@@ -1793,7 +1815,7 @@ fn two_values_that_need_escaping_name_the_first_field() {
 }
 
 #[test]
-fn a_shown_draft_holds_the_draft_it_was_made_from() {
+fn a_prepared_stock_item_holds_the_writes_and_company_of_its_draft() {
     let before = catalogue(&decode(BEFORE));
     let built = draft(
         &before,
@@ -1803,10 +1825,10 @@ fn a_shown_draft_holds_the_draft_it_was_made_from() {
         &decode(UNITS),
     )
     .expect("the captured values draft");
-    let expected_name = built.name().clone();
-    let shown = ShownDraft::from_draft(built);
-    assert_eq!(shown.draft().name(), &expected_name);
-    assert!(render_stock_item_create(&shown).is_ok());
+    let expected = built.writes().clone();
+    let prepared = PreparedStockItem::from_draft(built).expect("the captured values render");
+    assert_eq!(prepared.writes(), &expected);
+    assert_eq!(prepared.company(), &company());
 }
 
 fn edit_create_text(
@@ -1894,8 +1916,7 @@ fn assert_create_render_refusal(
         units,
     )
     .expect("the edited value still drafts");
-    let shown = ShownDraft::from_draft(built);
-    assert_eq!(render_stock_item_create(&shown), Err(expected));
+    assert_eq!(PreparedStockItem::from_draft(built), Err(expected));
 }
 
 fn assert_create_text_not_plain(field: DraftText, value: &str) {
@@ -1915,9 +1936,8 @@ fn assert_create_text_not_plain(field: DraftText, value: &str) {
         &units,
     )
     .unwrap_or_else(|error| panic!("{field:?} value {value:?} did not draft: {error:?}"));
-    let shown = ShownDraft::from_draft(built);
     assert_eq!(
-        render_stock_item_create(&shown),
+        PreparedStockItem::from_draft(built),
         Err(CreateRenderRefusal::TextNotPlain { field })
     );
 }

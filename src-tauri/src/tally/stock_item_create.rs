@@ -44,13 +44,13 @@
 //! HSN code's and description's values, the ineligible-ITC flag, the numbers of
 //! dated entries and state rows, and a parent at the root are not examined.
 //! `StockItemDraft` admits the structure of the first marked Create measured (one run,
-//! PARTIAL, §12a.13), with values read from the sibling, and
-//! `render_stock_item_create` renders it. The name is a `MasterName`; the parent
+//! PARTIAL, §12a.13), with values read from the sibling, and the
+//! `PreparedStockItem` made from it renders it. The name is a `MasterName`; the parent
 //! and unit equal a row name in the same company's group or unit read; the dates
 //! were parsed by the protocol crate. Each rate is a plain non-zero decimal on
 //! the three rows that carry one and absent on the two that do not; the HSN
 //! code and description do not hold the root marker. The draft does not hold
-//! text to plain text: the renderer does, refusing a parent, unit, HSN code or
+//! text to plain text: `PreparedStockItem` does, refusing a parent, unit, HSN code or
 //! HSN description that fails the `MasterName` rule or holds one of
 //! `& < > " '`. The rate's magnitude and the unit's value are not checked.
 //! Bridge does not know how Tally treats values other than the measured ones.
@@ -58,7 +58,6 @@
 // Nothing outside the tests calls this until the stock-item tools exist.
 #![cfg_attr(not(test), allow(dead_code))]
 
-use super::approved_import::StockItemConfirmation;
 use super::master_name::{MasterName, MasterNameError};
 use super::runtime::{AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits};
 use super::VerifiedCompanyIdentity;
@@ -422,7 +421,10 @@ impl StockItemWrites {
         &self,
         company: &VerifiedCompanyIdentity,
     ) -> Result<String, CreateRenderRefusal> {
-        render_writes(company.display_name(), self).map(|xml| sha256_hex(xml.as_bytes()))
+        create_text_refusal(self)?;
+        Ok(sha256_hex(
+            render_writes(company.display_name(), self).as_bytes(),
+        ))
     }
 }
 
@@ -489,6 +491,9 @@ pub(crate) enum StockItemCatalogueError {
     NoNameEntry { item: usize },
     /// The name index refused the rows.
     Index(MasterNameIndexError),
+    /// The item at this position has a GUID that is not lowercase hex digits
+    /// and hyphens, the form the master journal records; it is not lowercased.
+    GuidNotLowercase { item: usize },
 }
 
 /// Why a proposed name is not shown absent.
@@ -522,6 +527,9 @@ impl StockItemCatalogue {
         }
         let mut masters = Vec::with_capacity(items.len());
         for (item, row) in items.iter().enumerate() {
+            if !is_lowercase_hex_and_hyphens(&row.guid) {
+                return Err(StockItemCatalogueError::GuidNotLowercase { item });
+            }
             if row.names.is_empty() {
                 return Err(StockItemCatalogueError::NoNameEntry { item });
             }
@@ -688,6 +696,17 @@ pub(crate) struct SiblingGst<'a> {
     supply: &'a str,
     gst: &'a [GstDetailsEntry],
     hsn: &'a [HsnDetailsEntry],
+}
+
+/// Whether `guid` is non-empty and holds only lowercase hex digits and hyphens,
+/// as the captured reads hold a GUID and the master journal's pre-image records
+/// one, so a read-back compares like with like. Its characters only: a stock
+/// GUID is the company GUID, `-` and a hex suffix, and no layout is checked.
+fn is_lowercase_hex_and_hyphens(guid: &str) -> bool {
+    !guid.is_empty()
+        && guid
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f' | b'-'))
 }
 
 fn non_blank(text: &Option<String>) -> bool {
@@ -1167,41 +1186,46 @@ fn all_measured_rows(rates: Vec<DraftRate>) -> Result<Vec<DraftRate>, DraftRefus
     Ok(rates)
 }
 
-/// A draft the stock-item approval window showed and the person approved, with
-/// the preview that window showed under its answer lines. Outside this crate's
-/// tests the only way to make one is `from_confirmed`, which takes the
-/// confirmation that only `approved_import::confirm_stock_item` makes, after its
-/// dialog approved.
-#[derive(Debug)]
-pub(crate) struct ShownDraft<'a> {
-    draft: StockItemDraft<'a>,
-    shown: String,
-}
+pub(crate) use prepared::PreparedStockItem;
 
-impl<'a> ShownDraft<'a> {
-    pub(super) fn from_confirmed(confirmation: StockItemConfirmation<'a>) -> Self {
-        let (draft, shown) = confirmation.into_parts();
-        Self { draft, shown }
+/// A private module so that the only code able to build a `PreparedStockItem` is
+/// `from_draft`, which takes the draft by value: no constructor or conversion
+/// takes bare writes, so writes rebuilt from storage never reach a Create.
+mod prepared {
+    use super::{
+        create_text_refusal, CreateRenderRefusal, StockItemDraft, StockItemWrites,
+        VerifiedCompanyIdentity,
+    };
+
+    /// A stock-item Create made from a draft, owned: the verified company its
+    /// catalogue was read for and every value it writes, held to the renderer's
+    /// text rule. It proves no approval; the approval is the `ApprovedImport`
+    /// that holds it.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct PreparedStockItem {
+        company: VerifiedCompanyIdentity,
+        writes: StockItemWrites,
     }
 
-    /// A draft marked as shown without any window, for tests that render or
-    /// verify it. It holds no shown text.
-    #[cfg(test)]
-    pub(crate) fn from_draft(draft: StockItemDraft<'a>) -> Self {
-        Self {
-            draft,
-            shown: String::new(),
+    impl PreparedStockItem {
+        /// Takes the draft's writes and its catalogue's company, refusing what
+        /// `create_text_refusal` refuses.
+        pub(crate) fn from_draft(draft: StockItemDraft<'_>) -> Result<Self, CreateRenderRefusal> {
+            create_text_refusal(&draft.writes)?;
+            let company = draft.sibling.sibling().catalogue().company().clone();
+            Ok(Self {
+                company,
+                writes: draft.writes,
+            })
         }
-    }
 
-    pub(crate) fn draft(&self) -> &StockItemDraft<'a> {
-        &self.draft
-    }
+        pub(crate) fn company(&self) -> &VerifiedCompanyIdentity {
+            &self.company
+        }
 
-    /// The preview the approving window showed under its answer lines; empty
-    /// for a draft a test made.
-    pub(crate) fn shown_text(&self) -> &str {
-        &self.shown
+        pub(crate) fn writes(&self) -> &StockItemWrites {
+            &self.writes
+        }
     }
 }
 
@@ -1258,24 +1282,19 @@ pub(crate) fn create_text_refusal(writes: &StockItemWrites) -> Result<(), Create
     Ok(())
 }
 
-/// The one renderer of a stock item Create: it takes only a `ShownDraft`, sends
-/// nothing, and renders the structure of the first marked Create measured (one run,
-/// PARTIAL, §12a.13), with values read from the sibling. It first applies
-/// `create_text_refusal` and returns its refusal. The rate's magnitude is not
+/// The one renderer of a stock item Create: it takes only a `PreparedStockItem`,
+/// whose one maker has applied `create_text_refusal`, sends nothing, and renders
+/// the structure of the first marked Create measured (one run, PARTIAL,
+/// §12a.13), with values read from the sibling. The rate's magnitude is not
 /// checked, and Bridge does not know how Tally treats values other than the
 /// measured ones.
-pub(crate) fn render_stock_item_create(
-    shown: &ShownDraft<'_>,
-) -> Result<String, CreateRenderRefusal> {
-    let draft = shown.draft();
-    let company = draft.sibling().sibling().catalogue().company();
-    render_writes(company.display_name(), draft.writes())
+pub(crate) fn render_stock_item_create(prepared: &PreparedStockItem) -> String {
+    render_writes(prepared.company().display_name(), prepared.writes())
 }
 
-/// The body of the one renderer, over the company's name and the writes.
-fn render_writes(company: &str, writes: &StockItemWrites) -> Result<String, CreateRenderRefusal> {
-    create_text_refusal(writes)?;
-
+/// The body of the one renderer, over the company's name and writes the text
+/// rule admitted; `create_sha256` takes only its digest.
+fn render_writes(company: &str, writes: &StockItemWrites) -> String {
     let name = writes.name().as_str();
     let parent = writes.parent();
     let unit = writes.unit();
@@ -1310,13 +1329,9 @@ fn render_writes(company: &str, writes: &StockItemWrites) -> Result<String, Crea
         "<HSNDETAILS.LIST><APPLICABLEFROM>{hsn_from}</APPLICABLEFROM><HSNCODE>{code}</HSNCODE><HSN>{description}</HSN><SRCOFHSNDETAILS>{SPECIFY_DETAILS_HERE}</SRCOFHSNDETAILS></HSNDETAILS.LIST></STOCKITEM></TALLYMESSAGE>"
     ));
 
-    Ok(render_import_envelope(
-        company,
-        ImportReport::AllMasters,
-        &message,
-    ))
+    render_import_envelope(company, ImportReport::AllMasters, &message)
 }
 
 #[cfg(test)]
 #[path = "stock_item_create_tests.rs"]
-mod tests;
+pub(crate) mod tests;

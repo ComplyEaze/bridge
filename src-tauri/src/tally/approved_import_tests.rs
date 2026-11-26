@@ -219,9 +219,9 @@ fn approved_masters(name: &str) -> ApprovedImport {
     )
 }
 
-fn masters_of(approved: &ApprovedImport) -> &MasterAdmission {
+fn masters_of(approved: &ApprovedImport) -> &LedgerAdmission {
     match &approved.kind {
-        ApprovedKind::Masters(masters) => masters,
+        ApprovedKind::Masters(masters) => masters.ledgers().expect("a ledger admission"),
         ApprovedKind::Vouchers(_) => panic!("expected the masters kind"),
     }
 }

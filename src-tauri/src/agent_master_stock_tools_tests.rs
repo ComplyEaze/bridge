@@ -3,8 +3,8 @@
 //! company list and marks with the R1 book's stock reads rebound to the shape
 //! lab's GUID, each edit labelled there. No real Tally is involved.
 use super::super::super::master_post::tests::coordinator::{
-    passing_answers, rebound_prepared, rebound_shown, sent, shape_companies, shape_identity,
-    standalone, Sent, EVERY_READ,
+    marks_at, passing_answers, rebound_prepared, rebound_shown, sent, shape_companies,
+    shape_identity, standalone, through_binding, Sent, EVERY_READ,
 };
 use super::super::super::master_post::tests::{STOCK_GUID, STOCK_PROPOSED, STOCK_SOURCE};
 use super::*;
@@ -47,6 +47,17 @@ struct Run {
 
 /// Runs `prepare_stock_item` once against `plans`, with a fresh data directory.
 async fn prepare(plans: Vec<ScenarioPlan>, guid: &str, name: &str, sibling: &str) -> Run {
+    prepare_under(plans, guid, name, sibling, Redaction::None).await
+}
+
+/// [`prepare`] under `redaction`.
+async fn prepare_under(
+    plans: Vec<ScenarioPlan>,
+    guid: &str,
+    name: &str,
+    sibling: &str,
+    redaction: Redaction,
+) -> Run {
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let endpoint = TallyEndpointConfig {
@@ -59,7 +70,7 @@ async fn prepare(plans: Vec<ScenarioPlan>, guid: &str, name: &str, sibling: &str
         data_dir: directory.path().to_path_buf(),
         max_rows: 10,
         max_bytes: 200_000,
-        redaction: Redaction::None,
+        redaction,
         import_enabled: true,
         posting: Posting::On,
         master_writes_enabled: true,
@@ -110,11 +121,7 @@ async fn prepare_records_one_batch_of_the_shown_item_and_returns_its_preview() {
     assert_eq!(outcome.company_guid.as_deref(), Some(SHAPE_GUID));
 
     let journal = run.journal.expect("the stock journal is written");
-    let lines = journal
-        .split(|byte| *byte == b'\n')
-        .filter(|line| !line.is_empty())
-        .map(|line| serde_json::from_slice::<Value>(line).expect("a journal line parses"))
-        .collect::<Vec<_>>();
+    let lines = journal_lines(&journal);
     assert_eq!(lines.len(), 1, "exactly one record");
     assert_eq!(lines[0]["record_type"], "master_batch");
     assert_eq!(lines[0]["batch_id"], batch_id);
@@ -190,4 +197,82 @@ async fn a_refusal_at_the_stock_reads_records_nothing_and_education_is_the_licen
     expected_sent.extend([Sent::Health, Sent::Companies]);
     assert_eq!(run.sent, expected_sent);
     assert_eq!(run.journal, None, "no batch is written");
+}
+
+/// The journal's lines, each parsed.
+fn journal_lines(journal: &[u8]) -> Vec<Value> {
+    (journal.split(|byte| *byte == b'\n'))
+        .filter(|line| !line.is_empty())
+        .map(|line| serde_json::from_slice::<Value>(line).expect("a journal line parses"))
+        .collect()
+}
+
+#[tokio::test]
+async fn under_mask_parties_the_preview_masks_the_item_sibling_and_parent_and_records_the_same_batch(
+) {
+    let plain = prepare(passing_run(), SHAPE_GUID, STOCK_PROPOSED, STOCK_SOURCE).await;
+    let masked = prepare_under(
+        passing_run(),
+        SHAPE_GUID,
+        STOCK_PROPOSED,
+        STOCK_SOURCE,
+        Redaction::MaskParties,
+    )
+    .await;
+    let preview = |run: &Run| match &run.outcome {
+        Ok(outcome) => outcome.payload["result"]["preview"]
+            .as_str()
+            .expect("a preview")
+            .to_string(),
+        Err(failure) => panic!("the prepare refused: {failure:?}"),
+    };
+    let (plain_text, masked_text) = (preview(&plain), preview(&masked));
+    let prepared = rebound_prepared(&shape_identity());
+    let parent = prepared.writes().parent();
+    for text in [STOCK_PROPOSED, STOCK_SOURCE, parent] {
+        let hidden = crate::agent::mask(text);
+        // A mask that kept the plain text would pass the checks below.
+        assert_ne!(hidden, text);
+        assert!(masked_text.contains(&hidden), "{hidden} is shown");
+        assert!(!masked_text.contains(text), "{text} leaked");
+        assert!(
+            plain_text.contains(text),
+            "{text} is shown whole without masking"
+        );
+    }
+    // Only those three differ: the same lines, and the unit stays whole.
+    assert_eq!(masked_text.lines().count(), plain_text.lines().count());
+    assert!(masked_text.contains(prepared.writes().unit()));
+    // The recorded batch is the same but for its fresh id.
+    let batch = |run: &Run| {
+        let mut lines = journal_lines(run.journal.as_deref().expect("a batch is recorded"));
+        assert_eq!(lines.len(), 1);
+        lines[0]
+            .as_object_mut()
+            .unwrap()
+            .remove("batch_id")
+            .expect("a batch id");
+        lines.remove(0)
+    };
+    assert_eq!(batch(&masked), batch(&plain));
+}
+
+#[tokio::test]
+async fn a_read_refused_past_the_size_edge_answers_its_typed_code_and_records_nothing() {
+    // Mark 490 is the coordinator tests' constructed edit, past the candidate
+    // edge of 489: the read refuses before any stock request.
+    let mut plans = identity_answers(false);
+    plans.extend(through_binding(marks_at(490)));
+    let run = prepare(plans, SHAPE_GUID, STOCK_PROPOSED, STOCK_SOURCE).await;
+    let expected = MastersReadError::TooLarge {
+        master_alter_id: 490,
+        estimated_bytes: 0,
+        limit_bytes: 0,
+        limit_master_alter_id: 489,
+    };
+    assert_eq!(refused(&run), expected.safe_code());
+    let mut expected_sent = IDENTITY_READ.to_vec();
+    expected_sent.extend([Sent::Health, Sent::Companies, Sent::Companies, Sent::Marks]);
+    assert_eq!(run.sent, expected_sent);
+    assert_eq!(run.journal, None, "nothing is recorded");
 }

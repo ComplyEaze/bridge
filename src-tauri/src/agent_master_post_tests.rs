@@ -1684,7 +1684,7 @@ pub(crate) mod coordinator {
         ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
     }
 
-    fn marks_at(mark: u64) -> String {
+    pub(crate) fn marks_at(mark: u64) -> String {
         let marks = stock_capture(SHAPE_MARKS);
         assert_eq!(marks.matches(SHAPE_MARK).count(), 1);
         // A mark other than 289 is a constructed vector, not a capture.
@@ -1696,7 +1696,7 @@ pub(crate) mod coordinator {
 
     /// The opening requests' answers up to the binding marks: all a run that
     /// refuses at its size admission is sent.
-    fn through_binding(binding: String) -> Vec<ScenarioPlan> {
+    pub(crate) fn through_binding(binding: String) -> Vec<ScenarioPlan> {
         let companies = answer(stock_capture(SHAPE_COMPANIES));
         vec![health(), companies.clone(), companies, answer(binding)]
     }

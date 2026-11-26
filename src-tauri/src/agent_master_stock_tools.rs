@@ -6,6 +6,14 @@
 //! from the same draft and records the batch in the stock journal. It asks no
 //! one and writes nothing to Tally: as for a ledger, the ask and the hold come
 //! with the post.
+//!
+//! Under `mask_parties` the returned preview masks the item's name, its
+//! sibling's source name and its parent, as a stock read masks a stock item's
+//! name and parent; the base unit and the HSN description stay as the stock
+//! reads leave them. The recorded batch is the same either way.
+//!
+//! The answer's evidence is the company-list read of the identity check only:
+//! the stock reads keep none, and no declared reason code says so.
 use super::super::master_ledger::JournalRecord;
 use super::super::master_post::stock_company_marks;
 use super::super::master_review::{show_stock_item_draft, ShownStockItem};
@@ -54,6 +62,7 @@ impl Server {
                 marks,
                 stock_company_marks,
                 |reads| {
+                    // As the ledger prepare, no mark or aim check: the post rechecks.
                     let (candidate, groups, units, _, _) = reads.into_parts();
                     Ok(show_fresh_draft(
                         &candidate, &groups, &units, &name, &sibling, &origin,
@@ -74,7 +83,11 @@ impl Server {
         Ok(ToolOutcome {
             payload: json!({"result":{
                 "batch_id": batch_id,
-                "preview": shown.preview(),
+                "preview": if self.settings.redaction == crate::agent::Redaction::MaskParties {
+                    shown.masked_preview()
+                } else {
+                    shown.preview().to_string()
+                },
                 "next_step": PREPARED_STOCK_NEXT_STEP,
             }}),
             evidence: identity_evidence,
@@ -116,15 +129,12 @@ fn stock_read_failure(error: anyhow::Error) -> ToolFailure {
             Some(MastersReadError::EducationUnqualified)
         )
     });
-    let profile = if education {
-        DateBoundaryProfile::EducationRestricted
-    } else {
-        DateBoundaryProfile::ModeAgnostic
-    };
-    match require_licensed_mode(profile) {
-        Err(failure) => failure,
-        Ok(()) => ToolFailure::from_runtime(crate::agent::GENERIC_RUNTIME_READ_FAILURE, error),
+    if education {
+        if let Err(failure) = require_licensed_mode(DateBoundaryProfile::EducationRestricted) {
+            return failure;
+        }
     }
+    ToolFailure::from_runtime(crate::agent::GENERIC_RUNTIME_READ_FAILURE, error)
 }
 
 #[cfg(test)]

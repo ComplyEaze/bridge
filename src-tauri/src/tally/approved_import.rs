@@ -841,9 +841,9 @@ pub(crate) struct PendingPostApproval {
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
     /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there but the masters twin below and the one
-    /// note of a box that did not fit, which the caller gives and only the dialog
-    /// task calls.
+    /// task. Nothing else can be run there but the two masters twins below (the
+    /// ledger dialog and the stock-item dialog) and the one note of a box that
+    /// did not fit, which the caller gives and only the dialog task calls.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
         xml: String,
@@ -890,6 +890,33 @@ impl PendingPostApproval {
             async move {
                 ApprovedImport::confirm_masters(batch, &company, &preview, company_marks_request)
                     .await
+            },
+            None,
+        )
+    }
+
+    /// The same for the stock-item dialog: [`ApprovedImport::confirm_stock_item`]
+    /// with exactly these arguments, on its own task. A refusal is stamped as
+    /// the ledger dialog's code for the same answer, and a box that does not
+    /// fit is refused with nothing to note: one item has no shorter form.
+    pub(crate) fn ask_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_stock_item(
+                    prepared,
+                    preview,
+                    company_marks_request,
+                    parse_marks,
+                    batch_id,
+                )
+                .await
+                .map_err(|refusal| refusal.code().to_string())
             },
             None,
         )
@@ -1347,6 +1374,19 @@ pub(crate) enum StockItemDialogRefusal {
     /// The text is over the dialog's byte limit, or its box did not fit the
     /// screen.
     TooLarge,
+}
+
+impl StockItemDialogRefusal {
+    /// The ledger dialog's code for the same answer, so a held stock dialog
+    /// is refused as a held ledger dialog is.
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Declined => "master_approval_declined",
+            Self::Unavailable => "master_approval_unavailable",
+            Self::TimedOut => "master_approval_timed_out",
+            Self::TooLarge => "master_review_too_large",
+        }
+    }
 }
 
 /// A scripted answer to the native approval, for this crate's unit tests only

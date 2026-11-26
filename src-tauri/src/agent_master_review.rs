@@ -9,12 +9,13 @@
 //! that hides part of what will be created is not a review. The limits and the
 //! unsafe-character checks are the voucher preview's own.
 use super::super::failure_code::{create_render_refusal_code, StockItemCreateCode};
+use super::approval::{ApprovalBinding, HeldRequest};
 use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
-use crate::tally::approved_import::{ApprovedImport, StockItemDialogRefusal};
+use crate::tally::approved_import::PendingPostApproval;
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
 use crate::tally::stock_item_create::{
     create_text_refusal, CreateRenderRefusal, MarkedConstant, PreparedStockItem, StockItemDraft,
@@ -333,40 +334,101 @@ pub(super) fn stock_item_review_text(
     }
 }
 
-/// Why a stock-item draft was not confirmed. Nothing was created.
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum StockItemConfirmError {
-    /// The preview could not be built, so no one was asked.
-    Review(StockItemReviewError),
-    /// The dialog approved nothing.
-    Dialog(StockItemDialogRefusal),
+/// One stock-item draft as the person will be shown it: the Create prepared
+/// from the draft, the preview built from the same draft, and the endpoint
+/// the preview names, which its binding names too. Only
+/// [`show_stock_item_draft`] makes one, and [`ShownStockItem::ask`] is the one
+/// way to ask the person about it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct ShownStockItem {
+    prepared: PreparedStockItem,
+    preview: String,
+    origin: String,
 }
 
-/// Shows the preview of `draft` in the stock-item dialog and, only on the
-/// person's approval, returns the approval of the Create made from it. The
-/// preview is built here, from the draft itself, so the window shows what this
-/// draft creates.
+/// The preview of `draft` and the Create prepared from it: the one place a
+/// draft becomes a Create, so the window shows what this draft creates.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(super) async fn confirm_stock_item_draft(
+pub(super) fn show_stock_item_draft(
     draft: StockItemDraft<'_>,
     origin: &str,
-    company_marks_request: AgentReadRequest,
-    batch_id: String,
-) -> Result<ApprovedImport, StockItemConfirmError> {
-    let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
-    let prepared = PreparedStockItem::from_draft(draft).map_err(|refusal| {
-        StockItemConfirmError::Review(StockItemReviewError::NotRenderable(refusal))
-    })?;
-    ApprovedImport::confirm_stock_item(
+) -> Result<ShownStockItem, StockItemReviewError> {
+    let preview = stock_item_review_text(&draft, origin)?;
+    let prepared =
+        PreparedStockItem::from_draft(draft).map_err(StockItemReviewError::NotRenderable)?;
+    Ok(ShownStockItem {
         prepared,
         preview,
-        company_marks_request,
-        super::master_post::stock_company_marks,
-        batch_id,
-    )
-    .await
-    .map_err(StockItemConfirmError::Dialog)
+        origin: origin.to_string(),
+    })
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl ShownStockItem {
+    /// The binding of what was shown, at the endpoint it was shown for: at
+    /// the take, the fresh binding of a fresh draft.
+    pub(super) fn binding(&self) -> ApprovalBinding {
+        ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)
+    }
+
+    /// Shows the preview in the stock-item dialog, on its own task, and on the
+    /// person's approval holds the approval of this Create for `batch_id`,
+    /// read in the queue with the stock marks parser. The binding and the held
+    /// request are built here from the same item, so all three agree.
+    pub(super) fn ask(
+        self,
+        company_marks_request: AgentReadRequest,
+        batch_id: String,
+    ) -> AskedStockItem {
+        let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);
+        let held = HeldRequest::StockItem(HeldStockItem {
+            prepared: Box::new(self.prepared.clone()),
+        });
+        let dialog = PendingPostApproval::ask_stock_item(
+            self.prepared,
+            self.preview,
+            company_marks_request,
+            super::master_post::stock_company_marks,
+            batch_id,
+        );
+        AskedStockItem {
+            binding,
+            dialog,
+            held,
+        }
+    }
+}
+
+/// A stock item held beside its approval. Its field is private and it derives
+/// nothing, so only [`ShownStockItem::ask`] makes one: no other code can put
+/// a stock item in a [`HeldRequest`]. Boxed: a prepared item is large.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct HeldStockItem {
+    prepared: Box<PreparedStockItem>,
+}
+
+impl HeldStockItem {
+    /// The item held, for the comparison with the approved bytes.
+    pub(super) fn prepared(&self) -> &PreparedStockItem {
+        &self.prepared
+    }
+}
+
+/// One ask of a shown stock item: its binding, its open dialog and the request
+/// held beside it, all made by [`ShownStockItem::ask`] from the one item.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct AskedStockItem {
+    binding: ApprovalBinding,
+    dialog: PendingPostApproval,
+    held: HeldRequest,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl AskedStockItem {
+    /// The three parts, for the approvals holder to hold together.
+    pub(super) fn into_parts(self) -> (ApprovalBinding, PendingPostApproval, HeldRequest) {
+        (self.binding, self.dialog, self.held)
+    }
 }
 
 #[cfg(test)]

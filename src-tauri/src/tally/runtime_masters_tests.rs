@@ -5,8 +5,10 @@
 //! second collection, the series-level numbering, as a second pair between the
 //! first and the closing extent.
 use super::masters::{
-    admit_masters_size, check_masters_premise, check_numbering_premise, limit_for,
-    sized_before_the_read, MastersRead,
+    admit_candidate_stock_item_read, admit_masters_size, admit_stock_groups, admit_stock_units,
+    check_masters_premise, check_numbering_premise, limit_for, sized_before_the_read,
+    AdmittedCandidateRead, MastersRead, StockItemCountMismatch, StockItemReadKind,
+    StockItemReadKindError, StockItemReadSize,
 };
 use super::trial_balance_tests::{
     companies, config, decode, education, extents, identity, pair, status, xml, GUID,
@@ -20,6 +22,7 @@ use bridge_tally_protocol::native_voucher_type_numbering::{
     parse_voucher_type_numbering, render_voucher_type_numbering_request, DuplicateSetting,
     NumberingJoinError, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
+use bridge_tally_protocol::{decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding};
 use tally_protocol_simulator::{
     encode, ObservedRequest, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -1894,4 +1897,481 @@ fn stock_items_are_named_by_their_kind_and_only_by_it() {
     }
     assert_eq!(MastersKind::parse("stock_item"), None);
     assert_eq!(MastersKind::parse("Stock_Items"), None);
+}
+
+const SHAPE_ITEMS_BASELINE: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml"
+);
+const SHAPE_ITEMS_TWO_DATES: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml"
+);
+const SHAPE_COUNT: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml"
+);
+const STOCK_CREATE_ITEMS_BEFORE: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml"
+);
+const STOCK_CREATE_GROUPS: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml"
+);
+const STOCK_CREATE_UNITS: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml"
+);
+const STOCK_CREATE_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
+
+fn admission_capture(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("the committed UTF-16 capture decodes")
+    .text
+}
+
+fn shape_identity() -> VerifiedCompanyIdentity {
+    VerifiedCompanyIdentity::test_fixture("BRIDGE SHAPE LAB", CAPTURE_GUID)
+}
+
+fn stock_create_identity() -> VerifiedCompanyIdentity {
+    VerifiedCompanyIdentity::test_fixture("BRIDGE STOCK CREATE LAB", STOCK_CREATE_GUID)
+}
+
+fn stable_admission_pair(body: String) -> NativePairedRead {
+    let encoded_bytes = body.encode_utf16().count() * 2;
+    NativePairedRead::Stable {
+        body,
+        encoded_bytes,
+        encoded_sha256: String::new(),
+    }
+}
+
+fn drifted_admission_pair() -> NativePairedRead {
+    NativePairedRead::Drifted(RuntimeReadEvidence::empty())
+}
+
+/// The item and count files are real XML from one book but different capture
+/// times, and these item answers lack the three candidate scalars added for R1.
+/// They exercise admission logic, not a live eleven-field item/count pairing.
+fn admit_shape_candidate(
+    items: String,
+    count: String,
+    master_mark: u64,
+) -> anyhow::Result<AdmittedCandidateRead> {
+    admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, master_mark)?,
+        &shape_identity(),
+        stable_admission_pair(items),
+        stable_admission_pair(count),
+    )
+}
+
+fn with_stock_item_count(count: &str, value: Option<&str>) -> String {
+    assert_eq!(count.matches("<NUMSTOCKITEMS ").count(), 1);
+    let start = count.find("<NUMSTOCKITEMS ").unwrap();
+    let end = start + count[start..].find("</NUMSTOCKITEMS>").unwrap() + "</NUMSTOCKITEMS>".len();
+    let replacement = value.map_or_else(String::new, |value| {
+        format!("<NUMSTOCKITEMS TYPE=\"Number\">{value}</NUMSTOCKITEMS>")
+    });
+    format!("{}{}{}", &count[..start], replacement, &count[end..])
+}
+
+#[test]
+fn candidate_size_admission_keeps_the_489_mark_edge() {
+    let admitted = StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap();
+    assert_eq!(admitted.admitted_bytes(), 15_984_432);
+    assert!(matches!(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 490),
+        Err(MastersReadError::TooLarge {
+            master_alter_id: 490,
+            estimated_bytes: 16_017_120,
+            limit_bytes: 16_000_000,
+            limit_master_alter_id: 489,
+        })
+    ));
+}
+
+#[test]
+fn candidate_admission_requires_stable_item_and_count_pairs() {
+    let items = admission_capture(SHAPE_ITEMS_BASELINE);
+    let count = admission_capture(SHAPE_COUNT);
+    let candidate_drift = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &shape_identity(),
+        drifted_admission_pair(),
+        stable_admission_pair(count.clone()),
+    )
+    .expect_err("a drifted candidate is not admitted");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&candidate_drift),
+        Some(PairedReadValidationError::MastersCollection)
+    ));
+
+    let count_drift = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(items),
+        drifted_admission_pair(),
+    )
+    .expect_err("a drifted count is not admitted");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&count_drift),
+        Some(PairedReadValidationError::StockSummaryCollection)
+    ));
+}
+
+#[test]
+fn candidate_admission_refuses_an_unavailable_count() {
+    let items = admission_capture(SHAPE_ITEMS_BASELINE);
+    let count = admission_capture(SHAPE_COUNT);
+    for edited in [
+        with_stock_item_count(&count, None),
+        with_stock_item_count(&count, Some("")),
+        with_stock_item_count(&count, Some("eleven")),
+    ] {
+        let error = admit_shape_candidate(items.clone(), edited, 489)
+            .expect_err("an unavailable count is never zero or admitted");
+        assert!(matches!(
+            cause::<bridge_tally_protocol::native_stock_summary::NativeStockError>(&error),
+            Some(
+                bridge_tally_protocol::native_stock_summary::NativeStockError::ItemCountUnavailable
+            )
+        ));
+    }
+}
+
+#[test]
+fn candidate_admission_refuses_count_mismatch_in_either_direction() {
+    let items = admission_capture(SHAPE_ITEMS_BASELINE);
+    let count = admission_capture(SHAPE_COUNT);
+    for (reported, expected) in [(10, 10), (12, 12)] {
+        let error = admit_shape_candidate(
+            items.clone(),
+            with_stock_item_count(&count, Some(&reported.to_string())),
+            489,
+        )
+        .expect_err("a count in either mismatch direction refuses");
+        let mismatch = cause::<StockItemCountMismatch>(&error).expect("the typed mismatch");
+        assert_eq!(
+            mismatch,
+            &StockItemCountMismatch {
+                rows: 11,
+                tally_count: expected,
+            }
+        );
+    }
+}
+
+#[test]
+fn candidate_admission_binds_the_item_and_count_answers_to_one_company() {
+    let r1_items = admission_capture(STOCK_CREATE_ITEMS_BEFORE);
+    let shape_count = admission_capture(SHAPE_COUNT);
+    let wrong_items = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(r1_items.clone()),
+        stable_admission_pair(with_stock_item_count(&shape_count, Some("1"))),
+    )
+    .expect_err("another company's item rows refuse");
+    assert_eq!(
+        cause::<NativeMastersError>(&wrong_items),
+        Some(&NativeMastersError::RowGuidForeign)
+    );
+
+    let wrong_count = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &stock_create_identity(),
+        stable_admission_pair(r1_items),
+        stable_admission_pair(shape_count),
+    )
+    .expect_err("a count answer not naming the target refuses");
+    assert!(matches!(
+        cause::<bridge_tally_protocol::native_stock_summary::NativeStockError>(&wrong_count),
+        Some(bridge_tally_protocol::native_stock_summary::NativeStockError::CompanyFlagsNotOneRow)
+    ));
+}
+
+#[test]
+fn candidate_admission_enforces_the_mark_and_encoded_byte_premises() {
+    let items = admission_capture(SHAPE_ITEMS_TWO_DATES);
+    let count = with_stock_item_count(&admission_capture(SHAPE_COUNT), Some("12"));
+    let above_mark = admit_shape_candidate(items.clone(), count.clone(), 293)
+        .expect_err("the capture's AlterID 294 is above mark 293");
+    assert!(matches!(
+        cause::<MastersReadError>(&above_mark),
+        Some(MastersReadError::PremiseViolated(
+            "masters_alter_id_above_master_mark"
+        ))
+    ));
+
+    // The count edit and artificial byte limit are logic vectors, not a captured
+    // same-sitting count or a Tally limit.
+    let pair = stable_admission_pair(items);
+    let encoded_bytes = match &pair {
+        NativePairedRead::Stable { encoded_bytes, .. } => *encoded_bytes,
+        NativePairedRead::Drifted(_) => unreachable!(),
+    };
+    let over_bytes = admit_candidate_stock_item_read(
+        StockItemReadSize::with_limit_for_test(
+            StockItemReadKind::Candidate,
+            294,
+            u64::try_from(encoded_bytes - 1).unwrap(),
+        ),
+        &shape_identity(),
+        pair,
+        stable_admission_pair(count),
+    )
+    .expect_err("one byte over the artificial admitted limit refuses");
+    assert!(matches!(
+        cause::<MastersReadError>(&over_bytes),
+        Some(MastersReadError::PremiseViolated(
+            "masters_response_over_admitted_bytes"
+        ))
+    ));
+}
+
+#[test]
+fn support_reads_are_paired_sized_company_bound_and_of_their_own_kind() {
+    let groups = admission_capture(STOCK_CREATE_GROUPS);
+    let units = admission_capture(STOCK_CREATE_UNITS);
+    let identity = stock_create_identity();
+    let admitted_groups = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, 210).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .unwrap();
+    assert_eq!(admitted_groups.rows().len(), 1);
+    assert_eq!(admitted_groups.rows()[0].name, "SC Goods Group");
+    assert_eq!(admitted_groups.sized_mark(), 210);
+    let admitted_units = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Units, 210).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .unwrap();
+    assert_eq!(admitted_units.rows().len(), 1);
+    assert_eq!(admitted_units.rows()[0].name, "Nos");
+    assert_eq!(admitted_units.sized_mark(), 210);
+
+    for (kind, edge) in [
+        (StockItemReadKind::StockGroups, 1_160),
+        (StockItemReadKind::Units, 1_168),
+    ] {
+        assert!(StockItemReadSize::new(kind, edge).is_ok());
+        assert!(matches!(
+            StockItemReadSize::new(kind, edge + 1),
+            Err(MastersReadError::TooLarge {
+                master_alter_id,
+                limit_master_alter_id,
+                ..
+            }) if master_alter_id == edge + 1 && limit_master_alter_id == edge
+        ));
+    }
+
+    for drifted in [
+        admit_stock_groups(
+            StockItemReadSize::new(StockItemReadKind::StockGroups, 210).unwrap(),
+            &identity,
+            drifted_admission_pair(),
+        )
+        .expect_err("drifted groups refuse"),
+        admit_stock_units(
+            StockItemReadSize::new(StockItemReadKind::Units, 210).unwrap(),
+            &identity,
+            drifted_admission_pair(),
+        )
+        .expect_err("drifted units refuse"),
+    ] {
+        assert!(matches!(
+            cause::<PairedReadValidationError>(&drifted),
+            Some(PairedReadValidationError::MastersCollection)
+        ));
+    }
+
+    let foreign_groups = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("foreign groups refuse");
+    let foreign_units = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Units, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("foreign units refuse");
+    for error in [foreign_groups, foreign_units] {
+        assert_eq!(
+            cause::<NativeMastersError>(&error),
+            Some(&NativeMastersError::RowGuidForeign)
+        );
+    }
+
+    let wrong_group_token = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::Units, 210).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("a unit token admits no groups");
+    assert!(cause::<StockItemReadKindError>(&wrong_group_token).is_some());
+    let wrong_unit_token = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, 210).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("a group token admits no units");
+    assert!(cause::<StockItemReadKindError>(&wrong_unit_token).is_some());
+    // The candidate read takes only its own token, and neither support read
+    // takes the candidate's.
+    for kind in [StockItemReadKind::StockGroups, StockItemReadKind::Units] {
+        let wrong_candidate_token = admit_candidate_stock_item_read(
+            StockItemReadSize::new(kind, 489).unwrap(),
+            &shape_identity(),
+            stable_admission_pair(admission_capture(SHAPE_ITEMS_BASELINE)),
+            stable_admission_pair(admission_capture(SHAPE_COUNT)),
+        )
+        .expect_err("a support token admits no candidate read");
+        assert!(cause::<StockItemReadKindError>(&wrong_candidate_token).is_some());
+    }
+    let candidate_token_groups = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 210).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("a candidate token admits no groups");
+    assert!(cause::<StockItemReadKindError>(&candidate_token_groups).is_some());
+    let candidate_token_units = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 210).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("a candidate token admits no units");
+    assert!(cause::<StockItemReadKindError>(&candidate_token_units).is_some());
+
+    // These AlterID and byte faults are constructed admission vectors, not new
+    // captures. Both support reads use the same shared premise reasons.
+    let group_mark =
+        parse_native_masters(NativeMasterKind::StockGroups, &groups, STOCK_CREATE_GUID)
+            .unwrap()
+            .rows[0]
+            .alter_id
+            - 1;
+    let unit_mark = parse_native_masters(NativeMasterKind::Units, &units, STOCK_CREATE_GUID)
+        .unwrap()
+        .rows[0]
+        .alter_id
+        - 1;
+    let group_above = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, group_mark).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("a group above its token's mark refuses");
+    let unit_above = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Units, unit_mark).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("a unit above its token's mark refuses");
+    for error in [group_above, unit_above] {
+        assert!(matches!(
+            cause::<MastersReadError>(&error),
+            Some(MastersReadError::PremiseViolated(
+                "masters_alter_id_above_master_mark"
+            ))
+        ));
+    }
+
+    for (kind, body) in [
+        (StockItemReadKind::StockGroups, groups),
+        (StockItemReadKind::Units, units),
+    ] {
+        let pair = stable_admission_pair(body);
+        let encoded_bytes = match &pair {
+            NativePairedRead::Stable { encoded_bytes, .. } => *encoded_bytes,
+            NativePairedRead::Drifted(_) => unreachable!(),
+        };
+        let size = StockItemReadSize::with_limit_for_test(
+            kind,
+            210,
+            u64::try_from(encoded_bytes - 1).unwrap(),
+        );
+        let result = match kind {
+            StockItemReadKind::StockGroups => admit_stock_groups(size, &identity, pair).map(|_| ()),
+            StockItemReadKind::Units => admit_stock_units(size, &identity, pair).map(|_| ()),
+            StockItemReadKind::Candidate => unreachable!(),
+        };
+        let error = result.expect_err("one byte over the support token's limit refuses");
+        assert!(matches!(
+            cause::<MastersReadError>(&error),
+            Some(MastersReadError::PremiseViolated(
+                "masters_response_over_admitted_bytes"
+            ))
+        ));
+    }
+}
+
+#[test]
+fn a_zero_row_candidate_with_zero_count_is_no_items_not_a_complete_catalogue() {
+    // Structurally removing the eleven rows and changing the count to zero are
+    // constructed vectors; no captured zero-row candidate response is claimed.
+    let baseline = admission_capture(SHAPE_ITEMS_BASELINE);
+    let mut rest = baseline.as_str();
+    let mut without_rows = String::new();
+    let mut removed = 0;
+    while let Some(start) = rest.find("<STOCKITEM ") {
+        let end = rest[start..].find("</STOCKITEM>").unwrap() + "</STOCKITEM>".len();
+        without_rows.push_str(&rest[..start]);
+        rest = &rest[start + end..];
+        removed += 1;
+    }
+    without_rows.push_str(rest);
+    assert_eq!(removed, 11);
+    assert!(!without_rows.contains("<STOCKITEM "));
+    let admitted = admit_shape_candidate(
+        without_rows,
+        with_stock_item_count(&admission_capture(SHAPE_COUNT), Some("0")),
+        489,
+    )
+    .expect("zero rows and Tally's reported zero agree at admission");
+    let error =
+        crate::tally::stock_item_create::CompleteStockItemCatalogue::from_admitted(admitted)
+            .expect_err("zero rows never constructs a complete catalogue");
+    assert!(matches!(
+        error,
+        crate::tally::stock_item_create::StockItemCatalogueError::NoItems
+    ));
+
+    let start = baseline.find("<COLLECTION").unwrap();
+    let end = baseline.find("</COLLECTION>").unwrap() + "</COLLECTION>".len();
+    let absent = format!("{}{}", &baseline[..start], &baseline[end..]);
+    let error = admit_shape_candidate(absent, admission_capture(SHAPE_COUNT), 489)
+        .expect_err("an absent collection is malformed, not a zero-row answer");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::CollectionAbsent)
+    );
+}
+
+#[test]
+fn an_admitted_candidate_read_carries_its_sized_mark_into_the_complete_catalogue() {
+    // The shape lab's item and count files are one book's answers at
+    // different capture times (see admit_shape_candidate); the count file
+    // reports the eleven items the item file holds.
+    let admitted = admit_shape_candidate(
+        admission_capture(SHAPE_ITEMS_BASELINE),
+        admission_capture(SHAPE_COUNT),
+        489,
+    )
+    .expect("eleven rows and Tally's count of eleven admit");
+    assert_eq!(admitted.sized_mark(), 489);
+    assert_eq!(admitted.company(), &shape_identity());
+    let complete =
+        crate::tally::stock_item_create::CompleteStockItemCatalogue::from_admitted(admitted)
+            .expect("an admitted non-empty read is a complete catalogue");
+    assert_eq!(complete.sized_mark(), 489);
+    assert_eq!(complete.catalogue().items().len(), 11);
+    assert_eq!(complete.catalogue().company(), &shape_identity());
 }

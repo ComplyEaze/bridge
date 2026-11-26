@@ -1,6 +1,7 @@
-//! The recheck a master post makes inside the endpoint queue, after approval
-//! and before the intent: the one place that decides whether a ledger name is
-//! already taken.
+//! The rechecks a master post makes after approval and before the intent: the
+//! ledger path decides whether a ledger or group name is already taken, and the
+//! pure 5b-3a stock twin rebuilds an approved stock draft from fresh admitted
+//! stock reads. The stock twin is not called by the queue before 5b-3b.
 //!
 //! A master post reads the company's ledger index and group index twice each,
 //! between the all-company mark read as the binding reads begin and the aim
@@ -23,6 +24,11 @@ use super::post::admit_queued_aim;
 use crate::agent::change_parse::parse_all_company_marks;
 use crate::tally::approved_import::{ApprovedImportAdmissionError, QueuedAdmission};
 use crate::tally::ledger_create_item::{LedgerCreateBatch, LedgerCreateItem, RenderedLedgerCreate};
+use crate::tally::runtime::{AdmittedStockGroups, AdmittedStockUnits, StockItemReadKind};
+use crate::tally::stock_item_create::{
+    CompleteStockItemCatalogue, DraftRefusal, GoodsSibling, ItemNameNotAbsent, NotGoodsSibling,
+    ShownDraft, SiblingGst, SiblingRefusal, StockItemCatalogueError, StockItemDraft,
+};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError,
@@ -33,6 +39,116 @@ use bridge_tally_protocol::native_outstandings::{
 use bridge_tally_protocol::{parse_ledger_name_index, StandardLedgerCatalogError};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
+
+/// The fresh stock reads and marks for one already approved stock draft.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) struct StockItemRecheckInput<'a, 'draft> {
+    shown: &'a ShownDraft<'draft>,
+    candidate: &'a CompleteStockItemCatalogue,
+    groups: &'a AdmittedStockGroups,
+    units: &'a AdmittedStockUnits,
+    company_marks_at_binding: &'a str,
+    company_marks: &'a str,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) enum StockItemRecheckError {
+    #[error("stock reads are for another company")]
+    OtherCompany,
+    #[error("stock item name is not absent")]
+    NameNotAbsent(ItemNameNotAbsent),
+    #[error("stock item sibling is refused")]
+    Sibling(SiblingRefusal),
+    #[error("stock item sibling is not the measured goods case")]
+    NotGoods(NotGoodsSibling),
+    #[error("stock item draft is refused")]
+    Draft(DraftRefusal),
+    // Made by 5b-3b, when `CompleteStockItemCatalogue::from_admitted` refuses;
+    // nothing in this slice (tests included) builds it yet.
+    #[allow(dead_code)]
+    #[error("stock item catalogue is refused")]
+    Catalogue(StockItemCatalogueError),
+    #[error("stock item draft changed")]
+    DraftChanged,
+    #[error("stock item read was sized at another master mark")]
+    SizedAtAnotherMark {
+        read: StockItemReadKind,
+        sized: u64,
+        binding: u64,
+    },
+}
+
+/// Applies the ledger path's unchanged aim check, then rebuilds the shown stock
+/// draft from fresh admitted stock reads sized at the target's own binding
+/// mark. Step 1 compares the full
+/// `VerifiedCompanyIdentity` values the reads carry, which the caller attached;
+/// the parsers bind rows by GUID only. It returns no approval or dispatch value.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn recheck_stock_item_admission(
+    input: StockItemRecheckInput<'_, '_>,
+) -> anyhow::Result<()> {
+    let shown = input.shown.draft();
+    let company = shown.sibling().sibling().catalogue().company();
+    if input.candidate.catalogue().company() != company
+        || input.groups.company() != company
+        || input.units.company() != company
+    {
+        return Err(StockItemRecheckError::OtherCompany.into());
+    }
+
+    // The ledger path's aim check first: it admits exactly one target in each
+    // snapshot and an unmoved master mark, so the binding mark below is the
+    // target's own and not a namesake's or a same-GUID sibling's.
+    let binding_rows = admit_queued_aim(
+        input.company_marks_at_binding,
+        input.company_marks,
+        company.company_guid(),
+        company.display_name(),
+    )?;
+    let mut targets = binding_rows.iter().filter(|row| {
+        row.guid.eq_ignore_ascii_case(company.company_guid())
+            && row
+                .name
+                .trim()
+                .eq_ignore_ascii_case(company.display_name().trim())
+    });
+    let binding = match (targets.next(), targets.next()) {
+        (Some(row), None) => row.masters,
+        _ => return Err(ApprovedImportAdmissionError::MastersUnconfirmed.into()),
+    };
+    for (read, sized) in [
+        (StockItemReadKind::Candidate, input.candidate.sized_mark()),
+        (StockItemReadKind::StockGroups, input.groups.sized_mark()),
+        (StockItemReadKind::Units, input.units.sized_mark()),
+    ] {
+        if sized != binding {
+            return Err(StockItemRecheckError::SizedAtAnotherMark {
+                read,
+                sized,
+                binding,
+            }
+            .into());
+        }
+    }
+
+    let name = input
+        .candidate
+        .name_absent(shown.name())
+        .map_err(StockItemRecheckError::NameNotAbsent)?;
+    let sibling = SiblingGst::named(
+        input.candidate.catalogue(),
+        shown.sibling().sibling().source_name(),
+    )
+    .map_err(StockItemRecheckError::Sibling)?;
+    let sibling = GoodsSibling::from_sibling(sibling).map_err(StockItemRecheckError::NotGoods)?;
+    let fresh = StockItemDraft::new_admitted(name, sibling, input.groups, input.units)
+        .map_err(StockItemRecheckError::Draft)?;
+    if !fresh.same_create(shown) {
+        return Err(StockItemRecheckError::DraftChanged.into());
+    }
+    Ok(())
+}
 
 /// The request a master approval is held with: the batch and the request
 /// rendered from it, once. It is the masters twin of `NativePostRequest` in the

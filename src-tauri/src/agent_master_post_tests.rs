@@ -5,6 +5,7 @@
 use super::super::post::refusal_code;
 use super::*;
 use bridge_tally_core::master_name_index::Via;
+use bridge_tally_protocol::{decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding};
 
 const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const NAME: &str = "Synthetic Masters Lab";
@@ -832,4 +833,589 @@ fn a_name_that_is_a_captured_alias_is_taken_via_alias() {
             "{candidate}"
         );
     }
+}
+
+const STOCK_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml"
+);
+const STOCK_AFTER_MARKED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-after-marked-create.utf16le.xml"
+);
+const STOCK_ALIAS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-with-alias.utf16le.xml"
+);
+const STOCK_GROUPS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml"
+);
+const STOCK_UNITS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml"
+);
+const STOCK_MARKS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-marks.utf16le.xml"
+);
+const STOCK_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
+const STOCK_SOURCE: &str = "SC Sibling Goods";
+const STOCK_PROPOSED: &str = "SC Copied Marked";
+
+fn stock_capture(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("the stock capture decodes through the limited decoder")
+    .text
+}
+
+fn stock_identity_from_capture() -> VerifiedCompanyIdentity {
+    let marks = stock_capture(STOCK_MARKS);
+    let rows = parse_all_company_marks(&marks).expect("the captured marks parse");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].masters, 210);
+    VerifiedCompanyIdentity::test_fixture(rows[0].name.clone(), rows[0].guid.clone())
+}
+
+fn stock_test_draft<'a>(
+    catalogue: &'a crate::tally::stock_item_create::StockItemCatalogue,
+    proposed: &str,
+    source: &str,
+    groups: &str,
+    units: &str,
+) -> StockItemDraft<'a> {
+    let name = catalogue
+        .name_absent(&MasterName::new(proposed).unwrap())
+        .expect("the shown name is absent from its before read");
+    let sibling = SiblingGst::named(catalogue, &MasterName::new(source).unwrap())
+        .expect("the captured sibling is complete");
+    let sibling = GoodsSibling::from_sibling(sibling).expect("the captured sibling is Goods");
+    StockItemDraft::new(name, sibling, groups, units).expect("the measured draft shape admits")
+}
+
+struct StockRecheckCase {
+    shown_candidate: String,
+    fresh_candidate: String,
+    proposed: String,
+    source: String,
+    groups: String,
+    units: String,
+    binding: String,
+    aim: String,
+    candidate_mark: u64,
+    groups_mark: u64,
+    units_mark: u64,
+    shown_identity: VerifiedCompanyIdentity,
+    fresh_identity: VerifiedCompanyIdentity,
+    groups_identity: Option<VerifiedCompanyIdentity>,
+    units_identity: Option<VerifiedCompanyIdentity>,
+}
+
+fn stock_recheck_case() -> StockRecheckCase {
+    let identity = stock_identity_from_capture();
+    StockRecheckCase {
+        shown_candidate: stock_capture(STOCK_BEFORE),
+        fresh_candidate: stock_capture(STOCK_BEFORE),
+        proposed: STOCK_PROPOSED.to_string(),
+        source: STOCK_SOURCE.to_string(),
+        groups: stock_capture(STOCK_GROUPS),
+        units: stock_capture(STOCK_UNITS),
+        binding: stock_capture(STOCK_MARKS),
+        aim: stock_capture(STOCK_MARKS),
+        candidate_mark: 210,
+        groups_mark: 210,
+        units_mark: 210,
+        shown_identity: identity.clone(),
+        fresh_identity: identity,
+        groups_identity: None,
+        units_identity: None,
+    }
+}
+
+fn run_stock_recheck(case: StockRecheckCase) -> anyhow::Result<()> {
+    let shown_catalogue = crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
+        &case.shown_identity,
+        &case.shown_candidate,
+    )
+    .expect("the shown candidate catalogues");
+    let shown = ShownDraft::from_draft(stock_test_draft(
+        &shown_catalogue,
+        &case.proposed,
+        &case.source,
+        &case.groups,
+        &case.units,
+    ));
+    let fresh_catalogue = crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
+        &case.fresh_identity,
+        &case.fresh_candidate,
+    )
+    .expect("the fresh candidate catalogues");
+    let candidate =
+        CompleteStockItemCatalogue::from_catalogue_for_test(fresh_catalogue, case.candidate_mark);
+    let groups = AdmittedStockGroups::from_capture_for_test(
+        case.groups_identity
+            .as_ref()
+            .unwrap_or(&case.fresh_identity),
+        &case.groups,
+        case.groups_mark,
+    )
+    .expect("the captured groups parse for the fresh identity");
+    let units = AdmittedStockUnits::from_capture_for_test(
+        case.units_identity.as_ref().unwrap_or(&case.fresh_identity),
+        &case.units,
+        case.units_mark,
+    )
+    .expect("the captured units parse for the fresh identity");
+    recheck_stock_item_admission(StockItemRecheckInput {
+        shown: &shown,
+        candidate: &candidate,
+        groups: &groups,
+        units: &units,
+        company_marks_at_binding: &case.binding,
+        company_marks: &case.aim,
+    })
+}
+
+fn assert_stock_recheck_refusal(
+    result: anyhow::Result<()>,
+    expected: impl FnOnce(&StockItemRecheckError) -> bool,
+) {
+    let error = result.expect_err("the stock recheck refuses");
+    let typed = error
+        .downcast_ref::<StockItemRecheckError>()
+        .expect("the stock recheck keeps its typed error");
+    assert!(expected(typed), "{typed:?}");
+}
+
+#[test]
+fn stock_recheck_admits_the_same_shown_draft_and_unchanged_marks() {
+    let identity = stock_identity_from_capture();
+    assert_eq!(identity.display_name(), "BRIDGE STOCK CREATE LAB");
+    assert_eq!(identity.company_guid(), STOCK_GUID);
+    let catalogue = crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
+        &identity,
+        &stock_capture(STOCK_BEFORE),
+    )
+    .unwrap();
+    let sibling = SiblingGst::named(&catalogue, &MasterName::new(STOCK_SOURCE).unwrap()).unwrap();
+    assert!(sibling.guid().ends_with("-000000d0"));
+    run_stock_recheck(stock_recheck_case()).expect("the unchanged R1 recheck admits");
+}
+
+#[test]
+fn stock_recheck_refuses_a_name_taken_since_approval() {
+    let mut case = stock_recheck_case();
+    // Unchanged marks isolate name admission; a real Create moves the marks.
+    case.fresh_candidate = stock_capture(STOCK_AFTER_MARKED);
+    assert_stock_recheck_refusal(run_stock_recheck(case), |error| {
+        matches!(
+            error,
+            StockItemRecheckError::NameNotAbsent(ItemNameNotAbsent::Taken(_))
+        )
+    });
+}
+
+#[test]
+fn stock_recheck_does_not_treat_a_stock_group_or_unit_name_as_an_item_collision() {
+    // Measured, PARTIAL: Creates named like the book's stock group and unit each
+    // answered CREATED 1 and left the group and unit rows unchanged (§12a.13,
+    // the near-name Creates entry).
+    for proposed in ["SC Goods Group", "Nos"] {
+        let mut case = stock_recheck_case();
+        case.proposed = proposed.to_string();
+        run_stock_recheck(case).unwrap_or_else(|error| {
+            panic!("{proposed} is absent from the stock-item read: {error:?}")
+        });
+    }
+}
+
+#[test]
+fn stock_recheck_refuses_a_changed_written_field() {
+    let original = stock_capture(STOCK_BEFORE);
+    let gst = original.replacen(
+        "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>",
+        "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>",
+        1,
+    );
+    assert_ne!(gst, original);
+    let hsn = original.replacen(
+        "<HSNCODE TYPE=\"String\">39239090</HSNCODE>",
+        "<HSNCODE TYPE=\"String\">39239099</HSNCODE>",
+        1,
+    );
+    assert_ne!(hsn, original);
+    // Both edits are constructed fault vectors, not measured Tally changes.
+    for fresh_candidate in [gst, hsn] {
+        let mut case = stock_recheck_case();
+        case.fresh_candidate = fresh_candidate;
+        assert_stock_recheck_refusal(run_stock_recheck(case), |error| {
+            matches!(error, StockItemRecheckError::DraftChanged)
+        });
+    }
+}
+
+#[test]
+fn stock_recheck_refuses_a_different_source_item_or_shown_draft() {
+    let original = stock_capture(STOCK_BEFORE);
+    let other_source = original.replacen("000000d0", "000000d9", 1);
+    assert_ne!(other_source, original);
+    let mut fresh_source = stock_recheck_case();
+    fresh_source.fresh_candidate = other_source.clone();
+    assert_stock_recheck_refusal(run_stock_recheck(fresh_source), |error| {
+        matches!(error, StockItemRecheckError::DraftChanged)
+    });
+
+    let mut changed_shown = stock_recheck_case();
+    changed_shown.shown_candidate = other_source;
+    assert_stock_recheck_refusal(run_stock_recheck(changed_shown), |error| {
+        matches!(error, StockItemRecheckError::DraftChanged)
+    });
+}
+
+#[test]
+fn stock_recheck_refuses_another_company_even_with_a_matching_guid() {
+    let other = VerifiedCompanyIdentity::test_fixture("BRIDGE STOCK CREATE LAB OTHER", STOCK_GUID);
+    let own = stock_identity_from_capture();
+    // All three reads, then each read alone: the candidate (the support reads
+    // keep the shown identity), the stock groups, the units.
+    let mut all = stock_recheck_case();
+    all.fresh_identity = other.clone();
+    let mut candidate = stock_recheck_case();
+    candidate.fresh_identity = other.clone();
+    candidate.groups_identity = Some(own.clone());
+    candidate.units_identity = Some(own);
+    let mut groups = stock_recheck_case();
+    groups.groups_identity = Some(other.clone());
+    let mut units = stock_recheck_case();
+    units.units_identity = Some(other);
+    for case in [all, candidate, groups, units] {
+        assert_stock_recheck_refusal(run_stock_recheck(case), |error| {
+            matches!(error, StockItemRecheckError::OtherCompany)
+        });
+    }
+}
+
+#[test]
+fn stock_recheck_reuses_the_typed_aim_refusals() {
+    let moved = stock_capture(STOCK_MARKS).replacen(
+        "<ALTMSTID TYPE=\"Number\"> 210</ALTMSTID>",
+        "<ALTMSTID TYPE=\"Number\"> 211</ALTMSTID>",
+        1,
+    );
+    let mut moved_case = stock_recheck_case();
+    moved_case.aim = moved;
+    let error = run_stock_recheck(moved_case).expect_err("a moved aim refuses");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::MastersMoved)
+    ));
+
+    let mut malformed_aim = stock_recheck_case();
+    malformed_aim.aim = "<ENVELOPE/>".to_string();
+    let error = run_stock_recheck(malformed_aim).expect_err("malformed aim marks refuse");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
+    ));
+
+    let mut malformed_binding = stock_recheck_case();
+    malformed_binding.binding = "<ENVELOPE/>".to_string();
+    let error = run_stock_recheck(malformed_binding).expect_err("malformed binding marks refuse");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::MastersUnconfirmed)
+    ));
+
+    let mut without_target = stock_recheck_case();
+    without_target.aim = stock_capture(STOCK_MARKS).replacen(STOCK_GUID, GUID, 1);
+    let error = run_stock_recheck(without_target).expect_err("an aim without the target refuses");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::CompanyScopeChanged)
+    ));
+}
+
+#[test]
+fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
+    use std::collections::BTreeSet;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    fn scan(
+        directory: &Path,
+        root: &Path,
+        owners: &BTreeSet<PathBuf>,
+        visited: &mut usize,
+        problems: &mut Vec<String>,
+    ) {
+        for entry in fs::read_dir(directory).expect("the source directory is readable") {
+            let path = entry.expect("a source directory entry").path();
+            if path.is_dir() {
+                scan(&path, root, owners, visited, problems);
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if !name.ends_with(".rs")
+                || name.ends_with("_tests.rs")
+                || name.contains("_tests_")
+                || name == "tests.rs"
+            {
+                continue;
+            }
+            let relative = path.strip_prefix(root).unwrap().to_path_buf();
+            *visited += 1;
+            if owners.contains(&relative) {
+                continue;
+            }
+            let source = fs::read_to_string(&path).expect("a production source is readable");
+            for identifier in [
+                "admit_candidate_stock_item_read",
+                "admit_stock_groups",
+                "admit_stock_units",
+                "StockItemReadSize",
+                "recheck_stock_item_admission",
+                "CompleteStockItemCatalogue",
+                "new_admitted",
+            ] {
+                if source.contains(identifier) {
+                    problems.push(format!("{} names {identifier}", relative.display()));
+                }
+            }
+        }
+    }
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let owners = [
+        "tally/runtime_masters.rs",
+        "tally/runtime.rs",
+        "tally/stock_item_create.rs",
+        "agent_master_post.rs",
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .collect::<BTreeSet<_>>();
+    let mut visited = 0;
+    let mut problems = Vec::new();
+    scan(&root, &root, &owners, &mut visited, &mut problems);
+    assert!(visited >= 100, "the scan read only {visited} source files");
+    // This lexical guard is not macro-proof and does not replace the old seam gate.
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+#[test]
+fn stock_recheck_refuses_a_read_sized_at_another_mark() {
+    for (expected, field) in [
+        (StockItemReadKind::Candidate, 0),
+        (StockItemReadKind::StockGroups, 1),
+        (StockItemReadKind::Units, 2),
+    ] {
+        let mut case = stock_recheck_case();
+        match field {
+            0 => case.candidate_mark = 209,
+            1 => case.groups_mark = 209,
+            2 => case.units_mark = 209,
+            _ => unreachable!(),
+        }
+        assert_stock_recheck_refusal(run_stock_recheck(case), |error| {
+            matches!(
+                error,
+                StockItemRecheckError::SizedAtAnotherMark {
+                    read,
+                    sized: 209,
+                    binding: 210,
+                } if *read == expected
+            )
+        });
+    }
+}
+
+#[test]
+fn same_create_compares_every_written_field() {
+    let original = stock_capture(STOCK_BEFORE);
+    let groups = stock_capture(STOCK_GROUPS);
+    let units = stock_capture(STOCK_UNITS);
+    let identity = stock_identity_from_capture();
+    let same = |second_candidate: String,
+                second_proposed: &str,
+                second_source: &str,
+                second_groups: String,
+                second_units: String| {
+        let first_catalogue =
+            crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
+                &identity, &original,
+            )
+            .unwrap();
+        let second_catalogue =
+            crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
+                &identity,
+                &second_candidate,
+            )
+            .unwrap();
+        let first = stock_test_draft(
+            &first_catalogue,
+            "SC R10 Fresh",
+            STOCK_SOURCE,
+            &groups,
+            &units,
+        );
+        let second = stock_test_draft(
+            &second_catalogue,
+            second_proposed,
+            second_source,
+            &second_groups,
+            &second_units,
+        );
+        first.same_create(&second)
+    };
+    assert!(same(
+        original.clone(),
+        "SC R10 Fresh",
+        STOCK_SOURCE,
+        groups.clone(),
+        units.clone()
+    ));
+
+    let changed_parent = original.replace("SC Goods Group", "SC Other Group");
+    let changed_unit = original.replace("Nos", "Each");
+    let changed_guid = original.replacen("000000d0", "000000d9", 1);
+    let changed_rate = original.replacen(
+        "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>",
+        "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>",
+        1,
+    );
+    let changed_hsn = original.replacen("39239090", "39239099", 1);
+    // Each edit is a separate in-memory fault vector, not a captured Tally state.
+    for (label, candidate, proposed, source, changed_groups, changed_units) in [
+        (
+            "parent",
+            changed_parent,
+            "SC R10 Fresh",
+            STOCK_SOURCE,
+            groups.replace("SC Goods Group", "SC Other Group"),
+            units.clone(),
+        ),
+        (
+            "unit",
+            changed_unit,
+            "SC R10 Fresh",
+            STOCK_SOURCE,
+            groups.clone(),
+            units.replace("Nos", "Each"),
+        ),
+        (
+            "proposed name",
+            original.clone(),
+            "SC R10 Other",
+            STOCK_SOURCE,
+            groups.clone(),
+            units.clone(),
+        ),
+        (
+            "source name",
+            stock_capture(STOCK_ALIAS),
+            "SC R10 Fresh",
+            "SC Sibling Alias",
+            groups.clone(),
+            units.clone(),
+        ),
+        (
+            "source GUID",
+            changed_guid,
+            "SC R10 Fresh",
+            STOCK_SOURCE,
+            groups.clone(),
+            units.clone(),
+        ),
+        (
+            "GST rate",
+            changed_rate,
+            "SC R10 Fresh",
+            STOCK_SOURCE,
+            groups.clone(),
+            units.clone(),
+        ),
+        (
+            "HSN code",
+            changed_hsn,
+            "SC R10 Fresh",
+            STOCK_SOURCE,
+            groups.clone(),
+            units.clone(),
+        ),
+    ] {
+        assert!(
+            !same(candidate, proposed, source, changed_groups, changed_units),
+            "{label} differs"
+        );
+    }
+}
+
+#[test]
+fn stock_recheck_takes_the_binding_mark_from_the_named_target_not_a_same_guid_sibling() {
+    // A constructed snapshot, not a capture: a second loaded company sharing the
+    // target's GUID under another name (as a year split can), listed first, at
+    // another master mark. Reads sized at that sibling's mark must refuse.
+    let sibling = "<COMPANY NAME=\"BRIDGE STOCK CREATE LAB SPLIT\" RESERVEDNAME=\"\">\
+                   <GUID TYPE=\"String\">bac2b5e9-ada9-43c0-b8f8-a2812a813fa1</GUID>\
+                   <ALTMSTID TYPE=\"Number\"> 205</ALTMSTID></COMPANY>";
+    let with_sibling =
+        stock_capture(STOCK_MARKS).replacen("<COLLECTION>", &format!("<COLLECTION>{sibling}"), 1);
+    assert_ne!(with_sibling, stock_capture(STOCK_MARKS));
+    let mut case = stock_recheck_case();
+    case.binding = with_sibling.clone();
+    case.aim = with_sibling;
+    case.candidate_mark = 205;
+    case.groups_mark = 205;
+    case.units_mark = 205;
+    assert_stock_recheck_refusal(run_stock_recheck(case), |error| {
+        matches!(
+            error,
+            StockItemRecheckError::SizedAtAnotherMark {
+                sized: 205,
+                binding: 210,
+                ..
+            }
+        )
+    });
+}
+
+#[test]
+fn an_admitted_draft_refuses_support_reads_of_another_company() {
+    // The recheck's own company check runs first, so this calls the draft
+    // maker directly to reach its check.
+    let own = stock_identity_from_capture();
+    let other = VerifiedCompanyIdentity::test_fixture("BRIDGE STOCK CREATE LAB OTHER", STOCK_GUID);
+    let catalogue = crate::tally::stock_item_create::StockItemCatalogue::from_candidate_read(
+        &own,
+        &stock_capture(STOCK_BEFORE),
+    )
+    .unwrap();
+    let complete = CompleteStockItemCatalogue::from_catalogue_for_test(catalogue, 210);
+    let proposed = MasterName::new(STOCK_PROPOSED).unwrap();
+    let source = MasterName::new(STOCK_SOURCE).unwrap();
+    let groups_body = stock_capture(STOCK_GROUPS);
+    let units_body = stock_capture(STOCK_UNITS);
+    for (groups_identity, units_identity) in [(&other, &own), (&own, &other)] {
+        let groups =
+            AdmittedStockGroups::from_capture_for_test(groups_identity, &groups_body, 210).unwrap();
+        let units =
+            AdmittedStockUnits::from_capture_for_test(units_identity, &units_body, 210).unwrap();
+        let name = complete.name_absent(&proposed).unwrap();
+        let sibling =
+            GoodsSibling::from_sibling(SiblingGst::named(complete.catalogue(), &source).unwrap())
+                .unwrap();
+        assert!(matches!(
+            StockItemDraft::new_admitted(name, sibling, &groups, &units),
+            Err(crate::tally::stock_item_create::DraftRefusal::OtherCatalogue)
+        ));
+    }
+    // The same reads under the target's identity build the draft.
+    let groups = AdmittedStockGroups::from_capture_for_test(&own, &groups_body, 210).unwrap();
+    let units = AdmittedStockUnits::from_capture_for_test(&own, &units_body, 210).unwrap();
+    let name = complete.name_absent(&proposed).unwrap();
+    let sibling =
+        GoodsSibling::from_sibling(SiblingGst::named(complete.catalogue(), &source).unwrap())
+            .unwrap();
+    assert!(StockItemDraft::new_admitted(name, sibling, &groups, &units).is_ok());
 }

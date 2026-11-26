@@ -1,9 +1,14 @@
 //! One native masters read, inside the bracket the Trial Balance read uses.
 use super::*;
 use crate::tally::connection::compliance_estimate;
+#[cfg(test)]
+use bridge_tally_protocol::native_masters::NativeMastersError;
 use bridge_tally_protocol::native_masters::{
     masters_worst_row_bytes, parse_native_masters, render_native_masters_request, NativeMasterKind,
     NativeMasterRow, NativeMasters, MASTERS_RESPONSE_BUDGET_BYTES,
+};
+use bridge_tally_protocol::native_stock_summary::{
+    parse_company_inventory_flags, NativeStockError, NativeStockItemCount,
 };
 use bridge_tally_protocol::native_voucher_type_numbering::{
     join_series_numbering, parse_voucher_type_numbering, render_voucher_type_numbering_request,
@@ -178,6 +183,289 @@ pub(crate) fn check_masters_premise(
         ));
     }
     Ok(())
+}
+
+/// The three collection reads from which a complete stock-item draft is proved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StockItemReadKind {
+    Candidate,
+    StockGroups,
+    Units,
+}
+
+impl StockItemReadKind {
+    const fn native(self) -> NativeMasterKind {
+        match self {
+            Self::Candidate => NativeMasterKind::StockItems,
+            Self::StockGroups => NativeMasterKind::StockGroups,
+            Self::Units => NativeMasterKind::Units,
+        }
+    }
+}
+
+/// The size admission of one stock-item-related read, made before its fetch.
+/// The pair's provenance (that it came from two sends through the queue) is the
+/// caller's proof; 5b-3b's coordinator makes it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) struct StockItemReadSize {
+    kind: StockItemReadKind,
+    master_mark: u64,
+    limit_bytes: u64,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl StockItemReadSize {
+    pub(crate) fn new(kind: StockItemReadKind, master_mark: u64) -> Result<Self, MastersReadError> {
+        let native = kind.native();
+        let estimate = admit_masters_size(native, master_mark)?;
+        Ok(Self {
+            kind,
+            master_mark,
+            limit_bytes: limit_for(native, Some(estimate)),
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_limit_for_test(
+        kind: StockItemReadKind,
+        master_mark: u64,
+        limit_bytes: u64,
+    ) -> Self {
+        Self {
+            kind,
+            master_mark,
+            limit_bytes,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn admitted_bytes(&self) -> u64 {
+        self.limit_bytes
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("stock item read size token has another kind")]
+pub(crate) struct StockItemReadKindError {
+    expected: StockItemReadKind,
+    actual: StockItemReadKind,
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[error("stock item row count differs from the company count")]
+pub(crate) struct StockItemCountMismatch {
+    pub(crate) rows: usize,
+    pub(crate) tally_count: u64,
+}
+
+/// A stable, sized, company-bound candidate answer whose row count Tally's own
+/// company count confirms.
+#[derive(Debug)]
+pub(crate) struct AdmittedCandidateRead {
+    company: VerifiedCompanyIdentity,
+    body: String,
+    sized_mark: u64,
+}
+
+impl AdmittedCandidateRead {
+    pub(crate) fn company(&self) -> &VerifiedCompanyIdentity {
+        &self.company
+    }
+
+    pub(crate) fn body(&self) -> &str {
+        &self.body
+    }
+
+    pub(crate) const fn sized_mark(&self) -> u64 {
+        self.sized_mark
+    }
+}
+
+/// The parsed stock groups of one stable, sized read of the same company.
+#[derive(Debug)]
+pub(crate) struct AdmittedStockGroups {
+    company: VerifiedCompanyIdentity,
+    rows: Vec<NativeMasterRow>,
+    sized_mark: u64,
+}
+
+impl AdmittedStockGroups {
+    pub(crate) fn company(&self) -> &VerifiedCompanyIdentity {
+        &self.company
+    }
+
+    pub(crate) fn rows(&self) -> &[NativeMasterRow] {
+        &self.rows
+    }
+
+    pub(crate) const fn sized_mark(&self) -> u64 {
+        self.sized_mark
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_capture_for_test(
+        company: &VerifiedCompanyIdentity,
+        body: &str,
+        sized_mark: u64,
+    ) -> Result<Self, NativeMastersError> {
+        let rows =
+            parse_native_masters(NativeMasterKind::StockGroups, body, company.company_guid())?.rows;
+        Ok(Self {
+            company: company.clone(),
+            rows,
+            sized_mark,
+        })
+    }
+}
+
+/// The parsed units of one stable, sized read of the same company.
+#[derive(Debug)]
+pub(crate) struct AdmittedStockUnits {
+    company: VerifiedCompanyIdentity,
+    rows: Vec<NativeMasterRow>,
+    sized_mark: u64,
+}
+
+impl AdmittedStockUnits {
+    pub(crate) fn company(&self) -> &VerifiedCompanyIdentity {
+        &self.company
+    }
+
+    pub(crate) fn rows(&self) -> &[NativeMasterRow] {
+        &self.rows
+    }
+
+    pub(crate) const fn sized_mark(&self) -> u64 {
+        self.sized_mark
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_capture_for_test(
+        company: &VerifiedCompanyIdentity,
+        body: &str,
+        sized_mark: u64,
+    ) -> Result<Self, NativeMastersError> {
+        let rows =
+            parse_native_masters(NativeMasterKind::Units, body, company.company_guid())?.rows;
+        Ok(Self {
+            company: company.clone(),
+            rows,
+            sized_mark,
+        })
+    }
+}
+
+fn require_stock_item_read_kind(
+    size: &StockItemReadSize,
+    expected: StockItemReadKind,
+) -> Result<(), StockItemReadKindError> {
+    if size.kind != expected {
+        return Err(StockItemReadKindError {
+            expected,
+            actual: size.kind,
+        });
+    }
+    Ok(())
+}
+
+/// Admits the candidate and company-count answers as one complete candidate
+/// read. The pair's provenance (that it came from two sends through the queue)
+/// is the caller's proof; 5b-3b's coordinator makes it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn admit_candidate_stock_item_read(
+    size: StockItemReadSize,
+    identity: &VerifiedCompanyIdentity,
+    candidate_pair: NativePairedRead,
+    inventory_pair: NativePairedRead,
+) -> anyhow::Result<AdmittedCandidateRead> {
+    require_stock_item_read_kind(&size, StockItemReadKind::Candidate)?;
+    let (body, encoded_bytes, _) =
+        candidate_pair.require_stable(PairedReadValidationError::MastersCollection)?;
+    let (count_body, _, _) =
+        inventory_pair.require_stable(PairedReadValidationError::StockSummaryCollection)?;
+    let candidate =
+        parse_native_masters(NativeMasterKind::StockItems, &body, identity.company_guid())?;
+    check_masters_premise(
+        &candidate.rows,
+        size.master_mark,
+        encoded_bytes,
+        size.limit_bytes,
+    )?;
+    let count = parse_company_inventory_flags(&count_body, identity.company_guid())?.item_count;
+    match count {
+        NativeStockItemCount::Unavailable => {
+            return Err(NativeStockError::ItemCountUnavailable.into())
+        }
+        NativeStockItemCount::Reported(tally_count)
+            if tally_count != u64::try_from(candidate.rows.len()).unwrap_or(u64::MAX) =>
+        {
+            return Err(StockItemCountMismatch {
+                rows: candidate.rows.len(),
+                tally_count,
+            }
+            .into());
+        }
+        NativeStockItemCount::Reported(_) => {}
+    }
+    Ok(AdmittedCandidateRead {
+        company: identity.clone(),
+        body,
+        sized_mark: size.master_mark,
+    })
+}
+
+/// Admits one stock-group answer. The pair's provenance (that it came from two
+/// sends through the queue) is the caller's proof; 5b-3b's coordinator makes it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn admit_stock_groups(
+    size: StockItemReadSize,
+    identity: &VerifiedCompanyIdentity,
+    pair: NativePairedRead,
+) -> anyhow::Result<AdmittedStockGroups> {
+    require_stock_item_read_kind(&size, StockItemReadKind::StockGroups)?;
+    let (body, encoded_bytes, _) =
+        pair.require_stable(PairedReadValidationError::MastersCollection)?;
+    let parsed = parse_native_masters(
+        NativeMasterKind::StockGroups,
+        &body,
+        identity.company_guid(),
+    )?;
+    check_masters_premise(
+        &parsed.rows,
+        size.master_mark,
+        encoded_bytes,
+        size.limit_bytes,
+    )?;
+    Ok(AdmittedStockGroups {
+        company: identity.clone(),
+        rows: parsed.rows,
+        sized_mark: size.master_mark,
+    })
+}
+
+/// Admits one unit answer. The pair's provenance (that it came from two sends
+/// through the queue) is the caller's proof; 5b-3b's coordinator makes it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn admit_stock_units(
+    size: StockItemReadSize,
+    identity: &VerifiedCompanyIdentity,
+    pair: NativePairedRead,
+) -> anyhow::Result<AdmittedStockUnits> {
+    require_stock_item_read_kind(&size, StockItemReadKind::Units)?;
+    let (body, encoded_bytes, _) =
+        pair.require_stable(PairedReadValidationError::MastersCollection)?;
+    let parsed = parse_native_masters(NativeMasterKind::Units, &body, identity.company_guid())?;
+    check_masters_premise(
+        &parsed.rows,
+        size.master_mark,
+        encoded_bytes,
+        size.limit_bytes,
+    )?;
+    Ok(AdmittedStockUnits {
+        company: identity.clone(),
+        rows: parsed.rows,
+        sized_mark: size.master_mark,
+    })
 }
 
 /// The premise of the numbering read, checked against its answer: its rows

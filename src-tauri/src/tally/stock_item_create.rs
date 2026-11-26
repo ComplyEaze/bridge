@@ -15,11 +15,11 @@
 //! `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/`; see their
 //! `PROVENANCE.md` (PARTIAL: one book, one release, one sitting).
 //!
-//! The catalogue keeps the verified company it was read for. The proof holds
-//! for the answer it was built from, and nothing here shows that answer is the
-//! whole book. Before any caller acts on a name shown absent, the answer must
-//! come from the one request builder, be admitted by size, and agree with the
-//! company's stock item count (§12a.13). That caller is a later pull request.
+//! The partial catalogue keeps the verified company it was read for. The
+//! complete catalogue owns the 5b-3a proof that its answer came from an admitted
+//! read whose rows agree with the company's stock item count (§12a.13). The
+//! 5b-3b coordinator owns obtaining the paired reads through the queue; nothing
+//! in this transport-independent part reads or sends.
 //!
 //! `SiblingGst` is the one item that holds a given name exactly, as its row name
 //! or a name entry, with its six source fields present as read. A field of only
@@ -60,6 +60,7 @@
 
 use super::approved_import::StockItemConfirmation;
 use super::master_name::MasterName;
+use super::runtime::{AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits};
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError, NameCollision,
@@ -67,9 +68,9 @@ use bridge_tally_core::master_name_index::{
 use bridge_tally_protocol::gst_details::{GstDetailsEntry, GstDetailsObservation, GstRate};
 use bridge_tally_protocol::hsn_details::{HsnDetailsEntry, HsnDetailsObservation};
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
-use bridge_tally_protocol::native_masters::{
-    parse_native_masters, NativeMasterKind, NativeMastersError,
-};
+#[cfg(test)]
+use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
+use bridge_tally_protocol::native_masters::{NativeMasterRow, NativeMastersError};
 use bridge_tally_protocol::stock_item_candidate::{
     parse_candidate_stock_items, CandidateStockItem, ScalarObservation,
 };
@@ -254,6 +255,14 @@ pub(crate) struct StockItemCatalogue {
     index: MasterNameIndex,
 }
 
+/// A candidate catalogue whose admitted row count equals Tally's company count,
+/// together with the master mark at which its read was sized.
+#[derive(Debug)]
+pub(crate) struct CompleteStockItemCatalogue {
+    catalogue: StockItemCatalogue,
+    sized_mark: u64,
+}
+
 /// Why a candidate read gives no catalogue. Carries no name from the book.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum StockItemCatalogueError {
@@ -331,8 +340,7 @@ impl StockItemCatalogue {
         &self.items
     }
 
-    /// Shows `name` absent, or names the first item it could be taken for.
-    pub(crate) fn name_absent(
+    fn name_absent_proof(
         &self,
         name: &MasterName,
     ) -> Result<ItemNameAbsent<'_>, ItemNameNotAbsent> {
@@ -347,6 +355,55 @@ impl StockItemCatalogue {
             catalogue: self,
             name: name.clone(),
         })
+    }
+
+    /// The partial check remains available to its existing unit tests only.
+    #[cfg(test)]
+    pub(crate) fn name_absent(
+        &self,
+        name: &MasterName,
+    ) -> Result<ItemNameAbsent<'_>, ItemNameNotAbsent> {
+        self.name_absent_proof(name)
+    }
+}
+
+impl CompleteStockItemCatalogue {
+    /// Re-parses an admitted candidate body into the catalogue it proves whole.
+    pub(crate) fn from_admitted(
+        read: AdmittedCandidateRead,
+    ) -> Result<Self, StockItemCatalogueError> {
+        let catalogue = StockItemCatalogue::from_candidate_read(read.company(), read.body())?;
+        Ok(Self {
+            catalogue,
+            sized_mark: read.sized_mark(),
+        })
+    }
+
+    /// Shows `name` absent from the complete candidate answer, or names the
+    /// first item it could be taken for.
+    pub(crate) fn name_absent(
+        &self,
+        name: &MasterName,
+    ) -> Result<ItemNameAbsent<'_>, ItemNameNotAbsent> {
+        self.catalogue.name_absent_proof(name)
+    }
+
+    /// The parsed candidate catalogue, read-only.
+    pub(crate) fn catalogue(&self) -> &StockItemCatalogue {
+        &self.catalogue
+    }
+
+    /// The master mark at which the candidate read was sized.
+    pub(crate) const fn sized_mark(&self) -> u64 {
+        self.sized_mark
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_catalogue_for_test(catalogue: StockItemCatalogue, sized_mark: u64) -> Self {
+        Self {
+            catalogue,
+            sized_mark,
+        }
     }
 }
 
@@ -687,6 +744,7 @@ pub(crate) struct StockItemDraft<'a> {
 impl<'a> StockItemDraft<'a> {
     /// Checks the proposed name and sibling against the same company's group
     /// and unit reads, then admits the first measured copy's structure (§12a.13).
+    #[cfg(test)]
     pub(crate) fn new(
         name: ItemNameAbsent<'a>,
         sibling: GoodsSibling<'a>,
@@ -699,18 +757,43 @@ impl<'a> StockItemDraft<'a> {
         let company_guid = name.catalogue().company().company_guid();
         let groups = parse_native_masters(NativeMasterKind::StockGroups, groups, company_guid)
             .map_err(DraftRefusal::GroupsUnreadable)?;
-        let parent = sibling.sibling().parent();
-        if !groups.rows.iter().any(|row| row.name == parent) {
-            return Err(DraftRefusal::ParentNotInBook);
-        }
         let units = parse_native_masters(NativeMasterKind::Units, units, company_guid)
             .map_err(DraftRefusal::UnitsUnreadable)?;
+        Self::from_rows(name, sibling, &groups.rows, &units.rows)
+    }
+
+    /// Builds a draft only from the admitted, already parsed support reads.
+    pub(crate) fn new_admitted(
+        name: ItemNameAbsent<'a>,
+        sibling: GoodsSibling<'a>,
+        groups: &AdmittedStockGroups,
+        units: &AdmittedStockUnits,
+    ) -> Result<Self, DraftRefusal> {
+        let company = name.catalogue().company();
+        if groups.company() != company || units.company() != company {
+            return Err(DraftRefusal::OtherCatalogue);
+        }
+        Self::from_rows(name, sibling, groups.rows(), units.rows())
+    }
+
+    fn from_rows(
+        name: ItemNameAbsent<'a>,
+        sibling: GoodsSibling<'a>,
+        groups: &[NativeMasterRow],
+        units: &[NativeMasterRow],
+    ) -> Result<Self, DraftRefusal> {
+        if !std::ptr::eq(name.catalogue(), sibling.sibling().catalogue()) {
+            return Err(DraftRefusal::OtherCatalogue);
+        }
+        let parent = sibling.sibling().parent();
+        if !groups.iter().any(|row| row.name == parent) {
+            return Err(DraftRefusal::ParentNotInBook);
+        }
         let unit = sibling.sibling().unit();
-        if !units.rows.iter().any(|row| row.name == unit) {
+        if !units.iter().any(|row| row.name == unit) {
             return Err(DraftRefusal::UnitNotInBook);
         }
         let (gst, hsn) = measured_shape(sibling.sibling())?;
-
         Ok(Self {
             sibling,
             name: name.name().clone(),
@@ -719,6 +802,18 @@ impl<'a> StockItemDraft<'a> {
             gst,
             hsn,
         })
+    }
+
+    /// Whether rebuilding the draft would write every field the shown draft
+    /// writes, from exactly the same selected source item.
+    pub(crate) fn same_create(&self, other: &StockItemDraft<'_>) -> bool {
+        self.name == other.name
+            && self.sibling.sibling().source_name() == other.sibling.sibling().source_name()
+            && self.sibling.sibling().guid() == other.sibling.sibling().guid()
+            && self.parent == other.parent
+            && self.unit == other.unit
+            && self.gst == other.gst
+            && self.hsn == other.hsn
     }
 
     /// The proposed name proved absent from this catalogue.

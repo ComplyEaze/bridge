@@ -29,6 +29,9 @@ use crate::tally::approved_import::{
     Answered, ApprovedImport, PendingPostApproval, PostKind, UnderLockRefusal,
 };
 use crate::tally::ledger_create_item::LedgerCreateBatch;
+use crate::tally::stock_item_create::{
+    render_stock_item_create, PreparedStockItem, StockItemWrites,
+};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -145,6 +148,14 @@ enum BindingSubject {
         company: MasterCompanyTuple,
         batch: LedgerCreateBatch,
     },
+    /// One stock item `Create`: the verified company's tuple and every value
+    /// it writes, owned. A post of the masters kind, never equal to a ledger
+    /// binding, whose subject is the other variant. Boxed: the writes are
+    /// many times the size of the other subjects.
+    StockItem {
+        company: MasterCompanyTuple,
+        writes: Box<StockItemWrites>,
+    },
 }
 
 /// The verified company a master approval is for, as the person was shown it.
@@ -154,6 +165,17 @@ struct MasterCompanyTuple {
     guid: String,
     company_number: String,
     books_from: String,
+}
+
+impl MasterCompanyTuple {
+    fn of(company: &VerifiedCompanyIdentity) -> Self {
+        Self {
+            name: company.display_name().to_string(),
+            guid: company.company_guid().to_string(),
+            company_number: company.company_number().to_string(),
+            books_from: company.books_from_yyyymmdd().to_string(),
+        }
+    }
 }
 
 impl ApprovalBinding {
@@ -196,13 +218,31 @@ impl ApprovalBinding {
             endpoint_origin: Some(endpoint_origin.to_string()),
             preview_sha256: sha256_hex(preview.as_bytes()),
             subject: BindingSubject::Masters {
-                company: MasterCompanyTuple {
-                    name: company.display_name().to_string(),
-                    guid: company.company_guid().to_string(),
-                    company_number: company.company_number().to_string(),
-                    books_from: company.books_from_yyyymmdd().to_string(),
-                },
+                company: MasterCompanyTuple::of(company),
                 batch: batch.clone(),
+            },
+        }
+    }
+
+    /// The binding of one stock item `Create`: the batch digest, the endpoint,
+    /// the verified company tuple the item was prepared for, every value it
+    /// writes, and the preview the person was shown.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn stock_item(
+        batch_sha256: &str,
+        endpoint_origin: &str,
+        prepared: &PreparedStockItem,
+        preview: &str,
+    ) -> Self {
+        Self {
+            // One item has the one form: its box shows every copied field.
+            form: PreviewForm::Listed,
+            batch_sha256: batch_sha256.to_string(),
+            endpoint_origin: Some(endpoint_origin.to_string()),
+            preview_sha256: sha256_hex(preview.as_bytes()),
+            subject: BindingSubject::StockItem {
+                company: MasterCompanyTuple::of(prepared.company()),
+                writes: Box::new(prepared.writes().clone()),
             },
         }
     }
@@ -210,7 +250,7 @@ impl ApprovalBinding {
     pub(super) fn kind(&self) -> PostKind {
         match self.subject {
             BindingSubject::Vouchers { .. } => PostKind::Vouchers,
-            BindingSubject::Masters { .. } => PostKind::Masters,
+            BindingSubject::Masters { .. } | BindingSubject::StockItem { .. } => PostKind::Masters,
         }
     }
 
@@ -218,7 +258,7 @@ impl ApprovalBinding {
     fn voucher_count(&self) -> Option<usize> {
         match self.subject {
             BindingSubject::Vouchers { voucher_count, .. } => Some(voucher_count),
-            BindingSubject::Masters { .. } => None,
+            BindingSubject::Masters { .. } | BindingSubject::StockItem { .. } => None,
         }
     }
 }
@@ -229,13 +269,17 @@ impl ApprovalBinding {
 pub(super) enum HeldRequest {
     Vouchers(NativePostRequest),
     Masters(MasterPostRequest),
+    /// One stock item `Create`, held as prepared: its bytes are rendered from
+    /// it by the one renderer whenever they are compared. Boxed, as the
+    /// binding's writes are.
+    StockItem(Box<PreparedStockItem>),
 }
 
 impl HeldRequest {
     pub(super) fn kind(&self) -> PostKind {
         match self {
             Self::Vouchers(_) => PostKind::Vouchers,
-            Self::Masters(_) => PostKind::Masters,
+            Self::Masters(_) | Self::StockItem(_) => PostKind::Masters,
         }
     }
 }
@@ -249,6 +293,12 @@ impl From<NativePostRequest> for HeldRequest {
 impl From<MasterPostRequest> for HeldRequest {
     fn from(request: MasterPostRequest) -> Self {
         Self::Masters(request)
+    }
+}
+
+impl From<PreparedStockItem> for HeldRequest {
+    fn from(prepared: PreparedStockItem) -> Self {
+        Self::StockItem(Box::new(prepared))
     }
 }
 
@@ -1060,12 +1110,16 @@ impl Drop for PostApprovals {
 }
 
 /// A master approval is held with the request it was rendered for: the bytes
-/// the approval would send are the bytes held beside it. A voucher request has
-/// no such pair to compare.
+/// the approval would send are the bytes held beside it, for a stock item the
+/// bytes its one renderer gives the held item. A voucher request has no such
+/// pair to compare.
 fn held_matches_approved(held: &HeldRequest, approved: &ApprovedImport) -> bool {
     match held {
         HeldRequest::Vouchers(_) => true,
         HeldRequest::Masters(request) => approved.sends_exactly(request.xml()),
+        HeldRequest::StockItem(prepared) => {
+            approved.sends_exactly(&render_stock_item_create(prepared))
+        }
     }
 }
 

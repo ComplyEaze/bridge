@@ -413,8 +413,8 @@ impl Redemption<'_> {
         &self.batch_id
     }
 
-    /// Spend this approval, once: its own batch and id, through
-    /// [`PostApprovals::spend`], so a call can spend only what it took.
+    /// Spend this approval, once: its own batch and id, through the holder
+    /// that gave it, so a call can spend only what it took.
     pub(super) fn spend(&self) -> Result<(), UnderLockRefusal> {
         self.approvals.spend(&self.batch_id, self.id)
     }

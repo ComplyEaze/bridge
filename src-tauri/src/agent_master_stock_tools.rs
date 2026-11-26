@@ -39,8 +39,7 @@ impl Server {
         let sibling =
             MasterName::new(sibling).map_err(|error| master_name_code(error).to_string())?;
         let (_, identity, identity_evidence) = self.verified_company(company_guid).await?;
-        let origin = crate::agent::canonical_loopback_origin(&self.settings.endpoint)
-            .map_err(|_| "host_setting_invalid".to_string())?;
+        let origin = self.master_preview_origin()?;
         let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
             crate::agent::read_profiles::render_agent_company_high_water(identity.display_name()),
         )

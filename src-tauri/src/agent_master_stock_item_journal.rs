@@ -112,7 +112,7 @@ impl StoredStockItemCreate {
 /// [`StockItemReadBackBasis::from_journal`]'s.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct StockItemBatch {
+pub(in crate::agent) struct StockItemBatch {
     batch_id: String,
     /// `StockItemWrites::create_sha256` for the verified company.
     batch_sha256: String,
@@ -122,7 +122,7 @@ pub(super) struct StockItemBatch {
 }
 
 impl StockItemBatch {
-    pub(super) fn new(
+    pub(in crate::agent) fn new(
         batch_id: String,
         identity: &VerifiedCompanyIdentity,
         writes: &StockItemWrites,

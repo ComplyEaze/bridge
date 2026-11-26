@@ -10,6 +10,7 @@
 //! unsafe-character checks are the voucher preview's own.
 use super::super::failure_code::{create_render_refusal_code, StockItemCreateCode};
 use super::approval::{ApprovalBinding, HeldRequest};
+use super::master_ledger::stock_item_journal::StockItemBatch;
 use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
@@ -369,6 +370,17 @@ impl ShownStockItem {
     /// the take, the fresh binding of a fresh draft.
     pub(super) fn binding(&self) -> ApprovalBinding {
         ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)
+    }
+
+    /// The preview the person will be shown, for the prepare's answer.
+    pub(super) fn preview(&self) -> &str {
+        &self.preview
+    }
+
+    /// The journal batch of the Create shown, recorded under `batch_id`: its
+    /// company, stored writes and digest are the shown item's own.
+    pub(super) fn batch(&self, batch_id: String) -> Result<StockItemBatch, CreateRenderRefusal> {
+        StockItemBatch::new(batch_id, self.prepared.company(), self.prepared.writes())
     }
 
     /// Shows the preview in the stock-item dialog, on its own task, and on the

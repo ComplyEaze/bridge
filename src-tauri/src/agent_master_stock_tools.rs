@@ -33,6 +33,7 @@ use super::super::master_ledger::stock_item_journal::{
     record_stock_item_intent, StockIntentRefusal, StockItemBatch,
 };
 use super::super::master_ledger::JournalRecord;
+use super::super::master_post::StockItemRecheckError;
 use super::super::master_post::{recheck_stock_item_for_dispatch, stock_company_marks};
 use super::super::master_review::{show_stock_item_draft, ShownStockItem};
 use super::*;
@@ -64,6 +65,14 @@ const STOCK_SENT_NOTE: &str = "A send of this batch is recorded: it was sent to 
 const STOCK_UNKNOWN_NOTE: &str = "Whether this batch was sent to Tally is not known: the journal could not be read just now. The stock item is NOT verified.";
 /// A stock item name an unsettled stock dispatch holds.
 const STOCK_HOLD_NOTE: &str = "Nothing was sent. A stock item create ComplyEaze Bridge sent earlier for this name, or for a name that may be the same stock item, is not settled, and it holds the name in every company this data folder holds stock batches for. Do not create the stock item in Tally by hand meanwhile: the earlier create may still be waiting in Tally.";
+/// A stock batch whose send another call recorded after this call began.
+const STOCK_SENT_SINCE_NOTE: &str = "This call sent nothing. A send of this batch has been recorded since by another call; it may have been sent. The stock item is NOT verified.";
+/// A stock batch the hold check could not find in the journal it read.
+const STOCK_HOLD_UNREAD_NOTE: &str = "This call sent nothing. The journal could not be read just now to say which batch holds this stock item name.";
+/// The step after a stock item refused for a name an open dispatch holds.
+const STOCK_HOLD_NEXT_STEP: &str = "When the stock item creates that hold the name are settled, post this batch again. Do not create the stock item in Tally by hand meanwhile.";
+/// The step after a hold check that could not read the journal.
+const STOCK_UNREAD_NEXT_STEP: &str = "Post this batch again later: the journal is read again then. Do not create the stock item in Tally by hand meanwhile.";
 
 impl Server {
     /// Prepare ONE stock item, a copy of the sibling stock item `sibling` under
@@ -284,7 +293,7 @@ impl Server {
             // again (#725).
             drop(taken);
             self.drop_listing_snapshots(identity.company_guid());
-            let posted = posted.map_err(post_failure)?;
+            let posted = posted.map_err(stock_post_failure)?;
             for read in [&posted.admission_evidence, &posted.response_evidence] {
                 accumulated = combine_evidence(
                     accumulated.clone(),
@@ -405,52 +414,76 @@ fn stock_sent(
 }
 
 /// The answer to a stock item refused before the ask by what `view` shows of
-/// the stock journal; `None` when no open dispatch holds its name.
+/// the stock journal, view by view as the ledger post's
+/// `overlap_refusal_outcome` answers; `None` when no open dispatch holds its
+/// name. This call sent nothing in any case.
 fn stock_hold_refusal(
     batch_id: &str,
     guid: &str,
     accumulated: &Evidence,
     view: &OverlapView,
 ) -> Option<ToolOutcome> {
-    let held = match view {
+    let (code, attempted, dispatch, message, next_step) = match view {
         OverlapView::Settled => return None,
-        OverlapView::Held(held) => held,
-        OverlapView::SendRecordedSince => {
-            let code = UnderLockRefusal::AlreadyAttempted.code();
-            return Some(stock_sent(
-                batch_id,
-                guid,
-                accumulated.clone(),
-                code,
-                Some(true),
-            ));
-        }
-        OverlapView::Unread => {
-            return Some(stock_sent(
-                batch_id,
-                guid,
-                accumulated.clone(),
-                OVERLAP_CODE,
-                None,
-            ));
-        }
+        OverlapView::Held(_) => (
+            OVERLAP_CODE,
+            json!(false),
+            "not_dispatched",
+            STOCK_HOLD_NOTE,
+            STOCK_HOLD_NEXT_STEP,
+        ),
+        OverlapView::SendRecordedSince => (
+            UnderLockRefusal::AlreadyAttempted.code(),
+            json!(true),
+            "reconciliation_required",
+            STOCK_SENT_SINCE_NOTE,
+            STOCK_NEXT_STEP,
+        ),
+        // This call recorded nothing; whether another did is not known.
+        OverlapView::Unread => (
+            OVERLAP_CODE,
+            Value::Null,
+            "not_dispatched",
+            STOCK_HOLD_UNREAD_NOTE,
+            STOCK_UNREAD_NEXT_STEP,
+        ),
     };
     let mut evidence = accumulated.clone();
     evidence.state = "partial";
-    evidence.reason_code = Some(OVERLAP_CODE.to_string());
-    let mut error = json!({"code": OVERLAP_CODE, "message": STOCK_HOLD_NOTE, "hold": view.code()});
-    held.add_to(&mut error);
+    evidence.reason_code = Some(code.to_string());
+    let mut error =
+        json!({"code": code, "message": message, "hold": view.code(), "next_step": next_step});
+    if let OverlapView::Held(held) = view {
+        held.add_to(&mut error);
+    }
     Some(ToolOutcome {
         payload: json!({"result": {
             "batch_id": batch_id,
-            "attempt_recorded": false,
-            "dispatch": {"state": "not_dispatched", "resent": false},
+            "attempt_recorded": attempted,
+            "dispatch": {"state": dispatch, "resent": false},
             "error": error,
         }}),
         evidence,
         company_guid: Some(guid.to_string()),
         truncated: false,
     })
+}
+
+/// The refusal a failed stock dispatch becomes: a stock recheck refused in the
+/// queue answers the code the prepare gives the same condition, and anything
+/// else is mapped as the ledger post maps it.
+fn stock_post_failure(error: anyhow::Error) -> ToolFailure {
+    use StockItemRecheckError::{Catalogue, Draft, NameNotAbsent, NotGoods, Sibling};
+    let refused = (error.chain()).find_map(|cause| cause.downcast_ref::<StockItemRecheckError>());
+    let code = match refused {
+        Some(NameNotAbsent(refusal)) => item_name_refusal_code(refusal),
+        Some(Sibling(refusal)) => sibling_refusal_code(refusal),
+        Some(NotGoods(refusal)) => not_goods_refusal_code(refusal),
+        Some(Draft(refusal)) => draft_refusal_code(refusal),
+        Some(Catalogue(refusal)) => stock_item_catalogue_refusal_code(refusal),
+        _ => return post_failure(error),
+    };
+    ToolFailure::from(code)
 }
 
 /// The draft of `name` copied from `sibling`, built from the one execution's

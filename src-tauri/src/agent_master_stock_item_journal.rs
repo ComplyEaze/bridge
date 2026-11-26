@@ -329,7 +329,7 @@ pub(in crate::agent::agent_import) enum StockIntentRefusal {
 /// exclusive lock and in its order: the batch undispatched and unchanged, the
 /// token and the approval of that batch, the token of that digest, the
 /// journal's admission, then the spend of `redemption`, the sidecar and the
-/// intent. Nothing shipped calls it yet.
+/// intent. Its only caller is the stock post, which nothing registers.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(in crate::agent::agent_import) fn record_stock_item_intent(
     data_dir: &Path,

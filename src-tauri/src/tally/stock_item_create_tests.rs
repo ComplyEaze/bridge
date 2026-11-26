@@ -2066,3 +2066,142 @@ fn create_text_refusals_follow_field_and_check_order() {
         },
     );
 }
+
+/// The captured marked draft's writes as stored plain values; the draft and
+/// its catalogue are gone when this returns.
+fn captured_plain_writes() -> PlainStockItemWrites {
+    let before = catalogue(&decode(BEFORE));
+    let built = draft(
+        &before,
+        "SC Copied Marked",
+        "SC Sibling Goods",
+        &decode(GROUPS),
+        &decode(UNITS),
+    )
+    .expect("the captured values draft");
+    built.writes().to_plain()
+}
+
+#[test]
+fn rebuilt_writes_equal_the_draft_and_digest_as_the_captured_marked_request() {
+    let before = catalogue(&decode(BEFORE));
+    let built = draft(
+        &before,
+        "SC Copied Marked",
+        "SC Sibling Goods",
+        &decode(GROUPS),
+        &decode(UNITS),
+    )
+    .expect("the captured values draft");
+    let rebuilt =
+        StockItemWrites::rebuild(&captured_plain_writes()).expect("the stored values admit");
+    assert_eq!(&rebuilt, built.writes());
+    assert_eq!(rebuilt.sibling_guid(), SIBLING_GUID);
+    assert_eq!(rebuilt.sibling_source_name().as_str(), "SC Sibling Goods");
+    let captured = decode_xml_bytes(MARKED_REQUEST).expect("the marked request decodes");
+    assert_eq!(
+        rebuilt.create_sha256(&company()),
+        Ok(sha256_hex(captured.as_bytes()))
+    );
+    assert_eq!(
+        rebuilt.create_sha256(&company()),
+        Ok(sha256_hex(
+            render_captured_create("SC Copied Marked").as_bytes()
+        ))
+    );
+}
+
+fn assert_rebuild_refusal(
+    edit: impl FnOnce(&mut PlainStockItemWrites),
+    expected: WritesRebuildRefusal,
+) {
+    let mut plain = captured_plain_writes();
+    edit(&mut plain);
+    assert_eq!(StockItemWrites::rebuild(&plain), Err(expected));
+}
+
+#[test]
+fn a_stored_rate_other_than_the_measured_one_is_refused_at_its_row() {
+    use DraftRefusal::{DutyHeadNotMeasured, RateNotMeasured};
+    use WritesRebuildRefusal::Shape;
+    // Each edit is a hand edit of the stored values, not a captured state.
+    fn rate(row: usize, text: Option<&'static str>) -> impl FnOnce(&mut PlainStockItemWrites) {
+        move |plain| plain.rates[row].rate = text.map(str::to_owned)
+    }
+    assert_rebuild_refusal(rate(0, Some("9%")), Shape(RateNotMeasured { row: 0 }));
+    assert_rebuild_refusal(rate(1, Some(" 9")), Shape(RateNotMeasured { row: 1 }));
+    assert_rebuild_refusal(rate(2, Some("0.00")), Shape(RateNotMeasured { row: 2 }));
+    assert_rebuild_refusal(rate(2, None), Shape(RateNotMeasured { row: 2 }));
+    assert_rebuild_refusal(rate(3, Some("1")), Shape(RateNotMeasured { row: 3 }));
+    assert_rebuild_refusal(
+        |plain| plain.rates.swap(0, 1),
+        Shape(DutyHeadNotMeasured { row: 0 }),
+    );
+    assert_rebuild_refusal(
+        |plain| {
+            plain.rates.pop();
+        },
+        Shape(DutyHeadNotMeasured { row: 4 }),
+    );
+    assert_rebuild_refusal(
+        |plain| plain.rates.push(plain.rates[4].clone()),
+        Shape(DutyHeadNotMeasured { row: 5 }),
+    );
+}
+
+#[test]
+fn a_stored_date_the_protocol_crate_refuses_is_refused() {
+    // Hand edits of the stored values, not captured states.
+    assert_rebuild_refusal(
+        |plain| plain.gst_applicable_from = "20250431".to_owned(),
+        WritesRebuildRefusal::GstDateInvalid,
+    );
+    assert_rebuild_refusal(
+        |plain| plain.gst_applicable_from = " 20250401".to_owned(),
+        WritesRebuildRefusal::GstDateInvalid,
+    );
+    assert_rebuild_refusal(
+        |plain| plain.hsn_applicable_from = "2025-04-01".to_owned(),
+        WritesRebuildRefusal::HsnDateInvalid,
+    );
+}
+
+#[test]
+fn stored_text_is_refused_by_the_create_text_rule_and_the_name_rule() {
+    use WritesRebuildRefusal::{Name, Shape, SiblingGuidBlank, SourceName, Text};
+    // Hand edits of the stored values, not captured states.
+    assert_rebuild_refusal(
+        |plain| plain.parent = "SC Goods & Group".to_owned(),
+        Text(CreateRenderRefusal::TextNeedsEscaping {
+            field: DraftText::Parent,
+        }),
+    );
+    assert_rebuild_refusal(
+        |plain| plain.unit = " Nos".to_owned(),
+        Text(CreateRenderRefusal::TextNotPlain {
+            field: DraftText::Unit,
+        }),
+    );
+    assert_rebuild_refusal(
+        |plain| plain.name = "SC Copied <Marked>".to_owned(),
+        Text(CreateRenderRefusal::TextNeedsEscaping {
+            field: DraftText::Name,
+        }),
+    );
+    assert_rebuild_refusal(
+        |plain| plain.name = "SC  Copied".to_owned(),
+        Name(MasterNameError::RepeatedSpaces),
+    );
+    assert_rebuild_refusal(
+        |plain| plain.sibling_source_name = String::new(),
+        SourceName(MasterNameError::Empty),
+    );
+    assert_rebuild_refusal(
+        |plain| plain.sibling_guid = " ".to_owned(),
+        SiblingGuidBlank,
+    );
+    assert_rebuild_refusal(
+        |plain| plain.hsn_code = format!("{TALLY_SANITIZED_ROOT_MARKER} 39239090"),
+        Shape(DraftRefusal::HsnNotMeasured),
+    );
+}

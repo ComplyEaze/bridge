@@ -181,7 +181,7 @@ fn recheck_stock_item_admission(input: StockItemRecheckInput<'_, '_>) -> anyhow:
     let sibling = GoodsSibling::from_sibling(sibling).map_err(StockItemRecheckError::NotGoods)?;
     let fresh = StockItemDraft::new_admitted(name, sibling, input.groups, input.units)
         .map_err(StockItemRecheckError::Draft)?;
-    if !fresh.same_create(shown) {
+    if fresh.writes() != shown.writes() {
         return Err(StockItemRecheckError::DraftChanged.into());
     }
     Ok(())

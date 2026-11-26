@@ -2480,7 +2480,9 @@ pub(crate) mod coordinator {
         let rate = "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>";
         let changed = rebound_before().replacen(rate, "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>", 1);
         assert_ne!(changed, rebound_before());
-        let cases: [(Vec<ScenarioPlan>, fn(&anyhow::Error) -> bool); 4] = [
+        // Whether a run's error is the case's typed refusal.
+        type RefusedAs = fn(&anyhow::Error) -> bool;
+        let cases: [(Vec<ScenarioPlan>, RefusedAs); 4] = [
             (stock_answers(after, 3, marks_at(289)), |error| {
                 matches!(
                     stock_refusal(error),

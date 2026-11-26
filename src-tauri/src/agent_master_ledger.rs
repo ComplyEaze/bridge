@@ -91,6 +91,10 @@ use uuid::Uuid;
 
 /// The ledger journal's file.
 const JOURNAL_FILE: &str = <MasterBatch as JournalBatch>::JOURNAL_FILE;
+
+// The stock-item kind: its batch line and the one basis its read-back takes.
+#[path = "agent_master_stock_item_journal.rs"]
+pub(super) mod stock_item_journal;
 const PRE_IMAGE_PREFIX: &str = "master-pre-image-";
 
 /// Proof that the import admission lock is held exclusively. Built only by
@@ -124,12 +128,14 @@ impl ExclusiveAdmission {
     }
 }
 
-/// Whether `name` is a file this module writes: the journal, a sidecar named for
+/// Whether `name` is a file this module writes: a journal, a sidecar named for
 /// a well-formed batch id, or the stage a sidecar write leaves behind if it stops
 /// (`<batch id>.<uuid>.next`). The local-data report classes these with the
 /// import journal.
 pub(super) fn is_master_file(name: &str) -> bool {
-    if name == JOURNAL_FILE {
+    if name == JOURNAL_FILE
+        || name == <stock_item_journal::StockItemBatch as JournalBatch>::JOURNAL_FILE
+    {
         return true;
     }
     let Some(rest) = name.strip_prefix(PRE_IMAGE_PREFIX) else {
@@ -300,12 +306,12 @@ pub(super) struct MasterDispatchIntent {
 }
 
 impl MasterDispatchIntent {
-    /// The intent of `batch`, bound to the sidecar `pre_image` was written for.
-    /// Its items are the batch's names, in order. Ledger batches only: an intent
-    /// is appended to the ledger journal ([`append_intent`]), so another kind's
-    /// intent waits for that kind's own intent and sidecar.
-    pub(super) fn new(
-        batch: &MasterBatch,
+    /// The intent of `batch`, of any kind, bound to the sidecar `pre_image` was
+    /// written for. Its items are the batch's names, in order. It records no
+    /// kind: the journal file it is appended to ([`append_kind_intent`]) is the
+    /// kind.
+    pub(super) fn new<B: JournalBatch>(
+        batch: &B,
         native_request_sha256: String,
         pre_image: WrittenPreImage,
         pre_post_master_marks: Vec<MasterMark>,
@@ -571,6 +577,8 @@ pub(super) enum Invalid {
     KindFieldMismatch,
     BadGuid,
     DuplicateMark,
+    /// A stock-item batch whose stored item `StockItemWrites::rebuild` refuses.
+    ItemNotRebuilt,
     /// A record names a batch no earlier record introduced.
     NoBatch,
     /// A record carries a different batch digest than its batch.
@@ -679,6 +687,24 @@ fn check_ids(batch_id: &str, batch_sha256: &str) -> Result<(), Invalid> {
     Ok(())
 }
 
+/// A batch's company: its name, number and books-from not blank, then its GUID
+/// canonical.
+fn check_company(company: &MasterCompany) -> Result<(), Invalid> {
+    let MasterCompany {
+        guid,
+        name,
+        number,
+        books_from,
+    } = company;
+    for field in [name, number, books_from] {
+        non_blank(field)?;
+    }
+    if !is_canonical_guid(guid) {
+        return Err(Invalid::BadGuid);
+    }
+    Ok(())
+}
+
 impl StoredLedgerCreate {
     fn validate(&self) -> Result<(), Invalid> {
         non_blank(&self.name)?;
@@ -705,18 +731,7 @@ impl JournalBatch for MasterBatch {
 
     fn validate(&self) -> Result<(), Invalid> {
         check_ids(&self.batch_id, &self.batch_sha256)?;
-        let MasterCompany {
-            guid,
-            name,
-            number,
-            books_from,
-        } = &self.company;
-        for field in [name, number, books_from] {
-            non_blank(field)?;
-        }
-        if !is_canonical_guid(guid) {
-            return Err(Invalid::BadGuid);
-        }
+        check_company(&self.company)?;
         if self.items.is_empty() {
             return Err(Invalid::EmptyItems);
         }
@@ -1316,10 +1331,19 @@ pub(super) fn test_fault_fires(point: &str) -> bool {
 
 pub(super) use crate::tally::approved_import::RecordedIntent;
 
-/// Append a dispatch intent and return the token for its send. An error, a
-/// failed directory sync included, returns no token: the intent may be in the
-/// file, and the batch must be treated as dispatched.
+/// Append a dispatch intent to the ledger journal: [`append_kind_intent`].
 pub(super) fn append_intent(
+    data_dir: &Path,
+    lock: &ExclusiveAdmission,
+    intent: MasterDispatchIntent,
+) -> Result<RecordedIntent, MasterLedgerError> {
+    append_kind_intent::<MasterBatch>(data_dir, lock, intent)
+}
+
+/// Append a dispatch intent to the journal of kind `B` and return the token for
+/// its send. An error, a failed directory sync included, returns no token: the
+/// intent may be in the file, and the batch must be treated as dispatched.
+pub(super) fn append_kind_intent<B: JournalBatch>(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
     intent: MasterDispatchIntent,
@@ -1333,7 +1357,7 @@ pub(super) fn append_intent(
     }
     #[cfg(test)]
     let intent_lost_after_write = test_fault_fires("master_dispatch_intent_lost_after_write");
-    let recorded = append_intent_syncing(data_dir, lock, intent, sync_directory);
+    let recorded = append_kind_intent_syncing::<B>(data_dir, lock, intent, sync_directory);
     #[cfg(test)]
     if intent_lost_after_write && recorded.is_ok() {
         return Err(MasterLedgerError::DirectorySyncFailed);
@@ -1341,7 +1365,18 @@ pub(super) fn append_intent(
     recorded
 }
 
+/// [`append_kind_intent_syncing`] for the ledger journal.
+#[cfg(test)]
 fn append_intent_syncing(
+    data_dir: &Path,
+    lock: &ExclusiveAdmission,
+    intent: MasterDispatchIntent,
+    sync: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<RecordedIntent, MasterLedgerError> {
+    append_kind_intent_syncing::<MasterBatch>(data_dir, lock, intent, sync)
+}
+
+fn append_kind_intent_syncing<B: JournalBatch>(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
     intent: MasterDispatchIntent,
@@ -1351,7 +1386,12 @@ fn append_intent_syncing(
         intent.batch_id.clone(),
         intent.native_request_sha256.clone(),
     );
-    append_syncing(data_dir, lock, MasterRecord::DispatchIntent(intent), sync)?;
+    append_syncing(
+        data_dir,
+        lock,
+        JournalRecord::<B>::DispatchIntent(intent),
+        sync,
+    )?;
     Ok(RecordedIntent::issue(batch_id, native_request_sha256))
 }
 
@@ -1517,14 +1557,15 @@ impl WrittenPreImage {
     }
 }
 
-/// Write the sidecar for `batch`, whole and synced, under the admission lock.
+/// Write the sidecar for `batch`, of any kind, whole and synced, under the
+/// admission lock.
 /// A sidecar the reader would refuse for its size is never written. One already
 /// there with the same bytes is the same write repeated; with other bytes it is
 /// left alone and refused.
-pub(super) fn write_pre_image(
+pub(super) fn write_pre_image<B: JournalBatch>(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
-    batch: &MasterBatch,
+    batch: &B,
     pre_image: &PreImage,
 ) -> Result<WrittenPreImage, PreImageError> {
     write_pre_image_syncing(data_dir, lock, batch, pre_image, sync_directory)
@@ -1534,10 +1575,10 @@ pub(super) fn write_pre_image(
 /// fails when the sync after a new placement fails, but a sidecar already there
 /// may be an earlier attempt's whose sync failed, so the directory is synced
 /// here as well, whether the sidecar was just placed or was there already.
-fn write_pre_image_syncing(
+fn write_pre_image_syncing<B: JournalBatch>(
     data_dir: &Path,
     _lock: &ExclusiveAdmission,
-    batch: &MasterBatch,
+    batch: &B,
     pre_image: &PreImage,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<WrittenPreImage, PreImageError> {

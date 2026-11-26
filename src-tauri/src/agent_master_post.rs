@@ -94,11 +94,6 @@ pub(crate) async fn recheck_shown_stock_item(
     let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
         crate::agent::read_profiles::render_agent_company_high_water(company.display_name()),
     )?;
-    let parse_marks = |text: &str| {
-        let rows = parse_all_company_marks(text)
-            .map_err(|_| ApprovedImportAdmissionError::MastersUnconfirmed)?;
-        Ok(master_marks(&rows))
-    };
     let recheck = |reads: StockItemRecheckReads| {
         let (candidate, groups, units, at_binding, at_aim) = reads.into_parts();
         let candidate = CompleteStockItemCatalogue::from_admitted(candidate)
@@ -113,8 +108,17 @@ pub(crate) async fn recheck_shown_stock_item(
         })
     };
     runtime
-        .read_and_recheck_stock_item(config, company, marks, parse_marks, recheck)
+        .read_and_recheck_stock_item(config, company, marks, stock_company_marks, recheck)
         .await
+}
+
+/// The parse of the all-company marks answer a stock item's reads are sized by,
+/// for the standalone recheck and for the stock approval the queue reads with:
+/// an answer that does not parse is `MastersUnconfirmed`.
+pub(super) fn stock_company_marks(text: &str) -> anyhow::Result<Vec<CompanyMasterMark>> {
+    let rows = parse_all_company_marks(text)
+        .map_err(|_| ApprovedImportAdmissionError::MastersUnconfirmed)?;
+    Ok(master_marks(&rows))
 }
 
 /// The rows [`target_binding_mark`] chooses among, from the agent's parse.
@@ -398,7 +402,8 @@ pub(super) struct MasterAim {
 
 /// The recheck closure body of a master post: [`recheck_master_admission`], then
 /// the aim it saw, returned for the queue to hand to the intent by value. A
-/// recheck that refuses returns no aim.
+/// recheck that refuses returns no aim, and a queued stock item is refused as
+/// `AdmissionInconsistent`: this recheck admits ledgers only.
 pub(super) fn recheck_master_for_dispatch(
     queued: QueuedAdmission<'_>,
 ) -> anyhow::Result<MasterAim> {

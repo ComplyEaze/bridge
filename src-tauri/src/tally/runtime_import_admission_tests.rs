@@ -977,19 +977,30 @@ async fn a_master_post_whose_book_turns_to_education_is_refused_at_the_closing_o
     assert_eq!(simulator.finish().unwrap().len(), 31);
 }
 
-/// A stock-item Create is not sent yet: the runtime refuses it with the typed
-/// refusal before any request, so nothing is read, rechecked, recorded or sent.
+/// A stock-item Create for a company other than the queue's identity is a
+/// wiring fault: the runtime refuses it with the typed refusal before any
+/// request, so nothing is read, rechecked, recorded or sent.
 #[tokio::test]
-async fn a_stock_item_create_is_refused_before_any_request() {
+async fn a_stock_item_create_for_another_company_is_refused_before_any_request() {
     use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+    fn never_parsed(_: &str) -> anyhow::Result<Vec<crate::tally::runtime::CompanyMasterMark>> {
+        unreachable!("no marks are read for another company")
+    }
     let prepared = crate::tally::stock_item_create::tests::captured_prepared("SC Copied Marked");
-    // The approval's own company, so a company mismatch cannot be the refusal.
-    let identity = prepared.company().clone();
-    let marks = marks_request(identity.display_name());
+    // The captured licensed book, not the stock lab book the item was drafted in.
+    let identity = identity(&captured_companies());
+    assert_ne!(prepared.company(), &identity);
+    let marks = marks_request(prepared.company().display_name());
     let approved = SCRIPTED_APPROVAL
         .scope(
             ScriptedApproval::approving(),
-            ApprovedImport::confirm_stock_item(prepared, "Create stock".into(), marks),
+            ApprovedImport::confirm_stock_item(
+                prepared,
+                "Create stock".into(),
+                marks,
+                never_parsed,
+                master_batch().to_string(),
+            ),
         )
         .await
         .expect("the scripted dialog approves");
@@ -1015,7 +1026,7 @@ async fn a_stock_item_create_is_refused_before_any_request() {
             },
         )
         .await
-        .expect_err("a stock-item Create is not sent yet");
+        .expect_err("a stock-item Create for another company is refused");
     assert!(error.chain().any(|cause| matches!(
         cause.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::AdmissionInconsistent)

@@ -352,14 +352,21 @@ pub(super) async fn confirm_stock_item_draft(
     draft: StockItemDraft<'_>,
     origin: &str,
     company_marks_request: AgentReadRequest,
+    batch_id: String,
 ) -> Result<ApprovedImport, StockItemConfirmError> {
     let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
     let prepared = PreparedStockItem::from_draft(draft).map_err(|refusal| {
         StockItemConfirmError::Review(StockItemReviewError::NotRenderable(refusal))
     })?;
-    ApprovedImport::confirm_stock_item(prepared, preview, company_marks_request)
-        .await
-        .map_err(StockItemConfirmError::Dialog)
+    ApprovedImport::confirm_stock_item(
+        prepared,
+        preview,
+        company_marks_request,
+        super::master_post::stock_company_marks,
+        batch_id,
+    )
+    .await
+    .map_err(StockItemConfirmError::Dialog)
 }
 
 #[cfg(test)]

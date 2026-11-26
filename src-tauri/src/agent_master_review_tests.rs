@@ -809,6 +809,7 @@ async fn a_confirmed_stock_item_draft_is_approved_for_the_create_it_was_shown() 
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 ORIGIN,
                 stock_marks(),
+                stock_batch(),
             )
             .await
         })
@@ -828,6 +829,11 @@ async fn a_confirmed_stock_item_draft_is_approved_for_the_create_it_was_shown() 
         shown.post_kind(),
         crate::tally::approved_import::PostKind::Masters
     );
+}
+
+/// The journal batch a stock approval is bound to at birth.
+fn stock_batch() -> String {
+    crate::synthetic_batch_id(0xa1).to_string()
 }
 
 fn stock_marks() -> AgentReadRequest {
@@ -850,6 +856,7 @@ async fn a_declined_or_unscoped_stock_item_dialog_makes_no_approval() {
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 ORIGIN,
                 stock_marks(),
+                stock_batch(),
             )
             .await
         })
@@ -867,6 +874,7 @@ async fn a_declined_or_unscoped_stock_item_dialog_makes_no_approval() {
         stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
         ORIGIN,
         stock_marks(),
+        stock_batch(),
     )
     .await
     .err();
@@ -891,6 +899,7 @@ async fn a_refused_stock_item_preview_asks_no_one() {
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 "http://127.0.0.1:9000\nTally: other",
                 stock_marks(),
+                stock_batch(),
             )
             .await
         })

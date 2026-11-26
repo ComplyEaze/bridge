@@ -206,16 +206,14 @@ impl StockItemReadKind {
 }
 
 /// The size admission of one stock-item-related read, made before its fetch.
-/// Outside tests only [`TallyRuntime::read_and_recheck_stock_item`] makes one,
-/// from the target's own binding master mark.
-#[cfg_attr(not(test), allow(dead_code))]
+/// Outside tests only [`read_stock_item_admission`] makes one, from the
+/// target's own binding master mark.
 pub(crate) struct StockItemReadSize {
     kind: StockItemReadKind,
     master_mark: u64,
     limit_bytes: u64,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 impl StockItemReadSize {
     pub(crate) fn new(kind: StockItemReadKind, master_mark: u64) -> Result<Self, MastersReadError> {
         let native = kind.native();
@@ -372,8 +370,7 @@ fn require_stock_item_read_kind(
 
 /// Admits the candidate and company-count answers as one complete candidate
 /// read. Outside tests its pairs are the two that
-/// [`TallyRuntime::read_and_recheck_stock_item`] sends back to back.
-#[cfg_attr(not(test), allow(dead_code))]
+/// [`read_stock_item_admission`] sends back to back.
 pub(crate) fn admit_candidate_stock_item_read(
     size: StockItemReadSize,
     identity: &VerifiedCompanyIdentity,
@@ -417,7 +414,6 @@ pub(crate) fn admit_candidate_stock_item_read(
 }
 
 /// Admits one stock-group answer, as [`admit_candidate_stock_item_read`] its pairs.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn admit_stock_groups(
     size: StockItemReadSize,
     identity: &VerifiedCompanyIdentity,
@@ -445,7 +441,6 @@ pub(crate) fn admit_stock_groups(
 }
 
 /// Admits one unit answer, as [`admit_candidate_stock_item_read`] its pairs.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn admit_stock_units(
     size: StockItemReadSize,
     identity: &VerifiedCompanyIdentity,
@@ -757,7 +752,11 @@ pub(super) async fn read_stock_item_admission(
     binding_marks: &str,
     parse_marks: CompanyMarksParser,
     evidence: &mut RuntimeReadEvidence,
-) -> anyhow::Result<(AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits)> {
+) -> anyhow::Result<(
+    AdmittedCandidateRead,
+    AdmittedStockGroups,
+    AdmittedStockUnits,
+)> {
     let mark = target_binding_mark(&parse_marks(binding_marks)?, identity)?;
     let candidate_size = StockItemReadSize::new(StockItemReadKind::Candidate, mark)?;
     let groups_size = StockItemReadSize::new(StockItemReadKind::StockGroups, mark)?;

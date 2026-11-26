@@ -52,8 +52,8 @@ mod masters;
 pub(crate) use masters::StockItemCountMismatch;
 pub(crate) use masters::{
     target_binding_mark, AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits,
-    CompanyMasterMark, MastersKind, MastersReadError, MastersRows, StockItemReadKind,
-    StockItemRecheckReads, VoucherNumberingRead,
+    CompanyMarksParser, CompanyMasterMark, MastersKind, MastersReadError, MastersRows,
+    StockItemReadKind, StockItemRecheckReads, VoucherNumberingRead,
 };
 
 #[cfg(test)]
@@ -211,6 +211,16 @@ enum QueuedReads<'a> {
         ledgers_second: String,
         groups_first: String,
         groups_second: String,
+    },
+    /// The candidate, stock-group and unit reads, each sized at the target's
+    /// binding mark. Boxed: they carry the company three times.
+    StockItem {
+        admission: &'a super::approved_import::StockItemAdmission,
+        reads: Box<(
+            AdmittedCandidateRead,
+            AdmittedStockGroups,
+            AdmittedStockUnits,
+        )>,
     },
 }
 
@@ -3559,13 +3569,14 @@ impl TallyRuntime {
                         // A master post is for the company it was rendered for: the
                         // request names it, and the identity brackets check this one.
                         // A mismatch is a wiring fault, refused before any request.
-                        // No stock item Create is sent yet: one is refused here too.
                         if let super::approved_import::ApprovedKind::Masters(masters) = &request.kind {
                             let consistent = match masters.writes() {
                                 super::approved_import::AdmittedWrites::Ledgers(ledgers) => {
                                     ledgers.company() == &identity
                                 }
-                                super::approved_import::AdmittedWrites::StockItem { .. } => false,
+                                super::approved_import::AdmittedWrites::StockItem(stock) => {
+                                    stock.company() == &identity
+                                }
                             };
                             if !consistent {
                                 return Err(anyhow::Error::from(
@@ -3698,16 +3709,32 @@ impl TallyRuntime {
                                     admission_evidence,
                                 )
                             }
-                            super::approved_import::ApprovedKind::Masters(masters) => {
-                                // Refused at the company check above; never reached.
+                            super::approved_import::ApprovedKind::Masters(masters) => 'masters: {
                                 let admission = match masters.writes() {
                                     super::approved_import::AdmittedWrites::Ledgers(ledgers) => ledgers,
-                                    super::approved_import::AdmittedWrites::StockItem { .. } => {
-                                        return Err(with_read_evidence(
-                                            super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent
-                                                .into(),
-                                            admission_evidence.clone(),
+                                    // A stock item's reads, sized at the target's mark in the
+                                    // binding marks above, as the standalone recheck sizes them.
+                                    super::approved_import::AdmittedWrites::StockItem(admission) => {
+                                        let mut evidence = admission_evidence.clone();
+                                        // Boxed, as the invoice reads are: this future would
+                                        // otherwise sit inside the post's.
+                                        let read = Box::pin(masters::read_stock_item_admission(
+                                            &reads,
+                                            &identity,
+                                            &binding_marks.text,
+                                            admission.parse_marks(),
+                                            &mut evidence,
                                         ))
+                                        .await;
+                                        let stock_reads =
+                                            read.map_err(|error| with_read_evidence(error, evidence.clone()))?;
+                                        break 'masters (
+                                            QueuedReads::StockItem {
+                                                admission,
+                                                reads: Box::new(stock_reads),
+                                            },
+                                            evidence,
+                                        );
                                     }
                                 };
                                 let (ledgers_first, evidence) = fetch_admitted_agent_read(
@@ -3872,6 +3899,23 @@ impl TallyRuntime {
                                 company_marks_at_binding: &binding_marks.text,
                                 company_marks: &before_marks.text,
                             },
+                            (
+                                super::approved_import::ApprovedKind::Masters(_),
+                                QueuedReads::StockItem {
+                                    admission,
+                                    reads: stock,
+                                },
+                                None,
+                            ) => super::approved_import::QueuedAdmission::StockItem(
+                                super::approved_import::QueuedStockItem::new(
+                                    admission,
+                                    &stock.0,
+                                    &stock.1,
+                                    &stock.2,
+                                    &binding_marks.text,
+                                    &before_marks.text,
+                                ),
+                            ),
                             _ => {
                                 return Err(with_read_evidence(
                                     super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent

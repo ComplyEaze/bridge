@@ -1241,7 +1241,7 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
         ),
         (
             "read_and_recheck_stock_item",
-            &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 5)],
+            &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 3)],
         ),
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
         (
@@ -1263,7 +1263,7 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
         (
             "CompanyMasterMark",
             &[
-                ("agent_master_post.rs", 3),
+                ("agent_master_post.rs", 4),
                 ("tally/runtime.rs", 1),
                 ("tally/runtime_masters.rs", 3),
             ],
@@ -1711,21 +1711,26 @@ mod coordinator {
         .unwrap()
     }
 
-    /// Runs the coordinator for the R1 draft, rebound to the shape lab's
-    /// identity (a constructed GUID swap) so its company is the double's.
-    async fn run(plans: Vec<ScenarioPlan>) -> (anyhow::Result<()>, Vec<Sent>) {
-        let identity = shape_identity();
+    /// The R1 draft, rebound to the shape lab's identity (a constructed GUID
+    /// swap) so its company is the double's.
+    fn rebound_prepared(identity: &VerifiedCompanyIdentity) -> PreparedStockItem {
         let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
-        let catalogue = StockItemCatalogue::from_candidate_read(&identity, &r1(STOCK_BEFORE))
+        let catalogue = StockItemCatalogue::from_candidate_read(identity, &r1(STOCK_BEFORE))
             .expect("the rebound R1 read catalogues");
-        let shown = PreparedStockItem::from_draft(stock_test_draft(
+        PreparedStockItem::from_draft(stock_test_draft(
             &catalogue,
             STOCK_PROPOSED,
             STOCK_SOURCE,
             &r1(STOCK_GROUPS),
             &r1(STOCK_UNITS),
         ))
-        .expect("the rebound draft renders");
+        .expect("the rebound draft renders")
+    }
+
+    /// Runs the coordinator for the rebound R1 draft.
+    async fn run(plans: Vec<ScenarioPlan>) -> (anyhow::Result<()>, Vec<Sent>) {
+        let identity = shape_identity();
+        let shown = rebound_prepared(&identity);
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let config = TallyConfig {
             host: simulator.address().ip().to_string(),
@@ -1932,5 +1937,199 @@ mod coordinator {
             Candidate, Health, Candidate, Health, Count, Health, Count, Health,
         ];
         assert_eq!(sent, expected);
+    }
+
+    /// The queue's whole exchange for a stock approval: the opening mode,
+    /// company list and binding marks, the coordinator's four pairs, the
+    /// closing mode and company list, and the aim marks last.
+    #[rustfmt::skip]
+    const QUEUE_READS: [Sent; 24] = [
+        Health, Companies, Companies, Marks,
+        Candidate, Health, Candidate, Health, Count, Health, Count, Health,
+        StockGroups, Health, StockGroups, Health, Units, Health, Units, Health,
+        Health, Companies, Companies, Marks,
+    ];
+
+    fn queue_answers(binding: String, aim: String) -> Vec<ScenarioPlan> {
+        let mut plans = through_binding(binding);
+        for capture in [SHAPE_ITEMS, SHAPE_COUNT, SHAPE_GROUPS, SHAPE_UNITS] {
+            plans.extend(pair(stock_capture(capture), stock_capture(capture)));
+        }
+        let companies = answer(stock_capture(SHAPE_COMPANIES));
+        plans.extend([health(), companies.clone(), companies, answer(aim)]);
+        plans
+    }
+
+    /// A stock approval of the rebound R1 draft, bound at birth to `batch`.
+    async fn approved_stock(batch: &str) -> crate::tally::approved_import::ApprovedImport {
+        use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+        let identity = shape_identity();
+        let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
+            crate::agent::read_profiles::render_agent_company_high_water(identity.display_name()),
+        )
+        .unwrap();
+        SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                crate::tally::approved_import::ApprovedImport::confirm_stock_item(
+                    rebound_prepared(&identity),
+                    "Create stock".into(),
+                    marks,
+                    stock_company_marks,
+                    batch.to_string(),
+                ),
+            )
+            .await
+            .expect("the scripted dialog approves")
+    }
+
+    /// What the queue's recheck was handed for a stock item: whether the
+    /// prepared value is the approval's, the digest, the batch, the candidate
+    /// body, the three sized marks, and the binding and aim marks.
+    type SeenStock = (bool, String, String, String, [u64; 3], String, String);
+
+    /// Posts a stock approval through the queue with the ledger recheck, as a
+    /// master post's closure is, and an intent closure that only records that
+    /// it ran.
+    async fn post_stock(
+        plans: Vec<ScenarioPlan>,
+    ) -> (anyhow::Result<()>, Vec<Sent>, Option<SeenStock>, bool) {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::{Arc, Mutex};
+        let identity = shape_identity();
+        let prepared = rebound_prepared(&identity);
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let seen = Arc::new(Mutex::new(None));
+        let dispatched = Arc::new(AtomicBool::new(false));
+        let (seen_in, dispatched_in) = (seen.clone(), dispatched.clone());
+        let result = TallyRuntime::default()
+            .post_approved_import(
+                config,
+                &identity,
+                approved_stock(crate::synthetic_batch_id(0xa1)).await,
+                move |queued: QueuedAdmission<'_>| {
+                    if let QueuedAdmission::StockItem(stock) = &queued {
+                        *seen_in.lock().unwrap() = Some((
+                            stock.prepared() == &prepared,
+                            stock.xml_sha256().to_string(),
+                            stock.batch_id().to_string(),
+                            stock.candidate().body().to_string(),
+                            [
+                                stock.candidate().sized_mark(),
+                                stock.groups().sized_mark(),
+                                stock.units().sized_mark(),
+                            ],
+                            stock.company_marks_at_binding().to_string(),
+                            stock.company_marks().to_string(),
+                        ));
+                    }
+                    recheck_master_for_dispatch(queued)
+                },
+                move |_: MasterAim| {
+                    dispatched_in.store(true, Ordering::Release);
+                    Ok(())
+                },
+            )
+            .await
+            .map(|_| ());
+        let sent = sent(&simulator.finish().unwrap());
+        let seen = seen.lock().unwrap().take();
+        (result, sent, seen, dispatched.load(Ordering::Acquire))
+    }
+
+    fn assert_admission_refusal(
+        result: &anyhow::Result<()>,
+        expected: ApprovedImportAdmissionError,
+    ) {
+        let error = result.as_ref().expect_err("the post is refused");
+        assert!(
+            error
+                .chain()
+                .filter_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
+                .any(|found| std::mem::discriminant(found) == std::mem::discriminant(&expected)),
+            "{error:#}"
+        );
+    }
+
+    /// The queue reads a stock approval's reads in order and hands them to the
+    /// recheck as a stock item; the ledger recheck refuses that variant, so no
+    /// intent is recorded and nothing but exports is sent.
+    #[tokio::test]
+    async fn the_queue_reads_a_stock_approval_and_the_ledger_recheck_refuses_it() {
+        let (result, sent, seen, dispatched) =
+            post_stock(queue_answers(marks_at(289), marks_at(289))).await;
+        assert_admission_refusal(&result, ApprovedImportAdmissionError::AdmissionInconsistent);
+        assert!(!dispatched, "no intent is recorded");
+        assert_eq!(sent, QUEUE_READS, "every request an export, no POST");
+        let approved = approved_stock(crate::synthetic_batch_id(0xa1)).await;
+        assert_eq!(
+            seen,
+            Some((
+                true,
+                approved.xml_sha256(),
+                crate::synthetic_batch_id(0xa1).to_string(),
+                stock_capture(SHAPE_ITEMS),
+                [289; 3],
+                marks_at(289),
+                marks_at(289),
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn the_queue_makes_no_stock_read_in_education() {
+        // EDUMODE Yes is a constructed edit of the captured list.
+        let education = stock_capture(SHAPE_COMPANIES).replace(
+            "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
+            "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
+        );
+        let plans = vec![health(), answer(education.clone()), answer(education)];
+        let (result, sent, seen, dispatched) = post_stock(plans).await;
+        assert_admission_refusal(
+            &result,
+            ApprovedImportAdmissionError::MasterWritesNeedLicensedMode,
+        );
+        assert_eq!(sent, [Health, Companies, Companies]);
+        assert_eq!((seen, dispatched), (None, false));
+    }
+
+    #[tokio::test]
+    async fn binding_marks_the_parser_refuses_send_no_collection_read() {
+        // A constructed edit of the captured marks: the target's master mark is
+        // not a number, so the agent's parser refuses the answer.
+        let unparsable = stock_capture(SHAPE_MARKS)
+            .replace(SHAPE_MARK, "<ALTMSTID TYPE=\"Number\">x</ALTMSTID>");
+        assert_ne!(unparsable, stock_capture(SHAPE_MARKS));
+        let (result, sent, seen, dispatched) = post_stock(through_binding(unparsable)).await;
+        assert_admission_refusal(&result, ApprovedImportAdmissionError::MastersUnconfirmed);
+        assert_eq!(sent, [Health, Companies, Companies, Marks]);
+        assert_eq!((seen, dispatched), (None, false));
+        // The refusal keeps the evidence of the reads made before it.
+        let error = result.unwrap_err();
+        let failure = error
+            .downcast_ref::<crate::tally::runtime::RuntimeReadFailure>()
+            .expect("the stock arm attaches the queue's evidence");
+        assert!(failure.evidence.bytes > 0);
+    }
+
+    /// A clone of a stock approval bound to another batch keeps the batch it
+    /// was approved for, so an intent of the other batch licenses nothing.
+    #[tokio::test]
+    async fn a_cloned_stock_approval_keeps_the_batch_it_was_approved_for() {
+        use crate::tally::approved_import::{DispatchLicense, RecordedIntent};
+        let (a, b) = (
+            crate::synthetic_batch_id(0xa1),
+            crate::synthetic_batch_id(0xb2),
+        );
+        let approved = approved_stock(a).await;
+        let rebound = approved.clone().bound_to_batch(b);
+        assert_eq!(rebound.master_batch_id(), Some(a));
+        let sha = rebound.xml_sha256();
+        assert!(!RecordedIntent::issued_for_test(b, &sha).licenses(&rebound));
+        assert!(RecordedIntent::issued_for_test(a, &sha).licenses(&rebound));
     }
 }

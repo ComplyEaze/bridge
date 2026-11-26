@@ -540,6 +540,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(COMPANY_READ),
         of(CENSUS_REUSE),
         of(E_INVOICE_READBACK),
+        of(MASTER_POST),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -577,6 +578,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("CompanyReadCode", CompanyReadCode::ALL),
         of("CensusReuseCode", CensusReuseCode::ALL),
         of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
+        of("MasterPostCode", MasterPostCode::ALL),
     ];
     #[cfg(feature = "lab-writes")]
     let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
@@ -624,7 +626,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        19,
+        20,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -653,6 +655,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
     assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
     assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
+    assert_eq!(variants(MASTER_POST), MasterPostCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -695,6 +698,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(TIE_OUT, TieOutCode::as_str);
     check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
     check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);
+    check_pins(MASTER_POST, MasterPostCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
@@ -716,9 +720,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 77 + 4 + 2 + 1 + 1 + 4;
+    let expected = 77 + 4 + 2 + 1 + 1 + 4 + 5;
     #[cfg(feature = "lab-writes")]
-    let expected = 80 + 4 + 2 + 1 + 1 + 4;
+    let expected = 80 + 4 + 2 + 1 + 1 + 4 + 5;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();
@@ -838,6 +842,24 @@ fn the_census_reuse_code_is_pinned_once_and_is_the_string_a_caller_sees() {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'));
     }
 }
+
+/// [`MasterPostCode`]'s variants beside their strings, as [`GST_UNCERTAIN`] pins its own.
+const MASTER_POST: &[(MasterPostCode, &str)] = &[
+    (
+        MasterPostCode::BatchIdInvalid,
+        "import_batch_identifier_invalid",
+    ),
+    (MasterPostCode::BatchNotFound, "master_batch_not_found"),
+    (
+        MasterPostCode::CompanyIdentityMismatch,
+        "company_identity_mismatch",
+    ),
+    (MasterPostCode::BatchChanged, "import_batch_changed"),
+    (
+        MasterPostCode::ApprovalBindingChanged,
+        "import_approval_binding_changed",
+    ),
+];
 
 /// [`EInvoiceReadbackCode`]'s variants beside their strings, as [`GST_UNCERTAIN`] pins its own.
 const E_INVOICE_READBACK: &[(EInvoiceReadbackCode, &str)] = &[

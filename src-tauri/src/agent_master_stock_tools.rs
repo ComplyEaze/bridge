@@ -38,7 +38,7 @@ use super::super::master_review::{show_stock_item_draft, ShownStockItem};
 use super::*;
 use crate::agent::failure_code::{
     create_render_refusal_code, draft_refusal_code, item_name_refusal_code, not_goods_refusal_code,
-    sibling_refusal_code, stock_item_catalogue_refusal_code, StockItemCreateCode,
+    sibling_refusal_code, stock_item_catalogue_refusal_code, MasterPostCode, StockItemCreateCode,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::approved_import::ApprovedImport;
@@ -164,12 +164,12 @@ impl Server {
         let redeem_only = carried.is_some();
         // Refused, as the ledger post refuses, without touching the approval slot.
         if !valid_batch_id(batch_id) {
-            return Err("import_batch_identifier_invalid".to_string().into());
+            return Err(MasterPostCode::BatchIdInvalid.into());
         }
         let state = (self.read_kind_journal_shared(read_stock_item_journal)?)
             .state(batch_id)
             .cloned()
-            .ok_or_else(|| "master_batch_not_found".to_string())?;
+            .ok_or(MasterPostCode::BatchNotFound)?;
         let batch = state.batch;
         let guid = batch.company().guid.clone();
         let mut accumulated = carried.unwrap_or_else(empty_evidence);
@@ -202,10 +202,10 @@ impl Server {
             let (company, identity, identity_evidence) = self.verified_company(&guid).await?;
             accumulated = combine_evidence(accumulated.clone(), identity_evidence);
             if !same_company(&company.name, &identity, batch.company()) {
-                return Err("company_identity_mismatch".to_string().into());
+                return Err(MasterPostCode::CompanyIdentityMismatch.into());
             }
             // The stored line was admitted only if it rebuilds.
-            let stored = (batch.stored_writes()).map_err(|_| "import_batch_changed".to_string())?;
+            let stored = (batch.stored_writes()).map_err(|_| MasterPostCode::BatchChanged)?;
             let origin = self.master_preview_origin()?;
             let shown = self
                 .show_from_book(
@@ -220,7 +220,7 @@ impl Server {
             let fresh = (shown.batch(batch_id.to_string()))
                 .map_err(|error| ToolFailure::from(create_render_refusal_code(&error)))?;
             if fresh != batch {
-                return Err("import_batch_changed".to_string().into());
+                return Err(MasterPostCode::BatchChanged.into());
             }
             // A name an open stock dispatch holds is refused before the person
             // is asked; the check under the lock in the writer stays. A read
@@ -257,10 +257,10 @@ impl Server {
             // Only the fresh item may come back, else the approval is left
             // unspent: what the person was shown is the stored item.
             let HeldRequest::StockItem(held) = held else {
-                return Err("import_approval_binding_changed".to_string().into());
+                return Err(MasterPostCode::ApprovalBindingChanged.into());
             };
             if held.prepared().company() != &identity || *held.prepared().writes() != stored {
-                return Err("import_approval_binding_changed".to_string().into());
+                return Err(MasterPostCode::ApprovalBindingChanged.into());
             }
             owed_digest(&approved, &batch)?;
             let _endpoint_dispatch_lease = dispatch_lease::acquire(&self.settings.endpoint)?;
@@ -356,7 +356,7 @@ fn stock_marks(identity: &VerifiedCompanyIdentity) -> Result<AgentReadRequest, T
 /// queue, so a refusal leaves the approval unused and writes nothing.
 fn owed_digest(approved: &ApprovedImport, batch: &StockItemBatch) -> Result<(), ToolFailure> {
     if approved.xml_sha256() != batch.batch_sha256() {
-        return Err("import_batch_changed".to_string().into());
+        return Err(MasterPostCode::BatchChanged.into());
     }
     Ok(())
 }

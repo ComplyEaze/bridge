@@ -422,6 +422,19 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The refusals of the stock-item post before anything is sent (#1381), the strings the ledger
+    /// post writes for the same refusals.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) enum MasterPostCode {
+        BatchIdInvalid = "import_batch_identifier_invalid",
+        BatchNotFound = "master_batch_not_found",
+        CompanyIdentityMismatch = "company_identity_mismatch",
+        BatchChanged = "import_batch_changed",
+        ApprovalBindingChanged = "import_approval_binding_changed",
+    }
+}
+
 #[cfg(feature = "lab-writes")]
 failure_codes! {
     /// The refusals of `lab_import_masters` that name what they refused, each before any write.

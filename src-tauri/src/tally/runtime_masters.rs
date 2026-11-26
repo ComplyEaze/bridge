@@ -504,6 +504,40 @@ impl StockItemRecheckReads {
     }
 }
 
+/// One loaded company's row of the all-company marks answer, as far as the
+/// stock coordinator needs it. The agent's marks parser makes these rows; the
+/// runtime chooses the target among them ([`target_binding_mark`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CompanyMasterMark {
+    pub(crate) name: String,
+    pub(crate) guid: String,
+    pub(crate) masters: u64,
+}
+
+/// The target's master mark in a marks snapshot: that of the one row whose
+/// GUID and trimmed name both match `identity`, not the first row with its
+/// GUID, because a second loaded company can share a GUID under another name.
+/// No such row, or two, is `MastersUnconfirmed`. The stock coordinator sizes
+/// its reads at it and the stock recheck compares them to it.
+pub(crate) fn target_binding_mark(
+    rows: &[CompanyMasterMark],
+    identity: &VerifiedCompanyIdentity,
+) -> anyhow::Result<u64> {
+    let mut targets = rows.iter().filter(|row| {
+        row.guid.eq_ignore_ascii_case(identity.company_guid())
+            && row
+                .name
+                .trim()
+                .eq_ignore_ascii_case(identity.display_name().trim())
+    });
+    match (targets.next(), targets.next()) {
+        (Some(row), None) => Ok(row.masters),
+        _ => Err(
+            crate::tally::approved_import::ApprovedImportAdmissionError::MastersUnconfirmed.into(),
+        ),
+    }
+}
+
 /// The premise of the numbering read, checked against its answer: its rows
 /// cannot outnumber the master mark and the response fits `limit_bytes`.
 /// Voucher types are unbounded before the read, so the limit is the whole
@@ -869,30 +903,32 @@ impl TallyRuntime {
     /// on them. In order: the mode probe, Education refused before anything
     /// else is sent (the read is not measured there); the identity bracket;
     /// every loaded company's marks, the binding snapshot; the three size
-    /// admissions at the master mark `binding_mark` reads for the target from
-    /// that snapshot, so a book above an edge sends no collection request; the
-    /// candidate pair and the company-count pair, back to back; the stock-group
+    /// admissions at the target's own mark in that snapshot
+    /// ([`target_binding_mark`] over the rows `parse_marks` reads from it), so a
+    /// book above an edge sends no collection request; the candidate pair, a
+    /// drifted one refusing before the count is sent, and the company-count
+    /// pair, back to back; the stock-group
     /// pair; the unit pair; the closing identity and mode brackets; and the
     /// marks again, last, the aim. Only `recheck`, local work, follows the aim.
     /// Nothing here sends an import, and no shipped caller reaches it.
     #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) async fn read_and_recheck_stock_item<M, R>(
+    pub(crate) async fn read_and_recheck_stock_item<P, R>(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         company_marks_request: crate::tally::agent_read_request::AgentReadRequest,
-        binding_mark: M,
+        parse_marks: P,
         recheck: R,
     ) -> anyhow::Result<()>
     where
-        M: Fn(&str) -> anyhow::Result<u64>,
+        P: Fn(&str) -> anyhow::Result<Vec<CompanyMasterMark>>,
         R: Fn(StockItemRecheckReads) -> anyhow::Result<()>,
     {
         use crate::tally::approved_import::ApprovedImportAdmissionError;
         let _lease = self.begin_ordinary_read(&config)?;
         let marks_xml = company_marks_request.into_xml();
         self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, |client| {
-            let (binding_mark, recheck, marks_xml) = (&binding_mark, &recheck, marks_xml.clone());
+            let (parse_marks, recheck, marks_xml) = (&parse_marks, &recheck, marks_xml.clone());
             async move {
                 let (profile, _) = observe_read_boundary(&client).await?;
                 if profile == DateBoundaryProfile::EducationRestricted {
@@ -910,7 +946,7 @@ impl TallyRuntime {
                             ApprovedImportAdmissionError::MastersUnconfirmed,
                         )
                     })?;
-                let mark = binding_mark(&binding.text)?;
+                let mark = target_binding_mark(&parse_marks(&binding.text)?, identity)?;
                 let candidate_size = StockItemReadSize::new(StockItemReadKind::Candidate, mark)?;
                 let groups_size = StockItemReadSize::new(StockItemReadKind::StockGroups, mark)?;
                 let units_size = StockItemReadSize::new(StockItemReadKind::Units, mark)?;
@@ -922,6 +958,15 @@ impl TallyRuntime {
                         identity.company_name(),
                     ))
                     .await?;
+                // The admission's own drift refusal, taken before the count
+                // pair is sent rather than after it.
+                let (body, encoded_bytes, encoded_sha256) =
+                    candidate_pair.require_stable(PairedReadValidationError::MastersCollection)?;
+                let candidate_pair = NativePairedRead::Stable {
+                    body,
+                    encoded_bytes,
+                    encoded_sha256,
+                };
                 let count_pair = client
                     .fetch_native_report_paired(render_company_inventory_flags_request(
                         identity.display_name(),

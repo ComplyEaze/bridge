@@ -26,7 +26,8 @@ use crate::agent::change_parse::{parse_all_company_marks, LoadedCompanyMarks};
 use crate::tally::approved_import::{ApprovedImportAdmissionError, QueuedAdmission};
 use crate::tally::ledger_create_item::{LedgerCreateBatch, LedgerCreateItem, RenderedLedgerCreate};
 use crate::tally::runtime::{
-    AdmittedStockGroups, AdmittedStockUnits, StockItemReadKind, StockItemRecheckReads, TallyRuntime,
+    target_binding_mark, AdmittedStockGroups, AdmittedStockUnits, CompanyMasterMark,
+    StockItemReadKind, StockItemRecheckReads, TallyRuntime,
 };
 use crate::tally::stock_item_create::{
     CompleteStockItemCatalogue, DraftRefusal, GoodsSibling, ItemNameNotAbsent, NotGoodsSibling,
@@ -80,8 +81,9 @@ pub(crate) enum StockItemRecheckError {
 
 /// Reads the stock reads for `shown` in one queued execution
 /// ([`TallyRuntime::read_and_recheck_stock_item`]) and rechecks it on them
-/// ([`recheck_stock_item_admission`]). The reads are sized at the target's own
-/// binding mark ([`target_binding_mark`]). It returns no approval or dispatch
+/// ([`recheck_stock_item_admission`]). This module supplies only the parse of
+/// the marks answer; the runtime chooses the target's own binding mark among
+/// the rows ([`target_binding_mark`]) and sizes the reads at it. It returns no approval or dispatch
 /// value, sends no import, and nothing shipped calls it.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) async fn recheck_shown_stock_item(
@@ -93,10 +95,10 @@ pub(crate) async fn recheck_shown_stock_item(
     let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
         crate::agent::read_profiles::render_agent_company_high_water(company.display_name()),
     )?;
-    let binding_mark = |text: &str| {
+    let parse_marks = |text: &str| {
         let rows = parse_all_company_marks(text)
             .map_err(|_| ApprovedImportAdmissionError::MastersUnconfirmed)?;
-        target_binding_mark(&rows, company)
+        Ok(master_marks(&rows))
     };
     let recheck = |reads: StockItemRecheckReads| {
         let (candidate, groups, units, at_binding, at_aim) = reads.into_parts();
@@ -112,29 +114,19 @@ pub(crate) async fn recheck_shown_stock_item(
         })
     };
     runtime
-        .read_and_recheck_stock_item(config, company, marks, binding_mark, recheck)
+        .read_and_recheck_stock_item(config, company, marks, parse_marks, recheck)
         .await
 }
 
-/// The target's master mark in a binding snapshot: that of the one row whose
-/// GUID and name both match `company`, not the first row with its GUID, because
-/// a second loaded company can share a GUID under another name. The stock
-/// coordinator sizes its reads at it and the stock recheck compares them to it.
-fn target_binding_mark(
-    rows: &[LoadedCompanyMarks],
-    company: &VerifiedCompanyIdentity,
-) -> anyhow::Result<u64> {
-    let mut targets = rows.iter().filter(|row| {
-        row.guid.eq_ignore_ascii_case(company.company_guid())
-            && row
-                .name
-                .trim()
-                .eq_ignore_ascii_case(company.display_name().trim())
-    });
-    match (targets.next(), targets.next()) {
-        (Some(row), None) => Ok(row.masters),
-        _ => Err(ApprovedImportAdmissionError::MastersUnconfirmed.into()),
-    }
+/// The rows [`target_binding_mark`] chooses among, from the agent's parse.
+fn master_marks(rows: &[LoadedCompanyMarks]) -> Vec<CompanyMasterMark> {
+    rows.iter()
+        .map(|row| CompanyMasterMark {
+            name: row.name.clone(),
+            guid: row.guid.clone(),
+            masters: row.masters,
+        })
+        .collect()
 }
 
 /// Applies the ledger path's unchanged aim check, then rebuilds the shown stock
@@ -161,7 +153,7 @@ fn recheck_stock_item_admission(input: StockItemRecheckInput<'_, '_>) -> anyhow:
         company.company_guid(),
         company.display_name(),
     )?;
-    let binding = target_binding_mark(&binding_rows, company)?;
+    let binding = target_binding_mark(&master_marks(&binding_rows), company)?;
     for (read, sized) in [
         (StockItemReadKind::Candidate, input.candidate.sized_mark()),
         (StockItemReadKind::StockGroups, input.groups.sized_mark()),

@@ -1183,6 +1183,22 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
                 ("tally/runtime_masters.rs", 4),
             ],
         ),
+        (
+            "target_binding_mark",
+            &[
+                ("agent_master_post.rs", 4),
+                ("tally/runtime.rs", 1),
+                ("tally/runtime_masters.rs", 4),
+            ],
+        ),
+        (
+            "CompanyMasterMark",
+            &[
+                ("agent_master_post.rs", 3),
+                ("tally/runtime.rs", 1),
+                ("tally/runtime_masters.rs", 3),
+            ],
+        ),
     ];
 
     fn scan(directory: &Path, root: &Path, sources: &mut BTreeMap<PathBuf, String>) {
@@ -1456,13 +1472,18 @@ fn an_admitted_draft_refuses_support_reads_of_another_company() {
 /// that answers with captures of one synthetic book, the shape lab. Its item
 /// and company-count answers are 5b-3a's pairing: one book's answers at
 /// different capture times (14 Oct and 1 Oct 2026), not one sitting, and no
-/// same-sitting count of the R1 book exists. The shape lab's item answer is the
-/// shorter stock-item read, so no draft can be built from it: every run that
-/// reaches the recheck refuses at its sibling step, after the company, aim,
-/// sized-mark and name checks have passed on the coordinator's own reads.
+/// same-sitting count of the R1 book exists. The candidate answer the double
+/// gives is the shape lab's baseline short stock-item read, not the HSN/GST
+/// list `render_candidate_stock_items_request` asks for (the request bytes are
+/// that builder's; the answer is not its shape), so that response shape is
+/// never answered in these tests. No draft can be built from the short read:
+/// every run that reaches the recheck refuses at its sibling step, after the
+/// company, aim, sized-mark and name checks have passed on the coordinator's
+/// own reads.
 mod coordinator {
     use super::*;
-    use crate::tally::runtime::MastersReadError;
+    use crate::tally::connection::PairedReadValidationError;
+    use crate::tally::runtime::{MastersReadError, StockItemCountMismatch};
     use crate::tally::stock_item_create::StockItemCatalogue;
     use bridge_tally_protocol::native_masters::render_candidate_stock_items_request;
     use quick_xml::events::Event;
@@ -1590,11 +1611,16 @@ mod coordinator {
         vec![health(), companies.clone(), companies, answer(binding)]
     }
 
+    /// One paired read's answers: the first, a health check, the second and a
+    /// health check.
+    fn pair(first: String, second: String) -> [ScenarioPlan; 4] {
+        [answer(first), health(), answer(second), health()]
+    }
+
     fn every_answer(binding: String, aim: String) -> Vec<ScenarioPlan> {
         let mut plans = through_binding(binding);
         for capture in [SHAPE_ITEMS, SHAPE_COUNT, SHAPE_GROUPS, SHAPE_UNITS] {
-            let body = answer(stock_capture(capture));
-            plans.extend([body.clone(), health(), body, health()]);
+            plans.extend(pair(stock_capture(capture), stock_capture(capture)));
         }
         let companies = answer(stock_capture(SHAPE_COMPANIES));
         plans.extend([companies.clone(), health(), companies, answer(aim)]);
@@ -1745,5 +1771,95 @@ mod coordinator {
             Some(ApprovedImportAdmissionError::MastersMoved)
         ));
         assert_eq!(sent, EVERY_READ);
+    }
+
+    #[tokio::test]
+    async fn a_binding_snapshot_without_the_target_row_sizes_nothing() {
+        // Constructed rows in place of the captured target row: another
+        // company's, then one with the target's GUID under another name only.
+        let target = stock_capture(SHAPE_MARKS);
+        let start = target.find("<COMPANY NAME=").unwrap();
+        let end = start + target[start..].find("</COMPANY>").unwrap() + "</COMPANY>".len();
+        for row in [
+            "<COMPANY NAME=\"BRIDGE OTHER LAB\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">00000000-0000-4000-8000-000000000001</GUID><ALTMSTID TYPE=\"Number\"> 289</ALTMSTID></COMPANY>".to_string(),
+            format!("<COMPANY NAME=\"BRIDGE SHAPE LAB COPY\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{SHAPE_GUID}</GUID><ALTMSTID TYPE=\"Number\"> 289</ALTMSTID></COMPANY>"),
+        ] {
+            let without_target = target.replacen(&target[start..end], &row, 1);
+            let (result, sent) = run(through_binding(without_target)).await;
+            let error = result.expect_err("a snapshot without the target sizes nothing");
+            assert!(matches!(
+                error.downcast_ref::<ApprovedImportAdmissionError>(),
+                Some(ApprovedImportAdmissionError::MastersUnconfirmed)
+            ));
+            assert_eq!(sent, [Health, Companies, Companies, Marks]);
+        }
+    }
+
+    #[tokio::test]
+    async fn an_aim_answer_that_is_not_a_success_envelope_is_unconfirmed() {
+        // A constructed edit of the captured marks: STATUS 0, not a success.
+        let failed = marks_at(289).replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+        assert_ne!(failed, marks_at(289));
+        let (result, sent) = run(every_answer(marks_at(289), failed)).await;
+        let error = result.expect_err("an aim Bridge cannot read refuses");
+        assert!(matches!(
+            error.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
+        ));
+        assert_eq!(sent, EVERY_READ);
+    }
+
+    #[tokio::test]
+    async fn a_drifted_candidate_pair_refuses_before_the_count_is_sent() {
+        // A constructed edit: the second candidate answer renames one item.
+        let items = stock_capture(SHAPE_ITEMS);
+        let moved = items.replacen("\"Label Roll\"", "\"Label Rolls\"", 1);
+        assert_ne!(moved, items);
+        let mut plans = through_binding(marks_at(289));
+        plans.extend(pair(items, moved));
+        let (result, sent) = run(plans).await;
+        let error = result.expect_err("a drifted candidate pair refuses");
+        assert!(matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<PairedReadValidationError>()),
+            Some(PairedReadValidationError::MastersCollection)
+        ));
+        assert_eq!(
+            sent,
+            [Health, Companies, Companies, Marks, Candidate, Health, Candidate, Health]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_count_that_differs_from_the_candidate_rows_refuses_before_the_support_reads() {
+        // A constructed edit: the captured count reports 12 items, not 11.
+        let count = stock_capture(SHAPE_COUNT);
+        let reported = "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>";
+        assert_eq!(count.matches(reported).count(), 1);
+        let twelve = count.replace(
+            reported,
+            "<NUMSTOCKITEMS TYPE=\"Number\"> 12</NUMSTOCKITEMS>",
+        );
+        let mut plans = through_binding(marks_at(289));
+        plans.extend(pair(stock_capture(SHAPE_ITEMS), stock_capture(SHAPE_ITEMS)));
+        plans.extend(pair(twelve.clone(), twelve));
+        let (result, sent) = run(plans).await;
+        let error = result.expect_err("a count that differs from the rows refuses");
+        assert_eq!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<StockItemCountMismatch>()),
+            Some(&StockItemCountMismatch {
+                rows: 11,
+                tally_count: 12,
+            })
+        );
+        #[rustfmt::skip]
+        let expected = [
+            Health, Companies, Companies, Marks,
+            Candidate, Health, Candidate, Health, Count, Health, Count, Health,
+        ];
+        assert_eq!(sent, expected);
     }
 }

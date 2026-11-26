@@ -1323,7 +1323,7 @@ impl Server {
                             &numbering_admission,
                         )
                     },
-                    || {
+                    |()| {
                         // The file lock covers only the admission+synced append. It is not
                         // held over approval or network I/O. A competing process loses here.
                         let _lock = self

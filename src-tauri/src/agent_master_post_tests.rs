@@ -689,7 +689,7 @@ mod queue {
                         recheck_master_admission(queued).map(|_| ())
                     }
                 },
-                move || {
+                move |()| {
                     // Reaching the intent at all is what the test watches for.
                     flag.store(true, Ordering::Release);
                     Err::<(), _>(BeforeDispatchError::Refused(

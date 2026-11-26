@@ -4131,14 +4131,14 @@ async fn the_next_step_of_an_approved_answer_names_the_master_tool() {
 
 // --- before_dispatch, directly ---------------------------------------------
 
-fn aim_for_test() -> Mutex<Option<MasterAim>> {
-    Mutex::new(Some(MasterAim {
+fn aim_for_test() -> MasterAim {
+    MasterAim {
         pre_image: [(crate::synthetic_guid(0xaaaa).to_string(), 9)].into(),
         marks: vec![super::super::master_ledger::MasterMark {
             company_guid: GUID.into(),
             altmstid: 7,
         }],
-    }))
+    }
 }
 
 fn unit_server(directory: &std::path::Path) -> Server {
@@ -4162,7 +4162,7 @@ fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
     let kept = Mutex::new(None);
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
     let _licence = server
-        .record_master_intent(&batch, &request, approval, &aim_for_test(), &kept)
+        .record_master_intent(&batch, &request, approval, aim_for_test(), &kept)
         .expect("recorded");
     assert!(
         kept.lock().unwrap().is_none(),
@@ -4171,7 +4171,7 @@ fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
     // The same batch again: a send of it is on file.
     let again = server.post_approvals.redeeming_for_test(&batch.batch_id);
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, again, &aim_for_test(), &kept)),
+        refused(server.record_master_intent(&batch, &request, again, aim_for_test(), &kept)),
         UnderLockRefusal::AlreadyAttempted
     );
     let view = kept
@@ -4185,7 +4185,7 @@ fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
     let (rival, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&rival.batch_id);
     assert_eq!(
-        refused(server.record_master_intent(&rival, &request, approval, &aim_for_test(), &kept)),
+        refused(server.record_master_intent(&rival, &request, approval, aim_for_test(), &kept)),
         UnderLockRefusal::MasterOverlapsOpenDispatch
     );
     let view = kept
@@ -4243,7 +4243,7 @@ fn before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval() 
             &batch,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None),
         )
         .expect("recorded");
@@ -4281,24 +4281,13 @@ fn before_dispatch_refusals_record_nothing() {
         .join(format!("master-pre-image-{}.json", batch.batch_id));
     let before = journal_bytes(directory.path());
 
-    // No aim left by the recheck.
-    assert_eq!(
-        refused(server.record_master_intent(
-            &batch,
-            &request,
-            approval,
-            &Mutex::new(None),
-            &Mutex::new(None)
-        )),
-        UnderLockRefusal::PreImageUnrecorded
-    );
     // An empty pre-image is a failed read, not an empty book.
-    let empty = Mutex::new(Some(MasterAim {
+    let empty = MasterAim {
         pre_image: Default::default(),
-        marks: aim_for_test().lock().unwrap().clone().unwrap().marks,
-    }));
+        marks: aim_for_test().marks,
+    };
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, approval, &empty, &Mutex::new(None))),
+        refused(server.record_master_intent(&batch, &request, approval, empty, &Mutex::new(None))),
         UnderLockRefusal::PreImageUnrecorded
     );
     // A batch the caller holds that is not the journal's.
@@ -4309,7 +4298,7 @@ fn before_dispatch_refusals_record_nothing() {
             &changed,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::BatchChanged
@@ -4321,7 +4310,7 @@ fn before_dispatch_refusals_record_nothing() {
             &renamed,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::BatchChanged
@@ -4334,7 +4323,7 @@ fn before_dispatch_refusals_record_nothing() {
             &unknown,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::BatchNotFound
@@ -4345,7 +4334,7 @@ fn before_dispatch_refusals_record_nothing() {
             &batch,
             &request,
             Uuid::new_v4(),
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::ApprovalRevoked
@@ -4361,7 +4350,7 @@ fn before_dispatch_refusals_record_nothing() {
             &batch,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::AlreadyAttempted
@@ -4384,7 +4373,7 @@ fn before_dispatch_refuses_a_second_open_dispatch_of_the_same_ledger() {
         &second,
         &expected_request(),
         approval,
-        &aim_for_test(),
+        aim_for_test(),
         &Mutex::new(None),
     );
     assert!(
@@ -4419,24 +4408,20 @@ fn an_append_refusal_after_the_sidecar_was_written_leaves_no_sidecar() {
     let server = unit_server(directory.path());
     let (batch, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
-    let aim = aim_for_test();
-    {
-        // More company marks than one journal record may hold.
-        let mut aimed = aim.lock().unwrap();
-        let marks = &mut aimed.as_mut().unwrap().marks;
-        marks.extend(
-            (0..600_000_u32).map(|n| super::super::master_ledger::MasterMark {
-                company_guid: format!("{n:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}", 0, 0, 0, 0),
-                altmstid: 1,
-            }),
-        );
-    }
+    let mut aim = aim_for_test();
+    // More company marks than one journal record may hold.
+    aim.marks.extend(
+        (0..600_000_u32).map(|n| super::super::master_ledger::MasterMark {
+            company_guid: format!("{n:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}", 0, 0, 0, 0),
+            altmstid: 1,
+        }),
+    );
     let before = journal_bytes(directory.path());
     let result = server.record_master_intent(
         &batch,
         &expected_request(),
         approval,
-        &aim,
+        aim,
         &Mutex::new(None),
     );
     assert!(
@@ -4741,13 +4726,7 @@ fn recorded_intent_for(request: &MasterPostRequest) -> (RecordedIntent, String) 
     let (batch, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
     let intent = server
-        .record_master_intent(
-            &batch,
-            request,
-            approval,
-            &aim_for_test(),
-            &Mutex::new(None),
-        )
+        .record_master_intent(&batch, request, approval, aim_for_test(), &Mutex::new(None))
         .unwrap();
     (intent, batch.batch_id)
 }

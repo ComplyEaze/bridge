@@ -317,11 +317,19 @@ pub(super) struct MasterAdmission {
 }
 
 /// What a master admission creates: ledgers, or one stock item with the bytes
-/// its one renderer gave. Nothing sends a stock item yet: see [`MasterAdmission::ledgers`].
+/// its one renderer gave. Nothing sends a stock item yet: see [`MasterAdmission::writes`].
 #[derive(Clone)]
 enum MasterWrites {
     Ledgers(LedgerAdmission),
     StockItem { rendered: String },
+}
+
+/// What a master admission creates, by reference, for the runtime to match
+/// once at each site. The runtime refuses the stock arm at its company check,
+/// before any request: no stock item Create is sent yet.
+pub(super) enum AdmittedWrites<'a> {
+    Ledgers(&'a LedgerAdmission),
+    StockItem { rendered: &'a str },
 }
 
 /// One request of ledger `Create`s, rendered once, with the two index reads
@@ -358,21 +366,19 @@ impl MasterAdmission {
         }
     }
 
-    /// The ledger admission, or, for a stock item, the typed refusal: no stock
-    /// item Create is sent yet, so the runtime refuses one before any read.
-    pub(super) fn ledgers(&self) -> Result<&LedgerAdmission, ApprovedImportAdmissionError> {
+    /// What this admission creates: the ledger admission, or a stock item's
+    /// rendered bytes.
+    pub(super) fn writes(&self) -> AdmittedWrites<'_> {
         match &self.writes {
-            MasterWrites::Ledgers(ledgers) => Ok(ledgers),
-            MasterWrites::StockItem { .. } => {
-                Err(ApprovedImportAdmissionError::AdmissionInconsistent)
-            }
+            MasterWrites::Ledgers(ledgers) => AdmittedWrites::Ledgers(ledgers),
+            MasterWrites::StockItem { rendered } => AdmittedWrites::StockItem { rendered },
         }
     }
 
     fn xml(&self) -> &str {
-        match &self.writes {
-            MasterWrites::Ledgers(ledgers) => ledgers.rendered.xml(),
-            MasterWrites::StockItem { rendered } => rendered,
+        match self.writes() {
+            AdmittedWrites::Ledgers(ledgers) => ledgers.rendered.xml(),
+            AdmittedWrites::StockItem { rendered } => rendered,
         }
     }
 }
@@ -539,10 +545,11 @@ impl ApprovedImport {
     }
 
     /// The stock-item Create's approval: the stock-item dialog, answered only
-    /// by its own token. On the person's approval this holds `prepared` as the
-    /// masters kind; any other answer is a typed refusal and holds nothing. The
-    /// request is rendered before the dialog. `preview` is built from the
-    /// draft `prepared` was made from, by the caller's review builder.
+    /// by its own token. On the person's approval this holds, as the masters
+    /// kind, only the bytes rendered from `prepared`; any other answer is a
+    /// typed refusal and holds nothing. The request is rendered before the
+    /// dialog. `preview` is built from the draft `prepared` was made from, by
+    /// the caller's review builder.
     pub(crate) async fn confirm_stock_item(
         prepared: PreparedStockItem,
         preview: String,
@@ -565,7 +572,8 @@ impl ApprovedImport {
     }
 
     /// The bytes the one POST sends, whatever the kind. For masters they are
-    /// the bytes rendered once in [`MasterAdmission::new`], whose digest the
+    /// the bytes rendered once, in [`MasterAdmission::new`] for ledgers or in
+    /// [`MasterAdmission::stock_item`] for a stock item, whose digest the
     /// dispatch intent records.
     pub(super) fn xml(&self) -> &str {
         match &self.kind {
@@ -1072,9 +1080,9 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
-    /// A master post reached the lock without the pre-image its queue recheck
-    /// was to leave for the intent: no sidecar can be named, so no intent is
-    /// recorded and nothing is sent.
+    /// The pre-image a master post's queue recheck handed to the intent cannot
+    /// be recorded (an empty one is a failed read, not an empty book): no
+    /// sidecar can be named, so no intent is recorded and nothing is sent.
     #[error("master_pre_image_unrecorded")]
     PreImageUnrecorded,
     /// The pre-image sidecar could not be written. Refused before the intent:

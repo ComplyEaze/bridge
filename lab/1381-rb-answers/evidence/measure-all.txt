@@ -1,0 +1,36 @@
+M1: 3318 B sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1; 1 COMPANY row(s)
+  'BRIDGE STOCK CREATE LAB' (23 characters)
+I1: 8270 B sha256=92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4; 1 STOCKITEM row(s)
+  'SC Sibling Goods' (16 characters)
+G1: 4170 B sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a; 1 STOCKGROUP row(s)
+  'SC Goods Group' (14 characters)
+U1: 4040 B sha256 cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39; 1 UNIT row(s)
+  'Nos' (3 characters)
+W: 538 B sha256=1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010; WRITE ADMITTED
+M2: 3318 B sha256=4e9f77ceaba1315dbbe2c340da3bdf30d6a8f9fca36145e24570f7fb53760f81; 1 COMPANY row(s)
+  'BRIDGE STOCK CREATE LAB' (23 characters)
+I2: 10758 B sha256=2ae12ef647f24b9645231b868f733f978b09d3a8508aab5bf6dfa2564ccbffbd; 2 STOCKITEM row(s)
+  'SC Copied Goods' (15 characters)
+  'SC Sibling Goods' (16 characters)
+M3: 3318 B sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1; 1 COMPANY row(s)
+  'BRIDGE STOCK CREATE LAB' (23 characters)
+I3: 8270 B sha256=92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4; 1 STOCKITEM row(s)
+  'SC Sibling Goods' (16 characters)
+G3: 4170 B sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a; 1 STOCKGROUP row(s)
+  'SC Goods Group' (14 characters)
+U3: 4040 B sha256 cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39; 1 UNIT row(s)
+  'Nos' (3 characters)
+-- the bind, the write, the aim
+M1 state: met, ALTMSTID 210
+M2 state: met, ALTMSTID 211
+M3 state: met, ALTMSTID 210
+bind: met
+aim: 'SC Copied Goods' in I2 bound to the book yes; byte-equal to stock-create-lab-items-after-plain-create.utf16le.xml yes
+-- after the restore, against the pins
+M3 against stock-create-lab-marks.utf16le.xml: byte-equal yes; rows equal yes
+I3 against stock-create-lab-items-before.utf16le.xml: byte-equal yes; rows equal yes
+G3 against stock-create-lab-groups.utf16le.xml: byte-equal yes; rows equal yes
+U3 against stock-create-lab-units.utf16le.xml: byte-equal yes; rows equal yes
+RESTORE UNDID THE WRITE: yes (M3, I3, G3 and U3 byte-equal to the pins: 4 of 4)
+ALL 11 ANSWERS READ
+exit 0

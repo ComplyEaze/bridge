@@ -1,0 +1,61 @@
+RIGHT verdict, a whole answer: []
+RIGHT verdict, connection refused: ['curl exit 7', 'status 000', 'no CONTENT-LENGTH', 'empty answer']
+RIGHT verdict, status 500: ['status 500']
+RIGHT verdict, a cut answer: ['curl exit 18', 'CONTENT-LENGTH 4 but 2 bytes written']
+RIGHT verdict, an empty 200: ['empty answer']
+RIGHT verdict, no CONTENT-LENGTH: ['no CONTENT-LENGTH']
+RIGHT verdict, curl's size differs: ["curl's size 5 but 4 bytes written"]
+RIGHT verdict, above the bound: ['2000002 bytes, above the 2000000-byte bound: kept, not used']
+RIGHT order, M1 first: admitted
+RIGHT order, I1 after M1, its state met: admitted
+RIGHT order, I1 after M1, its state a stop: refused: local/evidence/m1-state.txt does not hold one of ['BOOK STATE MET'] (or the line then ': ...') and end `exit 0`
+RIGHT order, I1 after M1, the state line not last before exit 0: refused: local/evidence/m1-state.txt does not hold one of ['BOOK STATE MET'] (or the line then ': ...') and end `exit 0`
+RIGHT order, G1 before I1: refused: the log holds ['M1'], not ['M1', 'I1']: out of order
+RIGHT order, W after U1, the bind and the precheck met: admitted
+RIGHT order, W, the bind a stop: refused: local/evidence/bind.txt does not hold one of ['BIND MET'] (or the line then ': ...') and end `exit 0`
+RIGHT order, W, no bind record: refused: local/evidence/bind.txt is missing
+RIGHT order, W, the precheck failed: refused: local/evidence/r-precheck.txt does not hold one of ['PRECHECK MET'] (or the line then ': ...') and end `exit 0`
+RIGHT order, W, no precheck record: refused: local/precheck.txt is missing
+RIGHT order, W before U1: refused: the log holds ['M1', 'I1', 'G1'], not ['M1', 'I1', 'G1', 'U1']: out of order
+RIGHT order, M2 after W graded ADMITTED, the shot taken: admitted
+RIGHT order, M2 after W graded REFUSED: admitted
+RIGHT order, M2 after W graded UNCLEAR (v3 C8's one state read): admitted
+RIGHT order, M2 after W SENT-OK but not parsed (v3 C8's one state read): admitted
+RIGHT order, M2, the write's answer NOT READ: refused: local/evidence/w-grade.txt does not hold one of ['WRITE ADMITTED', 'WRITE REFUSED', 'WRITE UNCLEAR', 'WRITE NOT PARSED'] (or the line then ': ...') and end `exit 0`
+RIGHT order, M2, no screenshot after the write: refused: local/shots/s3-write is missing
+RIGHT order, I2 after M2, the write admitted and M2 met: admitted
+RIGHT order, I2, the write refused: refused: local/evidence/w-grade.txt does not hold one of ['WRITE ADMITTED'] (or the line then ': ...') and end `exit 0`
+RIGHT order, I2, M2 a stop: refused: local/evidence/m2-state.txt does not hold one of ['BOOK STATE MET'] (or the line then ': ...') and end `exit 0`
+RIGHT order, M3 after I2, the restore recorded: admitted
+RIGHT order, M3, no restore record: refused: local/evidence/r-after.txt is missing
+RIGHT order, M3, no aim record: refused: local/evidence/aim.txt is missing
+RIGHT order, M3, the aim a stop: refused: local/evidence/aim.txt does not hold one of ['AIM SHOWN'] (or the line then ': ...') and end `exit 0`
+RIGHT order, M3, the write unclear: refused: local/evidence/w-grade.txt does not hold one of ['WRITE ADMITTED'] (or the line then ': ...') and end `exit 0`
+RIGHT order, I3 after M3, its state met: admitted
+RIGHT order, I3 after M3, its state a stop: refused: local/evidence/m3-state.txt does not hold one of ['BOOK STATE MET'] (or the line then ': ...') and end `exit 0`
+RIGHT order, U3 last: admitted
+RIGHT order, anything after U3: refused: M1 was sent already: a request is sent once in the row's life
+RIGHT order, W again: refused: W was sent already: a request is sent once in the row's life
+RIGHT order, G3 after I3 failed: refused: I3 failed: nothing more is sent (stop-REQUEST-FAILED)
+RIGHT order, a label not in the row: refused: 'C1' is not one of M1 I1 G1 U1 W M2 I2 M3 I3 G3 U3
+RIGHT start marker, W started but not logged, W again: W was sent already: a request is sent once in the row's life
+RIGHT start marker, W logged, M2 admitted: None
+RIGHT start marker, W started but not logged, M2: W was started and has no log line (its answer never came): nothing more is sent (stop-NO-ANSWER)
+RIGHT request, M1's file requests/marks.utf16le.xml: admitted
+RIGHT request, I1's file requests/items.utf16le.xml: admitted
+RIGHT request, G1's file requests/groups.utf16le.xml: admitted
+RIGHT request, U1's file requests/units.utf16le.xml: admitted
+RIGHT request, W's file requests/create.utf16le.xml: admitted
+RIGHT request, the write's file under a read's label: the request is 'import': only W imports, and every other label exports
+RIGHT request, a read's file under W: the write's file is not the pinned one (WRITE_SHA, WRITE_BYTES)
+RIGHT request, the write's file with TALLYREQUEST Export: still not an export (neither an import nor an export (TALLYREQUEST 'export data', 3 write elements))
+RIGHT request, W's SHA256.txt line not its file: the request differs from its SHA256.txt line, or has none
+RIGHT request, a cut file: does not parse (ParseError)
+RIGHT records, no screenshot after the write: absent
+RIGHT records, the screenshot as .jpg: present; the grade read
+2026-11-26T05:39:21.221Z M1 requests/marks.utf16le.xml 990 B sha256=5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b | curl exit -1 status  CONTENT-LENGTH none answer 0 B sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 | first byte  s total  s | VERDICT REQUEST-FAILED: curl exit -1; status none; no CONTENT-LENGTH; curl's size none but 0 bytes written; empty answer
+RIGHT send, a curl that cannot start: exit 1, curl exit -1, REQUEST-FAILED (1)
+RIGHT log reader, three SENT-OK lines, one with a one-letter label
+RIGHT log reader, a stray line refuses
+58 cases, 58 right
+exit 0

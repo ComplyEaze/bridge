@@ -1,0 +1,13 @@
+W: 538 B sha256=1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010; byte-equal to the licensed answer stock-create-lab-create-answer.utf16le.xml: yes
+  CREATED '1'
+  ALTERED '0'
+  DELETED '0'
+  LASTVCHID '0'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'
+WRITE ADMITTED: CREATED 1, every other counter 0, no LINEERROR
+exit 0

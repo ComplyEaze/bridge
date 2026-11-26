@@ -1,0 +1,67 @@
+RIGHT state, the pinned marks: []
+RIGHT state, ALTMSTID 211: ["ALTMSTID '211', not '210'"]
+RIGHT state, a voucher mark: ["an ALTVCHID element ('1'); the recorded state has none"]
+RIGHT state, a second company loaded: ['2 COMPANY rows, not 1 (a company other than the book is loaded, or none)']
+RIGHT state, no company row (CMPINFO's COMPANY line is not a row): ['0 COMPANY rows, not 1 (a company other than the book is loaded, or none)']
+RIGHT state, another GUID: ["the row's GUID is ffffffff..., not the book's"]
+RIGHT state, an answer cut short: True
+RIGHT state, an empty answer: 'NOT READ: empty answer'
+RIGHT state, Tally's error envelope: 'NOT READ: HEADER/STATUS is not 1'
+RIGHT grade, the licensed answer (CREATED 1, the rest 0): 'ADMITTED'
+RIGHT grade, the licensed answer with a byte-order mark: 'ADMITTED'
+RIGHT grade, Tally's refusal (LINEERROR, CREATED 0): 'REFUSED'
+RIGHT grade, Tally's error envelope (STATUS 0, LINEERROR): 'REFUSED'
+RIGHT grade, Tally's partial landing (LINEERROR beside CREATED 2): 'UNCLEAR'
+RIGHT grade, CREATED 0 and no LINEERROR: 'REFUSED'
+RIGHT grade, ALTERED 1 (the item existed): 'UNCLEAR'
+RIGHT grade, CREATED 1 with EXCEPTIONS 1: 'UNCLEAR'
+RIGHT grade, CREATED 1 with a LINEERROR: 'UNCLEAR'
+RIGHT grade, CREATED 2: 'UNCLEAR'
+RIGHT grade, CREATED missing: 'UNCLEAR'
+RIGHT grade, CREATED empty (not zero): 'UNCLEAR'
+RIGHT grade, CREATED a digit that is not ASCII: 'UNCLEAR'
+RIGHT grade, the counters under a root that is not RESPONSE: 'UNCLEAR'
+RIGHT grade, CREATED repeated: 'UNCLEAR'
+RIGHT grade, a refusal with ALTERED missing: 'UNCLEAR'
+RIGHT grade, a refusal with ALTERED 1 (CREATED 0, a change landed): 'UNCLEAR'
+RIGHT grade, an ENVELOPE with STATUS 1: 'UNCLEAR'
+RIGHT grade, a counter nested, not a child of RESPONSE: 'UNCLEAR'
+RIGHT grade, an answer cut short: True
+RIGHT grade, an empty answer: 'NOT READ: empty answer'
+RIGHT grade, CREATED with a leading zero: 'UNCLEAR'
+RIGHT grade, an error envelope that also holds import counters: 'UNCLEAR'
+RIGHT grade, a counter's text holding a line break and a forged grade: UNCLEAR, printed by repr: ('UNCLEAR', False)
+RIGHT bind, the pins: exit and last line: (0, 'BIND MET')
+RIGHT bind, G1 one byte off its pin: stop-BOOK-STATE: (1, 'stop-BOOK-STATE: G1 is not byte-equal to stock-create-lab-groups.utf16le.xml')
+RIGHT bind, M1 at 211: stop-BOOK-STATE: 1
+RIGHT bind, U1's send failed: NOT READ, not a stop on the book: (2, 'NOT READ')
+RIGHT write, the licensed answer: exit and grade: (0, 'WRITE ADMITTED')
+RIGHT write, the licensed answer: byte-equal line: True
+RIGHT write, the send failed: NOT READ, never 'nothing created': (2, True)
+RIGHT write, SENT-OK but the answer cut short: WRITE NOT PARSED (stop-WRITE-ANSWER), never NOT READ: (0, 'WRITE NOT PARSED')
+RIGHT state M2, the write's answer not parsed: the mark recorded only: (1, 'stop-WRITE-ANSWER')
+RIGHT state M2, the write admitted, M2 at 211: (0, 'BOOK STATE MET')
+RIGHT state M2, the write admitted, M2 still 210: (1, 'stop-AIM-STATE')
+RIGHT state M2, the write refused, M2 at 210: (0, 'BOOK STATE MET')
+RIGHT state M2, the write refused, M2 at 211: (1, 'stop-AIM-STATE')
+RIGHT state M2, the write unclear, M2 recorded only: (1, 'stop-WRITE-ANSWER')
+RIGHT state M2, the write's send failed: NOT READ: (2, 'NOT READ')
+RIGHT aim, the licensed read after the write: AIM SHOWN: (0, 'AIM SHOWN')
+RIGHT aim, the licensed read: byte-equal line: True
+RIGHT aim, the read before the write: stop-AIM-STATE: (1, 'stop-AIM-STATE')
+RIGHT aim, the item's GUID not the book's: stop-AIM-STATE: 1
+RIGHT state M3, the pinned marks: 0
+RIGHT state M3 at 211: stop-RESTORED-STATE: (1, 'stop-RESTORED-STATE')
+RIGHT all, the admitted path on the pins: exit: 0
+RIGHT all, the admitted path: the line RESTORE UNDID THE WRITE: yes (M3, I3, G3...: True
+RIGHT all, the admitted path: the line ALL 11 ANSWERS READ...: True
+RIGHT all, the admitted path: the line M2 state: met, ALTMSTID 211...: True
+RIGHT all, the admitted path: the line bind: met...: True
+RIGHT all, I3 still holding the write: not undone: True
+RIGHT all, M1 with two ALTMSTID elements: NOT READ with its reason, never escaped: (2, True)
+RIGHT all, an I2 row with two GUID elements: NOT READ with its reason, never escaped: (2, True)
+RIGHT all, the refused path: six answers, no restore: (0, True, True)
+RIGHT all, U3's send failed: NOT ALL READ, never 'undone': (2, True)
+RIGHT all, the units fixture not its pin: NOT READ, not 'differs': (2, True)
+65 cases, 65 right
+exit 0

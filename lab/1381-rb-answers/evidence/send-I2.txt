@@ -1,0 +1,2 @@
+2026-11-26T05:40:55.524Z I2 requests/items.utf16le.xml 1330 B sha256=581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1 | curl exit 0 status 200 CONTENT-LENGTH 10758 answer 10758 B sha256=2ae12ef647f24b9645231b868f733f978b09d3a8508aab5bf6dfa2564ccbffbd | first byte 0.006135 s total 0.006835 s | VERDICT SENT-OK
+exit 0

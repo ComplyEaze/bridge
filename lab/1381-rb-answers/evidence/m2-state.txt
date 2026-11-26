@@ -1,0 +1,4 @@
+M2: 3318 B sha256=4e9f77ceaba1315dbbe2c340da3bdf30d6a8f9fca36145e24570f7fb53760f81
+  COMPANY row: GUID bac2b5e9... (the book's: yes), ALTMSTID 211, ALTVCHID absent
+BOOK STATE MET: one COMPANY row, the book's, ALTMSTID 211, no ALTVCHID
+exit 0

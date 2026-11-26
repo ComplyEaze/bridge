@@ -1,0 +1,11 @@
+label M3
+request requests/marks.utf16le.xml 990 B sha256=5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b
+start 2026-11-26T05:43:33.900Z
+end 2026-11-26T05:43:33.932Z
+curl exit 0
+curl -w line: 'status=200, bytes=3318, first byte=0.003764, total=0.004284'
+last status line: HTTP/1.1 200 OK
+CONTENT-LENGTH: 3318
+answer file: present, 3318 B sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1
+curl error output (0 characters): ''
+VERDICT SENT-OK

@@ -1,0 +1,2 @@
+2026-11-26T05:43:47.293Z G3 requests/groups.utf16le.xml 1144 B sha256 d79503503a31c4fee4195b2e03308c2833aa2e9c3072bd4cc0ed1f73d9121245 | curl exit 0 status 200 CONTENT-LENGTH 4170 answer 4170 B sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a | first byte 0.008166 s total 0.018440 s | VERDICT SENT-OK
+exit 0

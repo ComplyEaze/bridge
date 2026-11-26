@@ -1,0 +1,11 @@
+label G1
+request requests/groups.utf16le.xml 1144 B sha256 d79503503a31c4fee4195b2e03308c2833aa2e9c3072bd4cc0ed1f73d9121245
+start 2026-11-26T05:40:12.126Z
+end 2026-11-26T05:40:12.196Z
+curl exit 0
+curl -w line: 'status=200, bytes=4170, first byte=0.021909, total=0.024616'
+last status line: HTTP/1.1 200 OK
+CONTENT-LENGTH: 4170
+answer file: present, 4170 B sha256 b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a
+curl error output (0 characters): ''
+VERDICT SENT-OK

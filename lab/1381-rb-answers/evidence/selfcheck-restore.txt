@@ -1,0 +1,46 @@
+RIGHT plan, all as recorded: exit and first word: (0, 'PLAN WRITTEN')
+RIGHT plan, all as recorded: the printed text holds neither the number nor DATA: False
+RIGHT plan, all as recorded: the plan holds the number: True
+RIGHT plan, again: refused: 2
+RIGHT after, nothing changed: exit and NO DIFFERENCE: (0, 'NO DIFFERENCE')
+RIGHT after, again: refused: 2
+RIGHT after, one changed, one added, one removed: counts: (0, True, False)
+RIGHT plan, two files in the source: stop-RESTORE-SOURCE: (1, True)
+RIGHT plan, other bytes: stop-RESTORE-SOURCE: 1
+RIGHT plan, a file not named TDBK1800_<n>.001: stop-RESTORE-SOURCE: 1
+RIGHT plan, the source folder absent: stop-RESTORE-SOURCE: (1, 'stop-RESTORE-SOURCE')
+RIGHT plan, the source folder unreadable: FAILED READ, not absent: (2, 'FAILED READ')
+RIGHT plan, the data folder absent: stop-RESTORE-SOURCE: (1, 'stop-RESTORE-SOURCE')
+RIGHT after, no plan: refused: 2
+RIGHT after, the data folder absent: stop-RESTORE, the restore did not complete: (1, True)
+RIGHT after, the data folder present and empty: recorded, distinct from absent: (0, True)
+RIGHT after, the source changed: stop-RESTORE-SOURCE: 1
+RIGHT plan, the data folder unreadable (lstat refused): FAILED READ, not absent: (2, 'FAILED READ')
+RIGHT after, the data folder unreadable: FAILED READ, not stop-RESTORE: (2, 'FAILED READ')
+RIGHT plan, the data path a file: FAILED READ, not absent: (2, "FAILED READ: the company's data folder path is not a directory\n")
+RIGHT plan, the record cannot be written: FAILED READ, exit 2: (2, 'FAILED READ')
+RIGHT precheck, the record cannot be written: FAILED READ, exit 2: (2, 'FAILED READ')
+RIGHT precheck, all as recorded: exit and first word: (0, 'PRECHECK MET')
+RIGHT precheck, all as recorded: the printed text holds neither the number nor DATA: False
+RIGHT precheck, again: refused: 2
+RIGHT precheck, the fallback's bytes not recorded: stop-RESTORE-SOURCE: (1, True)
+RIGHT precheck, the fallback folder missing: stop-RESTORE-SOURCE: (1, 'stop-RESTORE-SOURCE: the fallback folder is absent')
+RIGHT precheck, the two company numbers differ: stop-RESTORE-SOURCE: (1, "stop-RESTORE-SOURCE: the fallback's company number is not BK-S's")
+RIGHT precheck, a DATA typo: stop-RESTORE-SOURCE, nothing shut: (1, "stop-RESTORE-SOURCE: the company's data folder is absent before the restore")
+RIGHT plan, no precheck: refused: (2, 'REFUSED: local/precheck.txt is missing: restore.py precheck first')
+RIGHT plan, the precheck record gone though its evidence says met: refused: (2, 'REFUSED: local/precheck.txt is missing: restore.py precheck first')
+RIGHT plan, a precheck that failed: refused: (2, 'REFUSED')
+RIGHT plan, a PRECHECK MET line not ending exit 0: refused: (2, 'REFUSED')
+RIGHT plan, the company number not the precheck's: stop-RESTORE-SOURCE: (1, "stop-RESTORE-SOURCE: the source's company number is not the precheck's")
+RIGHT plan, the write not graded: refused: (2, "REFUSED: local/evidence/w-grade.txt is missing (measure.py write): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, the write refused in-band: refused: (2, "REFUSED: local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, the write unclear: refused: (2, "REFUSED: local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, the write's send failed: refused: (2, "REFUSED: local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, the write's answer not parsed: refused: (2, "REFUSED: local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, WRITE ADMITTED not ending exit 0: refused: (2, "REFUSED: local/evidence/w-grade.txt holds no WRITE ADMITTED line ending exit 0 (measure.py write): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, no aim record: refused: (2, "REFUSED: local/evidence/aim.txt is missing (measure.py aim): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, the aim a stop: refused: (2, "REFUSED: local/evidence/aim.txt holds no AIM SHOWN line ending exit 0 (measure.py aim): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, the aim not read: refused: (2, "REFUSED: local/evidence/aim.txt holds no AIM SHOWN line ending exit 0 (measure.py aim): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+RIGHT plan, AIM SHOWN not ending exit 0: refused: (2, "REFUSED: local/evidence/aim.txt holds no AIM SHOWN line ending exit 0 (measure.py aim): this sheet restores only after WRITE ADMITTED and AIM SHOWN; any other restore is on the run lead's word, by a new sheet")
+44 cases, 44 right
+exit 0

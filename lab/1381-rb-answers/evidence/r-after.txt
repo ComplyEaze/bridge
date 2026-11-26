@@ -1,0 +1,22 @@
+AFTER RECORDED: the source unchanged (24219 B, sha256 equal to recorded); the company's data folder 19 entries before, 15 after; 1 added, 5 removed, 14 changed, 0 unchanged (local/r-after-listing.txt)
+  added: file 512 2026-11-26T11:12:40 TMESSAGE.TSF
+  removed: file 1024 2026-11-26T10:09:21 CmpSchMetaData.1800
+  removed: file 0 2026-11-26T11:10:32 Index.1800
+  removed: file 512 2026-11-26T11:09:47 TCMPSCHACCESS.TSF
+  removed: file 5632 2026-11-26T11:11:18 TCMPSCHSTATE.TSF
+  removed: file 2560 2026-11-26T10:09:21 TCMPSCHUPDATE.TSF
+  changed: file 512 2026-11-26T10:08:48 AddlCmp.1800  ->  file 512 2026-11-26T11:12:40 AddlCmp.1800
+  changed: file 512 2026-11-26T10:08:48 Aggr.1800  ->  file 512 2026-11-26T11:12:40 Aggr.1800
+  changed: file 1536 2026-11-26T10:08:48 CmpNotification.1800  ->  file 1536 2026-11-26T11:12:40 CmpNotification.1800
+  changed: file 5120 2026-11-26T11:10:32 CmpSave.1800  ->  file 5120 2026-11-26T11:12:40 CmpSave.1800
+  changed: file 5120 2026-11-26T11:10:32 Company.1800  ->  file 5120 2026-11-26T11:12:40 Company.1800
+  changed: file 512 2026-11-26T10:08:48 ExtMngr.1800  ->  file 512 2026-11-26T11:12:40 ExtMngr.1800
+  changed: file 512 2026-11-26T10:08:48 LinkMgr.1800  ->  file 512 2026-11-26T11:12:40 LinkMgr.1800
+  changed: file 194048 2026-11-26T11:10:32 Manager.1800  ->  file 193024 2026-11-26T11:12:40 Manager.1800
+  changed: file 512 2026-11-26T10:08:48 SecTran.1800  ->  file 512 2026-11-26T11:12:40 SecTran.1800
+  changed: file 512 2026-11-26T10:08:48 StatStatus.1800  ->  file 512 2026-11-26T11:12:40 StatStatus.1800
+  changed: file 512 2026-11-26T11:10:32 TACCESS.TSF  ->  file 512 2026-11-26T11:12:40 TACCESS.TSF
+  changed: file 5632 2026-11-26T11:11:18 TSTATE.TSF  ->  file 5632 2026-11-26T11:12:40 TSTATE.TSF
+  changed: file 512 2026-11-26T10:08:48 TranMgr.1800  ->  file 512 2026-11-26T11:12:40 TranMgr.1800
+  changed: file 512 2026-11-26T10:08:48 VchStatus.1800  ->  file 512 2026-11-26T11:12:40 VchStatus.1800
+exit 0

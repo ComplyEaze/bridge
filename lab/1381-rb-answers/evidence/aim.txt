@@ -1,0 +1,6 @@
+I2: 2 STOCKITEM row(s)
+  'SC Copied Goods': GUID bac2b5e9...-000000d1, bound to the book: yes
+  'SC Sibling Goods': GUID bac2b5e9...-000000d0, bound to the book: yes
+I2 byte-equal to stock-create-lab-items-after-plain-create.utf16le.xml (licensed, after the same write): yes (a measurement)
+AIM SHOWN: 'SC Copied Goods' in I2, bound to the book
+exit 0

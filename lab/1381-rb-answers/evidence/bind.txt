@@ -1,0 +1,3 @@
+M1 byte-equal to stock-create-lab-marks.utf16le.xml: yes (a measurement)
+BIND MET: M1 one COMPANY row, the book's, ALTMSTID 210, no ALTVCHID; I1, G1 and U1 byte-equal to the pins
+exit 0

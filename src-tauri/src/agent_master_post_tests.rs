@@ -1776,12 +1776,13 @@ mod coordinator {
     #[tokio::test]
     async fn a_binding_snapshot_without_the_target_row_sizes_nothing() {
         // Constructed rows in place of the captured target row: another
-        // company's, then one with the target's GUID under another name only.
+        // company's (the stock lab book's name and GUID), then one with the
+        // target's GUID under another name only.
         let target = stock_capture(SHAPE_MARKS);
         let start = target.find("<COMPANY NAME=").unwrap();
         let end = start + target[start..].find("</COMPANY>").unwrap() + "</COMPANY>".len();
         for row in [
-            "<COMPANY NAME=\"BRIDGE OTHER LAB\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">00000000-0000-4000-8000-000000000001</GUID><ALTMSTID TYPE=\"Number\"> 289</ALTMSTID></COMPANY>".to_string(),
+            format!("<COMPANY NAME=\"BRIDGE STOCK CREATE LAB\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{STOCK_GUID}</GUID><ALTMSTID TYPE=\"Number\"> 289</ALTMSTID></COMPANY>"),
             format!("<COMPANY NAME=\"BRIDGE SHAPE LAB COPY\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{SHAPE_GUID}</GUID><ALTMSTID TYPE=\"Number\"> 289</ALTMSTID></COMPANY>"),
         ] {
             let without_target = target.replacen(&target[start..end], &row, 1);

@@ -41,7 +41,7 @@ STATE = ('cd /c/bridge-lab/1381-rr && if [ -e local/evidence/{s}-state.txt ]; th
          'exists"; else python -I -X utf8 measure.py state {u} > local/evidence/{s}-state.txt 2>&1; echo "exit $?" >> '
          'local/evidence/{s}-state.txt; cat local/evidence/{s}-state.txt; fi')
 RESTORE = ('cd /c/bridge-lab/1381-rr && if [ -e local/evidence/r-{c}.txt ]; then echo "STOP: local/evidence/r-{c}.txt '
-           'exists"; else python -I -X utf8 restore.py {c} <DATA> > local/evidence/r-{c}.txt 2>&1; echo "exit $?" >> '
+           'exists"; else python -I -X utf8 restore.py {c} "<DATA>" > local/evidence/r-{c}.txt 2>&1; echo "exit $?" >> '
            'local/evidence/r-{c}.txt; cat local/evidence/r-{c}.txt; fi')
 COMPUTE = ('cd /c/bridge-lab/1381-rr && python -I -X utf8 measure.py all local/gen/ra > local/evidence/measure-all.txt '
            '2>&1; echo "exit $?" >> local/evidence/measure-all.txt; cat local/evidence/measure-all.txt')
@@ -116,8 +116,9 @@ def sheet():
                   (ROOT / "SHA256.txt").read_text(encoding="utf-8").splitlines() if row.count("  ") == 2)
     sha = re.findall(r'(?m)^WANT_SHA = "([0-9a-f]{64})"$', restore)
     size = re.findall(r"(?m)^WANT_BYTES = ([0-9]+)$", restore)
-    if len(sha) != 1 or len(size) != 1 or f"`{sha[0]}`" not in text or f"{int(size[0]):,} bytes" not in text:
-        errors.append("restore.py's WANT_SHA and WANT_BYTES are not once each, or not the sheet's BK-S")
+    if len(sha) != 1 or len(size) != 1 or f"{int(size[0]):,} bytes, sha256 `{sha[0]}`" not in section(text, "The backup"):
+        errors.append("restore.py's WANT_SHA and WANT_BYTES are not once each, or not the bytes and sha256 of one line "
+                      "of The backup")
     for name, line in GONE:
         if line in (ROOT / name).read_text(encoding="utf-8"):
             errors.append(f"{name} holds {line!r}: a client timeout")

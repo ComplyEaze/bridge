@@ -1024,7 +1024,7 @@ pub(in crate::agent::agent_import) async fn taken_stock_approval<'a>(
         approved_stock_item_for("SC Copied Marked", batch.to_string()).await;
     approvals
         .hold_approved(batch, binding, approved, held, answered)
-        .expect("the slot is free");
+        .expect("the slot is empty");
     let fresh = shown_stock_item("SC Copied Marked").binding();
     let (taken, _, _) = (approvals.take_for_dispatch(batch, &fresh))
         .unwrap_or_else(|code| panic!("the approval is taken: {code}"));

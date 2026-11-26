@@ -591,9 +591,11 @@ impl StockItemCatalogue {
 
 impl CompleteStockItemCatalogue {
     /// Re-parses an admitted candidate body into the catalogue it proves whole.
+    /// The read is taken owned or borrowed: the queue lends its own.
     pub(crate) fn from_admitted(
-        read: AdmittedCandidateRead,
+        read: impl std::borrow::Borrow<AdmittedCandidateRead>,
     ) -> Result<Self, StockItemCatalogueError> {
+        let read = read.borrow();
         let catalogue = StockItemCatalogue::from_candidate_read(read.company(), read.body())?;
         Ok(Self {
             catalogue,

@@ -1239,7 +1239,7 @@ impl Server {
 /// How the master journal's refusal of a dispatch intent is told apart: `Ok` for
 /// one raised before any byte of the intent was written (nothing is recorded),
 /// `Err` with its code for one after which the intent may be in the file.
-fn journal_refusal(error: MasterLedgerError) -> Result<UnderLockRefusal, String> {
+pub(super) fn journal_refusal(error: MasterLedgerError) -> Result<UnderLockRefusal, String> {
     match error {
         MasterLedgerError::OpenDispatchOverlaps => Ok(UnderLockRefusal::MasterOverlapsOpenDispatch),
         MasterLedgerError::DuplicateDispatch => Ok(UnderLockRefusal::AlreadyAttempted),

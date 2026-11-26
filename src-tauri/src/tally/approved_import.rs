@@ -494,10 +494,9 @@ pub(crate) enum QueuedAdmission<'a> {
         company_marks_at_binding: &'a str,
         company_marks: &'a str,
     },
-    /// A stock item `Create` and the stock reads the queue made for it. No
-    /// shipped recheck reads one yet: each refuses it. A plain `allow`, since
-    /// this file admits only bare test gates.
-    #[allow(dead_code)]
+    /// A stock item `Create` and the stock reads the queue made for it. Only
+    /// the stock recheck (`recheck_stock_item_for_dispatch`) admits one; every
+    /// other recheck refuses it.
     StockItem(QueuedStockItem<'a>),
 }
 
@@ -538,9 +537,7 @@ impl<'a> QueuedStockItem<'a> {
     }
 }
 
-/// What a stock recheck reads. No shipped recheck admits a stock item yet.
-// Part 2b's stock recheck reads these and removes this `allow`.
-#[allow(dead_code)]
+/// What the stock recheck reads.
 impl<'a> QueuedStockItem<'a> {
     pub(crate) fn prepared(&self) -> &'a PreparedStockItem {
         self.prepared

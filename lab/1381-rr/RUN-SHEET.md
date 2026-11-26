@@ -61,7 +61,7 @@ Every command is typed in **Git Bash**, from `/c/bridge-lab/1381-rr`, exactly as
 
 - Byte-equal to row 1381-RA's (`lab/1381-ra/` at 30f5c820): `.gitattributes`, `.gitignore` (`/local/`), and the four request files.
 - Changed copies of RA's, each change named in the file's own header: `send.py` (five labels M1 M2 I G U; the gates M2 after M1's state and the restore's after-record, I after M2's state; `--selftest` runs 28 synthetic cases); `measure.py` (RA's reader and state check; the count read cut; `state M1|M2`; `all` against RA's pinned answers; `--selftest` runs 30 cases on RA's answers, each negative case an answer with one edit); `check_sheet.py` (Steps holds exactly its command lines, once each and in order, step 0's and step 8's among them; the four self-check lines; `measure.py`'s RA pins equal to the table below; the four requests; the held lines of `send.py` and `restore.py`, BK-S's and the fallback's bytes and sha256 equal to The backup; `--fresh` as RA's, also allowing `notes.txt` and one `s0-window` screenshot; STOP-PYCACHE as RA's).
-- Written for this row: `restore.py` (v3 C6's records before and after the restore, in the shape of row 1108-R3's `c6prep.py`; `precheck`, before the shut, checks BK-S, the fallback and Tally's data folder; `--selftest` runs 29 cases on synthetic folders); `LAB-COMMON-RR.md`; `SHA256.txt` (every other file's sha256, bytes and path); `RUN-SHEET.md`, this sheet.
+- Written for this row: `restore.py` (v3 C6's records before and after the restore, in the shape of row 1108-R3's `c6prep.py`; `precheck`, before the shut, checks BK-S, the fallback and Tally's data folder; `plan` refuses unless a precheck met with the same company number; `--selftest` runs 34 cases on synthetic folders); `LAB-COMMON-RR.md`; `SHA256.txt` (every other file's sha256, bytes and path); `RUN-SHEET.md`, this sheet.
 - Not carried from RA: `gen_ra.py` and RA's count request (this row makes no request; its four are RA's, pinned by `SHA256.txt` and the table above).
 
 ## Self-checks before the sitting
@@ -75,7 +75,7 @@ cd /c/bridge-lab/1381-rr && python -I -X utf8 restore.py --selftest local/selfte
 cd /c/bridge-lab/1381-rr && python -I -X utf8 check_sheet.py > local/evidence/selfcheck-sheet.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-sheet.txt; cat local/evidence/selfcheck-sheet.txt
 ```
 
-EXPECT, in order: `28 cases, 28 right`, exit 0; `30 cases, 30 right`, exit 0; `29 cases, 29 right`, exit 0; three `OK` lines, exit 0. Any other: STOP-SELFCHECK.
+EXPECT, in order: `28 cases, 28 right`, exit 0; `30 cases, 30 right`, exit 0; `34 cases, 34 right`, exit 0; three `OK` lines, exit 0. Any other: STOP-SELFCHECK.
 
 ## Steps
 
@@ -84,7 +84,7 @@ EXPECT, in order: `28 cases, 28 right`, exit 0; `30 cases, 30 right`, exit 0; `2
 **Record-line rule.** A send, state or restore line that prints `STOP: local/evidence/<name> exists` is STOP-RERUN: that line was typed before, nothing was done now, and the earlier record stands. A send line that has not returned after 10 minutes is STOP-NO-ANSWER (R4): leave that Git Bash window and its curl exactly as they are and report.
 
 0. **Before the sitting.** Nothing is sent to Tally in this step except the GET `/status` of its last line. The screenshot comes straight after the folder line (R3).
-   - Make the row folder. EXPECT `made` and `exit 0`. `STOP: … exists`, or no `made` line because `/c/bridge-lab` is absent: STOP-FOLDER.
+   - Make the row folder. EXPECT `made` and `exit 0`. `STOP: … exists`, or no `made` line because `/c/bridge-lab` is absent: STOP-FOLDER. Any STOP after this line leaves `/c/bridge-lab/1381-rr` in place, with what it holds: delete nothing; a new sitting needs the run coordinator's word and a new folder name.
      ```bash
      if [ -e /c/bridge-lab/1381-rr ]; then echo "STOP: /c/bridge-lab/1381-rr exists"; else mkdir /c/bridge-lab/1381-rr /c/bridge-lab/1381-rr/local /c/bridge-lab/1381-rr/local/evidence /c/bridge-lab/1381-rr/local/gen /c/bridge-lab/1381-rr/local/shots && echo "made" > /c/bridge-lab/1381-rr/local/evidence/s0-made.txt; echo "exit $?" >> /c/bridge-lab/1381-rr/local/evidence/s0-made.txt; cat /c/bridge-lab/1381-rr/local/evidence/s0-made.txt; fi
      ```
@@ -95,7 +95,7 @@ EXPECT, in order: `28 cases, 28 right`, exit 0; `30 cases, 30 right`, exit 0; `2
      cd /c/bridge-lab/1381-rr && git -C <CLONE> fetch origin > local/evidence/s0-fetch-origin.txt 2>&1; echo "exit $?" >> local/evidence/s0-fetch-origin.txt; cat local/evidence/s0-fetch-origin.txt
      cd /c/bridge-lab/1381-rr && { git -C <CLONE> archive <SHEET> lab/1381-rr | tar -x -C /c/bridge-lab/1381-rr --strip-components=2; echo "exit ${PIPESTATUS[0]} ${PIPESTATUS[1]}"; } > local/evidence/s0-copy.txt 2>&1; cat local/evidence/s0-copy.txt
      ```
-   - **The pre-sitting check**, right after the copy: `local/` may hold only the three records above, the screenshot `s0-window` and `notes.txt`. EXPECT `OK: local/ holds only step 0's own records …` then the three `OK` lines, exit 0. `STOP-LOCAL-PREFILLED`: stop, delete nothing, report the names it prints. Any other miss: STOP-SELFCHECK.
+   - **The pre-sitting check**, right after the copy: `local/` may hold only `local/evidence/s0-made.txt`, `local/evidence/s0-fetch-origin.txt`, `local/evidence/s0-copy.txt`, `local/evidence/notes.txt`, this check's own `local/evidence/s0-fresh.txt`, and one screenshot, `local/shots/s0-window.png` or `local/shots/s0-window.jpg`. EXPECT `OK: local/ holds only step 0's own records …` then the three `OK` lines, exit 0. `STOP-LOCAL-PREFILLED`: stop, delete nothing, report the names it prints. Any other miss: STOP-SELFCHECK.
      ```bash
      cd /c/bridge-lab/1381-rr && python -I -X utf8 check_sheet.py --fresh > local/evidence/s0-fresh.txt 2>&1; echo "exit $?" >> local/evidence/s0-fresh.txt; cat local/evidence/s0-fresh.txt
      ```
@@ -124,7 +124,7 @@ EXPECT, in order: `28 cases, 28 right`, exit 0; `30 cases, 30 right`, exit 0; `2
    ```
 3. **The shut** (v3 C6's "Shut THE COMPANY first"), by RA's keys: a click on the Gateway's left panel; Alt+K (the Company menu); one click on Shut; Enter on the one row `BRIDGE STOCK CREATE LAB`. If R7's pair follows: zoom, then No by click on the renewal dialog; zoom, then "T: Continue In Educational Mode" by click on the License screen; screenshot each (`local/shots/s3-renewal.png`, `local/shots/s3-licence.png`, kept on the lab PC). Anything else: STOP-LICENCE or STOP-DIALOG. Then a screenshot `local/shots/s3-select.png`: EXPECT Select Company, no company loaded, title EDU.
 4. **The restore** (R5, v3 C6), once.
-   - **The plan**, with no company loaded. Replace `<DATA>` (Shell). EXPECT `PLAN WRITTEN: the source folder holds one file, 24219 B, sha256 ecc8d4028b88b763e5a8a22014bc699b07db68c3eb32cff3c6c92052b373b0f4 (equal to recorded), …` and `exit 0`. `STOP-RESTORE-SOURCE` (exit 1): STOP-RESTORE-SOURCE, nothing is restored. `FAILED READ` or `REFUSED` (exit 2): STOP-RESTORE-SOURCE as well, recorded as "the check failed", never as "no file". Write down the file's modified time the line prints.
+   - **The plan**, with no company loaded. Replace `<DATA>` (Shell). EXPECT `PLAN WRITTEN: the source folder holds one file, 24219 B, sha256 ecc8d4028b88b763e5a8a22014bc699b07db68c3eb32cff3c6c92052b373b0f4 (equal to recorded), …` and `exit 0`. `STOP-RESTORE-SOURCE` (exit 1): STOP-RESTORE-SOURCE, nothing is restored. `FAILED READ` or `REFUSED` (exit 2; `REFUSED` also when step 2's precheck is missing or did not end `PRECHECK MET` with `exit 0`): STOP-RESTORE-SOURCE as well, recorded as "the check failed", never as "no file". Write down the file's modified time the line prints.
      ```bash
      cd /c/bridge-lab/1381-rr && if [ -e local/evidence/r-plan.txt ]; then echo "STOP: local/evidence/r-plan.txt exists"; else python -I -X utf8 restore.py plan "<DATA>" > local/evidence/r-plan.txt 2>&1; echo "exit $?" >> local/evidence/r-plan.txt; cat local/evidence/r-plan.txt; fi
      ```

@@ -11,7 +11,9 @@ only; changes none. Writes only the record files named below (and, for the self-
                            folder (row 1381-O's backup-1) holds exactly one file TDBK1800_<n>.001 of its recorded
                            bytes and sha256, with the same company number as BK-S; DATA/<company number> exists and
                            can be listed. Writes local/precheck.txt. Prints `PRECHECK MET: ...` (exit 0).
-  restore.py plan DATA     before the restore, after the shut: the source folder holds exactly one file, named
+  restore.py plan DATA     before the restore, after the shut, and only after a precheck that met (local/precheck.txt
+                           present, local/evidence/r-precheck.txt holding `PRECHECK MET:` and ending `exit 0`, the
+                           same company number as now): the source folder holds exactly one file, named
                            TDBK1800_<company number>.001, of the recorded bytes and sha256 (BK-S, row 1108-R3);
                            the company's data folder DATA/<company number> exists. Writes local/restore-plan.txt and
                            local/r-before-listing.txt. Prints `PLAN WRITTEN: ...` (exit 0).
@@ -27,7 +29,7 @@ the company's data folder, `<file|dir> <bytes> <modified, local, to the second> 
 Exit 0: written. Exit 1: STOP-RESTORE-SOURCE (a backup folder absent or not as recorded, the two numbers differing,
 or the data folder absent before the restore) or STOP-RESTORE (the company's data folder absent after the restore).
 "Absent" is only FileNotFoundError or NotADirectoryError on the path itself. Exit 2: REFUSED (a record exists, or the
-plan is missing), or FAILED READ (any other error reading a folder or file, or writing a record, or a data path that
+precheck or the plan is missing), or FAILED READ (any other error reading a folder or file, or writing a record, or a data path that
 is not a directory): never reported as "nothing found" or as a restore that did not complete. Printed text never holds the company
 number or DATA: each is replaced by `<company number>` and `<DATA>`; the plan and the two listings stay on the lab PC.
 """
@@ -145,7 +147,20 @@ def plan(data, local, source=SOURCE, want_sha=WANT_SHA, want_bytes=WANT_BYTES):
     for path in (plan_file, before):
         if path.exists():
             raise Stop("REFUSED", f"local/{path.name} exists: never overwritten", 2)
+    record, evidence = local / "precheck.txt", local / "evidence" / "r-precheck.txt"
+    if not record.exists():
+        raise Stop("REFUSED", "local/precheck.txt is missing: restore.py precheck first", 2)
+    if not evidence.exists():
+        raise Stop("REFUSED", "local/evidence/r-precheck.txt is missing: restore.py precheck first", 2)
+    shown = [line.strip() for line in evidence.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not any(line.startswith("PRECHECK MET:") for line in shown) or shown[-1] != "exit 0":
+        raise Stop("REFUSED", "local/evidence/r-precheck.txt holds no PRECHECK MET line ending exit 0: "
+                   "restore.py precheck first", 2)
     name, number, size, modified = source_file(source, want_sha, want_bytes)
+    checked = re.search(r"(?m)^Company: BRIDGE STOCK CREATE LAB, number ([0-9]+) \(both files\)$",
+                        record.read_text(encoding="utf-8"))
+    if not checked or checked.group(1) != number:
+        raise Stop("STOP-RESTORE-SOURCE", "the source's company number is not the precheck's", 1)
     folder = f"{data}/{number}"
     lines = listing(folder, "before")
     local.mkdir(parents=True, exist_ok=True)
@@ -215,7 +230,7 @@ def selftest(scratch):
     fsha, fsize = hashlib.sha256(fbody).hexdigest(), len(fbody)
     right = total = 0
 
-    def lay(n):
+    def lay(n, prechecked=True):
         base = scratch / f"case{n}"
         src, data, local = base / "src", base / "data", base / "local"
         for folder in (src, data / number):
@@ -225,6 +240,10 @@ def selftest(scratch):
         (base / "fb" / f"TDBK1800_{number}.001").write_bytes(fbody)
         (data / number / "Company.1800").write_bytes(b"c" * 10)
         (data / number / "Manager.1800").write_bytes(b"m" * 20)
+        if prechecked:  # as step 2's line: precheck's lines, then `exit <code>`, in local/evidence/r-precheck.txt
+            code, text = go("precheck", src, data.as_posix(), local)
+            (local / "evidence").mkdir(parents=True, exist_ok=True)
+            (local / "evidence" / "r-precheck.txt").write_text(f"{text}exit {code}\n", encoding="utf-8")
         return src, data.as_posix(), local
 
     def go(command, src, data, local):
@@ -338,38 +357,74 @@ def selftest(scratch):
                                                                                  "folder path is not a directory\n"))
     # A record that cannot be written: FAILED READ, exit 2 (local/ is a file here).
     src, data, local = lay(13)
-    local.write_bytes(b"in the way")
-    code, text = go("plan", src, data, local)
+    real_write = pathlib.Path.write_text
+
+    def refuse_listing(path, *a, **k):  # the plan's first record write refused (portable: no file modes)
+        if path.name == "r-before-listing.txt":
+            raise PermissionError(13, "synthetic", str(path))
+        return real_write(path, *a, **k)
+    pathlib.Path.write_text = refuse_listing
+    try:
+        code, text = go("plan", src, data, local)
+    finally:
+        pathlib.Path.write_text = real_write
     case("plan, the record cannot be written: FAILED READ, exit 2", (code, text.split(":")[0]), (2, "FAILED READ"))
+    src, data, local = lay(19, prechecked=False)
+    local.write_bytes(b"in the way")
     code, text = go("precheck", src, data, local)
     case("precheck, the record cannot be written: FAILED READ, exit 2", (code, text.split(":")[0]), (2, "FAILED READ"))
     # precheck: BK-S, the fallback and the data folder, before the shut.
-    src, data, local = lay(14)
+    src, data, local = lay(14, prechecked=False)
     code, text = go("precheck", src, data, local)
     case("precheck, all as recorded: exit and first word", (code, text.split(":")[0]), (0, "PRECHECK MET"))
     case("precheck, all as recorded: the printed text holds neither the number nor DATA",
          number in text or data in text, False)
     case("precheck, again: refused", go("precheck", src, data, local)[0], 2)
-    src, data, local = lay(15)
+    src, data, local = lay(15, prechecked=False)
     (src.parent / "fb" / f"TDBK1800_{number}.001").write_bytes(fbody + b"!")
     code, text = go("precheck", src, data, local)
     case("precheck, the fallback's bytes not recorded: STOP-RESTORE-SOURCE",
          (code, text.startswith("STOP-RESTORE-SOURCE: the fallback backup is")), (1, True))
-    src, data, local = lay(16)
+    src, data, local = lay(16, prechecked=False)
     (src.parent / "fb" / f"TDBK1800_{number}.001").unlink()
     (src.parent / "fb").rmdir()
     code, text = go("precheck", src, data, local)
     case("precheck, the fallback folder missing: STOP-RESTORE-SOURCE",
          (code, text.strip()), (1, "STOP-RESTORE-SOURCE: the fallback folder is absent"))
-    src, data, local = lay(17)
+    src, data, local = lay(17, prechecked=False)
     (src.parent / "fb" / f"TDBK1800_{number}.001").rename(src.parent / "fb" / "TDBK1800_73520.001")
     code, text = go("precheck", src, data, local)
     case("precheck, the two company numbers differ: STOP-RESTORE-SOURCE",
          (code, text.strip()), (1, "STOP-RESTORE-SOURCE: the fallback's company number is not BK-S's"))
-    src, data, local = lay(18)
+    src, data, local = lay(18, prechecked=False)
     code, text = go("precheck", src, data + "/elsewhere", local)
     case("precheck, a DATA typo: STOP-RESTORE-SOURCE, nothing shut",
          (code, text.strip()), (1, "STOP-RESTORE-SOURCE: the company's data folder is absent before the restore"))
+    # plan only after a precheck that met, with the same company number.
+    src, data, local = lay(20, prechecked=False)
+    code, text = go("plan", src, data, local)
+    case("plan, no precheck: refused", (code, text.strip()),
+         (2, "REFUSED: local/precheck.txt is missing: restore.py precheck first"))
+    src, data, local = lay(21)
+    (local / "precheck.txt").unlink()
+    code, text = go("plan", src, data, local)
+    case("plan, the precheck record gone though its evidence says met: refused", (code, text.strip()),
+         (2, "REFUSED: local/precheck.txt is missing: restore.py precheck first"))
+    src, data, local = lay(22)
+    (local / "evidence" / "r-precheck.txt").write_text("STOP-RESTORE-SOURCE: the fallback folder is absent\nexit 1\n",
+                                                        encoding="utf-8")
+    code, text = go("plan", src, data, local)
+    case("plan, a precheck that failed: refused", (code, text.split(":")[0]), (2, "REFUSED"))
+    src, data, local = lay(23)
+    evidence = local / "evidence" / "r-precheck.txt"
+    evidence.write_text(evidence.read_text(encoding="utf-8").replace("exit 0", "exit 2"), encoding="utf-8")
+    code, text = go("plan", src, data, local)
+    case("plan, a PRECHECK MET line not ending exit 0: refused", (code, text.split(":")[0]), (2, "REFUSED"))
+    src, data, local = lay(24)
+    (src / f"TDBK1800_{number}.001").rename(src / "TDBK1800_73520.001")
+    code, text = go("plan", src, data, local)
+    case("plan, the company number not the precheck's: STOP-RESTORE-SOURCE", (code, text.strip()),
+         (1, "STOP-RESTORE-SOURCE: the source's company number is not the precheck's"))
     print(f"{total} cases, {right} right")
     return 0 if right == total else 1
 

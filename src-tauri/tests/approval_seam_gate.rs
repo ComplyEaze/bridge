@@ -3288,8 +3288,10 @@ const CONFIRM_STOCK_ITEM: &str = r#"    pub(crate) async fn confirm_stock_item(
         prepared: PreparedStockItem,
         preview: String,
         company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
     ) -> Result<Self, StockItemDialogRefusal> {
-        let admission = MasterAdmission::stock_item(prepared);
+        let admission = MasterAdmission::stock_item(prepared, parse_marks, batch_id);
         approve_stock_item(&preview).await?;
         Ok(Self {
             kind: ApprovedKind::Masters(Box::new(admission)),
@@ -3298,12 +3300,21 @@ const CONFIRM_STOCK_ITEM: &str = r#"    pub(crate) async fn confirm_stock_item(
     }"#;
 
 /// The stock-item admission's one maker. Only `confirm_stock_item` calls it, and
-/// holds what it makes only after the dialog approves.
-const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(prepared: PreparedStockItem) -> Self {
+/// holds what it makes only after the dialog approves. It renders the bytes
+/// once and binds the batch at birth.
+const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(
+        prepared: PreparedStockItem,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
         let rendered = render_stock_item_create(&prepared);
         Self {
-            writes: MasterWrites::StockItem { rendered },
-            batch_id: None,
+            writes: MasterWrites::StockItem(StockItemAdmission {
+                prepared,
+                rendered,
+                parse_marks,
+                batch_id,
+            }),
         }
     }"#;
 
@@ -3311,7 +3322,8 @@ const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(prepared: PreparedStockI
 /// one approval is redeemed once because `take_for_dispatch` removes the held
 /// approval by value, `RecordedIntent` is neither `Clone` nor `Default` and the
 /// send takes it by value, and the journal admits one intent per batch; until
-/// the stock send exists, the runtime refuses a stock item before any read.
+/// the stock send exists, the queue reads for a stock item and no recheck
+/// admits it.
 const PREPARED_STRUCT: &str = r#"    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) struct PreparedStockItem {
         company: VerifiedCompanyIdentity,
@@ -3353,14 +3365,21 @@ pub(super) async fn confirm_stock_item_draft(
     draft: StockItemDraft<'_>,
     origin: &str,
     company_marks_request: AgentReadRequest,
+    batch_id: String,
 ) -> Result<ApprovedImport, StockItemConfirmError> {
     let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
     let prepared = PreparedStockItem::from_draft(draft).map_err(|refusal| {
         StockItemConfirmError::Review(StockItemReviewError::NotRenderable(refusal))
     })?;
-    ApprovedImport::confirm_stock_item(prepared, preview, company_marks_request)
-        .await
-        .map_err(StockItemConfirmError::Dialog)
+    ApprovedImport::confirm_stock_item(
+        prepared,
+        preview,
+        company_marks_request,
+        super::master_post::stock_company_marks,
+        batch_id,
+    )
+    .await
+    .map_err(StockItemConfirmError::Dialog)
 }"#;
 
 fn stock_approval_problems(
@@ -3382,7 +3401,7 @@ fn stock_approval_problems(
         ),
         (
             approvals,
-            "writes: MasterWrites::StockItem { rendered }",
+            "writes: MasterWrites::StockItem(StockItemAdmission {",
             1,
             "its one construction",
         ),
@@ -3394,7 +3413,7 @@ fn stock_approval_problems(
         ),
         (
             approvals_tests,
-            "MasterWrites::StockItem {",
+            "MasterWrites::StockItem(",
             0,
             "test construction",
         ),
@@ -3877,6 +3896,256 @@ fn totals_form_problems(post: &str, approval: &str, others: &[(String, String)])
         problems.push("the note must be given only for a batch's listed form".into());
     }
     problems
+}
+
+/// The runtime's company check of a stock approval (#1381): before any
+/// request, a stock item for another company is refused.
+const STOCK_COMPANY_CHECK: &str =
+    "                                super::approved_import::AdmittedWrites::StockItem(stock) => {
+                                    stock.company() == &identity
+                                }";
+
+/// A stock approval keeps the batch it was born with: only a ledger approval
+/// is bound here.
+const BOUND_TO_BATCH: &str = "    pub(crate) fn bound_to_batch(mut self, batch_id: &str) -> Self {
+        if let ApprovedKind::Masters(masters) = &mut self.kind {
+            if let MasterWrites::Ledgers(ledgers) = &mut masters.writes {
+                ledgers.batch_id = Some(batch_id.to_string());
+            }
+        }
+        self
+    }";
+
+/// Only the tally layer makes a queued stock item, from the queue's own reads.
+const QUEUED_STOCK_ITEM_NEW: &str = "impl<'a> QueuedStockItem<'a> {
+    pub(super) fn new(";
+
+/// The queue's stock reads are sized from the binding marks answer, by the
+/// approval's own parser.
+const STOCK_READ_CALL: &str = "masters::read_stock_item_admission(
+                                            &reads,
+                                            &identity,
+                                            &binding_marks.text,
+                                            admission.parse_marks(),
+                                            &mut evidence,
+                                        ))";
+
+/// The queued stock item gets the binding marks, then the aim marks.
+const QUEUED_STOCK_ITEM_CALL: &str = "super::approved_import::QueuedStockItem::new(
+                                    admission,
+                                    &stock.0,
+                                    &stock.1,
+                                    &stock.2,
+                                    &binding_marks.text,
+                                    &before_marks.text,
+                                ),";
+
+fn stock_queue_problems(
+    approvals: &str,
+    runtime: &str,
+    runtime_masters: &str,
+    others: &[(String, String)],
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    let post = runtime
+        .find("async fn post_approved_import<")
+        .map_or("", |start| &runtime[start..]);
+    match (
+        runtime.matches(STOCK_COMPANY_CHECK).count(),
+        post.find(STOCK_COMPANY_CHECK),
+        post.find("observe_read_boundary(&reads)"),
+    ) {
+        (1, Some(check), Some(request)) if check < request => {}
+        _ => problems.push("the stock company check must come once, before any request".into()),
+    }
+    for (pin, label) in [
+        (
+            BOUND_TO_BATCH,
+            "bound_to_batch that leaves a stock approval",
+        ),
+        (QUEUED_STOCK_ITEM_NEW, "tally-only queued stock maker"),
+    ] {
+        if approvals.matches(pin).count() != 1 {
+            problems.push(format!("expected one {label}"));
+        }
+    }
+    // No literal by name, and one in its maker.
+    if approvals.matches("QueuedStockItem {").count() != 0
+        || approvals
+            .matches("Self {\n            prepared: &admission.prepared,")
+            .count()
+            != 1
+    {
+        problems.push("QueuedStockItem must be built only by its maker".into());
+    }
+    let renders = others
+        .iter()
+        .map(|(_, text)| text.matches("render_stock_item_create(&").count())
+        .sum::<usize>();
+    if renders != 1 || approvals.matches(STOCK_ITEM_ADMISSION).count() != 1 {
+        problems.push("a stock item must be rendered once, in MasterAdmission::stock_item".into());
+    }
+    for forbidden in ["post_probe_xml(", "acquire_wire("] {
+        if runtime_masters.contains(forbidden) {
+            problems.push(format!("`{forbidden}` in runtime_masters.rs"));
+        }
+    }
+    for (pin, label) in [
+        (STOCK_READ_CALL, "stock read sized from the binding marks"),
+        (
+            QUEUED_STOCK_ITEM_CALL,
+            "queued stock item with binding then aim marks",
+        ),
+    ] {
+        if runtime.matches(pin).count() != 1 {
+            problems.push(format!("expected one {label}"));
+        }
+    }
+    // Only the queue makes a queued stock item, and until part 2b changes this
+    // on purpose no shipped recheck names one.
+    for (needle, allowed) in [
+        ("QueuedStockItem::new(", &["src/tally/runtime.rs"][..]),
+        (
+            "QueuedAdmission::StockItem",
+            &["src/tally/runtime.rs", "src/tally/approved_import.rs"][..],
+        ),
+    ] {
+        let named: usize = others
+            .iter()
+            .filter(|(path, _)| !allowed.iter().any(|owner| is_source(path, owner)))
+            .map(|(_, text)| text.matches(needle).count())
+            .sum();
+        let in_runtime: usize = others
+            .iter()
+            .filter(|(path, _)| is_source(path, "src/tally/runtime.rs"))
+            .map(|(_, text)| text.matches(needle).count())
+            .sum();
+        if named != 0 || in_runtime != 1 {
+            problems.push(format!("`{needle}` must be named only by the queue"));
+        }
+    }
+    problems
+}
+
+#[test]
+fn the_queue_reads_a_stock_approval_for_its_own_company_and_never_rebinds_it() {
+    let approvals = read("src-tauri/src/tally/approved_import.rs");
+    let runtime = read("src-tauri/src/tally/runtime.rs");
+    let runtime_masters = read("src-tauri/src/tally/runtime_masters.rs");
+    // The approvals holder too: no queued stock item is named there either.
+    let mut others = other_sources();
+    others.push((
+        "src-tauri/src/agent_import_approval.rs".into(),
+        read("src-tauri/src/agent_import_approval.rs"),
+    ));
+    assert_eq!(
+        stock_queue_problems(&approvals, &runtime, &runtime_masters, &others),
+        Vec::<String>::new()
+    );
+    let unchecked = runtime.replace(
+        STOCK_COMPANY_CHECK,
+        "                                super::approved_import::AdmittedWrites::StockItem(_) => true,",
+    );
+    let rebinds = approvals.replace(
+        "            if let MasterWrites::Ledgers(ledgers) = &mut masters.writes {
+                ledgers.batch_id = Some(batch_id.to_string());
+            }",
+        "            match &mut masters.writes {
+                MasterWrites::Ledgers(ledgers) => ledgers.batch_id = Some(batch_id.to_string()),
+                MasterWrites::StockItem(stock) => stock.batch_id = batch_id.to_string(),
+            }",
+    );
+    let widened = approvals.replace(
+        QUEUED_STOCK_ITEM_NEW,
+        &QUEUED_STOCK_ITEM_NEW.replace("pub(super)", "pub(crate)"),
+    );
+    let public = approvals.replace(
+        QUEUED_STOCK_ITEM_NEW,
+        &QUEUED_STOCK_ITEM_NEW.replace("pub(super)", "pub"),
+    );
+    for mutated in [&unchecked, &rebinds, &widened, &public] {
+        assert!(
+            *mutated != runtime && *mutated != approvals,
+            "the mutation changed nothing"
+        );
+    }
+    let mut rendered_again = others.clone();
+    rendered_again.push((
+        "src/elsewhere.rs".into(),
+        "let _ = render_stock_item_create(&prepared);".into(),
+    ));
+    let aim_sized = runtime.replace(
+        STOCK_READ_CALL,
+        &STOCK_READ_CALL.replace("&binding_marks.text,", "&before_marks.text,"),
+    );
+    let other_parser = runtime.replace(
+        STOCK_READ_CALL,
+        &STOCK_READ_CALL.replace("admission.parse_marks(),", "stock_company_marks,"),
+    );
+    let swapped = runtime.replace(
+        QUEUED_STOCK_ITEM_CALL,
+        &QUEUED_STOCK_ITEM_CALL
+            .replace("&binding_marks.text,", "&aim,")
+            .replace("&before_marks.text,", "&binding_marks.text,")
+            .replace("&aim,", "&before_marks.text,"),
+    );
+    for mutated in [&aim_sized, &other_parser, &swapped] {
+        assert_ne!(*mutated, runtime, "the mutation changed nothing");
+    }
+    let mut made_elsewhere = others.clone();
+    made_elsewhere.push((
+        "src/elsewhere.rs".into(),
+        "let _ = QueuedStockItem::new(a, c, g, u, b, m);".into(),
+    ));
+    let mut admitted_elsewhere = others.clone();
+    admitted_elsewhere.push((
+        "src-tauri/src/agent_master_post.rs".into(),
+        "let QueuedAdmission::StockItem(stock) = queued else { todo!() };".into(),
+    ));
+    let in_the_holder = |needle: &str| {
+        let mut mutated = others.clone();
+        let holder = mutated
+            .iter_mut()
+            .find(|(path, _)| is_source(path, "src/agent_import_approval.rs"))
+            .expect("the approvals holder is scanned");
+        holder.1.push_str(needle);
+        mutated
+    };
+    let made_in_holder = in_the_holder("\nfn f() { QueuedStockItem::new(a, c, g, u, b, m); }");
+    let admitted_in_holder = in_the_holder("\nfn f() { let QueuedAdmission::StockItem(s) = q; }");
+    let mut runtime_elsewhere = others.clone();
+    runtime_elsewhere.push((
+        "src-tauri/src/agent/runtime.rs".into(),
+        "let _ = QueuedStockItem::new(a, c, g, u, b, m);".into(),
+    ));
+    let posts = format!("{runtime_masters}\nfn f() {{ wire.post_probe_xml(x); }}");
+    let locks = format!("{runtime_masters}\nfn f() {{ client.acquire_wire(); }}");
+    for (approvals, runtime, runtime_masters, others) in [
+        (&approvals, &unchecked, &runtime_masters, &others),
+        (&rebinds, &runtime, &runtime_masters, &others),
+        (&widened, &runtime, &runtime_masters, &others),
+        (&public, &runtime, &runtime_masters, &others),
+        (&approvals, &runtime, &runtime_masters, &rendered_again),
+        (&approvals, &runtime, &posts, &others),
+        (&approvals, &runtime, &locks, &others),
+        (&approvals, &aim_sized, &runtime_masters, &others),
+        (&approvals, &other_parser, &runtime_masters, &others),
+        (&approvals, &swapped, &runtime_masters, &others),
+        (&approvals, &runtime, &runtime_masters, &made_elsewhere),
+        (&approvals, &runtime, &runtime_masters, &admitted_elsewhere),
+        (&approvals, &runtime, &runtime_masters, &made_in_holder),
+        (&approvals, &runtime, &runtime_masters, &admitted_in_holder),
+        (&approvals, &runtime, &runtime_masters, &runtime_elsewhere),
+    ] {
+        assert!(!stock_queue_problems(approvals, runtime, runtime_masters, others).is_empty());
+    }
+}
+
+/// Whether `path` from [`other_sources`] is the crate's `source`, whatever the
+/// separator.
+fn is_source(path: &str, source: &str) -> bool {
+    path.replace('\\', "/")
+        .ends_with(&format!("src-tauri/{source}"))
 }
 
 /// Every non-test source file of the crate but the approvals holder and the

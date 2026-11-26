@@ -1,6 +1,9 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
 use super::ledger_create_item::{LedgerCreateBatch, RenderedLedgerCreate, MAX_LEDGERS_PER_BATCH};
+use super::runtime::{
+    AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits, CompanyMarksParser,
+};
 use super::stock_item_create::{render_stock_item_create, PreparedStockItem};
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{MasterKind, Via};
@@ -310,32 +313,56 @@ impl VoucherAdmission {
 #[derive(Clone)]
 pub(super) struct MasterAdmission {
     writes: MasterWrites,
-    /// The master journal batch this approval is for, once the tool binds it
-    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
-    /// batch is licensed by no intent.
-    batch_id: Option<String>,
 }
 
 /// What a master admission creates: ledgers, or one stock item with the bytes
-/// its one renderer gave. Nothing sends a stock item yet: see [`MasterAdmission::writes`].
+/// its one renderer gave. Nothing sends a stock item yet: the queue reads for
+/// one, and no recheck admits it.
 #[derive(Clone)]
 enum MasterWrites {
     Ledgers(LedgerAdmission),
-    StockItem { rendered: String },
+    StockItem(StockItemAdmission),
 }
 
 /// What a master admission creates, by reference, for the runtime to match
-/// once at each site. The runtime refuses the stock arm at its company check,
-/// before any request: no stock item Create is sent yet.
+/// once at each site.
 pub(super) enum AdmittedWrites<'a> {
     Ledgers(&'a LedgerAdmission),
-    StockItem { rendered: &'a str },
+    StockItem(&'a StockItemAdmission),
+}
+
+/// One stock item `Create`: the value it was rendered from, the bytes rendered
+/// from it once, the parser the queue reads the all-company marks with, and the
+/// master journal batch it was approved for. The batch is set at birth and
+/// nothing rebinds it ([`ApprovedImport::bound_to_batch`]), so every clone of
+/// the approval carries the batch it was approved for.
+#[derive(Clone)]
+pub(super) struct StockItemAdmission {
+    prepared: PreparedStockItem,
+    rendered: String,
+    parse_marks: CompanyMarksParser,
+    batch_id: String,
+}
+
+impl StockItemAdmission {
+    /// The company the item is created in, as its draft was read.
+    pub(super) fn company(&self) -> &VerifiedCompanyIdentity {
+        self.prepared.company()
+    }
+
+    pub(super) fn parse_marks(&self) -> CompanyMarksParser {
+        self.parse_marks
+    }
 }
 
 /// One request of ledger `Create`s, rendered once, with the two index reads
 /// the queue rechecks it on.
 #[derive(Clone)]
 pub(super) struct LedgerAdmission {
+    /// The master journal batch this approval is for, once the tool binds it
+    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
+    /// batch is licensed by no intent.
+    batch_id: Option<String>,
     batch: LedgerCreateBatch,
     rendered: RenderedLedgerCreate,
     /// The ledger name index read (the V3 catalogue request).
@@ -353,32 +380,39 @@ impl MasterAdmission {
     ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
         Ok(Self {
             writes: MasterWrites::Ledgers(LedgerAdmission::new(batch, company)?),
-            batch_id: None,
         })
     }
 
-    /// The stock-item admission, rendered once.
-    fn stock_item(prepared: PreparedStockItem) -> Self {
+    /// The stock-item admission, rendered once, bound at birth to the batch
+    /// it is approved for.
+    fn stock_item(
+        prepared: PreparedStockItem,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
         let rendered = render_stock_item_create(&prepared);
         Self {
-            writes: MasterWrites::StockItem { rendered },
-            batch_id: None,
+            writes: MasterWrites::StockItem(StockItemAdmission {
+                prepared,
+                rendered,
+                parse_marks,
+                batch_id,
+            }),
         }
     }
 
-    /// What this admission creates: the ledger admission, or a stock item's
-    /// rendered bytes.
+    /// What this admission creates: the ledger admission, or the stock item's.
     pub(super) fn writes(&self) -> AdmittedWrites<'_> {
         match &self.writes {
             MasterWrites::Ledgers(ledgers) => AdmittedWrites::Ledgers(ledgers),
-            MasterWrites::StockItem { rendered } => AdmittedWrites::StockItem { rendered },
+            MasterWrites::StockItem(stock) => AdmittedWrites::StockItem(stock),
         }
     }
 
     fn xml(&self) -> &str {
         match self.writes() {
             AdmittedWrites::Ledgers(ledgers) => ledgers.rendered.xml(),
-            AdmittedWrites::StockItem { rendered } => rendered,
+            AdmittedWrites::StockItem(stock) => &stock.rendered,
         }
     }
 }
@@ -395,6 +429,7 @@ impl LedgerAdmission {
             ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
         let rendered = batch.render_import(company);
         Ok(Self {
+            batch_id: None,
             batch,
             rendered,
             ledger_index_request: AgentReadRequest::parse(
@@ -459,6 +494,88 @@ pub(crate) enum QueuedAdmission<'a> {
         company_marks_at_binding: &'a str,
         company_marks: &'a str,
     },
+    /// A stock item `Create` and the stock reads the queue made for it. No
+    /// shipped recheck reads one yet: each refuses it. A plain `allow`, since
+    /// this file admits only bare test gates.
+    #[allow(dead_code)]
+    StockItem(QueuedStockItem<'a>),
+}
+
+/// What the queue read for a stock item `Create`, with the approval's own
+/// values: the prepared item, the digest of the bytes the POST would send, and
+/// the batch it was approved for. Only the queue makes one, from its own reads,
+/// so a recheck that takes it runs on what the queue read under its lock.
+pub(crate) struct QueuedStockItem<'a> {
+    prepared: &'a PreparedStockItem,
+    xml_sha256: String,
+    batch_id: &'a str,
+    candidate: &'a AdmittedCandidateRead,
+    groups: &'a AdmittedStockGroups,
+    units: &'a AdmittedStockUnits,
+    company_marks_at_binding: &'a str,
+    company_marks: &'a str,
+}
+
+impl<'a> QueuedStockItem<'a> {
+    pub(super) fn new(
+        admission: &'a StockItemAdmission,
+        candidate: &'a AdmittedCandidateRead,
+        groups: &'a AdmittedStockGroups,
+        units: &'a AdmittedStockUnits,
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+    ) -> Self {
+        Self {
+            prepared: &admission.prepared,
+            xml_sha256: bridge_tally_protocol::sha256_hex(admission.rendered.as_bytes()),
+            batch_id: &admission.batch_id,
+            candidate,
+            groups,
+            units,
+            company_marks_at_binding,
+            company_marks,
+        }
+    }
+}
+
+/// What a stock recheck reads. No shipped recheck admits a stock item yet.
+// Part 2b's stock recheck reads these and removes this `allow`.
+#[allow(dead_code)]
+impl<'a> QueuedStockItem<'a> {
+    pub(crate) fn prepared(&self) -> &'a PreparedStockItem {
+        self.prepared
+    }
+
+    /// The lowercase hex digest of the bytes the POST would send.
+    pub(crate) fn xml_sha256(&self) -> &str {
+        &self.xml_sha256
+    }
+
+    pub(crate) fn batch_id(&self) -> &'a str {
+        self.batch_id
+    }
+
+    pub(crate) fn candidate(&self) -> &'a AdmittedCandidateRead {
+        self.candidate
+    }
+
+    pub(crate) fn groups(&self) -> &'a AdmittedStockGroups {
+        self.groups
+    }
+
+    pub(crate) fn units(&self) -> &'a AdmittedStockUnits {
+        self.units
+    }
+
+    /// The all-company marks read as the binding reads began.
+    pub(crate) fn company_marks_at_binding(&self) -> &'a str {
+        self.company_marks_at_binding
+    }
+
+    /// The all-company marks read last before the recheck, the aim.
+    pub(crate) fn company_marks(&self) -> &'a str {
+        self.company_marks
+    }
 }
 
 /// Whether the profile accepts every voucher's date, and there is at least
@@ -546,16 +663,19 @@ impl ApprovedImport {
 
     /// The stock-item Create's approval: the stock-item dialog, answered only
     /// by its own token. On the person's approval this holds, as the masters
-    /// kind, only the bytes rendered from `prepared`; any other answer is a
-    /// typed refusal and holds nothing. The request is rendered before the
-    /// dialog. `preview` is built from the draft `prepared` was made from, by
-    /// the caller's review builder.
+    /// kind, `prepared` and the bytes rendered from it once, with the marks
+    /// parser the queue sizes its reads by and the journal batch `batch_id` it
+    /// is approved for; any other answer is a typed refusal and holds nothing.
+    /// The request is rendered before the dialog. `preview` is built from the
+    /// draft `prepared` was made from, by the caller's review builder.
     pub(crate) async fn confirm_stock_item(
         prepared: PreparedStockItem,
         preview: String,
         company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
     ) -> Result<Self, StockItemDialogRefusal> {
-        let admission = MasterAdmission::stock_item(prepared);
+        let admission = MasterAdmission::stock_item(prepared, parse_marks, batch_id);
         approve_stock_item(&preview).await?;
         Ok(Self {
             kind: ApprovedKind::Masters(Box::new(admission)),
@@ -595,11 +715,14 @@ impl ApprovedImport {
 
     /// This approval bound to the master journal batch it was taken for, so the
     /// intent that licenses its send must be that batch's. A voucher approval is
-    /// returned as it is.
+    /// returned as it is, and so is a stock item's: it was bound at birth, and a
+    /// clone of it keeps that batch, which licenses no other batch's intent.
     #[must_use]
     pub(crate) fn bound_to_batch(mut self, batch_id: &str) -> Self {
         if let ApprovedKind::Masters(masters) = &mut self.kind {
-            masters.batch_id = Some(batch_id.to_string());
+            if let MasterWrites::Ledgers(ledgers) = &mut masters.writes {
+                ledgers.batch_id = Some(batch_id.to_string());
+            }
         }
         self
     }
@@ -608,7 +731,10 @@ impl ApprovedImport {
     /// approval that was bound.
     pub(crate) fn master_batch_id(&self) -> Option<&str> {
         match &self.kind {
-            ApprovedKind::Masters(masters) => masters.batch_id.as_deref(),
+            ApprovedKind::Masters(masters) => match masters.writes() {
+                AdmittedWrites::Ledgers(ledgers) => ledgers.batch_id.as_deref(),
+                AdmittedWrites::StockItem(stock) => Some(&stock.batch_id),
+            },
             ApprovedKind::Vouchers(_) => None,
         }
     }

@@ -4959,8 +4959,12 @@ fn stock_spend_problems(approval: &str, sources: &[(String, String)]) -> Vec<Str
         let found = sources.iter().find(|(path, _)| is_source(path, source));
         found.map_or(String::new(), |(_, text)| flat(text))
     };
-    let journal = text_of("src/agent_master_stock_item_journal.rs");
-    let writer = fn_body(&journal, "fn record_stock_item_intent(");
+    // The writer's body is cut at its closing brace before it is flattened.
+    let journal = (sources.iter())
+        .find(|(path, _)| is_source(path, "src/agent_master_stock_item_journal.rs"))
+        .map_or("", |(_, text)| text.as_str());
+    let writer = flat(fn_body(journal, "fn record_stock_item_intent("));
+    let writer = writer.as_str();
     let spend = "redemption.spend().map_err(Refused)?;";
     let batch = "if batch_id != batch.batch_id || redemption.batch_id() != batch.batch_id { return Err(StockIntentRefusal::OtherBatch); }";
     let at = |needle: &str| {

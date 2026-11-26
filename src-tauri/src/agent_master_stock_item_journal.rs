@@ -12,6 +12,7 @@
 //! journal's open-dispatch overlap check sees only its own file. That rests on
 //! the two files being separate and on nothing else; the protocol reference
 //! does not record whether Tally keeps stock items and ledgers apart by name.
+use super::super::approval::Redemption;
 use super::super::master_post::StockItemRecheckPassed;
 use super::super::master_tools::journal_refusal;
 use super::{
@@ -301,7 +302,8 @@ impl StockItemReadBackBasis {
 /// and `Refused(PreImageRemoveFailed)`.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum StockIntentRefusal {
-    /// The recheck passed for another batch than the one to record.
+    /// The recheck passed, or the approval was taken, for another batch than
+    /// the one to record.
     OtherBatch,
     /// The recheck's digest is not the batch's: an intent that no read-back
     /// could verify is not written.
@@ -313,15 +315,16 @@ pub(super) enum StockIntentRefusal {
 
 /// The stock twin of the ledger post's `record_master_intent`, under the
 /// exclusive lock and in its order: the batch undispatched and unchanged, the
-/// token of that batch and digest, the journal's admission, then the spend, the
-/// sidecar and the intent. Nothing shipped calls it yet.
+/// token and the approval of that batch, the token of that digest, the
+/// journal's admission, then the spend of `redemption`, the sidecar and the
+/// intent. Nothing shipped calls it yet.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn record_stock_item_intent(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
     batch: &StockItemBatch,
     passed: StockItemRecheckPassed,
-    spend: impl FnOnce() -> Result<(), UnderLockRefusal>,
+    redemption: &Redemption<'_>,
 ) -> Result<RecordedIntent, StockIntentRefusal> {
     use StockIntentRefusal::{Other, Refused};
     let journal = read_kind_journal::<StockItemBatch>(data_dir)
@@ -335,7 +338,7 @@ pub(super) fn record_stock_item_intent(
         return Err(Refused(UnderLockRefusal::BatchChanged));
     }
     let (create_sha256, pre_image, marks, batch_id) = passed.into_intent_parts();
-    if batch_id != batch.batch_id {
+    if batch_id != batch.batch_id || redemption.batch_id() != batch.batch_id {
         return Err(StockIntentRefusal::OtherBatch);
     }
     if create_sha256 != batch.batch_sha256 {
@@ -348,7 +351,7 @@ pub(super) fn record_stock_item_intent(
     journal
         .check_intent_admissible(&current.batch, &marks)
         .map_err(refused)?;
-    spend().map_err(Refused)?;
+    redemption.spend().map_err(Refused)?;
     let written = write_pre_image(data_dir, lock, &current.batch, &pre_image)
         .map_err(|_| Refused(UnderLockRefusal::PreImageWriteFailed))?;
     let intent = MasterDispatchIntent::new(&current.batch, create_sha256, written, marks)

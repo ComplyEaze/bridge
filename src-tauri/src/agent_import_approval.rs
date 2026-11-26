@@ -407,6 +407,17 @@ impl Redemption<'_> {
     pub(super) fn id(&self) -> Uuid {
         self.id
     }
+
+    /// The batch this approval was taken for.
+    pub(super) fn batch_id(&self) -> &str {
+        &self.batch_id
+    }
+
+    /// Spend this approval, once: its own batch and id, through the holder
+    /// that gave it, so a call can spend only what it took.
+    pub(super) fn spend(&self) -> Result<(), UnderLockRefusal> {
+        self.approvals.spend(&self.batch_id, self.id)
+    }
 }
 
 impl Drop for Redemption<'_> {

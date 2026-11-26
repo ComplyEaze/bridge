@@ -1,6 +1,8 @@
 //! The one-ledger dialog's text: exact for each admitted kind, unsafe text
 //! refused, and every limit a refusal, never a cut.
-use super::super::approval::{ApprovalBinding, Begin, HeldRequest, Joined, PostApprovals};
+use super::super::approval::{
+    ApprovalBinding, Begin, HeldRequest, Joined, PostApprovals, Redemption,
+};
 use super::super::master_post::MasterPostRequest;
 use super::*;
 use crate::agent::failure_code::{stock_item_outcome_code, stock_item_read_back_code};
@@ -974,7 +976,9 @@ fn stock_company_ledger() -> LedgerCreateBatch {
 
 /// `PostApprovals` over a data directory with its imports directory, so a
 /// lapse leaves its note.
-fn stock_approvals(directory: &std::path::Path) -> PostApprovals {
+pub(in crate::agent::agent_import) fn stock_approvals(
+    directory: &std::path::Path,
+) -> PostApprovals {
     std::fs::create_dir_all(directory.join("imports")).unwrap();
     PostApprovals::new(directory)
 }
@@ -985,10 +989,18 @@ fn stock_approvals(directory: &std::path::Path) -> PostApprovals {
 async fn approved_stock_item(
     new_name: &str,
 ) -> (ApprovalBinding, HeldRequest, ApprovedImport, Answered) {
+    approved_stock_item_for(new_name, stock_batch()).await
+}
+
+/// [`approved_stock_item`], asked for `batch`.
+async fn approved_stock_item_for(
+    new_name: &str,
+    batch: String,
+) -> (ApprovalBinding, HeldRequest, ApprovedImport, Answered) {
     let shown = shown_stock_item(new_name);
     let asked = SCRIPTED_APPROVAL
         .scope(ScriptedApproval::approving(), async {
-            shown.ask(stock_marks(), stock_batch())
+            shown.ask(stock_marks(), batch)
         })
         .await;
     let (binding, dialog, held) = asked.into_parts();
@@ -999,6 +1011,24 @@ async fn approved_stock_item(
         approved.expect("the scripted dialog approves"),
         answered,
     )
+}
+
+/// A stock approval of `batch`, asked, held in `approvals` and taken for
+/// dispatch with the fresh binding of an equal draft: the redemption a stock
+/// intent writer spends.
+pub(in crate::agent::agent_import) async fn taken_stock_approval<'a>(
+    approvals: &'a PostApprovals,
+    batch: &str,
+) -> Redemption<'a> {
+    let (binding, held, approved, answered) =
+        approved_stock_item_for("SC Copied Marked", batch.to_string()).await;
+    approvals
+        .hold_approved(batch, binding, approved, held, answered)
+        .expect("the slot is empty");
+    let fresh = shown_stock_item("SC Copied Marked").binding();
+    let (taken, _, _) = (approvals.take_for_dispatch(batch, &fresh))
+        .unwrap_or_else(|code| panic!("the approval is taken: {code}"));
+    taken
 }
 
 /// The binding, the approval and the held request one ask made are held, then

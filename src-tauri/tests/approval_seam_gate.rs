@@ -4731,13 +4731,20 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
     let literals: usize = (sources.iter())
         .map(|(_, text)| literals_of(text, token))
         .sum();
-    let aliased = (sources.iter())
-        .flat_map(|(_, text)| text.lines())
-        .any(|line| {
-            let words = line.split_whitespace().collect::<Vec<_>>();
-            line.contains(token)
-                && (words.contains(&"type") || line.contains(&format!("{token} as ")))
-        });
+    // An import or type alias may be split across lines, so each is looked
+    // for in the text with its whitespace flattened, as
+    // `held_stock_item_aliases` does: a type alias is a `type` item, to its
+    // `;`, that names the token.
+    let aliased = (sources.iter()).any(|(_, text)| {
+        let flat = flat(text);
+        flat.contains(&format!("{token} as "))
+            || (flat.match_indices("type ")).any(|(at, _)| {
+                let item = &flat[at..];
+                let item = &item[..item.find(';').unwrap_or(item.len())];
+                let word = at == 0 || flat[..at].ends_with([' ', '{', '(', ';']);
+                word && item.contains(token)
+            })
+    });
     let mint = fn_body(&post, "fn recheck_stock_item_for_dispatch(");
     // Its one literal, after the digest of the bytes the POST sends is required.
     let digest = "sent_digest(stock.prepared(), stock.xml_sha256())?;";
@@ -4776,14 +4783,34 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
 }
 
 /// The lines above `item` in `source`, back over blank lines and doc and line
-/// comments to the end of the item before it (a line ending `}` or `;`),
-/// comments left out: its attributes, each line of a multi-line one too, and
-/// one a blank line separates still among them.
+/// comments to the end of the item before it (a line ending `}` or `;` once
+/// any trailing line comment is cut off), comments left out: its attributes,
+/// each line of a multi-line one too, and one a blank line separates still
+/// among them. An attribute line with a trailing comment is kept whole.
 fn attributes_above<'a>(source: &'a str, item: &str) -> Vec<&'a str> {
     let start = source.find(item).unwrap_or(0);
+    // The code of a line: up to a `//` outside a string literal. A quote
+    // char literal is blanked first, at the same length. A raw string that
+    // holds a `"` is not told apart; no attribute this pins has one.
+    let code = |line: &str| {
+        let (mut quoted, mut escaped) = (false, false);
+        let blanked = line.replace("'\\\"'", "'__'").replace("'\"'", "'_'");
+        let bytes = blanked.as_bytes();
+        let cut = (0..bytes.len()).find(|&at| {
+            let byte = bytes[at];
+            if quoted {
+                quoted = escaped || byte != b'"';
+                escaped = !escaped && byte == b'\\';
+                return false;
+            }
+            quoted = byte == b'"';
+            byte == b'/' && bytes.get(at + 1) == Some(&b'/')
+        });
+        line[..cut.unwrap_or(line.len())].trim_end().to_owned()
+    };
     let mut above = (source[..start].lines().rev().map(str::trim))
         .filter(|line| !line.is_empty() && !line.starts_with("//"))
-        .take_while(|line| !line.ends_with('}') && !line.ends_with(';'))
+        .take_while(|line| !code(line).ends_with('}') && !code(line).ends_with(';'))
         .collect::<Vec<_>>();
     above.reverse();
     above
@@ -4833,10 +4860,23 @@ fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
     // A derive above the pinned two, after the doc comment or before it, with
     // blank lines between or none.
     let token = "#[must_use]\n#[derive(Debug)]\npub(super) struct StockItemRecheckPassed {";
-    for above in ["#[derive(Clone)]", "#[cfg_attr(test, derive(Clone))]"] {
+    for above in [
+        "#[derive(Clone)]",
+        "#[cfg_attr(test, derive(Clone))]",
+        // A trailing comment that ends in `;` is not the end of an item.
+        "#[derive(Clone)] // x;",
+        "#[derive(Clone)] // }",
+    ] {
         mutations.push(edit(post, token, &format!("{above}\n{token}")));
     }
     let doc = "/// Proof that the queue's stock recheck passed";
+    // An item above whose string holds `//` still ends there.
+    let url = edit(
+        post,
+        doc,
+        &format!("const URL: &str = \"http://x\";\n{doc}"),
+    );
+    assert_eq!(stock_token_problems(&url), Vec::<String>::new());
     for above in [
         "#[derive(Clone)]\n",
         "#[derive(Clone)]\n\n",
@@ -4855,6 +4895,10 @@ fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
         format!("fn forge() -> anyhow::Result<StockItemRecheckPassed> {{ Ok(StockItemRecheckPassed{{ {fields} }}) }}"),
         format!("type Proof = StockItemRecheckPassed;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
         format!("use self::StockItemRecheckPassed as Proof;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+        // The import alias split across lines.
+        format!("use self::StockItemRecheckPassed\n    as Proof;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+        // The type alias split across lines.
+        format!("type Proof =\n    StockItemRecheckPassed;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
     ] {
         let anchor = "\n/// The digest of `prepared`'s writes";
         mutations.push(edit(post, anchor, &format!("\n{forged}{anchor}")));
@@ -4908,6 +4952,243 @@ fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
     }
     for (at, mutated) in mutations.iter().enumerate() {
         assert!(!stock_token_problems(mutated).is_empty(), "mutation {at}");
+    }
+}
+
+/// `text` with each run of whitespace made one space, so a call or a
+/// signature split across lines reads as one line.
+fn flat(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// `text` with all its whitespace removed, so a call reads the same however
+/// it is spaced or split.
+fn squashed(text: &str) -> String {
+    text.split_whitespace().collect()
+}
+
+/// How many times `text` uses a `spend`: the identifier after a `.` or a `:`,
+/// whitespace allowed between (a method call, or a path to one, called or
+/// not), or directly followed by `(` and not after `fn` (a bare call). A
+/// definition `fn spend(` is not a use, and neither is the word in prose.
+fn spend_uses(text: &str) -> usize {
+    let ident = |c: char| c.is_alphanumeric() || c == '_';
+    (text.match_indices("spend"))
+        .filter(|(at, word)| {
+            let (before, after) = (&text[..*at], &text[at + word.len()..]);
+            let bounded = !before.ends_with(ident) && !after.starts_with(ident);
+            let before = before.trim_end();
+            let reached = before.ends_with('.') || before.ends_with(':');
+            let called = after.starts_with('(') && !before.ends_with("fn");
+            bounded && (reached || called)
+        })
+        .count()
+}
+
+/// `Redemption::spend`, which spends the approval the call took: its own batch
+/// and id, no other.
+const REDEMPTION_SPEND: &str = "pub(super) fn spend(&self) -> Result<(), UnderLockRefusal> { self.approvals.spend(&self.batch_id, self.id) }";
+
+/// The stock intent writer's signature: it takes the redemption, and no spend
+/// of the caller's.
+const STOCK_WRITER_SIGNATURE: &str = "fn record_stock_item_intent( data_dir: &Path, lock: &ExclusiveAdmission, batch: &StockItemBatch, passed: StockItemRecheckPassed, redemption: &Redemption<'_>, ) -> Result<RecordedIntent, StockIntentRefusal> {";
+
+/// Problems with how a stock approval is spent: `Redemption::spend` spends its
+/// own batch and id; the stock intent writer takes a redemption, refuses one of
+/// another batch, and spends it once, after the journal's admission and before
+/// the sidecar; and no other source spends an approval but the two posts that
+/// spend theirs by id. `approval` is the approvals holder, and `sources` every
+/// other non-test source, as [`other_sources`] gives them.
+fn stock_spend_problems(approval: &str, sources: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    if squashed(approval)
+        .matches(&squashed(REDEMPTION_SPEND))
+        .count()
+        != 1
+        || spend_uses(approval) != 1
+    {
+        problems.push("`Redemption::spend` spends its own batch and id, through the holder".into());
+    }
+    let text_of = |source: &str| {
+        let found = sources.iter().find(|(path, _)| is_source(path, source));
+        found.map_or(String::new(), |(_, text)| squashed(text))
+    };
+    // The writer's body is cut at its closing brace before it is flattened.
+    let journal = (sources.iter())
+        .find(|(path, _)| is_source(path, "src/agent_master_stock_item_journal.rs"))
+        .map_or("", |(_, text)| text.as_str());
+    let writer = flat(fn_body(journal, "fn record_stock_item_intent("));
+    let writer = writer.as_str();
+    let spend = "redemption.spend().map_err(Refused)?;";
+    let batch = "if batch_id != batch.batch_id || redemption.batch_id() != batch.batch_id { return Err(StockIntentRefusal::OtherBatch); }";
+    let at = |needle: &str| {
+        (writer.matches(needle).count() == 1)
+            .then(|| writer.find(needle))
+            .flatten()
+    };
+    let order = [
+        at(batch),
+        at(".check_intent_admissible(&current.batch, &marks)"),
+        at(spend),
+        at("write_pre_image("),
+    ];
+    let ordered =
+        order.iter().all(Option::is_some) && order.windows(2).all(|pair| pair[0] < pair[1]);
+    if !writer.starts_with(STOCK_WRITER_SIGNATURE) || spend_uses(writer) != 1 || !ordered {
+        problems.push(
+            "the stock writer takes a redemption, checks its batch, and spends it once, \
+             after the admission and before the sidecar"
+                .into(),
+        );
+    }
+    let spend_call = squashed(spend);
+    // Every spend in the other sources, a call or a path to one: the
+    // writer's, and the two posts'.
+    let pinned = [
+        (
+            "src/agent_import_post.rs",
+            ".post_approvals.spend(batch_id,id)",
+        ),
+        (
+            "src/agent_master_tools.rs",
+            "self.post_approvals.spend(&batch.batch_id,approval)",
+        ),
+        (
+            "src/agent_master_stock_item_journal.rs",
+            spend_call.as_str(),
+        ),
+    ];
+    let all: usize = sources.iter().map(|(_, text)| spend_uses(text)).sum();
+    if all != pinned.len()
+        || pinned
+            .iter()
+            .any(|(source, call)| text_of(source).matches(call).count() != 1)
+    {
+        problems.push("an approval is spent only by the writer and the two posts".into());
+    }
+    problems
+}
+
+#[test]
+fn a_stock_approval_is_spent_only_through_its_redemption_by_the_writer() {
+    let approval = read("src-tauri/src/agent_import_approval.rs");
+    let sources = other_sources();
+    assert_eq!(
+        stock_spend_problems(&approval, &sources),
+        Vec::<String>::new()
+    );
+    let edit = |source: &str, from: &str, to: &str| {
+        let mut mutated = sources.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let journal = "src/agent_master_stock_item_journal.rs";
+    let spend = "    redemption.spend().map_err(Refused)?;\n";
+    let admissible = "    journal\n        .check_intent_admissible(";
+    let mut mutations = vec![
+        // The caller's spend back beside the redemption, or in its place.
+        edit(
+            journal,
+            "    redemption: &Redemption<'_>,\n",
+            "    redemption: &Redemption<'_>,\n    spend: impl FnOnce() -> Result<(), UnderLockRefusal>,\n",
+        ),
+        edit(journal, "redemption.spend()", "spend()"),
+        // Spent twice, or not at all.
+        edit(journal, spend, &format!("{spend}{spend}")),
+        edit(journal, spend, ""),
+        // The redemption's batch left unchecked.
+        edit(journal, " || redemption.batch_id() != batch.batch_id", ""),
+        // A second spend beside the writer, as a call and as a path.
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: &Redemption<'_>) { let _ = r.spend(); }\n#[cfg(test)]\n#[path",
+        ),
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: Option<&Redemption<'_>>) { r.map(Redemption::spend); }\n#[cfg(test)]\n#[path",
+        ),
+        // A second spend beside the writer, spaced or split so no `spend(`
+        // or `::spend` is in its text, and as a spaced path that is called.
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: &Redemption<'_>) { let _ = r.spend\n(); }\n#[cfg(test)]\n#[path",
+        ),
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: Option<&Redemption<'_>>) { r.map(Redemption :: spend); }\n#[cfg(test)]\n#[path",
+        ),
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: &Redemption<'_>) { let _ = Redemption :: spend(r); }\n#[cfg(test)]\n#[path",
+        ),
+        // A second spend in the writer itself, split across lines.
+        edit(
+            journal,
+            spend,
+            &format!("{spend}    let _ = redemption.spend\n    ();\n"),
+        ),
+        // A spend in another source, split across lines, before or after
+        // its parentheses.
+        edit(
+            "src/agent_master_post.rs",
+            "\n/// The digest of `prepared`'s writes",
+            "\nfn again(r: &super::approval::Redemption<'_>) { let _ = r\n    .spend(); }\n/// The digest of `prepared`'s writes",
+        ),
+        edit(
+            "src/agent_master_post.rs",
+            "\n/// The digest of `prepared`'s writes",
+            "\nfn again(r: &super::approval::Redemption<'_>) { let _ = r.spend\n    (); }\n/// The digest of `prepared`'s writes",
+        ),
+        // The ledger post's spend of another approval.
+        edit(
+            "src/agent_master_tools.rs",
+            ".spend(&batch.batch_id, approval)",
+            ".spend(&batch.batch_id, Uuid::nil())",
+        ),
+    ];
+    // The spend moved after the sidecar is written, or before the admission.
+    let moved = |to: &str| {
+        let without = edit(journal, spend, "");
+        let mut mutated = without.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, journal))
+            .unwrap();
+        entry.1 = entry.1.replacen(to, &format!("{spend}{to}"), 1);
+        assert_ne!(mutated, without, "the move changed nothing");
+        mutated
+    };
+    mutations.push(moved("    let intent = MasterDispatchIntent::new("));
+    mutations.push(moved(admissible));
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert_ne!(mutated, &sources, "mutation {at} changed nothing");
+        assert!(
+            !stock_spend_problems(&approval, mutated).is_empty(),
+            "mutation {at}"
+        );
+    }
+    // `Redemption::spend` spending another id, or another batch.
+    for (from, to) in [
+        (
+            "self.approvals.spend(&self.batch_id, self.id)",
+            "self.approvals.spend(&self.batch_id, Uuid::nil())",
+        ),
+        (
+            "self.approvals.spend(&self.batch_id, self.id)",
+            "self.approvals.spend(\"other\", self.id)",
+        ),
+    ] {
+        assert_eq!(approval.matches(from).count(), 1, "the edit starts once");
+        let mutated = approval.replacen(from, to, 1);
+        assert!(!stock_spend_problems(&mutated, &sources).is_empty(), "{to}");
     }
 }
 

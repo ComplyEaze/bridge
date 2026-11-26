@@ -536,7 +536,7 @@ mod writer {
     }
 
     #[tokio::test]
-    async fn an_open_dispatch_of_the_name_or_an_unspent_approval_writes_nothing() {
+    async fn an_open_dispatch_of_the_name_or_a_refused_spend_writes_nothing() {
         let (a, b) = (shape_batch(A), shape_batch(B));
         let directory = folder(&[&a, &b]);
         let dir = directory.path();
@@ -549,7 +549,7 @@ mod writer {
         );
         assert_eq!(spends.get(), 1);
         assert_eq!(written(dir, &b), (false, false));
-        // An approval that cannot be spent writes no sidecar and no intent.
+        // A spend that refuses writes no sidecar and no intent.
         let fresh = folder(&[&a]);
         let revoked =
             record_stock_item_intent(fresh.path(), &lock(), &a, minted(id(A)).await, || {

@@ -2466,6 +2466,11 @@ pub(crate) mod coordinator {
         assert_eq!(batch_id, batch);
     }
 
+    /// The stock recheck's typed refusal in `error`'s chain, if any.
+    fn stock_refusal(error: &anyhow::Error) -> Option<&StockItemRecheckError> {
+        error.chain().find_map(|cause| cause.downcast_ref())
+    }
+
     #[tokio::test]
     async fn the_stock_recheck_in_the_queue_keeps_each_refusal_and_mints_nothing() {
         // Constructed edits, each of a named capture: the R1 read after the
@@ -2475,43 +2480,57 @@ pub(crate) mod coordinator {
         let rate = "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>";
         let changed = rebound_before().replacen(rate, "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>", 1);
         assert_ne!(changed, rebound_before());
-        for (plans, expected) in [
-            (
-                stock_answers(after, 3, marks_at(289)),
-                "NameNotAbsent(Taken(",
-            ),
-            (stock_answers(changed, 1, marks_at(289)), "DraftChanged"),
+        let cases: [(Vec<ScenarioPlan>, fn(&anyhow::Error) -> bool); 4] = [
+            (stock_answers(after, 3, marks_at(289)), |error| {
+                matches!(
+                    stock_refusal(error),
+                    Some(StockItemRecheckError::NameNotAbsent(
+                        ItemNameNotAbsent::Taken(_)
+                    ))
+                )
+            }),
+            (stock_answers(changed, 1, marks_at(289)), |error| {
+                matches!(
+                    stock_refusal(error),
+                    Some(StockItemRecheckError::DraftChanged)
+                )
+            }),
             (
                 stock_answers(stock_capture(SHAPE_ITEMS), 11, marks_at(289)),
-                "Sibling(NotFound)",
+                |error| {
+                    matches!(
+                        stock_refusal(error),
+                        Some(StockItemRecheckError::Sibling(SiblingRefusal::NotFound))
+                    )
+                },
             ),
-            (
-                stock_answers(rebound_before(), 1, marks_at(290)),
-                "MastersMoved",
-            ),
-        ] {
+            (stock_answers(rebound_before(), 1, marks_at(290)), |error| {
+                matches!(
+                    (error.chain()).find_map(|cause| cause.downcast_ref()),
+                    Some(ApprovedImportAdmissionError::MastersMoved)
+                )
+            }),
+        ];
+        for (plans, refused_as) in cases {
             let batch = crate::synthetic_batch_id(0xa1);
             let (result, sent, passed) = mint_in_queue(batch, plans).await;
             let error = result.expect_err("the recheck refuses");
-            // The typed refusal, by its variant's Debug form.
-            let typed = error.chain().find_map(|cause| {
-                (cause
-                    .downcast_ref::<StockItemRecheckError>()
-                    .map(|e| format!("{e:?}")))
-                .or((cause.downcast_ref::<ApprovedImportAdmissionError>())
-                    .map(|e| format!("{e:?}")))
-            });
-            assert!(
-                typed.is_some_and(|typed| typed.starts_with(expected)),
-                "{error:#}"
-            );
+            assert!(refused_as(&error), "{error:#}");
             assert_eq!(sent, QUEUE_READS);
             assert!(passed.is_none(), "no token is minted");
         }
     }
 
+    /// A ledger admission is refused through the mint. `DigestMismatch` and
+    /// `NotRendered` cannot be reached through it: a queued stock item's
+    /// `xml_sha256` is taken from `render_stock_item_create` of the same
+    /// prepared item whose writes `create_sha256` renders, and a prepared item
+    /// has passed `create_text_refusal`, so only `sent_digest` is tested here.
+    /// Nor can `PreImage`: the admitted candidate read holds an item, each GUID
+    /// the company's followed by eight lowercase hex digits and none twice, so
+    /// `PreImage::new` refuses none unless the company GUID passed 119 characters.
     #[test]
-    fn the_stock_recheck_refuses_a_ledger_admission_and_bytes_of_another_digest() {
+    fn the_stock_recheck_refuses_a_ledger_admission_and_sent_digest_refuses_other_bytes() {
         let marks = marks(7);
         let queued = masters_queued(("", ""), ("", ""), &marks, &marks);
         let error = recheck_stock_item_for_dispatch(queued).expect_err("a ledger admission");

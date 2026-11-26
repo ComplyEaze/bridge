@@ -4244,8 +4244,18 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
             .collect::<Vec<_>>()
             .join(" ")
     });
-    if post.matches(STOCK_TOKEN).count() != 1 || fields.as_deref() != Some(STOCK_TOKEN_FIELDS) {
+    let attributes = attributes_above(&post, "pub(super) struct StockItemRecheckPassed {");
+    if post.matches(STOCK_TOKEN).count() != 1
+        || fields.as_deref() != Some(STOCK_TOKEN_FIELDS)
+        || attributes != ["#[must_use]", "#[derive(Debug)]"]
+    {
         problems.push("the token's derive line and private fields are pinned".into());
+    }
+    // Its one inherent impl holds one fn, which consumes it and builds none.
+    let methods = fn_body(&post, "impl StockItemRecheckPassed {");
+    let spend = "    pub(super) fn into_intent_parts(self) -> (String, PreImage, Vec<MasterMark>, String) {";
+    if methods.matches("fn ").count() != 1 || !methods.contains(spend) || methods.contains("Self") {
+        problems.push("the token's impl holds only `into_intent_parts`".into());
     }
     let count = |needle: &str| -> usize {
         sources
@@ -4259,17 +4269,35 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
     if impls != 1 {
         problems.push("one inherent impl of the token, and no trait impl".into());
     }
-    let literals = count("StockItemRecheckPassed {")
-        - count("struct StockItemRecheckPassed {")
-        - count("impl StockItemRecheckPassed {");
+    let token = "StockItemRecheckPassed";
+    let literals: usize = (sources.iter())
+        .map(|(_, text)| literals_of(text, token))
+        .sum();
+    let aliased = (sources.iter())
+        .flat_map(|(_, text)| text.lines())
+        .any(|line| {
+            let words = line.split_whitespace().collect::<Vec<_>>();
+            line.contains(token)
+                && (words.contains(&"type") || line.contains(&format!("{token} as ")))
+        });
     let mint = fn_body(&post, "fn recheck_stock_item_for_dispatch(");
     // Its one literal, after the digest of the bytes the POST sends is required.
     let digest = "sent_digest(stock.prepared(), stock.xml_sha256())?;";
     if literals != 1
-        || mint.matches("StockItemRecheckPassed {").count() != 1
+        || aliased
+        || literals_of(mint, token) != 1
         || mint.matches(digest).count() != 1
     {
         problems.push("the token is built once, in recheck_stock_item_for_dispatch".into());
+    }
+    // The existing recheck, run once as a statement whose refusal returns.
+    let call = "\n    recheck_stock_item_admission(StockItemRecheckInput {\n";
+    let returns = mint.find(call).is_some_and(|at| {
+        let close = mint[at..].find("\n    })").map_or(0, |end| at + end);
+        mint[close..].starts_with("\n    })?;\n")
+    });
+    if mint.matches(call).count() != 1 || !returns {
+        problems.push("the mint runs the stock recheck once and returns its refusal".into());
     }
     let writer = fn_body(&journal, "fn record_stock_item_intent(");
     for (needle, in_writer) in [
@@ -4287,6 +4315,33 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
         }
     }
     problems
+}
+
+/// The attribute lines above `item` in `source`, back to the blank line or the
+/// end of the item before it, doc and line comments left out.
+fn attributes_above<'a>(source: &'a str, item: &str) -> Vec<&'a str> {
+    let start = source.find(item).unwrap_or(0);
+    let mut above = (source[..start].lines().rev().map(str::trim))
+        .take_while(|line| !line.is_empty() && !line.ends_with('}') && !line.ends_with(';'))
+        .filter(|line| !line.starts_with("//"))
+        .collect::<Vec<_>>();
+    above.reverse();
+    above
+}
+
+/// How many times `name` is followed by `{`, whitespace allowed, in `text`,
+/// but not as the name a struct, an impl or a return type gives: its literals
+/// and patterns.
+fn literals_of(text: &str, name: &str) -> usize {
+    (text.match_indices(name))
+        .filter(|(at, _)| {
+            let before = text[..*at].trim_end();
+            text[at + name.len()..].trim_start().starts_with('{')
+                && !["struct", "impl", "->"]
+                    .iter()
+                    .any(|word| before.ends_with(word))
+        })
+        .count()
 }
 
 #[test]
@@ -4315,6 +4370,39 @@ fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
         let to = derive.replace("Debug", derived);
         mutations.push(edit(post, derive, &to));
     }
+    // A derive above the pinned two, before or after the doc comment.
+    let token = "#[must_use]\n#[derive(Debug)]\npub(super) struct StockItemRecheckPassed {";
+    for above in ["#[derive(Clone)]", "#[cfg_attr(test, derive(Clone))]"] {
+        mutations.push(edit(post, token, &format!("{above}\n{token}")));
+    }
+    let doc = "/// Proof that the queue's stock recheck passed";
+    mutations.push(edit(post, doc, &format!("#[derive(Clone)]\n{doc}")));
+    // A second literal: through `Self` in its impl, without the space, through
+    // a type alias and through an import alias.
+    let fields = "create_sha256: String::new(), pre_image: todo!(), marks: Vec::new(), batch_id: String::new()";
+    let methods = "impl StockItemRecheckPassed {\n";
+    let again = format!("{methods}    fn again() -> Self {{ Self {{ {fields} }} }}\n");
+    mutations.push(edit(post, methods, &again));
+    for forged in [
+        format!("fn forge() -> anyhow::Result<StockItemRecheckPassed> {{ Ok(StockItemRecheckPassed{{ {fields} }}) }}"),
+        format!("type Proof = StockItemRecheckPassed;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+        format!("use self::StockItemRecheckPassed as Proof;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+    ] {
+        let anchor = "\n/// The digest of `prepared`'s writes";
+        mutations.push(edit(post, anchor, &format!("\n{forged}{anchor}")));
+    }
+    // The existing recheck's refusal discarded.
+    let text = &sources
+        .iter()
+        .find(|(path, _)| is_source(path, post))
+        .unwrap()
+        .1;
+    let start = text
+        .find("    recheck_stock_item_admission(StockItemRecheckInput {\n        prepared: stock")
+        .unwrap();
+    let call = &text[start..start + text[start..].find("})?;").unwrap() + "})?;".len()];
+    let discarded = format!("    let _ = {}", call.trim_start()).replace("})?;", "});");
+    mutations.push(edit(post, call, &discarded));
     let manual =
         "\nimpl Clone for StockItemRecheckPassed { fn clone(&self) -> Self { todo!() } }\n";
     mutations.push(edit(
@@ -4350,8 +4438,8 @@ fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
             &format!("\n{added}\n#[cfg(test)]\n#[path"),
         ));
     }
-    for mutated in &mutations {
-        assert!(!stock_token_problems(mutated).is_empty());
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert!(!stock_token_problems(mutated).is_empty(), "mutation {at}");
     }
 }
 

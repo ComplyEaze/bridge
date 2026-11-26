@@ -14,7 +14,7 @@ use super::post::{
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
-use crate::tally::approved_import::{ApprovedImport, StockItemDialogRefusal};
+use crate::tally::approved_import::PendingPostApproval;
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
 use crate::tally::stock_item_create::{
     create_text_refusal, CreateRenderRefusal, MarkedConstant, PreparedStockItem, StockItemDraft,
@@ -333,40 +333,58 @@ pub(super) fn stock_item_review_text(
     }
 }
 
-/// Why a stock-item draft was not confirmed. Nothing was created.
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum StockItemConfirmError {
-    /// The preview could not be built, so no one was asked.
-    Review(StockItemReviewError),
-    /// The dialog approved nothing.
-    Dialog(StockItemDialogRefusal),
+/// One stock-item draft as the person will be shown it: the Create prepared
+/// from the draft and the preview built from the same draft. Only
+/// [`show_stock_item_draft`] makes one, and [`ShownStockItem::ask`] is the one
+/// way to ask the person about it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct ShownStockItem {
+    prepared: PreparedStockItem,
+    preview: String,
 }
 
-/// Shows the preview of `draft` in the stock-item dialog and, only on the
-/// person's approval, returns the approval of the Create made from it. The
-/// preview is built here, from the draft itself, so the window shows what this
-/// draft creates.
+/// The preview of `draft` and the Create prepared from it: the one place a
+/// draft becomes a Create, so the window shows what this draft creates.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(super) async fn confirm_stock_item_draft(
+pub(super) fn show_stock_item_draft(
     draft: StockItemDraft<'_>,
     origin: &str,
-    company_marks_request: AgentReadRequest,
-    batch_id: String,
-) -> Result<ApprovedImport, StockItemConfirmError> {
-    let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
-    let prepared = PreparedStockItem::from_draft(draft).map_err(|refusal| {
-        StockItemConfirmError::Review(StockItemReviewError::NotRenderable(refusal))
-    })?;
-    ApprovedImport::confirm_stock_item(
-        prepared,
-        preview,
-        company_marks_request,
-        super::master_post::stock_company_marks,
-        batch_id,
-    )
-    .await
-    .map_err(StockItemConfirmError::Dialog)
+) -> Result<ShownStockItem, StockItemReviewError> {
+    let preview = stock_item_review_text(&draft, origin)?;
+    let prepared =
+        PreparedStockItem::from_draft(draft).map_err(StockItemReviewError::NotRenderable)?;
+    Ok(ShownStockItem { prepared, preview })
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl ShownStockItem {
+    /// The Create the person is asked about, for its binding and the request
+    /// held beside the approval.
+    pub(super) fn prepared(&self) -> &PreparedStockItem {
+        &self.prepared
+    }
+
+    /// The text the person is shown, for its binding.
+    pub(super) fn preview(&self) -> &str {
+        &self.preview
+    }
+
+    /// Shows the preview in the stock-item dialog, on its own task, and on the
+    /// person's approval holds the approval of this Create for `batch_id`,
+    /// read in the queue with the stock marks parser.
+    pub(super) fn ask(
+        self,
+        company_marks_request: AgentReadRequest,
+        batch_id: String,
+    ) -> PendingPostApproval {
+        PendingPostApproval::ask_stock_item(
+            self.prepared,
+            self.preview,
+            company_marks_request,
+            super::master_post::stock_company_marks,
+            batch_id,
+        )
+    }
 }
 
 #[cfg(test)]

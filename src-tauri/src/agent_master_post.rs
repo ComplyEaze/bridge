@@ -42,7 +42,6 @@ use bridge_tally_protocol::native_outstandings::{
 };
 use bridge_tally_protocol::{parse_ledger_name_index, StandardLedgerCatalogError};
 use std::collections::BTreeMap;
-use std::sync::Mutex;
 
 /// The fresh stock reads and marks for one approved stock-item Create.
 struct StockItemRecheckInput<'a> {
@@ -398,24 +397,18 @@ pub(super) struct MasterAim {
 }
 
 /// The recheck closure body of a master post: [`recheck_master_admission`], then
-/// the aim it left, set into `aim` for the intent. The queue's recheck returns
-/// `()` and its signature stays that way; this is the side channel, as the
-/// voucher path's `aimed_mark` is. `aim` is written only when the recheck
-/// admitted the post, and a recheck that refuses leaves it as it was.
+/// the aim it saw, returned for the queue to hand to the intent by value. A
+/// recheck that refuses returns no aim.
 pub(super) fn recheck_master_for_dispatch(
     queued: QueuedAdmission<'_>,
-    aim: &Mutex<Option<MasterAim>>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<MasterAim> {
     let QueuedAdmission::Masters { company_marks, .. } = &queued else {
         return Err(ApprovedImportAdmissionError::AdmissionInconsistent.into());
     };
     let marks_text = (*company_marks).to_string();
     let pre_image = recheck_master_admission(queued)?;
     let marks = aim_master_marks(&marks_text)?;
-    *aim.lock()
-        .map_err(|_| ApprovedImportAdmissionError::AdmissionInconsistent)? =
-        Some(MasterAim { pre_image, marks });
-    Ok(())
+    Ok(MasterAim { pre_image, marks })
 }
 
 /// Every loaded company's master mark in the aim snapshot. A snapshot that does
@@ -454,8 +447,8 @@ pub(super) fn admit_master_create(
         company.display_name(),
     )?;
     // The pre-image is returned, not kept: [`recheck_master_for_dispatch`]
-    // carries it from the queue's recheck closure to `before_dispatch`, which
-    // writes it as the sidecar its intent names.
+    // returns it from the queue's recheck, and the queue hands it to
+    // `before_dispatch`, which writes it as the sidecar its intent names.
     Ok(index.pre_image())
 }
 

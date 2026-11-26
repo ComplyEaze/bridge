@@ -196,7 +196,7 @@ impl ObservedTally {
 
 /// What the endpoint queue read to admit a post, before the aim: the reads of
 /// the request's own kind.
-enum QueuedReads {
+enum QueuedReads<'a> {
     Vouchers {
         catalogue: String,
         groups: Option<String>,
@@ -205,6 +205,8 @@ enum QueuedReads {
         invoice_answers: Option<Box<super::approved_import::InvoiceAnswers>>,
     },
     Masters {
+        /// The ledger admission the index reads were made for.
+        admission: &'a super::approved_import::LedgerAdmission,
         ledgers_first: String,
         ledgers_second: String,
         groups_first: String,
@@ -3510,7 +3512,10 @@ impl TallyRuntime {
     /// One approved mutation through the shared endpoint queue. The durable
     /// intent is committed after identity admission and before any import bytes.
     /// Unlike paired reads, an import must never be repeated automatically.
-    pub(crate) async fn post_approved_import<A, F, L>(
+    /// What the admission recheck returns is handed to `before_dispatch` by
+    /// value, so the intent records what the recheck saw; a value never spent
+    /// is dropped in the same execution.
+    pub(crate) async fn post_approved_import<A, F, R, L>(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
@@ -3519,8 +3524,8 @@ impl TallyRuntime {
         before_dispatch: F,
     ) -> anyhow::Result<ApprovedImportDispatch>
     where
-        A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<()>,
-        F: Fn() -> Result<L, super::approved_import::BeforeDispatchError>,
+        A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<R>,
+        F: Fn(R) -> Result<L, super::approved_import::BeforeDispatchError>,
         L: super::approved_import::DispatchLicense,
     {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -3550,12 +3555,19 @@ impl TallyRuntime {
                     // marked as refused before the intent; nothing that records
                     // the intent or sends may move into it
                     // (`tests/approval_seam_gate.rs` holds it to that).
-                    let (admission_evidence, before_marks) = async {
+                    let (admission_evidence, before_marks, rechecked) = async {
                         // A master post is for the company it was rendered for: the
                         // request names it, and the identity brackets check this one.
                         // A mismatch is a wiring fault, refused before any request.
+                        // No stock item Create is sent yet: one is refused here too.
                         if let super::approved_import::ApprovedKind::Masters(masters) = &request.kind {
-                            if masters.ledgers()?.company() != &identity {
+                            let consistent = match masters.writes() {
+                                super::approved_import::AdmittedWrites::Ledgers(ledgers) => {
+                                    ledgers.company() == &identity
+                                }
+                                super::approved_import::AdmittedWrites::StockItem { .. } => false,
+                            };
+                            if !consistent {
                                 return Err(anyhow::Error::from(
                                     super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent,
                                 ));
@@ -3687,10 +3699,21 @@ impl TallyRuntime {
                                 )
                             }
                             super::approved_import::ApprovedKind::Masters(masters) => {
+                                // Refused at the company check above; never reached.
+                                let admission = match masters.writes() {
+                                    super::approved_import::AdmittedWrites::Ledgers(ledgers) => ledgers,
+                                    super::approved_import::AdmittedWrites::StockItem { .. } => {
+                                        return Err(with_read_evidence(
+                                            super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent
+                                                .into(),
+                                            admission_evidence.clone(),
+                                        ))
+                                    }
+                                };
                                 let (ledgers_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledgers()?.ledger_index_request(),
+                                    admission.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3698,7 +3721,7 @@ impl TallyRuntime {
                                 let (ledgers_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledgers()?.ledger_index_request(),
+                                    admission.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3706,7 +3729,7 @@ impl TallyRuntime {
                                 let (groups_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledgers()?.group_index_request(),
+                                    admission.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3714,13 +3737,14 @@ impl TallyRuntime {
                                 let (groups_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledgers()?.group_index_request(),
+                                    admission.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                                 let admission_evidence = admission_evidence.combine(evidence);
                                 (
                                     QueuedReads::Masters {
+                                        admission,
                                         ledgers_first: ledgers_first.body,
                                         ledgers_second: ledgers_second.body,
                                         groups_first: groups_first.body,
@@ -3829,8 +3853,9 @@ impl TallyRuntime {
                                 ),
                             },
                             (
-                                super::approved_import::ApprovedKind::Masters(masters),
+                                super::approved_import::ApprovedKind::Masters(_),
                                 QueuedReads::Masters {
+                                    admission,
                                     ledgers_first,
                                     ledgers_second,
                                     groups_first,
@@ -3838,8 +3863,8 @@ impl TallyRuntime {
                                 },
                                 None,
                             ) => super::approved_import::QueuedAdmission::Masters {
-                                batch: masters.ledgers()?.batch(),
-                                company: masters.ledgers()?.company(),
+                                batch: admission.batch(),
+                                company: admission.company(),
                                 ledgers_first,
                                 ledgers_second,
                                 groups_first,
@@ -3855,9 +3880,9 @@ impl TallyRuntime {
                                 ))
                             }
                         };
-                        recheck_admission(queued)
+                        let rechecked = recheck_admission(queued)
                             .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
-                        Ok::<_, anyhow::Error>((admission_evidence, before_marks))
+                        Ok::<_, anyhow::Error>((admission_evidence, before_marks, rechecked))
                     }
                     .await
                     .map_err(|source| {
@@ -3890,7 +3915,7 @@ impl TallyRuntime {
                             admission_evidence.clone(),
                         )
                     })?;
-                    let license = before_dispatch().map_err(|error| {
+                    let license = before_dispatch(rechecked).map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
                                 anyhow::Error::from(refusal)

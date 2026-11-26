@@ -815,15 +815,14 @@ impl Server {
                 return Err("import_approval_binding_changed".to_string().into());
             }
             let _endpoint_dispatch_lease = dispatch_lease::acquire(&self.settings.endpoint)?;
-            let aim = Mutex::new(None::<MasterAim>);
             let posted = self
                 .runtime
                 .post_approved_import(
                     self.tally_config(),
                     &identity,
                     approved,
-                    |queued| recheck_master_for_dispatch(queued, &aim),
-                    || self.record_master_intent(&batch, &request, taken.id(), &aim, &under_lock),
+                    recheck_master_for_dispatch,
+                    |aim| self.record_master_intent(&batch, &request, taken.id(), aim, &under_lock),
                 )
                 .await;
             // An approval this post did not spend lapses: it is never offered
@@ -1011,6 +1010,7 @@ impl Server {
     }
 
     /// `before_dispatch` of a master post, under the exclusive admission lock.
+    /// `aimed` is what the queue's recheck saw last before the POST.
     ///
     /// Refuses a batch the journal shows dispatched or changed, spends the
     /// approval, writes the pre-image sidecar and appends the dispatch intent;
@@ -1023,7 +1023,7 @@ impl Server {
         batch: &MasterBatch,
         request: &MasterPostRequest,
         approval: Uuid,
-        aim: &Mutex<Option<MasterAim>>,
+        aimed: MasterAim,
         under_lock: &Mutex<Option<UnderLockView>>,
     ) -> Result<RecordedIntent, BeforeDispatchError> {
         use BeforeDispatchError::{Other, Refused};
@@ -1050,12 +1050,6 @@ impl Server {
         if current.batch.batch_sha256 != batch.batch_sha256 || current.batch != *batch {
             return Err(refused(UnderLockRefusal::BatchChanged));
         }
-        // What the queue's recheck saw last before the POST; none is a fault.
-        let aimed = aim
-            .lock()
-            .ok()
-            .and_then(|mut aimed| aimed.take())
-            .ok_or_else(|| refused(UnderLockRefusal::PreImageUnrecorded))?;
         let pre_image = PreImage::new(aimed.pre_image)
             .map_err(|_| refused(UnderLockRefusal::PreImageUnrecorded))?;
         // Every refusal the journal would raise for this intent, decided against

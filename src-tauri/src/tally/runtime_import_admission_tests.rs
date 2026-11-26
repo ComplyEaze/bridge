@@ -279,7 +279,7 @@ async fn queued_education_change_refuses_before_final_absence_reads() {
             &identity(&companies),
             approved_import(&companies, "20260915"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -341,7 +341,7 @@ async fn queued_company_refusal_retains_captured_source_and_final_identity_evide
             &identity(&companies),
             approved_import(&companies, "20260901"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -425,7 +425,7 @@ async fn queued_catalogue_rename_refuses_before_intent_or_post() {
                     .expect("renamed captured catalog remains structurally valid"));
                 Err(ApprovedImportAdmissionError::LedgerIdentityChanged.into())
             },
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -485,7 +485,7 @@ async fn queued_import_keeps_admission_separate_from_raw_import_wire() {
             &identity(&companies),
             approved_import(&companies, "20260901"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -562,7 +562,7 @@ async fn queued_import_refuses_attribution_after_final_profile_and_catalogue_rea
                 assert_eq!(second, journal.as_str());
                 Err(ApprovedImportAdmissionError::PreexistingIdentity.into())
             },
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -640,7 +640,7 @@ async fn a_post_refused_by_a_busy_wire_lock_records_nothing_and_sends_nothing() 
                 *other_holder.lock().unwrap() = Some(file);
                 Ok(())
             },
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -700,7 +700,7 @@ async fn the_wire_lock_is_held_across_the_record_and_released_after_the_post() {
             &identity(&companies),
             approved_import(&companies, "20260901"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 let probe = crate::local_files::file::open_local_file(&probe_path, true).map_err(
                     |error| {
                         crate::tally::approved_import::BeforeDispatchError::Other(error.to_string())
@@ -755,7 +755,7 @@ async fn a_withdrawal_as_the_intent_is_recorded_still_sends_the_post() {
                 &identity(&companies),
                 approved_import(&companies, "20260901"),
                 |_: QueuedAdmission<'_>| Ok(()),
-                move || {
+                move |()| {
                     withdraw.cancel();
                     Ok(())
                 },
@@ -915,7 +915,7 @@ async fn a_master_post_in_education_mode_is_refused_before_any_other_read() {
                 recheck_flag.store(true, Ordering::Release);
                 Ok(())
             },
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(())
             },
@@ -961,7 +961,7 @@ async fn a_master_post_whose_book_turns_to_education_is_refused_at_the_closing_o
                 recheck_flag.store(true, Ordering::Release);
                 Ok(())
             },
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(())
             },
@@ -1009,7 +1009,7 @@ async fn a_stock_item_create_is_refused_before_any_request() {
                 recheck_flag.store(true, Ordering::Release);
                 Ok(())
             },
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(())
             },
@@ -1056,7 +1056,7 @@ async fn a_master_post_with_the_voucher_licence_sends_nothing() {
             &identity(&companies),
             approved_masters(&companies),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(())
             },
@@ -1113,7 +1113,7 @@ async fn a_recorded_intent_of_another_batch_or_other_bytes_sends_nothing() {
                 &identity(&companies),
                 approved,
                 |_: QueuedAdmission<'_>| Ok(()),
-                move || {
+                move |()| {
                     Ok(
                         crate::tally::approved_import::RecordedIntent::issued_for_test(
                             batch, &digest,
@@ -1195,7 +1195,7 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
                 assert_eq!(company_marks, seen.2);
                 Ok(())
             },
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(
                     crate::tally::approved_import::RecordedIntent::issued_for_test(
@@ -1264,7 +1264,7 @@ async fn a_master_post_for_another_company_is_refused_before_any_request() {
             &identity(&companies),
             approved,
             |_: QueuedAdmission<'_>| Ok(()),
-            || Ok(()),
+            |()| Ok(()),
         )
         .await
         .expect_err("a request rendered for another company is not posted here");
@@ -1301,7 +1301,7 @@ async fn a_post_is_refused_before_the_terms_are_accepted_and_goes_on_after() {
                     recheck.store(true, Ordering::Release);
                     Ok(())
                 },
-                move || {
+                move |()| {
                     dispatch.store(true, Ordering::Release);
                     Ok(())
                 },

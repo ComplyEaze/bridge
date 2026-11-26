@@ -827,9 +827,9 @@ fn each_dialog_mode_runs_its_own_dialog() {
 /// intent (#656) must hold no intent and no POST: a refusal from inside it is
 /// reported as "nothing was sent". So in `post_approved_import` the block
 /// opens once, closes into `PreIntentQueueRefusal` once, holds neither
-/// `before_dispatch()` nor `post_probe_xml(`, and both follow it in that order.
+/// `before_dispatch(` nor `post_probe_xml(`, and both follow it in that order.
 fn pre_intent_block_problems(runtime: &str) -> Vec<String> {
-    let open = "let (admission_evidence, before_marks) = async {";
+    let open = "let (admission_evidence, before_marks, rechecked) = async {";
     let close = "PreIntentQueueRefusal { source }";
     let Some(function) = runtime.find("async fn post_approved_import<") else {
         return vec!["post_approved_import not found".into()];
@@ -846,14 +846,14 @@ fn pre_intent_block_problems(runtime: &str) -> Vec<String> {
     }
     let mut problems = Vec::new();
     let block = &body[start..end];
-    for forbidden in ["before_dispatch()", "post_probe_xml("] {
+    for forbidden in ["before_dispatch(", "post_probe_xml("] {
         if block.contains(forbidden) {
             problems.push(format!("`{forbidden}` inside the pre-intent block"));
         }
     }
     let after = &body[end..];
     match (
-        after.find("before_dispatch()"),
+        after.find("before_dispatch("),
         after.find("post_probe_xml("),
     ) {
         (Some(intent), Some(post)) if intent < post => {}
@@ -869,8 +869,8 @@ fn nothing_is_sent_inside_the_pre_intent_block() {
     // The check itself: the intent moved into the block, or the block's error
     // left unmarked, is caught.
     let intent_inside = runtime.replacen(
-        "let (admission_evidence, before_marks) = async {",
-        "let (admission_evidence, before_marks) = async {\n                        before_dispatch().ok();",
+        "let (admission_evidence, before_marks, rechecked) = async {",
+        "let (admission_evidence, before_marks, rechecked) = async {\n                        before_dispatch(rechecked).ok();",
         1,
     );
     let unmarked = runtime.replacen("PreIntentQueueRefusal { source }", "source", 1);

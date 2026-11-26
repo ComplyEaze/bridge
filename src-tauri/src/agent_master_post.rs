@@ -1,7 +1,8 @@
 //! The rechecks a master post makes after approval and before the intent: the
 //! ledger path decides whether a ledger or group name is already taken, and the
-//! pure 5b-3a stock twin rebuilds an approved stock draft from fresh admitted
-//! stock reads. The stock twin is not called by the queue before 5b-3b.
+//! stock twin rebuilds an approved stock draft from fresh admitted stock reads,
+//! which [`recheck_shown_stock_item`] has the runtime's stock coordinator make
+//! in one queued execution. Nothing shipped calls the stock twin yet.
 //!
 //! A master post reads the company's ledger index and group index twice each,
 //! between the all-company mark read as the binding reads begin and the aim
@@ -21,15 +22,18 @@
 //! below it is pure over parsed indexes, so it is tested on constructed ones.
 use super::master_ledger::MasterMark;
 use super::post::admit_queued_aim;
-use crate::agent::change_parse::parse_all_company_marks;
+use crate::agent::change_parse::{parse_all_company_marks, LoadedCompanyMarks};
 use crate::tally::approved_import::{ApprovedImportAdmissionError, QueuedAdmission};
 use crate::tally::ledger_create_item::{LedgerCreateBatch, LedgerCreateItem, RenderedLedgerCreate};
-use crate::tally::runtime::{AdmittedStockGroups, AdmittedStockUnits, StockItemReadKind};
+use crate::tally::runtime::{
+    target_binding_mark, AdmittedStockGroups, AdmittedStockUnits, CompanyMasterMark,
+    StockItemReadKind, StockItemRecheckReads, TallyRuntime,
+};
 use crate::tally::stock_item_create::{
     CompleteStockItemCatalogue, DraftRefusal, GoodsSibling, ItemNameNotAbsent, NotGoodsSibling,
     ShownDraft, SiblingGst, SiblingRefusal, StockItemCatalogueError, StockItemDraft,
 };
-use crate::tally::VerifiedCompanyIdentity;
+use crate::tally::{TallyConfig, VerifiedCompanyIdentity};
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError,
 };
@@ -41,8 +45,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 /// The fresh stock reads and marks for one already approved stock draft.
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) struct StockItemRecheckInput<'a, 'draft> {
+struct StockItemRecheckInput<'a, 'draft> {
     shown: &'a ShownDraft<'draft>,
     candidate: &'a CompleteStockItemCatalogue,
     groups: &'a AdmittedStockGroups,
@@ -64,9 +67,6 @@ pub(crate) enum StockItemRecheckError {
     NotGoods(NotGoodsSibling),
     #[error("stock item draft is refused")]
     Draft(DraftRefusal),
-    // Made by 5b-3b, when `CompleteStockItemCatalogue::from_admitted` refuses;
-    // nothing in this slice (tests included) builds it yet.
-    #[allow(dead_code)]
     #[error("stock item catalogue is refused")]
     Catalogue(StockItemCatalogueError),
     #[error("stock item draft changed")]
@@ -79,15 +79,62 @@ pub(crate) enum StockItemRecheckError {
     },
 }
 
+/// Reads the stock reads for `shown` in one queued execution
+/// ([`TallyRuntime::read_and_recheck_stock_item`]) and rechecks it on them
+/// ([`recheck_stock_item_admission`]). This module supplies only the parse of
+/// the marks answer; the runtime chooses the target's own binding mark among
+/// the rows ([`target_binding_mark`]) and sizes the reads at it. It returns no approval or dispatch
+/// value, sends no import, and nothing shipped calls it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) async fn recheck_shown_stock_item(
+    runtime: &TallyRuntime,
+    config: TallyConfig,
+    shown: &ShownDraft<'_>,
+) -> anyhow::Result<()> {
+    let company = shown.draft().sibling().sibling().catalogue().company();
+    let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
+        crate::agent::read_profiles::render_agent_company_high_water(company.display_name()),
+    )?;
+    let parse_marks = |text: &str| {
+        let rows = parse_all_company_marks(text)
+            .map_err(|_| ApprovedImportAdmissionError::MastersUnconfirmed)?;
+        Ok(master_marks(&rows))
+    };
+    let recheck = |reads: StockItemRecheckReads| {
+        let (candidate, groups, units, at_binding, at_aim) = reads.into_parts();
+        let candidate = CompleteStockItemCatalogue::from_admitted(candidate)
+            .map_err(StockItemRecheckError::Catalogue)?;
+        recheck_stock_item_admission(StockItemRecheckInput {
+            shown,
+            candidate: &candidate,
+            groups: &groups,
+            units: &units,
+            company_marks_at_binding: &at_binding,
+            company_marks: &at_aim,
+        })
+    };
+    runtime
+        .read_and_recheck_stock_item(config, company, marks, parse_marks, recheck)
+        .await
+}
+
+/// The rows [`target_binding_mark`] chooses among, from the agent's parse.
+fn master_marks(rows: &[LoadedCompanyMarks]) -> Vec<CompanyMasterMark> {
+    rows.iter()
+        .map(|row| CompanyMasterMark {
+            name: row.name.clone(),
+            guid: row.guid.clone(),
+            masters: row.masters,
+        })
+        .collect()
+}
+
 /// Applies the ledger path's unchanged aim check, then rebuilds the shown stock
 /// draft from fresh admitted stock reads sized at the target's own binding
 /// mark. Step 1 compares the full
-/// `VerifiedCompanyIdentity` values the reads carry, which the caller attached;
-/// the parsers bind rows by GUID only. It returns no approval or dispatch value.
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn recheck_stock_item_admission(
-    input: StockItemRecheckInput<'_, '_>,
-) -> anyhow::Result<()> {
+/// `VerifiedCompanyIdentity` values the reads carry, which the coordinator
+/// attached; the parsers bind rows by GUID only.
+fn recheck_stock_item_admission(input: StockItemRecheckInput<'_, '_>) -> anyhow::Result<()> {
     let shown = input.shown.draft();
     let company = shown.sibling().sibling().catalogue().company();
     if input.candidate.catalogue().company() != company
@@ -106,17 +153,7 @@ pub(crate) fn recheck_stock_item_admission(
         company.company_guid(),
         company.display_name(),
     )?;
-    let mut targets = binding_rows.iter().filter(|row| {
-        row.guid.eq_ignore_ascii_case(company.company_guid())
-            && row
-                .name
-                .trim()
-                .eq_ignore_ascii_case(company.display_name().trim())
-    });
-    let binding = match (targets.next(), targets.next()) {
-        (Some(row), None) => row.masters,
-        _ => return Err(ApprovedImportAdmissionError::MastersUnconfirmed.into()),
-    };
+    let binding = target_binding_mark(&master_marks(&binding_rows), company)?;
     for (read, sized) in [
         (StockItemReadKind::Candidate, input.candidate.sized_mark()),
         (StockItemReadKind::StockGroups, input.groups.sized_mark()),

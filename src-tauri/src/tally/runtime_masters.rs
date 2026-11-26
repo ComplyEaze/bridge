@@ -4,11 +4,13 @@ use crate::tally::connection::compliance_estimate;
 #[cfg(test)]
 use bridge_tally_protocol::native_masters::NativeMastersError;
 use bridge_tally_protocol::native_masters::{
-    masters_worst_row_bytes, parse_native_masters, render_native_masters_request, NativeMasterKind,
-    NativeMasterRow, NativeMasters, MASTERS_RESPONSE_BUDGET_BYTES,
+    masters_worst_row_bytes, parse_native_masters, render_candidate_stock_items_request,
+    render_native_masters_request, NativeMasterKind, NativeMasterRow, NativeMasters,
+    MASTERS_RESPONSE_BUDGET_BYTES,
 };
 use bridge_tally_protocol::native_stock_summary::{
-    parse_company_inventory_flags, NativeStockError, NativeStockItemCount,
+    parse_company_inventory_flags, render_company_inventory_flags_request, NativeStockError,
+    NativeStockItemCount,
 };
 use bridge_tally_protocol::native_voucher_type_numbering::{
     join_series_numbering, parse_voucher_type_numbering, render_voucher_type_numbering_request,
@@ -204,8 +206,8 @@ impl StockItemReadKind {
 }
 
 /// The size admission of one stock-item-related read, made before its fetch.
-/// The pair's provenance (that it came from two sends through the queue) is the
-/// caller's proof; 5b-3b's coordinator makes it.
+/// Outside tests only [`TallyRuntime::read_and_recheck_stock_item`] makes one,
+/// from the target's own binding master mark.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct StockItemReadSize {
     kind: StockItemReadKind,
@@ -369,8 +371,8 @@ fn require_stock_item_read_kind(
 }
 
 /// Admits the candidate and company-count answers as one complete candidate
-/// read. The pair's provenance (that it came from two sends through the queue)
-/// is the caller's proof; 5b-3b's coordinator makes it.
+/// read. Outside tests its pairs are the two that
+/// [`TallyRuntime::read_and_recheck_stock_item`] sends back to back.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn admit_candidate_stock_item_read(
     size: StockItemReadSize,
@@ -414,8 +416,7 @@ pub(crate) fn admit_candidate_stock_item_read(
     })
 }
 
-/// Admits one stock-group answer. The pair's provenance (that it came from two
-/// sends through the queue) is the caller's proof; 5b-3b's coordinator makes it.
+/// Admits one stock-group answer, as [`admit_candidate_stock_item_read`] its pairs.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn admit_stock_groups(
     size: StockItemReadSize,
@@ -443,8 +444,7 @@ pub(crate) fn admit_stock_groups(
     })
 }
 
-/// Admits one unit answer. The pair's provenance (that it came from two sends
-/// through the queue) is the caller's proof; 5b-3b's coordinator makes it.
+/// Admits one unit answer, as [`admit_candidate_stock_item_read`] its pairs.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn admit_stock_units(
     size: StockItemReadSize,
@@ -466,6 +466,76 @@ pub(crate) fn admit_stock_units(
         rows: parsed.rows,
         sized_mark: size.master_mark,
     })
+}
+
+/// What [`TallyRuntime::read_and_recheck_stock_item`] read in its one queued
+/// execution: the three admitted stock reads, each sized at the target's binding
+/// master mark, and the binding and aim marks answers it sent. The fields are
+/// private and only that coordinator makes one, so a recheck that takes it runs
+/// on that coordinator's own reads.
+#[derive(Debug)]
+pub(crate) struct StockItemRecheckReads {
+    candidate: AdmittedCandidateRead,
+    groups: AdmittedStockGroups,
+    units: AdmittedStockUnits,
+    company_marks_at_binding: String,
+    company_marks: String,
+}
+
+impl StockItemRecheckReads {
+    /// The candidate, stock-group and unit reads, then the binding and aim
+    /// marks answers.
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        AdmittedCandidateRead,
+        AdmittedStockGroups,
+        AdmittedStockUnits,
+        String,
+        String,
+    ) {
+        (
+            self.candidate,
+            self.groups,
+            self.units,
+            self.company_marks_at_binding,
+            self.company_marks,
+        )
+    }
+}
+
+/// One loaded company's row of the all-company marks answer, as far as the
+/// stock coordinator needs it. The agent's marks parser makes these rows; the
+/// runtime chooses the target among them ([`target_binding_mark`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CompanyMasterMark {
+    pub(crate) name: String,
+    pub(crate) guid: String,
+    pub(crate) masters: u64,
+}
+
+/// The target's master mark in a marks snapshot: that of the one row whose
+/// GUID and trimmed name both match `identity`, not the first row with its
+/// GUID, because a second loaded company can share a GUID under another name.
+/// No such row, or two, is `MastersUnconfirmed`. The stock coordinator sizes
+/// its reads at it and the stock recheck compares them to it.
+pub(crate) fn target_binding_mark(
+    rows: &[CompanyMasterMark],
+    identity: &VerifiedCompanyIdentity,
+) -> anyhow::Result<u64> {
+    let mut targets = rows.iter().filter(|row| {
+        row.guid.eq_ignore_ascii_case(identity.company_guid())
+            && row
+                .name
+                .trim()
+                .eq_ignore_ascii_case(identity.display_name().trim())
+    });
+    match (targets.next(), targets.next()) {
+        (Some(row), None) => Ok(row.masters),
+        _ => Err(
+            crate::tally::approved_import::ApprovedImportAdmissionError::MastersUnconfirmed.into(),
+        ),
+    }
 }
 
 /// The premise of the numbering read, checked against its answer: its rows
@@ -823,6 +893,118 @@ impl TallyRuntime {
                 }
                 .await;
                 result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
+        .await
+    }
+
+    /// The reads a stock-item Create is rechecked on (#1381, slice 5b-3b), made
+    /// in one queued execution with the masters read's brackets, then `recheck`
+    /// on them. In order: the mode probe, Education refused before anything
+    /// else is sent (the read is not measured there); the identity bracket;
+    /// every loaded company's marks, the binding snapshot; the three size
+    /// admissions at the target's own mark in that snapshot
+    /// ([`target_binding_mark`] over the rows `parse_marks` reads from it), so a
+    /// book above an edge sends no collection request; the candidate pair, a
+    /// drifted one refusing before the count is sent, and the company-count
+    /// pair, back to back; the stock-group
+    /// pair; the unit pair; the closing identity and mode brackets; and the
+    /// marks again, last, the aim. Only `recheck`, local work, follows the aim.
+    /// Nothing here sends an import, and no shipped caller reaches it. The
+    /// runtime trusts the rows `parse_marks` returns; the check on them is the
+    /// recheck's own re-derivation of the mark from the binding text.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) async fn read_and_recheck_stock_item<P, R>(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        company_marks_request: crate::tally::agent_read_request::AgentReadRequest,
+        parse_marks: P,
+        recheck: R,
+    ) -> anyhow::Result<()>
+    where
+        P: Fn(&str) -> anyhow::Result<Vec<CompanyMasterMark>>,
+        R: Fn(StockItemRecheckReads) -> anyhow::Result<()>,
+    {
+        use crate::tally::approved_import::ApprovedImportAdmissionError;
+        let _lease = self.begin_ordinary_read(&config)?;
+        let marks_xml = company_marks_request.into_xml();
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, |client| {
+            let (parse_marks, recheck, marks_xml) = (&parse_marks, &recheck, marks_xml.clone());
+            async move {
+                let (profile, _) = observe_read_boundary(&client).await?;
+                if profile == DateBoundaryProfile::EducationRestricted {
+                    return Err(MastersReadError::EducationUnqualified.into());
+                }
+                bracket_verified_company_identity(&client, identity).await?;
+                // As the ledger queue reads its marks: a failed read is the
+                // typed refusal, and nothing was sent.
+                let binding = client
+                    .post_xml_raw(marks_xml.clone())
+                    .await
+                    .map_err(|error| {
+                        unconfirmed_unless_wire_refused(
+                            error,
+                            ApprovedImportAdmissionError::MastersUnconfirmed,
+                        )
+                    })?;
+                let mark = target_binding_mark(&parse_marks(&binding.text)?, identity)?;
+                let candidate_size = StockItemReadSize::new(StockItemReadKind::Candidate, mark)?;
+                let groups_size = StockItemReadSize::new(StockItemReadKind::StockGroups, mark)?;
+                let units_size = StockItemReadSize::new(StockItemReadKind::Units, mark)?;
+                // Nothing between the candidate pair and the count pair, so
+                // the count is of the book the candidate rows were read from as
+                // nearly as two serial reads allow.
+                let candidate_pair = client
+                    .fetch_native_report_paired(render_candidate_stock_items_request(
+                        identity.company_name(),
+                    ))
+                    .await?;
+                // The admission's own drift refusal, taken before the count
+                // pair is sent rather than after it.
+                let (body, encoded_bytes, encoded_sha256) =
+                    candidate_pair.require_stable(PairedReadValidationError::MastersCollection)?;
+                let candidate_pair = NativePairedRead::Stable {
+                    body,
+                    encoded_bytes,
+                    encoded_sha256,
+                };
+                let count_pair = client
+                    .fetch_native_report_paired(render_company_inventory_flags_request(
+                        identity.display_name(),
+                        identity.company_guid_value(),
+                    ))
+                    .await?;
+                let candidate = admit_candidate_stock_item_read(
+                    candidate_size,
+                    identity,
+                    candidate_pair,
+                    count_pair,
+                )?;
+                let support = |kind| render_native_masters_request(kind, identity.display_name());
+                let groups_pair = client
+                    .fetch_native_report_paired(support(NativeMasterKind::StockGroups))
+                    .await?;
+                let groups = admit_stock_groups(groups_size, identity, groups_pair)?;
+                let units_pair = client
+                    .fetch_native_report_paired(support(NativeMasterKind::Units))
+                    .await?;
+                let units = admit_stock_units(units_size, identity, units_pair)?;
+                bracket_verified_company_identity(&client, identity).await?;
+                confirm_read_boundary(&client, profile).await?;
+                let aim = client.post_xml_raw(marks_xml).await.map_err(|error| {
+                    unconfirmed_unless_wire_refused(
+                        error,
+                        ApprovedImportAdmissionError::CompanyScopeUnconfirmed,
+                    )
+                })?;
+                recheck(StockItemRecheckReads {
+                    candidate,
+                    groups,
+                    units,
+                    company_marks_at_binding: binding.text,
+                    company_marks: aim.text,
+                })
             }
         })
         .await

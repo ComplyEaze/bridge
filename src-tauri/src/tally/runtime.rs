@@ -48,9 +48,12 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 
 #[path = "runtime_masters.rs"]
 mod masters;
+#[cfg(test)]
+pub(crate) use masters::StockItemCountMismatch;
 pub(crate) use masters::{
-    AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits, MastersKind, MastersReadError,
-    MastersRows, StockItemReadKind, VoucherNumberingRead,
+    target_binding_mark, AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits,
+    CompanyMasterMark, MastersKind, MastersReadError, MastersRows, StockItemReadKind,
+    StockItemRecheckReads, VoucherNumberingRead,
 };
 
 #[cfg(test)]

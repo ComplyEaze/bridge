@@ -1136,21 +1136,76 @@ fn stock_recheck_reuses_the_typed_aim_refusals() {
 
 #[test]
 fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
-    use std::collections::BTreeSet;
+    use std::collections::BTreeMap;
     use std::fs;
     use std::path::{Path, PathBuf};
 
-    fn scan(
-        directory: &Path,
-        root: &Path,
-        owners: &BTreeSet<PathBuf>,
-        visited: &mut usize,
-        problems: &mut Vec<String>,
-    ) {
+    // Each entry point with the exact number of times each production file may
+    // name it: its definition, its doc links and its one designed caller. Every
+    // other production file must not name it, and one more naming in an owner
+    // file (a new caller there) fails as well.
+    const ALLOWED: &[(&str, &[(&str, usize)])] = &[
+        (
+            "admit_candidate_stock_item_read",
+            &[("tally/runtime_masters.rs", 4)],
+        ),
+        ("admit_stock_groups", &[("tally/runtime_masters.rs", 2)]),
+        ("admit_stock_units", &[("tally/runtime_masters.rs", 2)]),
+        ("StockItemReadSize", &[("tally/runtime_masters.rs", 9)]),
+        (
+            "recheck_stock_item_admission",
+            &[("agent_master_post.rs", 3)],
+        ),
+        (
+            "CompleteStockItemCatalogue",
+            &[
+                ("agent_master_post.rs", 3),
+                ("tally/stock_item_create.rs", 2),
+            ],
+        ),
+        (
+            "new_admitted",
+            &[
+                ("agent_master_post.rs", 1),
+                ("tally/stock_item_create.rs", 1),
+            ],
+        ),
+        (
+            "read_and_recheck_stock_item",
+            &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 4)],
+        ),
+        ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
+        (
+            "StockItemRecheckReads",
+            &[
+                ("agent_master_post.rs", 2),
+                ("tally/runtime.rs", 1),
+                ("tally/runtime_masters.rs", 4),
+            ],
+        ),
+        (
+            "target_binding_mark",
+            &[
+                ("agent_master_post.rs", 4),
+                ("tally/runtime.rs", 1),
+                ("tally/runtime_masters.rs", 4),
+            ],
+        ),
+        (
+            "CompanyMasterMark",
+            &[
+                ("agent_master_post.rs", 3),
+                ("tally/runtime.rs", 1),
+                ("tally/runtime_masters.rs", 3),
+            ],
+        ),
+    ];
+
+    fn scan(directory: &Path, root: &Path, sources: &mut BTreeMap<PathBuf, String>) {
         for entry in fs::read_dir(directory).expect("the source directory is readable") {
             let path = entry.expect("a source directory entry").path();
             if path.is_dir() {
-                scan(&path, root, owners, visited, problems);
+                scan(&path, root, sources);
                 continue;
             }
             let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
@@ -1163,42 +1218,35 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             {
                 continue;
             }
-            let relative = path.strip_prefix(root).unwrap().to_path_buf();
-            *visited += 1;
-            if owners.contains(&relative) {
-                continue;
-            }
             let source = fs::read_to_string(&path).expect("a production source is readable");
-            for identifier in [
-                "admit_candidate_stock_item_read",
-                "admit_stock_groups",
-                "admit_stock_units",
-                "StockItemReadSize",
-                "recheck_stock_item_admission",
-                "CompleteStockItemCatalogue",
-                "new_admitted",
-            ] {
-                if source.contains(identifier) {
-                    problems.push(format!("{} names {identifier}", relative.display()));
-                }
-            }
+            sources.insert(path.strip_prefix(root).unwrap().to_path_buf(), source);
         }
     }
 
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let owners = [
-        "tally/runtime_masters.rs",
-        "tally/runtime.rs",
-        "tally/stock_item_create.rs",
-        "agent_master_post.rs",
-    ]
-    .into_iter()
-    .map(PathBuf::from)
-    .collect::<BTreeSet<_>>();
-    let mut visited = 0;
+    let mut sources = BTreeMap::new();
+    scan(&root, &root, &mut sources);
+    assert!(
+        sources.len() >= 100,
+        "the scan read only {} source files",
+        sources.len()
+    );
     let mut problems = Vec::new();
-    scan(&root, &root, &owners, &mut visited, &mut problems);
-    assert!(visited >= 100, "the scan read only {visited} source files");
+    for (identifier, owners) in ALLOWED {
+        for (path, source) in &sources {
+            let found = source.matches(identifier).count();
+            let allowed = owners
+                .iter()
+                .find(|(owner, _)| Path::new(owner) == path)
+                .map_or(0, |(_, count)| *count);
+            if found != allowed {
+                problems.push(format!(
+                    "{} names {identifier} {found} times, not {allowed}",
+                    path.display()
+                ));
+            }
+        }
+    }
     // This lexical guard is not macro-proof and does not replace the old seam gate.
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
@@ -1418,4 +1466,401 @@ fn an_admitted_draft_refuses_support_reads_of_another_company() {
         GoodsSibling::from_sibling(SiblingGst::named(complete.catalogue(), &source).unwrap())
             .unwrap();
     assert!(StockItemDraft::new_admitted(name, sibling, &groups, &units).is_ok());
+}
+
+/// The stock coordinator ([`recheck_shown_stock_item`]) against a Tally double
+/// that answers with captures of one synthetic book, the shape lab. Its item
+/// and company-count answers are 5b-3a's pairing: one book's answers at
+/// different capture times (14 Oct and 1 Oct 2026), not one sitting, and no
+/// same-sitting count of the R1 book exists. The candidate answer the double
+/// gives is the shape lab's baseline short stock-item read, not the HSN/GST
+/// list `render_candidate_stock_items_request` asks for (the request bytes are
+/// that builder's; the answer is not its shape), so that response shape is
+/// never answered in these tests. No draft can be built from the short read,
+/// so no run here passes the recheck: a run whose reads all admit and whose aim
+/// matches refuses at the recheck's sibling step, after its company, aim,
+/// sized-mark and name checks; every other run refuses where its test says.
+mod coordinator {
+    use super::*;
+    use crate::tally::connection::PairedReadValidationError;
+    use crate::tally::runtime::{MastersReadError, StockItemCountMismatch};
+    use crate::tally::stock_item_create::StockItemCatalogue;
+    use bridge_tally_protocol::native_masters::render_candidate_stock_items_request;
+    use quick_xml::events::Event;
+    use tally_protocol_simulator::{
+        Fixture, ObservedRequest, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator,
+        WireEncoding,
+    };
+
+    const SHAPE_COMPANIES: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/note-days/shape_lab_company_list_response.utf16le.xml"
+    );
+    const SHAPE_MARKS: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/note-days/shape_lab_company_marks_response.utf16le.xml"
+    );
+    const SHAPE_ITEMS: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml"
+    );
+    const SHAPE_COUNT: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml"
+    );
+    const SHAPE_GROUPS: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
+    );
+    const SHAPE_UNITS: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/masters_units_shape_lab_live.utf16le.xml"
+    );
+    const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+    const SHAPE_MARK: &str = "<ALTMSTID TYPE=\"Number\"> 289</ALTMSTID>";
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Sent {
+        Health,
+        Companies,
+        Marks,
+        Candidate,
+        Count,
+        StockGroups,
+        Units,
+    }
+    use Sent::{Candidate, Companies, Count, Health, Marks, StockGroups, Units};
+
+    /// The whole exchange: opening mode and identity, the binding marks, four
+    /// pairs (each with a health check after each send), the closing identity
+    /// and mode, and the aim marks last.
+    #[rustfmt::skip]
+    const EVERY_READ: [Sent; 24] = [
+        Health, Companies, Companies, Marks,
+        Candidate, Health, Candidate, Health, Count, Health, Count, Health,
+        StockGroups, Health, StockGroups, Health, Units, Health, Units, Health,
+        Companies, Health, Companies, Marks,
+    ];
+
+    /// The text of the header element `tag` of one request, parsed.
+    fn header(body: &str, tag: &[u8]) -> String {
+        let mut reader = quick_xml::Reader::from_str(body);
+        let mut path = Vec::<Vec<u8>>::new();
+        loop {
+            match reader.read_event().expect("the request is well-formed XML") {
+                Event::Start(event) => {
+                    let name = event.name().as_ref().as_bytes().to_vec();
+                    if path == [b"ENVELOPE".to_vec(), b"HEADER".to_vec()] && name == tag {
+                        return reader.read_text(event.name()).unwrap().trim().to_string();
+                    }
+                    path.push(name);
+                }
+                Event::End(_) => {
+                    path.pop();
+                }
+                Event::Eof => panic!("the request has no header element"),
+                _ => {}
+            }
+        }
+    }
+
+    /// Each request the double received, by its parsed header. Every POST must
+    /// be an Export of one of the coordinator's six requests: an import, a
+    /// Create or any other request fails the test here.
+    fn sent(observed: &[ObservedRequest]) -> Vec<Sent> {
+        observed
+            .iter()
+            .map(|request| {
+                if request.method == "GET" {
+                    return Health;
+                }
+                let body = stock_capture(&request.request_body);
+                let body = body.trim_start_matches('\u{feff}');
+                assert_eq!(header(body, b"TALLYREQUEST"), "Export");
+                match header(body, b"ID").as_str() {
+                    "BridgeCompanyExtent" => Companies,
+                    "Bridge Agent Company High Water" => Marks,
+                    "Bridge Master Stock Items" => Candidate,
+                    "BridgeCompanyBookExtentV2" => Count,
+                    "Bridge Master Stock Groups" => StockGroups,
+                    "Bridge Master Units" => Units,
+                    other => panic!("the coordinator sent an unexpected request: {other}"),
+                }
+            })
+            .collect()
+    }
+
+    fn answer(body: String) -> ScenarioPlan {
+        ScenarioPlan::new(Fixture::SyntheticXml(body))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_framing(ResponseFraming::ContentLength)
+    }
+
+    fn health() -> ScenarioPlan {
+        ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
+    }
+
+    fn marks_at(mark: u64) -> String {
+        let marks = stock_capture(SHAPE_MARKS);
+        assert_eq!(marks.matches(SHAPE_MARK).count(), 1);
+        // A mark other than 289 is a constructed vector, not a capture.
+        marks.replace(
+            SHAPE_MARK,
+            &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>"),
+        )
+    }
+
+    /// The opening requests' answers up to the binding marks: all a run that
+    /// refuses at its size admission is sent.
+    fn through_binding(binding: String) -> Vec<ScenarioPlan> {
+        let companies = answer(stock_capture(SHAPE_COMPANIES));
+        vec![health(), companies.clone(), companies, answer(binding)]
+    }
+
+    /// One paired read's answers: the first, a health check, the second and a
+    /// health check.
+    fn pair(first: String, second: String) -> [ScenarioPlan; 4] {
+        [answer(first), health(), answer(second), health()]
+    }
+
+    fn every_answer(binding: String, aim: String) -> Vec<ScenarioPlan> {
+        let mut plans = through_binding(binding);
+        for capture in [SHAPE_ITEMS, SHAPE_COUNT, SHAPE_GROUPS, SHAPE_UNITS] {
+            plans.extend(pair(stock_capture(capture), stock_capture(capture)));
+        }
+        let companies = answer(stock_capture(SHAPE_COMPANIES));
+        plans.extend([companies.clone(), health(), companies, answer(aim)]);
+        plans
+    }
+
+    fn shape_identity() -> VerifiedCompanyIdentity {
+        let companies =
+            bridge_tally_protocol::parse_companies_from_collection(&stock_capture(SHAPE_COMPANIES))
+                .unwrap();
+        let row = &companies[0];
+        VerifiedCompanyIdentity::from_observed_companies(
+            row.name.clone(),
+            crate::tally::test_company_guid(SHAPE_GUID),
+            row.company_number.clone().unwrap(),
+            row.books_from.clone().unwrap(),
+            &companies,
+        )
+        .unwrap()
+    }
+
+    /// Runs the coordinator for the R1 draft, rebound to the shape lab's
+    /// identity (a constructed GUID swap) so its company is the double's.
+    async fn run(plans: Vec<ScenarioPlan>) -> (anyhow::Result<()>, Vec<Sent>) {
+        let identity = shape_identity();
+        let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
+        let catalogue = StockItemCatalogue::from_candidate_read(&identity, &r1(STOCK_BEFORE))
+            .expect("the rebound R1 read catalogues");
+        let shown = ShownDraft::from_draft(stock_test_draft(
+            &catalogue,
+            STOCK_PROPOSED,
+            STOCK_SOURCE,
+            &r1(STOCK_GROUPS),
+            &r1(STOCK_UNITS),
+        ));
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let result = recheck_shown_stock_item(&TallyRuntime::default(), config, &shown).await;
+        let observed = simulator.finish().unwrap();
+        let candidate = bridge_tally_protocol::sha256_hex(
+            &bridge_tally_protocol::encode_tally_xml_request_utf16le(
+                &render_candidate_stock_items_request(identity.company_name()),
+            ),
+        );
+        let sent = sent(&observed);
+        for (request, kind) in observed.iter().zip(&sent) {
+            if *kind == Candidate {
+                assert_eq!(
+                    request.request_body_sha256, candidate,
+                    "the candidate builder's bytes"
+                );
+            }
+        }
+        (result, sent)
+    }
+
+    fn refused_at_the_sibling(result: anyhow::Result<()>) {
+        assert_stock_recheck_refusal(result, |error| {
+            matches!(
+                error,
+                StockItemRecheckError::Sibling(SiblingRefusal::NotFound)
+            )
+        });
+    }
+
+    #[tokio::test]
+    async fn the_coordinator_makes_every_read_in_order_and_rechecks_on_them_after_the_aim() {
+        let (result, sent) = run(every_answer(marks_at(289), marks_at(289))).await;
+        refused_at_the_sibling(result);
+        assert_eq!(sent, EVERY_READ);
+    }
+
+    #[tokio::test]
+    async fn education_is_refused_before_identity_or_any_stock_read() {
+        // The mode probe is a health check and the company list; EDUMODE Yes
+        // is a constructed edit of the captured list.
+        let education = stock_capture(SHAPE_COMPANIES).replace(
+            "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
+            "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
+        );
+        let (result, sent) = run(vec![health(), answer(education)]).await;
+        let error = result.expect_err("Education refuses");
+        assert!(matches!(
+            error.downcast_ref::<MastersReadError>(),
+            Some(MastersReadError::EducationUnqualified)
+        ));
+        assert_eq!(sent, [Health, Companies]);
+    }
+
+    #[tokio::test]
+    async fn a_binding_mark_past_the_candidate_edge_sends_no_candidate_request() {
+        let (result, sent) = run(through_binding(marks_at(490))).await;
+        let error = result.expect_err("mark 490 refuses before the candidate pair");
+        assert!(matches!(
+            error.downcast_ref::<MastersReadError>(),
+            Some(MastersReadError::TooLarge {
+                master_alter_id: 490,
+                limit_master_alter_id: 489,
+                ..
+            })
+        ));
+        assert_eq!(sent, [Health, Companies, Companies, Marks]);
+        assert_eq!(sent.iter().filter(|kind| **kind == Candidate).count(), 0);
+
+        let (result, sent) = run(every_answer(marks_at(489), marks_at(489))).await;
+        refused_at_the_sibling(result);
+        assert_eq!(sent.iter().filter(|kind| **kind == Candidate).count(), 2);
+    }
+
+    #[tokio::test]
+    async fn the_reads_are_sized_at_the_target_row_not_a_same_guid_sibling() {
+        // Constructed rows: a loaded company sharing the target's GUID under
+        // another name, its mark past every edge, first in the snapshot.
+        let sibling = format!(
+            "<COMPANY NAME=\"BRIDGE SHAPE LAB COPY\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{SHAPE_GUID}</GUID><ALTMSTID TYPE=\"Number\"> 5000</ALTMSTID></COMPANY>"
+        );
+        let with_sibling = stock_capture(SHAPE_MARKS).replacen(
+            "<COMPANY NAME=",
+            &format!("{sibling}<COMPANY NAME="),
+            1,
+        );
+        let (result, sent) = run(every_answer(with_sibling, marks_at(289))).await;
+        refused_at_the_sibling(result);
+        assert_eq!(sent, EVERY_READ);
+
+        let target = stock_capture(SHAPE_MARKS);
+        let start = target.find("<COMPANY NAME=").unwrap();
+        let end = start + target[start..].find("</COMPANY>").unwrap() + "</COMPANY>".len();
+        let twice = target.replacen(&target[start..end], &target[start..end].repeat(2), 1);
+        let (result, sent) = run(through_binding(twice)).await;
+        let error = result.expect_err("two target rows size nothing");
+        assert!(matches!(
+            error.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersUnconfirmed)
+        ));
+        assert_eq!(sent, [Health, Companies, Companies, Marks]);
+    }
+
+    #[tokio::test]
+    async fn a_master_mark_moved_by_the_aim_refuses_the_recheck() {
+        let (result, sent) = run(every_answer(marks_at(289), marks_at(290))).await;
+        let error = result.expect_err("a moved mark refuses");
+        assert!(matches!(
+            error.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersMoved)
+        ));
+        assert_eq!(sent, EVERY_READ);
+    }
+
+    #[tokio::test]
+    async fn a_binding_snapshot_without_the_target_row_sizes_nothing() {
+        // Constructed rows in place of the captured target row: another
+        // company's (the stock lab book's name and GUID), then one with the
+        // target's GUID under another name only.
+        let target = stock_capture(SHAPE_MARKS);
+        let start = target.find("<COMPANY NAME=").unwrap();
+        let end = start + target[start..].find("</COMPANY>").unwrap() + "</COMPANY>".len();
+        for row in [
+            format!("<COMPANY NAME=\"BRIDGE STOCK CREATE LAB\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{STOCK_GUID}</GUID><ALTMSTID TYPE=\"Number\"> 289</ALTMSTID></COMPANY>"),
+            format!("<COMPANY NAME=\"BRIDGE SHAPE LAB COPY\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{SHAPE_GUID}</GUID><ALTMSTID TYPE=\"Number\"> 289</ALTMSTID></COMPANY>"),
+        ] {
+            let without_target = target.replacen(&target[start..end], &row, 1);
+            let (result, sent) = run(through_binding(without_target)).await;
+            let error = result.expect_err("a snapshot without the target sizes nothing");
+            assert!(matches!(
+                error.downcast_ref::<ApprovedImportAdmissionError>(),
+                Some(ApprovedImportAdmissionError::MastersUnconfirmed)
+            ));
+            assert_eq!(sent, [Health, Companies, Companies, Marks]);
+        }
+    }
+
+    #[tokio::test]
+    async fn an_aim_answer_that_is_not_a_success_envelope_is_unconfirmed() {
+        // A constructed edit of the captured marks: STATUS 0, not a success.
+        let failed = marks_at(289).replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+        assert_ne!(failed, marks_at(289));
+        let (result, sent) = run(every_answer(marks_at(289), failed)).await;
+        let error = result.expect_err("an aim Bridge cannot read refuses");
+        assert!(matches!(
+            error.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
+        ));
+        assert_eq!(sent, EVERY_READ);
+    }
+
+    #[tokio::test]
+    async fn a_drifted_candidate_pair_refuses_before_the_count_is_sent() {
+        // A constructed edit: the second candidate answer renames one item.
+        let items = stock_capture(SHAPE_ITEMS);
+        let moved = items.replacen("\"Label Roll\"", "\"Label Rolls\"", 1);
+        assert_ne!(moved, items);
+        let mut plans = through_binding(marks_at(289));
+        plans.extend(pair(items, moved));
+        let (result, sent) = run(plans).await;
+        let error = result.expect_err("a drifted candidate pair refuses");
+        assert!(matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<PairedReadValidationError>()),
+            Some(PairedReadValidationError::MastersCollection)
+        ));
+        assert_eq!(
+            sent,
+            [Health, Companies, Companies, Marks, Candidate, Health, Candidate, Health]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_count_that_differs_from_the_candidate_rows_refuses_before_the_support_reads() {
+        // A constructed edit: the captured count reports 12 items, not 11.
+        let count = stock_capture(SHAPE_COUNT);
+        let reported = "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>";
+        assert_eq!(count.matches(reported).count(), 1);
+        let twelve = count.replace(
+            reported,
+            "<NUMSTOCKITEMS TYPE=\"Number\"> 12</NUMSTOCKITEMS>",
+        );
+        let mut plans = through_binding(marks_at(289));
+        plans.extend(pair(stock_capture(SHAPE_ITEMS), stock_capture(SHAPE_ITEMS)));
+        plans.extend(pair(twelve.clone(), twelve));
+        let (result, sent) = run(plans).await;
+        let error = result.expect_err("a count that differs from the rows refuses");
+        assert_eq!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<StockItemCountMismatch>()),
+            Some(&StockItemCountMismatch {
+                rows: 11,
+                tally_count: 12,
+            })
+        );
+        #[rustfmt::skip]
+        let expected = [
+            Health, Companies, Companies, Marks,
+            Candidate, Health, Candidate, Health, Count, Health, Count, Health,
+        ];
+        assert_eq!(sent, expected);
+    }
 }

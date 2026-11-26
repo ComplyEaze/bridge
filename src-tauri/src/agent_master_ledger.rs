@@ -66,6 +66,11 @@
 //!   boundary reads as a shorter, valid journal: whole trailing records lost to a
 //!   crash or a restore are not detectable here.
 //!
+//! Each kind of master write has a journal file of its own, named by its
+//! [`JournalBatch`]: a build that predates a kind never opens that kind's file,
+//! so a line it does not know cannot stop the kinds it does. One admission lock
+//! serves every kind.
+//!
 //! Reuse: bounded record reading ([`ledger::read_record`]), the append that
 //! syncs and truncates a failed write back ([`append_private_import_ledger`]),
 //! the owner-only file mode ([`set_private_file`]), the batch-id validator
@@ -76,13 +81,16 @@ use super::persistence::{self, RecordOnce};
 use super::{append_private_import_ledger, set_private_file, valid_batch_id};
 use crate::agent::{local_file, sha256_hex};
 use bridge_tally_core::master_binding::{absence_key, canonical_master_key, MasterNameKeys};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Debug;
 use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-const JOURNAL_FILE: &str = "agent-master-ledger.jsonl";
+/// The ledger journal's file.
+const JOURNAL_FILE: &str = <MasterBatch as JournalBatch>::JOURNAL_FILE;
 const PRE_IMAGE_PREFIX: &str = "master-pre-image-";
 
 /// Proof that the import admission lock is held exclusively. Built only by
@@ -201,6 +209,35 @@ pub(super) struct MasterBatch {
     pub(super) items: Vec<StoredLedgerCreate>,
 }
 
+/// A batch of one kind of master write, as its journal records it: the file
+/// that kind's journal is, the checks a batch line must pass, and the ids,
+/// names and company the journal's own rules read. The journal, its records,
+/// their admission and the pre-image sidecar are generic over it.
+pub(super) trait JournalBatch:
+    Clone + Debug + PartialEq + Eq + Serialize + DeserializeOwned
+{
+    /// The journal file of this kind, in the data directory.
+    const JOURNAL_FILE: &'static str;
+
+    fn validate(&self) -> Result<(), Invalid>;
+
+    fn batch_id(&self) -> &str;
+
+    fn batch_sha256(&self) -> &str;
+
+    /// The company the batch writes into.
+    fn company_guid(&self) -> &str;
+
+    /// The names of the masters the batch writes, in order: what an intent
+    /// records and the open-dispatch overlap compares.
+    fn names(&self) -> Vec<&str>;
+}
+
+/// The items of an intent for `batch`: its names, in order.
+fn intent_items<B: JournalBatch>(batch: &B) -> Vec<IntentItem> {
+    batch.names().into_iter().map(IntentItem::of).collect()
+}
+
 /// What the intent records of one item, so a later read can look for it again.
 /// Built only from a batch name ([`IntentItem::of`]). A key read back from disk
 /// is not checked against the name; it is used only to add an overlap refusal
@@ -265,24 +302,20 @@ pub(super) struct MasterDispatchIntent {
 impl MasterDispatchIntent {
     /// The intent of `batch`, bound to the sidecar `pre_image` was written for.
     /// Its items are the batch's names, in order.
-    pub(super) fn new(
-        batch: &MasterBatch,
+    pub(super) fn new<B: JournalBatch>(
+        batch: &B,
         native_request_sha256: String,
         pre_image: WrittenPreImage,
         pre_post_master_marks: Vec<MasterMark>,
     ) -> Result<Self, PreImageError> {
-        if pre_image.batch_id != batch.batch_id {
+        if pre_image.batch_id != batch.batch_id() {
             return Err(PreImageError::OtherBatch);
         }
         Ok(Self {
-            batch_id: batch.batch_id.clone(),
-            batch_sha256: batch.batch_sha256.clone(),
+            batch_id: batch.batch_id().to_owned(),
+            batch_sha256: batch.batch_sha256().to_owned(),
             native_request_sha256,
-            items: batch
-                .items
-                .iter()
-                .map(|item| IntentItem::of(&item.name))
-                .collect(),
+            items: intent_items(batch),
             pre_image_sha256: pre_image.sha256,
             pre_image_count: pre_image.count,
             pre_post_master_marks,
@@ -417,9 +450,9 @@ pub(super) struct MasterVerdict {
 /// kind is a compile error until each decision site handles it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "record_type")]
-pub(super) enum MasterRecord {
+pub(super) enum JournalRecord<B> {
     #[serde(rename = "master_batch")]
-    Batch(MasterBatch),
+    Batch(B),
     #[serde(rename = "master_dispatch_intent")]
     DispatchIntent(MasterDispatchIntent),
     #[serde(rename = "master_dispatch_response")]
@@ -427,6 +460,9 @@ pub(super) enum MasterRecord {
     #[serde(rename = "master_verdict")]
     Verdict(MasterVerdict),
 }
+
+/// A line of the ledger journal.
+pub(super) type MasterRecord = JournalRecord<MasterBatch>;
 
 /// The shape of an intent on disk. Private, so deserialising one is possible
 /// only here.
@@ -445,9 +481,9 @@ struct IntentWire {
 /// A journal line as it is read.
 #[derive(Deserialize)]
 #[serde(tag = "record_type")]
-enum RecordWire {
+enum RecordWire<B> {
     #[serde(rename = "master_batch")]
-    Batch(MasterBatch),
+    Batch(B),
     #[serde(rename = "master_dispatch_intent")]
     DispatchIntent(IntentWire),
     #[serde(rename = "master_dispatch_response")]
@@ -457,10 +493,10 @@ enum RecordWire {
 }
 
 /// Parse one journal line. The result is not yet admitted.
-fn parse_record(text: &str) -> Result<MasterRecord, serde_json::Error> {
-    Ok(match serde_json::from_str::<RecordWire>(text)? {
-        RecordWire::Batch(record) => MasterRecord::Batch(record),
-        RecordWire::DispatchIntent(wire) => MasterRecord::DispatchIntent(MasterDispatchIntent {
+fn parse_record<B: JournalBatch>(text: &str) -> Result<JournalRecord<B>, serde_json::Error> {
+    Ok(match serde_json::from_str::<RecordWire<B>>(text)? {
+        RecordWire::Batch(record) => JournalRecord::Batch(record),
+        RecordWire::DispatchIntent(wire) => JournalRecord::DispatchIntent(MasterDispatchIntent {
             batch_id: wire.batch_id,
             batch_sha256: wire.batch_sha256,
             native_request_sha256: wire.native_request_sha256,
@@ -469,12 +505,12 @@ fn parse_record(text: &str) -> Result<MasterRecord, serde_json::Error> {
             pre_image_count: wire.pre_image_count,
             pre_post_master_marks: wire.pre_post_master_marks,
         }),
-        RecordWire::DispatchResponse(record) => MasterRecord::DispatchResponse(record),
-        RecordWire::Verdict(record) => MasterRecord::Verdict(record),
+        RecordWire::DispatchResponse(record) => JournalRecord::DispatchResponse(record),
+        RecordWire::Verdict(record) => JournalRecord::Verdict(record),
     })
 }
 
-impl MasterRecord {
+impl<B: JournalBatch> JournalRecord<B> {
     /// Whether this is a dispatch intent, the record whose durability the
     /// refusal to send twice rests on.
     fn is_dispatch_intent(&self) -> bool {
@@ -498,7 +534,7 @@ impl MasterRecord {
 
     pub(super) fn batch_id(&self) -> &str {
         match self {
-            Self::Batch(record) => &record.batch_id,
+            Self::Batch(record) => record.batch_id(),
             Self::DispatchIntent(record) => &record.batch_id,
             Self::DispatchResponse(record) => &record.batch_id,
             Self::Verdict(record) => &record.batch_id,
@@ -507,7 +543,7 @@ impl MasterRecord {
 
     pub(super) fn batch_sha256(&self) -> &str {
         match self {
-            Self::Batch(record) => &record.batch_sha256,
+            Self::Batch(record) => record.batch_sha256(),
             Self::DispatchIntent(record) => &record.batch_sha256,
             Self::DispatchResponse(record) => &record.batch_sha256,
             Self::Verdict(record) => &record.batch_sha256,
@@ -662,7 +698,9 @@ impl StoredLedgerCreate {
     }
 }
 
-impl MasterBatch {
+impl JournalBatch for MasterBatch {
+    const JOURNAL_FILE: &'static str = "agent-master-ledger.jsonl";
+
     fn validate(&self) -> Result<(), Invalid> {
         check_ids(&self.batch_id, &self.batch_sha256)?;
         let MasterCompany {
@@ -693,6 +731,18 @@ impl MasterBatch {
         match self.class {
             MasterClass::LedgerCreate => Ok(()),
         }
+    }
+
+    fn batch_id(&self) -> &str {
+        &self.batch_id
+    }
+
+    fn batch_sha256(&self) -> &str {
+        &self.batch_sha256
+    }
+
+    fn company_guid(&self) -> &str {
+        &self.company.guid
     }
 
     fn names(&self) -> Vec<&str> {
@@ -834,7 +884,7 @@ impl MasterVerdict {
     }
 }
 
-impl MasterRecord {
+impl<B: JournalBatch> JournalRecord<B> {
     fn validate(&self) -> Result<(), Invalid> {
         match self {
             Self::Batch(record) => record.validate(),
@@ -856,15 +906,18 @@ pub(super) struct MasterSummary {
 
 /// Everything the journal holds about one batch.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct BatchState {
-    pub(super) batch: MasterBatch,
+pub(super) struct JournalBatchState<B> {
+    pub(super) batch: B,
     pub(super) intent: Option<MasterDispatchIntent>,
     pub(super) response: Option<MasterDispatchResponse>,
     /// The latest verdict; once it is terminal, the last.
     pub(super) verdict: Option<MasterVerdict>,
 }
 
-impl BatchState {
+/// Everything the ledger journal holds about one batch.
+pub(super) type BatchState = JournalBatchState<MasterBatch>;
+
+impl<B> JournalBatchState<B> {
     /// Whether a terminal verdict has settled the batch's outcome.
     pub(super) fn is_settled(&self) -> bool {
         self.verdict
@@ -883,13 +936,24 @@ pub(super) struct BlockingBatch {
 }
 
 /// The admitted journal: per-batch state, built record by record.
-#[derive(Debug, Default)]
-pub(super) struct MasterJournal {
-    batches: BTreeMap<String, BatchState>,
+#[derive(Debug)]
+pub(super) struct Journal<B> {
+    batches: BTreeMap<String, JournalBatchState<B>>,
 }
 
-impl MasterJournal {
-    pub(super) fn state(&self, batch_id: &str) -> Option<&BatchState> {
+/// The admitted ledger journal.
+pub(super) type MasterJournal = Journal<MasterBatch>;
+
+impl<B> Default for Journal<B> {
+    fn default() -> Self {
+        Self {
+            batches: BTreeMap::new(),
+        }
+    }
+}
+
+impl<B: JournalBatch> Journal<B> {
+    pub(super) fn state(&self, batch_id: &str) -> Option<&JournalBatchState<B>> {
         self.batches.get(batch_id)
     }
 
@@ -927,12 +991,12 @@ impl MasterJournal {
 
     /// The state of the batch a record belongs to, if that batch is introduced
     /// and the record carries its digest.
-    fn batch_of(&self, record: &MasterRecord) -> Result<&BatchState, Invalid> {
+    fn batch_of(&self, record: &JournalRecord<B>) -> Result<&JournalBatchState<B>, Invalid> {
         let state = self
             .batches
             .get(record.batch_id())
             .ok_or(Invalid::NoBatch)?;
-        if state.batch.batch_sha256 != record.batch_sha256() {
+        if state.batch.batch_sha256() != record.batch_sha256() {
             return Err(Invalid::ShaMismatch);
         }
         Ok(state)
@@ -964,8 +1028,8 @@ impl MasterJournal {
                 })
             })
             .map(|state| BlockingBatch {
-                batch_id: state.batch.batch_id.clone(),
-                company_guid: state.batch.company.guid.clone(),
+                batch_id: state.batch.batch_id().to_owned(),
+                company_guid: state.batch.company_guid().to_owned(),
             })
             .collect()
     }
@@ -974,13 +1038,8 @@ impl MasterJournal {
     /// journal applies when the intent is appended. The post refuses on it
     /// before the dialog and names the batches from it; the refusal that
     /// decides is the one under the exclusive lock.
-    pub(super) fn open_dispatch_blockers(&self, batch: &MasterBatch) -> Vec<BlockingBatch> {
-        let items = batch
-            .items
-            .iter()
-            .map(|item| IntentItem::of(&item.name))
-            .collect::<Vec<_>>();
-        self.overlaps_open_dispatch(&batch.batch_id, &items)
+    pub(super) fn open_dispatch_blockers(&self, batch: &B) -> Vec<BlockingBatch> {
+        self.overlaps_open_dispatch(batch.batch_id(), &intent_items(batch))
     }
 
     /// Every refusal the journal would raise for a dispatch intent of the batch
@@ -1000,7 +1059,7 @@ impl MasterJournal {
             .batches
             .get(batch_id)
             .ok_or(MasterLedgerError::Invalid(Invalid::NoBatch))?;
-        if state.batch.batch_sha256 != batch_sha256 {
+        if state.batch.batch_sha256() != batch_sha256 {
             return Err(MasterLedgerError::Invalid(Invalid::ShaMismatch));
         }
         if state.intent.is_some() {
@@ -1015,7 +1074,7 @@ impl MasterJournal {
         }
         if !marks
             .iter()
-            .any(|mark| mark.company_guid == state.batch.company.guid)
+            .any(|mark| mark.company_guid == state.batch.company_guid())
         {
             return Err(MasterLedgerError::Invalid(Invalid::MarksMissing));
         }
@@ -1032,30 +1091,30 @@ impl MasterJournal {
     /// name; the append checks again.
     pub(super) fn check_intent_admissible(
         &self,
-        batch: &MasterBatch,
+        batch: &B,
         marks: &[MasterMark],
     ) -> Result<(), MasterLedgerError> {
-        let items = batch
-            .items
-            .iter()
-            .map(|item| IntentItem::of(&item.name))
-            .collect::<Vec<_>>();
-        self.intent_refusal(&batch.batch_id, &batch.batch_sha256, &items, marks)
+        self.intent_refusal(
+            batch.batch_id(),
+            batch.batch_sha256(),
+            &intent_items(batch),
+            marks,
+        )
     }
 
     /// Admit one record, or refuse it and leave the journal as it was.
-    pub(super) fn admit(&mut self, record: MasterRecord) -> Result<(), MasterLedgerError> {
+    pub(super) fn admit(&mut self, record: JournalRecord<B>) -> Result<(), MasterLedgerError> {
         record.validate().map_err(MasterLedgerError::Invalid)?;
         match &record {
-            MasterRecord::Batch(batch) => {
+            JournalRecord::Batch(batch) => {
                 // A batch id is introduced once. The same batch again is
                 // refused too: the caller reads the state instead of writing.
-                if self.batches.contains_key(&batch.batch_id) {
+                if self.batches.contains_key(batch.batch_id()) {
                     return Err(MasterLedgerError::Invalid(Invalid::BatchIdReused));
                 }
                 self.batches.insert(
-                    batch.batch_id.clone(),
-                    BatchState {
+                    batch.batch_id().to_owned(),
+                    JournalBatchState {
                         batch: batch.clone(),
                         intent: None,
                         response: None,
@@ -1064,7 +1123,7 @@ impl MasterJournal {
                 );
                 Ok(())
             }
-            MasterRecord::DispatchIntent(intent) => {
+            JournalRecord::DispatchIntent(intent) => {
                 self.intent_refusal(
                     &intent.batch_id,
                     &intent.batch_sha256,
@@ -1076,7 +1135,7 @@ impl MasterJournal {
                 }
                 Ok(())
             }
-            MasterRecord::DispatchResponse(response) => {
+            JournalRecord::DispatchResponse(response) => {
                 let state = self.batch_of(&record).map_err(MasterLedgerError::Invalid)?;
                 if state.intent.is_none() {
                     return Err(MasterLedgerError::Invalid(Invalid::ResponseWithoutIntent));
@@ -1089,7 +1148,7 @@ impl MasterJournal {
                 }
                 Ok(())
             }
-            MasterRecord::Verdict(verdict) => {
+            JournalRecord::Verdict(verdict) => {
                 let state = self.batch_of(&record).map_err(MasterLedgerError::Invalid)?;
                 if state.intent.is_none() {
                     return Err(MasterLedgerError::Invalid(Invalid::VerdictWithoutIntent));
@@ -1152,15 +1211,20 @@ fn read_error(code: String) -> MasterLedgerError {
     }
 }
 
-fn journal_path(data_dir: &Path) -> PathBuf {
-    data_dir.join(JOURNAL_FILE)
+fn journal_path<B: JournalBatch>(data_dir: &Path) -> PathBuf {
+    data_dir.join(B::JOURNAL_FILE)
 }
 
-/// The admitted journal of `data_dir`; a journal not yet written is empty.
+/// The admitted ledger journal of `data_dir`; a journal not yet written is empty.
 pub(super) fn read_journal(data_dir: &Path) -> Result<MasterJournal, MasterLedgerError> {
-    match local_file::open_local_file(&journal_path(data_dir), false) {
-        Ok(file) => MasterJournal::read(std::io::BufReader::new(file)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(MasterJournal::default()),
+    read_kind_journal(data_dir)
+}
+
+/// The admitted journal of kind `B` in `data_dir`; one not yet written is empty.
+fn read_kind_journal<B: JournalBatch>(data_dir: &Path) -> Result<Journal<B>, MasterLedgerError> {
+    match local_file::open_local_file(&journal_path::<B>(data_dir), false) {
+        Ok(file) => Journal::read(std::io::BufReader::new(file)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Journal::default()),
         Err(_) => Err(MasterLedgerError::Unavailable),
     }
 }
@@ -1191,10 +1255,10 @@ pub(super) fn read_summary(reader: impl BufRead) -> Result<MasterSummary, Master
 /// The state is read afresh on each append, so an earlier append that created the
 /// file and then failed does not excuse a later one.
 /// An intent does not go through here: see [`append_intent`].
-pub(super) fn append(
+pub(super) fn append<B: JournalBatch>(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
-    record: MasterRecord,
+    record: JournalRecord<B>,
 ) -> Result<(), MasterLedgerError> {
     if record.is_dispatch_intent() {
         return Err(MasterLedgerError::UseAppendIntent);
@@ -1291,13 +1355,13 @@ fn append_intent_syncing(
 
 /// [`append`] for any record, with the directory sync given so a test can fail
 /// it.
-fn append_syncing(
+fn append_syncing<B: JournalBatch>(
     data_dir: &Path,
     _lock: &ExclusiveAdmission,
-    record: MasterRecord,
+    record: JournalRecord<B>,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<(), MasterLedgerError> {
-    let path = journal_path(data_dir);
+    let path = journal_path::<B>(data_dir);
     // A journal file that is absent or empty has not yet been made durable by an
     // earlier append that got that far, and an intent must never rest on a file
     // a power failure could take back: sync for either, and for every intent.
@@ -1305,7 +1369,7 @@ fn append_syncing(
         .ok()
         .is_none_or(|meta| meta.len() == 0);
     let sync_after = empty_before || record.is_dispatch_intent();
-    let mut journal = read_journal(data_dir)?;
+    let mut journal = read_kind_journal::<B>(data_dir)?;
     let encoded =
         serde_json::to_string(&record).map_err(|_| MasterLedgerError::SerializationFailed)?;
     let encoded = format!("{encoded}\n");
@@ -1455,10 +1519,10 @@ impl WrittenPreImage {
 /// A sidecar the reader would refuse for its size is never written. One already
 /// there with the same bytes is the same write repeated; with other bytes it is
 /// left alone and refused.
-pub(super) fn write_pre_image(
+pub(super) fn write_pre_image<B: JournalBatch>(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
-    batch: &MasterBatch,
+    batch: &B,
     pre_image: &PreImage,
 ) -> Result<WrittenPreImage, PreImageError> {
     write_pre_image_syncing(data_dir, lock, batch, pre_image, sync_directory)
@@ -1468,14 +1532,14 @@ pub(super) fn write_pre_image(
 /// fails when the sync after a new placement fails, but a sidecar already there
 /// may be an earlier attempt's whose sync failed, so the directory is synced
 /// here as well, whether the sidecar was just placed or was there already.
-fn write_pre_image_syncing(
+fn write_pre_image_syncing<B: JournalBatch>(
     data_dir: &Path,
     _lock: &ExclusiveAdmission,
-    batch: &MasterBatch,
+    batch: &B,
     pre_image: &PreImage,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<WrittenPreImage, PreImageError> {
-    let path = pre_image_path(data_dir, &batch.batch_id)?;
+    let path = pre_image_path(data_dir, batch.batch_id())?;
     let bytes = pre_image.bytes()?;
     if bytes.len() > MAX_RECORD_BYTES {
         return Err(PreImageError::TooLargeToWrite);
@@ -1492,7 +1556,7 @@ fn write_pre_image_syncing(
     }
     sync(data_dir).map_err(|_| PreImageError::DirectorySyncFailed)?;
     Ok(WrittenPreImage {
-        batch_id: batch.batch_id.clone(),
+        batch_id: batch.batch_id().to_owned(),
         sha256: sha256_hex(&bytes),
         count: pre_image.len() as u64,
     })

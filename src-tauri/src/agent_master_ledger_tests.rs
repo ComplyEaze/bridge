@@ -2276,3 +2276,81 @@ fn the_ledger_journal_keeps_its_bytes_through_read_and_append() {
         golden
     );
 }
+
+/// A second batch kind, for these tests only: a file and a batch line of its own.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProbeBatch {
+    batch_id: String,
+    batch_sha256: String,
+    company_guid: String,
+    names: Vec<String>,
+}
+
+impl JournalBatch for ProbeBatch {
+    const JOURNAL_FILE: &'static str = "agent-master-probe.jsonl";
+
+    fn validate(&self) -> Result<(), Invalid> {
+        check_ids(&self.batch_id, &self.batch_sha256)
+    }
+
+    fn batch_id(&self) -> &str {
+        &self.batch_id
+    }
+
+    fn batch_sha256(&self) -> &str {
+        &self.batch_sha256
+    }
+
+    fn company_guid(&self) -> &str {
+        &self.company_guid
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.names.iter().map(String::as_str).collect()
+    }
+}
+
+#[test]
+fn a_second_batch_kind_has_its_own_file_and_neither_journal_reads_the_other() {
+    assert_eq!(JOURNAL_FILE, "agent-master-ledger.jsonl");
+    let directory = tempfile::tempdir().unwrap();
+    let (ledger_path, probe_path) = (
+        directory.path().join("agent-master-ledger.jsonl"),
+        directory.path().join("agent-master-probe.jsonl"),
+    );
+    let lock = lock();
+    let probe = ProbeBatch {
+        batch_id: sentinel_batch_id(0x72),
+        batch_sha256: digest('e'),
+        company_guid: COMPANY_GUID.into(),
+        names: vec!["Synthetic Item".into()],
+    };
+    append(directory.path(), &lock, JournalRecord::Batch(probe.clone())).unwrap();
+    assert!(probe_path.exists());
+    assert!(!ledger_path.exists());
+    let ledger = batch(&sentinel_batch_id(0x71));
+    for record in full_records(&ledger) {
+        put(directory.path(), &lock, record).unwrap();
+    }
+    let ledger_text = std::fs::read_to_string(&ledger_path).unwrap();
+    let probe_text = std::fs::read_to_string(&probe_path).unwrap();
+    assert_eq!(ledger_text, journal_text(&full_records(&ledger)));
+    assert_eq!(probe_text.lines().count(), 1);
+    // Each journal holds its own batch only.
+    let ledger_journal = read_journal(directory.path()).unwrap();
+    assert!(ledger_journal.state(&ledger.batch_id).is_some());
+    assert!(ledger_journal.state(&probe.batch_id).is_none());
+    let probe_journal = read_kind_journal::<ProbeBatch>(directory.path()).unwrap();
+    assert_eq!(probe_journal.state(&probe.batch_id).unwrap().batch, probe);
+    assert!(probe_journal.state(&ledger.batch_id).is_none());
+    // Neither kind reads the other's lines.
+    assert_eq!(
+        MasterJournal::read(Cursor::new(probe_text.as_bytes())).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+    assert_eq!(
+        Journal::<ProbeBatch>::read(Cursor::new(ledger_text.as_bytes())).unwrap_err(),
+        invalid(Invalid::Parse)
+    );
+}

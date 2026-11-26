@@ -3395,18 +3395,21 @@ pub(super) fn show_stock_item_draft(
     let preview = stock_item_review_text(&draft, origin)?;
     let prepared =
         PreparedStockItem::from_draft(draft).map_err(StockItemReviewError::NotRenderable)?;
-    Ok(ShownStockItem { prepared, preview })
+    Ok(ShownStockItem {
+        prepared,
+        preview,
+        origin: origin.to_string(),
+    })
 }"#;
 
 /// The one caller of `ask_stock_item`, with the stock marks parser; it builds
 /// the binding and the held request from the same item.
 const SHOWN_ASK: &str = r#"    pub(super) fn ask(
         self,
-        endpoint_origin: &str,
         company_marks_request: AgentReadRequest,
         batch_id: String,
     ) -> AskedStockItem {
-        let binding = ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview);
+        let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);
         let held = HeldRequest::StockItem(Box::new(self.prepared.clone()));
         let dialog = PendingPostApproval::ask_stock_item(
             self.prepared,
@@ -3423,8 +3426,8 @@ const SHOWN_ASK: &str = r#"    pub(super) fn ask(
     }"#;
 
 /// The fresh binding of what was shown, for the take.
-const SHOWN_BINDING: &str = r#"    pub(super) fn binding(&self, endpoint_origin: &str) -> ApprovalBinding {
-        ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview)
+const SHOWN_BINDING: &str = r#"    pub(super) fn binding(&self) -> ApprovalBinding {
+        ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)
     }"#;
 
 /// [`other_sources`] and the approvals holder, which that scan skips.
@@ -3562,6 +3565,7 @@ fn stock_approval_problems(
 const SHOWN_STRUCT: &str = r#"pub(super) struct ShownStockItem {
     prepared: PreparedStockItem,
     preview: String,
+    origin: String,
 }"#;
 
 const ASKED_STRUCT: &str = r#"pub(super) struct AskedStockItem {
@@ -3631,9 +3635,25 @@ fn stock_ask_parts_problems(others: &[(String, String)]) -> Vec<String> {
     if review.matches(SHOWN_ASK).count() != 1 || review.matches(SHOWN_BINDING).count() != 1 {
         problems.push("ask and binding build from the shown item itself".into());
     }
+    // The stock subject is built once, in the binding's maker; the holder's
+    // other namings of it are the `{ .. }` patterns of its matches.
+    let maker = holder
+        .find("    pub(super) fn stock_item(")
+        .map_or("", |at| {
+            let rest = &holder[at..];
+            &rest[..rest.find("\n    }\n").unwrap_or(rest.len())]
+        });
+    let subject = "BindingSubject::StockItem {";
+    let subjects = holder.matches(subject).count() - holder.matches("StockItem { .. }").count();
+    // `Self::stock_item` and `ApprovalBinding::stock_item`, called or aliased;
+    // the module path `stock_item_create` aside.
+    let named = holder.matches("::stock_item").count() - holder.matches("::stock_item_").count();
     if count("ApprovalBinding::stock_item") != 2
         || shown.matches("ApprovalBinding::stock_item(").count() != 2
         || holder.matches("stock_item(").count() != 1
+        || named != 0
+        || subjects != 1
+        || maker.matches(subject).count() != 1
     {
         problems.push("a stock binding is built only by ShownStockItem".into());
     }
@@ -3687,11 +3707,35 @@ fn one_ask_builds_the_stock_binding_and_held_request_and_nothing_else_does() {
             "    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
             "    fn other(p: &PreparedStockItem) -> Self {\n        Self::stock_item(\"o\", p, \"x\")\n    }\n\n    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
         ),
-        // A binding in `ask` built from another prepared value.
+        // The maker aliased, here or in the holder, and a second stock
+        // subject built in the holder without the maker.
+        elsewhere("let make = ApprovalBinding::stock_item;"),
+        edit(
+            holder,
+            tail,
+            "\nfn other() { let make = ApprovalBinding::stock_item; }\nfn approved(\n",
+        ),
+        edit(
+            holder,
+            "    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+            "    fn other(p: &PreparedStockItem) -> Self {\n        let make = Self::stock_item;\n        make(\"o\", p, \"x\")\n    }\n\n    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+        ),
+        edit(
+            holder,
+            tail,
+            "\nfn other(company: MasterCompanyTuple, writes: Box<StockItemWrites>) -> BindingSubject {\n    BindingSubject::StockItem { company, writes }\n}\nfn approved(\n",
+        ),
+        // A binding in `ask` built from another prepared value, and the fresh
+        // binding built with another preview.
         edit(
             review,
-            "        let binding = ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview);\n",
-            "        let binding = ApprovalBinding::stock_item(endpoint_origin, &other, &self.preview);\n",
+            "        let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);\n",
+            "        let binding = ApprovalBinding::stock_item(&self.origin, &other, &self.preview);\n",
+        ),
+        edit(
+            review,
+            "        ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)\n    }",
+            "        ApprovalBinding::stock_item(&self.origin, &self.prepared, \"\")\n    }",
         ),
         // A held request built outside `ask`, or from another value in it.
         elsewhere("let held = HeldRequest::StockItem(Box::new(prepared));"),

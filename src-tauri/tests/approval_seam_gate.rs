@@ -4317,13 +4317,15 @@ fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
     problems
 }
 
-/// The attribute lines above `item` in `source`, back to the blank line or the
-/// end of the item before it, doc and line comments left out.
+/// The lines above `item` in `source`, back over blank lines and doc and line
+/// comments to the end of the item before it (a line ending `}` or `;`),
+/// comments left out: its attributes, each line of a multi-line one too, and
+/// one a blank line separates still among them.
 fn attributes_above<'a>(source: &'a str, item: &str) -> Vec<&'a str> {
     let start = source.find(item).unwrap_or(0);
     let mut above = (source[..start].lines().rev().map(str::trim))
-        .take_while(|line| !line.is_empty() && !line.ends_with('}') && !line.ends_with(';'))
-        .filter(|line| !line.starts_with("//"))
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .take_while(|line| !line.ends_with('}') && !line.ends_with(';'))
         .collect::<Vec<_>>();
     above.reverse();
     above
@@ -4370,13 +4372,21 @@ fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
         let to = derive.replace("Debug", derived);
         mutations.push(edit(post, derive, &to));
     }
-    // A derive above the pinned two, before or after the doc comment.
+    // A derive above the pinned two, after the doc comment or before it, with
+    // blank lines between or none.
     let token = "#[must_use]\n#[derive(Debug)]\npub(super) struct StockItemRecheckPassed {";
     for above in ["#[derive(Clone)]", "#[cfg_attr(test, derive(Clone))]"] {
         mutations.push(edit(post, token, &format!("{above}\n{token}")));
     }
     let doc = "/// Proof that the queue's stock recheck passed";
-    mutations.push(edit(post, doc, &format!("#[derive(Clone)]\n{doc}")));
+    for above in [
+        "#[derive(Clone)]\n",
+        "#[derive(Clone)]\n\n",
+        "#[derive(Clone)]\n\n\n",
+        "#[cfg_attr(test, derive(Clone))]\n\n",
+    ] {
+        mutations.push(edit(post, doc, &format!("{above}{doc}")));
+    }
     // A second literal: through `Self` in its impl, without the space, through
     // a type alias and through an import alias.
     let fields = "create_sha256: String::new(), pre_image: todo!(), marks: Vec::new(), batch_id: String::new()";

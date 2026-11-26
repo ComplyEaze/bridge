@@ -297,7 +297,8 @@ impl StockItemReadBackBasis {
 /// `Other` was decided before any byte of the intent was written. Two can
 /// leave a sidecar that names no intent, as the ledger writer's can:
 /// `Refused(PreImageWriteFailed)` when the directory sync failed after the
-/// file was placed, and `Refused(PreImageRemoveFailed)`.
+/// file was placed or another sidecar was already in place (`ExistsDifferent`),
+/// and `Refused(PreImageRemoveFailed)`.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum StockIntentRefusal {
     /// The recheck passed for another batch than the one to record.

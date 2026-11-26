@@ -3432,11 +3432,23 @@ const SHOWN_BINDING: &str = r#"    pub(super) fn binding(&self) -> ApprovalBindi
         ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)
     }"#;
 
-/// The shown item's two readers for the stock prepare: the preview, and the
-/// journal batch, built from the shown item's own company and writes. Neither
-/// hands out the prepared item.
+/// The shown item's three readers for the stock prepare: the preview, the same
+/// preview masked through the one layout, and the journal batch, built from the
+/// shown item's own company and writes. None hands out the prepared item.
 const SHOWN_PREVIEW: &str = r#"    pub(super) fn preview(&self) -> &str {
         &self.preview
+    }"#;
+
+const SHOWN_MASKED: &str = r#"    pub(super) fn masked_preview(&self) -> String {
+        let (company, writes) = (self.prepared.company(), self.prepared.writes());
+        stock_item_lines(company, writes, &self.origin, |text| {
+            if bridge_tally_protocol::is_tally_reserved_root(text) {
+                text.to_string()
+            } else {
+                super::super::mask(text)
+            }
+        })
+        .join("\n")
     }"#;
 
 const SHOWN_BATCH: &str = r#"    pub(super) fn batch(&self, batch_id: String) -> Result<StockItemBatch, CreateRenderRefusal> {
@@ -3679,11 +3691,13 @@ fn stock_ask_parts_problems(others: &[(String, String)]) -> Vec<String> {
     if review.matches(SHOWN_ASK).count() != 1 || review.matches(SHOWN_BINDING).count() != 1 {
         problems.push("ask and binding build from the shown item itself".into());
     }
-    // Its only other readers are the preview and the batch, and the batch is
-    // the one stock journal batch made outside the journal's own file.
+    // Its only other readers are the preview, the masked preview and the
+    // batch (five methods with `ask` and `binding`), and the batch is the one
+    // stock journal batch made outside the journal's own file.
     if review.matches(SHOWN_PREVIEW).count() != 1
+        || review.matches(SHOWN_MASKED).count() != 1
         || review.matches(SHOWN_BATCH).count() != 1
-        || shown.matches("fn ").count() != 4
+        || shown.matches("fn ").count() != 5
         || count("StockItemBatch::new(") != 1
     {
         problems.push("the prepare reads the shown item only by its preview and batch".into());
@@ -3791,6 +3805,11 @@ fn one_ask_builds_the_stock_binding_and_held_request_and_nothing_else_does() {
             "        StockItemBatch::new(batch_id, self.prepared.company(), &other)\n",
         ),
         elsewhere("let batch = StockItemBatch::new(id, &identity, &writes);"),
+        edit(
+            review,
+            "                super::super::mask(text)\n",
+            "                text.to_string()\n",
+        ),
         edit(
             review,
             "    pub(super) fn preview(&self) -> &str {\n",

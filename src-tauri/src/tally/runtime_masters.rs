@@ -997,21 +997,22 @@ impl TallyRuntime {
     /// drifted one refusing before the count is sent, and the company-count
     /// pair, back to back; the stock-group
     /// pair; the unit pair; the closing identity and mode brackets; and the
-    /// marks again, last, the aim. Only `recheck`, local work, follows the aim.
-    /// Nothing here sends an import, and no shipped caller reaches it. The
+    /// marks again, last, the aim. Only `recheck`, local work, follows the aim,
+    /// and its value is returned. Nothing here sends an import, and no shipped
+    /// caller reaches it. The
     /// runtime trusts the rows `parse_marks` returns; the check on them is the
     /// recheck's own re-derivation of the mark from the binding text.
     #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) async fn read_and_recheck_stock_item<R>(
+    pub(crate) async fn read_and_recheck_stock_item<R, T>(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         company_marks_request: crate::tally::agent_read_request::AgentReadRequest,
         parse_marks: CompanyMarksParser,
         recheck: R,
-    ) -> anyhow::Result<()>
+    ) -> anyhow::Result<T>
     where
-        R: Fn(StockItemRecheckReads) -> anyhow::Result<()>,
+        R: Fn(StockItemRecheckReads) -> anyhow::Result<T>,
     {
         use crate::tally::approved_import::ApprovedImportAdmissionError;
         let _lease = self.begin_ordinary_read(&config)?;

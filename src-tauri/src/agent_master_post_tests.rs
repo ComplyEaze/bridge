@@ -853,9 +853,9 @@ const STOCK_UNITS: &[u8] = include_bytes!(
 const STOCK_MARKS: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-marks.utf16le.xml"
 );
-const STOCK_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
-const STOCK_SOURCE: &str = "SC Sibling Goods";
-const STOCK_PROPOSED: &str = "SC Copied Marked";
+pub(crate) const STOCK_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
+pub(crate) const STOCK_SOURCE: &str = "SC Sibling Goods";
+pub(crate) const STOCK_PROPOSED: &str = "SC Copied Marked";
 
 fn stock_capture(bytes: &[u8]) -> String {
     decode_tally_xml_response_bytes_limited(
@@ -1229,6 +1229,7 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             "CompleteStockItemCatalogue",
             &[
                 ("agent_master_post.rs", 4),
+                ("agent_master_stock_tools.rs", 2),
                 ("tally/stock_item_create.rs", 2),
             ],
         ),
@@ -1236,14 +1237,21 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             "new_admitted",
             &[
                 ("agent_master_post.rs", 1),
+                ("agent_master_stock_tools.rs", 1),
                 ("tally/stock_item_create.rs", 1),
             ],
         ),
         (
             "read_and_recheck_stock_item",
-            &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 3)],
+            &[
+                ("agent_master_post.rs", 2),
+                ("agent_master_stock_tools.rs", 1),
+                ("tally/runtime_masters.rs", 3),
+            ],
         ),
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
+        // The stock prepare: its definition and its module's title, no caller.
+        ("prepare_stock_item", &[("agent_master_stock_tools.rs", 2)]),
         // The in-queue stock recheck and the stock intent writer: no caller.
         (
             "recheck_stock_item_for_dispatch",
@@ -1596,7 +1604,7 @@ pub(crate) mod coordinator {
     const SHAPE_MARK: &str = "<ALTMSTID TYPE=\"Number\"> 289</ALTMSTID>";
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    enum Sent {
+    pub(crate) enum Sent {
         Health,
         Companies,
         Marks,
@@ -1611,7 +1619,7 @@ pub(crate) mod coordinator {
     /// pairs (each with a health check after each send), the closing identity
     /// and mode, and the aim marks last.
     #[rustfmt::skip]
-    const EVERY_READ: [Sent; 24] = [
+    pub(crate) const EVERY_READ: [Sent; 24] = [
         Health, Companies, Companies, Marks,
         Candidate, Health, Candidate, Health, Count, Health, Count, Health,
         StockGroups, Health, StockGroups, Health, Units, Health, Units, Health,
@@ -1643,7 +1651,7 @@ pub(crate) mod coordinator {
     /// Each request the double received, by its parsed header. Every POST must
     /// be an Export of one of the coordinator's six requests: an import, a
     /// Create or any other request fails the test here.
-    fn sent(observed: &[ObservedRequest]) -> Vec<Sent> {
+    pub(crate) fn sent(observed: &[ObservedRequest]) -> Vec<Sent> {
         observed
             .iter()
             .map(|request| {
@@ -1676,7 +1684,7 @@ pub(crate) mod coordinator {
         ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
     }
 
-    fn marks_at(mark: u64) -> String {
+    pub(crate) fn marks_at(mark: u64) -> String {
         let marks = stock_capture(SHAPE_MARKS);
         assert_eq!(marks.matches(SHAPE_MARK).count(), 1);
         // A mark other than 289 is a constructed vector, not a capture.
@@ -1688,7 +1696,7 @@ pub(crate) mod coordinator {
 
     /// The opening requests' answers up to the binding marks: all a run that
     /// refuses at its size admission is sent.
-    fn through_binding(binding: String) -> Vec<ScenarioPlan> {
+    pub(crate) fn through_binding(binding: String) -> Vec<ScenarioPlan> {
         let companies = answer(stock_capture(SHAPE_COMPANIES));
         vec![health(), companies.clone(), companies, answer(binding)]
     }
@@ -2351,6 +2359,47 @@ pub(crate) mod coordinator {
     /// [`stock_answers`] for the R1 draft unchanged: the recheck passes.
     pub(crate) fn passing_answers() -> Vec<ScenarioPlan> {
         stock_answers(rebound_before(), 1, marks_at(289))
+    }
+
+    /// `plans`, a queue run, in the standalone read's order: its closing
+    /// identity bracket sends the company list before the health check.
+    pub(crate) fn standalone(mut plans: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
+        let at = plans.len() - 4;
+        plans.swap(at, at + 1);
+        plans
+    }
+
+    /// The shape lab's captured company list, and the same list in Education
+    /// (EDUMODE Yes, the constructed edit the Education tests above make).
+    pub(crate) fn shape_companies(education: bool) -> String {
+        let companies = stock_capture(SHAPE_COMPANIES);
+        if !education {
+            return companies;
+        }
+        companies.replace(
+            "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
+            "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
+        )
+    }
+
+    /// The rebound R1 draft of [`rebound_prepared`], shown at `origin`: what
+    /// the person is shown for the constructed run.
+    pub(crate) fn rebound_shown(
+        identity: &VerifiedCompanyIdentity,
+        origin: &str,
+    ) -> super::super::super::master_review::ShownStockItem {
+        let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
+        let catalogue = StockItemCatalogue::from_candidate_read(identity, &r1(STOCK_BEFORE))
+            .expect("the rebound R1 read catalogues");
+        let draft = stock_test_draft(
+            &catalogue,
+            STOCK_PROPOSED,
+            STOCK_SOURCE,
+            &r1(STOCK_GROUPS),
+            &r1(STOCK_UNITS),
+        );
+        super::super::super::master_review::show_stock_item_draft(draft, origin)
+            .expect("the rebound draft is shown")
     }
 
     /// The R1 import answer to the marked create, CREATED 1, for the POST.

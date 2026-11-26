@@ -10,6 +10,7 @@
 //! unsafe-character checks are the voucher preview's own.
 use super::super::failure_code::{create_render_refusal_code, StockItemCreateCode};
 use super::approval::{ApprovalBinding, HeldRequest};
+use super::master_ledger::stock_item_journal::StockItemBatch;
 use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
@@ -19,7 +20,7 @@ use crate::tally::approved_import::PendingPostApproval;
 use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
 use crate::tally::stock_item_create::{
     create_text_refusal, CreateRenderRefusal, MarkedConstant, PreparedStockItem, StockItemDraft,
-    GOODS, SPECIFY_DETAILS_HERE, TAXABLE,
+    StockItemWrites, GOODS, SPECIFY_DETAILS_HERE, TAXABLE,
 };
 use crate::tally::VerifiedCompanyIdentity;
 
@@ -260,6 +261,29 @@ pub(super) fn stock_item_review_text(
     }
     create_text_refusal(draft.writes()).map_err(StockItemReviewError::NotRenderable)?;
 
+    let lines = stock_item_lines(company, draft.writes(), origin, str::to_string);
+    if fits(&lines) {
+        Ok(lines.join("\n"))
+    } else {
+        Err(StockItemReviewError::Review(MasterReviewError::TooLarge))
+    }
+}
+
+/// The stock preview's lines for `writes` in `company`, reached at `origin`,
+/// with the item's name, its sibling's source name, its parent and its HSN
+/// description as `shown` gives them: whole for the dialog, masked for a result under `mask_parties`.
+/// The one layout of the stock preview; it checks nothing.
+fn stock_item_lines(
+    company: &VerifiedCompanyIdentity,
+    writes: &StockItemWrites,
+    origin: &str,
+    shown: impl Fn(&str) -> String,
+) -> Vec<String> {
+    let source = shown(writes.sibling_source_name().as_str());
+    let gst = writes.gst();
+    let hsn = writes.hsn();
+    let applicability = MarkedConstant::Applicable.render();
+    let state = MarkedConstant::Any.render();
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let mut lines = vec![
         format!(
@@ -277,32 +301,35 @@ pub(super) fn stock_item_review_text(
         ),
         format!("Tally: {origin}"),
         String::new(),
-        format!("Create stock item {}", quoted(draft.name().as_str())),
+        format!(
+            "Create stock item {}",
+            quoted(&shown(writes.name().as_str()))
+        ),
         format!(
             "All six copied fields come from sibling stock item {}.",
-            quoted(source)
+            quoted(&source)
         ),
         format!(
             "Parent (stock group): {} — source: {}",
-            quoted(draft.parent()),
-            quoted(source)
+            quoted(&shown(writes.parent())),
+            quoted(&source)
         ),
         format!(
             "Base unit: {} — source: {}",
-            quoted(draft.unit()),
-            quoted(source)
+            quoted(writes.unit()),
+            quoted(&source)
         ),
         format!(
             "GST applicability: {} — source: {}",
             quoted(applicability),
-            quoted(source)
+            quoted(&source)
         ),
         format!(
             "Type of supply: {} — source: {}",
             quoted(GOODS),
-            quoted(source)
+            quoted(&source)
         ),
-        format!("GST details entry 1 — source: {}", quoted(source)),
+        format!("GST details entry 1 — source: {}", quoted(&source)),
         format!("  Applicable from: {}", quoted(gst.applicable_from())),
         format!("  Taxability: {}", quoted(TAXABLE)),
         format!("  Source of GST details: {}", quoted(SPECIFY_DETAILS_HERE)),
@@ -319,19 +346,15 @@ pub(super) fn stock_item_review_text(
     }
     lines.extend([
         "  GST slab rates: empty".to_string(),
-        format!("HSN details entry 1 — source: {}", quoted(source)),
+        format!("HSN details entry 1 — source: {}", quoted(&source)),
         format!("  Applicable from: {}", quoted(hsn.applicable_from())),
         format!("  HSN code: {}", quoted(hsn.code())),
-        format!("  HSN description: {}", quoted(hsn.description())),
+        format!("  HSN description: {}", quoted(&shown(hsn.description()))),
         format!("  Source of HSN details: {}", quoted(SPECIFY_DETAILS_HERE)),
         String::new(),
         "Do not create or rename stock items in Tally until this is done.".to_string(),
     ]);
-    if fits(&lines) {
-        Ok(lines.join("\n"))
-    } else {
-        Err(StockItemReviewError::Review(MasterReviewError::TooLarge))
-    }
+    lines
 }
 
 /// One stock-item draft as the person will be shown it: the Create prepared
@@ -369,6 +392,33 @@ impl ShownStockItem {
     /// the take, the fresh binding of a fresh draft.
     pub(super) fn binding(&self) -> ApprovalBinding {
         ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)
+    }
+
+    /// The preview the person will be shown, for the prepare's answer.
+    pub(super) fn preview(&self) -> &str {
+        &self.preview
+    }
+
+    /// The same preview with the item's name, its sibling's source name, its
+    /// parent and its HSN description masked, for a result under
+    /// `mask_parties`, as a stock read masks them; the dialog shows them whole. Tally's reserved root is not
+    /// masked. The fit was judged on the whole text when the item was shown.
+    pub(super) fn masked_preview(&self) -> String {
+        let (company, writes) = (self.prepared.company(), self.prepared.writes());
+        stock_item_lines(company, writes, &self.origin, |text| {
+            if bridge_tally_protocol::is_tally_reserved_root(text) {
+                text.to_string()
+            } else {
+                super::super::mask(text)
+            }
+        })
+        .join("\n")
+    }
+
+    /// The journal batch of the Create shown, recorded under `batch_id`: its
+    /// company, stored writes and digest are the shown item's own.
+    pub(super) fn batch(&self, batch_id: String) -> Result<StockItemBatch, CreateRenderRefusal> {
+        StockItemBatch::new(batch_id, self.prepared.company(), self.prepared.writes())
     }
 
     /// Shows the preview in the stock-item dialog, on its own task, and on the

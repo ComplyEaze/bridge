@@ -60,6 +60,8 @@ use crate::tally::master_name::{MasterName, MasterNameError};
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 
+#[path = "agent_master_stock_tools.rs"]
+mod stock_tools;
 #[path = "agent_master_verdict.rs"]
 pub(super) mod verdict;
 #[path = "agent_master_verify.rs"]
@@ -518,6 +520,13 @@ impl Server {
         })
     }
 
+    /// The Tally endpoint a master preview names: the configured endpoint's
+    /// canonical loopback origin.
+    fn master_preview_origin(&self) -> Result<String, ToolFailure> {
+        super::super::canonical_loopback_origin(&self.settings.endpoint)
+            .map_err(|_| "host_setting_invalid".to_string().into())
+    }
+
     /// Prepare ONE ledger for creation. Nothing is written to Tally.
     pub(in crate::agent) async fn prepare_ledger_creates(
         &self,
@@ -528,8 +537,7 @@ impl Server {
         let creates = parse_ledger_creates(args)?;
         let (company, identity, identity_evidence) = self.verified_company(guid).await?;
         let mut accumulated = identity_evidence;
-        let origin = super::super::canonical_loopback_origin(&self.settings.endpoint)
-            .map_err(|_| "host_setting_invalid".to_string())?;
+        let origin = self.master_preview_origin()?;
         // The proposed name against the book as it stands, once. The queue
         // makes the binding check again, twice, at the post.
         let (ledgers, evidence, profile) = self

@@ -35,9 +35,10 @@
 use super::approval::{ApprovalBinding, HeldRequest};
 use super::master_ledger::{
     append, append_intent, read_journal, remove_pre_image, write_pre_image, BatchState,
-    BlockingBatch, ExclusiveAdmission, MasterBatch, MasterClass, MasterCompany, MasterCounters,
-    MasterDispatchIntent, MasterDispatchResponse, MasterJournal, MasterLedgerError, MasterRecord,
-    PreImage, RecordedIntent, StoredLedgerCreate, StoredLedgerKind,
+    BlockingBatch, ExclusiveAdmission, Journal, JournalBatch, MasterBatch, MasterClass,
+    MasterCompany, MasterCounters, MasterDispatchIntent, MasterDispatchResponse, MasterJournal,
+    MasterLedgerError, MasterRecord, PreImage, RecordedIntent, StoredLedgerCreate,
+    StoredLedgerKind,
 };
 use super::master_post::{
     check_name_free, recheck_master_for_dispatch, MasterAim, MasterPostRequest,
@@ -57,6 +58,7 @@ use crate::tally::ledger_create_item::{
     LedgerCreateItem, PartySide, VerifiedGstin,
 };
 use crate::tally::master_name::{MasterName, MasterNameError};
+use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 
@@ -391,17 +393,26 @@ fn verdict_state_code(state: super::master_ledger::MasterVerdictState) -> &'stat
 impl Server {
     /// The masters journal as it stands, read under the shared admission lock.
     fn read_master_journal(&self) -> Result<MasterJournal, String> {
-        let _lock = self.lock_import_admission_shared()?;
-        read_journal(&self.settings.data_dir).map_err(|error| error.code().to_string())
+        self.read_kind_journal_shared(read_journal)
     }
 
-    /// The journal read of the check that precedes the dialog.
-    fn read_master_journal_for_hold_check(&self) -> Result<MasterJournal, String> {
+    /// The journal `read` reads, under the shared admission lock.
+    fn read_kind_journal_shared<B>(&self, read: KindReader<B>) -> Result<Journal<B>, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        read(&self.settings.data_dir).map_err(|error| error.code().to_string())
+    }
+
+    /// The journal read of the check that precedes the dialog, of the kind
+    /// `read` reads.
+    fn read_master_journal_for_hold_check<B>(
+        &self,
+        read: KindReader<B>,
+    ) -> Result<Journal<B>, String> {
         #[cfg(test)]
         if super::master_ledger::test_fault_fires("hold_check_read_busy") {
             return Err("import_admission_busy".to_string());
         }
-        self.read_master_journal()
+        self.read_kind_journal_shared(read)
     }
 
     /// The one journal read of a failed post, which says whether a send was
@@ -609,47 +620,38 @@ impl Server {
         &self,
         args: &Value,
     ) -> Result<ToolOutcome, ToolFailure> {
-        match self.post_ledger_creates_entry(args, Entry::Fresh).await? {
-            Pass::Done(outcome) => Ok(outcome),
-            // At most one more pass: a redeem-only pass never joins, so it
-            // never hands on another redeem.
+        self.master_post_passes(move |entry| self.post_ledger_creates_pass(args, entry))
+            .await
+    }
+
+    /// The passes of one master post call: a fresh pass and, when its Join
+    /// found a click to redeem, at most one redeem-only pass, which never joins
+    /// and so never hands on another redeem (#725).
+    async fn master_post_passes<P, F>(&self, pass: P) -> Result<ToolOutcome, ToolFailure>
+    where
+        P: Fn(Entry) -> F,
+        F: std::future::Future<Output = Result<Pass, ToolFailure>>,
+    {
+        let (evidence, call_started) = match pass(Entry::Fresh).await? {
+            Pass::Done(outcome) => return Ok(outcome),
             Pass::Redeem {
                 evidence,
                 call_started,
-            } => match self
-                .post_ledger_creates_entry(
-                    args,
-                    Entry::RedeemOnly {
-                        evidence,
-                        call_started,
-                    },
-                )
-                .await?
-            {
-                Pass::Done(outcome) => Ok(outcome),
-                Pass::Redeem { .. } => Err("import_approval_revoked".to_string().into()),
-            },
-        }
-    }
-
-    async fn post_ledger_creates_entry(
-        &self,
-        args: &Value,
-        entry: Entry,
-    ) -> Result<Pass, ToolFailure> {
-        let Entry::RedeemOnly { call_started, .. } = &entry else {
-            return self.post_ledger_creates_pass(args, entry).await;
+            } => (evidence, call_started),
         };
         // A redeem-only pass runs on the wire-wait budget the call has left, as
         // the voucher post's does (#893).
         let shared_left = crate::tally::runtime::operation_wire_budget_remaining()
             .unwrap_or_else(|| self.runtime.wire_gate_config().retry().total());
         let budget = super::post::redeem_pass_wire_budget(call_started.elapsed(), shared_left);
-        crate::tally::runtime::with_operation_wire_budget_of(
-            budget,
-            self.post_ledger_creates_pass(args, entry),
-        )
-        .await
+        let redeemed = pass(Entry::RedeemOnly {
+            evidence,
+            call_started,
+        });
+        match crate::tally::runtime::with_operation_wire_budget_of(budget, redeemed).await? {
+            Pass::Done(outcome) => Ok(outcome),
+            Pass::Redeem { .. } => Err("import_approval_revoked".to_string().into()),
+        }
     }
 
     async fn post_ledger_creates_pass(
@@ -718,13 +720,7 @@ impl Server {
             };
             let (company, identity, identity_evidence) = self.verified_company(&guid).await?;
             accumulated = combine_evidence(accumulated.clone(), identity_evidence);
-            if company.name != batch.company.name
-                || identity.company_number() != batch.company.number
-                || identity.books_from_yyyymmdd() != batch.company.books_from
-                || !identity
-                    .company_guid()
-                    .eq_ignore_ascii_case(&batch.company.guid)
-            {
+            if !same_company(&company.name, &identity, &batch.company) {
                 return Err("company_identity_mismatch".to_string().into());
             }
             // Rendered once. Its digest must be the batch's, so a record the
@@ -764,7 +760,7 @@ impl Server {
             // A read that fails here skips this check and goes on as the post
             // did before it existed: the check under the lock decides, and this
             // read adds no failure and withdraws no approval.
-            if let Ok(fresh) = self.read_master_journal_for_hold_check() {
+            if let Ok(fresh) = self.read_master_journal_for_hold_check(read_journal) {
                 let view = overlap_view(Some(&fresh), batch_id, &guid);
                 if !matches!(view, OverlapView::Settled) {
                     self.post_approvals.revoke_unredeemed_of(
@@ -839,32 +835,7 @@ impl Server {
             // Whatever the outcome, the book may have changed: no ledger
             // listing of this company is continued from before it (#630).
             self.drop_listing_snapshots(identity.company_guid());
-            let posted = posted.map_err(|error| {
-                let code = refusal_code(&error);
-                let transport = (code == "post_queue_read_failed")
-                    .then(|| {
-                        error.chain().find_map(|cause| {
-                            cause
-                                .downcast_ref::<bridge_tally_transport::TallyTransportError>()
-                                .map(bridge_tally_transport::TallyTransportError::safe_code)
-                        })
-                    })
-                    .flatten();
-                let group = error.chain().find_map(|cause| {
-                    match cause.downcast_ref::<ApprovedImportAdmissionError>() {
-                        Some(ApprovedImportAdmissionError::GroupExportInvalid { cause }) => *cause,
-                        Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable {
-                            cause,
-                        }) => Some(*cause),
-                        _ => None,
-                    }
-                });
-                let mut failure = ToolFailure::from_runtime(code, error);
-                if failure.cause.is_none() {
-                    failure.cause = refusal_cause(&failure.code, group, transport);
-                }
-                failure
-            })?;
+            let posted = posted.map_err(post_failure)?;
             accumulated = combine_evidence(
                 accumulated.clone(),
                 evidence_from_runtime_read(posted.admission_evidence.clone()),
@@ -1139,13 +1110,7 @@ impl Server {
         let verified = match self.verified_company(&state.batch.company.guid).await {
             Ok((company, identity, identity_evidence)) => {
                 evidence = combine_evidence(evidence, identity_evidence);
-                if company.name != state.batch.company.name
-                    || identity.company_number() != state.batch.company.number
-                    || identity.books_from_yyyymmdd() != state.batch.company.books_from
-                    || !identity
-                        .company_guid()
-                        .eq_ignore_ascii_case(&state.batch.company.guid)
-                {
+                if !same_company(&company.name, &identity, &state.batch.company) {
                     Err("company_identity_mismatch".to_string())
                 } else {
                     Ok(identity)
@@ -1260,6 +1225,17 @@ pub(super) fn journal_refusal(error: MasterLedgerError) -> Result<UnderLockRefus
         | MasterLedgerError::DirectorySyncFailed => Err(error.code().to_string()),
     }
 }
+
+/// Whether the company verified now, named `name`, is the one `stored` records.
+fn same_company(name: &str, identity: &VerifiedCompanyIdentity, stored: &MasterCompany) -> bool {
+    name == stored.name
+        && identity.company_number() == stored.number
+        && identity.books_from_yyyymmdd() == stored.books_from
+        && identity.company_guid().eq_ignore_ascii_case(&stored.guid)
+}
+
+/// A reader of one kind's journal in a data directory.
+type KindReader<B> = fn(&std::path::Path) -> Result<Journal<B>, MasterLedgerError>;
 
 /// The refusal code of a dispatch that an unsettled batch's ledger name blocks.
 const OVERLAP_CODE: &str = MasterLedgerError::OpenDispatchOverlaps.code();
@@ -1384,8 +1360,8 @@ impl OverlapView {
 
 /// What `journal` shows of `batch_id` refused for its ledger name. `None` is a
 /// journal that could not be read.
-fn overlap_view(
-    journal: Option<&MasterJournal>,
+fn overlap_view<B: JournalBatch>(
+    journal: Option<&Journal<B>>,
     batch_id: &str,
     company_guid: &str,
 ) -> OverlapView {
@@ -1542,6 +1518,34 @@ fn master_unanswered_next_step(reason: &str) -> Option<&'static str> {
         "request_deadline_exceeded" => Some(NEXT_TALLY_BUSY),
         _ => None,
     }
+}
+
+/// The refusal a master post's failed dispatch becomes.
+fn post_failure(error: anyhow::Error) -> ToolFailure {
+    let code = refusal_code(&error);
+    let transport = (code == "post_queue_read_failed")
+        .then(|| {
+            error.chain().find_map(|cause| {
+                cause
+                    .downcast_ref::<bridge_tally_transport::TallyTransportError>()
+                    .map(bridge_tally_transport::TallyTransportError::safe_code)
+            })
+        })
+        .flatten();
+    let group = error.chain().find_map(|cause| {
+        match cause.downcast_ref::<ApprovedImportAdmissionError>() {
+            Some(ApprovedImportAdmissionError::GroupExportInvalid { cause }) => *cause,
+            Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable { cause }) => {
+                Some(*cause)
+            }
+            _ => None,
+        }
+    });
+    let mut failure = ToolFailure::from_runtime(code, error);
+    if failure.cause.is_none() {
+        failure.cause = refusal_cause(&failure.code, group, transport);
+    }
+    failure
 }
 
 /// The refusal a name check's typed error becomes.

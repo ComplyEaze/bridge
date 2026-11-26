@@ -60,6 +60,8 @@ use crate::tally::master_name::{MasterName, MasterNameError};
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 
+#[path = "agent_master_stock_tools.rs"]
+mod stock_tools;
 #[path = "agent_master_verdict.rs"]
 pub(super) mod verdict;
 #[path = "agent_master_verify.rs"]

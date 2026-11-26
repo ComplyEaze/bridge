@@ -3410,7 +3410,9 @@ const SHOWN_ASK: &str = r#"    pub(super) fn ask(
         batch_id: String,
     ) -> AskedStockItem {
         let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);
-        let held = HeldRequest::StockItem(Box::new(self.prepared.clone()));
+        let held = HeldRequest::StockItem(HeldStockItem {
+            prepared: Box::new(self.prepared.clone()),
+        });
         let dialog = PendingPostApproval::ask_stock_item(
             self.prepared,
             self.preview,
@@ -3559,9 +3561,10 @@ fn stock_approval_problems(
     problems
 }
 
-/// `ShownStockItem` and `AskedStockItem`: private fields, their one attribute
-/// and no derive, one inherent impl each, and one literal each, in
-/// `show_stock_item_draft` and in `ShownStockItem::ask`; their tests build none.
+/// `ShownStockItem`, `AskedStockItem` and `HeldStockItem`: private fields,
+/// their one attribute and no derive, one inherent impl each, and one literal
+/// each, in `show_stock_item_draft` and in `ShownStockItem::ask` (twice); their
+/// tests build none. A held stock request is so made only by `ask`.
 const SHOWN_STRUCT: &str = r#"pub(super) struct ShownStockItem {
     prepared: PreparedStockItem,
     preview: String,
@@ -3572,6 +3575,10 @@ const ASKED_STRUCT: &str = r#"pub(super) struct AskedStockItem {
     binding: ApprovalBinding,
     dialog: PendingPostApproval,
     held: HeldRequest,
+}"#;
+
+const HELD_STRUCT: &str = r#"pub(super) struct HeldStockItem {
+    prepared: Box<PreparedStockItem>,
 }"#;
 
 fn shown_stock_item_problems(
@@ -3587,6 +3594,7 @@ fn shown_stock_item_problems(
             "pub(super) fn show_stock_item_draft(",
         ),
         ("AskedStockItem", ASKED_STRUCT, "    pub(super) fn ask("),
+        ("HeldStockItem", HELD_STRUCT, "    pub(super) fn ask("),
     ] {
         if review.matches(pin).count() != 1
             || attributes_above(review, pin) != ["#[cfg_attr(not(test), allow(dead_code))]"]
@@ -3613,8 +3621,9 @@ fn shown_stock_item_problems(
 }
 
 /// A stock binding is built only in `ShownStockItem`'s impl, in `ask` and in
-/// `binding`, and a stock held request only in `ask`: nowhere else, the
-/// approvals holder included, builds either.
+/// `binding`: nowhere else, the approvals holder included, builds one. The
+/// held request `ask` builds is pinned with it; `HeldStockItem` keeps any
+/// other code from building one.
 fn stock_ask_parts_problems(others: &[(String, String)]) -> Vec<String> {
     let mut problems = Vec::new();
     let text_of = |source: &str| {
@@ -3656,19 +3665,6 @@ fn stock_ask_parts_problems(others: &[(String, String)]) -> Vec<String> {
         || maker.matches(subject).count() != 1
     {
         problems.push("a stock binding is built only by ShownStockItem".into());
-    }
-    let ask = fn_body(&review, "    pub(super) fn ask(");
-    let held_patterns = holder.matches("HeldRequest::StockItem(").count()
-        + holder.matches("Self::StockItem(").count();
-    if count("StockItem(Box::new(") != 1
-        || ask
-            .matches("HeldRequest::StockItem(Box::new(self.prepared.clone()))")
-            .count()
-            != 1
-        || count("HeldRequest::StockItem(") != 2
-        || held_patterns != 2
-    {
-        problems.push("a stock held request is built only by ShownStockItem::ask".into());
     }
     problems
 }
@@ -3737,13 +3733,11 @@ fn one_ask_builds_the_stock_binding_and_held_request_and_nothing_else_does() {
             "        ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)\n    }",
             "        ApprovalBinding::stock_item(&self.origin, &self.prepared, \"\")\n    }",
         ),
-        // A held request built outside `ask`, or from another value in it.
-        elsewhere("let held = HeldRequest::StockItem(Box::new(prepared));"),
-        elsewhere("let held = HeldRequest::StockItem(boxed);"),
+        // The held request in `ask` built from another value.
         edit(
             review,
-            "HeldRequest::StockItem(Box::new(self.prepared.clone()))",
-            "HeldRequest::StockItem(Box::new(other.clone()))",
+            "            prepared: Box::new(self.prepared.clone()),\n",
+            "            prepared: Box::new(other.clone()),\n",
         ),
     ];
     for (at, mutated) in mutations.iter().enumerate() {
@@ -3756,7 +3750,7 @@ fn one_ask_builds_the_stock_binding_and_held_request_and_nothing_else_does() {
 }
 
 #[test]
-fn shown_and_asked_stock_items_have_private_fields_no_derive_one_impl_and_one_literal() {
+fn shown_asked_and_held_stock_items_have_private_fields_no_derive_one_impl_and_one_literal() {
     let review = read("src-tauri/src/agent_master_review.rs");
     let review_tests = read("src-tauri/src/agent_master_review_tests.rs");
     let others = sources_with_approvals();
@@ -3799,6 +3793,18 @@ fn shown_and_asked_stock_items_have_private_fields_no_derive_one_impl_and_one_li
         in_review(
             "\n#[cfg(test)]\n#[path",
             "\nfn again(binding: ApprovalBinding, dialog: PendingPostApproval, held: HeldRequest) -> AskedStockItem {\n    AskedStockItem { binding, dialog, held }\n}\n#[cfg(test)]\n#[path",
+        ),
+        in_review(
+            "    prepared: Box<PreparedStockItem>,\n",
+            "    pub(super) prepared: Box<PreparedStockItem>,\n",
+        ),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct HeldStockItem {",
+            "#[cfg_attr(not(test), allow(dead_code))]\n#[derive(Clone)]\npub(super) struct HeldStockItem {",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(prepared: Box<PreparedStockItem>) -> HeldRequest {\n    HeldRequest::StockItem(HeldStockItem { prepared })\n}\n#[cfg(test)]\n#[path",
         ),
     ];
     let mut elsewhere = others.clone();

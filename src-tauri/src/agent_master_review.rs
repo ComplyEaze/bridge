@@ -381,7 +381,9 @@ impl ShownStockItem {
         batch_id: String,
     ) -> AskedStockItem {
         let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);
-        let held = HeldRequest::StockItem(Box::new(self.prepared.clone()));
+        let held = HeldRequest::StockItem(HeldStockItem {
+            prepared: Box::new(self.prepared.clone()),
+        });
         let dialog = PendingPostApproval::ask_stock_item(
             self.prepared,
             self.preview,
@@ -394,6 +396,21 @@ impl ShownStockItem {
             dialog,
             held,
         }
+    }
+}
+
+/// A stock item held beside its approval. Its field is private and it derives
+/// nothing, so only [`ShownStockItem::ask`] makes one: no other code can put
+/// a stock item in a [`HeldRequest`]. Boxed: a prepared item is large.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct HeldStockItem {
+    prepared: Box<PreparedStockItem>,
+}
+
+impl HeldStockItem {
+    /// The item held, for the comparison with the approved bytes.
+    pub(super) fn prepared(&self) -> &PreparedStockItem {
+        &self.prepared
     }
 }
 

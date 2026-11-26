@@ -1026,10 +1026,10 @@ async fn one_asks_binding_approval_and_held_request_are_taken_with_a_fresh_bindi
     let HeldRequest::StockItem(held) = held else {
         panic!("a stock approval comes back with its stock item");
     };
-    assert_eq!(*held, prepared);
+    assert_eq!(*held.prepared(), prepared);
     let marked = bridge_tally_protocol::decode_xml_bytes(STOCK_MARKED_REQUEST)
         .expect("the captured request decodes");
-    assert_eq!(render_stock_item_create(&held), marked);
+    assert_eq!(render_stock_item_create(held.prepared()), marked);
     assert!(redeemed.sends_exactly(&marked));
     drop(taken);
 
@@ -1135,7 +1135,7 @@ async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() 
     let other_held: [(&str, HeldRequest); 2] = [
         (
             "another stock item",
-            HeldRequest::StockItem(Box::new(other)),
+            approved_stock_item("SC Copied Other").await.1,
         ),
         (
             "a ledger request",
@@ -1170,7 +1170,7 @@ async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() 
             &batch,
             ledger_binding.clone(),
             ApprovedImport::approved_masters_for_test(ledger.clone(), &company, stock_marks()),
-            HeldRequest::StockItem(Box::new(prepared)),
+            approved_stock_item("SC Copied Marked").await.1,
             answered_now(),
         )
         .unwrap();

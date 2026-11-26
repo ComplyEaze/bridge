@@ -23,6 +23,7 @@
 //! totals only, as an ordinary ask of that text. Nothing is shown twice in one
 //! call, and no call chooses the form.
 use super::master_post::MasterPostRequest;
+use super::master_review::HeldStockItem;
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
 use crate::tally::approved_import::{
@@ -269,10 +270,10 @@ pub(super) enum HeldRequest {
     Vouchers(NativePostRequest),
     Masters(MasterPostRequest),
     /// One stock item `Create`, held as prepared: its bytes are rendered from
-    /// it by the one renderer whenever they are compared. Boxed, as the
-    /// binding's writes are. It has no `From`: only `ShownStockItem::ask`
-    /// builds one, beside the binding and the dialog of the same item.
-    StockItem(Box<PreparedStockItem>),
+    /// it by the one renderer whenever they are compared. Only
+    /// `ShownStockItem::ask` can make a [`HeldStockItem`], beside the binding
+    /// and the dialog of the same item, so no other code can hold one.
+    StockItem(HeldStockItem),
 }
 
 impl HeldRequest {
@@ -1111,8 +1112,8 @@ fn held_matches_approved(held: &HeldRequest, approved: &ApprovedImport) -> bool 
     match held {
         HeldRequest::Vouchers(_) => true,
         HeldRequest::Masters(request) => approved.sends_exactly(request.xml()),
-        HeldRequest::StockItem(prepared) => {
-            approved.sends_exactly(&render_stock_item_create(prepared))
+        HeldRequest::StockItem(held) => {
+            approved.sends_exactly(&render_stock_item_create(held.prepared()))
         }
     }
 }

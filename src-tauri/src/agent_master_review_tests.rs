@@ -814,7 +814,7 @@ async fn a_confirmed_stock_item_draft_is_approved_for_the_create_it_was_shown() 
                 ORIGIN,
             )
             .expect("the captured draft is shown")
-            .ask(ORIGIN, stock_marks(), stock_batch())
+            .ask(stock_marks(), stock_batch())
             .into_parts()
             .1
         })
@@ -877,25 +877,17 @@ async fn a_declined_or_unscoped_stock_item_dialog_makes_no_approval() {
     };
     let asked = SCRIPTED_APPROVAL
         .scope(scripted, async {
-            shown()
-                .ask(ORIGIN, stock_marks(), stock_batch())
-                .into_parts()
-                .1
+            shown().ask(stock_marks(), stock_batch()).into_parts().1
         })
         .await;
     let declined = stock_answer(asked).await.0.err();
     assert_eq!(declined.as_deref(), Some("master_approval_declined"));
     assert_eq!(recording.stock_items(), [STOCK_ITEM_PREVIEW]);
 
-    let unscoped = stock_answer(
-        shown()
-            .ask(ORIGIN, stock_marks(), stock_batch())
-            .into_parts()
-            .1,
-    )
-    .await
-    .0
-    .err();
+    let unscoped = stock_answer(shown().ask(stock_marks(), stock_batch()).into_parts().1)
+        .await
+        .0
+        .err();
     assert_eq!(unscoped.as_deref(), Some("master_approval_declined"));
 }
 
@@ -912,7 +904,7 @@ async fn a_refused_stock_item_preview_asks_no_one() {
                 stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"),
                 "http://127.0.0.1:9000\nTally: other",
             )
-            .map(|shown| shown.ask(ORIGIN, stock_marks(), stock_batch()))
+            .map(|shown| shown.ask(stock_marks(), stock_batch()))
         })
         .await
         .err();
@@ -996,7 +988,7 @@ async fn approved_stock_item(
     let shown = shown_stock_item(new_name);
     let asked = SCRIPTED_APPROVAL
         .scope(ScriptedApproval::approving(), async {
-            shown.ask(ORIGIN, stock_marks(), stock_batch())
+            shown.ask(stock_marks(), stock_batch())
         })
         .await;
     let (binding, dialog, held) = asked.into_parts();
@@ -1026,7 +1018,7 @@ async fn one_asks_binding_approval_and_held_request_are_taken_with_a_fresh_bindi
         .hold_approved(&batch, binding.clone(), approved, held, answered)
         .unwrap();
     assert!(matches!(approvals.begin(&batch), Begin::Redeem(_)));
-    let fresh = shown_stock_item("SC Copied Marked").binding(ORIGIN);
+    let fresh = shown_stock_item("SC Copied Marked").binding();
     assert_eq!(fresh, binding);
     let (taken, redeemed, held) = approvals.take_for_dispatch(&batch, &fresh).unwrap();
     assert_eq!(redeemed.post_kind(), PostKind::Masters);
@@ -1045,7 +1037,7 @@ async fn one_asks_binding_approval_and_held_request_are_taken_with_a_fresh_bindi
     approvals
         .hold_approved(&batch, binding, approved, held, answered)
         .unwrap();
-    let other = shown_stock_item("SC Copied Other").binding(ORIGIN);
+    let other = shown_stock_item("SC Copied Other").binding();
     assert_eq!(
         approvals.take_for_dispatch(&batch, &other).err().as_deref(),
         Some("import_approval_binding_changed")
@@ -1067,6 +1059,11 @@ async fn a_held_stock_item_approval_is_refused_for_another_binding() {
     let other = shown_stock_item("SC Copied Other");
     assert_ne!(other.prepared.writes(), base.prepared.writes());
     let company = base.prepared.company().clone();
+    // The binding names the endpoint the preview was shown for.
+    assert_eq!(
+        base.binding(),
+        ApprovalBinding::stock_item(ORIGIN, &base.prepared, &base.preview)
+    );
     let fresh_bindings = [
         (
             "writes",
@@ -1076,7 +1073,10 @@ async fn a_held_stock_item_approval_is_refused_for_another_binding() {
             "preview",
             ApprovalBinding::stock_item(ORIGIN, &base.prepared, &other.preview),
         ),
-        ("endpoint", base.binding("http://127.0.0.1:1")),
+        (
+            "endpoint",
+            ApprovalBinding::stock_item("http://127.0.0.1:1", &base.prepared, &base.preview),
+        ),
         (
             "ledger",
             ApprovalBinding::masters(
@@ -1090,7 +1090,7 @@ async fn a_held_stock_item_approval_is_refused_for_another_binding() {
     ];
     for (case, fresh) in fresh_bindings {
         let (binding, held, approved, answered) = approved_stock_item("SC Copied Marked").await;
-        assert_eq!(binding, base.binding(ORIGIN), "{case}");
+        assert_eq!(binding, base.binding(), "{case}");
         assert_ne!(fresh, binding, "{case} must differ from the base");
         approvals
             .hold_approved(&batch, binding, approved, held, answered)
@@ -1202,7 +1202,7 @@ async fn a_held_request_that_does_not_render_to_the_approved_bytes_is_refused() 
             .unwrap(),
     );
     hold_ledger();
-    let stock = shown_stock_item("SC Copied Marked").binding(ORIGIN);
+    let stock = shown_stock_item("SC Copied Marked").binding();
     assert_eq!(stock.kind(), ledger_binding.kind());
     assert_eq!(
         approvals.take_for_dispatch(&batch, &stock).err().as_deref(),
@@ -1228,7 +1228,7 @@ async fn a_held_stock_item_dialog_is_approved_or_refused_by_its_answer() {
         };
         let asked = SCRIPTED_APPROVAL
             .scope(scripted.clone(), async {
-                shown.ask(ORIGIN, stock_marks(), stock_batch())
+                shown.ask(stock_marks(), stock_batch())
             })
             .await;
         let (binding, dialog, held) = asked.into_parts();

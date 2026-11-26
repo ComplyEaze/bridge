@@ -335,13 +335,15 @@ pub(super) fn stock_item_review_text(
 }
 
 /// One stock-item draft as the person will be shown it: the Create prepared
-/// from the draft and the preview built from the same draft. Only
+/// from the draft, the preview built from the same draft, and the endpoint
+/// the preview names, which its binding names too. Only
 /// [`show_stock_item_draft`] makes one, and [`ShownStockItem::ask`] is the one
 /// way to ask the person about it.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) struct ShownStockItem {
     prepared: PreparedStockItem,
     preview: String,
+    origin: String,
 }
 
 /// The preview of `draft` and the Create prepared from it: the one place a
@@ -354,15 +356,19 @@ pub(super) fn show_stock_item_draft(
     let preview = stock_item_review_text(&draft, origin)?;
     let prepared =
         PreparedStockItem::from_draft(draft).map_err(StockItemReviewError::NotRenderable)?;
-    Ok(ShownStockItem { prepared, preview })
+    Ok(ShownStockItem {
+        prepared,
+        preview,
+        origin: origin.to_string(),
+    })
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
 impl ShownStockItem {
-    /// The binding of what was shown, reached at `endpoint_origin`: at the
-    /// take, the fresh binding of a fresh draft.
-    pub(super) fn binding(&self, endpoint_origin: &str) -> ApprovalBinding {
-        ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview)
+    /// The binding of what was shown, at the endpoint it was shown for: at
+    /// the take, the fresh binding of a fresh draft.
+    pub(super) fn binding(&self) -> ApprovalBinding {
+        ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)
     }
 
     /// Shows the preview in the stock-item dialog, on its own task, and on the
@@ -371,11 +377,10 @@ impl ShownStockItem {
     /// request are built here from the same item, so all three agree.
     pub(super) fn ask(
         self,
-        endpoint_origin: &str,
         company_marks_request: AgentReadRequest,
         batch_id: String,
     ) -> AskedStockItem {
-        let binding = ApprovalBinding::stock_item(endpoint_origin, &self.prepared, &self.preview);
+        let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);
         let held = HeldRequest::StockItem(Box::new(self.prepared.clone()));
         let dialog = PendingPostApproval::ask_stock_item(
             self.prepared,

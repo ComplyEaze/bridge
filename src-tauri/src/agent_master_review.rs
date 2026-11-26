@@ -270,8 +270,8 @@ pub(super) fn stock_item_review_text(
 }
 
 /// The stock preview's lines for `writes` in `company`, reached at `origin`,
-/// with the item's name, its sibling's source name and its parent as `shown`
-/// gives them: whole for the dialog, masked for a result under `mask_parties`.
+/// with the item's name, its sibling's source name, its parent and its HSN
+/// description as `shown` gives them: whole for the dialog, masked for a result under `mask_parties`.
 /// The one layout of the stock preview; it checks nothing.
 fn stock_item_lines(
     company: &VerifiedCompanyIdentity,
@@ -349,7 +349,7 @@ fn stock_item_lines(
         format!("HSN details entry 1 — source: {}", quoted(&source)),
         format!("  Applicable from: {}", quoted(hsn.applicable_from())),
         format!("  HSN code: {}", quoted(hsn.code())),
-        format!("  HSN description: {}", quoted(hsn.description())),
+        format!("  HSN description: {}", quoted(&shown(hsn.description()))),
         format!("  Source of HSN details: {}", quoted(SPECIFY_DETAILS_HERE)),
         String::new(),
         "Do not create or rename stock items in Tally until this is done.".to_string(),
@@ -399,9 +399,9 @@ impl ShownStockItem {
         &self.preview
     }
 
-    /// The same preview with the item's name, its sibling's source name and
-    /// its parent masked, for a result under `mask_parties`, as a stock read
-    /// masks them; the dialog shows them whole. Tally's reserved root is not
+    /// The same preview with the item's name, its sibling's source name, its
+    /// parent and its HSN description masked, for a result under
+    /// `mask_parties`, as a stock read masks them; the dialog shows them whole. Tally's reserved root is not
     /// masked. The fit was judged on the whole text when the item was shown.
     pub(super) fn masked_preview(&self) -> String {
         let (company, writes) = (self.prepared.company(), self.prepared.writes());

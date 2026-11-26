@@ -208,7 +208,7 @@ fn journal_lines(journal: &[u8]) -> Vec<Value> {
 }
 
 #[tokio::test]
-async fn under_mask_parties_the_preview_masks_the_item_sibling_and_parent_and_records_the_same_batch(
+async fn under_mask_parties_the_preview_masks_the_item_sibling_parent_and_hsn_description_and_records_the_same_batch(
 ) {
     let plain = prepare(passing_run(), SHAPE_GUID, STOCK_PROPOSED, STOCK_SOURCE).await;
     let masked = prepare_under(
@@ -228,8 +228,10 @@ async fn under_mask_parties_the_preview_masks_the_item_sibling_and_parent_and_re
     };
     let (plain_text, masked_text) = (preview(&plain), preview(&masked));
     let prepared = rebound_prepared(&shape_identity());
-    let parent = prepared.writes().parent();
-    for text in [STOCK_PROPOSED, STOCK_SOURCE, parent] {
+    let (parent, hsn) = (prepared.writes().parent(), prepared.writes().hsn());
+    // The captured sibling's HSN description is not empty, so its mask is seen.
+    assert!(!hsn.description().is_empty());
+    for text in [STOCK_PROPOSED, STOCK_SOURCE, parent, hsn.description()] {
         let hidden = crate::agent::mask(text);
         // A mask that kept the plain text would pass the checks below.
         assert_ne!(hidden, text);
@@ -240,9 +242,20 @@ async fn under_mask_parties_the_preview_masks_the_item_sibling_and_parent_and_re
             "{text} is shown whole without masking"
         );
     }
-    // Only those three differ: the same lines, and the unit stays whole.
+    // Only those four differ: the same lines; the unit, the HSN code and the
+    // rates stay whole.
     assert_eq!(masked_text.lines().count(), plain_text.lines().count());
-    assert!(masked_text.contains(prepared.writes().unit()));
+    let quoted = |text: &str| serde_json::to_string(text).unwrap();
+    assert!(masked_text.contains(&format!("Base unit: {}", quoted(prepared.writes().unit()))));
+    assert!(masked_text.contains(&format!("HSN code: {}", quoted(hsn.code()))));
+    let rate_lines = |text: &str| {
+        text.lines()
+            .filter(|line| line.contains("Rate row "))
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+    };
+    assert!(!rate_lines(&masked_text).is_empty());
+    assert_eq!(rate_lines(&masked_text), rate_lines(&plain_text));
     // The recorded batch is the same but for its fresh id.
     let batch = |run: &Run| {
         let mut lines = journal_lines(run.journal.as_deref().expect("a batch is recorded"));

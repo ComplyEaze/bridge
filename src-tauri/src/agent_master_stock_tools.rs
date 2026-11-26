@@ -8,9 +8,13 @@
 //! with the post.
 //!
 //! Under `mask_parties` the returned preview masks the item's name, its
-//! sibling's source name and its parent, as a stock read masks a stock item's
-//! name and parent; the base unit and the HSN description stay as the stock
-//! reads leave them. The recorded batch is the same either way.
+//! sibling's source name, its parent and its HSN description, as a stock read
+//! masks a stock item's name, parent and HSN description (a person can edit
+//! that description). The base unit stays whole because unit names are
+//! configuration labels, and the HSN code and the rates stay whole because they
+//! are not names. Each is masked with `mask`, since the masters read's own
+//! marking works on a JSON field, not a plain string. The recorded batch is the
+//! same either way.
 //!
 //! The answer's evidence is the company-list read of the identity check only:
 //! the stock reads keep none, and no declared reason code says so.

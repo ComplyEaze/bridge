@@ -184,21 +184,14 @@ fn recheck_stock_item_admission(input: StockItemRecheckInput<'_>) -> anyhow::Res
     Ok(())
 }
 
-/// The request a master approval is held with: the ledger batch or the stock
-/// item, and the request rendered from it, once. It is the masters twin of
-/// `NativePostRequest` in the approval slot; the approval binding holds the
-/// verified company tuple.
+/// The request a master approval is held with: the batch and the request
+/// rendered from it, once. It is the masters twin of `NativePostRequest` in the
+/// approval slot, and carries no company: the rendered bytes name it, and the
+/// approval binding holds the verified tuple.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum MasterPostRequest {
-    Ledgers {
-        batch: LedgerCreateBatch,
-        rendered: RenderedLedgerCreate,
-    },
-    StockItem {
-        prepared: PreparedStockItem,
-        xml: String,
-        sha256: String,
-    },
+pub(super) struct MasterPostRequest {
+    batch: LedgerCreateBatch,
+    rendered: RenderedLedgerCreate,
 }
 
 impl MasterPostRequest {
@@ -209,44 +202,22 @@ impl MasterPostRequest {
     ) -> Self {
         let batch = batch.into();
         let rendered = batch.render_import(company);
-        Self::Ledgers { batch, rendered }
-    }
-
-    /// Renders `prepared` with its one renderer, once.
-    // Held by the stock-item tool, which is not built yet.
-    #[allow(dead_code)]
-    pub(super) fn stock_item(prepared: PreparedStockItem) -> Self {
-        let xml = prepared.render();
-        let sha256 = bridge_tally_protocol::sha256_hex(xml.as_bytes());
-        Self::StockItem {
-            prepared,
-            xml,
-            sha256,
-        }
+        Self { batch, rendered }
     }
 
     #[cfg(test)]
     pub(super) fn batch(&self) -> &LedgerCreateBatch {
-        match self {
-            Self::Ledgers { batch, .. } => batch,
-            Self::StockItem { .. } => panic!("a stock-item request holds no ledger batch"),
-        }
+        &self.batch
     }
 
     /// The rendered request, as the POST will send it.
     pub(super) fn xml(&self) -> &str {
-        match self {
-            Self::Ledgers { rendered, .. } => rendered.xml(),
-            Self::StockItem { xml, .. } => xml,
-        }
+        self.rendered.xml()
     }
 
     /// Lowercase hex digest of [`Self::xml`].
     pub(super) fn sha256(&self) -> &str {
-        match self {
-            Self::Ledgers { rendered, .. } => rendered.sha256(),
-            Self::StockItem { sha256, .. } => sha256,
-        }
+        self.rendered.sha256()
     }
 }
 

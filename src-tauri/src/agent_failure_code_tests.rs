@@ -716,9 +716,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 76 + 4 + 2 + 1 + 1 + 4;
+    let expected = 77 + 4 + 2 + 1 + 1 + 4;
     #[cfg(feature = "lab-writes")]
-    let expected = 79 + 4 + 2 + 1 + 1 + 4;
+    let expected = 80 + 4 + 2 + 1 + 1 + 4;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

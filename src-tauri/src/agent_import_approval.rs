@@ -29,7 +29,6 @@ use crate::tally::approved_import::{
     Answered, ApprovedImport, PendingPostApproval, PostKind, UnderLockRefusal,
 };
 use crate::tally::ledger_create_item::LedgerCreateBatch;
-use crate::tally::stock_item_create::StockItemWrites;
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -146,12 +145,6 @@ enum BindingSubject {
         company: MasterCompanyTuple,
         batch: LedgerCreateBatch,
     },
-    /// One stock-item `Create`: the verified company's tuple and every value it
-    /// writes, so an approval is redeemed only for the writes it was shown.
-    StockItem {
-        company: MasterCompanyTuple,
-        writes: StockItemWrites,
-    },
 }
 
 /// The verified company a master approval is for, as the person was shown it.
@@ -161,17 +154,6 @@ struct MasterCompanyTuple {
     guid: String,
     company_number: String,
     books_from: String,
-}
-
-impl MasterCompanyTuple {
-    fn of(company: &VerifiedCompanyIdentity) -> Self {
-        Self {
-            name: company.display_name().to_string(),
-            guid: company.company_guid().to_string(),
-            company_number: company.company_number().to_string(),
-            books_from: company.books_from_yyyymmdd().to_string(),
-        }
-    }
 }
 
 impl ApprovalBinding {
@@ -214,32 +196,13 @@ impl ApprovalBinding {
             endpoint_origin: Some(endpoint_origin.to_string()),
             preview_sha256: sha256_hex(preview.as_bytes()),
             subject: BindingSubject::Masters {
-                company: MasterCompanyTuple::of(company),
+                company: MasterCompanyTuple {
+                    name: company.display_name().to_string(),
+                    guid: company.company_guid().to_string(),
+                    company_number: company.company_number().to_string(),
+                    books_from: company.books_from_yyyymmdd().to_string(),
+                },
                 batch: batch.clone(),
-            },
-        }
-    }
-
-    /// The binding of one stock-item `Create`: the request digest, the
-    /// endpoint, the verified company tuple, every value it writes, and the
-    /// preview the person was shown.
-    // Bound by the stock-item tool, which is not built yet.
-    #[allow(dead_code)]
-    pub(super) fn stock_item(
-        request_sha256: &str,
-        endpoint_origin: &str,
-        company: &VerifiedCompanyIdentity,
-        writes: &StockItemWrites,
-        preview: &str,
-    ) -> Self {
-        Self {
-            form: PreviewForm::Listed,
-            batch_sha256: request_sha256.to_string(),
-            endpoint_origin: Some(endpoint_origin.to_string()),
-            preview_sha256: sha256_hex(preview.as_bytes()),
-            subject: BindingSubject::StockItem {
-                company: MasterCompanyTuple::of(company),
-                writes: writes.clone(),
             },
         }
     }
@@ -247,7 +210,7 @@ impl ApprovalBinding {
     pub(super) fn kind(&self) -> PostKind {
         match self.subject {
             BindingSubject::Vouchers { .. } => PostKind::Vouchers,
-            BindingSubject::Masters { .. } | BindingSubject::StockItem { .. } => PostKind::Masters,
+            BindingSubject::Masters { .. } => PostKind::Masters,
         }
     }
 
@@ -255,7 +218,7 @@ impl ApprovalBinding {
     fn voucher_count(&self) -> Option<usize> {
         match self.subject {
             BindingSubject::Vouchers { voucher_count, .. } => Some(voucher_count),
-            BindingSubject::Masters { .. } | BindingSubject::StockItem { .. } => None,
+            BindingSubject::Masters { .. } => None,
         }
     }
 }

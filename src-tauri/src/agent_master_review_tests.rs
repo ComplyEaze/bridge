@@ -7,7 +7,8 @@ use crate::tally::ledger_create_item::{
 };
 use crate::tally::master_name::MasterName;
 use crate::tally::stock_item_create::{
-    CreateRenderRefusal, DraftText, GoodsSibling, SiblingGst, StockItemCatalogue, StockItemDraft,
+    render_stock_item_create, CreateRenderRefusal, DraftText, GoodsSibling, SiblingGst,
+    StockItemCatalogue, StockItemDraft,
 };
 use crate::tally::stock_item_verified::{ReadBackVerdict, StockItemImportOutcome};
 use bridge_tally_protocol::{
@@ -357,6 +358,10 @@ const STOCK_UNITS: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml"
 );
 
+const STOCK_MARKED_REQUEST: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-marked-create.request.utf16le.xml"
+);
+
 const STOCK_ITEM_PREVIEW: &str = concat!(
     "Create ONE stock item in \"BRIDGE STOCK CREATE LAB\"\n",
     "Company GUID: bac2b5e9-ada9-43c0-b8f8-a2812a813fa1\n",
@@ -643,9 +648,9 @@ fn the_preview_shows_what_the_create_renderer_sends_for_the_same_draft() {
         let catalogue = stock_catalogue(STOCK_COMPANY, &xml);
         let draft = stock_draft(&catalogue, new_name, source_name);
         let preview = stock_item_review_text(&draft, ORIGIN).expect("the draft has a review");
-        let request = PreparedStockItem::from_draft(draft)
-            .expect("the draft renders")
-            .render();
+        let request = render_stock_item_create(
+            &PreparedStockItem::from_draft(draft).expect("the draft renders"),
+        );
         // The captured company name needs no XML escape, so the envelope holds
         // it as shown.
         assert_eq!(
@@ -814,9 +819,11 @@ async fn a_confirmed_stock_item_draft_is_approved_for_the_create_it_was_shown() 
     assert!(recording.reviews().is_empty());
     assert!(recording.masters().is_empty());
 
-    let draft = stock_draft(&before, "SC Copied Marked", "SC Sibling Goods");
-    let expected = PreparedStockItem::from_draft(draft).expect("the same draft renders");
-    assert!(shown.sends_exactly(&expected.render()));
+    // The one prepared value the dialog was shown is the one sent: the preview
+    // above, and the captured marked-create request here.
+    let marked = bridge_tally_protocol::decode_xml_bytes(STOCK_MARKED_REQUEST)
+        .expect("the captured request decodes");
+    assert!(shown.sends_exactly(&marked));
     assert_eq!(
         shown.post_kind(),
         crate::tally::approved_import::PostKind::Masters

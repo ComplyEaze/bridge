@@ -1592,7 +1592,7 @@ pub(crate) fn captured_prepared(proposed_name: &str) -> PreparedStockItem {
 }
 
 fn render_captured_create(proposed_name: &str) -> String {
-    captured_prepared(proposed_name).render()
+    render_stock_item_create(&captured_prepared(proposed_name))
 }
 
 fn assert_create_text_refusal(built: Result<StockItemDraft<'_>, DraftRefusal>, field: DraftText) {

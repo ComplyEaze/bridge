@@ -85,7 +85,7 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         "approve(count, preview).await?;\n        Ok(Self {",
         "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
         "approve_masters(preview).await?;\n        Ok(Self {\n            kind: ApprovedKind::Masters(",
-        "approve_stock_item(&preview).await?;\n    Ok(ShownDraft::from_confirmed(",
+        "approve_stock_item(&preview).await?;\n        Ok(Self {\n            kind: ApprovedKind::Masters(",
     ] {
         if source.matches(call_site).count() != 1 {
             problems.push(format!("expected exactly one call site `{call_site}`"));
@@ -616,8 +616,8 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "confirm_stock_item_dialog(&preview).await?;",
         ),
         source.replace(
-            "approve_stock_item(&preview).await?;\n    Ok(ShownDraft::from_confirmed(",
-            "approve(ONE_STOCK_ITEM, &preview).await?;\n    Ok(ShownDraft::from_confirmed(",
+            "approve_stock_item(&preview).await?;\n        Ok(Self {",
+            "approve(ONE_STOCK_ITEM, &preview).await?;\n        Ok(Self {",
         ),
         // A master approval must never be answered by the post dialog, nor a
         // post by the one-ledger dialog.
@@ -3284,33 +3284,42 @@ fn each_dialog_answers_only_on_its_positive_button() {
     }
 }
 
-const CONFIRM_STOCK_ITEM: &str = r#"pub(crate) async fn confirm_stock_item<'a>(
-    draft: StockItemDraft<'a>,
-    preview: String,
-) -> Result<ShownDraft<'a>, StockItemDialogRefusal> {
-    approve_stock_item(&preview).await?;
-    Ok(ShownDraft::from_confirmed(StockItemConfirmation {
-        draft,
-        shown: preview,
-    }))
-}"#;
+const CONFIRM_STOCK_ITEM: &str = r#"    pub(crate) async fn confirm_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, StockItemDialogRefusal> {
+        let admission = MasterAdmission::stock_item(prepared);
+        approve_stock_item(&preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Masters(Box::new(admission)),
+            company_marks_request,
+        })
+    }"#;
 
-const STOCK_ITEM_CONFIRMATION: &str = r#"#[derive(Debug)]
-pub(crate) struct StockItemConfirmation<'a> {
-    draft: StockItemDraft<'a>,
-    shown: String,
-}"#;
+/// The stock-item admission's one maker. Only `confirm_stock_item` calls it, and
+/// holds what it makes only after the dialog approves.
+const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(prepared: PreparedStockItem) -> Self {
+        let rendered = render_stock_item_create(&prepared);
+        Self {
+            writes: MasterWrites::StockItem { prepared, rendered },
+            batch_id: None,
+        }
+    }"#;
 
-/// `ShownDraft` with its one derive: an added `Clone` or `Default` would let one
-/// approval stand for a second Create.
-const SHOWN_DRAFT_STRUCT: &str = r#"#[derive(Debug)]
-pub(crate) struct ShownDraft<'a> {
-    draft: StockItemDraft<'a>,
-    shown: String,
-}"#;
+/// `PreparedStockItem` with its fields private to its module. It is `Clone`:
+/// one approval is redeemed once because `take_for_dispatch` removes the held
+/// approval by value, `RecordedIntent` is neither `Clone` nor `Default` and the
+/// send takes it by value, and the journal admits one intent per batch; until
+/// the stock send exists, the runtime refuses a stock item before any read.
+const PREPARED_STRUCT: &str = r#"    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct PreparedStockItem {
+        company: VerifiedCompanyIdentity,
+        writes: StockItemWrites,
+    }"#;
 
 /// The lines of `source` that begin an `impl` naming `name`: one inherent block
-/// each, and no trait impl (`Clone`, `Default`, `From`) that could make another.
+/// each, and no trait impl (`Default`, `From`) that could make another.
 fn impl_lines_naming(source: &str, name: &str) -> usize {
     source
         .lines()
@@ -3318,45 +3327,43 @@ fn impl_lines_naming(source: &str, name: &str) -> usize {
         .count()
 }
 
-const SHOWN_DRAFT_MAKERS: &str = r#"impl<'a> ShownDraft<'a> {
-    pub(super) fn from_confirmed(confirmation: StockItemConfirmation<'a>) -> Self {
-        let (draft, shown) = confirmation.into_parts();
-        Self { draft, shown }
-    }
-
-    /// A draft marked as shown without any window, for tests that render or
-    /// verify it. It holds no shown text.
-    #[cfg(test)]
-    pub(crate) fn from_draft(draft: StockItemDraft<'a>) -> Self {
-        Self {
-            draft,
-            shown: String::new(),
+const PREPARED_MAKERS: &str = r#"    impl PreparedStockItem {
+        /// Takes the draft's writes and its catalogue's company, refusing what
+        /// `create_text_refusal` refuses.
+        pub(crate) fn from_draft(draft: StockItemDraft<'_>) -> Result<Self, CreateRenderRefusal> {
+            create_text_refusal(&draft.writes)?;
+            let company = draft.sibling.sibling().catalogue().company().clone();
+            Ok(Self {
+                company,
+                writes: draft.writes,
+            })
         }
-    }
 
-    pub(crate) fn draft(&self) -> &StockItemDraft<'a> {
-        &self.draft
-    }
+        pub(crate) fn company(&self) -> &VerifiedCompanyIdentity {
+            &self.company
+        }
 
-    /// The preview the approving window showed under its answer lines; empty
-    /// for a draft a test made.
-    pub(crate) fn shown_text(&self) -> &str {
-        &self.shown
-    }
-}"#;
+        pub(crate) fn writes(&self) -> &StockItemWrites {
+            &self.writes
+        }
+    }"#;
 
 const CONFIRM_STOCK_ITEM_DRAFT: &str = r#"#[cfg_attr(not(test), allow(dead_code))]
-pub(super) async fn confirm_stock_item_draft<'a>(
-    draft: StockItemDraft<'a>,
+pub(super) async fn confirm_stock_item_draft(
+    draft: StockItemDraft<'_>,
     origin: &str,
-) -> Result<ShownDraft<'a>, StockItemConfirmError> {
+    company_marks_request: AgentReadRequest,
+) -> Result<ApprovedImport, StockItemConfirmError> {
     let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
-    confirm_stock_item(draft, preview)
+    let prepared = PreparedStockItem::from_draft(draft).map_err(|refusal| {
+        StockItemConfirmError::Review(StockItemReviewError::NotRenderable(refusal))
+    })?;
+    ApprovedImport::confirm_stock_item(prepared, preview, company_marks_request)
         .await
         .map_err(StockItemConfirmError::Dialog)
 }"#;
 
-fn shown_draft_problems(
+fn stock_approval_problems(
     approvals: &str,
     approvals_tests: &str,
     stock: &str,
@@ -3369,82 +3376,92 @@ fn shown_draft_problems(
         (approvals, CONFIRM_STOCK_ITEM, 1, "confirm_stock_item"),
         (
             approvals,
-            STOCK_ITEM_CONFIRMATION,
+            STOCK_ITEM_ADMISSION,
             1,
-            "StockItemConfirmation",
+            "the stock-item admission",
         ),
         (
             approvals,
-            "StockItemConfirmation {",
+            "MasterWrites::StockItem { prepared, rendered }",
             1,
             "its one construction",
         ),
         (
             approvals,
-            "ShownDraft::from_confirmed(",
+            "MasterAdmission::stock_item(",
             1,
-            "its one confirmed maker",
+            "its one approved maker",
         ),
         (
             approvals_tests,
-            "StockItemConfirmation {",
+            "MasterWrites::StockItem {",
             0,
             "test construction",
         ),
         (
             approvals_tests,
-            "from_confirmed(",
+            "MasterAdmission::stock_item(",
             0,
-            "test confirmation use",
+            "test admission use",
         ),
-        (stock, SHOWN_DRAFT_MAKERS, 1, "ShownDraft makers"),
+        (stock, PREPARED_MAKERS, 1, "PreparedStockItem makers"),
         (
             stock,
-            SHOWN_DRAFT_STRUCT,
+            PREPARED_STRUCT,
             1,
-            "ShownDraft and its one derive",
+            "PreparedStockItem and its private fields",
         ),
-        (stock, "ShownDraft {", 0, "stock construction"),
-        (stock_tests, "ShownDraft {", 0, "stock test construction"),
-        (
-            stock_tests,
-            "from_confirmed(",
-            0,
-            "stock test confirmation use",
-        ),
+        (stock, "mod prepared {", 1, "its private module"),
         (review, CONFIRM_STOCK_ITEM_DRAFT, 1, "the coordinator"),
     ] {
         if text.matches(pin).count() != expected {
             problems.push(format!("expected {expected} of {label}"));
         }
     }
-    if impl_lines_naming(stock, "ShownDraft") != 1 {
-        problems.push("expected one impl naming ShownDraft".into());
+    // A brace after the name, other than after `->`, is its declaration, its
+    // impl or a struct literal.
+    let braces = |text: &str| {
+        text.matches("PreparedStockItem {").count() - text.matches("-> PreparedStockItem {").count()
+    };
+    if braces(stock) != 2 || braces(stock_tests) != 0 {
+        problems.push("PreparedStockItem must be built only inside its module".into());
     }
-    if impl_lines_naming(approvals, "StockItemConfirmation") != 1 {
-        problems.push("expected one impl naming StockItemConfirmation".into());
+    if impl_lines_naming(stock, "PreparedStockItem") != 1 {
+        problems.push("expected one impl naming PreparedStockItem".into());
     }
-    let confirmed_elsewhere = others
+    if impl_lines_naming(stock_tests, "PreparedStockItem") != 0 {
+        problems.push("expected no test impl naming PreparedStockItem".into());
+    }
+    let impls_elsewhere = others
         .iter()
-        .filter(|(path, _)| !path.ends_with("approved_import.rs"))
-        .map(|(_, text)| text.matches("ShownDraft::from_confirmed(").count())
+        .filter(|(path, _)| !path.ends_with("stock_item_create.rs"))
+        .map(|(_, text)| impl_lines_naming(text, "PreparedStockItem"))
         .sum::<usize>();
-    let confirmed_in_approvals = others
+    if impls_elsewhere != 0 {
+        problems.push("PreparedStockItem must be implemented only in its module".into());
+    }
+    let prepared_elsewhere = others
         .iter()
-        .filter(|(path, _)| path.ends_with("approved_import.rs"))
-        .map(|(_, text)| text.matches("ShownDraft::from_confirmed(").count())
+        .filter(|(path, _)| !path.ends_with("agent_master_review.rs"))
+        .map(|(_, text)| text.matches("PreparedStockItem::from_draft(").count())
         .sum::<usize>();
-    if confirmed_elsewhere != 0 || confirmed_in_approvals != 1 {
-        problems.push("ShownDraft::from_confirmed must be called only in approved_import".into());
+    let prepared_in_review = others
+        .iter()
+        .filter(|(path, _)| path.ends_with("agent_master_review.rs"))
+        .map(|(_, text)| text.matches("PreparedStockItem::from_draft(").count())
+        .sum::<usize>();
+    if prepared_elsewhere != 0 || prepared_in_review != 1 {
+        problems
+            .push("PreparedStockItem::from_draft must be called only by its coordinator".into());
     }
     let stock_calls = others
         .iter()
-        .map(|(_, text)| text.matches("confirm_stock_item(").count())
+        .map(|(_, text)| text.matches("::confirm_stock_item(").count())
         .sum::<usize>();
     let review_calls = others
         .iter()
         .filter(|(path, _)| path.ends_with("agent_master_review.rs"))
-        .map(|(_, text)| text.matches("confirm_stock_item(").count())
+        .map(|(_, text)| text.matches("::confirm_stock_item(").count())
         .sum::<usize>();
     if stock_calls != 1 || review_calls != 1 {
         problems.push("confirm_stock_item must be called only by its coordinator".into());
@@ -3453,7 +3470,7 @@ fn shown_draft_problems(
 }
 
 #[test]
-fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
+fn a_stock_item_approval_is_made_only_after_the_stock_item_dialog_approves() {
     let approvals = read("src-tauri/src/tally/approved_import.rs");
     let approvals_tests = read("src-tauri/src/tally/approved_import_tests.rs");
     let stock = read("src-tauri/src/tally/stock_item_create.rs");
@@ -3463,7 +3480,7 @@ fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
     // This scan skips agent_import_approval.rs and files named *_tests.rs,
     // *_tests_* or tests.rs, rather than literally every non-test source.
     assert_eq!(
-        shown_draft_problems(
+        stock_approval_problems(
             &approvals,
             &approvals_tests,
             &stock,
@@ -3476,10 +3493,10 @@ fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
 
     let without_approval = approvals.replace(
         CONFIRM_STOCK_ITEM,
-        &CONFIRM_STOCK_ITEM.replace("    approve_stock_item(&preview).await?;\n", ""),
+        &CONFIRM_STOCK_ITEM.replace("        approve_stock_item(&preview).await?;\n", ""),
     );
     assert_ne!(without_approval, approvals);
-    assert!(!shown_draft_problems(
+    assert!(!stock_approval_problems(
         &without_approval,
         &approvals_tests,
         &stock,
@@ -3489,52 +3506,23 @@ fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
     )
     .is_empty());
 
-    let ungated_test_maker = stock.replace(
-        SHOWN_DRAFT_MAKERS,
-        &SHOWN_DRAFT_MAKERS.replacen("    #[cfg(test)]\n", "", 1),
-    );
-    assert_ne!(ungated_test_maker, stock);
-    assert!(!shown_draft_problems(
-        &approvals,
-        &approvals_tests,
-        &ungated_test_maker,
-        &stock_tests,
-        &review,
-        &others,
-    )
-    .is_empty());
-
-    for (stock_text, approvals_text) in [
-        (
-            stock.replace(SHOWN_DRAFT_STRUCT, &SHOWN_DRAFT_STRUCT.replace("Debug", "Debug, Clone")),
-            approvals.clone(),
+    // The old Clone mutations on `ShownDraft` and `StockItemConfirmation` are
+    // gone with no replacement: single use rests where `PREPARED_STRUCT` says.
+    for stock_text in [
+        stock.replace(
+            PREPARED_STRUCT,
+            &PREPARED_STRUCT.replace("        company:", "        pub(crate) company:"),
         ),
-        (
-            format!("{stock}\nimpl Default for ShownDraft<'_> {{ fn default() -> Self {{ todo!() }} }}"),
-            approvals.clone(),
+        stock.replace(
+            PREPARED_STRUCT,
+            &PREPARED_STRUCT.replace("Debug, Clone,", "Debug, Clone, Default,"),
         ),
-        (
-            format!("{stock}\nimpl<'b> ShownDraft<'b> {{ fn again(d: StockItemDraft<'b>) -> Self {{ Self {{ draft: d, shown: String::new() }} }} }}"),
-            approvals.clone(),
-        ),
-        (
-            stock.clone(),
-            approvals.replace(
-                STOCK_ITEM_CONFIRMATION,
-                &STOCK_ITEM_CONFIRMATION.replace("Debug", "Debug, Clone"),
-            ),
-        ),
-        (
-            stock.clone(),
-            format!("{approvals}\nimpl Clone for StockItemConfirmation<'_> {{ fn clone(&self) -> Self {{ todo!() }} }}"),
-        ),
+        format!("{stock}\nimpl From<StockItemWrites> for PreparedStockItem {{ fn from(_: StockItemWrites) -> Self {{ todo!() }} }}"),
+        format!("{stock}\nimpl PreparedStockItem {{ fn again(writes: StockItemWrites) -> Self {{ todo!() }} }}"),
     ] {
-        assert!(
-            stock_text != stock || approvals_text != approvals,
-            "the mutation changed nothing"
-        );
-        assert!(!shown_draft_problems(
-            &approvals_text,
+        assert_ne!(stock_text, stock, "the mutation changed nothing");
+        assert!(!stock_approval_problems(
+            &approvals,
             &approvals_tests,
             &stock_text,
             &stock_tests,
@@ -3544,8 +3532,8 @@ fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
         .is_empty());
     }
 
-    let second_maker = format!("{approvals}\nShownDraft::from_confirmed(");
-    assert!(!shown_draft_problems(
+    let second_maker = format!("{approvals}\nMasterAdmission::stock_item(");
+    assert!(!stock_approval_problems(
         &second_maker,
         &approvals_tests,
         &stock,
@@ -3555,12 +3543,11 @@ fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
     )
     .is_empty());
 
-    let child_confirmation = format!(
-        "{approvals_tests}\nfn f(d: StockItemDraft<'_>) {{ let _ = StockItemConfirmation {{ draft: d, shown: String::new() }}; }}"
-    );
-    assert!(!shown_draft_problems(
+    let child_admission =
+        format!("{approvals_tests}\nfn f(p: PreparedStockItem) {{ let _ = MasterAdmission::stock_item(p); }}");
+    assert!(!stock_approval_problems(
         &approvals,
-        &child_confirmation,
+        &child_admission,
         &stock,
         &stock_tests,
         &review,
@@ -3568,39 +3555,45 @@ fn a_shown_draft_is_made_only_after_the_stock_item_dialog_approves() {
     )
     .is_empty());
 
-    let child_shown =
-        format!("{stock_tests}\nlet _ = ShownDraft {{ draft, shown: String::new() }};");
-    assert!(!shown_draft_problems(
-        &approvals,
-        &approvals_tests,
-        &stock,
-        &child_shown,
-        &review,
-        &others,
-    )
-    .is_empty());
+    for child_prepared in [
+        format!("{stock_tests}\nlet _ = PreparedStockItem {{ company, writes }};"),
+        format!("{stock_tests}\nimpl From<StockItemWrites> for PreparedStockItem {{ fn from(_: StockItemWrites) -> Self {{ todo!() }} }}"),
+    ] {
+        assert!(!stock_approval_problems(
+            &approvals,
+            &approvals_tests,
+            &stock,
+            &child_prepared,
+            &review,
+            &others,
+        )
+        .is_empty());
+    }
 
-    let mut elsewhere = others.clone();
-    elsewhere.push((
-        "src/elsewhere.rs".into(),
-        "confirm_stock_item(draft, text)".into(),
-    ));
-    assert!(!shown_draft_problems(
-        &approvals,
-        &approvals_tests,
-        &stock,
-        &stock_tests,
-        &review,
-        &elsewhere,
-    )
-    .is_empty());
+    for elsewhere_text in [
+        "ApprovedImport::confirm_stock_item(prepared, text, marks)",
+        "PreparedStockItem::from_draft(draft)",
+        "impl From<StockItemWrites> for PreparedStockItem {}",
+    ] {
+        let mut elsewhere = others.clone();
+        elsewhere.push(("src/elsewhere.rs".into(), elsewhere_text.into()));
+        assert!(!stock_approval_problems(
+            &approvals,
+            &approvals_tests,
+            &stock,
+            &stock_tests,
+            &review,
+            &elsewhere,
+        )
+        .is_empty());
+    }
 
     let caller_preview = review.replace(
         "stock_item_review_text(&draft, origin)",
         "Ok::<String, StockItemReviewError>(origin.to_string())",
     );
     assert_ne!(caller_preview, review);
-    assert!(!shown_draft_problems(
+    assert!(!stock_approval_problems(
         &approvals,
         &approvals_tests,
         &stock,

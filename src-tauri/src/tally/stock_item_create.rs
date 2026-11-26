@@ -527,7 +527,7 @@ impl StockItemCatalogue {
         }
         let mut masters = Vec::with_capacity(items.len());
         for (item, row) in items.iter().enumerate() {
-            if !is_lowercase_guid(&row.guid) {
+            if !is_lowercase_hex_and_hyphens(&row.guid) {
                 return Err(StockItemCatalogueError::GuidNotLowercase { item });
             }
             if row.names.is_empty() {
@@ -698,9 +698,11 @@ pub(crate) struct SiblingGst<'a> {
     hsn: &'a [HsnDetailsEntry],
 }
 
-/// Lowercase hex digits and hyphens, as the captured reads hold a GUID and the
-/// master journal's pre-image records one, so a read-back compares like with like.
-fn is_lowercase_guid(guid: &str) -> bool {
+/// Whether `guid` is non-empty and holds only lowercase hex digits and hyphens,
+/// as the captured reads hold a GUID and the master journal's pre-image records
+/// one, so a read-back compares like with like. Its characters only: a stock
+/// GUID is the company GUID, `-` and a hex suffix, and no layout is checked.
+fn is_lowercase_hex_and_hyphens(guid: &str) -> bool {
     !guid.is_empty()
         && guid
             .bytes()
@@ -1191,7 +1193,7 @@ pub(crate) use prepared::PreparedStockItem;
 /// takes bare writes, so writes rebuilt from storage never reach a Create.
 mod prepared {
     use super::{
-        create_text_refusal, render_writes, CreateRenderRefusal, StockItemDraft, StockItemWrites,
+        create_text_refusal, CreateRenderRefusal, StockItemDraft, StockItemWrites,
         VerifiedCompanyIdentity,
     };
 
@@ -1223,15 +1225,6 @@ mod prepared {
 
         pub(crate) fn writes(&self) -> &StockItemWrites {
             &self.writes
-        }
-
-        /// The one renderer of a stock item Create: it sends nothing, and
-        /// renders the structure of the first marked Create measured (one run,
-        /// PARTIAL, §12a.13), with values read from the sibling. The rate's
-        /// magnitude is not checked, and Bridge does not know how Tally treats
-        /// values other than the measured ones.
-        pub(crate) fn render(&self) -> String {
-            render_writes(self.company.display_name(), &self.writes)
         }
     }
 }
@@ -1287,6 +1280,16 @@ pub(crate) fn create_text_refusal(writes: &StockItemWrites) -> Result<(), Create
         }
     }
     Ok(())
+}
+
+/// The one renderer of a stock item Create: it takes only a `PreparedStockItem`,
+/// whose one maker has applied `create_text_refusal`, sends nothing, and renders
+/// the structure of the first marked Create measured (one run, PARTIAL,
+/// §12a.13), with values read from the sibling. The rate's magnitude is not
+/// checked, and Bridge does not know how Tally treats values other than the
+/// measured ones.
+pub(crate) fn render_stock_item_create(prepared: &PreparedStockItem) -> String {
+    render_writes(prepared.company().display_name(), prepared.writes())
 }
 
 /// The body of the one renderer, over the company's name and writes the text

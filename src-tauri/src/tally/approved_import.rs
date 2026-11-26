@@ -1,7 +1,7 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
 use super::ledger_create_item::{LedgerCreateBatch, RenderedLedgerCreate, MAX_LEDGERS_PER_BATCH};
-use super::stock_item_create::PreparedStockItem;
+use super::stock_item_create::{render_stock_item_create, PreparedStockItem};
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
@@ -356,7 +356,7 @@ impl MasterAdmission {
 
     /// The stock-item admission, rendered once.
     fn stock_item(prepared: PreparedStockItem) -> Self {
-        let rendered = prepared.render();
+        let rendered = render_stock_item_create(&prepared);
         Self {
             writes: MasterWrites::StockItem { prepared, rendered },
             batch_id: None,
@@ -715,7 +715,7 @@ pub(crate) struct PendingPostApproval {
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
     /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there but the two master twins below and the one
+    /// task. Nothing else can be run there but the masters twin below and the one
     /// note of a box that did not fit, which the caller gives and only the dialog
     /// task calls.
     #[allow(clippy::too_many_arguments)]
@@ -764,26 +764,6 @@ impl PendingPostApproval {
             async move {
                 ApprovedImport::confirm_masters(batch, &company, &preview, company_marks_request)
                     .await
-            },
-            None,
-        )
-    }
-
-    /// The same for the stock-item dialog: [`ApprovedImport::confirm_stock_item`]
-    /// with exactly these arguments, on its own task, its refusal stamped as
-    /// its code.
-    // Asked by the stock-item tool, which is not built yet.
-    #[allow(dead_code)]
-    pub(crate) fn ask_stock_item(
-        prepared: PreparedStockItem,
-        preview: String,
-        company_marks_request: AgentReadRequest,
-    ) -> Self {
-        Self::stamped(
-            async move {
-                ApprovedImport::confirm_stock_item(prepared, preview, company_marks_request)
-                    .await
-                    .map_err(|refusal| refusal.code().to_string())
             },
             None,
         )
@@ -1241,18 +1221,6 @@ pub(crate) enum StockItemDialogRefusal {
     /// The text is over the dialog's byte limit, or its box did not fit the
     /// screen.
     TooLarge,
-}
-
-impl StockItemDialogRefusal {
-    /// The code a refusal is stamped with when the dialog runs on its own task.
-    fn code(self) -> &'static str {
-        match self {
-            Self::Declined => "stock_item_approval_declined",
-            Self::Unavailable => "stock_item_approval_unavailable",
-            Self::TimedOut => "stock_item_approval_timed_out",
-            Self::TooLarge => "master_review_too_large",
-        }
-    }
 }
 
 /// A scripted answer to the native approval, for this crate's unit tests only

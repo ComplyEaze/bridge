@@ -3360,27 +3360,59 @@ const PREPARED_MAKERS: &str = r#"    impl PreparedStockItem {
         }
     }"#;
 
-const CONFIRM_STOCK_ITEM_DRAFT: &str = r#"#[cfg_attr(not(test), allow(dead_code))]
-pub(super) async fn confirm_stock_item_draft(
+/// The one ask of the stock-item dialog: `confirm_stock_item` on the dialog's
+/// own task, its refusal stamped as the ledger dialog's code.
+const ASK_STOCK_ITEM: &str = r#"    pub(crate) fn ask_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_stock_item(
+                    prepared,
+                    preview,
+                    company_marks_request,
+                    parse_marks,
+                    batch_id,
+                )
+                .await
+                .map_err(|refusal| refusal.code().to_string())
+            },
+            None,
+        )
+    }"#;
+
+/// The coordinator: the one place a draft becomes a Create, beside the preview
+/// built from the same draft.
+const SHOW_STOCK_ITEM_DRAFT: &str = r#"#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn show_stock_item_draft(
     draft: StockItemDraft<'_>,
     origin: &str,
-    company_marks_request: AgentReadRequest,
-    batch_id: String,
-) -> Result<ApprovedImport, StockItemConfirmError> {
-    let preview = stock_item_review_text(&draft, origin).map_err(StockItemConfirmError::Review)?;
-    let prepared = PreparedStockItem::from_draft(draft).map_err(|refusal| {
-        StockItemConfirmError::Review(StockItemReviewError::NotRenderable(refusal))
-    })?;
-    ApprovedImport::confirm_stock_item(
-        prepared,
-        preview,
-        company_marks_request,
-        super::master_post::stock_company_marks,
-        batch_id,
-    )
-    .await
-    .map_err(StockItemConfirmError::Dialog)
+) -> Result<ShownStockItem, StockItemReviewError> {
+    let preview = stock_item_review_text(&draft, origin)?;
+    let prepared =
+        PreparedStockItem::from_draft(draft).map_err(StockItemReviewError::NotRenderable)?;
+    Ok(ShownStockItem { prepared, preview })
 }"#;
+
+/// The one caller of `ask_stock_item`, which asks about what was shown, read
+/// in the queue with the stock marks parser.
+const SHOWN_ASK: &str = r#"    pub(super) fn ask(
+        self,
+        company_marks_request: AgentReadRequest,
+        batch_id: String,
+    ) -> PendingPostApproval {
+        PendingPostApproval::ask_stock_item(
+            self.prepared,
+            self.preview,
+            company_marks_request,
+            super::master_post::stock_company_marks,
+            batch_id,
+        )
+    }"#;
 
 fn stock_approval_problems(
     approvals: &str,
@@ -3431,7 +3463,9 @@ fn stock_approval_problems(
             "PreparedStockItem and its private fields",
         ),
         (stock, "mod prepared {", 1, "its private module"),
-        (review, CONFIRM_STOCK_ITEM_DRAFT, 1, "the coordinator"),
+        (approvals, ASK_STOCK_ITEM, 1, "ask_stock_item"),
+        (review, SHOW_STOCK_ITEM_DRAFT, 1, "the coordinator"),
+        (review, SHOWN_ASK, 1, "its one ask"),
     ] {
         if text.matches(pin).count() != expected {
             problems.push(format!("expected {expected} of {label}"));
@@ -3477,15 +3511,118 @@ fn stock_approval_problems(
         .iter()
         .map(|(_, text)| text.matches("::confirm_stock_item(").count())
         .sum::<usize>();
-    let review_calls = others
+    let ask_calls = others
         .iter()
-        .filter(|(path, _)| path.ends_with("agent_master_review.rs"))
+        .filter(|(path, _)| is_source(path, "src/tally/approved_import.rs"))
         .map(|(_, text)| text.matches("::confirm_stock_item(").count())
         .sum::<usize>();
-    if stock_calls != 1 || review_calls != 1 {
-        problems.push("confirm_stock_item must be called only by its coordinator".into());
+    if stock_calls != 1 || ask_calls != 1 {
+        problems.push("confirm_stock_item must be called only by ask_stock_item".into());
+    }
+    // Named once where it is defined and once where `ShownStockItem::ask`
+    // calls it, and nowhere else: no second caller and no alias.
+    for (path, text) in others {
+        let allowed = usize::from(
+            is_source(path, "src/tally/approved_import.rs")
+                || is_source(path, "src/agent_master_review.rs"),
+        );
+        if text.matches("ask_stock_item").count() != allowed {
+            problems.push(format!("{path} names ask_stock_item outside its one call"));
+        }
     }
     problems
+}
+
+/// `ShownStockItem`: private fields, its one attribute and no derive, one
+/// inherent impl, and one literal, in `show_stock_item_draft`; its tests build
+/// none.
+const SHOWN_STRUCT: &str = r#"pub(super) struct ShownStockItem {
+    prepared: PreparedStockItem,
+    preview: String,
+}"#;
+
+fn shown_stock_item_problems(
+    review: &str,
+    review_tests: &str,
+    others: &[(String, String)],
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    if review.matches(SHOWN_STRUCT).count() != 1
+        || attributes_above(review, SHOWN_STRUCT) != ["#[cfg_attr(not(test), allow(dead_code))]"]
+    {
+        problems.push("ShownStockItem's fields are private and it derives nothing".into());
+    }
+    let name = "ShownStockItem";
+    let impls: usize = (others.iter())
+        .map(|(_, text)| impl_lines_naming(text, name))
+        .sum();
+    if impls != 1 || impl_lines_naming(review_tests, name) != 0 {
+        problems.push("ShownStockItem has one inherent impl and no trait impl".into());
+    }
+    let literals: usize = (others.iter())
+        .map(|(_, text)| literals_of(text, name))
+        .sum();
+    let maker = fn_body(review, "pub(super) fn show_stock_item_draft(");
+    if literals != 1 || literals_of(maker, name) != 1 || literals_of(review_tests, name) != 0 {
+        problems.push("ShownStockItem is built only by show_stock_item_draft".into());
+    }
+    problems
+}
+
+#[test]
+fn a_shown_stock_item_is_made_once_and_asked_once() {
+    let review = read("src-tauri/src/agent_master_review.rs");
+    let review_tests = read("src-tauri/src/agent_master_review_tests.rs");
+    let others = other_sources();
+    assert_eq!(
+        shown_stock_item_problems(&review, &review_tests, &others),
+        Vec::<String>::new()
+    );
+    let in_review = |from: &str, to: &str| {
+        assert_eq!(review.matches(from).count(), 1, "the edit starts once");
+        let mut mutated = others.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, "src/agent_master_review.rs"))
+            .expect("the coordinator is scanned");
+        entry.1 = entry.1.replacen(from, to, 1);
+        (entry.1.clone(), mutated)
+    };
+    let mut mutations = vec![
+        in_review("    prepared: PreparedStockItem,\n", "    pub(super) prepared: PreparedStockItem,\n"),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct ShownStockItem {",
+            "#[cfg_attr(not(test), allow(dead_code))]\n#[derive(Clone)]\npub(super) struct ShownStockItem {",
+        ),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct ShownStockItem {",
+            "#[derive(Default)]\n#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct ShownStockItem {",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nimpl Clone for ShownStockItem { fn clone(&self) -> Self { todo!() } }\n#[cfg(test)]\n#[path",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(prepared: PreparedStockItem) -> ShownStockItem {\n    ShownStockItem { prepared, preview: String::new() }\n}\n#[cfg(test)]\n#[path",
+        ),
+    ];
+    let mut elsewhere = others.clone();
+    elsewhere.push((
+        "src/elsewhere.rs".into(),
+        "impl From<PreparedStockItem> for ShownStockItem {}".into(),
+    ));
+    mutations.push((review.clone(), elsewhere));
+    for (at, (mutated_review, mutated)) in mutations.iter().enumerate() {
+        assert_ne!(mutated, &others, "mutation {at} changed nothing");
+        assert!(
+            !shown_stock_item_problems(mutated_review, &review_tests, mutated).is_empty(),
+            "mutation {at}"
+        );
+    }
+    let test_literal = format!(
+        "{review_tests}\nfn f(prepared: PreparedStockItem) {{ let _ = ShownStockItem {{ prepared, preview: String::new() }}; }}"
+    );
+    assert!(!shown_stock_item_problems(&review, &test_literal, &others).is_empty());
 }
 
 #[test]
@@ -3606,6 +3743,81 @@ fn a_stock_item_approval_is_made_only_after_the_stock_item_dialog_approves() {
         )
         .is_empty());
     }
+
+    // A second caller of `ask_stock_item`, here or elsewhere, an alias of it,
+    // an ask that reads the marks with another parser, and an ask that maps
+    // the dialog's refusal to another code.
+    let in_others = |source: &str, from: &str, to: &str| {
+        let mut mutated = others.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let review_path = "src/agent_master_review.rs";
+    let approvals_path = "src/tally/approved_import.rs";
+    let mut asks = vec![
+        in_others(
+            review_path,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(p: PreparedStockItem) { PendingPostApproval::ask_stock_item(p, t, m, f, b); }\n#[cfg(test)]\n#[path",
+        ),
+        in_others(
+            review_path,
+            "            super::master_post::stock_company_marks,\n",
+            "            |_| Ok(Vec::new()),\n",
+        ),
+        in_others(
+            approvals_path,
+            "                .map_err(|refusal| refusal.code().to_string())\n",
+            "                .map_err(|_| \"import_approval_declined\".to_string())\n",
+        ),
+    ];
+    for elsewhere_text in [
+        "PendingPostApproval::ask_stock_item(prepared, preview, marks, parse, batch)",
+        "let ask = PendingPostApproval::ask_stock_item;",
+    ] {
+        let mut elsewhere = others.clone();
+        elsewhere.push(("src/elsewhere.rs".into(), elsewhere_text.into()));
+        asks.push(elsewhere);
+    }
+    for (at, mutated) in asks.iter().enumerate() {
+        let mutated_text = |source: &str, fallback: &str| {
+            (mutated.iter())
+                .find(|(path, _)| is_source(path, source))
+                .map_or(fallback.to_string(), |(_, text)| text.clone())
+        };
+        assert!(
+            !stock_approval_problems(
+                &mutated_text(approvals_path, &approvals),
+                &approvals_tests,
+                &stock,
+                &stock_tests,
+                &mutated_text(review_path, &review),
+                mutated,
+            )
+            .is_empty(),
+            "ask mutation {at}"
+        );
+    }
+    // A second Create made from a draft in the coordinator.
+    let second_prepared = format!("{review}\nlet _ = PreparedStockItem::from_draft(draft);");
+    let mut second_prepared_others = others.clone();
+    let entry = (second_prepared_others.iter_mut())
+        .find(|(path, _)| is_source(path, review_path))
+        .expect("the coordinator is scanned");
+    entry.1 = second_prepared.clone();
+    assert!(!stock_approval_problems(
+        &approvals,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &second_prepared,
+        &second_prepared_others,
+    )
+    .is_empty());
 
     let caller_preview = review.replace(
         "stock_item_review_text(&draft, origin)",

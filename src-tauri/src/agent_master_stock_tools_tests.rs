@@ -544,8 +544,8 @@ mod post {
         assert!(run.cancelled().is_empty(), "no request is sent");
     }
 
-    /// A batch whose stored company is not the one verified now: a hand edit
-    /// of the stored company name.
+    /// A batch whose stored company is not the one verified now (a hand edit
+    /// of the stored company name), with an approval held for it.
     #[tokio::test]
     async fn another_company_identity_is_refused_after_the_identity_read() {
         let run = posting(identity_answers(false), Redaction::None);
@@ -553,10 +553,14 @@ mod post {
             line["company"]["name"] = json!("Another Company");
         });
         record(run.dir(), &batch);
+        // An approval held for the batch: the refusal before the take
+        // withdraws it.
+        hold_for(&run, id(A)).await;
         let scripted = ScriptedApproval::approving();
         let outcome = run.post(&scripted, id(A)).await;
         assert_eq!(refused_code(&outcome), "company_identity_mismatch");
         assert!(scripted.stock_items().is_empty());
+        assert!(!run.server.post_approvals.holds(id(A)), "it is withdrawn");
         assert_eq!(run.records(), ["master_batch"]);
         assert_eq!(sent(&run.finish()), IDENTITY_READ);
     }

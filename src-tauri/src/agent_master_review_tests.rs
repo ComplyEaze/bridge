@@ -1183,12 +1183,12 @@ async fn held_requests_of_other_bytes_and_a_held_ledger_approval_for_a_stock_bin
         Some("import_approval_binding_changed"),
         "a ledger approval held with a stock item"
     );
-    let hold_ledger = || {
+    let hold_ledger = |batch: &str| {
         let approved =
             ApprovedImport::approved_masters_for_test(ledger.clone(), &company, stock_marks());
         let held = MasterPostRequest::render(ledger.clone(), &company);
         (approvals.hold_approved(
-            &batch,
+            batch,
             ledger_binding.clone(),
             approved,
             held,
@@ -1196,35 +1196,41 @@ async fn held_requests_of_other_bytes_and_a_held_ledger_approval_for_a_stock_bin
         ))
         .unwrap();
     };
-    hold_ledger();
+    hold_ledger(&batch);
     drop(
         approvals
             .take_for_dispatch(&batch, &ledger_binding)
             .unwrap(),
     );
-    hold_ledger();
+    // A batch of its own, with no note yet: the note read below is this
+    // refusal's.
+    let ledger_batch = crate::synthetic_batch_id(0xa2).to_string();
+    hold_ledger(&ledger_batch);
+    assert!(approvals.lapse_note(&ledger_batch).is_none());
     let stock = shown_stock_item("SC Copied Marked").binding();
     assert_eq!(stock.kind(), ledger_binding.kind());
     assert_eq!(
-        approvals.take_for_dispatch(&batch, &stock).err().as_deref(),
+        approvals
+            .take_for_dispatch(&ledger_batch, &stock)
+            .err()
+            .as_deref(),
         Some("import_approval_binding_changed"),
         "a held ledger approval, a stock binding"
     );
     assert_eq!(
-        approvals.lapse_note(&batch).unwrap()["reason"],
+        approvals.lapse_note(&ledger_batch).unwrap()["reason"],
         "approval_binding_changed"
     );
-    assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+    assert!(matches!(approvals.begin(&ledger_batch), Begin::Ask(_)));
 }
 
 /// One prepared item has one digest: its binding's, its approval's and the
 /// one its writes give for its company are the same.
 #[tokio::test]
 async fn a_stock_items_binding_digest_is_its_approvals_and_its_writes_digest() {
-    let shown = shown_stock_item("SC Copied Marked");
-    let prepared = shown.prepared.clone();
-    let digest = shown.binding().digest_for_test().to_string();
-    let (_, _, approved, _) = approved_stock_item("SC Copied Marked").await;
+    let prepared = shown_stock_item("SC Copied Marked").prepared;
+    let (binding, _, approved, _) = approved_stock_item("SC Copied Marked").await;
+    let digest = binding.digest_for_test().to_string();
     assert_eq!(digest, approved.xml_sha256());
     let writes = prepared.writes().create_sha256(prepared.company());
     assert_eq!(digest, writes.expect("the captured item renders"));

@@ -539,6 +539,7 @@ impl<'a> QueuedStockItem<'a> {
 }
 
 /// What a stock recheck reads. No shipped recheck admits a stock item yet.
+// Part 2b's stock recheck reads these and removes this `allow`.
 #[allow(dead_code)]
 impl<'a> QueuedStockItem<'a> {
     pub(crate) fn prepared(&self) -> &'a PreparedStockItem {

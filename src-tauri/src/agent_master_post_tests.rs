@@ -2060,8 +2060,11 @@ mod coordinator {
     /// intent is recorded and nothing but exports is sent.
     #[tokio::test]
     async fn the_queue_reads_a_stock_approval_and_the_ledger_recheck_refuses_it() {
+        // Distinct binding and aim marks (289 is the captured mark, 290 a
+        // constructed edit), so each reaches its own place and the reads are
+        // sized from the binding.
         let (result, sent, seen, dispatched) =
-            post_stock(queue_answers(marks_at(289), marks_at(289))).await;
+            post_stock(queue_answers(marks_at(289), marks_at(290))).await;
         assert_admission_refusal(&result, ApprovedImportAdmissionError::AdmissionInconsistent);
         assert!(!dispatched, "no intent is recorded");
         assert_eq!(sent, QUEUE_READS, "every request an export, no POST");
@@ -2075,7 +2078,7 @@ mod coordinator {
                 stock_capture(SHAPE_ITEMS),
                 [289; 3],
                 marks_at(289),
-                marks_at(289),
+                marks_at(290),
             ))
         );
     }
@@ -2114,6 +2117,140 @@ mod coordinator {
             .downcast_ref::<crate::tally::runtime::RuntimeReadFailure>()
             .expect("the stock arm attaches the queue's evidence");
         assert!(failure.evidence.bytes > 0);
+    }
+
+    /// The read evidence on top of a refused post's chain.
+    fn queue_evidence(result: &anyhow::Result<()>) -> crate::tally::runtime::RuntimeReadEvidence {
+        result
+            .as_ref()
+            .expect_err("the post is refused")
+            .downcast_ref::<crate::tally::runtime::RuntimeReadFailure>()
+            .expect("the queue attaches its evidence")
+            .evidence
+            .clone()
+    }
+
+    /// `chain` with each request's own hash folded on, as the evidence links
+    /// them: `<earlier>:<next request>`.
+    fn linked(chain: &str, requests: &[String]) -> String {
+        requests.iter().fold(chain.to_string(), |chain, request| {
+            let next = bridge_tally_protocol::sha256_hex(
+                &bridge_tally_protocol::encode_tally_xml_request_utf16le(request),
+            );
+            bridge_tally_protocol::sha256_hex(format!("{chain}:{next}").as_bytes())
+        })
+    }
+
+    /// The request chain of the queue's evidence as its stock reads begin: a
+    /// run the parser refuses there sends the same requests before it.
+    async fn chain_before_the_stock_reads() -> String {
+        let unparsable = stock_capture(SHAPE_MARKS)
+            .replace(SHAPE_MARK, "<ALTMSTID TYPE=\"Number\">x</ALTMSTID>");
+        let (result, _, _, _) = post_stock(through_binding(unparsable)).await;
+        queue_evidence(&result).request_sha256
+    }
+
+    #[tokio::test]
+    async fn a_drifted_candidate_pair_in_the_queue_refuses_before_the_count_with_its_evidence() {
+        // A constructed edit: the second candidate answer renames one item.
+        let items = stock_capture(SHAPE_ITEMS);
+        let moved = items.replacen("\"Label Roll\"", "\"Label Rolls\"", 1);
+        assert_ne!(moved, items);
+        let mut plans = through_binding(marks_at(289));
+        plans.extend(pair(items, moved));
+        let (result, sent, seen, dispatched) = post_stock(plans).await;
+        let error = result
+            .as_ref()
+            .expect_err("a drifted candidate pair refuses");
+        assert!(matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<PairedReadValidationError>()),
+            Some(PairedReadValidationError::MastersCollection)
+        ));
+        assert_eq!(
+            sent,
+            [Health, Companies, Companies, Marks, Candidate, Health, Candidate, Health]
+        );
+        assert_eq!((seen, dispatched), (None, false));
+        // Both candidate reads, each linked once, on the queue's own chain.
+        let candidate = render_candidate_stock_items_request(shape_identity().company_name());
+        let pair_chain = linked(
+            &bridge_tally_protocol::sha256_hex(
+                &bridge_tally_protocol::encode_tally_xml_request_utf16le(&candidate),
+            ),
+            &[candidate],
+        );
+        let opening = chain_before_the_stock_reads().await;
+        assert_eq!(
+            queue_evidence(&result).request_sha256,
+            bridge_tally_protocol::sha256_hex(format!("{opening}:{pair_chain}").as_bytes())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_binding_mark_past_the_candidate_edge_sends_no_stock_read_from_the_queue() {
+        // Mark 490 is a constructed edit; only the binding answer carries it.
+        let (result, sent, seen, dispatched) = post_stock(through_binding(marks_at(490))).await;
+        let error = result.expect_err("mark 490 refuses before the candidate pair");
+        assert!(matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<MastersReadError>()),
+            Some(MastersReadError::TooLarge {
+                master_alter_id: 490,
+                limit_master_alter_id: 489,
+                ..
+            })
+        ));
+        assert_eq!(sent, [Health, Companies, Companies, Marks]);
+        assert_eq!((seen, dispatched), (None, false));
+    }
+
+    #[tokio::test]
+    async fn a_stock_read_refused_after_agreeing_pairs_keeps_their_evidence() {
+        // A constructed edit: both unit answers report a Tally failure, so the
+        // unit pair agrees and its admission refuses.
+        let failed =
+            stock_capture(SHAPE_UNITS).replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1);
+        assert_ne!(failed, stock_capture(SHAPE_UNITS));
+        let mut plans = through_binding(marks_at(289));
+        for capture in [SHAPE_ITEMS, SHAPE_COUNT, SHAPE_GROUPS] {
+            plans.extend(pair(stock_capture(capture), stock_capture(capture)));
+        }
+        plans.extend(pair(failed.clone(), failed));
+        let (result, sent, seen, dispatched) = post_stock(plans).await;
+        use bridge_tally_protocol::native_masters::NativeMastersError;
+        let error = result.as_ref().expect_err("the unit admission refuses");
+        assert!(matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<NativeMastersError>()),
+            Some(NativeMastersError::TallyReportedFailure)
+        ));
+        assert_eq!(sent[..], QUEUE_READS[..20]);
+        assert_eq!((seen, dispatched), (None, false));
+        let identity = shape_identity();
+        let requests = [
+            render_candidate_stock_items_request(identity.company_name()),
+            bridge_tally_protocol::native_stock_summary::render_company_inventory_flags_request(
+                identity.display_name(),
+                identity.company_guid_value(),
+            ),
+            bridge_tally_protocol::native_masters::render_native_masters_request(
+                bridge_tally_protocol::native_masters::NativeMasterKind::StockGroups,
+                identity.display_name(),
+            ),
+            bridge_tally_protocol::native_masters::render_native_masters_request(
+                bridge_tally_protocol::native_masters::NativeMasterKind::Units,
+                identity.display_name(),
+            ),
+        ];
+        let opening = chain_before_the_stock_reads().await;
+        assert_eq!(
+            queue_evidence(&result).request_sha256,
+            linked(&opening, &requests)
+        );
     }
 
     /// A clone of a stock approval bound to another batch keeps the batch it

@@ -257,7 +257,7 @@ pub(super) fn stock_item_review_text(
     if shown.iter().copied().any(has_unreviewable_format_character) {
         return Err(StockItemReviewError::Review(MasterReviewError::FormatText));
     }
-    create_text_refusal(draft).map_err(StockItemReviewError::NotRenderable)?;
+    create_text_refusal(draft.writes()).map_err(StockItemReviewError::NotRenderable)?;
 
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let mut lines = vec![

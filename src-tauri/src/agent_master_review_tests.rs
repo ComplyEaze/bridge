@@ -762,6 +762,18 @@ fn stock_item_review_refusals_use_addendum_codes() {
     );
 }
 
+/// The read-back verdict of `shown`'s writes, with the company and GUIDs of
+/// the catalogue its sibling was found in.
+fn shown_read_back(shown: &ShownDraft<'_>, fresh: &StockItemCatalogue) -> ReadBackVerdict {
+    let before = shown.draft().sibling().sibling().catalogue();
+    let guids = before
+        .items()
+        .iter()
+        .map(|item| item.guid.clone())
+        .collect();
+    ReadBackVerdict::of(before.company(), shown.draft().writes(), &guids, fresh)
+}
+
 #[test]
 fn successful_outcome_and_equal_readback_have_no_refusal_code() {
     let parsed = parse_import_outcome(&stock_decode(STOCK_CREATE_ANSWER))
@@ -773,7 +785,7 @@ fn successful_outcome_and_equal_readback_have_no_refusal_code() {
     let shown =
         ShownDraft::from_draft(stock_draft(&before, "SC Copied Marked", "SC Sibling Goods"));
     let after = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_AFTER_MARKED));
-    let verdict = ReadBackVerdict::of(&shown, &after);
+    let verdict = shown_read_back(&shown, &after);
     assert!(matches!(verdict, ReadBackVerdict::Equal(_)));
 
     assert_eq!(stock_item_outcome_code(&outcome), None);
@@ -814,7 +826,7 @@ async fn a_confirmed_stock_item_draft_holds_the_preview_it_was_shown() {
 
     let after = stock_catalogue(STOCK_COMPANY, &stock_decode(STOCK_AFTER_MARKED));
     assert!(matches!(
-        ReadBackVerdict::of(&shown, &after),
+        shown_read_back(&shown, &after),
         ReadBackVerdict::Equal(_)
     ));
 }

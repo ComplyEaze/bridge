@@ -1053,6 +1053,74 @@ fn stock_recheck_refuses_a_changed_written_field() {
     }
 }
 
+/// `body` with a copy of its one `open`...`close` row added after it, the
+/// copy's `from` texts replaced by their `to` texts.
+fn with_second_row(body: &str, open: &str, close: &str, edits: &[(&str, &str)]) -> String {
+    assert_eq!(body.matches(open).count(), 1, "the row occurs once");
+    let start = body.find(open).unwrap();
+    let end = start + body[start..].find(close).unwrap() + close.len();
+    let mut row = body[start..end].to_string();
+    for (from, to) in edits {
+        assert_eq!(
+            row.matches(from).count(),
+            1,
+            "{from} occurs once in the row"
+        );
+        row = row.replacen(from, to, 1);
+    }
+    let mut out = body.to_string();
+    out.insert_str(end, &row);
+    out
+}
+
+#[test]
+fn stock_recheck_refuses_a_changed_parent_or_unit() {
+    // Constructed fault vectors, not measured Tally changes: the fresh
+    // sibling's parent or unit names a second row added to the captured group
+    // or unit read, which the shown and the fresh draft are both checked
+    // against, so only that written field differs.
+    let original = stock_capture(STOCK_BEFORE);
+    let groups = with_second_row(
+        &stock_capture(STOCK_GROUPS),
+        "<STOCKGROUP NAME=\"SC Goods Group\"",
+        "</STOCKGROUP>",
+        &[
+            ("NAME=\"SC Goods Group\"", "NAME=\"SC Other Group\""),
+            ("<NAME>SC Goods Group</NAME>", "<NAME>SC Other Group</NAME>"),
+            ("-000000cf<", "-000000f1<"),
+        ],
+    );
+    let units = with_second_row(
+        &stock_capture(STOCK_UNITS),
+        "<UNIT NAME=\"Nos\"",
+        "</UNIT>",
+        &[
+            ("NAME=\"Nos\"", "NAME=\"Each\""),
+            (">Nos</NAME>", ">Each</NAME>"),
+            ("-000000ce<", "-000000f2<"),
+        ],
+    );
+    let parent = "<PARENT TYPE=\"String\">SC Goods Group</PARENT>";
+    let unit = "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>";
+    let mut case = stock_recheck_case();
+    case.groups = groups.clone();
+    case.units = units.clone();
+    run_stock_recheck(case).expect("the added rows alone change nothing");
+    for (from, to) in [
+        (parent, "<PARENT TYPE=\"String\">SC Other Group</PARENT>"),
+        (unit, "<BASEUNITS TYPE=\"String\">Each</BASEUNITS>"),
+    ] {
+        assert_eq!(original.matches(from).count(), 1);
+        let mut case = stock_recheck_case();
+        case.groups = groups.clone();
+        case.units = units.clone();
+        case.fresh_candidate = original.replacen(from, to, 1);
+        assert_stock_recheck_refusal(run_stock_recheck(case), |error| {
+            matches!(error, StockItemRecheckError::DraftChanged)
+        });
+    }
+}
+
 #[test]
 fn stock_recheck_refuses_a_different_source_item_or_shown_draft() {
     let original = stock_capture(STOCK_BEFORE);
@@ -1279,7 +1347,7 @@ fn stock_recheck_refuses_a_read_sized_at_another_mark() {
 }
 
 #[test]
-fn same_create_compares_every_written_field() {
+fn writes_compare_every_written_field() {
     let original = stock_capture(STOCK_BEFORE);
     let groups = stock_capture(STOCK_GROUPS);
     let units = stock_capture(STOCK_UNITS);
@@ -1314,7 +1382,7 @@ fn same_create_compares_every_written_field() {
             &second_groups,
             &second_units,
         );
-        first.same_create(&second)
+        first.writes() == second.writes()
     };
     assert!(same(
         original.clone(),

@@ -1,14 +1,16 @@
 //! The last step of creating one stock item (#1381): the import answer to a
-//! Create, a fresh read of the item checked against what was shown, and the
+//! Create, a fresh read of the item checked against what it wrote, and the
 //! one type that holds both.
 //!
 //! A Create's counters alone do not show that the item was stored as sent: row
 //! 1381-R1 of `TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md`
 //! §12a.13 records a Create the counters reported clean whose stored item a
 //! fresh read showed to differ. So `VerifiedItem` is built only from a clean
-//! answer together with a fresh read whose new row equals the shown draft:
-//! `VerifiedItem::new` takes the shown draft and the fresh read and judges the
-//! read itself, so no verdict made for another draft can be passed in.
+//! answer together with a fresh read whose new row equals the writes:
+//! `VerifiedItem::new` takes the company, the writes, the GUIDs of the read
+//! before the Create and the fresh read, and judges the read itself, so no
+//! verdict made for other writes can be passed in. The writes are owned
+//! (`StockItemWrites`), so they may be a draft's or rebuilt from stored values.
 //! Outside this module a clean answer cannot be made by hand: `CountersClean`
 //! holds a `CleanCreate` that only `StockItemImportOutcome::of` makes (and
 //! `Equal` an `EqualRead` that only `ReadBackVerdict::of` makes).
@@ -16,12 +18,13 @@
 //! `VerifiedItem` does not prove:
 //! - that the fresh read was taken after the Create was posted (the caller's
 //!   job);
-//! - that the window showed text describing this draft: `ShownDraft` holds the
-//!   preview the approving window showed, and its one non-test maker is asked
-//!   with a preview built from the same draft, but nothing here compares the two;
+//! - that the writes are those of a draft the person approved, or that the
+//!   window showed text describing them: it takes the writes as passed;
+//! - that the company and the before GUIDs are those the writes were drafted
+//!   on: the caller passes all three;
 //! - that the fresh read is the whole book (size and count admission are the
 //!   caller's, as the module doc of `stock_item_create.rs` says);
-//! - that the answer was Tally's answer to this draft's Create: it takes the
+//! - that the answer was Tally's answer to these writes' Create: it takes the
 //!   outcome as it is passed.
 //!
 //! The tests read the captures in
@@ -33,10 +36,12 @@
 
 use super::master_name::MasterName;
 use super::stock_item_create::{
-    measured_shape, missing_fields, DraftRefusal, GoodsSibling, NotGoodsSibling, ShownDraft,
-    SiblingField, SiblingGst, SiblingRefusal, StockItemCatalogue,
+    measured_shape, missing_fields, DraftRefusal, GoodsSibling, NotGoodsSibling, SiblingField,
+    SiblingGst, SiblingRefusal, StockItemCatalogue, StockItemWrites,
 };
+use super::VerifiedCompanyIdentity;
 use bridge_tally_protocol::{ImportCounters, TallyImportApplicationStatus, TallyImportOutcome};
+use std::collections::BTreeSet;
 
 /// The proof inside `CountersClean`. Its field is private, so only
 /// `StockItemImportOutcome::of` makes one.
@@ -107,35 +112,35 @@ pub(crate) struct EqualRead {
     guid: String,
 }
 
-/// What a fresh stock item read says of the item a shown draft proposed.
+/// What a fresh stock item read says of the item a Create's writes proposed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ReadBackVerdict {
-    /// One new row holds the draft's name as its row name, none of its six
+    /// One new row holds the writes' name as its row name, none of its six
     /// fields is missing, `GoodsSibling` admits its applicability, type of
     /// supply and taxability, and its parent, unit, GST entry and HSN entry
-    /// equal the draft's.
+    /// equal the writes'.
     Equal(EqualRead),
     /// When any field is missing, the missing fields only; otherwise the
-    /// fields that differ from the draft, up to a refusal (see `of`). In
+    /// fields that differ from the writes, up to a refusal (see `of`). In
     /// `SiblingField` order. Never empty.
     Differs { fields: Vec<SiblingField> },
-    /// Not exactly one item holds the draft's name as its row name or a name
+    /// Not exactly one item holds the writes' name as its row name or a name
     /// entry, or the one that does holds it only as a name entry; `rows` is how
     /// many items hold it.
     NotFoundOnce { rows: usize },
-    /// The one item holding the name has a GUID the before catalogue held.
+    /// The one item holding the name has a GUID of the read before the Create.
     NotNew,
-    /// The fresh read was made for another company than the before catalogue.
+    /// The fresh read was made for another company than the one passed.
     OtherCompany,
 }
 
 impl ReadBackVerdict {
-    /// Checks `fresh` against `shown`. The before catalogue is the one the
-    /// shown draft's sibling was found in.
+    /// Checks `fresh` against `writes` for `company`; `before` holds the GUIDs
+    /// of the read before the Create.
     ///
     /// The six fields are read by the code the sibling is read by
     /// (`missing_fields`, `SiblingGst::named`, `GoodsSibling::from_sibling`
-    /// and `measured_shape`), then compared with the draft by `==`. When any
+    /// and `measured_shape`), then compared with the writes by `==`. When any
     /// field is missing from the read, only the missing fields are listed and
     /// nothing is compared. A refusal by
     /// `GoodsSibling::from_sibling` or `measured_shape` names the field it is
@@ -143,15 +148,18 @@ impl ReadBackVerdict {
     /// then names every field found to differ up to that refusal and may not
     /// name a later one. Rates are compared as the text read, exactly: a rate
     /// sent as `2.5` and read as `2.50` differs (§12a.13, row 1381-O, o4).
-    pub(crate) fn of(shown: &ShownDraft<'_>, fresh: &StockItemCatalogue) -> Self {
-        let draft = shown.draft();
-        let before = draft.sibling().sibling().catalogue();
+    pub(crate) fn of(
+        company: &VerifiedCompanyIdentity,
+        writes: &StockItemWrites,
+        before: &BTreeSet<String>,
+        fresh: &StockItemCatalogue,
+    ) -> Self {
         // `VerifiedCompanyIdentity` derives equality over its whole tuple.
-        if fresh.company() != before.company() {
+        if fresh.company() != company {
             return Self::OtherCompany;
         }
 
-        let name = draft.name().as_str();
+        let name = writes.name().as_str();
         let holding: Vec<_> = fresh
             .items()
             .iter()
@@ -166,11 +174,7 @@ impl ReadBackVerdict {
             }
         };
 
-        if before
-            .items()
-            .iter()
-            .any(|existing| existing.guid == item.guid)
-        {
+        if before.contains(&item.guid) {
             return Self::NotNew;
         }
 
@@ -178,7 +182,7 @@ impl ReadBackVerdict {
         if !missing.is_empty() {
             return Self::Differs { fields: missing };
         }
-        let sibling = match SiblingGst::named(fresh, draft.name()) {
+        let sibling = match SiblingGst::named(fresh, writes.name()) {
             Ok(sibling) => sibling,
             // Not reached after the two checks above, which make the same
             // tests on the same row; each arm still refuses.
@@ -200,10 +204,10 @@ impl ReadBackVerdict {
         };
 
         let mut fields = Vec::new();
-        if sibling.parent() != draft.parent() {
+        if sibling.parent() != writes.parent() {
             fields.push(SiblingField::Parent);
         }
-        if sibling.unit() != draft.unit() {
+        if sibling.unit() != writes.unit() {
             fields.push(SiblingField::Unit);
         }
         match GoodsSibling::from_sibling(sibling) {
@@ -211,10 +215,10 @@ impl ReadBackVerdict {
             Ok(goods) => match measured_shape(goods.sibling()) {
                 Err(refusal) => fields.push(shape_refusal_field(&refusal)),
                 Ok((gst, hsn)) => {
-                    if gst != *draft.gst() {
+                    if gst != *writes.gst() {
                         fields.push(SiblingField::GstDetails);
                     }
-                    if hsn != *draft.hsn() {
+                    if hsn != *writes.hsn() {
                         fields.push(SiblingField::HsnDetails);
                     }
                 }
@@ -263,7 +267,7 @@ fn shape_refusal_field(refusal: &DraftRefusal) -> SiblingField {
 }
 
 /// A stock item whose Create was answered clean and whose fresh read equals
-/// the shown draft. See the module doc for what it does not prove.
+/// the writes. See the module doc for what it does not prove.
 #[derive(Debug)]
 pub(crate) struct VerifiedItem {
     guid: String,
@@ -279,18 +283,20 @@ pub(crate) struct NotVerified {
 }
 
 impl VerifiedItem {
-    /// Judges `fresh` against `shown` with `ReadBackVerdict::of`, and is `Ok`
+    /// Judges `fresh` against `writes` with `ReadBackVerdict::of`, and is `Ok`
     /// only for `CountersClean` with `Equal`; the GUID is the read's and the
-    /// name the shown draft's.
+    /// name the writes'.
     pub(crate) fn new(
         outcome: StockItemImportOutcome,
-        shown: &ShownDraft<'_>,
+        company: &VerifiedCompanyIdentity,
+        writes: &StockItemWrites,
+        before: &BTreeSet<String>,
         fresh: &StockItemCatalogue,
     ) -> Result<Self, NotVerified> {
-        match (outcome, ReadBackVerdict::of(shown, fresh)) {
+        match (outcome, ReadBackVerdict::of(company, writes, before, fresh)) {
             (StockItemImportOutcome::CountersClean(_), ReadBackVerdict::Equal(read)) => Ok(Self {
                 guid: read.guid,
-                name: shown.draft().name().clone(),
+                name: writes.name().clone(),
             }),
             (outcome, verdict) => Err(NotVerified { outcome, verdict }),
         }
@@ -301,7 +307,7 @@ impl VerifiedItem {
         &self.guid
     }
 
-    /// The created item's name, as the shown draft held it.
+    /// The created item's name, as the writes held it.
     pub(crate) fn name(&self) -> &MasterName {
         &self.name
     }

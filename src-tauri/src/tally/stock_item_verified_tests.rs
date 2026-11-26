@@ -5,7 +5,7 @@
 //! whose helpers are private to that module.
 
 use super::*;
-use crate::tally::stock_item_create::{StockItemCatalogueError, StockItemDraft};
+use crate::tally::stock_item_create::{ShownDraft, StockItemCatalogueError, StockItemDraft};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::native_masters::NativeMastersError;
 use bridge_tally_protocol::{
@@ -80,6 +80,39 @@ fn shown<'c>(before: &'c StockItemCatalogue, new_name: &str) -> ShownDraft<'c> {
     let draft = StockItemDraft::new(absent, sibling, &decode(GROUPS), &decode(UNITS))
         .expect("the sibling drafts");
     ShownDraft::from_draft(draft)
+}
+
+/// The GUIDs of a read, as the set taken before a Create.
+fn guids(read: &StockItemCatalogue) -> BTreeSet<String> {
+    read.items().iter().map(|item| item.guid.clone()).collect()
+}
+
+/// `ReadBackVerdict::of` for `shown`'s writes, with the company and GUIDs of
+/// the catalogue its sibling was found in.
+fn verdict(shown: &ShownDraft<'_>, fresh: &StockItemCatalogue) -> ReadBackVerdict {
+    let before = shown.draft().sibling().sibling().catalogue();
+    ReadBackVerdict::of(
+        before.company(),
+        shown.draft().writes(),
+        &guids(before),
+        fresh,
+    )
+}
+
+/// `VerifiedItem::new` with the same arguments as `verdict`.
+fn verified(
+    outcome: StockItemImportOutcome,
+    shown: &ShownDraft<'_>,
+    fresh: &StockItemCatalogue,
+) -> Result<VerifiedItem, NotVerified> {
+    let before = shown.draft().sibling().sibling().catalogue();
+    VerifiedItem::new(
+        outcome,
+        before.company(),
+        shown.draft().writes(),
+        &guids(before),
+        fresh,
+    )
 }
 
 fn outcome(xml: &str) -> StockItemImportOutcome {
@@ -213,14 +246,14 @@ fn clean_counters_with_a_line_error_are_not_clean() {
 fn the_marked_create_reads_back_equal_and_is_verified() {
     let before = catalogue(&decode(BEFORE));
     let shown = shown(&before, MARKED_NAME);
-    let verdict = ReadBackVerdict::of(&shown, &catalogue(&decode(MARKED)));
+    let verdict = verdict(&shown, &catalogue(&decode(MARKED)));
     assert_eq!(
         verdict,
         ReadBackVerdict::Equal(EqualRead {
             guid: MARKED_GUID.to_string(),
         })
     );
-    let verified = VerifiedItem::new(
+    let verified = verified(
         outcome(&decode(ANSWER)),
         &shown,
         &catalogue(&decode(MARKED)),
@@ -234,13 +267,13 @@ fn the_marked_create_reads_back_equal_and_is_verified() {
 fn the_plain_create_reads_back_without_applicability_and_gst_details_and_is_not_verified() {
     let before = catalogue(&decode(BEFORE));
     let shown = shown(&before, PLAIN_NAME);
-    let verdict = ReadBackVerdict::of(&shown, &catalogue(&decode(PLAIN)));
+    let verdict = verdict(&shown, &catalogue(&decode(PLAIN)));
     let expected = differs(&[SiblingField::Applicability, SiblingField::GstDetails]);
     assert_eq!(verdict, expected);
     let outcome = outcome(&decode(ANSWER));
     assert_eq!(outcome, clean_create());
-    let refused = VerifiedItem::new(outcome, &shown, &catalogue(&decode(PLAIN)))
-        .expect_err("the read differs");
+    let refused =
+        verified(outcome, &shown, &catalogue(&decode(PLAIN))).expect_err("the read differs");
     assert_eq!(refused.outcome, clean_create());
     assert_eq!(refused.verdict, expected);
 }
@@ -262,7 +295,7 @@ fn a_changed_rate_differs_in_the_gst_details_only() {
         "<GSTRATE TYPE=\"Number\"> 8</GSTRATE>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         differs(&[SiblingField::GstDetails])
     );
 }
@@ -282,7 +315,7 @@ fn a_rate_equal_in_value_but_spelt_otherwise_differs() {
         "<GSTRATE TYPE=\"Number\"> 9.00</GSTRATE>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         differs(&[SiblingField::GstDetails])
     );
 }
@@ -302,7 +335,7 @@ fn a_changed_parent_or_unit_differs_in_that_field_only() {
         "<PARENT TYPE=\"String\">SC Other Group</PARENT>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         differs(&[SiblingField::Parent])
     );
     let unit = "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>";
@@ -316,7 +349,7 @@ fn a_changed_parent_or_unit_differs_in_that_field_only() {
         "<BASEUNITS TYPE=\"String\">Box</BASEUNITS>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         differs(&[SiblingField::Unit])
     );
 }
@@ -336,7 +369,7 @@ fn a_changed_hsn_code_differs_in_the_hsn_details_only() {
         "<HSNCODE TYPE=\"String\">39239091</HSNCODE>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         differs(&[SiblingField::HsnDetails])
     );
 }
@@ -357,7 +390,7 @@ fn a_row_the_goods_rule_or_the_measured_shape_refuses_names_that_field() {
         "<GSTAPPLICABLE TYPE=\"String\">Applicable</GSTAPPLICABLE>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         differs(&[SiblingField::Applicability])
     );
     let state = "<STATENAME TYPE=\"String\">&#4; Any</STATENAME>";
@@ -372,7 +405,7 @@ fn a_row_the_goods_rule_or_the_measured_shape_refuses_names_that_field() {
         "<STATENAME TYPE=\"String\">Any</STATENAME>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         differs(&[SiblingField::GstDetails])
     );
 }
@@ -382,12 +415,12 @@ fn a_name_not_held_once_as_a_row_name_is_not_found_once() {
     let before = catalogue(&decode(BEFORE));
     // The draft's name in the read before the Create: no item holds it.
     assert_eq!(
-        ReadBackVerdict::of(&shown(&before, MARKED_NAME), &before),
+        verdict(&shown(&before, MARKED_NAME), &before),
         ReadBackVerdict::NotFoundOnce { rows: 0 }
     );
     // A case variant of the created name: no item holds it exactly.
     assert_eq!(
-        ReadBackVerdict::of(
+        verdict(
             &shown(&before, "sc copied marked"),
             &catalogue(&decode(MARKED))
         ),
@@ -395,7 +428,7 @@ fn a_name_not_held_once_as_a_row_name_is_not_found_once() {
     );
     // The alias keyed on the sibling: one item holds it, as a name entry only.
     assert_eq!(
-        ReadBackVerdict::of(
+        verdict(
             &shown(&before, "SC Sibling Alias"),
             &catalogue(&decode(ALIAS))
         ),
@@ -423,7 +456,7 @@ fn a_row_whose_guid_was_in_the_before_read_is_not_new() {
         "<NAME>SC Copied Marked</NAME>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&renamed)),
+        verdict(&shown, &catalogue(&renamed)),
         ReadBackVerdict::NotNew
     );
 }
@@ -440,7 +473,7 @@ fn a_read_for_another_company_is_refused() {
     // It shows the check fires on edited text, not how Tally behaves.
     let other = marked.replace(COMPANY_GUID, OTHER_COMPANY_GUID);
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue_for(OTHER_COMPANY_GUID, &other)),
+        verdict(&shown, &catalogue_for(OTHER_COMPANY_GUID, &other)),
         ReadBackVerdict::OtherCompany
     );
     // The captured read, unedited, catalogued for an identity with the same
@@ -451,7 +484,7 @@ fn a_read_for_another_company_is_refused() {
     )
     .expect("the read catalogues");
     assert_eq!(
-        ReadBackVerdict::of(&shown, &renamed_company),
+        verdict(&shown, &renamed_company),
         ReadBackVerdict::OtherCompany
     );
 }
@@ -463,7 +496,7 @@ fn only_a_clean_answer_with_an_equal_read_is_verified() {
     let shown = shown(&before, MARKED_NAME);
     let marked_xml = decode(MARKED);
     let marked = catalogue(&marked_xml);
-    let equal = ReadBackVerdict::of(&shown, &marked);
+    let equal = verdict(&shown, &marked);
     assert!(matches!(equal, ReadBackVerdict::Equal(_)));
     let clean = outcome(&decode(ANSWER));
     assert_eq!(clean, clean_create());
@@ -485,8 +518,8 @@ fn only_a_clean_answer_with_an_equal_read_is_verified() {
         StockItemImportOutcome::ApplicationFailure,
     ];
     for other in outcomes {
-        let refused = VerifiedItem::new(other.clone(), &shown, &marked)
-            .expect_err("only a clean answer is verified");
+        let refused =
+            verified(other.clone(), &shown, &marked).expect_err("only a clean answer is verified");
         assert_eq!(refused.outcome, other);
         assert_eq!(refused.verdict, equal);
     }
@@ -529,13 +562,13 @@ fn only_a_clean_answer_with_an_equal_read_is_verified() {
         ),
     ];
     for (read, expected) in reads {
-        let refused = VerifiedItem::new(clean.clone(), &shown, &read)
-            .expect_err("only an equal read is verified");
+        let refused =
+            verified(clean.clone(), &shown, &read).expect_err("only an equal read is verified");
         assert_eq!(refused.outcome, clean);
         assert_eq!(refused.verdict, expected);
     }
 
-    let verified = VerifiedItem::new(clean, &shown, &marked).expect("the captured pair verifies");
+    let verified = verified(clean, &shown, &marked).expect("the captured pair verifies");
     assert_eq!(verified.guid(), MARKED_GUID);
 }
 
@@ -582,7 +615,7 @@ fn a_name_held_by_two_items_is_not_found_once() {
         "<NAME>SC Sibling Goods</NAME><NAME>SC Copied Marked</NAME>",
     );
     assert_eq!(
-        ReadBackVerdict::of(&shown, &catalogue(&read)),
+        verdict(&shown, &catalogue(&read)),
         ReadBackVerdict::NotFoundOnce { rows: 2 }
     );
     // Hand edit: the sibling's row name and name entry both changed to the
@@ -615,10 +648,60 @@ fn a_draft_is_judged_against_the_read_it_is_given() {
     // that equals the marked draft.
     let before = catalogue(&decode(BEFORE));
     let plain = shown(&before, PLAIN_NAME);
-    let refused = VerifiedItem::new(clean_create(), &plain, &catalogue(&decode(MARKED)))
+    let refused = verified(clean_create(), &plain, &catalogue(&decode(MARKED)))
         .expect_err("the plain draft's row differs");
     assert_eq!(
         refused.verdict,
         differs(&[SiblingField::Applicability, SiblingField::GstDetails])
     );
+}
+
+/// The marked draft's writes, stored as plain values and rebuilt, with the
+/// draft and its catalogue gone.
+fn rebuilt_marked_writes() -> StockItemWrites {
+    let before = catalogue(&decode(BEFORE));
+    let plain = shown(&before, MARKED_NAME).draft().writes().to_plain();
+    StockItemWrites::rebuild(&plain).expect("the stored values admit")
+}
+
+#[test]
+fn rebuilt_writes_read_back_equal_to_the_marked_create_and_verify() {
+    let writes = rebuilt_marked_writes();
+    let company = VerifiedCompanyIdentity::test_fixture(COMPANY, COMPANY_GUID);
+    let before = guids(&catalogue(&decode(BEFORE)));
+    let marked = catalogue(&decode(MARKED));
+    assert_eq!(
+        ReadBackVerdict::of(&company, &writes, &before, &marked),
+        ReadBackVerdict::Equal(EqualRead {
+            guid: MARKED_GUID.to_string(),
+        })
+    );
+    let verified = VerifiedItem::new(
+        outcome(&decode(ANSWER)),
+        &company,
+        &writes,
+        &before,
+        &marked,
+    )
+    .expect("a clean answer with an equal read is verified");
+    assert_eq!(verified.guid(), MARKED_GUID);
+    assert_eq!(verified.name(), &name(MARKED_NAME));
+}
+
+#[test]
+fn rebuilt_writes_whose_row_guid_is_in_the_before_set_are_not_new() {
+    let writes = rebuilt_marked_writes();
+    let company = VerifiedCompanyIdentity::test_fixture(COMPANY, COMPANY_GUID);
+    let marked = catalogue(&decode(MARKED));
+    // The before set taken from the read after the Create holds the new row's
+    // own GUID, so the row is not new.
+    let after = guids(&marked);
+    assert!(after.contains(MARKED_GUID));
+    assert_eq!(
+        ReadBackVerdict::of(&company, &writes, &after, &marked),
+        ReadBackVerdict::NotNew
+    );
+    let refused = VerifiedItem::new(clean_create(), &company, &writes, &after, &marked)
+        .expect_err("a row that is not new is not verified");
+    assert_eq!(refused.verdict, ReadBackVerdict::NotNew);
 }

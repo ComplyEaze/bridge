@@ -3302,7 +3302,7 @@ const CONFIRM_STOCK_ITEM: &str = r#"    pub(crate) async fn confirm_stock_item(
 const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(prepared: PreparedStockItem) -> Self {
         let rendered = render_stock_item_create(&prepared);
         Self {
-            writes: MasterWrites::StockItem { prepared, rendered },
+            writes: MasterWrites::StockItem { rendered },
             batch_id: None,
         }
     }"#;
@@ -3382,7 +3382,7 @@ fn stock_approval_problems(
         ),
         (
             approvals,
-            "MasterWrites::StockItem { prepared, rendered }",
+            "writes: MasterWrites::StockItem { rendered }",
             1,
             "its one construction",
         ),

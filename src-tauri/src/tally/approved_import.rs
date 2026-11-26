@@ -321,12 +321,7 @@ pub(super) struct MasterAdmission {
 #[derive(Clone)]
 enum MasterWrites {
     Ledgers(LedgerAdmission),
-    StockItem {
-        // Read by the queued send, which is not built yet.
-        #[allow(dead_code)]
-        prepared: PreparedStockItem,
-        rendered: String,
-    },
+    StockItem { rendered: String },
 }
 
 /// One request of ledger `Create`s, rendered once, with the two index reads
@@ -358,7 +353,7 @@ impl MasterAdmission {
     fn stock_item(prepared: PreparedStockItem) -> Self {
         let rendered = render_stock_item_create(&prepared);
         Self {
-            writes: MasterWrites::StockItem { prepared, rendered },
+            writes: MasterWrites::StockItem { rendered },
             batch_id: None,
         }
     }
@@ -377,7 +372,7 @@ impl MasterAdmission {
     fn xml(&self) -> &str {
         match &self.writes {
             MasterWrites::Ledgers(ledgers) => ledgers.rendered.xml(),
-            MasterWrites::StockItem { rendered, .. } => rendered,
+            MasterWrites::StockItem { rendered } => rendered,
         }
     }
 }

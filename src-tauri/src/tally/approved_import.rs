@@ -1080,9 +1080,9 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
-    /// A master post reached the lock without the pre-image its queue recheck
-    /// was to leave for the intent: no sidecar can be named, so no intent is
-    /// recorded and nothing is sent.
+    /// The pre-image a master post's queue recheck handed to the intent cannot
+    /// be recorded (an empty one is a failed read, not an empty book): no
+    /// sidecar can be named, so no intent is recorded and nothing is sent.
     #[error("master_pre_image_unrecorded")]
     PreImageUnrecorded,
     /// The pre-image sidecar could not be written. Refused before the intent:

@@ -1,0 +1,215 @@
+# Row 1381-RB: a master changed between the bind and the aim, then put back by Tally's own Restore
+
+For #1381. A builder binds to the book's master state (the bind), and later aims a write at it (the aim); if a master changes between the two, the aim must not proceed on the old bind. This row makes that change happen on the lab, raw files only, in Educational Mode: it binds (M1, I1, G1, U1), sends one stock-item Create by file (W), reads the mark and the items (M2, I2), and then restores BK-S by Tally's own Restore and reads the book again (M3, I3, G3, U3) to show the change was undone. No Bridge build: ComplyEaze Bridge's masters runtime refuses Educational Mode, so the half in which Bridge itself refuses the recheck waits for a licensed Tally and is not in this sheet. No backup (R5).
+
+**How an EXPECT is marked.** **(lab `row`)** is an earlier observation; **(not shown)** is what this sitting measures. Every computed line is a measurement, never a pass or fail of anything. Any outcome other than an EXPECT is the finding, recorded, not a failure of the sheet.
+
+**Rules.** `LAB-COMMON-RB.md` (R1 to R13) applies in full, with LAB-COMMON v3 (blob c4badf8c) C3 and C4 for the write and C6 for the one restore: the one synthetic book, Educational Mode as the state measured (a title band other than EDU is STOP-EDITION), eleven sends by `send.py` only, of which W is the one write, sent once; the bind and the precheck before it; a screenshot straight after it; no backup; the restore only after a write graded `WRITE ADMITTED`; nothing ends a process; everything the lab adds under `local/`; every STOP named and left as it stands. Each R clause names the RR or v3 clause it keeps or changes.
+
+## The questions
+
+- **Q1.** In Educational Mode, is a stock-item Create sent as a file admitted? W is row 1381-R1's plain Create, byte-identical to master's fixture. No raw write has landed on this lab in Educational Mode: row 2162-PA posted nothing (its build refused before sending).
+- **Q2.** Between the bind (M1) and the aim (M2), does the master mark move from 210 to 211, and does the stock-item read (I2) show the new item?
+- **Q3.** Does restoring BK-S then undo the change: are M3, I3, G3 and U3 byte-equal to the pins? Row 1381-RR could not show a restore undoing anything, since its book was already at BK-S's state; this is that test.
+
+**EXPECT** (not shown; lab 1381-R1, licensed, S5, for the write; lab 1381-RR, Educational Mode, for the restore): W answered byte-equal to the licensed answer, `WRITE ADMITTED`; M2 at ALTMSTID 211; I2 holding `SC Copied Goods` beside `SC Sibling Goods`, byte-equal to the licensed read after the same write; the restore with its two prompts only; M3, I3, G3 and U3 byte-equal to the pins; the data-folder listing showing entries changed. An in-band refusal of W is Q1's "no", recorded whole, and then only M2 is read (EXPECT ALTMSTID 210) and no restore is made.
+
+## The write
+
+`requests/create.utf16le.xml`, master's `src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-plain-create.request.utf16le.xml`, copied by git (blob 090d427f, the same on master and on this branch), 3,646 bytes, sha256 `8f1e50a6f4a996adf951b6b30cee4f0b1366e9925f6bc3e6f016ecb2d8b28f93`. One `STOCKITEM NAME="SC Copied Goods" ACTION="Create"` in an `Import Data` of `All Masters` for `BRIDGE STOCK CREATE LAB`, with the sibling's parent, unit, GST applicability, type of supply, GST details and HSN details written plain. Its provenance is that folder's `PROVENANCE.md`: row 1381-R1 sent it once, licensed (TallyPrime 7.2 Silver, 9 Nov 2026), and Tally answered CREATED 1 with every other counter 0, byte-equal to `stock-create-lab-create-answer.utf16le.xml`, and moved the master mark from 210 to 211; the stock-item read after it is `stock-create-lab-items-after-plain-create.utf16le.xml`. `send.py` holds W's sha256 and bytes (`check_sheet.py` checks they are this section's) and sends W only once in the row's life.
+
+## The backup
+
+- **BK-S** (lab 1108-R3; the restore source of row 1381-RR): `C:\bridge-lab\1108r3\backups\bks\TDBK1800_<company number>.001`, 24,219 bytes, sha256 `ecc8d4028b88b763e5a8a22014bc699b07db68c3eb32cff3c6c92052b373b0f4`, as row 1381-RR's sheet records it. Restored by row 1381-RR in Educational Mode on 26 Nov 2026 (`lab/1381-rr-answers` at 7f88bb89, its `RESULTS.md`): the Restore list showed the book with its number and `19-Nov-26 (7:40 pm)`; "Accept ?" (`y`) and the folder-exists prompt (`r`, Replace) were its only prompts; Select Company about 5 s after the Replace; M, I, G and U after it equal to the pins below.
+- **The fallback**, never restored inside this row: row 1381-O's backup-1, `C:\lab\1381-o\backup-1\TDBK1800_<company number>.001`, 24,219 bytes, sha256 `d23f881a6bac8e1f9bf53035e7f21a72234f9f57c3672a965bc23a3dd76d44eb` (lab 1381-O, S2 and S6). Restored only on the run coordinator's word, by v3 C6, as a separate act (R5, R10). **A fallback restore would itself be a restore in Educational Mode of a different file**, which no row has made: if BK-S's restore fails, the way back is a route not yet proven. So `restore.py precheck` (step 2) checks the fallback file, its bytes, sha256 and company number, and Tally's data folder before the write; a miss there costs nothing, since nothing has been written.
+- **No backup is taken** (R5): the bind shows the book at BK-S's state.
+- `restore.py` holds BK-S's folder, bytes and sha256 and the fallback's (`check_sheet.py` checks they are this section's), takes the company number from the backup's own file name, and takes Tally's data folder from its command line (`<DATA>` below), so that neither is in this folder.
+
+## The book
+
+`BRIDGE STOCK CREATE LAB`, synthetic; its GUID `bac2b5e9…` is listed in master's `scripts/merge-gate-synthetic-uuids.json`; its provenance is `src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/PROVENANCE.md`. **Its state** (lab 1381-RR, `lab/1381-rr-answers` at 7f88bb89, 26 Nov 2026 04:35Z to 04:41Z, Educational Mode, after its restore of BK-S): one stock item `SC Sibling Goods`, one group `SC Goods Group`, one unit `Nos`; ALTMSTID 210, no ALTVCHID; Gateway period 1-Apr-25 to 31-Mar-26, current date Tuesday 1-Apr-2025. The bind (R1) checks that state before W.
+
+## The requests
+
+The four reads are byte-identical copies of row 1381-RR's (git blob ids equal to `lab/1381-rr/requests/` at 62858add), each one Export of a Collection with no date window and no import (`check_sheet.py` checks), sent as a byte-order mark then UTF-16LE with `Content-Type: text/xml; charset=utf-16`. W is the one import.
+
+| labels | request | bytes | sha256 | git blob |
+|---|---|---|---|---|
+| M1, M2, M3 | `requests/marks.utf16le.xml` | 990 | `5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b` | ae363536 |
+| I1, I2, I3 | `requests/items.utf16le.xml` | 1330 | `581b1d95df1b7b80c846ce13e7df18cc47defddb1c646eb025d48bfa5afe0ac1` | dfa57543 |
+| G1, G3 | `requests/groups.utf16le.xml` | 1144 | `d79503503a31c4fee4195b2e03308c2833aa2e9c3072bd4cc0ed1f73d9121245` | 81407606 |
+| U1, U3 | `requests/units.utf16le.xml` | 1174 | `3f79503b5480a6e3a23ec6fb8fc8fd5ca8200d4f0889590c994d1240ed299d0c` | ea630407 |
+| W | `requests/create.utf16le.xml` | 3646 | `8f1e50a6f4a996adf951b6b30cee4f0b1366e9925f6bc3e6f016ecb2d8b28f93` | 090d427f |
+
+## The pins
+
+Master's fixtures, `src-tauri/crates/bridge-tally-protocol/tests/fixtures/` (the first six under `agent/stock-create-lab/`, `PROVENANCE.md` there; the next two under `agent/`; the last at the top), each sha256 computed with git from its blob. `measure.py` pins them by sha256 and bytes, compares this sitting's answers with them, and reads a reference file only when it is its pin (else `NOT READ`). Step 0 takes them from the sheet's commit in the lab's clone into `local/gen/fx/`.
+
+| use | fixture | bytes | sha256 | git blob |
+|---|---|---|---|---|
+| M1 (printed), M3 | `stock-create-lab-marks.utf16le.xml` | 3318 | `ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1` | 9944270a |
+| I1 (bind), I3 | `stock-create-lab-items-before.utf16le.xml` | 8270 | `92508c8e43b9ad14e75551219291b70d5f9db326ae0299b602dc4c128de683a4` | 8e6d9df8 |
+| G1 (bind), G3 | `stock-create-lab-groups.utf16le.xml` | 4170 | `b57cf4dc5311ee18bc767d9a3a8f6fa1220cdae9f72461066a85964b5d84602a` | f0e86592 |
+| U1 (bind), U3 | `stock-create-lab-units.utf16le.xml` | 4040 | `cb9d693327fb6b8b27c9449ee9f841cc12f8a4afe2598b38692a0f825f0d4f39` | ce98c10b |
+| I2 (licensed, after the same write) | `stock-create-lab-items-after-plain-create.utf16le.xml` | 10758 | `2ae12ef647f24b9645231b868f733f978b09d3a8508aab5bf6dfa2564ccbffbd` | 44674944 |
+| W's answer (licensed) | `stock-create-lab-create-answer.utf16le.xml` | 538 | `1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010` | b79743a9 |
+| self-test only: a refusal | `single-import-missing-ledger.utf16le.xml` | 704 | `1009e1b4a24b9f10db29fa9e4008e11c55a97cdce383c59a92601390031594fb` | 2a4e5939 |
+| self-test only: a partial landing | `partial-import-missing-ledger.utf16le.xml` | 710 | `30438f1480e4601a5c236d52be7fa85a89da9cb0d1f42a6b1ad88bf02f3fba50` | 71f3a6b7 |
+| self-test only: an error envelope | `builtin_unknown_report_refusal_live.utf16le.xml` | 448 | `010d3144c2483d9147bb576a3b88314ff0d6434645bcbea5822bfcaa8ef43dc6` | f613a479 |
+
+The first four are also row 1381-RR's answers after its restore of BK-S, byte for byte (`lab/1381-rr-answers` at 7f88bb89, `RESULTS.md`, The five send lines). The three self-test files are Tally's own answers to other imports, captured live; the grader's negative cases are these with one edit each.
+
+## Order and the one variable
+
+The bind first, before anything is done to the book: M1 and its state, then I1, G1 and U1 and their comparison with the pins. Then the precheck (files only), then W, with no key pressed in Tally from M1 to W. Then M2, MARKS first after a write, and I2. Then the shut, the plan, the restore, the after-record and the load, with no request sent between I2 and M3. Then M3, MARKS first after a restore (v3 C6), its state checked before I3, G3 and U3. Between the bind and the aim the one change is W; between the aim and M3 the one change is the restore (and the shut and load it needs).
+
+## Shell
+
+Every command is typed in **Git Bash**, from `/c/bridge-lab/1381-rb`, exactly as written: each line begins `cd /c/bridge-lab/1381-rb && ` and depends on no shell variable set by an earlier line. Step 0's first line does not: it makes the folder, and when the folder already exists it prints its STOP and writes nothing. The interpreter is `python` (3.10) with `-I -X utf8`; `python3` is the Store alias and is never used. Every command's output goes to a file under `local/evidence/` with its exit code, then is printed whole. A line that begins `#` is an instruction, not typed. `<CLONE>` is the Git Bash path of the lab's Bridge clone; `<SHEET>` is the 40-character commit of this branch the run coordinator's GO names; `<DATA>` is Tally's data folder with forward slashes, the folder rows 1108-R3 and 1381-RR used as their Restore Data Path, and the folder the Restore screen must show as its Restore Data Path; it stays inside its double quotes, and the operator has it in hand before step 1. Screenshots are saved in the screen tool's own format (lab 1381-RA and 1381-RR: `.jpg`) under the sheet's names; a zoom is kept as its own file, `<name>-zoom.jpg`, beside the screenshot it enlarges, and a Gateway screenshot may be a zoom of the whole-window screenshot taken in the same action (lab 1381-RR, deviations 1 and 2). Screenshots, the loads, the shuts and the restore are the operator's screen-tool acts on Tally's existing window (never "open application"); each screenshot is saved under `local/shots/` with its name and recorded in the notes.
+
+## Files
+
+- Byte-equal to row 1381-RR's (`lab/1381-rr/` at 62858add): `.gitattributes`, `.gitignore` (`/local/`), and the four read files.
+- `requests/create.utf16le.xml`: master's fixture, byte-identical (The write).
+- Changed copies of RR's, each change named in the file's own header: `send.py` (eleven labels; W pinned and parsed, and every other request parsed as an export; the gates of R4; a start marker before curl; `--selftest` runs 54 cases); `measure.py` (RR's reader and state check; `state M1|M2|M3`, `bind`, `write`, `aim` and `all` against master's pinned fixtures; `--selftest` runs 56 cases, each negative case a captured answer with one edit); `restore.py` (RR's, its precheck before the write and its plan also needing the write's grade; `--selftest` runs 38 cases on synthetic folders); `check_sheet.py` (Steps holds exactly its command lines, once each and in order; the four self-check lines; `measure.py`'s pins equal to The pins; `send.py`'s write pin equal to The write; the four reads and the one import; the held lines of `send.py`, `measure.py` and `restore.py`; BK-S's and the fallback's bytes and sha256 equal to The backup; `--fresh` as RR's; STOP-PYCACHE as RR's).
+- Written for this row: `LAB-COMMON-RB.md`; `SHA256.txt` (every other file's sha256, bytes and path); `RUN-SHEET.md`, this sheet.
+
+## Self-checks before the sitting
+
+Run from `/c/bridge-lab/1381-rb` at step 0, after the pins are in `local/gen/fx/`. Nothing is sent to Tally.
+
+```bash
+cd /c/bridge-lab/1381-rb && python -I -X utf8 send.py --selftest local/selftest/send > local/evidence/selfcheck-send.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-send.txt; tail -n 2 local/evidence/selfcheck-send.txt
+cd /c/bridge-lab/1381-rb && python -I -X utf8 measure.py --selftest local/gen/fx local/selftest/measure > local/evidence/selfcheck-measure.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-measure.txt; tail -n 2 local/evidence/selfcheck-measure.txt
+cd /c/bridge-lab/1381-rb && python -I -X utf8 restore.py --selftest local/selftest/restore > local/evidence/selfcheck-restore.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-restore.txt; tail -n 2 local/evidence/selfcheck-restore.txt
+cd /c/bridge-lab/1381-rb && python -I -X utf8 check_sheet.py > local/evidence/selfcheck-sheet.txt 2>&1; echo "exit $?" >> local/evidence/selfcheck-sheet.txt; cat local/evidence/selfcheck-sheet.txt
+```
+
+EXPECT, in order: `54 cases, 54 right`, exit 0; `56 cases, 56 right`, exit 0; `38 cases, 38 right`, exit 0; three `OK` lines, exit 0. Any other: STOP-SELFCHECK.
+
+## Steps
+
+**Prompt rule.** No dialog is expected but R7's licence pair after a Shut Company and R5's two restore prompts. Any other dialog or message on Tally's screen: copy its text, press no key, send nothing, STOP-DIALOG (a licence screen anywhere else: STOP-LICENCE). Never end a process (R8).
+
+**Record-line rule.** A send, state, grade or restore line that prints `STOP: local/evidence/<name> exists` is STOP-RERUN: that line was typed before, nothing was done now, and the earlier record stands. A send line that has not returned after 10 minutes is STOP-NO-ANSWER (R4): leave that Git Bash window and its curl exactly as they are, take a screenshot of Tally's window, and report.
+
+0. **Before the sitting.** Nothing is sent to Tally in this step except the GET `/status` of its last line. The screenshot comes straight after the folder line (R3).
+   - Make the row folder. EXPECT `made` and `exit 0`. `STOP: … exists`, or no `made` line because `/c/bridge-lab` is absent: STOP-FOLDER. Any STOP after this line leaves `/c/bridge-lab/1381-rb` in place, with what it holds: delete nothing; a new sitting needs the run coordinator's word and a new folder name.
+     ```bash
+     if [ -e /c/bridge-lab/1381-rb ]; then echo "STOP: /c/bridge-lab/1381-rb exists"; else mkdir /c/bridge-lab/1381-rb /c/bridge-lab/1381-rb/local /c/bridge-lab/1381-rb/local/evidence /c/bridge-lab/1381-rb/local/gen /c/bridge-lab/1381-rb/local/shots && echo "made" > /c/bridge-lab/1381-rb/local/evidence/s0-made.txt; echo "exit $?" >> /c/bridge-lab/1381-rb/local/evidence/s0-made.txt; cat /c/bridge-lab/1381-rb/local/evidence/s0-made.txt; fi
+     ```
+   - **The screen**, straight after the folder line, before the fetch, the copy and anything else (R3): a screenshot of the whole Tally window, `local/shots/s0-window.jpg`. EXPECT Select Company with no company loaded, the title band `TallyPrime EDU`, no dialog. A company loaded: STOP-OTHER-COMPANY, shut nothing. Another title: STOP-EDITION. A dialog or half-entered screen: STOP-DIALOG.
+   - **The notes** are begun now, as `local/evidence/notes.txt`: UTC times, one line per step (R13). They end before step 7's listing, which hashes them.
+   - Fetch, and copy this sheet's folder into the row folder byte for byte from the lab's Bridge clone. EXPECT the fetch `exit 0` and the copy `exit 0 0`. Any other exit: STOP-COPY. The fetch is this row's one network act other than Tally's port; nothing in it goes to Tally.
+     ```bash
+     cd /c/bridge-lab/1381-rb && git -C <CLONE> fetch origin > local/evidence/s0-fetch-origin.txt 2>&1; echo "exit $?" >> local/evidence/s0-fetch-origin.txt; cat local/evidence/s0-fetch-origin.txt
+     cd /c/bridge-lab/1381-rb && { git -C <CLONE> archive <SHEET> lab/1381-rb | tar -x -C /c/bridge-lab/1381-rb --strip-components=2; echo "exit ${PIPESTATUS[0]} ${PIPESTATUS[1]}"; } > local/evidence/s0-copy.txt 2>&1; cat local/evidence/s0-copy.txt
+     ```
+   - **The pre-sitting check**, right after the copy: `local/` may hold only `local/evidence/s0-made.txt`, `local/evidence/s0-fetch-origin.txt`, `local/evidence/s0-copy.txt`, `local/evidence/notes.txt`, this check's own `local/evidence/s0-fresh.txt`, and one screenshot, `local/shots/s0-window.jpg` or `local/shots/s0-window.png`. EXPECT `OK: local/ holds only step 0's own records …` then the three `OK` lines, exit 0. `STOP-LOCAL-PREFILLED`: stop, delete nothing, report the names it prints. Any other miss: STOP-SELFCHECK.
+     ```bash
+     cd /c/bridge-lab/1381-rb && python -I -X utf8 check_sheet.py --fresh > local/evidence/s0-fresh.txt 2>&1; echo "exit $?" >> local/evidence/s0-fresh.txt; cat local/evidence/s0-fresh.txt
+     ```
+   - The pins (The pins), from the sheet's own commit in the lab's clone, each by its blob, into `local/gen/fx/`. EXPECT `failed 0`. Any other: STOP-CODE-COMMIT. The self-tests then check each against its sha256.
+     ```bash
+     cd /c/bridge-lab/1381-rb && mkdir local/gen/fx && { n=0; for f in agent/stock-create-lab/stock-create-lab-marks.utf16le.xml agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml agent/stock-create-lab/stock-create-lab-groups.utf16le.xml agent/stock-create-lab/stock-create-lab-units.utf16le.xml agent/stock-create-lab/stock-create-lab-items-after-plain-create.utf16le.xml agent/stock-create-lab/stock-create-lab-create-answer.utf16le.xml agent/single-import-missing-ledger.utf16le.xml agent/partial-import-missing-ledger.utf16le.xml builtin_unknown_report_refusal_live.utf16le.xml; do git -C <CLONE> cat-file blob "<SHEET>:src-tauri/crates/bridge-tally-protocol/tests/fixtures/$f" > "local/gen/fx/${f##*/}" || n=$((n+1)); done; echo "failed $n"; } > local/evidence/s0-fx.txt 2>&1; cat local/evidence/s0-fx.txt
+     ```
+   - Run all four Self-checks. Any miss: STOP-SELFCHECK.
+   - Processes and the port, read only, as RR's step 0. EXPECT for `bridge_mcp.exe` the one line `INFO: No tasks are running which match the specified criteria.`, exit 0 (else STOP-STRAY); for `tally.exe` exactly one line, its PID recorded (else STOP-TALLY); at least one `LISTENING` line ending `:9001` with that PID, and a `LISTENING` line for another port (else STOP-TALLY). The `tally.exe` and port files stay on the lab PC (R13).
+     ```bash
+     cd /c/bridge-lab/1381-rb && tasklist //FI "IMAGENAME eq bridge_mcp.exe" //FO CSV //NH > local/evidence/s0-bridge.txt 2>&1; echo "exit $?" >> local/evidence/s0-bridge.txt; cat local/evidence/s0-bridge.txt
+     cd /c/bridge-lab/1381-rb && tasklist //FI "IMAGENAME eq tally.exe" //FO CSV //NH > local/s0-tally.txt 2>&1; echo "exit $?" >> local/s0-tally.txt; cat local/s0-tally.txt
+     cd /c/bridge-lab/1381-rb && netstat -ano > local/s0-netstat.txt 2>&1; echo "exit $?" >> local/s0-netstat.txt; grep -c LISTENING local/s0-netstat.txt; grep -E ':9001 .*LISTENING' local/s0-netstat.txt
+     ```
+   - GET `/status`, the last act of step 0. EXPECT `exit 0` and the `-w` line `200 51` (lab 1381-RR: `200 51`); another byte count is recorded, not a STOP. Any other status or exit: STOP-TALLY.
+     ```bash
+     cd /c/bridge-lab/1381-rb && curl.exe -sS -w "%{http_code} %{size_download}\n" -D local/evidence/s0-status.headers.txt http://127.0.0.1:9001/status -o local/evidence/s0-status.txt > local/evidence/s0-status-curl.txt 2>&1; echo "exit $?" >> local/evidence/s0-status-curl.txt; cat local/evidence/s0-status-curl.txt
+     ```
+1. **The load and the bind** (R1). The load by RR's keys (lab 1381-RR): a click in the Select Company filter box; `BRIDGE`, then a space and `STOCK`, then a space and `CREATE` until one row is left, `BRIDGE STOCK CREATE LAB`; screenshot `local/shots/s1-select.jpg`; Enter. The book absent from the list: STOP-BOOK-ABSENT, press nothing. Then a screenshot of the whole window, `local/shots/s1-gateway.jpg`: EXPECT the Gateway with `BRIDGE STOCK CREATE LAB` as the one company, the title band EDU, no dialog. Record the period and the current date the Gateway shows (EXPECT 1-Apr-25 to 31-Mar-26 and Tuesday 1-Apr-2025, lab 1381-RR; another date is recorded, not a STOP). A second company: STOP-OTHER-COMPANY. A dialog: STOP-DIALOG (a licence screen: STOP-LICENCE). Then, with no key or click in Tally from here to W, each line in turn, the next only after the last one's file ends as EXPECTed: M1, EXPECT `VERDICT SENT-OK` and `exit 0`; its state, EXPECT `BOOK STATE MET: …` and `exit 0`; I1, G1 and U1, each `VERDICT SENT-OK` and `exit 0`; the bind, EXPECT `BIND MET: …` and `exit 0`. Any send `REFUSED` (exit 2): nothing was sent (STOP-SEND-REFUSED); exit 1: STOP-REQUEST-FAILED. `STOP-BOOK-STATE` (exit 1) or `NOT READ` (exit 2) at the state or the bind: STOP-BOOK-STATE, nothing is written (R1).
+   ```bash
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-M1.txt ]; then echo "STOP: local/evidence/send-M1.txt exists"; else python -I -X utf8 send.py M1 > local/evidence/send-M1.txt 2>&1; echo "exit $?" >> local/evidence/send-M1.txt; cat local/evidence/send-M1.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/m1-state.txt ]; then echo "STOP: local/evidence/m1-state.txt exists"; else python -I -X utf8 measure.py state M1 > local/evidence/m1-state.txt 2>&1; echo "exit $?" >> local/evidence/m1-state.txt; cat local/evidence/m1-state.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-I1.txt ]; then echo "STOP: local/evidence/send-I1.txt exists"; else python -I -X utf8 send.py I1 > local/evidence/send-I1.txt 2>&1; echo "exit $?" >> local/evidence/send-I1.txt; cat local/evidence/send-I1.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-G1.txt ]; then echo "STOP: local/evidence/send-G1.txt exists"; else python -I -X utf8 send.py G1 > local/evidence/send-G1.txt 2>&1; echo "exit $?" >> local/evidence/send-G1.txt; cat local/evidence/send-G1.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-U1.txt ]; then echo "STOP: local/evidence/send-U1.txt exists"; else python -I -X utf8 send.py U1 > local/evidence/send-U1.txt 2>&1; echo "exit $?" >> local/evidence/send-U1.txt; cat local/evidence/send-U1.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/bind.txt ]; then echo "STOP: local/evidence/bind.txt exists"; else python -I -X utf8 measure.py bind > local/evidence/bind.txt 2>&1; echo "exit $?" >> local/evidence/bind.txt; cat local/evidence/bind.txt; fi
+   ```
+2. **The precheck** (R5), with the book loaded, after the bind; it reads files only and sends nothing. Replace `<DATA>` (Shell). EXPECT `PRECHECK MET: …` and `exit 0`. `STOP-RESTORE-SOURCE` (exit 1), `FAILED READ` or `REFUSED` (exit 2): STOP-RESTORE-SOURCE, recorded as "the check failed"; nothing is written and nothing is restored, so a `<DATA>` typo or a missing fallback costs nothing.
+   ```bash
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/r-precheck.txt ]; then echo "STOP: local/evidence/r-precheck.txt exists"; else python -I -X utf8 restore.py precheck "<DATA>" > local/evidence/r-precheck.txt 2>&1; echo "exit $?" >> local/evidence/r-precheck.txt; cat local/evidence/r-precheck.txt; fi
+   ```
+3. **The write** (R4), once. Write down the UTC time before the send line. EXPECT `VERDICT SENT-OK` and `exit 0`. `REFUSED` (exit 2): nothing was sent (STOP-SEND-REFUSED). Exit 1: STOP-REQUEST-FAILED, "the request failed", never "nothing created". No return in 10 minutes: STOP-NO-ANSWER (Record-line rule); W is never sent again. **Straight after the send line returns**, before anything else: a screenshot of the whole Tally window, `local/shots/s3-write.jpg` (`send.py` will not send M2 without it): EXPECT the Gateway as at step 1, the title band EDU, no dialog. A dialog or message: STOP-DIALOG, press no key, send nothing (R7). Another title: STOP-EDITION. Then the grade, from the file only: EXPECT `WRITE ADMITTED: …` and `exit 0` (lab 1381-R1, licensed: byte-equal to `stock-create-lab-create-answer.utf16le.xml`, not shown here).
+   - `WRITE ADMITTED`: step 4, then step 5.
+   - `WRITE REFUSED` (an in-band refusal): Q1's "no", recorded whole with its LINEERROR text; not a STOP. Step 4's first two lines only (M2 and its state, EXPECT ALTMSTID 210); then step 6's compute line; then step 7. No restore (`restore.py plan` refuses).
+   - `WRITE UNCLEAR`: STOP-WRITE-ANSWER. Step 4's first two lines once (R10, v3 C8: they record the mark), then stop and report.
+   - `NOT READ` (exit 2): STOP-REQUEST-FAILED; nothing more is sent.
+   ```bash
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-W.txt ]; then echo "STOP: local/evidence/send-W.txt exists"; else python -I -X utf8 send.py W > local/evidence/send-W.txt 2>&1; echo "exit $?" >> local/evidence/send-W.txt; cat local/evidence/send-W.txt; fi
+   # the screenshot local/shots/s3-write.jpg, straight after the line above returns, then:
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/w-grade.txt ]; then echo "STOP: local/evidence/w-grade.txt exists"; else python -I -X utf8 measure.py write > local/evidence/w-grade.txt 2>&1; echo "exit $?" >> local/evidence/w-grade.txt; cat local/evidence/w-grade.txt; fi
+   ```
+4. **The aim: M2, its state, I2, the aim.** Each line in turn, the next only after the last one's file ends as EXPECTed. Each send: `VERDICT SENT-OK` and `exit 0`; exit 1: STOP-REQUEST-FAILED; exit 2: STOP-SEND-REFUSED. M2's state after `WRITE ADMITTED`: EXPECT `BOOK STATE MET: … ALTMSTID 211 …` and `exit 0` (lab 1381-R1, licensed: 210 to 211; not shown here); after `WRITE REFUSED`: EXPECT ALTMSTID 210. `STOP-AIM-STATE` (exit 1) or `NOT READ` (exit 2): STOP-AIM-STATE, and I2 is not sent (`send.py` will not send it). The aim: EXPECT `AIM SHOWN: 'SC Copied Goods' in I2, bound to the book` and `exit 0`, and I2 byte-equal to `stock-create-lab-items-after-plain-create.utf16le.xml` (a measurement, not shown; `no` is recorded, not a STOP). `STOP-AIM-STATE` (exit 1): the write is not shown by the read (v3 C3): STOP; the book holds W, and the restore waits for the run coordinator's word.
+   ```bash
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-M2.txt ]; then echo "STOP: local/evidence/send-M2.txt exists"; else python -I -X utf8 send.py M2 > local/evidence/send-M2.txt 2>&1; echo "exit $?" >> local/evidence/send-M2.txt; cat local/evidence/send-M2.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/m2-state.txt ]; then echo "STOP: local/evidence/m2-state.txt exists"; else python -I -X utf8 measure.py state M2 > local/evidence/m2-state.txt 2>&1; echo "exit $?" >> local/evidence/m2-state.txt; cat local/evidence/m2-state.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-I2.txt ]; then echo "STOP: local/evidence/send-I2.txt exists"; else python -I -X utf8 send.py I2 > local/evidence/send-I2.txt 2>&1; echo "exit $?" >> local/evidence/send-I2.txt; cat local/evidence/send-I2.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/aim.txt ]; then echo "STOP: local/evidence/aim.txt exists"; else python -I -X utf8 measure.py aim > local/evidence/aim.txt 2>&1; echo "exit $?" >> local/evidence/aim.txt; cat local/evidence/aim.txt; fi
+   ```
+5. **The shut and the restore** (R5, v3 C6), once, only after `WRITE ADMITTED` and `AIM SHOWN`.
+   - **The shut** (v3 C6's "Shut THE COMPANY first"), by RR's keys: a click on the Gateway's left panel; Alt+K (the Company menu); one click on Shut; Enter on the one row `BRIDGE STOCK CREATE LAB`. If R7's pair follows: zoom, then No by click on the renewal dialog; zoom, then "T: Continue In Educational Mode" by click on the License screen; screenshot each (`local/shots/s5-renewal.jpg`, `local/shots/s5-licence.jpg`, kept on the lab PC). Anything else: STOP-LICENCE or STOP-DIALOG. Then a screenshot `local/shots/s5-select.jpg`: EXPECT Select Company, no company loaded, title EDU.
+   - **The plan**, with no company loaded. Replace `<DATA>` (Shell). EXPECT `PLAN WRITTEN: the source folder holds one file, 24219 B, sha256 ecc8d4028b88b763e5a8a22014bc699b07db68c3eb32cff3c6c92052b373b0f4 (equal to recorded), …` and `exit 0`. `STOP-RESTORE-SOURCE` (exit 1): STOP-RESTORE-SOURCE, nothing is restored. `FAILED READ` or `REFUSED` (exit 2; `REFUSED` also when step 2's precheck is missing or did not end `PRECHECK MET` with `exit 0`, when the write has no grade, or when it was refused): STOP-RESTORE-SOURCE as well, recorded as "the check failed", never as "no file". Write down the file's modified time the line prints.
+     ```bash
+     cd /c/bridge-lab/1381-rb && if [ -e local/evidence/r-plan.txt ]; then echo "STOP: local/evidence/r-plan.txt exists"; else python -I -X utf8 restore.py plan "<DATA>" > local/evidence/r-plan.txt 2>&1; echo "exit $?" >> local/evidence/r-plan.txt; cat local/evidence/r-plan.txt; fi
+     ```
+   - **On Tally's screen**, by row 1381-RR's keys (its step 4 and The restore), with the UTC time at the first click and at the return written down (from the screenshots' own times where the notes lag, R13). Click Data, Backup & Restore, Restore. EXPECT the Restore Data Path to read `<DATA>`'s folder (zoom; another: STOP-RESTORE-SOURCE, press no key). Choose Specify Path (click to highlight, Enter) and type `C:\bridge-lab\1108r3\backups\bks` (zoom: exact); Enter. EXPECT the list to show `BRIDGE STOCK CREATE LAB` alone, with the number `restore-plan.txt` names and `19-Nov-26 (7:40 pm)` (lab 1381-RR): screenshot `local/shots/s5-list.jpg`; anything else: STOP-RESTORE-SOURCE, press no key. Enter on that row; click End of List alone. EXPECT "Accept ?": screenshot `local/shots/s5-accept.jpg`, then `y`. EXPECT the folder-exists prompt naming the plan's number: screenshot `local/shots/s5-replace.jpg` (and its zoom on the number), then Replace (`r`). EXPECT Select Company with no company loaded within 10 minutes of the Replace (lab 1381-RR: about 5 s): screenshot `local/shots/s5-after.jpg`, title EDU.
+   - **Stops here** (R5): any licence, activation, renewal or Educational-Mode dialog or screen: press no key, copy its text, screenshot, STOP-LICENCE. Any other prompt, or a list that differs from the plan: press no key, screenshot, STOP-DIALOG (a list: STOP-RESTORE-SOURCE). No Replace prompt, or not back at Select Company in 10 minutes: press no key, screenshot, STOP-RESTORE "the restore of BK-S did not complete". The fallback is named in The backup, restored only on the run coordinator's word.
+   - **The after-record**, back at Select Company, before the load. EXPECT `AFTER RECORDED: the source unchanged …`, the counts, each changed, added or removed entry by name, and `exit 0` (lab 1381-RR: 1 added, 4 removed, 14 changed). `NO DIFFERENCE` on its own line is recorded as the finding "the restore's effect on the folder not shown": not a STOP; step 6's reads decide Q3. `STOP-RESTORE` (exit 1): STOP-RESTORE "the restore of BK-S did not complete". `STOP-RESTORE-SOURCE` (exit 1), `FAILED READ` or `REFUSED` (exit 2): STOP-RESTORE-SOURCE, recorded as "the check failed".
+     ```bash
+     cd /c/bridge-lab/1381-rb && if [ -e local/evidence/r-after.txt ]; then echo "STOP: local/evidence/r-after.txt exists"; else python -I -X utf8 restore.py after "<DATA>" > local/evidence/r-after.txt 2>&1; echo "exit $?" >> local/evidence/r-after.txt; cat local/evidence/r-after.txt; fi
+     ```
+6. **The load after the restore, M3, its state, I3, G3, U3, and the compute.** The load by step 1's keys; screenshot `local/shots/s6-select.jpg`; Enter. The book absent from the list, or not opening: STOP-RESTORE "the restore of BK-S did not complete". Then, before any request (v3 C6), a screenshot of the whole Tally window, `local/shots/s6-window.jpg` (no dialog, no half-entered screen), and one of the Gateway, `local/shots/s6-gateway.jpg`: EXPECT `BRIDGE STOCK CREATE LAB` as the one company, the title band EDU (else STOP-EDITION), no dialog (a licence screen: STOP-LICENCE). Record the period and the current date the Gateway shows (EXPECT as at step 1). Then each line in turn, as step 4. M3's state: EXPECT `BOOK STATE MET: … ALTMSTID 210 …` and `exit 0`; `STOP-RESTORED-STATE` (exit 1) or `NOT READ` (exit 2): STOP-RESTORED-STATE, I3, G3 and U3 are not sent, and the compute is still run. After U3 a screenshot of the whole Tally window, `local/shots/s6-after-u3.jpg`: the Gateway as before, no dialog, title EDU. The compute, from the files only: EXPECT `RESTORE UNDID THE WRITE: yes (…4 of 4)` and `ALL 11 ANSWERS READ`, `exit 0` (after `WRITE REFUSED`: `ALL 6 ANSWERS READ`). `RESTORE UNDID THE WRITE: no` is the finding "BK-S restored but not equal to the pins" (R10): no STOP after the fact, since nothing is left to send, but the fallback is only on the run coordinator's word. `NOT ALL READ` (exit 2) is recorded with each `NOT READ` reason.
+   ```bash
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-M3.txt ]; then echo "STOP: local/evidence/send-M3.txt exists"; else python -I -X utf8 send.py M3 > local/evidence/send-M3.txt 2>&1; echo "exit $?" >> local/evidence/send-M3.txt; cat local/evidence/send-M3.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/m3-state.txt ]; then echo "STOP: local/evidence/m3-state.txt exists"; else python -I -X utf8 measure.py state M3 > local/evidence/m3-state.txt 2>&1; echo "exit $?" >> local/evidence/m3-state.txt; cat local/evidence/m3-state.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-I3.txt ]; then echo "STOP: local/evidence/send-I3.txt exists"; else python -I -X utf8 send.py I3 > local/evidence/send-I3.txt 2>&1; echo "exit $?" >> local/evidence/send-I3.txt; cat local/evidence/send-I3.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-G3.txt ]; then echo "STOP: local/evidence/send-G3.txt exists"; else python -I -X utf8 send.py G3 > local/evidence/send-G3.txt 2>&1; echo "exit $?" >> local/evidence/send-G3.txt; cat local/evidence/send-G3.txt; fi
+   cd /c/bridge-lab/1381-rb && if [ -e local/evidence/send-U3.txt ]; then echo "STOP: local/evidence/send-U3.txt exists"; else python -I -X utf8 send.py U3 > local/evidence/send-U3.txt 2>&1; echo "exit $?" >> local/evidence/send-U3.txt; cat local/evidence/send-U3.txt; fi
+   cd /c/bridge-lab/1381-rb && python -I -X utf8 measure.py all local/gen/fx > local/evidence/measure-all.txt 2>&1; echo "exit $?" >> local/evidence/measure-all.txt; cat local/evidence/measure-all.txt
+   ```
+7. **Close** (R11), by step 5's shut keys and R7's pair if it comes (`local/shots/s7-renewal.jpg`, `local/shots/s7-licence.jpg`); then a screenshot `local/shots/s7-select.jpg`: EXPECT Select Company, no company loaded, title EDU. Then the processes, the port and GET `/status` again; no XML request is sent after the shut. EXPECT the same one `tally.exe` PID as step 0 owning `:9001`, and `200 <bytes>` with `exit 0`. Then the files: `check_sheet.py` exit 0 with its three `OK` lines, and the listing's `exit 0`. The notes (`local/evidence/notes.txt`) end before the listing, which hashes them; the listing's own line goes in the results.
+   ```bash
+   cd /c/bridge-lab/1381-rb && tasklist //FI "IMAGENAME eq tally.exe" //FO CSV //NH > local/s7-tally.txt 2>&1; echo "exit $?" >> local/s7-tally.txt; cat local/s7-tally.txt
+   cd /c/bridge-lab/1381-rb && netstat -ano > local/s7-netstat.txt 2>&1; echo "exit $?" >> local/s7-netstat.txt; grep -c LISTENING local/s7-netstat.txt; grep -E ':9001 .*LISTENING' local/s7-netstat.txt
+   cd /c/bridge-lab/1381-rb && curl.exe -sS -w "%{http_code} %{size_download}\n" -D local/evidence/s7-status.headers.txt http://127.0.0.1:9001/status -o local/evidence/s7-status.txt > local/evidence/s7-status-curl.txt 2>&1; echo "exit $?" >> local/evidence/s7-status-curl.txt; cat local/evidence/s7-status-curl.txt
+   cd /c/bridge-lab/1381-rb && python -I -X utf8 check_sheet.py > local/evidence/s7-sheet.txt 2>&1; echo "exit $?" >> local/evidence/s7-sheet.txt; cat local/evidence/s7-sheet.txt
+   cd /c/bridge-lab/1381-rb && find local -type f ! -name s7-listing.txt | sort | xargs -d '\n' sha256sum > local/evidence/s7-listing.txt 2>&1; echo "exit $?" >> local/evidence/s7-listing.txt; wc -l local/evidence/s7-listing.txt
+   ```
+
+## Stops
+
+Each leaves things as they stand and is reported, with its files and what the book holds (R10, in its words), before anything else: STOP-FOLDER, STOP-COPY, STOP-RERUN, STOP-LOCAL-PREFILLED, STOP-PYCACHE, STOP-CODE-COMMIT, STOP-SELFCHECK, STOP-STRAY, STOP-TALLY, STOP-OTHER-COMPANY, STOP-BOOK-ABSENT, STOP-EDITION, STOP-DIALOG, STOP-LICENCE, STOP-BOOK-STATE, STOP-RESTORE-SOURCE, STOP-SEND-REFUSED, STOP-REQUEST-FAILED, STOP-NO-ANSWER, STOP-WRITE-ANSWER, STOP-AIM-STATE, STOP-RESTORE, STOP-RESTORED-STATE. After any STOP from step 3's send on, the row does not resume in this sitting (R9, R10): W is never sent twice and the restore is never made twice. A book left changed or stuck blocks only the 1381 lab rows (R10).
+
+## Record
+
+For each send: `local/answers/a-<label>.xml` (the answer exactly as received), `a-<label>.headers.txt`, `a-<label>.transport.txt`, `a-<label>.started.txt`, its `local/evidence/send-<label>.txt`, and its line in `local/evidence/send-log.txt` (with curl's first-byte and total seconds). For the bind and the aim: `m1-state.txt`, `bind.txt`, `w-grade.txt`, `m2-state.txt`, `aim.txt`, and the screenshot `s3-write` with the UTC times before W's send and at the screenshot. For the restore: `local/evidence/r-precheck.txt`, `local/evidence/r-plan.txt` and `local/evidence/r-after.txt` (pushed), `local/precheck.txt`, `local/restore-plan.txt`, `local/r-before-listing.txt` and `local/r-after-listing.txt` (kept on the lab PC, R13), the screenshots by name, and the notes line with the UTC times of the first click and the return, the prompts as seen, and the keys pressed. For the sitting: step 0's files, `m3-state.txt`, `measure-all.txt`, the two `/status` captures, `local/evidence/s7-listing.txt`, and the notes, `local/evidence/notes.txt` (begun at step 0 after the folder line, ended before `s7-listing.txt`): UTC times, one line per step, the title band at each screenshot, the Gateway's period and date at steps 1 and 6, and the keys of the loads and the shuts.
+
+## Computes
+
+`measure.py bind` prints M1's state and whether I1, G1 and U1 are byte-equal to their pins. `measure.py write` prints W's bytes and sha256, whether it is byte-equal to the licensed answer, every counter and LINEERROR as received, and the grade (R6). `measure.py state M2` takes its expected mark from that grade. `measure.py aim` prints I2's rows, whether each is bound to the book, and whether I2 is byte-equal to the licensed read after the same write. `measure.py all` prints, from the files alone, per label: bytes, sha256 and its rows, or `NOT READ` with its reason (never zero rows); the three states, the bind and the aim; M3, I3, G3 and U3 against the pins, byte-equal and rows equal (rows compared as canonical XML: tag, attributes, trimmed text, children in order); and `RESTORE UNDID THE WRITE: yes` only when all four are byte-equal. `restore.py after` prints the data-folder listing difference: entries added, removed and changed (bytes or modified time), by name.
+
+## Decides
+
+- **Q1** by `w-grade.txt`, `m2-state.txt` and `aim.txt`: yes only if `WRITE ADMITTED`, M2's state met at ALTMSTID 211 and `AIM SHOWN` (v3 C4: the counters are never the proof; the reads are). `WRITE REFUSED` answers no, with its LINEERROR text, and M2 at 210 shows the mark did not move. `WRITE UNCLEAR`, `NOT READ`, STOP-NO-ANSWER or STOP-DIALOG leave Q1 open, recorded with their files.
+- **Q2** by `m2-state.txt` (the mark 210 to 211) and `aim.txt` (`SC Copied Goods` in I2; byte-equal to the licensed read, yes or no). Q2 is "the master changed between the bind and the aim" only when both show it.
+- **Q3** by `measure-all.txt`'s four lines and `RESTORE UNDID THE WRITE`, with `r-after.txt` and step 5's screenshots for the restore itself. Yes only if all four are byte-equal to the pins. A difference while M3's state is met is the finding "BK-S restored but not equal to the pins" (R10), for the run coordinator.
+- Each answer is one book, one write, one backup, one release, one sitting, in Educational Mode: partial, and recorded so.
+
+## Not covered
+
+- **Bridge refusing the recheck.** The masters runtime refuses Educational Mode, so the half in which ComplyEaze Bridge itself sees the moved mark and refuses waits for a licensed Tally.
+- **A backup in Educational Mode** (R5), row 1381-R1's marked Create, an alias, any other write, and any restore of row 1381-O's backup-1.
+- **A licensed write or restore**: made already (lab 1381-R1, lab 1108-R3); not repeated.
+- A Bridge build, other books, releases and sittings, and transport failure (recorded apart from the answer if it happens, R4).
+
+## Close and evidence
+
+Step 7 leaves Tally at Select Company with no company loaded, title EDU, the one `tally.exe` owning 9001, and the book restored from BK-S (or, after an in-band refusal, as found). Report to the run coordinator: the send lines, `m1-state.txt`, `bind.txt`, `r-precheck.txt`, `w-grade.txt` and W's answer whole, `m2-state.txt`, `aim.txt`, `r-plan.txt`, `r-after.txt`, `m3-state.txt`, `measure-all.txt` whole, the step 3 and step 5 notes lines, the title band and Gateway lines, and any STOP with its name, files and what the book holds. The evidence branch may carry `local/evidence/` and the answers with their headers, transport records and start markers; `precheck.txt`, `restore-plan.txt`, the two listings, the screenshots and the `tally.exe` and port listings stay on the lab PC (R13), all listed by name, size and sha256 in a `kept-local.txt`. The branch is pushed only after the pre-push scan and the run coordinator's yes.

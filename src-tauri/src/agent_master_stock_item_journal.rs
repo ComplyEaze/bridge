@@ -2,7 +2,8 @@
 //! file of its own (`agent-master-stock-item.jsonl`), and
 //! [`StockItemReadBackBasis`], the one value a stock-item read-back takes.
 //!
-//! No shipped path writes this file yet. The intent, the pre-image sidecar and
+//! No shipped path writes this file yet: [`record_stock_item_intent`], its
+//! intent writer, has no shipped caller. The intent, the pre-image sidecar and
 //! the record tags are the master journal's own, generic over the batch kind;
 //! neither the intent nor the sidecar records a kind, because the file is the
 //! kind.
@@ -11,10 +12,15 @@
 //! journal's open-dispatch overlap check sees only its own file. That rests on
 //! the two files being separate and on nothing else; the protocol reference
 //! does not record whether Tally keeps stock items and ledgers apart by name.
+use super::super::master_post::StockItemRecheckPassed;
+use super::super::master_tools::journal_refusal;
 use super::{
-    check_company, check_ids, read_pre_image, Invalid, Journal, JournalBatch, MasterCompany,
-    PreImage, PreImageError,
+    append_kind_intent, check_company, check_ids, read_kind_journal, read_pre_image,
+    remove_pre_image, write_pre_image, ExclusiveAdmission, Invalid, Journal, JournalBatch,
+    MasterCompany, MasterDispatchIntent, MasterLedgerError, PreImage, PreImageError,
+    RecordedIntent,
 };
+use crate::tally::approved_import::UnderLockRefusal;
 use crate::tally::stock_item_create::{
     CreateRenderRefusal, PlainRate, PlainStockItemWrites, StockItemCatalogue, StockItemWrites,
     WritesRebuildRefusal,
@@ -285,6 +291,79 @@ impl StockItemReadBackBasis {
     ) -> Result<VerifiedItem, NotVerified> {
         VerifiedItem::new(outcome, &self.company, &self.writes, &self.before.0, fresh)
     }
+}
+
+/// Why [`record_stock_item_intent`] recorded no intent. Every variant but
+/// `Other` was decided before any byte of the intent was written. Two can
+/// leave a sidecar that names no intent, as the ledger writer's can:
+/// `Refused(PreImageWriteFailed)` when the directory sync failed after the
+/// file was placed or another sidecar was already in place (`ExistsDifferent`),
+/// and `Refused(PreImageRemoveFailed)`.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum StockIntentRefusal {
+    /// The recheck passed for another batch than the one to record.
+    OtherBatch,
+    /// The recheck's digest is not the batch's: an intent that no read-back
+    /// could verify is not written.
+    OtherDigest,
+    Refused(UnderLockRefusal),
+    /// The intent may be in the file: the batch is treated as sent.
+    Other(String),
+}
+
+/// The stock twin of the ledger post's `record_master_intent`, under the
+/// exclusive lock and in its order: the batch undispatched and unchanged, the
+/// token of that batch and digest, the journal's admission, then the spend, the
+/// sidecar and the intent. Nothing shipped calls it yet.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn record_stock_item_intent(
+    data_dir: &Path,
+    lock: &ExclusiveAdmission,
+    batch: &StockItemBatch,
+    passed: StockItemRecheckPassed,
+    spend: impl FnOnce() -> Result<(), UnderLockRefusal>,
+) -> Result<RecordedIntent, StockIntentRefusal> {
+    use StockIntentRefusal::{Other, Refused};
+    let journal = read_kind_journal::<StockItemBatch>(data_dir)
+        .map_err(|_| Refused(UnderLockRefusal::MasterJournalUnavailable))?;
+    let current =
+        (journal.state(&batch.batch_id)).ok_or(Refused(UnderLockRefusal::BatchNotFound))?;
+    if current.intent.is_some() {
+        return Err(Refused(UnderLockRefusal::AlreadyAttempted));
+    }
+    if current.batch != *batch {
+        return Err(Refused(UnderLockRefusal::BatchChanged));
+    }
+    let (create_sha256, pre_image, marks, batch_id) = passed.into_intent_parts();
+    if batch_id != batch.batch_id {
+        return Err(StockIntentRefusal::OtherBatch);
+    }
+    if create_sha256 != batch.batch_sha256 {
+        return Err(StockIntentRefusal::OtherDigest);
+    }
+    let refused = |error| match journal_refusal(error) {
+        Ok(refusal) => Refused(refusal),
+        Err(code) => Other(code),
+    };
+    journal
+        .check_intent_admissible(&current.batch, &marks)
+        .map_err(refused)?;
+    spend().map_err(Refused)?;
+    let written = write_pre_image(data_dir, lock, &current.batch, &pre_image)
+        .map_err(|_| Refused(UnderLockRefusal::PreImageWriteFailed))?;
+    let intent = MasterDispatchIntent::new(&current.batch, create_sha256, written, marks)
+        .map_err(|_| MasterLedgerError::Invalid(Invalid::BadDigest));
+    let appended =
+        intent.and_then(|intent| append_kind_intent::<StockItemBatch>(data_dir, lock, intent));
+    appended.map_err(|error| match refused(error) {
+        // Refused before any byte of the intent was written: the sidecar names
+        // no intent, so it is removed while the lock is held.
+        Refused(refusal) => match remove_pre_image(data_dir, lock, &batch.batch_id) {
+            Ok(()) => Refused(refusal),
+            Err(_) => Refused(UnderLockRefusal::PreImageRemoveFailed),
+        },
+        other => other,
+    })
 }
 
 #[cfg(test)]

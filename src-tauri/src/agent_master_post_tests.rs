@@ -1223,12 +1223,12 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
         ("StockItemReadSize", &[("tally/runtime_masters.rs", 9)]),
         (
             "recheck_stock_item_admission",
-            &[("agent_master_post.rs", 3)],
+            &[("agent_master_post.rs", 5)],
         ),
         (
             "CompleteStockItemCatalogue",
             &[
-                ("agent_master_post.rs", 3),
+                ("agent_master_post.rs", 4),
                 ("tally/stock_item_create.rs", 2),
             ],
         ),
@@ -1244,6 +1244,15 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             &[("agent_master_post.rs", 2), ("tally/runtime_masters.rs", 3)],
         ),
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
+        // The in-queue stock recheck and the stock intent writer: no caller.
+        (
+            "recheck_stock_item_for_dispatch",
+            &[("agent_master_post.rs", 2), ("tally/approved_import.rs", 1)],
+        ),
+        (
+            "record_stock_item_intent",
+            &[("agent_master_stock_item_journal.rs", 3)],
+        ),
         (
             "StockItemRecheckReads",
             &[
@@ -1546,19 +1555,23 @@ fn an_admitted_draft_refuses_support_reads_of_another_company() {
 /// list `render_candidate_stock_items_request` asks for (the request bytes are
 /// that builder's; the answer is not its shape), so that response shape is
 /// never answered in these tests. No draft can be built from the short read,
-/// so no run here passes the recheck: a run whose reads all admit and whose aim
-/// matches refuses at the recheck's sibling step, after its company, aim,
-/// sized-mark and name checks; every other run refuses where its test says.
-mod coordinator {
+/// so no run on these answers alone passes the recheck: one whose reads all
+/// admit and whose aim matches refuses at the recheck's sibling step; the
+/// passing runs ([`passing_answers`]) mix in rebound R1 reads.
+pub(crate) mod coordinator {
     use super::*;
+    use crate::tally::approved_import::{BeforeDispatchError, DispatchLicense, UnderLockRefusal};
     use crate::tally::connection::PairedReadValidationError;
+    use crate::tally::runtime::ApprovedImportDispatch;
     use crate::tally::runtime::{MastersReadError, StockItemCountMismatch};
     use crate::tally::stock_item_create::StockItemCatalogue;
-    use bridge_tally_protocol::native_masters::render_candidate_stock_items_request;
+    use bridge_tally_protocol::native_masters::{
+        render_candidate_stock_items_request, NativeMasterRow,
+    };
     use quick_xml::events::Event;
+    pub(crate) use tally_protocol_simulator::ObservedRequest;
     use tally_protocol_simulator::{
-        Fixture, ObservedRequest, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator,
-        WireEncoding,
+        Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
     };
 
     const SHAPE_COMPANIES: &[u8] = include_bytes!(
@@ -1696,7 +1709,7 @@ mod coordinator {
         plans
     }
 
-    fn shape_identity() -> VerifiedCompanyIdentity {
+    pub(crate) fn shape_identity() -> VerifiedCompanyIdentity {
         let companies =
             bridge_tally_protocol::parse_companies_from_collection(&stock_capture(SHAPE_COMPANIES))
                 .unwrap();
@@ -1713,7 +1726,7 @@ mod coordinator {
 
     /// The R1 draft, rebound to the shape lab's identity (a constructed GUID
     /// swap) so its company is the double's.
-    fn rebound_prepared(identity: &VerifiedCompanyIdentity) -> PreparedStockItem {
+    pub(crate) fn rebound_prepared(identity: &VerifiedCompanyIdentity) -> PreparedStockItem {
         let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
         let catalogue = StockItemCatalogue::from_candidate_read(identity, &r1(STOCK_BEFORE))
             .expect("the rebound R1 read catalogues");
@@ -1961,7 +1974,9 @@ mod coordinator {
     }
 
     /// A stock approval of the rebound R1 draft, bound at birth to `batch`.
-    async fn approved_stock(batch: &str) -> crate::tally::approved_import::ApprovedImport {
+    pub(crate) async fn approved_stock(
+        batch: &str,
+    ) -> crate::tally::approved_import::ApprovedImport {
         use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
         let identity = shape_identity();
         let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
@@ -1994,8 +2009,27 @@ mod coordinator {
     async fn post_stock(
         plans: Vec<ScenarioPlan>,
     ) -> (anyhow::Result<()>, Vec<Sent>, Option<SeenStock>, bool) {
+        let (result, sent, seen, dispatched, _) = post_stock_seeing(plans).await;
+        (result, sent, seen, dispatched)
+    }
+
+    /// The group and unit rows the queue handed the recheck, in that order.
+    type SeenRows = (Vec<NativeMasterRow>, Vec<NativeMasterRow>);
+
+    /// [`post_stock`], with the group and unit rows the recheck was handed.
+    async fn post_stock_seeing(
+        plans: Vec<ScenarioPlan>,
+    ) -> (
+        anyhow::Result<()>,
+        Vec<Sent>,
+        Option<SeenStock>,
+        bool,
+        Option<SeenRows>,
+    ) {
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::{Arc, Mutex};
+        let rows = Arc::new(Mutex::new(None));
+        let rows_in = rows.clone();
         let identity = shape_identity();
         let prepared = rebound_prepared(&identity);
         let simulator = SequenceSimulator::spawn(plans).unwrap();
@@ -2013,6 +2047,10 @@ mod coordinator {
                 approved_stock(crate::synthetic_batch_id(0xa1)).await,
                 move |queued: QueuedAdmission<'_>| {
                     if let QueuedAdmission::StockItem(stock) = &queued {
+                        *rows_in.lock().unwrap() = Some((
+                            stock.groups().rows().to_vec(),
+                            stock.units().rows().to_vec(),
+                        ));
                         *seen_in.lock().unwrap() = Some((
                             stock.prepared() == &prepared,
                             stock.xml_sha256().to_string(),
@@ -2038,7 +2076,8 @@ mod coordinator {
             .map(|_| ());
         let sent = sent(&simulator.finish().unwrap());
         let seen = seen.lock().unwrap().take();
-        (result, sent, seen, dispatched.load(Ordering::Acquire))
+        let rows = rows.lock().unwrap().take();
+        (result, sent, seen, dispatched.load(Ordering::Acquire), rows)
     }
 
     fn assert_admission_refusal(
@@ -2063,8 +2102,8 @@ mod coordinator {
         // Distinct binding and aim marks (289 is the captured mark, 290 a
         // constructed edit), so each reaches its own place and the reads are
         // sized from the binding.
-        let (result, sent, seen, dispatched) =
-            post_stock(queue_answers(marks_at(289), marks_at(290))).await;
+        let (result, sent, seen, dispatched, rows) =
+            post_stock_seeing(queue_answers(marks_at(289), marks_at(290))).await;
         assert_admission_refusal(&result, ApprovedImportAdmissionError::AdmissionInconsistent);
         assert!(!dispatched, "no intent is recorded");
         assert_eq!(sent, QUEUE_READS, "every request an export, no POST");
@@ -2081,6 +2120,17 @@ mod coordinator {
                 marks_at(290),
             ))
         );
+        // The group rows, then the unit rows, each as the double answered.
+        use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
+        let parsed = |kind, capture| {
+            parse_native_masters(kind, &stock_capture(capture), SHAPE_GUID)
+                .unwrap()
+                .rows
+        };
+        let groups = parsed(NativeMasterKind::StockGroups, SHAPE_GROUPS);
+        let units = parsed(NativeMasterKind::Units, SHAPE_UNITS);
+        assert_ne!(groups, units);
+        assert_eq!(rows, Some((groups, units)));
     }
 
     #[tokio::test]
@@ -2268,5 +2318,236 @@ mod coordinator {
         let sha = rebound.xml_sha256();
         assert!(!RecordedIntent::issued_for_test(b, &sha).licenses(&rebound));
         assert!(RecordedIntent::issued_for_test(a, &sha).licenses(&rebound));
+    }
+
+    /// A queue run's answers, no same-sitting capture: the shape lab's mode,
+    /// companies and binding marks (289), `candidate`, the shape lab's count
+    /// of 11 items made `items` (a hand edit), the R1 group and unit reads
+    /// rebound to the shape lab's GUID (hand edits), and aim marks at `aim`.
+    fn stock_answers(candidate: String, items: usize, aim: String) -> Vec<ScenarioPlan> {
+        let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
+        let count = stock_capture(SHAPE_COUNT);
+        let reported = "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>";
+        assert_eq!(count.matches(reported).count(), 1);
+        let count = count.replace(
+            reported,
+            &format!("<NUMSTOCKITEMS TYPE=\"Number\"> {items}</NUMSTOCKITEMS>"),
+        );
+        let mut plans = through_binding(marks_at(289));
+        for read in [candidate, count, r1(STOCK_GROUPS), r1(STOCK_UNITS)] {
+            plans.extend(pair(read.clone(), read));
+        }
+        let companies = answer(stock_capture(SHAPE_COMPANIES));
+        plans.extend([health(), companies.clone(), companies, answer(aim)]);
+        plans
+    }
+
+    /// The R1 candidate read before the creates, one item, rebound to the
+    /// shape lab's GUID (a hand edit).
+    fn rebound_before() -> String {
+        stock_capture(STOCK_BEFORE).replace(STOCK_GUID, SHAPE_GUID)
+    }
+
+    /// [`stock_answers`] for the R1 draft unchanged: the recheck passes.
+    pub(crate) fn passing_answers() -> Vec<ScenarioPlan> {
+        stock_answers(rebound_before(), 1, marks_at(289))
+    }
+
+    /// The R1 import answer to the marked create, CREATED 1, for the POST.
+    pub(crate) fn import_answer() -> ScenarioPlan {
+        answer(stock_capture(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-create-answer.utf16le.xml"
+        )))
+    }
+
+    /// What a stock post through the queue returned, the requests the double
+    /// received, and how many it had received when `before_dispatch` ran.
+    pub(crate) type StockRun = (
+        anyhow::Result<ApprovedImportDispatch>,
+        Vec<ObservedRequest>,
+        Option<usize>,
+    );
+
+    /// Posts the stock approval of [`rebound_prepared`], bound to `batch`,
+    /// through the queue with `recheck` and `before_dispatch`.
+    pub(crate) async fn post_stock_through<R, L: DispatchLicense>(
+        batch: &str,
+        plans: Vec<ScenarioPlan>,
+        recheck: impl Fn(QueuedAdmission<'_>) -> anyhow::Result<R>,
+        before_dispatch: impl Fn(R) -> Result<L, BeforeDispatchError>,
+    ) -> StockRun {
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let at_dispatch = std::sync::Mutex::new(None);
+        let approved = approved_stock(batch).await;
+        let result = TallyRuntime::default()
+            .post_approved_import(config, &shape_identity(), approved, recheck, |rechecked| {
+                *at_dispatch.lock().unwrap() = Some(simulator.received());
+                before_dispatch(rechecked)
+            })
+            .await;
+        let at_dispatch = at_dispatch.into_inner().unwrap();
+        (result, simulator.finish().unwrap(), at_dispatch)
+    }
+
+    /// The decoded body of each import the double received, by parsed header.
+    pub(crate) fn imports(observed: &[ObservedRequest]) -> Vec<String> {
+        (observed.iter())
+            .filter(|request| request.method != "GET")
+            .map(|request| stock_capture(&request.request_body))
+            .map(|body| body.trim_start_matches('\u{feff}').to_string())
+            .filter(|body| header(body, b"TALLYREQUEST") == "Import Data")
+            .collect()
+    }
+
+    /// The token the stock recheck minted in a queue run for `batch` on
+    /// `plans`, kept by a `before_dispatch` that then refuses, so nothing is
+    /// posted: the run's result, its requests and the token.
+    async fn mint_in_queue(
+        batch: &str,
+        plans: Vec<ScenarioPlan>,
+    ) -> (
+        anyhow::Result<()>,
+        Vec<Sent>,
+        Option<StockItemRecheckPassed>,
+    ) {
+        let kept = std::sync::Mutex::new(None);
+        let (result, observed, _) =
+            post_stock_through(batch, plans, recheck_stock_item_for_dispatch, |passed| {
+                *kept.lock().unwrap() = Some(passed);
+                Err::<RecordedIntent, _>(BeforeDispatchError::Refused(
+                    UnderLockRefusal::ApprovalRevoked,
+                ))
+            })
+            .await;
+        (
+            result.map(|_| ()),
+            sent(&observed),
+            kept.into_inner().unwrap(),
+        )
+    }
+
+    /// A token the stock recheck minted in the queue for `batch`.
+    pub(crate) async fn minted(batch: &str) -> StockItemRecheckPassed {
+        let (_, _, passed) = mint_in_queue(batch, passing_answers()).await;
+        passed.expect("the stock recheck passes on the passing answers")
+    }
+
+    use crate::tally::approved_import::RecordedIntent;
+
+    #[tokio::test]
+    async fn the_stock_recheck_mints_its_token_from_the_queues_own_reads() {
+        // The aim with the R1 book's captured row loaded beside the target (a
+        // constructed pairing), so the aim's marks are not the binding's.
+        let (r1, aim) = (stock_capture(STOCK_MARKS), marks_at(289));
+        let row = |text: &str| {
+            let start = text.find("<COMPANY NAME=").unwrap();
+            (
+                start,
+                start + text[start..].find("</COMPANY>").unwrap() + "</COMPANY>".len(),
+            )
+        };
+        let ((start, end), (_, after)) = (row(&r1), row(&aim));
+        let aim = format!("{}{}{}", &aim[..after], &r1[start..end], &aim[after..]);
+        let batch = crate::synthetic_batch_id(0xa1);
+        let plans = stock_answers(rebound_before(), 1, aim.clone());
+        let (result, sent, passed) = mint_in_queue(batch, plans).await;
+        result.expect_err("the keeping closure refuses");
+        assert_eq!(sent, QUEUE_READS, "every request an export, no POST");
+        let (digest, pre_image, marks, batch_id) = passed.expect("minted").into_intent_parts();
+        assert_eq!(digest, approved_stock(batch).await.xml_sha256());
+        let item = format!("{SHAPE_GUID}-000000d0");
+        assert_eq!(pre_image.entries(), &BTreeMap::from([(item, 210)]));
+        assert_ne!(marks, aim_master_marks(&marks_at(289)).unwrap());
+        assert_eq!(marks, aim_master_marks(&aim).unwrap());
+        assert_eq!(batch_id, batch);
+    }
+
+    /// The stock recheck's typed refusal in `error`'s chain, if any.
+    fn stock_refusal(error: &anyhow::Error) -> Option<&StockItemRecheckError> {
+        error.chain().find_map(|cause| cause.downcast_ref())
+    }
+
+    #[tokio::test]
+    async fn the_stock_recheck_in_the_queue_keeps_each_refusal_and_mints_nothing() {
+        // Constructed edits, each of a named capture: the R1 read after the
+        // marked create, rebound; its GST rate 9 made 10; the shape lab's own
+        // items, which hold no such sibling; and an aim mark of 290.
+        let after = stock_capture(STOCK_AFTER_MARKED).replace(STOCK_GUID, SHAPE_GUID);
+        let rate = "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>";
+        let changed = rebound_before().replacen(rate, "<GSTRATE TYPE=\"Number\"> 10</GSTRATE>", 1);
+        assert_ne!(changed, rebound_before());
+        // Whether a run's error is the case's typed refusal.
+        type RefusedAs = fn(&anyhow::Error) -> bool;
+        let cases: [(Vec<ScenarioPlan>, RefusedAs); 4] = [
+            (stock_answers(after, 3, marks_at(289)), |error| {
+                matches!(
+                    stock_refusal(error),
+                    Some(StockItemRecheckError::NameNotAbsent(
+                        ItemNameNotAbsent::Taken(_)
+                    ))
+                )
+            }),
+            (stock_answers(changed, 1, marks_at(289)), |error| {
+                matches!(
+                    stock_refusal(error),
+                    Some(StockItemRecheckError::DraftChanged)
+                )
+            }),
+            (
+                stock_answers(stock_capture(SHAPE_ITEMS), 11, marks_at(289)),
+                |error| {
+                    matches!(
+                        stock_refusal(error),
+                        Some(StockItemRecheckError::Sibling(SiblingRefusal::NotFound))
+                    )
+                },
+            ),
+            (stock_answers(rebound_before(), 1, marks_at(290)), |error| {
+                matches!(
+                    (error.chain()).find_map(|cause| cause.downcast_ref()),
+                    Some(ApprovedImportAdmissionError::MastersMoved)
+                )
+            }),
+        ];
+        for (plans, refused_as) in cases {
+            let batch = crate::synthetic_batch_id(0xa1);
+            let (result, sent, passed) = mint_in_queue(batch, plans).await;
+            let error = result.expect_err("the recheck refuses");
+            assert!(refused_as(&error), "{error:#}");
+            assert_eq!(sent, QUEUE_READS);
+            assert!(passed.is_none(), "no token is minted");
+        }
+    }
+
+    /// A ledger admission is refused through the mint. `DigestMismatch` and
+    /// `NotRendered` cannot be reached through it: a queued stock item's
+    /// `xml_sha256` is taken from `render_stock_item_create` of the same
+    /// prepared item whose writes `create_sha256` renders, and a prepared item
+    /// has passed `create_text_refusal`, so only `sent_digest` is tested here.
+    /// Nor can `PreImage`: the admitted candidate read holds an item, each GUID
+    /// the company's followed by eight lowercase hex digits and none twice, so
+    /// `PreImage::new` refuses none unless the company GUID passed 119 characters.
+    #[test]
+    fn the_stock_recheck_refuses_a_ledger_admission_and_sent_digest_refuses_other_bytes() {
+        let marks = marks(7);
+        let queued = masters_queued(("", ""), ("", ""), &marks, &marks);
+        let error = recheck_stock_item_for_dispatch(queued).expect_err("a ledger admission");
+        assert!(matches!(
+            error.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+        ));
+        // A constructed digest, not the one the prepared writes give.
+        let prepared = rebound_prepared(&shape_identity());
+        let own = prepared.writes().create_sha256(prepared.company()).unwrap();
+        assert_eq!(sent_digest(&prepared, &own).unwrap(), own);
+        let other = "0".repeat(64);
+        assert!(matches!(
+            sent_digest(&prepared, &other),
+            Err(StockItemRecheckError::DigestMismatch)
+        ));
     }
 }

@@ -3322,8 +3322,8 @@ const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(
 /// one approval is redeemed once because `take_for_dispatch` removes the held
 /// approval by value, `RecordedIntent` is neither `Clone` nor `Default` and the
 /// send takes it by value, and the journal admits one intent per batch; until
-/// the stock send exists, the queue reads for a stock item and no recheck
-/// admits it.
+/// the stock send exists, only the stock recheck, which nothing shipped calls,
+/// admits a queued stock item.
 const PREPARED_STRUCT: &str = r#"    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) struct PreparedStockItem {
         company: VerifiedCompanyIdentity,
@@ -4001,13 +4001,17 @@ fn stock_queue_problems(
             problems.push(format!("expected one {label}"));
         }
     }
-    // Only the queue makes a queued stock item, and until part 2b changes this
-    // on purpose no shipped recheck names one.
+    // Only the queue makes a queued stock item, and only the stock recheck
+    // admits one: once, in `recheck_stock_item_for_dispatch`.
     for (needle, allowed) in [
         ("QueuedStockItem::new(", &["src/tally/runtime.rs"][..]),
         (
             "QueuedAdmission::StockItem",
-            &["src/tally/runtime.rs", "src/tally/approved_import.rs"][..],
+            &[
+                "src/tally/runtime.rs",
+                "src/tally/approved_import.rs",
+                "src/agent_master_post.rs",
+            ][..],
         ),
     ] {
         let named: usize = others
@@ -4024,7 +4028,48 @@ fn stock_queue_problems(
             problems.push(format!("`{needle}` must be named only by the queue"));
         }
     }
+    let posts: Vec<&str> = (others.iter())
+        .filter(|(path, _)| is_source(path, "src/agent_master_post.rs"))
+        .map(|(_, text)| text.as_str())
+        .collect();
+    let admits = |text: &str| text.matches("QueuedAdmission::StockItem").count();
+    let recheck = |text| fn_body(text, "fn recheck_stock_item_for_dispatch(");
+    if posts.len() != 1 || admits(posts[0]) != 1 || admits(recheck(posts[0])) != 1 {
+        problems.push("the stock recheck must admit a queued stock item once, itself".into());
+    }
+    // The variant is named in full, so the counts above see every use: no
+    // import of the variants, no alias of the type and no impl of it outside
+    // its file.
+    for (path, text) in others {
+        let aliased = [
+            "QueuedAdmission::{",
+            "QueuedAdmission::*",
+            "QueuedAdmission as ",
+        ]
+        .iter()
+        .any(|form| text.contains(form))
+            || text.lines().any(|line| {
+                line.trim_start().starts_with("type ") && line.contains("QueuedAdmission")
+            });
+        let implemented = !is_source(path, "src/tally/approved_import.rs")
+            && impl_lines_naming(text, "QueuedAdmission") != 0;
+        if aliased || implemented {
+            problems.push(format!("{path} reaches QueuedAdmission by another name"));
+        }
+    }
+    if runtime.matches("read_stock_item_admission(").count() != 1 {
+        problems.push("the queue reads a stock approval's reads by one call".into());
+    }
     problems
+}
+
+/// The text of the function that `signature` begins, to its closing brace at
+/// column one; empty if `source` has no such function.
+fn fn_body<'a>(source: &'a str, signature: &str) -> &'a str {
+    source.find(signature).map_or("", |start| {
+        let rest = &source[start..];
+        &rest[..rest.find("\n}\n").map_or(rest.len(), |end| end + 3)]
+    })
 }
 
 #[test]
@@ -4118,6 +4163,31 @@ fn the_queue_reads_a_stock_approval_for_its_own_company_and_never_rebinds_it() {
         "src-tauri/src/agent/runtime.rs".into(),
         "let _ = QueuedStockItem::new(a, c, g, u, b, m);".into(),
     ));
+    // Another file admitting a queued stock item, or reaching the variant by
+    // an import, an alias or an impl of its own.
+    let mut aliases = Vec::new();
+    for text in [
+        "let QueuedAdmission::StockItem(stock) = queued else { todo!() };",
+        "use crate::tally::approved_import::QueuedAdmission::{StockItem};",
+        "use crate::tally::approved_import::QueuedAdmission::*;",
+        "use crate::tally::approved_import::QueuedAdmission as Queued;",
+        "type Queued<'a> = crate::tally::approved_import::QueuedAdmission<'a>;",
+        "impl<'a> QueuedAdmission<'a> { fn f(self) { let Self::StockItem(_) = self; } }",
+    ] {
+        let mut mutated = others.clone();
+        mutated.push(("src-tauri/src/agent_master_tools.rs".into(), text.into()));
+        aliases.push(mutated);
+    }
+    let read_twice = runtime.replacen(
+        "masters::read_stock_item_admission(",
+        "masters::read_stock_item_admission(&reads, &identity, &before_marks.text, p, &mut e);\nmasters::read_stock_item_admission(",
+        1,
+    );
+    assert_ne!(read_twice, runtime, "the mutation changed nothing");
+    for mutated in &aliases {
+        assert!(!stock_queue_problems(&approvals, &runtime, &runtime_masters, mutated).is_empty());
+    }
+    assert!(!stock_queue_problems(&approvals, &read_twice, &runtime_masters, &others).is_empty());
     let posts = format!("{runtime_masters}\nfn f() {{ wire.post_probe_xml(x); }}");
     let locks = format!("{runtime_masters}\nfn f() {{ client.acquire_wire(); }}");
     for (approvals, runtime, runtime_masters, others) in [
@@ -4138,6 +4208,248 @@ fn the_queue_reads_a_stock_approval_for_its_own_company_and_never_rebinds_it() {
         (&approvals, &runtime, &runtime_masters, &runtime_elsewhere),
     ] {
         assert!(!stock_queue_problems(approvals, runtime, runtime_masters, others).is_empty());
+    }
+}
+
+/// The stock recheck's token: debug only, private fields, so no copy, default,
+/// clone or deserialized value of it can exist.
+const STOCK_TOKEN: &str = "#[must_use]
+#[derive(Debug)]
+pub(super) struct StockItemRecheckPassed {";
+
+/// The token's fields, each private.
+const STOCK_TOKEN_FIELDS: &str =
+    "create_sha256: String, pre_image: PreImage, marks: Vec<MasterMark>, batch_id: String,";
+
+/// Problems with how the stock recheck's token is made and spent: one literal,
+/// in `recheck_stock_item_for_dispatch`; one spend, and one stock intent
+/// append, in `record_stock_item_intent`. `sources` is every non-test source,
+/// as [`other_sources`] gives them.
+fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let text_of = |source: &str| {
+        let found = sources.iter().find(|(path, _)| is_source(path, source));
+        found.map_or(String::new(), |(_, text)| text.clone())
+    };
+    let (post, journal) = (
+        text_of("src/agent_master_post.rs"),
+        text_of("src/agent_master_stock_item_journal.rs"),
+    );
+    let fields = post.find(STOCK_TOKEN).map(|start| {
+        let rest = &post[start + STOCK_TOKEN.len()..];
+        let body = &rest[..rest.find("\n}\n").unwrap_or(rest.len())];
+        (body.lines())
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    });
+    let attributes = attributes_above(&post, "pub(super) struct StockItemRecheckPassed {");
+    if post.matches(STOCK_TOKEN).count() != 1
+        || fields.as_deref() != Some(STOCK_TOKEN_FIELDS)
+        || attributes != ["#[must_use]", "#[derive(Debug)]"]
+    {
+        problems.push("the token's derive line and private fields are pinned".into());
+    }
+    // Its one inherent impl holds one fn, which consumes it and builds none.
+    let methods = fn_body(&post, "impl StockItemRecheckPassed {");
+    let spend = "    pub(super) fn into_intent_parts(self) -> (String, PreImage, Vec<MasterMark>, String) {";
+    if methods.matches("fn ").count() != 1 || !methods.contains(spend) || methods.contains("Self") {
+        problems.push("the token's impl holds only `into_intent_parts`".into());
+    }
+    let count = |needle: &str| -> usize {
+        sources
+            .iter()
+            .map(|(_, text)| text.matches(needle).count())
+            .sum()
+    };
+    let impls: usize = (sources.iter())
+        .map(|(_, text)| impl_lines_naming(text, "StockItemRecheckPassed"))
+        .sum();
+    if impls != 1 {
+        problems.push("one inherent impl of the token, and no trait impl".into());
+    }
+    let token = "StockItemRecheckPassed";
+    let literals: usize = (sources.iter())
+        .map(|(_, text)| literals_of(text, token))
+        .sum();
+    let aliased = (sources.iter())
+        .flat_map(|(_, text)| text.lines())
+        .any(|line| {
+            let words = line.split_whitespace().collect::<Vec<_>>();
+            line.contains(token)
+                && (words.contains(&"type") || line.contains(&format!("{token} as ")))
+        });
+    let mint = fn_body(&post, "fn recheck_stock_item_for_dispatch(");
+    // Its one literal, after the digest of the bytes the POST sends is required.
+    let digest = "sent_digest(stock.prepared(), stock.xml_sha256())?;";
+    if literals != 1
+        || aliased
+        || literals_of(mint, token) != 1
+        || mint.matches(digest).count() != 1
+    {
+        problems.push("the token is built once, in recheck_stock_item_for_dispatch".into());
+    }
+    // The existing recheck, run once as a statement whose refusal returns.
+    let call = "\n    recheck_stock_item_admission(StockItemRecheckInput {\n";
+    let returns = mint.find(call).is_some_and(|at| {
+        let close = mint[at..].find("\n    })").map_or(0, |end| at + end);
+        mint[close..].starts_with("\n    })?;\n")
+    });
+    if mint.matches(call).count() != 1 || !returns {
+        problems.push("the mint runs the stock recheck once and returns its refusal".into());
+    }
+    let writer = fn_body(&journal, "fn record_stock_item_intent(");
+    for (needle, in_writer) in [
+        ("into_intent_parts(", "passed.into_intent_parts()"),
+        (
+            "append_kind_intent::<StockItemBatch>",
+            "append_kind_intent::<StockItemBatch>(data_dir, lock, intent)",
+        ),
+    ] {
+        let calls = count(needle) - count(&format!("fn {needle}"));
+        if calls != 1 || writer.matches(in_writer).count() != 1 {
+            problems.push(format!(
+                "`{needle}` is called once, by the stock intent writer"
+            ));
+        }
+    }
+    problems
+}
+
+/// The lines above `item` in `source`, back over blank lines and doc and line
+/// comments to the end of the item before it (a line ending `}` or `;`),
+/// comments left out: its attributes, each line of a multi-line one too, and
+/// one a blank line separates still among them.
+fn attributes_above<'a>(source: &'a str, item: &str) -> Vec<&'a str> {
+    let start = source.find(item).unwrap_or(0);
+    let mut above = (source[..start].lines().rev().map(str::trim))
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .take_while(|line| !line.ends_with('}') && !line.ends_with(';'))
+        .collect::<Vec<_>>();
+    above.reverse();
+    above
+}
+
+/// How many times `name` is followed by `{`, whitespace allowed, in `text`,
+/// but not as the name a struct, an impl or a return type gives: its literals
+/// and patterns.
+fn literals_of(text: &str, name: &str) -> usize {
+    (text.match_indices(name))
+        .filter(|(at, _)| {
+            let before = text[..*at].trim_end();
+            text[at + name.len()..].trim_start().starts_with('{')
+                && !["struct", "impl", "->"]
+                    .iter()
+                    .any(|word| before.ends_with(word))
+        })
+        .count()
+}
+
+#[test]
+fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
+    let sources = other_sources();
+    assert_eq!(stock_token_problems(&sources), Vec::<String>::new());
+    let edit = |source: &str, from: &str, to: &str| {
+        let mut mutated = sources.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let post = "src/agent_master_post.rs";
+    let journal = "src/agent_master_stock_item_journal.rs";
+    let derive = "#[derive(Debug)]\npub(super) struct StockItemRecheckPassed {";
+    let mut mutations = Vec::new();
+    for derived in [
+        "Debug, Clone",
+        "Debug, Default",
+        "Debug, Clone, Copy",
+        "Debug, Deserialize",
+    ] {
+        let to = derive.replace("Debug", derived);
+        mutations.push(edit(post, derive, &to));
+    }
+    // A derive above the pinned two, after the doc comment or before it, with
+    // blank lines between or none.
+    let token = "#[must_use]\n#[derive(Debug)]\npub(super) struct StockItemRecheckPassed {";
+    for above in ["#[derive(Clone)]", "#[cfg_attr(test, derive(Clone))]"] {
+        mutations.push(edit(post, token, &format!("{above}\n{token}")));
+    }
+    let doc = "/// Proof that the queue's stock recheck passed";
+    for above in [
+        "#[derive(Clone)]\n",
+        "#[derive(Clone)]\n\n",
+        "#[derive(Clone)]\n\n\n",
+        "#[cfg_attr(test, derive(Clone))]\n\n",
+    ] {
+        mutations.push(edit(post, doc, &format!("{above}{doc}")));
+    }
+    // A second literal: through `Self` in its impl, without the space, through
+    // a type alias and through an import alias.
+    let fields = "create_sha256: String::new(), pre_image: todo!(), marks: Vec::new(), batch_id: String::new()";
+    let methods = "impl StockItemRecheckPassed {\n";
+    let again = format!("{methods}    fn again() -> Self {{ Self {{ {fields} }} }}\n");
+    mutations.push(edit(post, methods, &again));
+    for forged in [
+        format!("fn forge() -> anyhow::Result<StockItemRecheckPassed> {{ Ok(StockItemRecheckPassed{{ {fields} }}) }}"),
+        format!("type Proof = StockItemRecheckPassed;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+        format!("use self::StockItemRecheckPassed as Proof;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+    ] {
+        let anchor = "\n/// The digest of `prepared`'s writes";
+        mutations.push(edit(post, anchor, &format!("\n{forged}{anchor}")));
+    }
+    // The existing recheck's refusal discarded.
+    let text = &sources
+        .iter()
+        .find(|(path, _)| is_source(path, post))
+        .unwrap()
+        .1;
+    let start = text
+        .find("    recheck_stock_item_admission(StockItemRecheckInput {\n        prepared: stock")
+        .unwrap();
+    let call = &text[start..start + text[start..].find("})?;").unwrap() + "})?;".len()];
+    let discarded = format!("    let _ = {}", call.trim_start()).replace("})?;", "});");
+    mutations.push(edit(post, call, &discarded));
+    let manual =
+        "\nimpl Clone for StockItemRecheckPassed { fn clone(&self) -> Self { todo!() } }\n";
+    mutations.push(edit(
+        post,
+        "\n/// The digest of `prepared`'s writes",
+        &format!("{manual}/// The digest of `prepared`'s writes"),
+    ));
+    mutations.push(edit(
+        post,
+        "    create_sha256: String,",
+        "    pub(super) create_sha256: String,",
+    ));
+    // The digest check dropped from the mint.
+    mutations.push(edit(
+        post,
+        "    let create_sha256 = sent_digest(stock.prepared(), stock.xml_sha256())?;",
+        "    let create_sha256 = stock.xml_sha256().to_owned();",
+    ));
+    // A second mint, in the standalone recheck.
+    mutations.push(edit(
+        post,
+        "    runtime\n        .read_and_recheck_stock_item(",
+        "    let _ = StockItemRecheckPassed { create_sha256, pre_image, marks, batch_id };\n    runtime\n        .read_and_recheck_stock_item(",
+    ));
+    // A second spend, and a second stock intent append, beside the writer.
+    for added in [
+        "fn spend(p: StockItemRecheckPassed) { let _ = p.into_intent_parts(); }",
+        "fn again(i: MasterDispatchIntent) { append_kind_intent::<StockItemBatch>(d, l, i); }",
+    ] {
+        mutations.push(edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            &format!("\n{added}\n#[cfg(test)]\n#[path"),
+        ));
+    }
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert!(!stock_token_problems(mutated).is_empty(), "mutation {at}");
     }
 }
 

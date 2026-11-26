@@ -430,3 +430,185 @@ fn only_the_basis_judges_a_stock_item_read_back() {
     assert_eq!(callers("ReadBackVerdict::of("), [basis.clone(), verified]);
     assert_eq!(callers("VerifiedItem::new("), [basis]);
 }
+
+/// The stock intent writer on tokens the stock recheck minted in the queue, on
+/// the constructed answers of `coordinator::passing_answers`.
+mod writer {
+    use super::super::super::super::master_post::recheck_stock_item_for_dispatch;
+    use super::super::super::super::master_post::tests::coordinator::{
+        approved_stock, import_answer, imports, minted, passing_answers, post_stock_through,
+        rebound_prepared, shape_identity,
+    };
+    use super::super::super::TEST_FAULTS;
+    use super::*;
+    use crate::tally::approved_import::{BeforeDispatchError, DispatchLicense};
+
+    const A: u16 = 0xa1;
+    const B: u16 = 0xb2;
+
+    fn id(serial: u16) -> &'static str {
+        crate::synthetic_batch_id(serial)
+    }
+
+    /// The batch of the rebound draft, as a stock tool would record it.
+    fn shape_batch(serial: u16) -> StockItemBatch {
+        let prepared = rebound_prepared(&shape_identity());
+        StockItemBatch::new(id(serial).into(), prepared.company(), prepared.writes()).unwrap()
+    }
+
+    /// A data folder holding `batches`, none dispatched.
+    fn folder(batches: &[&StockItemBatch]) -> tempfile::TempDir {
+        let directory = tempfile::tempdir().unwrap();
+        let dir = directory.path();
+        for batch in batches {
+            append(dir, &lock(), JournalRecord::Batch((*batch).clone())).unwrap();
+        }
+        directory
+    }
+
+    /// Whether the journal in `dir` shows `batch` dispatched, and whether its
+    /// sidecar is there.
+    fn written(dir: &Path, batch: &StockItemBatch) -> (bool, bool) {
+        let journal = read_kind_journal::<StockItemBatch>(dir).unwrap();
+        let sidecar = dir.join(format!("master-pre-image-{}.json", batch.batch_id));
+        (journal.dispatched(&batch.batch_id), sidecar.exists())
+    }
+
+    /// Records `batch` on `passed`, counting the approval's spends.
+    fn record(
+        dir: &Path,
+        batch: &StockItemBatch,
+        passed: StockItemRecheckPassed,
+        spends: &std::cell::Cell<u32>,
+    ) -> Result<RecordedIntent, StockIntentRefusal> {
+        record_stock_item_intent(dir, &lock(), batch, passed, || {
+            spends.set(spends.get() + 1);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn the_writer_records_one_intent_that_licenses_its_own_batch_only() {
+        let batch = shape_batch(A);
+        let directory = folder(&[&batch]);
+        let dir = directory.path();
+        let spends = std::cell::Cell::new(0);
+        let recorded = record(dir, &batch, minted(id(A)).await, &spends).unwrap();
+        assert_eq!(spends.get(), 1);
+        assert_eq!(written(dir, &batch), (true, true));
+        assert_eq!(recorded.batch_id(), id(A));
+        assert!(recorded.licenses(&approved_stock(id(A)).await));
+        let journal = read_kind_journal::<StockItemBatch>(dir).unwrap();
+        StockItemReadBackBasis::from_journal(dir, &journal, id(A), &shape_identity())
+            .expect("the basis builds for the recorded batch");
+        // A second token for the same batch: the journal already holds its
+        // intent, and nothing is spent.
+        let again = record(dir, &batch, minted(id(A)).await, &spends);
+        assert_eq!(
+            again.unwrap_err(),
+            StockIntentRefusal::Refused(UnderLockRefusal::AlreadyAttempted)
+        );
+        assert_eq!(spends.get(), 1);
+        // An intent of batch A licenses no approval of batch B.
+        let (a, b) = (shape_batch(A), shape_batch(B));
+        let other = folder(&[&a, &b]);
+        let recorded = record(other.path(), &a, minted(id(A)).await, &spends).unwrap();
+        assert!(!recorded.licenses(&approved_stock(id(B)).await));
+    }
+
+    #[tokio::test]
+    async fn a_token_for_another_batch_or_digest_writes_nothing() {
+        let spends = std::cell::Cell::new(0);
+        let b = shape_batch(B);
+        let directory = folder(&[&b]);
+        let refused = record(directory.path(), &b, minted(id(A)).await, &spends);
+        assert_eq!(refused.unwrap_err(), StockIntentRefusal::OtherBatch);
+        assert_eq!(written(directory.path(), &b), (false, false));
+        // A hand edit: batch A's stored digest made another, so only the
+        // digest differs from the token's.
+        let mut r1 = shape_batch(A);
+        r1.batch_sha256 = "f".repeat(64);
+        let directory = folder(&[&r1]);
+        let refused = record(directory.path(), &r1, minted(id(A)).await, &spends);
+        assert_eq!(refused.unwrap_err(), StockIntentRefusal::OtherDigest);
+        assert_eq!(written(directory.path(), &r1), (false, false));
+        assert_eq!(spends.get(), 0);
+    }
+
+    #[tokio::test]
+    async fn an_open_dispatch_of_the_name_or_a_refused_spend_writes_nothing() {
+        let (a, b) = (shape_batch(A), shape_batch(B));
+        let directory = folder(&[&a, &b]);
+        let dir = directory.path();
+        let spends = std::cell::Cell::new(0);
+        let _recorded = record(dir, &a, minted(id(A)).await, &spends).unwrap();
+        let overlap = record(dir, &b, minted(id(B)).await, &spends);
+        assert_eq!(
+            overlap.unwrap_err(),
+            StockIntentRefusal::Refused(UnderLockRefusal::MasterOverlapsOpenDispatch)
+        );
+        assert_eq!(spends.get(), 1);
+        assert_eq!(written(dir, &b), (false, false));
+        // A spend that refuses writes no sidecar and no intent.
+        let fresh = folder(&[&a]);
+        let revoked =
+            record_stock_item_intent(fresh.path(), &lock(), &a, minted(id(A)).await, || {
+                Err(UnderLockRefusal::ApprovalRevoked)
+            });
+        assert_eq!(
+            revoked.unwrap_err(),
+            StockIntentRefusal::Refused(UnderLockRefusal::ApprovalRevoked)
+        );
+        assert_eq!(written(fresh.path(), &a), (false, false));
+    }
+
+    #[tokio::test]
+    async fn a_sidecar_written_before_a_refused_append_is_removed() {
+        let a = shape_batch(A);
+        let directory = folder(&[&a]);
+        let passed = minted(id(A)).await;
+        let spends = std::cell::Cell::new(0);
+        let refused = TEST_FAULTS.sync_scope(
+            std::cell::RefCell::new(vec!["master_dispatch_intent"]),
+            || record(directory.path(), &a, passed, &spends),
+        );
+        assert_eq!(
+            refused.unwrap_err(),
+            StockIntentRefusal::Refused(UnderLockRefusal::MasterJournalRefused)
+        );
+        assert_eq!(spends.get(), 1);
+        assert_eq!(written(directory.path(), &a), (false, false));
+    }
+
+    /// The queue's stock recheck and the stock intent writer, end to end: the
+    /// intent is recorded before the POST, and the one import the double
+    /// receives is the approved bytes.
+    #[tokio::test]
+    async fn the_queue_records_the_stock_intent_before_it_posts_the_approved_bytes() {
+        let a = shape_batch(A);
+        let directory = folder(&[&a]);
+        let dir = directory.path();
+        let mut plans = passing_answers();
+        let reads = plans.len();
+        plans.push(import_answer());
+        let (result, observed, at_dispatch) =
+            post_stock_through(id(A), plans, recheck_stock_item_for_dispatch, |passed| {
+                assert_eq!(
+                    written(dir, &a),
+                    (false, false),
+                    "nothing before the writer"
+                );
+                record_stock_item_intent(dir, &lock(), &a, passed, || Ok(()))
+                    .map_err(|refusal| BeforeDispatchError::Other(format!("{refusal:?}")))
+            })
+            .await;
+        result.expect("the post is sent");
+        assert_eq!(at_dispatch, Some(reads), "the writer ran before the POST");
+        assert_eq!(written(dir, &a), (true, true));
+        let approved = approved_stock(id(A)).await;
+        let sent = imports(&observed);
+        assert_eq!(sent.len(), 1, "exactly one import");
+        assert!(approved.sends_exactly(&sent[0]), "the approved bytes");
+        assert_eq!(observed.len(), reads + 1);
+    }
+}

@@ -8,8 +8,8 @@ The developer configuration below remains for supported client integrations.
 `bridge_mcp` is Bridge's newline-delimited JSON-RPC 2.0 MCP server. It uses
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
-parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra, or
-a saved batch of 2 to 50) is off by default because of the limits under
+parsing by default. Voucher posting (one Journal, Payment, Receipt, Contra or Sales
+invoice, or a saved batch of 2 to 50 with no invoice) is off by default because of the limits under
 *Approved voucher posting* below; the **Allow voucher posting, one voucher or a
 batch of up to 50** setting adds it, with separate native approval for each new
 attempt. Command-line installations
@@ -1518,24 +1518,38 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   result is the one a book without the figure would get, and `closing_stock`
   says why it was declined:
   - the line is spelled exactly so, appears once, carries a debit in its sub
-    column alone, the `Opening Stock` line is shown empty (opening stock is
-    not measured) and the `Cost of Sales :` heading appears once;
+    column alone, the `Opening Stock` line appears once and is shown empty or
+    carries a debit in its sub column alone, and the `Cost of Sales :` heading
+    appears once, carrying an amount when there is opening stock (#692);
   - the company's own flags (`ISINTEGRATED` and `ISINVENTORYON`, read only
     when the Profit and Loss offers the figure) are both `Yes`;
   - no Stock-in-Hand ledger carries an amount;
-  - the derived Balance Sheet lines sum to zero (a Trial Balance that does not
-    balance leaves Tally's `Difference in opening balances` out of this book's
-    Balance Sheet export, so the statement would not balance);
-  - that one figure closes every gap at once: Current Assets (compared with
-    the derived group plus the figure), the Balance Sheet's Profit & Loss A/c
-    line and the trading result (moved by the figure), and the `Cost of Sales :`
-    heading (the derived Purchase Accounts plus Direct Expenses, less the
-    figure). `Add: Purchase Accounts`, Tally's name for the purchase line on
+  - the derived Balance Sheet lines sum to minus the opening stock, or to zero
+    without one (a Trial Balance that does not balance leaves Tally's
+    `Difference in opening balances` out of this book's Balance Sheet export,
+    so the statement would not balance);
+  - the figures close every gap at once: Current Assets (compared with the
+    derived group plus the closing stock), the Balance Sheet's Profit & Loss
+    A/c line and the trading result (moved by the opening less the closing
+    stock), and the `Cost of Sales :` heading (the derived Purchase Accounts
+    plus Direct Expenses, plus the opening and less the closing stock). With
+    opening stock, a Direct Expenses line with an amount in its main column
+    refuses;
+  - with opening stock, Tally's own Stock Summary for the same window, sent by
+    the request `stock_summary` sends and read only in this case, carries a
+    value on every row (a row of negative stock carries none). It is read only
+    for a window from 1 April to a month's last day in that financial year, on
+    a book whose master mark `stock_summary` admits in one read; any other
+    window or book declines the opening stock without sending it. `Add: Purchase Accounts`, Tally's name for the purchase line on
     such a book, then ties to Purchase Accounts.
   `closing_stock` is `{"state": "applied", "value", "source":
-  "tally_profit_and_loss_less_closing_stock"}`, `{"state": "declined", "why",
-  "lines"}` (`why` is `shape_not_as_seen`, `not_a_debit`,
-  `opening_stock_not_shown_empty`, `book_not_shown_integrated`,
+  "tally_profit_and_loss_less_closing_stock"}`, with `"opening": {"value",
+  "source": "tally_profit_and_loss_opening_stock"}` where opening stock was
+  used, `{"state": "declined", "why", "lines"}` (`why` is `shape_not_as_seen`,
+  `not_a_debit`, `opening_stock_not_as_seen`,
+  `cost_of_sales_heading_without_amount`, `stock_summary_window_not_measured`,
+  `stock_summary_too_large`, `stock_summary_not_read`,
+  `stock_summary_row_without_value`, `book_not_shown_integrated`,
   `inventory_flags_not_read`, `balance_sheet_does_not_balance` or
   `does_not_close_every_gap`), or null when no closing stock was considered:
   the Profit and Loss offered none, or the statement was refused for another
@@ -1547,9 +1561,25 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   `balance_sheet` whose Profit and Loss cannot be read (no closing stock is
   considered and the sheet is the one it always was). The figure is Tally's, not derived or taken from
   `stock_summary`, and the derived Current Assets line keeps the Trial
-  Balance's sum. Measured on one synthetic book (three items, TallyPrime 7.1 Silver): opening stock, a costing
-  method, a non-integrated book, a window spanning two years and more than one
-  item or purchase rate are not.
+  Balance's sum. Measured without opening stock on one synthetic book (three
+  items, TallyPrime 7.1 Silver), and on another whose second year opens with
+  stock Tally carried from the first (TallyPrime 7.2 Silver: each year, a
+  half-year, both years together, one item's costing changed, and one direct
+  expense). Of those windows, only a year from 1 April is one the tools now
+  establish with opening stock: the half-year from October and the two years
+  together refuse as `stock_summary_window_not_measured`. A Stock Summary that
+  lists no rows refuses as `stock_summary_not_read`. Its rows are not tied to
+  the stock items or to the report's own total, and once read, the answer's
+  size and row count are not checked against the admitted estimate and the
+  book's master mark, as `stock_summary` checks them; only a value on every
+  listed row is required. A window to any other month's
+  last day, February's included, is admitted by `stock_summary`'s month-end
+  rule, and no run read one. A
+  company split into a new year, a non-integrated book, costing other than Avg.
+  Cost or FIFO, godowns, batches and GST beside opening stock are not. A
+  Profit & Loss A/c ledger whose closing is not its own opening plus the
+  window's movement is refused as for any such row: after one item's costing
+  was changed, Tally kept the carried opening and moved that closing.
 
 ### Ledger-movement opening decision
 
@@ -1763,7 +1793,8 @@ or vouchers.
   `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
   every voucher read was checked against a separate count of the window (a census,
   which ComplyEaze Bridge sends for every book that has held a voucher, however
-  few), and an empty window only when its corroboration read confirmed it: the
+  few, unless a repeat of the same question takes the census of the call before it,
+  see "A repeated `vouchers` read reuses its census" below), and an empty window only when its corroboration read confirmed it: the
   read widened by a day on each side was also empty and the company has no
   vouchers. Otherwise it is `partial` with `reason`
   `nonempty_window_unqualified`, or, for an empty window, the corroboration's own
@@ -1970,6 +2001,30 @@ is the mark Tally sent.
   sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
   requests. Before this change each later page repeated the whole read.
 
+### A repeated `vouchers` read reuses its census (`window.census_reused`)
+
+The first page of a `vouchers` call counts the window's vouchers before it reads them. A call that asks the
+same question again, for the same company, the same dates exactly as sent and the same book, takes that count
+from the call before it instead of counting again, when the company's two change marks, which this call reads
+afresh, equal the marks the count was taken at. The count is kept for 10 minutes, in memory, and is dropped when
+a mark differs, when a write through this server touches the company, or when a newer count of the same
+question replaces it.
+
+- The window of that call shows it: `window.census.requests` is 0 and `window.census_reused.read_at` says when
+  the count was taken. A call that counted its own census has no `census_reused`.
+- The reused count only plans the read. Every part read is still compared with it, voucher by voucher, so a count
+  that no longer describes the book refuses the call as `census_reused_mismatch` (the `cause` says how the part
+  differed), the count is dropped, and the next call counts afresh. It never lets a call answer from a count the
+  vouchers read do not match.
+- A window with no voucher is still checked by a count of its own, a day wider on each side, which is never
+  reused. A read that gives the marks itself, an import's read-back and the audit's sealed read take no held
+  count and leave none. A reused count never earns a `BracketedCount`, which no `vouchers` call uses.
+- `window.census.requests` is 0 on such a call, so `read_cost` (shown only for a slow or large census) counts
+  no census reads for it; `census_reused` says why.
+- Not established: how often a real user repeats the same window (the lab's own repeats were counted; no real
+  request trail was read), whether a save by a user of the multi-user edition on another computer or a restored copy of the company moves the
+  marks at once (as for held windows above), and the saving on a real book.
+
 ### What a `vouchers` read cost (`window.read_cost`)
 
 The census a window read pays follows the book's voucher mark, not the window:
@@ -1991,7 +2046,8 @@ no estimate for a larger or a smaller window.
   took at least (N - 1) x 0.5 s in gaps. It is time between reads, not time spent
   sleeping (the gate sleeps only what is left of the half second after Bridge's own
   work). It is rounded down.
-- `host_240` says how this window sat against the one measured host limit:
+- `host_240` says how this window sat against the 240 s limit of Claude Desktop's chat app on macOS
+  (it does not judge a window against the Windows limits that `host_limits` names):
   `window_fits` with `vouchers_that_fitted` (what this window carried; it claims
   nothing about a larger or a smaller window, since fewer vouchers are not cheaper:
   a window with no voucher is read twice), `window_too_long` (this window did not
@@ -1999,14 +2055,17 @@ no estimate for a larger or a smaller window.
   shorter window saves only the time of its vouchers and how short is enough is not
   established), or `not_established` (no voucher was read, whatever the time: such a window is read
   twice, the second read wider (with its own census on a large book; a small book's
-  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
+  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop's chat app on macOS is cancelled and
   its result never arrives, so `window_too_long` is seen on another host.
 - A read that **stopped** (a refusal) states the floor and no verdict: a request
   that failed or hung is not what a window costs.
 - `host_limits` names each host and its basis: Claude Desktop's chat app on macOS
   cancelled a silent 250 s call at 240 s in two runs on one build (calls between
   130 s and 240 s were not tried, and the call's other reads are not in the figures; and whether progress would extend the limit is not
-  answered; protocol reference 11f); on Windows it is unmeasured; Claude Code
+  answered; protocol reference 11f); on Windows the chat tab cut a 60 s call at about
+  60 s with no cancel logged by the server, and the Code tab cut a 90 s call at 60.0 s and sent a
+  cancel (one run of each kind on each tab, 5 Nov, #2119 row H, not yet in the protocol reference; a call just under 60 s was not tried
+  on either tab); Claude Code
   completed a 150 s call under its defaults (CLI 2.1.285: one silent run and one with
   progress; Code tab 2.1.284: one silent run), and a 60 s per-server timeout set on a
   scratch project cut a 150 s call at exactly 60 s and was not reset by progress (CLI,
@@ -2062,8 +2121,9 @@ ends).
   voucher_window_book_too_large` and `limit_census_reads` (a mark above 2,097,152, the refusal the read
   itself makes, from the same function; no floor is given for a read that sends no census).
 - `census_reads` is **derived** from the mark and the read's own rules (`census_read_count`, which the
-  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so it sends at
-  least one census read on any book that has held a voucher; `ledger_movement` and `verify_import` send
+  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so a call that
+  counts sends at least one census read on any book that has held a voucher (a repeat of the same
+  `vouchers` question within ten minutes on unchanged marks may send none, #2399); `ledger_movement` and `verify_import` send
   none while the mark times their default voucher size fits one request (a mark of 170 or less). A
   book that has never held a voucher (no mark) sends none, and only then is the count 0.
 - `floor_seconds` is **derived from the gate's rule**, as `read_cost.floor_seconds` is, and from the
@@ -2084,7 +2144,8 @@ ends).
 Not covered: the data parts (they need the census), the wider read an empty window gets in `vouchers` and in
 `ledger_movement` (it pays its own census on a large book), the second window read of `ledger_movement`
 (it sends no census),
-`outstandings` and `voucher_presence`. Windows hosts are not measured.
+`outstandings` and `voucher_presence`. No window is judged against a Windows host's limit: `host_limits`
+names what was measured there, one run of each kind on each tab.
 
 ### Search and summaries in `vouchers` (#1230)
 
@@ -2596,7 +2657,8 @@ reads Tally, saves local proof files and writes nothing to Tally), and
 `build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
-Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
+Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, and
+`Sales` while posting is on, each
 with freshly observed supported TallyPrime product and licence mode before and
 after the build reads. Release and licence tier are returned as observed facts;
 they do not independently refuse a file. `tally_status` reports the observed
@@ -2636,7 +2698,8 @@ Historical batch records remain readable. None of this qualifies every host,
 licence mode, or manually imported file. An unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
 per approval (a voucher that carries a voucher number is refused), and a saved
-batch of 2 to 50 posts in one import after one approval of its summary. One
+batch of 2 to 50 posts in one import after one approval of its summary. A Sales
+invoice carries its number and is posted alone, one per approval. One
 posting setting covers both, in the MCPB extension and on the command line (#1090).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
@@ -3006,7 +3069,7 @@ Positive historical readback remains available on an unqualified profile.
 A failed profile probe remains a read failure.
 
 Safety boundary: local loopback only, bounded responses, verified company tuple
-selection, append-only receipts, and separately approved Journal, Payment, Receipt or Contra
+selection, append-only receipts, and separately approved Journal, Payment, Receipt, Contra or Sales
 dispatch. Unsupported:
 Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,
@@ -3321,7 +3384,9 @@ cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
 `master_approval_timed_out` say the person declined the dialog, the dialog could
 not be shown, or the person did not answer in time; each says nothing was sent,
 and a declined or timed-out answer's `next_step` says that the next call with the
-same `batch_id` opens a new dialog. `master_review_too_large` from
+same `batch_id` opens a new dialog. One returned from a dialog an earlier call left
+open carries `cause` `approval_answered_earlier` and that cause's `next_step`
+instead, as `post_import`'s does. `master_review_too_large` from
 `post_ledger_creates` says the dialog's text was over its limit or, on Windows,
 where the dialog is measured against the screen as the post's is, that it did not
 fit the screen whole; nothing was sent, and its `next_step` says to try a
@@ -3460,8 +3525,8 @@ its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 
 One native-approved Journal and restart reconciliation have been observed on
-macOS against a synthetic Silver 7.1 instance. This remains a preview: Windows
-interactive approval and native posting on Education have not been established.
+macOS against a synthetic Silver 7.1 instance. Windows interactive approval and
+native posting on Education have not been established.
 Native posts on licensed 7.1 Gold were captured once, in one session on a
 development build and one client book, with the approval step not recorded
 ([reference](../tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)). Also
@@ -3679,12 +3744,16 @@ been observed live on a synthetic Silver 7.1 company, each reading back
 Keep the selected company free of other imports and ledger changes while posting,
 and leave Tally's product/licence mode unchanged. Bridge serializes its own writers;
 its separate checks cannot lock out Tally UI edits or other importers. Concurrent
-external changes are outside this preview's validated posting workflow.
+external changes are outside the validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
 approval. (The tool call itself returns "approval pending" after about 40 seconds
 and the dialog stays open (for up to the two minutes); calling `post_import`
-again with the same batch waits on that same dialog.) If dispatch has already begun, cancellation cannot undo Tally's
+again with the same batch waits on that same dialog.) If that dialog is answered No,
+runs out of time or ends unanswered while no call is waiting, the batch's next call
+returns that refusal once without showing a dialog, with `error.cause`
+`approval_answered_earlier` and a `next_step` saying so; the call after it asks the
+person again. If dispatch has already begun, cancellation cannot undo Tally's
 work. A timeout, crash, malformed response or incomplete readback requires
 `verify_import` on the **same original batch**. Once dispatch intent exists,
 `post_import` only reconciles and never resends, including after process restart.
@@ -3884,7 +3953,15 @@ Tally reported the voucher as not created when it was sent, and to look for it
 in Tally before entering it by hand; the status and the batch's state are the
 same. A partly created batch is never read as not created: a
 count does not say which voucher Tally rejected, and two vouchers of one batch
-with the same content defeat matching by content. A binding refusal is final: an
+with the same content defeat matching by content. When the post's own answer
+reported every counter, at least one created and one exception, nothing else
+counted and a total equal to the vouchers sent, and the company's voucher mark
+moved by what Tally reported creating (read on both sides of the post, or the
+post's recorded verdict for a later check), the `next_step` of each voucher the
+check cannot find adds that Tally's answer reported that many of the vouchers
+sent as not created and that ComplyEaze Bridge cannot say which: the count is
+all that is claimed, no voucher is named, and the status stays
+`sent_not_attributed` (bridge#1108). A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays
@@ -4170,6 +4247,11 @@ Per tool:
   combination (`src-tauri/src/agent_company.rs`).
 - `tally_status`: the probe alone (`Server::status`,
   `src-tauri/src/agent_company.rs`).
+  Its `build_notice` string appears on the first status read of a session when the
+  build's release date (`src-tauri/release-date.txt`, compiled in by `build.rs`) is
+  more than 60 days before this computer's date; it states both dates and where
+  releases are listed, makes no request, and the server instructions tell the
+  assistant to relay it once (#2391).
 - `masters`:
   1. the company read;
   2. the extent check (if a later page);
@@ -4400,6 +4482,16 @@ gives a next step where there is one: only five statuses (`bound_not_in_window`,
 file imported by hand and a refusal before anything was sent carry none, because the batch can still be
 posted.
 
+A `posted_verified` Sales invoice row of `post_import` or `verify_import` carries `e_invoice_sent`, with
+`details` `none` and a `note`, only where the invoice was sent without e-invoice details and only for a batch
+ComplyEaze Bridge posted itself; an invoice sent with e-invoice details and a file imported by hand do not
+carry it. The note says: "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no
+IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act;
+ComplyEaze Bridge does not generate one." ComplyEaze Bridge does not read whether e-invoicing applies, so the
+note is worded for either case. This field is not the `e_invoice` object of a `vouchers` row, and a proof saved
+by an earlier build does not carry it. No other row carries the field, and a row that stops reading
+`posted_verified` loses it.
+
 ## Protocol and migration notes
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported
@@ -4444,6 +4536,21 @@ discovery reports `invalid_books_from` for a malformed value.
 Observed company numbers must contain 1–16 ASCII digits, using the same rule as
 desktop selection. Discovery labels malformed values `invalid_company_number`;
 scoped access refuses them before any company report is read.
+
+`list_companies` lists every company Tally reports, with its name exactly as Tally reported it,
+never trimmed. A company whose name a read cannot carry also has `name_refusal`, one of
+`company_name_blank`, `company_name_control_character` or `company_name_length_not_established`
+(over 360 UTF-8 bytes). Its name is shown whole, with each control and invisible format character
+written as its `\u{..}` code, and every read naming it refuses as `company_name_invalid`. No other
+company has the key. Any other company's name is shown with each invisible format character
+written as its code too, so a name holding one never draws like the same name without it, no text
+is hidden in a name and none reorders the text around it. Other scripts' format characters, such
+as Mongolian or Khmer ones, are shown as codes too. The one exception is the zero-width joiner and
+non-joiner (U+200D, U+200C), shown as they are wherever they stand, because Indic and Persian names
+are written with them; so a name of joiners alone draws as nothing. A backslash is shown as it is,
+so a name that spells a `\u{..}` code out as text draws like one holding that character. The
+escape applies to `list_companies`; a record a read writes holds the name as Tally reported it
+(#2433).
 
 Port zero and ports above 65535 are rejected at startup.
 Unknown arguments, wrong selector types, and invalid enums are rejected before
@@ -4633,7 +4740,10 @@ its own cause, `native_bills_report_deadline_exceeded` (#2119); another request 
 same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
 repeat the call. Tally can go on building the report after the limit (a read sent straight after
 was refused for time too), so it also says to wait and let `tally_status` answer before the next
-read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
+read, that one party's open bills at the same `as_of` can still be read, after asking the user,
+with `party` and `detail` `open_bills` (that party's Ledger Outstandings beside the book's list of
+ledgers, not the Bills report, and no total for the book), and that an
+earlier `as_of` with fewer open bills answered on that book. Where the limit
 falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
 flight and sends nothing more (#778).
 

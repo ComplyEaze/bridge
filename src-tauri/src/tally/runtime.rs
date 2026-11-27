@@ -48,7 +48,13 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 
 #[path = "runtime_masters.rs"]
 mod masters;
-pub(crate) use masters::{MastersKind, MastersReadError, MastersRows, VoucherNumberingRead};
+#[cfg(test)]
+pub(crate) use masters::StockItemCountMismatch;
+pub(crate) use masters::{
+    target_binding_mark, AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits,
+    CompanyMarksParser, CompanyMasterMark, MastersKind, MastersReadError, MastersRows,
+    StockItemReadKind, StockItemRecheckReads, VoucherNumberingRead,
+};
 
 #[cfg(test)]
 #[path = "runtime_masters_tests.rs"]
@@ -190,7 +196,7 @@ impl ObservedTally {
 
 /// What the endpoint queue read to admit a post, before the aim: the reads of
 /// the request's own kind.
-enum QueuedReads {
+enum QueuedReads<'a> {
     Vouchers {
         catalogue: String,
         groups: Option<String>,
@@ -199,10 +205,22 @@ enum QueuedReads {
         invoice_answers: Option<Box<super::approved_import::InvoiceAnswers>>,
     },
     Masters {
+        /// The ledger admission the index reads were made for.
+        admission: &'a super::approved_import::LedgerAdmission,
         ledgers_first: String,
         ledgers_second: String,
         groups_first: String,
         groups_second: String,
+    },
+    /// The candidate, stock-group and unit reads, each sized at the target's
+    /// binding mark. Boxed: they carry the company three times.
+    StockItem {
+        admission: &'a super::approved_import::StockItemAdmission,
+        reads: Box<(
+            AdmittedCandidateRead,
+            AdmittedStockGroups,
+            AdmittedStockUnits,
+        )>,
     },
 }
 
@@ -488,6 +506,7 @@ fn classify_audit_part_failure(error: &anyhow::Error) -> AuditPartFailure {
             | TallyTransportError::ResponseTruncated => AuditPartFailureKind::ConnectionDropped,
             TallyTransportError::HttpStatus { .. }
             | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer
             | TallyTransportError::UnsupportedContentEncoding => {
                 AuditPartFailureKind::HeadRejected(transport.safe_code())
             }
@@ -981,7 +1000,7 @@ pub(crate) async fn read_classified_currency(
         ))
     };
     let (body, read) = paired_read(
-        render_company_currency_request(identity.display_name()),
+        render_company_currency_request(identity.company_name()),
         PairedReadValidationError::CurrencyMaster,
     )
     .await?;
@@ -1015,7 +1034,7 @@ pub(crate) async fn identify_base_among_several(
     };
     let (with_original_names, company_currency_name) = {
         let (body, read) = paired_read(
-            render_company_currency_request_with_originalname(identity.display_name()),
+            render_company_currency_request_with_originalname(identity.company_name()),
             PairedReadValidationError::CurrencyMaster,
         )
         .await?;
@@ -1029,7 +1048,7 @@ pub(crate) async fn identify_base_among_several(
             ));
         }
         let (body, read) = paired_read(
-            render_company_base_currency_request(identity.display_name()),
+            render_company_base_currency_request(identity.company_name()),
             PairedReadValidationError::CompanyCurrencyName,
         )
         .await?;
@@ -1981,7 +2000,11 @@ async fn read_invoice_plan(
     answers.rates = Some(paired(client, identity, &plan.rates, &mut evidence).await?);
     answers.voucher_types =
         Some(paired(client, identity, &plan.voucher_types, &mut evidence).await?);
-    answers.number = Some(paired(client, identity, &plan.number, &mut evidence).await?);
+    for month in &plan.number {
+        answers
+            .number
+            .push(paired(client, identity, month, &mut evidence).await?);
+    }
     if let Some(request) = &plan.number_control {
         answers.number_control = Some(paired(client, identity, request, &mut evidence).await?);
     }
@@ -3268,7 +3291,7 @@ impl TallyRuntime {
                         // before any ledger request (bridge#714). A foreign
                         // ledger's non-zero bare opening is UNOBSERVED; the
                         // captured book's dollar openings are 0.00.
-                        let request = render_company_currency_request(identity.display_name());
+                        let request = render_company_currency_request(identity.company_name());
                         let (body, encoded_bytes, encoded_sha256) = client
                             .fetch_native_report_paired(request.clone())
                             .await?
@@ -3338,7 +3361,7 @@ impl TallyRuntime {
                         )
                         .map_err(OpeningBoundaryObservationError::Period)?;
                         let request =
-                            render_native_ledger_export_request(identity.display_name(), &period);
+                            render_native_ledger_export_request(identity.company_name(), &period);
                         let paired = client.fetch_native_report_paired(request.clone()).await?;
                         let (body, encoded_bytes, encoded_sha256) = paired
                             .require_stable(PairedReadValidationError::NativeLedgerCollection)?;
@@ -3363,7 +3386,7 @@ impl TallyRuntime {
                         }
                         let groups = if read_groups {
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let paired = client.fetch_native_report_paired(request.clone()).await?;
                             let (body, encoded_bytes, encoded_sha256) = paired
                                 .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
@@ -3681,7 +3704,10 @@ impl TallyRuntime {
     /// One approved mutation through the shared endpoint queue. The durable
     /// intent is committed after identity admission and before any import bytes.
     /// Unlike paired reads, an import must never be repeated automatically.
-    pub(crate) async fn post_approved_import<A, F, L>(
+    /// What the admission recheck returns is handed to `before_dispatch` by
+    /// value, so the intent records what the recheck saw; a value never spent
+    /// is dropped in the same execution.
+    pub(crate) async fn post_approved_import<A, F, R, L>(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
@@ -3690,8 +3716,8 @@ impl TallyRuntime {
         before_dispatch: F,
     ) -> anyhow::Result<ApprovedImportDispatch>
     where
-        A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<()>,
-        F: Fn() -> Result<L, super::approved_import::BeforeDispatchError>,
+        A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<R>,
+        F: Fn(R) -> Result<L, super::approved_import::BeforeDispatchError>,
         L: super::approved_import::DispatchLicense,
     {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -3721,12 +3747,20 @@ impl TallyRuntime {
                     // marked as refused before the intent; nothing that records
                     // the intent or sends may move into it
                     // (`tests/approval_seam_gate.rs` holds it to that).
-                    let (admission_evidence, before_marks) = async {
+                    let (admission_evidence, before_marks, rechecked) = async {
                         // A master post is for the company it was rendered for: the
                         // request names it, and the identity brackets check this one.
                         // A mismatch is a wiring fault, refused before any request.
                         if let super::approved_import::ApprovedKind::Masters(masters) = &request.kind {
-                            if masters.company() != &identity {
+                            let consistent = match masters.writes() {
+                                super::approved_import::AdmittedWrites::Ledgers(ledgers) => {
+                                    ledgers.company() == &identity
+                                }
+                                super::approved_import::AdmittedWrites::StockItem(stock) => {
+                                    stock.company() == &identity
+                                }
+                            };
+                            if !consistent {
                                 return Err(anyhow::Error::from(
                                     super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent,
                                 ));
@@ -3857,11 +3891,38 @@ impl TallyRuntime {
                                     admission_evidence,
                                 )
                             }
-                            super::approved_import::ApprovedKind::Masters(masters) => {
+                            super::approved_import::ApprovedKind::Masters(masters) => 'masters: {
+                                let admission = match masters.writes() {
+                                    super::approved_import::AdmittedWrites::Ledgers(ledgers) => ledgers,
+                                    // A stock item's reads, sized at the target's mark in the
+                                    // binding marks above, as the standalone recheck sizes them.
+                                    super::approved_import::AdmittedWrites::StockItem(admission) => {
+                                        let mut evidence = admission_evidence.clone();
+                                        // Boxed, as the invoice reads are: this future would
+                                        // otherwise sit inside the post's.
+                                        let read = Box::pin(masters::read_stock_item_admission(
+                                            &reads,
+                                            &identity,
+                                            &binding_marks.text,
+                                            admission.parse_marks(),
+                                            &mut evidence,
+                                        ))
+                                        .await;
+                                        let stock_reads =
+                                            read.map_err(|error| with_read_evidence(error, evidence.clone()))?;
+                                        break 'masters (
+                                            QueuedReads::StockItem {
+                                                admission,
+                                                reads: Box::new(stock_reads),
+                                            },
+                                            evidence,
+                                        );
+                                    }
+                                };
                                 let (ledgers_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledger_index_request(),
+                                    admission.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3869,7 +3930,7 @@ impl TallyRuntime {
                                 let (ledgers_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledger_index_request(),
+                                    admission.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3877,7 +3938,7 @@ impl TallyRuntime {
                                 let (groups_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.group_index_request(),
+                                    admission.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3885,13 +3946,14 @@ impl TallyRuntime {
                                 let (groups_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.group_index_request(),
+                                    admission.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                                 let admission_evidence = admission_evidence.combine(evidence);
                                 (
                                     QueuedReads::Masters {
+                                        admission,
                                         ledgers_first: ledgers_first.body,
                                         ledgers_second: ledgers_second.body,
                                         groups_first: groups_first.body,
@@ -4000,8 +4062,9 @@ impl TallyRuntime {
                                 ),
                             },
                             (
-                                super::approved_import::ApprovedKind::Masters(masters),
+                                super::approved_import::ApprovedKind::Masters(_),
                                 QueuedReads::Masters {
+                                    admission,
                                     ledgers_first,
                                     ledgers_second,
                                     groups_first,
@@ -4009,8 +4072,8 @@ impl TallyRuntime {
                                 },
                                 None,
                             ) => super::approved_import::QueuedAdmission::Masters {
-                                batch: masters.batch(),
-                                company: masters.company(),
+                                batch: admission.batch(),
+                                company: admission.company(),
                                 ledgers_first,
                                 ledgers_second,
                                 groups_first,
@@ -4018,6 +4081,23 @@ impl TallyRuntime {
                                 company_marks_at_binding: &binding_marks.text,
                                 company_marks: &before_marks.text,
                             },
+                            (
+                                super::approved_import::ApprovedKind::Masters(_),
+                                QueuedReads::StockItem {
+                                    admission,
+                                    reads: stock,
+                                },
+                                None,
+                            ) => super::approved_import::QueuedAdmission::StockItem(
+                                super::approved_import::QueuedStockItem::new(
+                                    admission,
+                                    &stock.0,
+                                    &stock.1,
+                                    &stock.2,
+                                    &binding_marks.text,
+                                    &before_marks.text,
+                                ),
+                            ),
                             _ => {
                                 return Err(with_read_evidence(
                                     super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent
@@ -4026,9 +4106,9 @@ impl TallyRuntime {
                                 ))
                             }
                         };
-                        recheck_admission(queued)
+                        let rechecked = recheck_admission(queued)
                             .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
-                        Ok::<_, anyhow::Error>((admission_evidence, before_marks))
+                        Ok::<_, anyhow::Error>((admission_evidence, before_marks, rechecked))
                     }
                     .await
                     .map_err(|source| {
@@ -4061,7 +4141,7 @@ impl TallyRuntime {
                             admission_evidence.clone(),
                         )
                     })?;
-                    let license = before_dispatch().map_err(|error| {
+                    let license = before_dispatch(rechecked).map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
                                 anyhow::Error::from(refusal)
@@ -4323,8 +4403,14 @@ impl TallyRuntime {
                         }
                     };
                     let mut total_bytes = 0usize;
-                    let read =
-                        |kind| render_native_bills_request(kind, company, &books_from, &as_of);
+                    let read = |kind| {
+                        render_native_bills_request(
+                            kind,
+                            identity.company_name(),
+                            &books_from,
+                            &as_of,
+                        )
+                    };
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
                         .fetch_native_report_paired(receivable_request.clone())
@@ -4355,7 +4441,8 @@ impl TallyRuntime {
                     // subgroup. The native group snapshot resolves it all the
                     // way to Sundry Debtors/Creditors without importing the
                     // legacy custom-TDL profile.
-                    let group_request = render_native_group_snapshot_request(company);
+                    let group_request =
+                        render_native_group_snapshot_request(identity.company_name());
                     let groups = client
                         .fetch_native_report_paired(group_request.clone())
                         .await?;
@@ -4406,8 +4493,10 @@ impl TallyRuntime {
                         encoded_bytes,
                     ));
 
-                    let ledger_request =
-                        render_native_ledger_snapshot_request(company, &snapshot_period);
+                    let ledger_request = render_native_ledger_snapshot_request(
+                        identity.company_name(),
+                        &snapshot_period,
+                    );
                     let ledgers = client
                         .fetch_native_report_paired(ledger_request.clone())
                         .await?;
@@ -4652,7 +4741,7 @@ impl TallyRuntime {
                     // Pin identity first: a currency read against the wrong
                     // company is worse than none.
                     let extent = client.fetch_company_book_extent(&identity).await?;
-                    let request = render_company_currency_request(identity.display_name());
+                    let request = render_company_currency_request(identity.company_name());
                     let body = client.fetch_native_report_paired(request.clone()).await?;
                     let (body, encoded_bytes, encoded_sha256) =
                         body.require_stable(PairedReadValidationError::CurrencyMaster)?;
@@ -4935,7 +5024,8 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
         ) => ReadFailureClass::SizeLimit,
         Some(
             TallyTransportError::UnsupportedContentEncoding
-            | TallyTransportError::InvalidEncoding { .. },
+            | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer,
         ) => ReadFailureClass::Decode,
         Some(
             TallyTransportError::EndpointInvalid { .. }

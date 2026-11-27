@@ -315,6 +315,8 @@ const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
 const NONINT_LAB_GUID: &str = "567653b1-c8be-4deb-b4fc-3ea5de801884";
 const INTEGRATED_CTRL_LAB_GUID: &str = "3fc2a3c7-1da8-4bc4-a472-44028cdebca7";
+/// BRIDGE STOCK CREATE LAB, row 1381-R1's book (`tests/fixtures/agent/stock-create-lab/PROVENANCE.md`).
+const STOCK_CREATE_LAB_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
 
 /// The base of a book with several masters, built the way
@@ -480,6 +482,12 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-p1-20260731.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-supplier-rj-20260731.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot",
         parse: |_, text| typed(parse_native_ledger_snapshot(text)),
@@ -1182,6 +1190,42 @@ const ROWS: &[Row] = &[
         parse: |_, text| untyped(parse_import_outcome(text)),
     },
     Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p1_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p2_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_evidence",
+        parse: |_, text| import_evidence(text),
+    },
+    Row {
+        fixture: "tests/fixtures/import_post_partial_landing_p3_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/post-span-import-response.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",
@@ -1213,6 +1257,12 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/single-import-missing-ledger.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/single-import-stock-in-hand-journal.utf16le.xml",
         source: Source::Captured,
         parser: "parse_import_outcome",
         parse: |_, text| untyped(parse_import_outcome(text)),
@@ -2075,6 +2125,49 @@ const ROWS: &[Row] = &[
         parser: "parse_native_masters(StockItems)",
         parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
     },
+    // Row 1381-R1 (#1381): the candidate stock-item read, the groups, units and import answer.
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-after-plain-create.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-after-marked-create.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-items-with-alias.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockGroups)",
+        parse: |_, text| masters(NativeMasterKind::StockGroups, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(Units)",
+        parse: |_, text| masters(NativeMasterKind::Units, text, STOCK_CREATE_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/stock-create-lab/stock-create-lab-create-answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_import_outcome",
+        parse: |_, text| untyped(parse_import_outcome(text)),
+    },
     Row {
         fixture: "tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml",
         source: Source::Captured,
@@ -2779,6 +2872,15 @@ const ROWS: &[Row] = &[
     // Party ledger masters: src/agent_ledgers_tests.rs, src/agent_register_tests.rs; the
     // compliance read's other replays (src/tally/runtime_party_evidence_tests.rs,
     // src/agent_register_server_tests.rs) by the same parser.
+    // Row 2162-S9b's compliance read, captured with each GSTIN set to a synthetic value of the
+    // same length (pilot-lab/PROVENANCE.md): src/agent_import_invoice_tests.rs reads its
+    // customer's two dated registration entries.
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab/pilot-lab-s9b-customer-sez-compliance.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(PILOT LAB)",
+        parse: |_, text| party_masters(text, PILOT_LAB_GUID),
+    },
     Row {
         fixture: "tests/fixtures/agent/native-ledger-masters-duty-heads.utf16le.xml",
         source: Source::Captured,
@@ -3655,11 +3757,20 @@ const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
-const PILOT_LAB_READBACK: &str =
-    "a read-back answer of the pilot lab (9 and 10 Oct 2026), with no \
+const PILOT_LAB_READBACK: &str = "a read-back answer of the pilot lab, with no \
      row here: the app crate's invoice tests (src/agent_import_invoice_tests.rs, and the replay in \
      src/agent_import_post_e2e_tests.rs) parse it with the read-back's own parser and pin what it \
      returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_RESAVE_READBACK: &str =
+    "a read-back answer of the pilot lab's row 2162-RS (9 Nov 2026), before or after a person \
+     saved the invoice again unchanged, with no row here: the app crate's invoice tests \
+     (src/agent_import_invoice_tests.rs) parse it with the read-back's own parser and pin what it \
+     returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_NUMBER_MONTHS: &str = "a month answer of the invoice number's read of the pilot \
+     lab's financial year 2026-27 (row 2162-M1, 9 Nov 2026), with no row here: the app crate's \
+     replays (src/agent_import_post_e2e_tests.rs, src/agent_import_invoice_admission_tests.rs) \
+     feed it through the number check and pin what it decides, and src/agent_import_tests.rs \
+     pins each month's request and August's rows; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oct 2026), with no \
      row here: the app crate's replay (src/agent_import_post_e2e_tests.rs, and for the tax units \
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
@@ -3669,6 +3780,12 @@ const PILOT_LAB_W18_REPLAY: &str = "an answer of the pilot lab's W18, W18b and W
      with no row here: the app crate's HSN/SAC warning replay (src/agent_import_w18_replay_tests.rs) \
      feeds it through the build, the post and the verification and pins what each parse returns; \
      pilot-lab-w18/PROVENANCE.md says what it is";
+const PILOT_LAB_GY_COMPANY_GST: &str = "a company object answer of the pilot lab's row 2162-GY \
+     (9 Nov 2026), before and after the company's GST was turned off, a copy with the company number \
+     replaced, with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs) parses \
+     it, and its tests (src/agent_import_invoice_hsn_tests.rs and \
+     src/agent_import_invoice_admission_tests.rs) pin what each parse returns; \
+     pilot-lab-gy/PROVENANCE.md says what it is";
 const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on the Windows lab \
      (12 Oct 2026), with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs \
      and src/agent_import_invoice_wire.rs) parses it, and its tests \
@@ -3686,6 +3803,12 @@ const PILOT_LAB_LEDGER_FILTER: &str = "an answer of the pilot lab's ledger-filte
      (src/agent_import_invoice_scope_tests.rs, and `rates_cut_to` in \
      src/agent_import_tests.rs) pin what each parse returns; the file is the answer whole as \
      received; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_ZERO_PER_UNIT: &str = "an answer of the pilot lab's rate read on 24 Nov 2026 \
+     (row 2162-RW), before or after the voucher lists of two HSN/SAC codes were opened, with no \
+     row here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs) and its \
+     tests (src/agent_import_invoice_wire_tests.rs and src/agent_import_invoice_tests.rs) pin what \
+     each parse returns; the file is the answer whole as received; pilot-lab/PROVENANCE.md says \
+     what it is";
 const PILOT_LAB_SCOPED_HSN: &str = "an answer of the pilot lab read on 21 Oct 2026, with no row \
      here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_admission_tests.rs, \
@@ -3991,6 +4114,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_EVIDENCE,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-after.utf16le.xml",
+        PILOT_LAB_RESAVE_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-before.utf16le.xml",
+        PILOT_LAB_RESAVE_READBACK,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-resaved.utf16le.xml",
         PILOT_LAB_READBACK,
     ),
@@ -4027,11 +4158,27 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_READBACK,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-registration-empty-gstin.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml",
         PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-number-dropped-zero.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-held-once.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-0010-two-sales-types.utf16le.xml",
         PILOT_LAB_REPLAY,
     ),
     (
@@ -4069,6 +4216,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-none.utf16le.xml",
         PILOT_LAB_LEDGER_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml",
+        PILOT_LAB_ZERO_PER_UNIT,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml",
+        PILOT_LAB_ZERO_PER_UNIT,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-whole-10oct.utf16le.xml",
@@ -4111,6 +4266,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_NUMBERING,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-08.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-2026-09.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbers-empty-month.utf16le.xml",
+        PILOT_LAB_NUMBER_MONTHS,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",
         PILOT_LAB_EVIDENCE,
     ),
@@ -4133,6 +4300,15 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-vouchers-after-post.utf8.xml",
         PILOT_LAB_EVIDENCE,
+    ),
+    // Row 2162-GY's company object answers, before and after the company's GST was turned off.
+    (
+        "tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml",
+        PILOT_LAB_GY_COMPANY_GST,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml",
+        PILOT_LAB_GY_COMPANY_GST,
     ),
     // The W18 replay answers (the build's reads on the book with the four-digit ledger).
     (
@@ -4244,6 +4420,26 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     // Company high-water and mark reads.
     (
         "tests/fixtures/agent/d3-batch-company-high-water.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/stock-create-lab/stock-create-lab-marks.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-marks-after.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-before.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-marks-after.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (
@@ -4574,6 +4770,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VERIFICATION,
     ),
     (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r0-verification-after.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-before.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/partial-landing-rows/partial-landing-r1-r2-verification-after.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
         "tests/fixtures/agent/review-lab-batch-import-verification.utf16le.xml",
         APP_VERIFICATION,
     ),
@@ -4664,6 +4876,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

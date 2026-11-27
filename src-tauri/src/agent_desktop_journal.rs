@@ -9,6 +9,7 @@ use super::desktop_journal_review::{
 use super::post::{admit_saved_journal, admit_saved_journal_integrity, OnAccountMarks};
 use super::*;
 use crate::tally::{TallyConfig, TallyRuntime};
+use bridge_tally_protocol::xml_read_profiles::ShownCompanyName;
 use bridge_tally_transport::canonical_loopback_origin;
 use std::env;
 use std::path::PathBuf;
@@ -171,6 +172,7 @@ impl DesktopJournalService {
             batch_id: snapshot.batch.batch_id,
             sha256: snapshot.batch.sha256,
             company: DesktopJournalCompany {
+                shown_name: ShownCompanyName::of(&company.name).into_text(),
                 name: company.name,
                 guid: company.guid,
                 company_number: company.company_number,
@@ -314,10 +316,12 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(crate::agent::ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(crate::agent::VoucherPages::default())),
+            held_censuses: Arc::new(Mutex::new(crate::agent::HeldCensuses::default())),
             post_approvals,
             // The desktop app calls Bridge's operations directly and never dispatches an MCP
             // tool, so there is no MCP client to accept anything.
             terms: super::super::terms::TermsGate::NotRequired,
+            build_notice_sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
 }

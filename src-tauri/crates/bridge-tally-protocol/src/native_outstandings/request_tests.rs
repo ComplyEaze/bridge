@@ -6,7 +6,7 @@ fn renders_the_verified_working_bills_request_shape() {
     let to = TallyDate::parse("20260731").unwrap();
     let xml = render_native_bills_request(
         NativeBillsReportKind::Receivable,
-        "Bridge Billwise Lab",
+        &ValidatedCompanyName::new("Bridge Billwise Lab").unwrap(),
         &from,
         &to,
     );
@@ -16,7 +16,7 @@ fn renders_the_verified_working_bills_request_shape() {
     );
     let payable = render_native_bills_request(
         NativeBillsReportKind::Payable,
-        "Bridge Billwise Lab",
+        &ValidatedCompanyName::new("Bridge Billwise Lab").unwrap(),
         &from,
         &to,
     );
@@ -117,8 +117,12 @@ fn ledger_snapshot_period_validates_both_closing_balance_boundaries() {
 fn escapes_company_names_in_both_requests() {
     let from = TallyDate::parse("20240401").unwrap();
     let to = TallyDate::parse("20260731").unwrap();
-    let xml =
-        render_native_bills_request(NativeBillsReportKind::Receivable, "A & B <Co>", &from, &to);
+    let xml = render_native_bills_request(
+        NativeBillsReportKind::Receivable,
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &from,
+        &to,
+    );
     assert!(xml.contains("A &amp; B &lt;Co&gt;"));
     assert!(!xml.contains("A & B <Co>"));
 
@@ -128,7 +132,10 @@ fn escapes_company_names_in_both_requests() {
         to.clone(),
     )
     .expect("mode-agnostic profile accepts valid calendar dates");
-    let ledger_xml = render_native_ledger_snapshot_request("A & B <Co>", &snapshot_period);
+    let ledger_xml = render_native_ledger_snapshot_request(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &snapshot_period,
+    );
     assert!(ledger_xml.contains("A &amp; B &lt;Co&gt;"));
     assert!(ledger_xml.contains(
         "<FETCH>NAME, PARENT, CLOSINGBALANCE, OPENINGBALANCE, ISBILLWISEON, CURRENCYNAME</FETCH>"
@@ -138,7 +145,8 @@ fn escapes_company_names_in_both_requests() {
     assert!(ledger_xml.contains(r#"<SVFROMDATE TYPE="Date">20240401</SVFROMDATE>"#));
     assert!(ledger_xml.contains(r#"<SVTODATE TYPE="Date">20260731</SVTODATE>"#));
 
-    let group_xml = render_native_group_snapshot_request("A & B <Co>");
+    let group_xml =
+        render_native_group_snapshot_request(&ValidatedCompanyName::new("A & B <Co>").unwrap());
     assert!(group_xml.contains("A &amp; B &lt;Co&gt;"));
     assert!(group_xml.contains(r#"<ID>List of Groups</ID>"#));
     assert!(
@@ -157,14 +165,20 @@ fn escapes_company_names_in_both_requests() {
     let export_period =
         NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from.clone(), to.clone())
             .expect("mode-agnostic profile accepts valid calendar dates");
-    let export_xml = render_native_ledger_export_request("A & B <Co>", &export_period);
+    let export_xml = render_native_ledger_export_request(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &export_period,
+    );
     assert!(export_xml.contains("A &amp; B &lt;Co&gt;"));
     assert!(!export_xml.contains("INCOMETAXNUMBER"));
     assert!(
         !export_xml.contains("BRIDGECOMPANYGUID"),
         "the ordinary ledger profile retains its existing response shape"
     );
-    let party_master_xml = render_party_ledger_master_request("A & B <Co>", &export_period);
+    let party_master_xml = render_party_ledger_master_request(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &export_period,
+    );
     assert!(party_master_xml.contains("INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD"));
     assert!(party_master_xml
         .contains("<COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>"));
@@ -177,7 +191,9 @@ fn escapes_company_names_in_both_requests() {
     assert!(export_xml.contains(r#"<SVFROMDATE TYPE="Date">20240401</SVFROMDATE>"#));
     assert!(export_xml.contains(r#"<SVTODATE TYPE="Date">20260731</SVTODATE>"#));
 
-    let voucher_type_xml = render_native_voucher_type_export_request("A & B <Co>");
+    let voucher_type_xml = render_native_voucher_type_export_request(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+    );
     assert!(voucher_type_xml.contains("A &amp; B &lt;Co&gt;"));
     assert!(voucher_type_xml.contains("<ID>List of VoucherTypes</ID>"));
     assert!(voucher_type_xml.contains("<FETCH>NAME, PARENT, GUID, MASTERID, ALTERID</FETCH>"));
@@ -186,8 +202,11 @@ fn escapes_company_names_in_both_requests() {
 
     let voucher_from = TallyDate::parse("20260401").unwrap();
     let voucher_to = TallyDate::parse("20260930").unwrap();
-    let voucher_xml =
-        render_native_voucher_export_request("A & B <Co>", &voucher_from, &voucher_to);
+    let voucher_xml = render_native_voucher_export_request(
+        &ValidatedCompanyName::new("A & B <Co>").unwrap(),
+        &voucher_from,
+        &voucher_to,
+    );
     assert!(voucher_xml.contains("A &amp; B &lt;Co&gt;"));
     assert!(voucher_xml.contains("<TYPE>Collection</TYPE>"));
     assert!(voucher_xml.contains(
@@ -251,7 +270,11 @@ fn voucher_window_bounds_reject_non_ascii_digits() {
 fn voucher_window_bounds_accept_a_valid_date_and_render_the_existing_predicate() {
     let from = TallyDate::parse("20260401").unwrap();
     let to = TallyDate::parse("20260930").unwrap();
-    let voucher_xml = render_native_voucher_export_request("Bridge Billwise Lab", &from, &to);
+    let voucher_xml = render_native_voucher_export_request(
+        &ValidatedCompanyName::new("Bridge Billwise Lab").unwrap(),
+        &from,
+        &to,
+    );
     assert!(voucher_xml.contains(
         r#"<SYSTEM TYPE="Formulae" NAME="BridgeVoucherWindowFilter">$Date &gt;= $$Date:"20260401" AND $Date &lt;= $$Date:"20260930"</SYSTEM>"#
     ));
@@ -270,7 +293,11 @@ fn voucher_window_bounds_accept_a_valid_date_and_render_the_existing_predicate()
 fn native_voucher_export_request_is_bounded_by_a_date_filter() {
     let from = TallyDate::parse("20260401").unwrap();
     let to = TallyDate::parse("20260930").unwrap();
-    let voucher_xml = render_native_voucher_export_request("Bridge Billwise Lab", &from, &to);
+    let voucher_xml = render_native_voucher_export_request(
+        &ValidatedCompanyName::new("Bridge Billwise Lab").unwrap(),
+        &from,
+        &to,
+    );
 
     // The SYSTEM Formulae predicate is present and compares $Date against
     // literal date bounds built from the function's own from/to
@@ -358,15 +385,25 @@ fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
         NativeLedgerSnapshotPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
     let part = one_part(&["Sundry Debtors", "Duties & Taxes"]);
 
-    let whole_master = render_party_ledger_master_request("Co", &export);
-    let whole_balance = render_native_ledger_snapshot_request("Co", &snapshot);
+    let whole_master =
+        render_party_ledger_master_request(&ValidatedCompanyName::new("Co").unwrap(), &export);
+    let whole_balance =
+        render_native_ledger_snapshot_request(&ValidatedCompanyName::new("Co").unwrap(), &snapshot);
     for whole in [&whole_master, &whole_balance] {
         assert!(!whole.contains("<SYSTEM"));
         assert!(!whole.contains("<FILTERS>"));
     }
 
-    let master = render_party_ledger_master_request_for_parents("Co", &export, &part);
-    let balance = render_native_ledger_snapshot_request_for_parents("Co", &snapshot, &part);
+    let master = render_party_ledger_master_request_for_parents(
+        &ValidatedCompanyName::new("Co").unwrap(),
+        &export,
+        &part,
+    );
+    let balance = render_native_ledger_snapshot_request_for_parents(
+        &ValidatedCompanyName::new("Co").unwrap(),
+        &snapshot,
+        &part,
+    );
     for (filtered, whole) in [(&master, &whole_master), (&balance, &whole_balance)] {
         assert_eq!(strip_parent_filter(filtered), *whole);
         assert_eq!(filtered.matches("<SYSTEM ").count(), 1);
@@ -402,17 +439,30 @@ fn ledger_part_requests_differ_from_the_whole_read_only_by_the_guid_filter() {
     let formula = format!(
         r#"<SYSTEM TYPE="Formulae" NAME="BridgeInvoiceLedgers">$GUID = "{company}-000000d0" OR $GUID = "{company}-000000d5" OR $GUID = "{company}-000000d8"</SYSTEM>"#
     );
-    let master = render_party_ledger_master_request_for_ledgers("BRIDGE PILOT LAB", &export, &part);
-    let balance =
-        render_native_ledger_snapshot_request_for_ledgers("BRIDGE PILOT LAB", &snapshot, &part);
+    let master = render_party_ledger_master_request_for_ledgers(
+        &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
+        &export,
+        &part,
+    );
+    let balance = render_native_ledger_snapshot_request_for_ledgers(
+        &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
+        &snapshot,
+        &part,
+    );
     for (filtered, whole) in [
         (
             &master,
-            render_party_ledger_master_request("BRIDGE PILOT LAB", &export),
+            render_party_ledger_master_request(
+                &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
+                &export,
+            ),
         ),
         (
             &balance,
-            render_native_ledger_snapshot_request("BRIDGE PILOT LAB", &snapshot),
+            render_native_ledger_snapshot_request(
+                &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
+                &snapshot,
+            ),
         ),
     ] {
         let expected = whole
@@ -438,7 +488,11 @@ fn the_reserved_root_part_carries_tallys_own_root_literal() {
     let export =
         NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
     let root = format!("{} Primary", crate::TALLY_SANITIZED_ROOT_MARKER);
-    let xml = render_party_ledger_master_request_for_parents("Co", &export, &one_part(&[&root]));
+    let xml = render_party_ledger_master_request_for_parents(
+        &ValidatedCompanyName::new("Co").unwrap(),
+        &export,
+        &one_part(&[&root]),
+    );
     assert!(xml.contains(r#"NAME="BridgeParentPart">$Parent = "&#4; Primary"</SYSTEM>"#));
     assert!(!xml.contains('\u{fffd}'));
 }
@@ -470,7 +524,11 @@ fn the_complement_part_request_lists_each_not_formula_in_one_filters_element() {
     .unwrap();
     let complement = partition.parts().last().unwrap();
     assert!(complement.is_complement());
-    let xml = render_party_ledger_master_request_for_parents("Co", &export, complement);
+    let xml = render_party_ledger_master_request_for_parents(
+        &ValidatedCompanyName::new("Co").unwrap(),
+        &export,
+        complement,
+    );
     assert_eq!(xml.matches("<SYSTEM ").count(), 2);
     assert!(xml.contains(
         r#"<TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeNot0">NOT ($Parent = "A" OR $Parent = "B &amp; C")</SYSTEM><SYSTEM TYPE="Formulae" NAME="BridgeNot1">NOT ($Parent = "D")</SYSTEM><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">"#
@@ -495,7 +553,7 @@ fn gst_details_period() -> NativeLedgerExportPeriod {
 fn the_gst_details_request_is_byte_for_byte_the_one_sent_live() {
     assert_eq!(
         render_party_ledger_master_request_with_gst_details(
-            "BRIDGE PILOT LAB",
+            &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
             &gst_details_period()
         ),
         crate::text_encoding::decode_xml_bytes(GST_DETAILS_REQUEST).unwrap()
@@ -506,9 +564,14 @@ fn the_gst_details_request_is_byte_for_byte_the_one_sent_live() {
 fn the_gst_details_request_differs_from_the_production_compliance_request_only_by_its_fetch_suffix()
 {
     let period = gst_details_period();
-    let production = render_party_ledger_master_request("BRIDGE PILOT LAB", &period);
-    let with_details =
-        render_party_ledger_master_request_with_gst_details("BRIDGE PILOT LAB", &period);
+    let production = render_party_ledger_master_request(
+        &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
+        &period,
+    );
+    let with_details = render_party_ledger_master_request_with_gst_details(
+        &ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap(),
+        &period,
+    );
     let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
     assert_eq!(
         production.replacen(
@@ -559,9 +622,16 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
         one_part(&["Sundry Debtors", "Duties & Taxes"]),
         complement,
     ] {
-        let production = render_party_ledger_master_request_for_parents("Co", &period, &part);
-        let with_details =
-            render_party_ledger_master_request_for_parents_with_gst_details("Co", &period, &part);
+        let production = render_party_ledger_master_request_for_parents(
+            &ValidatedCompanyName::new("Co").unwrap(),
+            &period,
+            &part,
+        );
+        let with_details = render_party_ledger_master_request_for_parents_with_gst_details(
+            &ValidatedCompanyName::new("Co").unwrap(),
+            &period,
+            &part,
+        );
         let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
         let marker = "LEDGSTREGDETAILS.LIST</FETCH>";
         assert_eq!(production.matches(marker).count(), 1);
@@ -571,7 +641,10 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
         );
         assert_ne!(production, with_details);
         // The suffix is the whole-book variant's, byte for byte.
-        let whole = render_party_ledger_master_request_with_gst_details("Co", &period);
+        let whole = render_party_ledger_master_request_with_gst_details(
+            &ValidatedCompanyName::new("Co").unwrap(),
+            &period,
+        );
         assert!(whole.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
         assert!(with_details.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
         assert_eq!(with_details.matches("<FILTERS>").count(), 1);
@@ -604,11 +677,17 @@ fn the_mailing_details_request_is_byte_for_byte_the_one_sent_live() {
     .expect("mode-agnostic profile accepts valid calendar dates");
     let live = crate::text_encoding::decode_xml_bytes(MAILING_DETAILS_REQUEST).unwrap();
     assert_eq!(
-        render_party_ledger_master_request_with_mailing_details("Bridge Lab Win 0.5.1", &period),
+        render_party_ledger_master_request_with_mailing_details(
+            &ValidatedCompanyName::new("Bridge Lab Win 0.5.1").unwrap(),
+            &period
+        ),
         live
     );
     assert_eq!(
-        render_party_ledger_master_request("Bridge Lab Win 0.5.1", &period),
+        render_party_ledger_master_request(
+            &ValidatedCompanyName::new("Bridge Lab Win 0.5.1").unwrap(),
+            &period
+        ),
         live.replacen(", LEDMAILINGDETAILS.LIST", "", 1)
     );
 }
@@ -621,9 +700,15 @@ fn a_parent_parts_mailing_details_read_is_the_plain_part_request_and_one_element
         one_part(&["Sundry Debtors"]),
         one_part(&["Sundry Debtors", "Duties & Taxes"]),
     ] {
-        let plain = render_party_ledger_master_request_for_parents("Co", &period, &part);
+        let plain = render_party_ledger_master_request_for_parents(
+            &ValidatedCompanyName::new("Co").unwrap(),
+            &period,
+            &part,
+        );
         let with_mailing = render_party_ledger_master_request_for_parents_with_mailing_details(
-            "Co", &period, &part,
+            &ValidatedCompanyName::new("Co").unwrap(),
+            &period,
+            &part,
         );
         assert_eq!(
             plain.replacen(

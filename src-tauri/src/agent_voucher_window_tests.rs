@@ -5209,6 +5209,7 @@ fn window_timings_drop_only_their_parts_when_over_the_allowance() {
         to: tally_date("20260801"),
         marks: RequestTally { requests: 1, ms: 2 },
         census: RequestTally { requests: 3, ms: 4 },
+        census_reused: None,
         parts: vec![part; 3],
         failed: Some(FailedRequest {
             kind: "part",
@@ -6826,10 +6827,10 @@ async fn a_partial_window_is_not_held_and_a_named_snapshot_of_it_refuses() {
     plans.push(xml_plan("<ENVELOPE></ENVELOPE>".to_string()));
     let first_len = plans.len();
     // The second page of a window nothing is held for: no marks read for
-    // nothing, then the window afresh.
+    // nothing, then the window afresh. Its census is the first call's, held
+    // while the marks are equal (#2399), so only the window is read again.
     plans.extend(identity_plans());
     plans.extend(paired(&mark(3)));
-    plans.extend(paired(&composite));
     plans.extend(paired(&composite));
     plans.push(xml_plan("<ENVELOPE></ENVELOPE>".to_string()));
     // The third, naming a snapshot there is none of: refused after the identity read alone.
@@ -7757,7 +7758,9 @@ async fn a_ledger_summary_masks_every_bucket_label_under_mask_parties() {
 #[tokio::test]
 async fn a_listing_and_a_summary_do_not_replace_or_serve_each_other() {
     let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
-    plans.extend(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    // The summary asks the question the listing did on unchanged marks, so it takes
+    // the listing's census (#2399) and reads only the window.
+    plans.extend(reusing_second_call_plans(counted_marks(), three_vouchers()));
     plans.extend(marks_page_plans(counted_marks()));
     let total = plans.len();
     let one = OneServer::spawn(plans);
@@ -9675,4 +9678,283 @@ async fn a_page_asking_for_gst_details_is_not_served_from_a_window_held_without_
     assert_eq!(error["cause"], "snapshot_not_held", "{second}");
     // The second page sent the identity read only: no marks read and nothing of the window.
     assert_eq!(one.requests(), total);
+}
+
+// --- #2399: a census reused while the company's marks are unchanged ----------
+
+/// The requests of a repeated first-page call whose census is taken from the
+/// store: the identity read, the marks, then the window. No census request.
+fn reusing_second_call_plans(marks: ScenarioPlan, data: String) -> Vec<ScenarioPlan> {
+    let mut plans = identity_plans();
+    plans.extend(paired(&marks));
+    plans.extend(paired(&xml_plan(data)));
+    plans
+}
+
+fn window_of(response: &Value) -> &Value {
+    &response["structuredContent"]["result"]["window"]
+}
+
+fn first_call_then(second: Vec<ScenarioPlan>) -> (OneServer, usize) {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    let first = plans.len();
+    plans.extend(second);
+    (OneServer::spawn(plans), first)
+}
+
+/// The second call of an identical `vouchers` read, on a book whose marks have
+/// not moved, sends the identity read, the marks and the window: 16 legs rather
+/// than 22. Its answer is the first call's, and its timings say the census was
+/// not counted again and when it was. A third call is served from the same
+/// census and says the same time: a reuse does not count the census again, so
+/// it does not restart the ten minutes either.
+#[tokio::test]
+async fn a_repeated_read_on_unchanged_marks_takes_its_census_from_the_store() {
+    let mut second = reusing_second_call_plans(counted_marks(), three_vouchers());
+    second.extend(reusing_second_call_plans(counted_marks(), three_vouchers()));
+    let (one, first_legs) = first_call_then(second);
+    let first = one.call(json!({})).await;
+    assert_eq!(window_of(&first)["census"]["requests"], 1, "{first}");
+    assert!(window_of(&first).get("census_reused").is_none(), "{first}");
+    assert_eq!(one.server.held_censuses.lock().unwrap().held_count(), 1);
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    let second = one.call(json!({})).await;
+    assert_eq!(page_items_of(&second), page_items_of(&first));
+    assert_eq!(window_of(&second)["census"]["requests"], 0, "{second}");
+    assert!(
+        window_of(&second)["census_reused"]["read_at"].is_string(),
+        "{second}"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    let third = one.call(json!({})).await;
+    assert_eq!(window_of(&third)["census"]["requests"], 0, "{third}");
+    assert_eq!(
+        window_of(&third)["census_reused"],
+        window_of(&second)["census_reused"]
+    );
+    assert_eq!(page_items_of(&third), page_items_of(&first));
+    assert_eq!(one.requests(), first_legs + 16 + 16);
+}
+
+/// Each part of the key is built from the call's own question: a window that
+/// ends or starts on another day counts afresh (the marks are equal), and the
+/// same question asked again after them is still served from its own census.
+#[tokio::test]
+async fn a_call_for_another_window_counts_its_own_census() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    plans.extend(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    plans.extend(reusing_second_call_plans(counted_marks(), three_vouchers()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    for extra in [
+        json!({}),
+        json!({"to": "20260930"}),
+        json!({"from": "20260701"}),
+    ] {
+        let response = one.call(extra).await;
+        assert_eq!(window_of(&response)["census"]["requests"], 1, "{response}");
+    }
+    let again = one.call(json!({"from": "20260701"})).await;
+    assert_eq!(window_of(&again)["census"]["requests"], 0, "{again}");
+    assert_eq!(one.server.held_censuses.lock().unwrap().held_count(), 3);
+    assert_eq!(one.requests(), total);
+}
+
+/// A voucher mark that moved, or a master mark that moved with the voucher mark
+/// still, is a miss: the census is counted again and replaces the held one.
+#[tokio::test]
+async fn a_moved_mark_of_either_kind_counts_the_census_again() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    for marks in [mark(capacity - 1), marks_plan(capacity, 8)] {
+        let mut second = identity_plans();
+        second.extend(paired(&marks));
+        second.extend(paired(&xml_plan(three_vouchers())));
+        second.extend(paired(&xml_plan(three_vouchers())));
+        let (one, first_legs) = first_call_then(second);
+        let first = one.call(json!({})).await;
+        assert_eq!(window_of(&first)["census"]["requests"], 1);
+        let again = one.call(json!({})).await;
+        assert_eq!(window_of(&again)["census"]["requests"], 1, "{again}");
+        assert!(window_of(&again).get("census_reused").is_none(), "{again}");
+        assert_eq!(page_items_of(&again), page_items_of(&first));
+        assert_eq!(one.requests(), first_legs + 22);
+    }
+}
+
+/// A read that took a held census and found its window's vouchers were not the
+/// ones it described is refused as such, with how the part differed, and leaves
+/// no census: the call after it counts afresh.
+#[tokio::test]
+async fn a_reused_census_that_does_not_describe_the_window_refuses_and_is_dropped() {
+    let mut second = reusing_second_call_plans(counted_marks(), vouchers_kept(2));
+    second.extend(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let (one, first_legs) = first_call_then(second);
+    one.call(json!({})).await;
+    let refused = one.call(json!({})).await;
+    let error = refusal_of(&refused);
+    assert_eq!(error["code"], "census_reused_mismatch", "{refused}");
+    assert_eq!(error["cause"], "part_census_mismatch", "{refused}");
+    assert_eq!(error["counts"], json!({"returned": 2, "counted": 3}));
+    assert_eq!(one.server.held_censuses.lock().unwrap().held_count(), 0);
+    let third = one.call(json!({})).await;
+    assert_eq!(window_of(&third)["census"]["requests"], 1, "{third}");
+    assert_eq!(one.requests(), first_legs + 16 + 22);
+}
+
+/// A refusal of a read that counted its own census is the refusal it always was,
+/// and holds nothing.
+#[tokio::test]
+async fn a_census_that_did_not_stand_is_not_held() {
+    let plans = counted_vouchers_plans(three_vouchers(), vouchers_kept(2));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(json!({})).await;
+    assert_eq!(
+        refusal_of(&refused)["code"],
+        "voucher_window_part_not_admitted"
+    );
+    assert_eq!(one.server.held_censuses.lock().unwrap().held_count(), 0);
+    one.requests();
+}
+
+/// A write through this server drops the census with the held windows.
+#[tokio::test]
+async fn a_write_through_the_server_drops_a_held_census() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    one.call(json!({})).await;
+    assert_eq!(one.server.held_censuses.lock().unwrap().held_count(), 1);
+    one.server.drop_listing_snapshots(GUID);
+    assert_eq!(one.server.held_censuses.lock().unwrap().held_count(), 0);
+    one.requests();
+}
+
+/// Every reader but the `vouchers` tool's first page reads as it always did:
+/// it neither takes a held census nor leaves one.
+#[tokio::test]
+async fn a_read_not_given_the_store_neither_takes_nor_leaves_a_census() {
+    let limits =
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).counting_small_books();
+    let mut plans = Vec::new();
+    for _ in 0..2 {
+        plans.extend(paired(&counted_marks()));
+        plans.extend(paired(&xml_plan(three_vouchers())));
+        plans.extend(paired(&xml_plan(three_vouchers())));
+    }
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let identity = identity();
+    for _ in 0..2 {
+        let outcome = server
+            .read_voucher_window(
+                &identity,
+                identity.display_name(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                VoucherReadShape::EntryWildcard,
+                WindowPlanSource::Estimate { known_marks: None },
+                limits,
+                |xml| parse_agent_rows(xml, GUID),
+            )
+            .await
+            .unwrap();
+        assert_eq!(outcome.timings.census.requests, 1);
+        assert!(outcome.timings.census_reused.is_none());
+    }
+    assert_eq!(server.held_censuses.lock().unwrap().held_count(), 0);
+    assert_eq!(simulator.finish().unwrap().len(), 36);
+}
+
+fn held_key(guid: &str) -> CensusKey {
+    CensusKey {
+        company_guid: guid.to_string(),
+        from: tally_date("20260801"),
+        to: tally_date("20260831"),
+        ledger: None,
+        capacity: 8192,
+    }
+}
+
+fn admitted(key: CensusKey, marks: CompanyMarks, vouchers: u64) -> AdmittedCensus {
+    let rows = (1..=vouchers).map(|id| CensusRow {
+        day: day("20260801"),
+        alter_id: id,
+        guid: format!("00000000-0000-4000-8000-{id:012}"),
+    });
+    let census = WindowCensus::from_census_rows(rows).unwrap();
+    AdmittedCensus::of(key, marks, &census).unwrap()
+}
+
+/// A census is found only by the marks the same call read: equal on both marks,
+/// else it is gone, and a later look with the old marks does not bring it back.
+#[test]
+fn a_held_census_is_found_only_on_equal_marks_and_a_mismatch_drops_it() {
+    let key = held_key(GUID);
+    let mut held = HeldCensuses::default();
+    assert!(held.hold(admitted(key.clone(), marks_of(10), 3)));
+    assert!(held.find(&FreshMarks(marks_of(10)), &key).is_some());
+    assert!(held
+        .find(&FreshMarks(CompanyMarks::new(Some(10), 8)), &key)
+        .is_none());
+    assert_eq!(held.held_count(), 0);
+    assert!(held.find(&FreshMarks(marks_of(10)), &key).is_none());
+}
+
+/// Each part of the key must equal the question's: the company, both ends of the
+/// window, the ledger scope and the census capacity.
+#[test]
+fn a_held_census_answers_only_the_question_it_was_counted_for() {
+    let key = held_key(GUID);
+    let mut held = HeldCensuses::default();
+    held.hold(admitted(key.clone(), marks_of(10), 3));
+    let fresh = FreshMarks(marks_of(10));
+    for other in [
+        held_key("00000000-0000-4000-8000-000000000002"),
+        CensusKey {
+            to: tally_date("20260830"),
+            ..key.clone()
+        },
+        CensusKey {
+            from: tally_date("20260802"),
+            ..key.clone()
+        },
+        CensusKey {
+            ledger: Some("Cash".to_string()),
+            ..key.clone()
+        },
+        CensusKey {
+            capacity: 4096,
+            ..key.clone()
+        },
+    ] {
+        assert!(held.find(&fresh, &other).is_none(), "{other:?}");
+    }
+    assert!(held.find(&fresh, &key).is_some());
+}
+
+/// A census that does not name every voucher's GUID cannot be held: it would be
+/// admitted on AlterIDs alone.
+#[test]
+fn a_census_without_every_guid_cannot_be_made_holdable() {
+    let census = WindowCensus::from_rows([(day("20260801"), 1)]);
+    assert!(AdmittedCensus::of(held_key(GUID), marks_of(10), &census).is_none());
+}
+
+#[test]
+fn a_held_census_expires_and_the_byte_cap_holds() {
+    let key = held_key(GUID);
+    let mut held = HeldCensuses::default();
+    held.limits_for_test(std::time::Duration::ZERO, HELD_CENSUS_MAX_BYTES);
+    held.hold(admitted(key.clone(), marks_of(10), 3));
+    assert!(held.find(&FreshMarks(marks_of(10)), &key).is_none());
+    let mut held = HeldCensuses::default();
+    held.limits_for_test(
+        std::time::Duration::from_secs(600),
+        5 * HELD_CENSUS_BYTES_PER_VOUCHER,
+    );
+    assert!(!held.hold(admitted(key.clone(), marks_of(10), 6)));
+    assert!(held.hold(admitted(key.clone(), marks_of(10), 3)));
+    let other = held_key("00000000-0000-4000-8000-000000000002");
+    assert!(held.hold(admitted(other, marks_of(10), 3)));
+    assert_eq!(held.held_count(), 1);
 }

@@ -4,6 +4,7 @@
 )]
 use super::*;
 use crate::tally::ConnectionStatus;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 use std::collections::BTreeMap;
 
 #[test]
@@ -25,7 +26,10 @@ fn scoped_opening_uses_requested_boundary_without_changing_book_start_default() 
         None,
     )
     .unwrap();
-    let xml = render_native_ledger_export_request("Bridge Synthetic Book", &scoped);
+    let xml = render_native_ledger_export_request(
+        &ValidatedCompanyName::new("Bridge Synthetic Book").unwrap(),
+        &scoped,
+    );
     let reader = quick_xml::Reader::from_str(&xml);
     let mut reader = reader;
     let mut observed_from = None;

@@ -1,0 +1,711 @@
+{
+  "file": "src-tauri/src/agent_import_release.rs",
+  "base_commit": "d79d79d8",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again). A tool mutant that survived was run again in the whole_set and survivors_again runs as the same edit written as text, under the id named in its run's command.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2183,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_release.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|release/)'",
+      "time": "2026-11-10T15:34:12Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 2183,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/import|numbering|post|approv|release/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 4994,
+      "command": "as the hand run with every bridge test (-E 'all()'), for the tool's two missed mutants (T1 is 57:5, T2 is 58:9) and the seventeen hand-written ones that survived. R22 and R27 each first read caught by a_mailing_read_cut_short_is_marked_as_the_mailing_read, a test of another module that failed alone; each was run again and missed, and the second run is the one recorded",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 4999,
+      "command": "as the whole_set run, for the same nineteen; then, after one assertion was added to a_batch_a_release_cannot_rest_on_is_refused_before_any_read, again for R22 (killed by that test) and for the six still missed then (R18, R27, R28, R31, R32, R38), and that second run is the one recorded for them",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 24,
+      "missed": 0,
+      "unviable": 1
+    },
+    "hand": {
+      "caught": 33,
+      "missed": 5
+    },
+    "survived_at_base": {
+      "tool": 2,
+      "hand": 17
+    },
+    "equivalent": {
+      "hand": 4
+    },
+    "accepted_not_equivalent": {
+      "hand": 1
+    }
+  },
+  "tool_results": {
+    "47:5 replace type_admitted -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "47:5 replace type_admitted -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "57:5 replace shown_rolled_back -> bool with true": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_read_shows_the_book_rolled_back_only_by_its_binding_and_its_status",
+      "killer_at": "this_commit"
+    },
+    "57:5 replace shown_rolled_back -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "58:9 replace && with || in shown_rolled_back": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_read_shows_the_book_rolled_back_only_by_its_binding_and_its_status",
+      "killer_at": "this_commit"
+    },
+    "57:35 replace != with == in shown_rolled_back": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "58:49 replace == with != in shown_rolled_back": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "64:5 replace built_on -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "64:5 replace built_on -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "78:5 replace release_preview -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "78:5 replace release_preview -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "82:24 delete ! in release_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "85:36 replace == with != in release_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "130:5 replace report -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    },
+    "145:9 replace Server::release_rolled_back_rows -> Result<ToolOutcome, ToolFailure> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ToolOutcome: std::default::Default` is not satisfied"
+    },
+    "151:33 replace || with && in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "151:12 delete ! in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "154:12 delete ! in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "164:12 delete ! in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "186:12 delete ! in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "226:50 replace || with && in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "226:31 replace != with == in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "226:53 delete ! in Server::release_rolled_back_rows": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "246:9 replace Server::import_row_release -> Result<bool, String> with Ok(true)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "246:9 replace Server::import_row_release -> Result<bool, String> with Ok(false)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "R01": {
+      "what": "ROLLED_BACK_NOT_ESTABLISHED: the refusal takes the not-posted code (codes swapped)",
+      "edits": [
+        {
+          "from": "const ROLLED_BACK_NOT_ESTABLISHED: &str = \"ack_rolled_back_not_established\";",
+          "to": "const ROLLED_BACK_NOT_ESTABLISHED: &str = \"ack_batch_not_posted\";"
+        }
+      ],
+      "mutation": "5ba77788eb10a252431fe6e1647681ec",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R02": {
+      "what": "TYPE_NOT_ADMITTED: the refusal takes the rolled-back code (codes swapped)",
+      "edits": [
+        {
+          "from": "const TYPE_NOT_ADMITTED: &str = \"ack_release_type_not_admitted\";",
+          "to": "const TYPE_NOT_ADMITTED: &str = \"ack_rolled_back_not_established\";"
+        }
+      ],
+      "mutation": "4b78428be9f5fddbfc8d9ccaebd922ea",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R03": {
+      "what": "VOUCHERS_NOT_LISTED: the refusal takes the type code (codes swapped)",
+      "edits": [
+        {
+          "from": "const VOUCHERS_NOT_LISTED: &str = \"ack_release_vouchers_not_listed\";",
+          "to": "const VOUCHERS_NOT_LISTED: &str = \"ack_release_type_not_admitted\";"
+        }
+      ],
+      "mutation": "4062fdebbfdfc88d8111b0a1a67aa54d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R04": {
+      "what": "type_admitted: a Contra is admitted",
+      "edits": [
+        {
+          "from": "VoucherType::Journal | VoucherType::Payment | VoucherType::Receipt\n",
+          "to": "VoucherType::Journal | VoucherType::Payment | VoucherType::Receipt | VoucherType::Contra\n"
+        }
+      ],
+      "mutation": "00419c22d121ea5c72b5aab167d40364",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R05": {
+      "what": "type_admitted: a Receipt is refused",
+      "edits": [
+        {
+          "from": "VoucherType::Journal | VoucherType::Payment | VoucherType::Receipt\n",
+          "to": "VoucherType::Journal | VoucherType::Payment\n"
+        }
+      ],
+      "mutation": "c35db014c549b379babd78701ec253b3",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_payment_or_receipt_batch_goes_on_to_the_read_as_a_journal_batch_does",
+      "killer_at": "this_commit"
+    },
+    "R06": {
+      "what": "type_admitted: a Payment is refused",
+      "edits": [
+        {
+          "from": "VoucherType::Journal | VoucherType::Payment | VoucherType::Receipt\n",
+          "to": "VoucherType::Journal | VoucherType::Receipt\n"
+        }
+      ],
+      "mutation": "e92aa517330bb1ab4a35e4f23ed2728c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_payment_or_receipt_batch_goes_on_to_the_read_as_a_journal_batch_does",
+      "killer_at": "this_commit"
+    },
+    "R07": {
+      "what": "type_admitted: a Journal is refused",
+      "edits": [
+        {
+          "from": "VoucherType::Journal | VoucherType::Payment | VoucherType::Receipt\n",
+          "to": "VoucherType::Payment | VoucherType::Receipt\n"
+        }
+      ],
+      "mutation": "976a0c6eb78cccd52f83edd408196789",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "R08": {
+      "what": "shown_rolled_back: the posted_verified guard dropped",
+      "edits": [
+        {
+          "from": "result[\"verification_status\"] != \"posted_verified\"\n        && result[\"post_span_binding\"]",
+          "to": "result[\"post_span_binding\"]"
+        }
+      ],
+      "mutation": "f8e9f7c72eb2c30b1079d1a9f5230ba5",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_read_shows_the_book_rolled_back_only_by_its_binding_and_its_status",
+      "killer_at": "this_commit"
+    },
+    "R09": {
+      "what": "shown_rolled_back: the binding state is not read",
+      "edits": [
+        {
+          "from": "        && result[\"post_span_binding\"][\"state\"] == \"book_rolled_back\"\n",
+          "to": "\n"
+        }
+      ],
+      "mutation": "42cbd3a5f733e6c8afec4a5587cde9f4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_read_shows_the_book_rolled_back_only_by_its_binding_and_its_status",
+      "killer_at": "this_commit"
+    },
+    "R10": {
+      "what": "built_on: the date keeps only the year and month (..10 to ..7)",
+      "edits": [
+        {
+          "from": "built_at.get(..10).unwrap_or(built_at)",
+          "to": "built_at.get(..7).unwrap_or(built_at)"
+        }
+      ],
+      "mutation": "cd9d25f8a0854ac5f61110e75110006d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "R11": {
+      "what": "built_on: the build time is shown raw, not as Tally writes a day",
+      "edits": [
+        {
+          "from": "    post::shown_date(&day)\n",
+          "to": "    day\n"
+        }
+      ],
+      "mutation": "f8f6cae38ffedd480b5a1b659c4dd121",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "R12": {
+      "what": "release_preview: a company with no name shows nothing, not its GUID",
+      "edits": [
+        {
+          "from": ".unwrap_or(&line.company_guid);",
+          "to": ".unwrap_or_else(|| \"\");"
+        }
+      ],
+      "mutation": "a9145a0e6c010c48f3a3f315dfa8b3a1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_names_a_nameless_company_by_its_guid_and_shows_no_reordering_character",
+      "killer_at": "this_commit"
+    },
+    "R13": {
+      "what": "release_preview: an empty company name is shown, not the GUID (filter dropped)",
+      "edits": [
+        {
+          "from": "        .filter(|name| !name.is_empty())\n",
+          "to": ""
+        }
+      ],
+      "mutation": "614bf6c45044fcf947133ae997121d2b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_names_a_nameless_company_by_its_guid_and_shows_no_reordering_character",
+      "killer_at": "this_commit"
+    },
+    "R14": {
+      "what": "release_preview: one voucher gets the plural words (count == 1 to count == 0)",
+      "edits": [
+        {
+          "from": "let (noun, confirm) = if count == 1 {",
+          "to": "let (noun, confirm) = if count == 0 {"
+        }
+      ],
+      "mutation": "e19536166bc427dbb2a9500bdb9c0898",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "R15": {
+      "what": "release_preview: the listed vouchers are left out",
+      "edits": [
+        {
+          "from": "    lines.extend(listed.iter().cloned());\n",
+          "to": ""
+        }
+      ],
+      "mutation": "967580f17d620e0fddefa092a872eccb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "R16": {
+      "what": "release_preview: the confirm line is left out",
+      "edits": [
+        {
+          "from": "    lines.push(wrap(confirm.into()));\n",
+          "to": ""
+        }
+      ],
+      "mutation": "cad03243f6dae919e075d55a0a6b58eb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "R17": {
+      "what": "release_preview: the line saying the mark may read higher now is left out",
+      "edits": [
+        {
+          "from": "        wrap(\"It may read higher now.\".into()),\n        String::new(),\n    ];",
+          "to": "        String::new(),\n    ];"
+        }
+      ],
+      "mutation": "dc54ea486c037c86628cc4cd13644969",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_lists_every_voucher_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "R18": {
+      "what": "release_preview: the first line is not wrapped to fit the box",
+      "edits": [
+        {
+          "from": "        wrap(\"THIS RELEASES THIS BATCH'S ROWS, SO THAT THEY CAN BE BUILT AND POSTED AGAIN.\".into()),",
+          "to": "        \"THIS RELEASES THIS BATCH'S ROWS, SO THAT THEY CAN BE BUILT AND POSTED AGAIN.\".into(),"
+        }
+      ],
+      "mutation": "b6173dbbd57827aa75a3cc5c63e4d10b",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "R19": {
+      "what": "release_preview: the batch id is shown raw (stop::shown dropped)",
+      "edits": [
+        {
+          "from": "wrap(format!(\"Batch: {}\", stop::shown(&line.batch_id))),",
+          "to": "wrap(format!(\"Batch: {}\", line.batch_id)),"
+        }
+      ],
+      "mutation": "16f78e92925c342afc82c1815d033d36",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_names_a_nameless_company_by_its_guid_and_shows_no_reordering_character",
+      "killer_at": "this_commit"
+    },
+    "R20": {
+      "what": "report: the state reads verified",
+      "edits": [
+        {
+          "from": "json!({\"state\": \"rows_released\", \"next_step\": NEXT_STEP})",
+          "to": "json!({\"state\": \"posted_verified\", \"next_step\": NEXT_STEP})"
+        }
+      ],
+      "mutation": "f0b1ba185952e3129640cc0195255c1d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    },
+    "R21": {
+      "what": "release_rolled_back_rows: a batch never dispatched is let past the first check",
+      "edits": [
+        {
+          "from": "if !snapshot.dispatched || line.vouchers.is_empty() {",
+          "to": "if line.vouchers.is_empty() {"
+        }
+      ],
+      "mutation": "320cc0bba07852c5c600b76a6fae2549",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R22": {
+      "what": "release_rolled_back_rows: a batch with no vouchers is let past the first check",
+      "edits": [
+        {
+          "from": "if !snapshot.dispatched || line.vouchers.is_empty() {",
+          "to": "if !snapshot.dispatched {"
+        }
+      ],
+      "mutation": "91b1e129734bb73c1f719522d672764d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R23": {
+      "what": "release_rolled_back_rows: the company GUID is compared case-sensitively",
+      "edits": [
+        {
+          "from": "            .eq_ignore_ascii_case(required_string(args, \"company_guid\")?)",
+          "to": "            .eq(required_string(args, \"company_guid\")?)"
+        }
+      ],
+      "mutation": "b0c8470e794a2ad919d81e7aa7cf212f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    },
+    "R24": {
+      "what": "release_rolled_back_rows: the pre-POST mark guard dropped",
+      "edits": [
+        {
+          "from": "        if snapshot.pre_post_voucher_mark.is_none() {\n            return Err(ROLLED_BACK_NOT_ESTABLISHED.to_string().into());\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "46f47e5d468eb1bd7a16355a7bd4dff3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R25": {
+      "what": "release_rolled_back_rows: one admitted voucher admits the batch (all to any)",
+      "edits": [
+        {
+          "from": "            .all(|voucher| type_admitted(&voucher.voucher_type))",
+          "to": "            .any(|voucher| type_admitted(&voucher.voucher_type))"
+        }
+      ],
+      "mutation": "258c5ab5a884140e0437195d718054e8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "R26": {
+      "what": "release_rolled_back_rows: a standing release is not refused before the read",
+      "edits": [
+        {
+          "from": "        if self.import_row_release(&line.batch_id)? {\n            return Err(\"ack_already_recorded\".to_string().into());\n        }\n",
+          "to": ""
+        }
+      ],
+      "mutation": "7d0791c4cd1c8ed394f6d74234baf5ee",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    },
+    "R27": {
+      "what": "release_rolled_back_rows: the record is built from the batch as first read, not as held after the read",
+      "edits": [
+        {
+          "from": "        let record = ledger::StatusRecord::row_release(&held.batch, &cover)\n            .ok_or_else(|| fail(ROLLED_BACK_NOT_ESTABLISHED))?;",
+          "to": "        let record = ledger::StatusRecord::row_release(&line, &cover)\n            .ok_or_else(|| fail(ROLLED_BACK_NOT_ESTABLISHED))?;"
+        }
+      ],
+      "mutation": "eb01e528d6a635fc1ccfdffc0b42d056",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "R28": {
+      "what": "release_rolled_back_rows: the dialog shows the batch as first read, not as held after the read",
+      "edits": [
+        {
+          "from": "let preview = release_preview(&held.batch, cover.mark_read(), &listed);",
+          "to": "let preview = release_preview(&line, cover.mark_read(), &listed);"
+        }
+      ],
+      "mutation": "a327c58e70f832cb820b505535f55778",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "R29": {
+      "what": "release_rolled_back_rows: the dialog shows the pre-POST mark, not the cover's mark read",
+      "edits": [
+        {
+          "from": "let preview = release_preview(&held.batch, cover.mark_read(), &listed);",
+          "to": "let preview = release_preview(&held.batch, held.pre_post_voucher_mark.unwrap_or_default(), &listed);"
+        }
+      ],
+      "mutation": "9351c71219383f067f74dab984f04b24",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::the_release_dialog_shows_the_mark_the_cover_read",
+      "killer_at": "this_commit"
+    },
+    "R30": {
+      "what": "release_rolled_back_rows: the generation check dropped",
+      "edits": [
+        {
+          "from": "if current.generation != held.generation || !admitted {",
+          "to": "if !admitted {"
+        }
+      ],
+      "mutation": "b9430704a69f2a85b1350f370c33edca",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "R31": {
+      "what": "release_rolled_back_rows: a journal that would refuse the record is read as admitting it",
+      "edits": [
+        {
+          "from": "ledger::row_release_after(reader, &record).unwrap_or(false),",
+          "to": "ledger::row_release_after(reader, &record).unwrap_or(true),"
+        }
+      ],
+      "mutation": "b05a96b692f07d2695cf268f580cb5f6",
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "R32": {
+      "what": "release_rolled_back_rows: no journal is read as admitting the record",
+      "edits": [
+        {
+          "from": "            None => false,\n        };\n        if current.generation",
+          "to": "            None => true,\n        };\n        if current.generation"
+        }
+      ],
+      "mutation": "b7d85e533b22b416aa5c19ae102e527f",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "R33": {
+      "what": "release_rolled_back_rows: the record is not written",
+      "edits": [
+        {
+          "from": "        self.append_import_record_while_admitted(&record)\n            .map_err(|code| fail(&code))?;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "36e480adefc82e490eabb0a2688fe21b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "R34": {
+      "what": "release_rolled_back_rows: the answer's state reads verified",
+      "edits": [
+        {
+          "from": "                \"state\": \"rows_released\",\n                \"verification_status\"",
+          "to": "                \"state\": \"posted_verified\",\n                \"verification_status\""
+        }
+      ],
+      "mutation": "2282d5d60357d4510f608eb9968d18a3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads",
+      "killer_at": "base"
+    },
+    "R35": {
+      "what": "release_rolled_back_rows: the answer drops the verification status",
+      "edits": [
+        {
+          "from": "                \"verification_status\": result[\"verification_status\"],\n                \"next_step\": NEXT_STEP,",
+          "to": "                \"next_step\": NEXT_STEP,"
+        }
+      ],
+      "mutation": "b678e8175c569115c4fc81fb1c08db00",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    },
+    "R36": {
+      "what": "release_rolled_back_rows: the answer names no company",
+      "edits": [
+        {
+          "from": "            company_guid: Some(line.company_guid.clone()),\n            truncated: false,\n        })\n    }\n\n    /// Whether a release",
+          "to": "            company_guid: None,\n            truncated: false,\n        })\n    }\n\n    /// Whether a release"
+        }
+      ],
+      "mutation": "8f504ea3675da37fedfdaffb8825d554",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    },
+    "R37": {
+      "what": "release_rolled_back_rows: the dialog is asked for as a settlement, not a row release",
+      "edits": [
+        {
+          "from": "ReviewAcknowledged::confirm(ReviewKind::RowRelease, count, &preview)",
+          "to": "ReviewAcknowledged::confirm(ReviewKind::Settle, count, &preview)"
+        }
+      ],
+      "mutation": "6dc315d6e08f7b1b241840a897cd3ce7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_rolled_back_batch_s_rows_are_released_only_by_the_person",
+      "killer_at": "base"
+    },
+    "R38": {
+      "what": "import_row_release: no journal reads as a release standing",
+      "edits": [
+        {
+          "from": "            Some(reader) => ledger::row_release(reader, batch_id),\n            None => Ok(false),",
+          "to": "            Some(reader) => ledger::row_release(reader, batch_id),\n            None => Ok(true),"
+        }
+      ],
+      "mutation": "0bfc889a139778acc596c037235f2181",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::release_tests::a_batch_a_release_cannot_rest_on_is_refused_before_any_read",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "R18": {
+      "mutation": "b6173dbbd57827aa75a3cc5c63e4d10b",
+      "reason": "equivalent: the line is 76 characters, under the 100 the box takes, so wrapped_to_fit returns it unchanged"
+    },
+    "R27": {
+      "mutation": "eb01e528d6a635fc1ccfdffc0b42d056",
+      "reason": "equivalent: a batch id is minted once for one batch (bridge-UUID), so the batch held after the read is the first-read line with only its status changed by a verification record (persist_import_verification clones the line and sets status); StatusRecord::row_release reads the company, endpoint origin, batch id and sha256, never the status"
+    },
+    "R28": {
+      "mutation": "a327c58e70f832cb820b505535f55778",
+      "reason": "equivalent: as R27; release_preview reads the company, company GUID, batch id, build time and vouchers, never the status"
+    },
+    "R31": {
+      "mutation": "b05a96b692f07d2695cf268f580cb5f6",
+      "reason": "not killed, and not equivalent: row_release_after fails when the journal with the record appended would not read, which only a second release of this batch causes. One written after the snapshot taken after the read is refused first by the generation check; one written between the check of a standing release and that snapshot, while the read runs, needs a test double that writes during a read, which the tests do not have yet"
+    },
+    "R32": {
+      "mutation": "b7d85e533b22b416aa5c19ae102e527f",
+      "reason": "equivalent, unreachable: import_snapshot_while_admitted has just found the batch in the journal under the same exclusive lock, so the journal exists and its reader is never None here"
+    }
+  }
+}

@@ -7,7 +7,7 @@
 //! chain (primary group first), opening, debit, credit and closing (debit positive). Ledger names
 //! are shown as they are in the books; whether a name fits its group is the CA's reading.
 
-use crate::book::Book;
+use crate::book::{Book, TbMovements};
 use crate::error::{AuditError, Result};
 use crate::findings::{EvidenceRef, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
@@ -98,6 +98,19 @@ pub fn run(book: &Book, rules: &Rules) -> Result<TestResult> {
             "Closing balance per the Trial Balance (Dr positive).",
             ev(),
         )?;
+        // A closing that is not the row's opening plus debit less credit is stated beside the
+        // field, never in place of it (#2133). A row that ties adds nothing.
+        if let TbMovements::Differ { by_paise } = t.movements().ok_or_else(overflow)? {
+            r.fig(
+                &format!("tb_closing_not_movements_{h}"),
+                Value::Int(by_paise),
+                Unit::Paise,
+                "The closing balance less (opening + debit - credit), Dr positive. The closing is \
+Tally's own field kept as exported; on a Closing Stock ledger whose closing was keyed on Tally's \
+screen it is the opening, and it is not the closing stock Tally's statements use.",
+                ev(),
+            )?;
+        }
         opening = opening.checked_add(t.opening_paise).ok_or_else(overflow)?;
         debit = debit.checked_add(t.debit_paise).ok_or_else(overflow)?;
         credit = credit.checked_add(t.credit_paise).ok_or_else(overflow)?;
@@ -143,14 +156,16 @@ balance.",
     Ok(r)
 }
 
-/// TB-1 and TB-2, independent of [`run`]: each listed row equals the Trial Balance export, and
+/// TB-1, TB-2 and TB-3, independent of [`run`]: each listed row equals the Trial Balance export, the
+/// closing-not-movements figure is present exactly when the row does not tie and equals the gap, and
 /// the period's movements (closing less opening) of the listed rows sum to zero. Not "debits
 /// equal credits": Tally's export can carry a stock value in a Stock-in-Hand ledger's debit
 /// column without moving its closing.
 pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>> {
     let mut out = Vec::new();
     let mut moved: i64 = 0;
-    let overflow = || AuditError::Config("trial_balance: TB-2 overflowed i64 paise".to_string());
+    let overflow =
+        || AuditError::Config("trial_balance: an invariant overflowed i64 paise".to_string());
     let ints: std::collections::HashMap<&str, i64> = result
         .figures
         .iter()
@@ -166,6 +181,18 @@ pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>>
         if let Some(c) = closing {
             if c != t.closing_paise {
                 out.push(format!("TB-1: closing for ledger tag {h} != Trial Balance"));
+            }
+        }
+        let gap = int(format!("{TEST_ID}.tb_closing_not_movements_{h}"));
+        if closing.is_some() {
+            let want = match t.movements().ok_or_else(overflow)? {
+                TbMovements::Differ { by_paise } => Some(by_paise),
+                TbMovements::Tie => None,
+            };
+            if gap != want {
+                out.push(format!(
+                    "TB-3: the closing-not-movements figure for ledger tag {h} is not the gap"
+                ));
             }
         }
         if let (Some(c), Some(o)) = (closing, int(format!("{TEST_ID}.tb_opening_{h}"))) {

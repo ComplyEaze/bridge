@@ -386,7 +386,7 @@ fn a_trial_balance_and_catalogue_that_name_different_ledgers_refuse() {
         )
         .unwrap_err()
         .code,
-        MovementCurrencyCode::SnapshotDrifted.as_str()
+        ReadCode::LedgerSnapshotDrifted.as_str()
     );
 }
 
@@ -431,7 +431,7 @@ fn only_the_movement_policy_keeps_a_composite_entry_and_none_keeps_a_typed_compo
     // The day-moves read takes `Refuse`; given a marked entry, its sum refuses rather than read it.
     assert_eq!(
         day_moves_of(&window(BOOK_WINDOW), "BRIDGE USD Customer").unwrap_err(),
-        "voucher_amount_invalid"
+        FailureCode::from(ReadCode::VoucherAmountInvalid)
     );
     // DERIVED from the capture: a BILLTYPE added to the first composite allocation.
     let allocation = "<BILLALLOCATIONS.LIST>\r\n       <AMOUNT TYPE=\"Amount\">-$1000000.00";

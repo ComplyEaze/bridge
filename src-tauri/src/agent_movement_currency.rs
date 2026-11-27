@@ -15,7 +15,7 @@
 //! (`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`); a ledger only the Trial Balance can show, such
 //! as `Profit & Loss A/c`, would then be read. So a check that fails refuses the whole read.
 
-use super::super::failure_code::MovementCurrencyCode;
+use super::super::failure_code::{MovementCurrencyCode, ReadCode};
 use super::*;
 use crate::tally::runtime::{SeveralCurrencyFirstDay, TrialBalanceLedgerScope};
 use bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger;
@@ -90,7 +90,7 @@ impl CurrencySetAside {
         let TrialBalanceLedgerScope::BaseCurrencyLedgersOnly { foreign, mixed, .. } = scope else {
             // The Trial Balance found one Currency master where the opening read found several:
             // the book changed between the two reads.
-            return Err(MovementCurrencyCode::SnapshotDrifted.into());
+            return Err(ReadCode::LedgerSnapshotDrifted.into());
         };
         let catalogue_names = catalogue
             .iter()

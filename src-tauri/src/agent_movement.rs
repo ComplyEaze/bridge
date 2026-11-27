@@ -1,5 +1,5 @@
 //! Movement for the local MCP adapter.
-use super::failure_code::MovementCurrencyCode;
+use super::failure_code::{CompanyReadCode, FailureCode, MovementCode, ReadCode};
 use super::voucher_window::{WindowScope, LEDGER_SCOPE_NEEDS_DAY_SPLIT};
 use super::*;
 use bridge_tally_core::TallyDate;
@@ -145,7 +145,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         if from > to {
-            return Err("invalid_date_range".to_string().into());
+            return Err(ReadCode::InvalidDateRange.into());
         }
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
@@ -153,7 +153,7 @@ impl Server {
                 company
                     .books_from
                     .as_deref()
-                    .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                    .ok_or(ReadCode::CompanyIdentityIncomplete)?,
             )?;
             ensure_movement_window_within_books(&from, &books_from)?;
             let opening_date = from.clone();
@@ -200,7 +200,7 @@ impl Server {
             let set_aside = match several_currency.as_ref() {
                 Some(first_day) => {
                     let period = crate::tally::runtime::TrialBalancePeriod::new(from.clone(), to.clone())
-                        .map_err(|_| ToolFailure::from(MovementCurrencyCode::InvalidDateRange))?;
+                        .map_err(|_| ToolFailure::from(ReadCode::InvalidDateRange))?;
                     let (trial_balance, extent) = self
                         .runtime
                         .fetch_trial_balance_with_extent(
@@ -216,7 +216,7 @@ impl Server {
                         evidence_from_runtime_read(trial_balance.evidence.clone()),
                     );
                     if extent != opening_extent {
-                        return Err(MovementCurrencyCode::SnapshotDrifted.into());
+                        return Err(ReadCode::LedgerSnapshotDrifted.into());
                     }
                     let set_aside =
                         currency::CurrencySetAside::before_window(
@@ -294,7 +294,7 @@ impl Server {
             // rule-3 set that moved between them refuses as drifted; so does a book whose
             // Currency admission changed.
             if corroborating.several_currency.is_some() != set_aside.is_some() {
-                return Err(MovementCurrencyCode::SnapshotDrifted.into());
+                return Err(ReadCode::LedgerSnapshotDrifted.into());
             }
             let corroborating_ledgers = corroborating.ledgers;
             // An in-window posting need not change the period opening. Repeat
@@ -321,7 +321,7 @@ impl Server {
                 .map_err(|failure| match WholeBookReason::of_failure(&failure) {
                     // The same parts, read again, now answer differently: the book moved.
                     Some(_) => {
-                        let mut drifted = ToolFailure::from("voucher_snapshot_drifted".to_string());
+                        let mut drifted = ToolFailure::from(MovementCode::VoucherSnapshotDrifted);
                         drifted.evidence = failure.evidence;
                         tag_window_refusal(drifted, whole_book)
                     }
@@ -334,7 +334,7 @@ impl Server {
                 evidence = combine_evidence(evidence.clone(), closing);
             }
             if voucher_snapshot != closing_snapshot {
-                return Err("voucher_snapshot_drifted".to_string().into());
+                return Err(MovementCode::VoucherSnapshotDrifted.into());
             }
             validate_movement_snapshot(&ledgers, &corroborating_ledgers, &vouchers)?;
             // The window both reads agreed on checks the Trial Balance: a composite entry on a
@@ -377,6 +377,10 @@ impl Server {
                         // this entry belongs to a known, unselected ledger.
                         continue;
                     };
+                    // No input reaches this refusal: `parse_scoped_movement_rows` parsed every
+                    // amount of these vouchers with the same call and refused the read first, and
+                    // its test holds that site (#2558). A composite entry (#683) has no amount to
+                    // parse; one on a kept ledger was refused by `check_composite_entries` above.
                     let amount = entry.plain_amount()?;
                     let (is_debit, magnitude) =
                         movement_entry_effect(&amount, entry.is_deemed_positive);
@@ -422,7 +426,7 @@ impl Server {
             // On this path the result is always partial, as its rules are measured on one book
             // (§8.2n); an unobserved opening names the reason when both hold.
             let partial_reason = if opening_unobserved {
-                Some("opening_balance_not_observed")
+                Some(MovementCode::OpeningBalanceNotObserved.as_str())
             } else if set_aside.is_some() {
                 Some("base_currency_ledgers_only")
             } else {
@@ -591,9 +595,9 @@ impl Server {
         composites: MovementComposites,
     ) -> Result<MovementWindowRead, ToolFailure> {
         let company = ValidatedCompanyName::new(company.to_string())
-            .map_err(|_| "company_name_invalid".to_string())?;
+            .map_err(|_| CompanyReadCode::NameInvalid)?;
         let range = ValidatedDateRange::new(from.as_str(), to.as_str())
-            .map_err(|_| "invalid_date_range".to_string())?;
+            .map_err(|_| ReadCode::InvalidDateRange)?;
         let shape = VoucherReadShape::Movement;
         let read = self
             .read_scoped_voucher_window(
@@ -772,7 +776,7 @@ fn validate_movement_snapshot(
     opening: &[TallyLedger],
     corroboration: &[TallyLedger],
     vouchers: &[MovementVoucher],
-) -> Result<(), String> {
+) -> Result<(), FailureCode> {
     let initial = opening
         .iter()
         .map(|ledger| (ledger.name.as_str(), ledger))
@@ -789,7 +793,7 @@ fn validate_movement_snapshot(
             .flat_map(|voucher| &voucher.ledger_entries)
             .any(|entry| !initial.contains_key(entry.ledger_name.as_str()))
     {
-        return Err("ledger_snapshot_drifted".to_string());
+        return Err(ReadCode::LedgerSnapshotDrifted.into());
     }
     Ok(())
 }
@@ -823,11 +827,11 @@ pub(super) enum MovementAmount {
 
 impl MovementEntry {
     /// The entry's figure; a composite has none (`voucher_amount_invalid`).
-    fn plain_amount(&self) -> Result<bridge_tally_core::ExactDecimal, String> {
+    fn plain_amount(&self) -> Result<bridge_tally_core::ExactDecimal, ReadCode> {
         match &self.amount {
             MovementAmount::Plain(amount) => bridge_tally_core::ExactDecimal::parse(amount.clone())
-                .map_err(|_| "voucher_amount_invalid".to_string()),
-            MovementAmount::Composite => Err("voucher_amount_invalid".to_string()),
+                .map_err(|_| ReadCode::VoucherAmountInvalid),
+            MovementAmount::Composite => Err(ReadCode::VoucherAmountInvalid),
         }
     }
 }
@@ -870,8 +874,8 @@ fn parse_movement_polarity<'de, D: serde::Deserializer<'de>>(
 pub(super) fn day_moves_of(
     vouchers: &[MovementVoucher],
     ledger: &str,
-) -> Result<BTreeMap<String, bridge_tally_core::ExactDecimal>, String> {
-    let invalid = |_| "voucher_amount_invalid".to_string();
+) -> Result<BTreeMap<String, bridge_tally_core::ExactDecimal>, FailureCode> {
+    let invalid = |_| ReadCode::VoucherAmountInvalid;
     let mut moves = BTreeMap::<String, bridge_tally_core::ExactDecimal>::new();
     for voucher in vouchers {
         for entry in voucher
@@ -902,7 +906,7 @@ pub(super) fn parse_movement_vouchers(
     from: &str,
     to: &str,
     company_guid: &str,
-) -> Result<Vec<MovementVoucher>, String> {
+) -> Result<Vec<MovementVoucher>, ToolFailure> {
     Ok(parse_movement_rows(parse_agent_changed_rows(xml, company_guid)?, from, to)?.rows)
 }
 
@@ -912,7 +916,11 @@ struct MovementPage {
 }
 
 #[cfg(test)]
-fn parse_movement_rows(rows: Vec<Value>, from: &str, to: &str) -> Result<MovementPage, String> {
+fn parse_movement_rows(
+    rows: Vec<Value>,
+    from: &str,
+    to: &str,
+) -> Result<MovementPage, ToolFailure> {
     parse_scoped_movement_rows(rows, WindowScope::Book, from, to)
 }
 
@@ -921,13 +929,12 @@ fn parse_scoped_movement_rows(
     scope: WindowScope<'_>,
     from: &str,
     to: &str,
-) -> Result<MovementPage, String> {
+) -> Result<MovementPage, ToolFailure> {
     let observed_rows = rows.len();
     let vouchers = rows
         .into_iter()
         .map(|row| {
-            serde_json::from_value::<MovementVoucher>(row)
-                .map_err(|_| "ledger_movement_read_failed".to_string())
+            serde_json::from_value::<MovementVoucher>(row).map_err(|_| MovementCode::ReadFailed)
         })
         .collect::<Result<Vec<_>, _>>()?;
     // A ledger-scoped read promised the vouchers with a line on that ledger: a row without one
@@ -939,7 +946,7 @@ fn parse_scoped_movement_rows(
                 .iter()
                 .any(|entry| entry.ledger_name == ledger.as_str())
         }) {
-            return Err(LEDGER_SCOPE_ROW_WITHOUT_LINE.to_string());
+            return Err(LEDGER_SCOPE_ROW_WITHOUT_LINE.to_string().into());
         }
     }
     // Check the whole window before excluding cancelled/optional records.
@@ -947,7 +954,7 @@ fn parse_scoped_movement_rows(
         .iter()
         .any(|voucher| voucher.date.as_str() < from || voucher.date.as_str() > to)
     {
-        return Err("window_not_honoured".to_string());
+        return Err(ReadCode::WindowNotHonoured.into());
     }
     // A voucher with no accounting entries cannot move a ledger balance, so it
     // is excluded the way a cancelled or optional one is rather than refusing
@@ -980,12 +987,12 @@ fn parse_scoped_movement_rows(
                 entry.plain_amount().and_then(|amount| {
                     total
                         .checked_add(&amount)
-                        .map_err(|_| "voucher_amount_invalid".to_string())
+                        .map_err(|_| ReadCode::VoucherAmountInvalid)
                 })
             },
         )?;
         if !total.is_zero() {
-            return Err("voucher_entries_unbalanced".to_string());
+            return Err(ReadCode::VoucherEntriesUnbalanced.into());
         }
     }
     Ok(MovementPage {

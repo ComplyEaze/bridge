@@ -351,8 +351,8 @@ fn kind(word: &str) -> WordKind {
 /// name, and the length cap are each derived here from those names and must
 /// equal the type's. The pairing rule is not derived: the captures show each
 /// `"` and spaced bracket paired within one word, and two brackets inside a
-/// word, each the only bracket in its name; the rule admits only those
-/// shapes, the narrower choice.
+/// word, each in a name with no other mark, no Devanagari and no `and`; the
+/// rule admits only those shapes, the narrower choice.
 #[test]
 fn the_tables_are_what_the_kept_captures_show() {
     use std::collections::{BTreeMap, BTreeSet};
@@ -457,6 +457,7 @@ fn a_combination_no_kept_name_shows_is_refused_by_its_limit() {
         // The Devanagari word twice, beside a mark it was not read beside, or
         // before another word.
         (format!("Ak {word} {word} Am"), RepeatedWord),
+        (format!("Ak {word} & Bm {word}"), RepeatedWord),
         (format!("Ak & {word}"), Adjacent),
         (format!("Ak {word} Am"), Adjacent),
         (format!("Ak {word} + Am"), Adjacent),
@@ -469,6 +470,14 @@ fn a_combination_no_kept_name_shows_is_refused_by_its_limit() {
         ("Ak \"Am Bm\" Cm".to_string(), Unpaired('"')),
         ("Ak(Am \"Bm\" Cm".to_string(), Unpaired('(')),
         ("Ak(Am Bm)Cm".to_string(), Unpaired('(')),
+        // A pair closed by the other mark.
+        ("Ak \"Bm) Cm".to_string(), Unpaired(')')),
+        ("Ak (Bm\" Cm".to_string(), Unpaired('"')),
+        // A bracket inside a word, in a name holding another mark or `and`.
+        ("Ak(Bm & Cm".to_string(), Unpaired('(')),
+        ("Ak)Bm & Cm".to_string(), Unpaired(')')),
+        ("Ak(Bm and Cm".to_string(), Unpaired('(')),
+        (format!("Ak(Bm {word}"), Unpaired('(')),
         // One placing, or one mark, more often than any kept name holds it.
         ("Ak.Bm.Cm.Dm".to_string(), Repeated('.')),
         ("Ak & Bm & Cm & Dm".to_string(), Repeated('&')),
@@ -486,6 +495,7 @@ fn a_combination_no_kept_name_shows_is_refused_by_its_limit() {
         "Ak \"Bm\" Cm".to_string(),
         "Ak (Bm) Cm".to_string(),
         "Ak(Bm".to_string(),
+        "Ak)Bm Cm 12".to_string(),
         "Ak & Bm".to_string(),
         "Ak-Bm 2023-24".to_string(),
         format!("Ak {word} & Bm"),

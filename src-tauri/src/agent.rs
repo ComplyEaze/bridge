@@ -2651,22 +2651,26 @@ fn party_name_cause_remediation(cause: &str) -> Option<&'static str> {
              nothing was sent."
         )),
         "party_name_formula_word_not_measured" => Some(step!(
-            "The party's ledger name holds a word Tally's formulas read as an operator, \
-             where ComplyEaze Bridge has not seen Tally read it as part of a name, so nothing \
-             was sent."
+            "The party's ledger name holds a word on ComplyEaze Bridge's own list of words \
+             Tally's formulas may read as operators, a list that errs wide, where ComplyEaze \
+             Bridge has not seen Tally read it as part of a name, so nothing was sent."
         )),
         "party_name_marked_too_long" => Some(step!(
-            "The party's ledger name holds marks and is longer than any such name ComplyEaze \
-             Bridge has seen Tally read in this report, so nothing was sent."
+            "The party's ledger name holds a mark, the word and, or Devanagari, and is longer \
+             than any such name ComplyEaze Bridge has seen Tally read in this report (72 \
+             characters), so nothing was sent."
         )),
         "party_name_key_shared" => Some(step!(
-            "Another ledger of this company has the same letters and digits as the party's \
-             ledger name, and ComplyEaze Bridge has seen Tally read such a name only where no \
-             other ledger shared them, so nothing was sent."
+            "The party's ledger name is not the letters and digits of exactly one ledger in \
+             ComplyEaze Bridge's list of this company's ledgers: another ledger shares them, or \
+             no ledger in that list has them. ComplyEaze Bridge has seen Tally read such a name \
+             only where exactly one ledger had them, so nothing was sent."
         )),
         "party_name_spacing" => Some(step!(
-            "The party's ledger name starts or ends with a space, or holds two in a row, \
-             which Tally does not keep in a name, so nothing was sent."
+            "The party's ledger name starts or ends with a space, or holds two in a row. \
+             This is ComplyEaze Bridge's own refusal: of these only one trailing space has \
+             been measured, on another kind of request, where Tally matched the name without \
+             it. Nothing was sent."
         )),
         "party_name_combination_not_measured" => Some(step!(
             "The party's ledger name holds marks or words together in a way ComplyEaze Bridge \

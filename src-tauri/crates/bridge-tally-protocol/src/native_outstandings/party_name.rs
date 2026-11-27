@@ -15,7 +15,8 @@
 //!   [`MEASURED_MARK_MOST`] says;
 //! - a `"` or a bracket that has a space on one side opens and closes a pair
 //!   within one space-separated word, never inside another pair; a bracket
-//!   inside a word stands alone, the name's only bracket or quote;
+//!   inside a word stands alone, in a name holding no other mark, no
+//!   Devanagari and no `and`, as the two kept names with one do;
 //! - the one formula word read, lower-case `and`, stands once between two
 //!   other words, and no other formula word appears;
 //! - Devanagari appears only once, as [`MEASURED_DEVANAGARI_WORD`] whole;
@@ -170,8 +171,9 @@ pub enum Combination {
     /// The mark more often than [`MEASURED_MARK_MOST`] allows, or one of its
     /// placings twice.
     Repeated(char),
-    /// A quote or bracket not paired within one word, closed with none open,
-    /// opened inside another pair, or inside a word beside another.
+    /// A quote or bracket not paired within one word, closed with none open
+    /// or by the other mark, opened inside another pair, or inside a word in a
+    /// name holding any other mark, Devanagari or `and`.
     Unpaired(char),
     /// `and` or the Devanagari word more than once.
     RepeatedWord,
@@ -385,14 +387,19 @@ fn combination(
 
 /// Quotes and brackets as the kept names hold them: a `"` or `(` that starts a
 /// word opens a pair that the matching mark ending the same word closes; a
-/// bracket inside a word is the name's only bracket or quote. Nothing else
-/// opens or closes, so no pair spans two words or holds another.
+/// bracket inside a word stands in a name of letters, digits and spaces
+/// otherwise, with no `and`, as the two kept names with one (`Lk(Lm`,
+/// `Rk)Rm`) do. Nothing else opens or closes, so no pair spans two words or
+/// holds another. A word opens at most once, at its start, so nothing is open
+/// there yet.
 fn paired(words: &[&str]) -> Result<(), Combination> {
-    let total = words
+    let alone = words
         .iter()
         .flat_map(|word| word.chars())
-        .filter(|character| matches!(character, '"' | '(' | ')'))
-        .count();
+        .filter(|character| !character.is_ascii_alphanumeric())
+        .count()
+        == 1
+        && !words.contains(&"and");
     for word in words {
         let characters = word.chars().collect::<Vec<_>>();
         let end = characters.len() - 1;
@@ -400,16 +407,11 @@ fn paired(words: &[&str]) -> Result<(), Combination> {
         for (at, mark) in characters.iter().copied().enumerate() {
             match mark {
                 '(' | ')' if at != 0 && at != end => {
-                    if total != 1 {
+                    if !alone {
                         return Err(Combination::Unpaired(mark));
                     }
                 }
-                '"' | '(' if at == 0 => {
-                    if open.is_some() {
-                        return Err(Combination::Unpaired(mark));
-                    }
-                    open = Some(mark);
-                }
+                '"' | '(' if at == 0 => open = Some(mark),
                 '"' | ')' if at == end => {
                     let opener = if mark == ')' { '(' } else { '"' };
                     if open != Some(opener) {

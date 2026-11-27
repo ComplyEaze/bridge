@@ -358,7 +358,10 @@ impl Server {
                 *evidence = combine_evidence(evidence.clone(), ledger_evidence);
                 profile = Some(boundary);
                 match self
-                    .post_read(identity, native_group_snapshot_read(company))
+                    .post_read(
+                        identity,
+                        native_group_snapshot_read(identity.company_name()),
+                    )
                     .await
                 {
                     Err(failure) => status["group_index"] = unavailable(&failure.code),
@@ -434,7 +437,7 @@ impl Server {
             .map_err(|_| "period_unsupported".to_string())?;
         let part = single_parent_part(parent).ok_or("parent_unsupported".to_string())?;
         let request = crate::agent::read_profiles::party_ledger_master_for_parent_read(
-            identity.display_name(),
+            identity.company_name(),
             &period,
             &part,
         );

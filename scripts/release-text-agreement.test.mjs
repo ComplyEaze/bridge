@@ -3,9 +3,15 @@
 // Holds the files that name the newest published release to scripts/release-text-agreement.mjs. The real
 // files must agree; each rule is shown to fail on a copy of the real text changed in exactly one place.
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { readFileSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import test from "node:test";
-import { parseSpan, parseVersion, problemsIn, ReleaseTextError } from "./release-text-agreement.mjs";
+import { fileURLToPath } from "node:url";
+import { checkPublished, exitStatus, parseSpan, parseVersion, problemsIn, ReleaseTextError, run } from "./release-text-agreement.mjs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const real = {
@@ -115,4 +121,208 @@ test("versions compare by number, not by text", () => {
     registryVersion: "0.9.0",
   };
   assert.deepEqual(problemsIn(state), []);
+});
+
+const TAG = "mcp-v0.5.0";
+const PUBLISHED_AT = "2026-10-08T02:15:10Z";
+const PUBLISHED_DATE = "8 October 2026";
+const LATEST_URL = "https://api.github.com/repos/ComplyEaze/bridge/releases/latest";
+// The list the check no longer reads: a double serves it so that a check which still chose by publication time sees a different answer.
+const LIST_URL = "https://api.github.com/repos/ComplyEaze/bridge/releases?per_page=100";
+const githubRelease = (tag = TAG, published_at = PUBLISHED_AT, draft = false, prerelease = false) => ({ tag_name: tag, published_at, draft, prerelease });
+const managedSpan = (name, tag, date) => `<!-- managed:${name} -->[\`${tag}\`](https://github.com/ComplyEaze/bridge/releases/latest) (${date})<!-- /managed:${name} -->`;
+
+function publishedText({ readmeTag = TAG, securityTag = TAG, registryVersion = "0.5.0", readmeDate = PUBLISHED_DATE, securityDate = PUBLISHED_DATE } = {}) {
+  return {
+    readme: managedSpan("current-release", readmeTag, readmeDate),
+    security: managedSpan("latest-preview", securityTag, securityDate),
+    registryVersion,
+  };
+}
+
+async function publishedRoot(t) {
+  const root = await mkdtemp(resolve(tmpdir(), "release-text-published-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(resolve(root, "registry"), { recursive: true });
+  await writeFile(resolve(root, "README.md"), publishedText().readme);
+  await writeFile(resolve(root, "SECURITY.md"), publishedText().security);
+  await writeFile(resolve(root, "registry", "server.json"), JSON.stringify({ version: "0.5.0" }));
+  return root;
+}
+
+// Serves GitHub's latest marker, and the releases list when a test gives one. Any other address fails the test.
+function latestAnswer(latest, list = []) {
+  return async (url) => {
+    if (url === LATEST_URL) return typeof latest === "string" ? latest : JSON.stringify(latest);
+    if (url === LIST_URL) return JSON.stringify(list);
+    return assert.fail(`unexpected request ${url}`);
+  };
+}
+
+async function refusal(action) {
+  try {
+    await action();
+  } catch (error) {
+    assert.ok(error instanceof ReleaseTextError, `expected a ReleaseTextError, got ${error}`);
+    return error;
+  }
+  assert.fail("the command agreed");
+}
+
+const commandRefusal = (args, options) => refusal(() => run(args, options));
+
+test("the hand command uses the publication calendar date in India time", async () => {
+  const rows = [
+    ["mcp-v0.4.0", "2026-10-01T18:55:38Z", "2 October 2026", "2026-10-02"],
+    [TAG, PUBLISHED_AT, PUBLISHED_DATE, "2026-10-08"],
+    // The two sides of midnight in India: 18:29:59Z is 23:59:59 there, and one second later is the next day.
+    ["mcp-v0.4.1", "2026-10-01T18:29:59Z", "1 October 2026", "2026-10-01"],
+    ["mcp-v0.4.2", "2026-10-01T18:30:00Z", "2 October 2026", "2026-10-02"],
+  ];
+  for (const [tag, publishedAt, date, isoDate] of rows) {
+    const text = publishedText({ readmeTag: tag, securityTag: tag, registryVersion: tag.slice("mcp-v".length), readmeDate: date, securityDate: date });
+    const release = await checkPublished(text, tag, latestAnswer(githubRelease(tag, publishedAt)));
+    assert.equal(release.tag, tag);
+    assert.equal(release.date, isoDate);
+  }
+});
+
+test("an older line's patch with the newest publication time, not marked latest, does not decide the release", async () => {
+  const list = [
+    githubRelease("mcp-v0.4.9", "2026-10-20T00:00:00Z"),
+    githubRelease(),
+    githubRelease("mcp-v0.3.0", "2026-09-01T00:00:00Z"),
+  ];
+  assert.equal((await checkPublished(publishedText(), TAG, latestAnswer(githubRelease(), list))).tag, TAG);
+  const patchText = publishedText({ readmeTag: "mcp-v0.4.9", securityTag: "mcp-v0.4.9", registryVersion: "0.4.9" });
+  const error = await refusal(() => checkPublished(patchText, "mcp-v0.4.9", latestAnswer(githubRelease(), list)));
+  assert.equal(error.code, "release_disagrees");
+  assert.deepEqual(error.message.split("\n"), ["GitHub's latest release is mcp-v0.5.0, not mcp-v0.4.9."]);
+});
+
+test("a latest marker that is not the greatest publication time is the release that counts", async () => {
+  const newer = githubRelease("mcp-v0.6.0", "2026-10-09T00:00:00Z");
+  const list = [githubRelease(), newer];
+  assert.equal((await checkPublished(publishedText(), TAG, latestAnswer(githubRelease(), list))).tag, TAG);
+  const newerText = publishedText({ readmeTag: "mcp-v0.6.0", securityTag: "mcp-v0.6.0", registryVersion: "0.6.0", readmeDate: "9 October 2026", securityDate: "9 October 2026" });
+  const error = await refusal(() => checkPublished(newerText, "mcp-v0.6.0", latestAnswer(githubRelease(), list)));
+  assert.equal(error.code, "release_disagrees");
+  assert.deepEqual(error.message.split("\n"), ["GitHub's latest release is mcp-v0.5.0, not mcp-v0.6.0."]);
+});
+
+test("each published-release rule reports its own disagreement", async () => {
+  const cases = [
+    [{}, githubRelease("mcp-v0.6.0", "2026-10-09T00:00:00Z"), "GitHub's latest release is mcp-v0.6.0, not mcp-v0.5.0."],
+    // A pre-release is never GitHub's latest, so the older latest release is what the answer names.
+    [{ readmeTag: "mcp-v0.6.0", securityTag: "mcp-v0.6.0", registryVersion: "0.6.0" }, githubRelease(), "GitHub's latest release is mcp-v0.5.0, not mcp-v0.6.0."],
+    [{}, githubRelease(TAG, PUBLISHED_AT, false, true), "GitHub marks mcp-v0.5.0 as both latest and a pre-release."],
+    [{ readmeTag: "mcp-v0.5.1" }, githubRelease(), "README.md names mcp-v0.5.1, not mcp-v0.5.0."],
+    [{ securityTag: "mcp-v0.5.1" }, githubRelease(), "SECURITY.md names mcp-v0.5.1, not mcp-v0.5.0."],
+    [{ registryVersion: "0.5.1" }, githubRelease(), "registry/server.json names mcp-v0.5.1, not mcp-v0.5.0."],
+    [{ readmeDate: "9 October 2026" }, githubRelease(), "README.md dates mcp-v0.5.0 2026-10-09, but its GitHub publication date is 2026-10-08 in India time."],
+    [{ securityDate: "9 October 2026" }, githubRelease(), "SECURITY.md dates mcp-v0.5.0 2026-10-09, but its GitHub publication date is 2026-10-08 in India time."],
+  ];
+  for (const [changes, latest, expected] of cases) {
+    const tag = changes.readmeTag === "mcp-v0.6.0" ? "mcp-v0.6.0" : TAG;
+    const error = await refusal(() => checkPublished(publishedText(changes), tag, latestAnswer(latest)));
+    assert.equal(error.code, "release_disagrees");
+    assert.deepEqual(error.message.split("\n"), [expected]);
+  }
+});
+
+test("one refusal names every disagreement", async () => {
+  const text = publishedText({ readmeTag: "mcp-v0.5.1", securityTag: "mcp-v0.5.2", registryVersion: "0.5.3", readmeDate: "9 October 2026", securityDate: "10 October 2026" });
+  const error = await refusal(() => checkPublished(text, TAG, latestAnswer(githubRelease("mcp-v0.6.0", "2026-10-11T00:00:00Z"))));
+  assert.equal(error.code, "release_disagrees");
+  // Not latest, three wrong tags and no date comparison: GitHub gave no publication date for the requested tag.
+  assert.equal(error.message.split("\n").length, 4);
+});
+
+test("request and answer failures, including a latest marker that cannot be read or does not exist, have typed codes and never become agreement", async () => {
+  const missingTime = { tag_name: TAG, draft: false, prerelease: false };
+  const badDraft = { tag_name: TAG, published_at: PUBLISHED_AT, draft: "false", prerelease: false };
+  const cases = [
+    ["github_unavailable", async () => { throw new Error("connection failed"); }],
+    ["github_unavailable", async () => { throw new Error("HTTP 503"); }],
+    // No latest release at all: GitHub answers 404, which is a failed request, not agreement and not "no release".
+    ["github_unavailable", async () => { throw new Error("HTTP 404"); }],
+    ["github_unreadable", async () => "not JSON"],
+    ["github_unreadable", async () => "null"],
+    ["github_unreadable", latestAnswer([githubRelease()])],
+    ["github_unreadable", latestAnswer({ releases: [] })],
+    ["github_unreadable", latestAnswer(githubRelease(""))],
+    ["github_unreadable", latestAnswer(badDraft)],
+    ["github_unreadable", latestAnswer(githubRelease(TAG, PUBLISHED_AT, false, "false"))],
+    ["github_unreadable", latestAnswer(githubRelease(TAG, PUBLISHED_AT, true))],
+    ["github_unreadable", latestAnswer(missingTime)],
+    ["github_unreadable", latestAnswer(githubRelease(TAG, "2026-10-08"))],
+    ["github_unreadable", latestAnswer(githubRelease(TAG, "not a time"))],
+  ];
+  for (const [code, fetchText] of cases) {
+    const error = await refusal(() => checkPublished(publishedText(), TAG, fetchText));
+    assert.equal(error.code, code);
+  }
+});
+
+test("a missing local file is a typed unreadable-input error", async (t) => {
+  const never = async () => { throw new Error("no network in this test"); };
+  for (const path of ["README.md", "SECURITY.md", "registry/server.json"]) {
+    const root = await publishedRoot(t);
+    await rm(resolve(root, path));
+    const error = await commandRefusal(["--published", TAG], { root, fetchText: never });
+    assert.equal(error.code, "local_file_unreadable");
+    assert.ok(error.message.startsWith(`${path} cannot be read:`), error.message);
+  }
+});
+
+test("registry JSON that cannot be parsed is a typed unreadable-input error", async (t) => {
+  const root = await publishedRoot(t);
+  await writeFile(resolve(root, "registry", "server.json"), "not JSON");
+  const error = await commandRefusal(["--published", TAG], { root, fetchText: async () => { throw new Error("no network in this test"); } });
+  assert.equal(error.code, "registry_unreadable");
+});
+
+test("the command agrees from the files on disk and prints the tag and its publication date", async (t) => {
+  const root = await publishedRoot(t);
+  const line = await run(["--published", TAG], { root, fetchText: latestAnswer(githubRelease()) });
+  assert.equal(line, `README.md, SECURITY.md and registry/server.json agree with ${TAG} (published 2026-10-08 in India time)`);
+});
+
+test("the hand command rejects usage mistakes before asking GitHub", async () => {
+  const never = async () => { throw new Error("no network in this test"); };
+  for (const args of [[], ["--published"], ["--published", "--unknown"], ["--unknown"], ["--published", TAG, "extra"]]) {
+    const error = await commandRefusal(args, { fetchText: never });
+    assert.equal(error.code, "usage");
+  }
+});
+
+test("every error code maps to disagreement or could-not-determine", () => {
+  const codes = [
+    "release_disagrees",
+    "usage",
+    "version_unreadable",
+    "span_count",
+    "span_form",
+    "span_date",
+    "sentence_count",
+    "github_unavailable",
+    "github_unreadable",
+    "registry_unreadable",
+    "local_file_unreadable",
+  ];
+  for (const code of codes) {
+    assert.equal(exitStatus(new ReleaseTextError(code, "detail")), code === "release_disagrees" ? 1 : 2, code);
+  }
+  assert.equal(exitStatus(new Error("unexpected")), 2);
+});
+
+test("a child process reports a usage code and exit status without asking GitHub", async () => {
+  const script = fileURLToPath(new URL("./release-text-agreement.mjs", import.meta.url));
+  const child = spawn(process.execPath, [script, "--published"], { stdio: ["ignore", "ignore", "pipe"] });
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const [status] = await once(child, "close");
+  assert.equal(status, 2);
+  assert.equal(stderr.split("\n")[0], "usage");
 });

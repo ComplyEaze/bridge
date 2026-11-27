@@ -585,8 +585,8 @@
       "id": "high_value_register.cash_payment_single_transaction_amount_payment_a1f3b688_0e76c1f2",
       "value": 21000000,
       "unit": "paise",
-      "definition_sha256_16": "73bba6ec230a002f",
-      "definition_text": "Cash payments from/to one party ledger (tag 0e76c1f2) sharing voucher reference (tag a1f3b688), summed across every date.",
+      "definition_sha256_16": "abed6a465da7608b",
+      "definition_text": "Cash payments on vouchers with no party ledger (tag 0e76c1f2) sharing voucher reference (tag a1f3b688), whatever name they print, summed across every date: the payees' side of each voucher.",
       "evidence": [
         {
           "kind": "voucher",
@@ -1057,8 +1057,8 @@
       "id": "high_value_register.cash_receipt_single_transaction_amount_receipt_4638a6fe_0e76c1f2",
       "value": 21000000,
       "unit": "paise",
-      "definition_sha256_16": "d7a5dad1ef4d2b78",
-      "definition_text": "Cash receipts from/to one party ledger (tag 0e76c1f2) sharing voucher reference (tag 4638a6fe), summed across every date.",
+      "definition_sha256_16": "7288dae95d9c5afa",
+      "definition_text": "Cash receipts on vouchers with no party ledger (tag 0e76c1f2) sharing voucher reference (tag 4638a6fe), whatever name they print, summed across every date: the payers' side of each voucher.",
       "evidence": [
         {
           "kind": "voucher",
@@ -1313,7 +1313,7 @@
         {
           "kind": "row",
           "id": "high_value_register:unidentified_party",
-          "label": "‹cash leg with no identified party› (printed as 'Mixed Seller')"
+          "label": "‹bank leg with no identified party› (printed as 'Mixed Seller')"
         },
         {
           "kind": "voucher",
@@ -1321,8 +1321,8 @@
           "label": "Payment p04 on 2025-06-03"
         }
       ],
-      "title_sha256_16": "46a0a13c033306a9",
-      "title_text": "Bank paid on 2025-06-03 on vouchers that do not name the payee: the payees' side is at or over the CA-set vouching threshold, but the bank credited on these vouchers is below it",
+      "title_sha256_16": "5c25556dbf1c59e2",
+      "title_text": "Paid from the bank on 2025-06-03 on vouchers that do not name the payee: the payees' side is at or over the CA-set vouching threshold, but the bank credited on these vouchers is below it",
       "limits_sha256_16": "b19dc18b65e46d71",
       "limits_text": [
         "Bank mode is not a s.269ST test (that section is cash-only); this row is the CA-set vouching-list threshold only, not a statutory limb.",
@@ -1330,10 +1330,10 @@
         "The amount is the payees' side of each voucher, not the voucher's own bank line. On one or more of the row's vouchers the two differ, so such a voucher carries other lines as well (such as money moving by cash, a discount or deduction, a round-off, a loan, a counterparty this register leaves out, several parties sharing the line, or money moving the other way). The bank credited on these vouchers is below the threshold, so the bank paid on them is below it too. The bank credited on these vouchers is shown with this row.",
         "No party ledger is on these vouchers -- the books cannot name the counterparty. The row holds every voucher of the day with no party ledger, whatever name it prints (each usable printed name is shown with the row), so it may be one person's money or several people's; none is dropped or scattered across its tax/round-off lines."
       ],
-      "ask_client_sha256_16": "062c7f5caabded7e",
+      "ask_client_sha256_16": "0b48a31332902d63",
       "ask_client_text": [
         "Vouch this entry to the bank statement and the underlying document.",
-        "Who was paid on each of these vouchers, and did any one person reach the CA-set vouching threshold this day? Supply each counterparty's name and PAN."
+        "Who was paid on each of these vouchers? Supply each counterparty's name and PAN."
       ]
     },
     {
@@ -1366,8 +1366,8 @@
           "label": "Payment n03 on 2025-08-06"
         }
       ],
-      "title_sha256_16": "1b225217ddf6f5dd",
-      "title_text": "Bank paid to one party on 2025-08-06: the party's side is at or over the CA-set vouching threshold, but the bank credited on these vouchers is below it",
+      "title_sha256_16": "3bb72c8cb4a5ecc5",
+      "title_text": "Paid from the bank to one party on 2025-08-06: the party's side is at or over the CA-set vouching threshold, but the bank credited on these vouchers is below it",
       "limits_sha256_16": "04480e8956cf884c",
       "limits_text": [
         "Bank mode is not a s.269ST test (that section is cash-only); this row is the CA-set vouching-list threshold only, not a statutory limb.",
@@ -1401,7 +1401,7 @@
         {
           "kind": "row",
           "id": "high_value_register:unidentified_party",
-          "label": "‹cash leg with no identified party› (printed as 'Mixed Buyer')"
+          "label": "‹bank leg with no identified party› (printed as 'Mixed Buyer')"
         },
         {
           "kind": "voucher",
@@ -1409,8 +1409,8 @@
           "label": "Receipt u11 on 2025-05-07"
         }
       ],
-      "title_sha256_16": "1432a2d09ff31f5a",
-      "title_text": "Bank received on 2025-05-07 on vouchers that do not name the payer: the payers' side is at or over the CA-set vouching threshold, but the bank debited on these vouchers is below it",
+      "title_sha256_16": "18241116d5b125d6",
+      "title_text": "Received into the bank on 2025-05-07 on vouchers that do not name the payer: the payers' side is at or over the CA-set vouching threshold, but the bank debited on these vouchers is below it",
       "limits_sha256_16": "f73849530599560f",
       "limits_text": [
         "Bank mode is not a s.269ST test (that section is cash-only); this row is the CA-set vouching-list threshold only, not a statutory limb.",
@@ -1418,10 +1418,10 @@
         "The amount is the payers' side of each voucher, not the voucher's own bank line. On one or more of the row's vouchers the two differ, so such a voucher carries other lines as well (such as money moving by cash, a discount or deduction, a round-off, a loan, a counterparty this register leaves out, several parties sharing the line, or money moving the other way). The bank debited on these vouchers is below the threshold, so the bank received on them is below it too. The bank debited on these vouchers is shown with this row.",
         "No party ledger is on these vouchers -- the books cannot name the counterparty. The row holds every voucher of the day with no party ledger, whatever name it prints (each usable printed name is shown with the row), so it may be one person's money or several people's; none is dropped or scattered across its tax/round-off lines."
       ],
-      "ask_client_sha256_16": "be2f983604e1d97a",
+      "ask_client_sha256_16": "1db308900efb9104",
       "ask_client_text": [
         "Vouch this entry to the bank statement and the underlying document.",
-        "Who paid on each of these vouchers, and did any one person reach the CA-set vouching threshold this day? Supply each counterparty's name and PAN."
+        "Who paid on each of these vouchers? Supply each counterparty's name and PAN."
       ]
     },
     {
@@ -1442,7 +1442,7 @@
         {
           "kind": "row",
           "id": "high_value_register:unidentified_party",
-          "label": "‹cash leg with no identified party› (printed as 'Online Buyer')"
+          "label": "‹bank leg with no identified party› (printed as 'Online Buyer')"
         },
         {
           "kind": "voucher",
@@ -1450,18 +1450,18 @@
           "label": "Receipt b01 on 2025-06-04"
         }
       ],
-      "title_sha256_16": "e2ce22fc6bf797df",
-      "title_text": "Bank received on 2025-06-04 on vouchers that do not name the payer: the total is at or over the CA-set vouching threshold; whether any one person paid that much is not known",
+      "title_sha256_16": "fbfecbb333c307aa",
+      "title_text": "Received into the bank on 2025-06-04 on vouchers that do not name the payer: the total is at or over the CA-set vouching threshold",
       "limits_sha256_16": "ee97b28d663d3831",
       "limits_text": [
         "Bank mode is not a s.269ST test (that section is cash-only); this row is the CA-set vouching-list threshold only, not a statutory limb.",
         "Account-payee status of the instrument behind this bank movement is not visible in Tally.",
         "No party ledger is on these vouchers -- the books cannot name the counterparty. The row holds every voucher of the day with no party ledger, whatever name it prints (each usable printed name is shown with the row), so it may be one person's money or several people's; none is dropped or scattered across its tax/round-off lines."
       ],
-      "ask_client_sha256_16": "be2f983604e1d97a",
+      "ask_client_sha256_16": "1db308900efb9104",
       "ask_client_text": [
         "Vouch this entry to the bank statement and the underlying document.",
-        "Who paid on each of these vouchers, and did any one person reach the CA-set vouching threshold this day? Supply each counterparty's name and PAN."
+        "Who paid on each of these vouchers? Supply each counterparty's name and PAN."
       ]
     },
     {
@@ -1494,8 +1494,8 @@
           "label": "Receipt n02 on 2025-08-05"
         }
       ],
-      "title_sha256_16": "7b89a326bf1607e1",
-      "title_text": "Bank received from one party on 2025-08-05: the party's side is at or over the CA-set vouching threshold, but the bank debited on these vouchers is below it",
+      "title_sha256_16": "47e297ceacd3d52a",
+      "title_text": "Received into the bank from one party on 2025-08-05: the party's side is at or over the CA-set vouching threshold, but the bank debited on these vouchers is below it",
       "limits_sha256_16": "dc174c138a94fe6f",
       "limits_text": [
         "Bank mode is not a s.269ST test (that section is cash-only); this row is the CA-set vouching-list threshold only, not a statutory limb.",

@@ -57,6 +57,12 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
             "#[cfg(not(test))]",
         ),
         ("use test_seam::approve_masters;", "#[cfg(test)]"),
+        // The stock-item dialog (#1381), gated the same way.
+        (
+            "use confirm_stock_item_dialog as approve_stock_item;",
+            "#[cfg(not(test))]",
+        ),
+        ("use test_seam::approve_stock_item;", "#[cfg(test)]"),
         // What a post dialog's own task runs under (#725), gated the same way.
         (
             "use carry_nothing as carry_approval_scope;",
@@ -79,6 +85,7 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         "approve(count, preview).await?;\n        Ok(Self {",
         "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
         "approve_masters(preview).await?;\n        Ok(Self {\n            kind: ApprovedKind::Masters(",
+        "approve_stock_item(&preview).await?;\n        Ok(Self {\n            kind: ApprovedKind::Masters(",
     ] {
         if source.matches(call_site).count() != 1 {
             problems.push(format!("expected exactly one call site `{call_site}`"));
@@ -88,6 +95,7 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         "approve(count, preview)",
         "approve_review(kind, count, preview)",
         "approve_masters(preview)",
+        "approve_stock_item(&preview)",
     ] {
         if source.matches(call).count() != 1 {
             problems.push(format!("`{call}` must be called exactly once"));
@@ -595,6 +603,22 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "#[cfg(test)]\nuse test_seam::approve_masters;",
             "use test_seam::approve_masters;",
         ),
+        source.replace(
+            "#[cfg(not(test))]\nuse confirm_stock_item_dialog as approve_stock_item;",
+            "#[cfg(not(debug_assertions))]\nuse confirm_stock_item_dialog as approve_stock_item;",
+        ),
+        source.replace(
+            "#[cfg(test)]\nuse test_seam::approve_stock_item;",
+            "use test_seam::approve_stock_item;",
+        ),
+        source.replace(
+            "approve_stock_item(&preview).await?;",
+            "confirm_stock_item_dialog(&preview).await?;",
+        ),
+        source.replace(
+            "approve_stock_item(&preview).await?;\n        Ok(Self {",
+            "approve(ONE_STOCK_ITEM, &preview).await?;\n        Ok(Self {",
+        ),
         // A master approval must never be answered by the post dialog, nor a
         // post by the one-ledger dialog.
         source.replace(
@@ -724,6 +748,7 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
         "Some(\"--confirm-release\") => agent::run_release_confirmation,",
         "Some(\"--confirm-settle\") => agent::run_settle_confirmation,",
         "Some(\"--confirm-row-release\") => agent::run_release_rows_confirmation,",
+        "Some(\"--confirm-stock-item\") => agent::run_stock_item_confirmation,",
     ] {
         if lib.matches(arm).count() != 1 {
             problems.push(format!("expected exactly one `{arm}`"));
@@ -783,6 +808,15 @@ fn each_dialog_mode_runs_its_own_dialog() {
             "Some(\"--confirm-review\") => agent::run_masters_confirmation,",
         ),
         lib.replace("\"--confirm-masters\"", "\"--confirm-ledger\""),
+        lib.replace(
+            "agent::run_stock_item_confirmation,",
+            "agent::run_masters_confirmation,",
+        ),
+        lib.replace(
+            "Some(\"--confirm-masters\") => agent::run_masters_confirmation,",
+            "Some(\"--confirm-masters\") => agent::run_stock_item_confirmation,",
+        ),
+        lib.replace("\"--confirm-stock-item\"", "\"--confirm-stock\""),
     ] {
         assert_ne!(broken, lib);
         assert!(!dialog_mode_problems(&broken).is_empty());
@@ -793,9 +827,9 @@ fn each_dialog_mode_runs_its_own_dialog() {
 /// intent (#656) must hold no intent and no POST: a refusal from inside it is
 /// reported as "nothing was sent". So in `post_approved_import` the block
 /// opens once, closes into `PreIntentQueueRefusal` once, holds neither
-/// `before_dispatch()` nor `post_probe_xml(`, and both follow it in that order.
+/// `before_dispatch(` nor `post_probe_xml(`, and both follow it in that order.
 fn pre_intent_block_problems(runtime: &str) -> Vec<String> {
-    let open = "let (admission_evidence, before_marks) = async {";
+    let open = "let (admission_evidence, before_marks, rechecked) = async {";
     let close = "PreIntentQueueRefusal { source }";
     let Some(function) = runtime.find("async fn post_approved_import<") else {
         return vec!["post_approved_import not found".into()];
@@ -812,14 +846,14 @@ fn pre_intent_block_problems(runtime: &str) -> Vec<String> {
     }
     let mut problems = Vec::new();
     let block = &body[start..end];
-    for forbidden in ["before_dispatch()", "post_probe_xml("] {
+    for forbidden in ["before_dispatch(", "post_probe_xml("] {
         if block.contains(forbidden) {
             problems.push(format!("`{forbidden}` inside the pre-intent block"));
         }
     }
     let after = &body[end..];
     match (
-        after.find("before_dispatch()"),
+        after.find("before_dispatch("),
         after.find("post_probe_xml("),
     ) {
         (Some(intent), Some(post)) if intent < post => {}
@@ -835,8 +869,8 @@ fn nothing_is_sent_inside_the_pre_intent_block() {
     // The check itself: the intent moved into the block, or the block's error
     // left unmarked, is caught.
     let intent_inside = runtime.replacen(
-        "let (admission_evidence, before_marks) = async {",
-        "let (admission_evidence, before_marks) = async {\n                        before_dispatch().ok();",
+        "let (admission_evidence, before_marks, rechecked) = async {",
+        "let (admission_evidence, before_marks, rechecked) = async {\n                        before_dispatch(rechecked).ok();",
         1,
     );
     let unmarked = runtime.replacen("PreIntentQueueRefusal { source }", "source", 1);
@@ -873,6 +907,16 @@ const MASTERS_ENTRY: &str = "pub fn run_masters_confirmation() -> bool {
     answer_with_token(
         MASTERS_TOKEN_PREFIX,
         show_create_ledger,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}";
+
+/// The stock-item child's whole entry point, as [`POST_ENTRY`] (#1381).
+const STOCK_ITEM_ENTRY: &str = "pub fn run_stock_item_confirmation() -> bool {
+    answer_with_token(
+        STOCK_ITEM_TOKEN_PREFIX,
+        show_create_stock_item,
         std::io::stdin(),
         std::io::stdout(),
     )
@@ -928,13 +972,14 @@ fn dialog_token_problems(source: &str) -> Vec<String> {
         SETTLE_ENTRY,
         RELEASE_ROWS_ENTRY,
         MASTERS_ENTRY,
+        STOCK_ITEM_ENTRY,
     ] {
         if source.matches(entry).count() != 1 {
             problems.push(format!("expected exactly one `{entry}`"));
         }
     }
-    if source.matches("answer_with_token(").count() != 7 {
-        problems.push("expected the six entry points and the definition only".into());
+    if source.matches("answer_with_token(").count() != 8 {
+        problems.push("expected the seven entry points and the definition only".into());
     }
     problems
 }
@@ -1008,6 +1053,15 @@ fn each_dialog_answers_with_its_own_token() {
         source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("POST_TOKEN_PREFIX", "MASTERS_TOKEN_PREFIX")),
         source.replace(REVIEW_ENTRY, &REVIEW_ENTRY.replace("show_review_acknowledgement,", "show_create_ledger,")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("STOCK_ITEM_TOKEN_PREFIX", "MASTERS_TOKEN_PREFIX")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("STOCK_ITEM_TOKEN_PREFIX", "POST_TOKEN_PREFIX")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("show_create_stock_item,", "show_create_ledger,")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("show_create_stock_item,", "|_, _| true,")),
+        source.replace(STOCK_ITEM_ENTRY, &STOCK_ITEM_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
+        source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("show_create_ledger,", "show_create_stock_item,")),
+        format!(
+            "{source}\nfn extra() -> bool {{ answer_with_token(STOCK_ITEM_TOKEN_PREFIX, |_, _| true, std::io::stdin(), std::io::stdout()) }}\n"
+        ),
         format!(
             "{source}\nfn extra() -> bool {{ answer_with_token(MASTERS_TOKEN_PREFIX, |_, _| true, std::io::stdin(), std::io::stdout()) }}\n"
         ),
@@ -1136,6 +1190,65 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
                 // As for the post's box (`show_review`): topmost with
                 // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
                 // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}"#;
+
+/// The stock-item dialog (#1381), for one item only.
+const STOCK_ITEM_DIALOG: &str = r#"#[cfg(not(windows))]
+fn show_create_stock_item(count: VoucherCount, preview: &str) -> bool {
+    let Some((title, button)) = stock_item_words(count) else {
+        return false;
+    };
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(title)
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        // The Cancel label supplies the native Escape action. Creating
+        // requires the explicitly matched positive button.
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            button.clone(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(button)
+}"#;
+
+const STOCK_ITEM_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
+fn show_create_stock_item(count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    // As for the ledger dialog: No is the default, Escape and close are Cancel.
+    let Some((title, _)) = stock_item_words(count) else {
+        return false;
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
+    // As for `show_create_ledger`: measured when it opens, never returning if
+    // it is not wholly on the screen, and brought to the front once it appears.
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button.
                 MB_YESNOCANCEL
                     | MB_DEFBUTTON2
                     | MB_ICONWARNING
@@ -1496,6 +1609,10 @@ const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCoun
             },
             "Nothing is created until you answer.",
         ),
+        Shown::StockItem => (
+            "create this stock item in Tally".into(),
+            "Nothing is created until you answer.",
+        ),
     }
 }"#;
 
@@ -1509,6 +1626,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Settle => SETTLE_BUTTON.to_string(),
         Shown::RowRelease => RELEASE_ROWS_BUTTON.to_string(),
         Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
+        Shown::StockItem => stock_item_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -1729,12 +1847,12 @@ pub(crate) fn guarded(show: impl FnOnce(windows_sys::Win32::Foundation::HWND) ->
     }
 }"#;
 
-/// The hook that measures the box and cancels one that does not fit, verbatim
-/// (#1832). An edit that measured nothing, or always found a fit, would leave
-/// the unit-tested outcome logic intact and measure nothing.
+/// The hook that restores an iconic box, measures it and cancels one that does
+/// not fit, verbatim (#1832, #2569). An edit that measured nothing, or always
+/// found a fit, would leave the unit-tested outcome logic intact and measure nothing.
 const BOX_FIT_HOOK: &str = r#"#[cfg(windows)]
 mod windows_hook {
-    use super::{Rect, Seen};
+    use super::{needs_restore, Rect, Seen};
     use std::cell::Cell;
     use std::ffi::c_void;
     use std::io::Write;
@@ -1749,10 +1867,10 @@ mod windows_hook {
     use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, CallNextHookEx, CreateWindowExW, DestroyWindow, EnumThreadWindows,
-        FlashWindowEx, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId,
-        IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx,
-        FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT,
-        WM_COMMAND, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+        FlashWindowEx, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, IsIconic,
+        IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowsHookExW, ShowWindow,
+        UnhookWindowsHookEx, FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK,
+        IDCANCEL, SW_RESTORE, WH_CBT, WM_COMMAND, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
     };
 
     #[link(name = "kernel32")]
@@ -1858,6 +1976,9 @@ mod windows_hook {
         /// owner as the box closes, and the owner's empty rectangle would read
         /// as a box that did not fit, refusing an answer already given.
         static OWNER: Cell<HWND> = const { Cell::new(std::ptr::null_mut()) };
+        /// Nested activations during a restore call the next hook only: they
+        /// must not issue another restore or overwrite the box's fit state.
+        static RESTORING: Cell<bool> = const { Cell::new(false) };
     }
 
     impl TopmostOwner {
@@ -2118,19 +2239,32 @@ mod windows_hook {
         fitted
     }
 
-    /// The hook procedure: when the box is about to be activated, measure it;
-    /// if it does not fit, post it a Cancel and remember that it did not. The
-    /// box's owner is not the box and is not measured.
+    /// The hook procedure: when the box is about to be activated, restore it if
+    /// minimised, then measure it; if it does not fit, post it a Cancel and
+    /// remember that it did not. The box's owner is not the box and is not measured.
     unsafe extern "system" fn on_activate(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if code == HCBT_ACTIVATE as i32 && wparam as HWND != OWNER.with(Cell::get) {
             let window = wparam as HWND;
-            let fitted = fits(window);
-            remember(seen().after(fitted));
-            if !fitted {
-                // SAFETY: `window` is the box being activated; Cancel is a
-                // button every box this module guards has.
-                unsafe {
-                    PostMessageW(window, WM_COMMAND, IDCANCEL as WPARAM, 0);
+            if !RESTORING.with(Cell::get) {
+                // SAFETY: `window` is the box being activated.
+                let iconic = unsafe { IsIconic(window) } != 0;
+                if needs_restore(iconic) {
+                    RESTORING.with(|restoring| restoring.set(true));
+                    // SAFETY: `window` is the box being activated.
+                    unsafe {
+                        ShowWindow(window, SW_RESTORE);
+                    }
+                    RESTORING.with(|restoring| restoring.set(false));
+                    let _ = writeln!(std::io::stderr(), "box-fit: restored from minimised");
+                }
+                let fitted = fits(window);
+                remember(seen().after(fitted));
+                if !fitted {
+                    // SAFETY: `window` is the box being activated; Cancel is a
+                    // button every box this module guards has.
+                    unsafe {
+                        PostMessageW(window, WM_COMMAND, IDCANCEL as WPARAM, 0);
+                    }
                 }
             }
         }
@@ -2201,6 +2335,15 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
         source.replacen("rect.is_wholly_inside(work));", "true);", 1),
         source.replacen("if !fitted {", "if false {", 1),
         source.replacen("remember(seen().after(fitted));", "remember(Seen::Fits);", 1),
+        // The iconic box is not restored, restoration happens after measurement,
+        // or every box is restored rather than only an iconic one (#2569).
+        source.replacen("                        ShowWindow(window, SW_RESTORE);\n", "", 1),
+        source.replacen(
+            "                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                    let _ = writeln!(std::io::stderr(), \"box-fit: restored from minimised\");\n                }\n                let fitted = fits(window);",
+            "                let fitted = fits(window);\n                if needs_restore(iconic) {\n                    RESTORING.with(|restoring| restoring.set(true));\n                    // SAFETY: `window` is the box being activated.\n                    unsafe {\n                        ShowWindow(window, SW_RESTORE);\n                    }\n                    RESTORING.with(|restoring| restoring.set(false));\n                    let _ = writeln!(std::io::stderr(), \"box-fit: restored from minimised\");\n                }",
+            1,
+        ),
+        source.replacen("if needs_restore(iconic) {", "if true {", 1),
         // The hook measures the box's hidden owner again, so an owner Windows
         // activates as the box closes refuses the answer just given (#1780).
         source.replacen(" && wparam as HWND != OWNER.with(Cell::get) {", " {", 1),
@@ -2251,7 +2394,49 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 58] = [
+const STOCK_ITEM_WORDS: &str = r#"fn stock_item_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((STOCK_ITEM_TITLE.into(), STOCK_ITEM_BUTTON.into())),
+        Some(_) => None,
+    }
+}"#;
+
+const CONFIRM_STOCK_ITEM_DIALOG: &str = r#"async fn confirm_stock_item_dialog(preview: &str) -> Result<(), StockItemDialogRefusal> {
+    let executable = std::env::current_exe().map_err(|_| StockItemDialogRefusal::Unavailable)?;
+    let shown = displayed_text(Shown::StockItem, ONE_STOCK_ITEM, preview);
+    confirm_stock_item_with(&executable, &shown).await
+}"#;
+
+const CONFIRM_STOCK_ITEM_WITH: &str = r#"async fn confirm_stock_item_with(
+    executable: &std::path::Path,
+    preview: &str,
+) -> Result<(), StockItemDialogRefusal> {
+    if preview.len() > MAX_PREVIEW_BYTES {
+        return Err(StockItemDialogRefusal::TooLarge);
+    }
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-stock-item",
+        STOCK_ITEM_TOKEN_PREFIX,
+        ONE_STOCK_ITEM,
+        preview,
+    )
+    .await
+    {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the ledger's box.
+        Ok(answer) if answer.box_did_not_fit => Err(StockItemDialogRefusal::TooLarge),
+        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
+        // A person's decline is no token and exit 1. A clean exit without the
+        // token is an executable that is not this dialog.
+        Ok(answer) if answer.exited_cleanly => Err(StockItemDialogRefusal::Unavailable),
+        Ok(_) => Err(StockItemDialogRefusal::Declined),
+        Err(DialogFailure::Unavailable) => Err(StockItemDialogRefusal::Unavailable),
+        Err(DialogFailure::TimedOut) => Err(StockItemDialogRefusal::TimedOut),
+    }
+}"#;
+
+const DIALOG_ANSWER_PINS: [(&str, usize); 67] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2360,6 +2545,24 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 58] = [
         1,
     ),
     (CONFIRM_MASTERS_WITH, 1),
+    (
+        "const STOCK_ITEM_TOKEN_PREFIX: &str = \"bridge-create-stock-item:\";",
+        1,
+    ),
+    (
+        "const STOCK_ITEM_TITLE: &str = \"ComplyEaze Bridge — create one stock item?\";",
+        1,
+    ),
+    ("const STOCK_ITEM_BUTTON: &str = \"Create stock item\";", 1),
+    (
+        "const ONE_STOCK_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);",
+        1,
+    ),
+    (STOCK_ITEM_WORDS, 1),
+    (STOCK_ITEM_DIALOG, 1),
+    (STOCK_ITEM_DIALOG_WINDOWS, 1),
+    (CONFIRM_STOCK_ITEM_DIALOG, 1),
+    (CONFIRM_STOCK_ITEM_WITH, 1),
     ("const RELEASE_BUTTON: &str = \"Release the stop\";", 1),
     ("const SETTLE_BUTTON: &str = \"Close the batch\";", 1),
     ("const RELEASE_ROWS_BUTTON: &str = \"Release the rows\";", 1),
@@ -2412,8 +2615,10 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // each arm of its own.
     // #1780 added one more, the test-only accessor for what a review shows.
     // The ledger batch made the one-item count test-only (#690).
-    ("#[cfg(test)]", 9),
-    ("#[cfg(not(test))]", 5),
+    // The stock-item dialog (#1381) added one test seam arm and one accessor.
+    ("#[cfg(test)]", 11),
+    // The stock-item dialog (#1381) added one non-test seam arm.
+    ("#[cfg(not(test))]", 6),
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
     // The one-ledger dialog added one Windows dialog, one non-Windows dialog
@@ -2422,14 +2627,17 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // its title, dialog and button on a Mac. #1709: the same for the settle
     // window, and #1038 for the row release window. The ledger batch moved the
     // Mac ledger button into the count's words, used on both systems (#690).
-    ("#[cfg(windows)]", 14),
+    // The stock-item dialog (#1381) added one Windows box.
+    ("#[cfg(windows)]", 15),
     // #1780's Mac check (c2): the seven measured figures, the screen span,
     // where the top sits, the comparison, the fit on every screen, the child's
     // exit and their two tests;
     // and four `cfg(target_os = "macos")` items (the text's height, the screens,
     // the two together, and the height's test) with one other-platform arm.
-    ("#[cfg(not(windows))]", 33),
-    ("cfg", 67),
+    // The stock-item dialog (#1381) added one non-Windows box.
+    ("#[cfg(not(windows))]", 34),
+    // The stock-item dialog (#1381) added five bare-text occurrences.
+    ("cfg", 72),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2745,6 +2953,185 @@ fn each_dialog_answers_only_on_its_positive_button() {
             ),
             1,
         ),
+        // The stock-item dialog approves only on its own positive button, in
+        // its own mode, with its own token, for one item and a fitting box.
+        source.replacen(
+            STOCK_ITEM_DIALOG,
+            &STOCK_ITEM_DIALOG.replacen(
+                "== rfd::MessageDialogResult::Custom(button)",
+                "!= rfd::MessageDialogResult::Custom(button)",
+                1,
+            ),
+            1,
+        ),
+        source.replacen("\"Create stock item\"", "\"Cancel\"", 1),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replacen("answer == IDYES", "answer != IDNO", 1),
+            1,
+        ),
+        source.replacen(
+            "const STOCK_ITEM_TITLE: &str = \"ComplyEaze Bridge — create one stock item?\";",
+            "const STOCK_ITEM_TITLE: &str = \"ComplyEaze Bridge — approve one voucher\";",
+            1,
+        ),
+        source.replacen(
+            "const STOCK_ITEM_TOKEN_PREFIX: &str = \"bridge-create-stock-item:\";",
+            "const STOCK_ITEM_TOKEN_PREFIX: &str = \"bridge-create-ledger:\";",
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG,
+            &STOCK_ITEM_DIALOG.replacen(
+                "stock_item_words(count)",
+                "stock_item_words(ONE_STOCK_ITEM)",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replacen(
+                "stock_item_words(count)",
+                "stock_item_words(ONE_STOCK_ITEM)",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_WORDS,
+            &STOCK_ITEM_WORDS.replacen(
+                "Some(_) => None,",
+                "Some(_) => Some((STOCK_ITEM_TITLE.into(), STOCK_ITEM_BUTTON.into())),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_DIALOG,
+            &CONFIRM_STOCK_ITEM_DIALOG.replacen(
+                "confirm_stock_item_with(&executable, &shown).await\n}",
+                "let _ = (executable, shown);\n    Ok(())\n}",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_DIALOG,
+            &CONFIRM_STOCK_ITEM_DIALOG.replacen(
+                "displayed_text(Shown::StockItem, ONE_STOCK_ITEM, preview)",
+                "preview.to_string()",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),",
+                "Ok(answer) if answer.exited_cleanly => Ok(()),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "Ok(answer) if answer.exited_cleanly => Err(StockItemDialogRefusal::Unavailable),",
+                "Ok(answer) if answer.exited_cleanly => Ok(()),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "\"--confirm-stock-item\"",
+                "\"--confirm-masters\"",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "STOCK_ITEM_TOKEN_PREFIX",
+                "MASTERS_TOKEN_PREFIX",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "        ONE_STOCK_ITEM,\n",
+                "        VoucherCount(NonZeroUsize::MAX),\n",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen("MAX_PREVIEW_BYTES", "usize::MAX", 1),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &CONFIRM_STOCK_ITEM_WITH.replacen(
+                "        Ok(answer) if answer.box_did_not_fit => Err(StockItemDialogRefusal::TooLarge),\n",
+                "",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_STOCK_ITEM_WITH,
+            &format!(
+                "#[cfg(not(windows))]\n{CONFIRM_STOCK_ITEM_WITH}\n#[cfg(windows)]\nasync fn confirm_stock_item_with(_: &std::path::Path, _: &str) -> Result<(), StockItemDialogRefusal> {{\n    Ok(())\n}}"
+            ),
+            1,
+        ),
+        source.replacen(STOCK_ITEM_DIALOG, &discard_answer(STOCK_ITEM_DIALOG), 1),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &discard_answer(STOCK_ITEM_DIALOG_WINDOWS),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG,
+            &STOCK_ITEM_DIALOG.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
+            1,
+        ),
+        source.replacen(
+            STOCK_ITEM_DIALOG_WINDOWS,
+            &STOCK_ITEM_DIALOG_WINDOWS.replacen(
+                "super::box_fit::guarded(|owner| {",
+                "(|owner| {",
+                1,
+            ),
+            1,
+        ),
+        // The two replace_last rows above now reach the stock boxes. Keep an
+        // explicit mutation for each ledger box as well.
+        source.replacen(
+            MASTERS_DIALOG,
+            &MASTERS_DIALOG.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
+            1,
+        ),
+        source.replacen(
+            MASTERS_DIALOG_WINDOWS,
+            &MASTERS_DIALOG_WINDOWS.replacen(
+                "super::box_fit::guarded(|owner| {",
+                "(|owner| {",
+                1,
+            ),
+            1,
+        ),
         // The post and review dialogs asked in the one-ledger mode.
         source.replacen(
             CONFIRM_WITH,
@@ -2895,6 +3282,855 @@ fn each_dialog_answers_only_on_its_positive_button() {
         assert_ne!(broken, source);
         assert!(!dialog_answer_problems(&broken).is_empty());
     }
+}
+
+const CONFIRM_STOCK_ITEM: &str = r#"    pub(crate) async fn confirm_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Result<Self, StockItemDialogRefusal> {
+        let admission = MasterAdmission::stock_item(prepared, parse_marks, batch_id);
+        approve_stock_item(&preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Masters(Box::new(admission)),
+            company_marks_request,
+        })
+    }"#;
+
+/// The stock-item admission's one maker. Only `confirm_stock_item` calls it, and
+/// holds what it makes only after the dialog approves. It renders the bytes
+/// once and binds the batch at birth.
+const STOCK_ITEM_ADMISSION: &str = r#"    fn stock_item(
+        prepared: PreparedStockItem,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
+        let rendered = render_stock_item_create(&prepared);
+        Self {
+            writes: MasterWrites::StockItem(StockItemAdmission {
+                prepared,
+                rendered,
+                parse_marks,
+                batch_id,
+            }),
+        }
+    }"#;
+
+/// `PreparedStockItem` with its fields private to its module. It is `Clone`:
+/// one approval is redeemed once because `take_for_dispatch` removes the held
+/// approval by value, `RecordedIntent` is neither `Clone` nor `Default` and the
+/// send takes it by value, and the journal admits one intent per batch; until
+/// the stock send exists, only the stock recheck, which nothing shipped calls,
+/// admits a queued stock item.
+const PREPARED_STRUCT: &str = r#"    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct PreparedStockItem {
+        company: VerifiedCompanyIdentity,
+        writes: StockItemWrites,
+    }"#;
+
+/// The lines of `source` that begin an `impl` naming `name`: one inherent block
+/// each, and no trait impl (`Default`, `From`) that could make another.
+fn impl_lines_naming(source: &str, name: &str) -> usize {
+    source
+        .lines()
+        .filter(|line| line.trim_start().starts_with("impl") && line.contains(name))
+        .count()
+}
+
+const PREPARED_MAKERS: &str = r#"    impl PreparedStockItem {
+        /// Takes the draft's writes and its catalogue's company, refusing what
+        /// `create_text_refusal` refuses.
+        pub(crate) fn from_draft(draft: StockItemDraft<'_>) -> Result<Self, CreateRenderRefusal> {
+            create_text_refusal(&draft.writes)?;
+            let company = draft.sibling.sibling().catalogue().company().clone();
+            Ok(Self {
+                company,
+                writes: draft.writes,
+            })
+        }
+
+        pub(crate) fn company(&self) -> &VerifiedCompanyIdentity {
+            &self.company
+        }
+
+        pub(crate) fn writes(&self) -> &StockItemWrites {
+            &self.writes
+        }
+    }"#;
+
+/// The one ask of the stock-item dialog: `confirm_stock_item` on the dialog's
+/// own task, its refusal stamped as the ledger dialog's code.
+const ASK_STOCK_ITEM: &str = r#"    pub(crate) fn ask_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_stock_item(
+                    prepared,
+                    preview,
+                    company_marks_request,
+                    parse_marks,
+                    batch_id,
+                )
+                .await
+                .map_err(|refusal| refusal.code().to_string())
+            },
+            None,
+        )
+    }"#;
+
+/// The coordinator: the one place a draft becomes a Create, beside the preview
+/// built from the same draft.
+const SHOW_STOCK_ITEM_DRAFT: &str = r#"#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn show_stock_item_draft(
+    draft: StockItemDraft<'_>,
+    origin: &str,
+) -> Result<ShownStockItem, StockItemReviewError> {
+    let preview = stock_item_review_text(&draft, origin)?;
+    let prepared =
+        PreparedStockItem::from_draft(draft).map_err(StockItemReviewError::NotRenderable)?;
+    Ok(ShownStockItem {
+        prepared,
+        preview,
+        origin: origin.to_string(),
+    })
+}"#;
+
+/// The one caller of `ask_stock_item`, with the stock marks parser; it builds
+/// the binding and the held request from the same item.
+const SHOWN_ASK: &str = r#"    pub(super) fn ask(
+        self,
+        company_marks_request: AgentReadRequest,
+        batch_id: String,
+    ) -> AskedStockItem {
+        let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);
+        let held = HeldRequest::StockItem(HeldStockItem {
+            prepared: Box::new(self.prepared.clone()),
+        });
+        let dialog = PendingPostApproval::ask_stock_item(
+            self.prepared,
+            self.preview,
+            company_marks_request,
+            super::master_post::stock_company_marks,
+            batch_id,
+        );
+        AskedStockItem {
+            binding,
+            dialog,
+            held,
+        }
+    }"#;
+
+/// The fresh binding of what was shown, for the take.
+const SHOWN_BINDING: &str = r#"    pub(super) fn binding(&self) -> ApprovalBinding {
+        ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)
+    }"#;
+
+/// The shown item's three readers for the stock prepare: the preview, the same
+/// preview masked through the one layout, and the journal batch, built from the
+/// shown item's own company and writes. None hands out the prepared item.
+const SHOWN_PREVIEW: &str = r#"    pub(super) fn preview(&self) -> &str {
+        &self.preview
+    }"#;
+
+const SHOWN_MASKED: &str = r#"    pub(super) fn masked_preview(&self) -> String {
+        let (company, writes) = (self.prepared.company(), self.prepared.writes());
+        stock_item_lines(company, writes, &self.origin, |text| {
+            if bridge_tally_protocol::is_tally_reserved_root(text) {
+                text.to_string()
+            } else {
+                super::super::mask(text)
+            }
+        })
+        .join("\n")
+    }"#;
+
+const SHOWN_BATCH: &str = r#"    pub(super) fn batch(&self, batch_id: String) -> Result<StockItemBatch, CreateRenderRefusal> {
+        StockItemBatch::new(batch_id, self.prepared.company(), self.prepared.writes())
+    }"#;
+
+/// [`other_sources`] and the approvals holder, which that scan skips.
+fn sources_with_approvals() -> Vec<(String, String)> {
+    let mut sources = other_sources();
+    sources.push((
+        "src-tauri/src/agent_import_approval.rs".into(),
+        read("src-tauri/src/agent_import_approval.rs"),
+    ));
+    sources
+}
+
+fn stock_approval_problems(
+    approvals: &str,
+    approvals_tests: &str,
+    stock: &str,
+    stock_tests: &str,
+    review: &str,
+    others: &[(String, String)],
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (text, pin, expected, label) in [
+        (approvals, CONFIRM_STOCK_ITEM, 1, "confirm_stock_item"),
+        (
+            approvals,
+            STOCK_ITEM_ADMISSION,
+            1,
+            "the stock-item admission",
+        ),
+        (
+            approvals,
+            "writes: MasterWrites::StockItem(StockItemAdmission {",
+            1,
+            "its one construction",
+        ),
+        (
+            approvals,
+            "MasterAdmission::stock_item(",
+            1,
+            "its one approved maker",
+        ),
+        (
+            approvals_tests,
+            "MasterWrites::StockItem(",
+            0,
+            "test construction",
+        ),
+        (
+            approvals_tests,
+            "MasterAdmission::stock_item(",
+            0,
+            "test admission use",
+        ),
+        (stock, PREPARED_MAKERS, 1, "PreparedStockItem makers"),
+        (
+            stock,
+            PREPARED_STRUCT,
+            1,
+            "PreparedStockItem and its private fields",
+        ),
+        (stock, "mod prepared {", 1, "its private module"),
+        (approvals, ASK_STOCK_ITEM, 1, "ask_stock_item"),
+        (review, SHOW_STOCK_ITEM_DRAFT, 1, "the coordinator"),
+        (review, SHOWN_ASK, 1, "its one ask"),
+    ] {
+        if text.matches(pin).count() != expected {
+            problems.push(format!("expected {expected} of {label}"));
+        }
+    }
+    // A brace after the name, other than after `->`, is its declaration, its
+    // impl or a struct literal.
+    let braces = |text: &str| {
+        text.matches("PreparedStockItem {").count() - text.matches("-> PreparedStockItem {").count()
+    };
+    if braces(stock) != 2 || braces(stock_tests) != 0 {
+        problems.push("PreparedStockItem must be built only inside its module".into());
+    }
+    if impl_lines_naming(stock, "PreparedStockItem") != 1 {
+        problems.push("expected one impl naming PreparedStockItem".into());
+    }
+    if impl_lines_naming(stock_tests, "PreparedStockItem") != 0 {
+        problems.push("expected no test impl naming PreparedStockItem".into());
+    }
+    let impls_elsewhere = others
+        .iter()
+        .filter(|(path, _)| !path.ends_with("stock_item_create.rs"))
+        .map(|(_, text)| impl_lines_naming(text, "PreparedStockItem"))
+        .sum::<usize>();
+    if impls_elsewhere != 0 {
+        problems.push("PreparedStockItem must be implemented only in its module".into());
+    }
+    let prepared_elsewhere = others
+        .iter()
+        .filter(|(path, _)| !path.ends_with("agent_master_review.rs"))
+        .map(|(_, text)| text.matches("PreparedStockItem::from_draft(").count())
+        .sum::<usize>();
+    let prepared_in_review = others
+        .iter()
+        .filter(|(path, _)| path.ends_with("agent_master_review.rs"))
+        .map(|(_, text)| text.matches("PreparedStockItem::from_draft(").count())
+        .sum::<usize>();
+    if prepared_elsewhere != 0 || prepared_in_review != 1 {
+        problems
+            .push("PreparedStockItem::from_draft must be called only by its coordinator".into());
+    }
+    let stock_calls = others
+        .iter()
+        .map(|(_, text)| text.matches("::confirm_stock_item(").count())
+        .sum::<usize>();
+    let ask_calls = others
+        .iter()
+        .filter(|(path, _)| is_source(path, "src/tally/approved_import.rs"))
+        .map(|(_, text)| text.matches("::confirm_stock_item(").count())
+        .sum::<usize>();
+    if stock_calls != 1 || ask_calls != 1 {
+        problems.push("confirm_stock_item must be called only by ask_stock_item".into());
+    }
+    // Named once where it is defined and once where `ShownStockItem::ask`
+    // calls it, and nowhere else: no second caller and no alias.
+    for (path, text) in others {
+        let allowed = usize::from(
+            is_source(path, "src/tally/approved_import.rs")
+                || is_source(path, "src/agent_master_review.rs"),
+        );
+        if text.matches("ask_stock_item").count() != allowed {
+            problems.push(format!("{path} names ask_stock_item outside its one call"));
+        }
+    }
+    problems
+}
+
+/// `ShownStockItem`, `AskedStockItem` and `HeldStockItem`: private fields,
+/// their one attribute and no derive, one inherent impl each, and one literal
+/// each, in `show_stock_item_draft` and in `ShownStockItem::ask` (twice); their
+/// tests build none. A held stock request is so made only by `ask`.
+const SHOWN_STRUCT: &str = r#"pub(super) struct ShownStockItem {
+    prepared: PreparedStockItem,
+    preview: String,
+    origin: String,
+}"#;
+
+const ASKED_STRUCT: &str = r#"pub(super) struct AskedStockItem {
+    binding: ApprovalBinding,
+    dialog: PendingPostApproval,
+    held: HeldRequest,
+}"#;
+
+const HELD_STRUCT: &str = r#"pub(super) struct HeldStockItem {
+    prepared: Box<PreparedStockItem>,
+}"#;
+
+/// `literals_of` counts `HeldStockItem {`; it sees neither `Self {` nor a
+/// renamed type. So the held item's one impl is pinned whole, the coordinator
+/// writes no `Self {` at all, and no source renames the type.
+const HELD_IMPL: &str = r#"impl HeldStockItem {
+    /// The item held, for the comparison with the approved bytes.
+    pub(super) fn prepared(&self) -> &PreparedStockItem {
+        &self.prepared
+    }
+}"#;
+
+fn held_stock_item_aliases(others: &[(String, String)]) -> bool {
+    others.iter().any(|(_, text)| {
+        let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        flat.contains("= HeldStockItem") || flat.contains("HeldStockItem as ")
+    })
+}
+
+fn shown_stock_item_problems(
+    review: &str,
+    review_tests: &str,
+    others: &[(String, String)],
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, pin, maker) in [
+        (
+            "ShownStockItem",
+            SHOWN_STRUCT,
+            "pub(super) fn show_stock_item_draft(",
+        ),
+        ("AskedStockItem", ASKED_STRUCT, "    pub(super) fn ask("),
+        ("HeldStockItem", HELD_STRUCT, "    pub(super) fn ask("),
+    ] {
+        if review.matches(pin).count() != 1
+            || attributes_above(review, pin) != ["#[cfg_attr(not(test), allow(dead_code))]"]
+        {
+            problems.push(format!(
+                "{name}'s fields are private and it derives nothing"
+            ));
+        }
+        let impls: usize = (others.iter())
+            .map(|(_, text)| impl_lines_naming(text, name))
+            .sum();
+        if impls != 1 || impl_lines_naming(review_tests, name) != 0 {
+            problems.push(format!("{name} has one inherent impl and no trait impl"));
+        }
+        let literals: usize = (others.iter())
+            .map(|(_, text)| literals_of(text, name))
+            .sum();
+        let maker = fn_body(review, maker);
+        if literals != 1 || literals_of(maker, name) != 1 || literals_of(review_tests, name) != 0 {
+            problems.push(format!("{name} is built only by its one maker"));
+        }
+    }
+    if review.matches(HELD_IMPL).count() != 1
+        || review.contains("Self {")
+        || review.contains("Self{")
+        || held_stock_item_aliases(others)
+    {
+        problems.push("HeldStockItem's impl only reads it, and nothing renames it".into());
+    }
+    problems
+}
+
+/// A stock binding is built only in `ShownStockItem`'s impl, in `ask` and in
+/// `binding`: nowhere else, the approvals holder included, builds one. The
+/// held request `ask` builds is pinned with it; `HeldStockItem` keeps any
+/// other code from building one.
+fn stock_ask_parts_problems(others: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let text_of = |source: &str| {
+        let found = others.iter().find(|(path, _)| is_source(path, source));
+        found.map_or(String::new(), |(_, text)| text.clone())
+    };
+    let (review, holder) = (
+        text_of("src/agent_master_review.rs"),
+        text_of("src/agent_import_approval.rs"),
+    );
+    let count = |needle: &str| -> usize {
+        others
+            .iter()
+            .map(|(_, text)| text.matches(needle).count())
+            .sum()
+    };
+    let shown = fn_body(&review, "impl ShownStockItem {");
+    if review.matches(SHOWN_ASK).count() != 1 || review.matches(SHOWN_BINDING).count() != 1 {
+        problems.push("ask and binding build from the shown item itself".into());
+    }
+    // Its only other readers are the preview, the masked preview and the
+    // batch (five methods with `ask` and `binding`), and the batch is the one
+    // stock journal batch made outside the journal's own file.
+    if review.matches(SHOWN_PREVIEW).count() != 1
+        || review.matches(SHOWN_MASKED).count() != 1
+        || review.matches(SHOWN_BATCH).count() != 1
+        || shown.matches("fn ").count() != 5
+        || count("StockItemBatch::new(") != 1
+    {
+        problems.push("the prepare reads the shown item only by its preview and batch".into());
+    }
+    // The stock subject is built once, in the binding's maker; the holder's
+    // other namings of it are the `{ .. }` patterns of its matches.
+    let maker = holder
+        .find("    pub(super) fn stock_item(")
+        .map_or("", |at| {
+            let rest = &holder[at..];
+            &rest[..rest.find("\n    }\n").unwrap_or(rest.len())]
+        });
+    let subject = "BindingSubject::StockItem {";
+    let subjects = holder.matches(subject).count() - holder.matches("StockItem { .. }").count();
+    // `Self::stock_item` and `ApprovalBinding::stock_item`, called or aliased;
+    // the module path `stock_item_create` aside.
+    let named = holder.matches("::stock_item").count() - holder.matches("::stock_item_").count();
+    if count("ApprovalBinding::stock_item") != 2
+        || shown.matches("ApprovalBinding::stock_item(").count() != 2
+        || holder.matches("stock_item(").count() != 1
+        || named != 0
+        || subjects != 1
+        || maker.matches(subject).count() != 1
+    {
+        problems.push("a stock binding is built only by ShownStockItem".into());
+    }
+    problems
+}
+
+#[test]
+fn one_ask_builds_the_stock_binding_and_held_request_and_nothing_else_does() {
+    let sources = sources_with_approvals();
+    assert_eq!(stock_ask_parts_problems(&sources), Vec::<String>::new());
+    let edit = |source: &str, from: &str, to: &str| {
+        let mut mutated = sources.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let elsewhere = |text: &str| {
+        let mut mutated = sources.clone();
+        mutated.push(("src/elsewhere.rs".into(), text.into()));
+        mutated
+    };
+    let review = "src/agent_master_review.rs";
+    let holder = "src/agent_import_approval.rs";
+    let tail = "\nfn approved(\n";
+    let mutations = [
+        // A binding built elsewhere, or in the approvals holder.
+        elsewhere("let b = ApprovalBinding::stock_item(origin, &prepared, preview);"),
+        edit(
+            holder,
+            tail,
+            "\nfn other(p: &PreparedStockItem) -> ApprovalBinding { ApprovalBinding::stock_item(\"o\", p, \"x\") }\nfn approved(\n",
+        ),
+        edit(
+            holder,
+            "    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+            "    fn other(p: &PreparedStockItem) -> Self {\n        Self::stock_item(\"o\", p, \"x\")\n    }\n\n    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+        ),
+        // The maker aliased, here or in the holder, and a second stock
+        // subject built in the holder without the maker.
+        elsewhere("let make = ApprovalBinding::stock_item;"),
+        edit(
+            holder,
+            tail,
+            "\nfn other() { let make = ApprovalBinding::stock_item; }\nfn approved(\n",
+        ),
+        edit(
+            holder,
+            "    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+            "    fn other(p: &PreparedStockItem) -> Self {\n        let make = Self::stock_item;\n        make(\"o\", p, \"x\")\n    }\n\n    pub(super) fn kind(&self) -> PostKind {\n        match self.subject {",
+        ),
+        edit(
+            holder,
+            tail,
+            "\nfn other(company: MasterCompanyTuple, writes: Box<StockItemWrites>) -> BindingSubject {\n    BindingSubject::StockItem { company, writes }\n}\nfn approved(\n",
+        ),
+        // A binding in `ask` built from another prepared value, and the fresh
+        // binding built with another preview.
+        edit(
+            review,
+            "        let binding = ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview);\n",
+            "        let binding = ApprovalBinding::stock_item(&self.origin, &other, &self.preview);\n",
+        ),
+        edit(
+            review,
+            "        ApprovalBinding::stock_item(&self.origin, &self.prepared, &self.preview)\n    }",
+            "        ApprovalBinding::stock_item(&self.origin, &self.prepared, \"\")\n    }",
+        ),
+        // The held request in `ask` built from another value.
+        edit(
+            review,
+            "            prepared: Box::new(self.prepared.clone()),\n",
+            "            prepared: Box::new(other.clone()),\n",
+        ),
+        // The prepare's batch built from other writes, or elsewhere, and a
+        // reader that hands out the prepared item.
+        edit(
+            review,
+            "        StockItemBatch::new(batch_id, self.prepared.company(), self.prepared.writes())\n",
+            "        StockItemBatch::new(batch_id, self.prepared.company(), &other)\n",
+        ),
+        elsewhere("let batch = StockItemBatch::new(id, &identity, &writes);"),
+        edit(
+            review,
+            "                super::super::mask(text)\n",
+            "                text.to_string()\n",
+        ),
+        edit(
+            review,
+            "    pub(super) fn preview(&self) -> &str {\n",
+            "    pub(super) fn prepared(&self) -> &PreparedStockItem {\n        &self.prepared\n    }\n\n    pub(super) fn preview(&self) -> &str {\n",
+        ),
+    ];
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert_ne!(mutated, &sources, "mutation {at} changed nothing");
+        assert!(
+            !stock_ask_parts_problems(mutated).is_empty(),
+            "mutation {at}"
+        );
+    }
+}
+
+#[test]
+fn shown_asked_and_held_stock_items_have_private_fields_no_derive_one_impl_and_one_literal() {
+    let review = read("src-tauri/src/agent_master_review.rs");
+    let review_tests = read("src-tauri/src/agent_master_review_tests.rs");
+    let others = sources_with_approvals();
+    assert_eq!(
+        shown_stock_item_problems(&review, &review_tests, &others),
+        Vec::<String>::new()
+    );
+    let in_review = |from: &str, to: &str| {
+        assert_eq!(review.matches(from).count(), 1, "the edit starts once");
+        let mut mutated = others.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, "src/agent_master_review.rs"))
+            .expect("the coordinator is scanned");
+        entry.1 = entry.1.replacen(from, to, 1);
+        (entry.1.clone(), mutated)
+    };
+    let mut mutations = vec![
+        in_review("    prepared: PreparedStockItem,\n", "    pub(super) prepared: PreparedStockItem,\n"),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct ShownStockItem {",
+            "#[cfg_attr(not(test), allow(dead_code))]\n#[derive(Clone)]\npub(super) struct ShownStockItem {",
+        ),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct ShownStockItem {",
+            "#[derive(Default)]\n#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct ShownStockItem {",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nimpl Clone for ShownStockItem { fn clone(&self) -> Self { todo!() } }\n#[cfg(test)]\n#[path",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(prepared: PreparedStockItem) -> ShownStockItem {\n    ShownStockItem { prepared, preview: String::new() }\n}\n#[cfg(test)]\n#[path",
+        ),
+        in_review("    held: HeldRequest,\n}", "    pub(super) held: HeldRequest,\n}"),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct AskedStockItem {",
+            "#[cfg_attr(not(test), allow(dead_code))]\n#[derive(Default)]\npub(super) struct AskedStockItem {",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(binding: ApprovalBinding, dialog: PendingPostApproval, held: HeldRequest) -> AskedStockItem {\n    AskedStockItem { binding, dialog, held }\n}\n#[cfg(test)]\n#[path",
+        ),
+        in_review(
+            "    prepared: Box<PreparedStockItem>,\n",
+            "    pub(super) prepared: Box<PreparedStockItem>,\n",
+        ),
+        in_review(
+            "#[cfg_attr(not(test), allow(dead_code))]\npub(super) struct HeldStockItem {",
+            "#[cfg_attr(not(test), allow(dead_code))]\n#[derive(Clone)]\npub(super) struct HeldStockItem {",
+        ),
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(prepared: Box<PreparedStockItem>) -> HeldRequest {\n    HeldRequest::StockItem(HeldStockItem { prepared })\n}\n#[cfg(test)]\n#[path",
+        ),
+        // A second maker inside the one impl, written as `Self {`.
+        in_review(
+            "        &self.prepared\n    }\n}",
+            "        &self.prepared\n    }\n\n    pub(super) fn make(prepared: Box<PreparedStockItem>) -> Self {\n        Self { prepared }\n    }\n}",
+        ),
+        // The same, written as `Self{`.
+        in_review(
+            "        &self.prepared\n    }\n}",
+            "        &self.prepared\n    }\n\n    pub(super) fn make(prepared: Box<PreparedStockItem>) -> Self {\n        Self{ prepared }\n    }\n}",
+        ),
+        // A renamed type, built under its other name.
+        in_review(
+            "\n#[cfg(test)]\n#[path",
+            "\ntype Held = HeldStockItem;\nfn again(prepared: Box<PreparedStockItem>) -> Held {\n    Held { prepared }\n}\n#[cfg(test)]\n#[path",
+        ),
+    ];
+    let mut renamed = others.clone();
+    renamed.push((
+        "src/elsewhere.rs".into(),
+        "use super::master_review::{\n    HeldStockItem\n    as Held,\n};".into(),
+    ));
+    mutations.push((review.clone(), renamed));
+    let mut elsewhere = others.clone();
+    elsewhere.push((
+        "src/elsewhere.rs".into(),
+        "impl From<PreparedStockItem> for ShownStockItem {}".into(),
+    ));
+    mutations.push((review.clone(), elsewhere));
+    for (at, (mutated_review, mutated)) in mutations.iter().enumerate() {
+        assert_ne!(mutated, &others, "mutation {at} changed nothing");
+        assert!(
+            !shown_stock_item_problems(mutated_review, &review_tests, mutated).is_empty(),
+            "mutation {at}"
+        );
+    }
+    let test_literal = format!(
+        "{review_tests}\nfn f(prepared: PreparedStockItem) {{ let _ = ShownStockItem {{ prepared, preview: String::new() }}; }}"
+    );
+    assert!(!shown_stock_item_problems(&review, &test_literal, &others).is_empty());
+}
+
+#[test]
+fn a_stock_item_approval_is_made_only_after_the_stock_item_dialog_approves() {
+    let approvals = read("src-tauri/src/tally/approved_import.rs");
+    let approvals_tests = read("src-tauri/src/tally/approved_import_tests.rs");
+    let stock = read("src-tauri/src/tally/stock_item_create.rs");
+    let stock_tests = read("src-tauri/src/tally/stock_item_create_tests.rs");
+    let review = read("src-tauri/src/agent_master_review.rs");
+    let others = sources_with_approvals();
+    // This scan skips files named *_tests.rs, *_tests_* or tests.rs, rather
+    // than literally every non-test source; the approvals holder is read.
+    assert_eq!(
+        stock_approval_problems(
+            &approvals,
+            &approvals_tests,
+            &stock,
+            &stock_tests,
+            &review,
+            &others,
+        ),
+        Vec::<String>::new()
+    );
+
+    let without_approval = approvals.replace(
+        CONFIRM_STOCK_ITEM,
+        &CONFIRM_STOCK_ITEM.replace("        approve_stock_item(&preview).await?;\n", ""),
+    );
+    assert_ne!(without_approval, approvals);
+    assert!(!stock_approval_problems(
+        &without_approval,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    // The old Clone mutations on `ShownDraft` and `StockItemConfirmation` are
+    // gone with no replacement: single use rests where `PREPARED_STRUCT` says.
+    for stock_text in [
+        stock.replace(
+            PREPARED_STRUCT,
+            &PREPARED_STRUCT.replace("        company:", "        pub(crate) company:"),
+        ),
+        stock.replace(
+            PREPARED_STRUCT,
+            &PREPARED_STRUCT.replace("Debug, Clone,", "Debug, Clone, Default,"),
+        ),
+        format!("{stock}\nimpl From<StockItemWrites> for PreparedStockItem {{ fn from(_: StockItemWrites) -> Self {{ todo!() }} }}"),
+        format!("{stock}\nimpl PreparedStockItem {{ fn again(writes: StockItemWrites) -> Self {{ todo!() }} }}"),
+    ] {
+        assert_ne!(stock_text, stock, "the mutation changed nothing");
+        assert!(!stock_approval_problems(
+            &approvals,
+            &approvals_tests,
+            &stock_text,
+            &stock_tests,
+            &review,
+            &others,
+        )
+        .is_empty());
+    }
+
+    let second_maker = format!("{approvals}\nMasterAdmission::stock_item(");
+    assert!(!stock_approval_problems(
+        &second_maker,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    let child_admission =
+        format!("{approvals_tests}\nfn f(p: PreparedStockItem) {{ let _ = MasterAdmission::stock_item(p); }}");
+    assert!(!stock_approval_problems(
+        &approvals,
+        &child_admission,
+        &stock,
+        &stock_tests,
+        &review,
+        &others,
+    )
+    .is_empty());
+
+    for child_prepared in [
+        format!("{stock_tests}\nlet _ = PreparedStockItem {{ company, writes }};"),
+        format!("{stock_tests}\nimpl From<StockItemWrites> for PreparedStockItem {{ fn from(_: StockItemWrites) -> Self {{ todo!() }} }}"),
+    ] {
+        assert!(!stock_approval_problems(
+            &approvals,
+            &approvals_tests,
+            &stock,
+            &child_prepared,
+            &review,
+            &others,
+        )
+        .is_empty());
+    }
+
+    for elsewhere_text in [
+        "ApprovedImport::confirm_stock_item(prepared, text, marks)",
+        "PreparedStockItem::from_draft(draft)",
+        "impl From<StockItemWrites> for PreparedStockItem {}",
+    ] {
+        let mut elsewhere = others.clone();
+        elsewhere.push(("src/elsewhere.rs".into(), elsewhere_text.into()));
+        assert!(!stock_approval_problems(
+            &approvals,
+            &approvals_tests,
+            &stock,
+            &stock_tests,
+            &review,
+            &elsewhere,
+        )
+        .is_empty());
+    }
+
+    // A second caller of `ask_stock_item`, here or elsewhere, an alias of it,
+    // an ask that reads the marks with another parser, and an ask that maps
+    // the dialog's refusal to another code.
+    let in_others = |source: &str, from: &str, to: &str| {
+        let mut mutated = others.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let review_path = "src/agent_master_review.rs";
+    let approvals_path = "src/tally/approved_import.rs";
+    let holder_path = "src/agent_import_approval.rs";
+    let mut asks = vec![
+        in_others(
+            holder_path,
+            "\nfn approved(\n",
+            "\nfn again() { PendingPostApproval::ask_stock_item(p, t, m, f, b); }\nfn approved(\n",
+        ),
+        in_others(
+            holder_path,
+            "\nfn approved(\n",
+            "\nfn again() { ApprovedImport::confirm_stock_item(p, t, m, f, b); }\nfn approved(\n",
+        ),
+        in_others(
+            review_path,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(p: PreparedStockItem) { PendingPostApproval::ask_stock_item(p, t, m, f, b); }\n#[cfg(test)]\n#[path",
+        ),
+        in_others(
+            review_path,
+            "            super::master_post::stock_company_marks,\n",
+            "            |_| Ok(Vec::new()),\n",
+        ),
+        in_others(
+            approvals_path,
+            "                .map_err(|refusal| refusal.code().to_string())\n",
+            "                .map_err(|_| \"import_approval_declined\".to_string())\n",
+        ),
+    ];
+    // A second Create made from a draft in the coordinator.
+    asks.push(in_others(
+        review_path,
+        "\n#[cfg(test)]\n#[path",
+        "\nfn twice(d: StockItemDraft<'_>) { let _ = PreparedStockItem::from_draft(d); }\n#[cfg(test)]\n#[path",
+    ));
+    for elsewhere_text in [
+        "PendingPostApproval::ask_stock_item(prepared, preview, marks, parse, batch)",
+        "let ask = PendingPostApproval::ask_stock_item;",
+    ] {
+        let mut elsewhere = others.clone();
+        elsewhere.push(("src/elsewhere.rs".into(), elsewhere_text.into()));
+        asks.push(elsewhere);
+    }
+    for (at, mutated) in asks.iter().enumerate() {
+        let mutated_text = |source: &str, fallback: &str| {
+            (mutated.iter())
+                .find(|(path, _)| is_source(path, source))
+                .map_or(fallback.to_string(), |(_, text)| text.clone())
+        };
+        assert!(
+            !stock_approval_problems(
+                &mutated_text(approvals_path, &approvals),
+                &approvals_tests,
+                &stock,
+                &stock_tests,
+                &mutated_text(review_path, &review),
+                mutated,
+            )
+            .is_empty(),
+            "ask mutation {at}"
+        );
+    }
+    let caller_preview = review.replace(
+        "stock_item_review_text(&draft, origin)",
+        "Ok::<String, StockItemReviewError>(origin.to_string())",
+    );
+    assert_ne!(caller_preview, review);
+    assert!(!stock_approval_problems(
+        &approvals,
+        &approvals_tests,
+        &stock,
+        &stock_tests,
+        &caller_preview,
+        &others,
+    )
+    .is_empty());
 }
 
 #[test]
@@ -3172,6 +4408,849 @@ fn totals_form_problems(post: &str, approval: &str, others: &[(String, String)])
     problems
 }
 
+/// The runtime's company check of a stock approval (#1381): before any
+/// request, a stock item for another company is refused.
+const STOCK_COMPANY_CHECK: &str =
+    "                                super::approved_import::AdmittedWrites::StockItem(stock) => {
+                                    stock.company() == &identity
+                                }";
+
+/// A stock approval keeps the batch it was born with: only a ledger approval
+/// is bound here.
+const BOUND_TO_BATCH: &str = "    pub(crate) fn bound_to_batch(mut self, batch_id: &str) -> Self {
+        if let ApprovedKind::Masters(masters) = &mut self.kind {
+            if let MasterWrites::Ledgers(ledgers) = &mut masters.writes {
+                ledgers.batch_id = Some(batch_id.to_string());
+            }
+        }
+        self
+    }";
+
+/// Only the tally layer makes a queued stock item, from the queue's own reads.
+const QUEUED_STOCK_ITEM_NEW: &str = "impl<'a> QueuedStockItem<'a> {
+    pub(super) fn new(";
+
+/// The queue's stock reads are sized from the binding marks answer, by the
+/// approval's own parser.
+const STOCK_READ_CALL: &str = "masters::read_stock_item_admission(
+                                            &reads,
+                                            &identity,
+                                            &binding_marks.text,
+                                            admission.parse_marks(),
+                                            &mut evidence,
+                                        ))";
+
+/// The queued stock item gets the binding marks, then the aim marks.
+const QUEUED_STOCK_ITEM_CALL: &str = "super::approved_import::QueuedStockItem::new(
+                                    admission,
+                                    &stock.0,
+                                    &stock.1,
+                                    &stock.2,
+                                    &binding_marks.text,
+                                    &before_marks.text,
+                                ),";
+
+fn stock_queue_problems(
+    approvals: &str,
+    runtime: &str,
+    runtime_masters: &str,
+    others: &[(String, String)],
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    let post = runtime
+        .find("async fn post_approved_import<")
+        .map_or("", |start| &runtime[start..]);
+    match (
+        runtime.matches(STOCK_COMPANY_CHECK).count(),
+        post.find(STOCK_COMPANY_CHECK),
+        post.find("observe_read_boundary(&reads)"),
+    ) {
+        (1, Some(check), Some(request)) if check < request => {}
+        _ => problems.push("the stock company check must come once, before any request".into()),
+    }
+    for (pin, label) in [
+        (
+            BOUND_TO_BATCH,
+            "bound_to_batch that leaves a stock approval",
+        ),
+        (QUEUED_STOCK_ITEM_NEW, "tally-only queued stock maker"),
+    ] {
+        if approvals.matches(pin).count() != 1 {
+            problems.push(format!("expected one {label}"));
+        }
+    }
+    // No literal by name, and one in its maker.
+    if approvals.matches("QueuedStockItem {").count() != 0
+        || approvals
+            .matches("Self {\n            prepared: &admission.prepared,")
+            .count()
+            != 1
+    {
+        problems.push("QueuedStockItem must be built only by its maker".into());
+    }
+    let renders = others
+        .iter()
+        .map(|(_, text)| text.matches("render_stock_item_create(&").count())
+        .sum::<usize>();
+    if renders != 1 || approvals.matches(STOCK_ITEM_ADMISSION).count() != 1 {
+        problems.push("a stock item must be rendered once, in MasterAdmission::stock_item".into());
+    }
+    for forbidden in ["post_probe_xml(", "acquire_wire("] {
+        if runtime_masters.contains(forbidden) {
+            problems.push(format!("`{forbidden}` in runtime_masters.rs"));
+        }
+    }
+    for (pin, label) in [
+        (STOCK_READ_CALL, "stock read sized from the binding marks"),
+        (
+            QUEUED_STOCK_ITEM_CALL,
+            "queued stock item with binding then aim marks",
+        ),
+    ] {
+        if runtime.matches(pin).count() != 1 {
+            problems.push(format!("expected one {label}"));
+        }
+    }
+    // Only the queue makes a queued stock item, and only the stock recheck
+    // admits one: once, in `recheck_stock_item_for_dispatch`.
+    for (needle, allowed) in [
+        ("QueuedStockItem::new(", &["src/tally/runtime.rs"][..]),
+        (
+            "QueuedAdmission::StockItem",
+            &[
+                "src/tally/runtime.rs",
+                "src/tally/approved_import.rs",
+                "src/agent_master_post.rs",
+            ][..],
+        ),
+    ] {
+        let named: usize = others
+            .iter()
+            .filter(|(path, _)| !allowed.iter().any(|owner| is_source(path, owner)))
+            .map(|(_, text)| text.matches(needle).count())
+            .sum();
+        let in_runtime: usize = others
+            .iter()
+            .filter(|(path, _)| is_source(path, "src/tally/runtime.rs"))
+            .map(|(_, text)| text.matches(needle).count())
+            .sum();
+        if named != 0 || in_runtime != 1 {
+            problems.push(format!("`{needle}` must be named only by the queue"));
+        }
+    }
+    let posts: Vec<&str> = (others.iter())
+        .filter(|(path, _)| is_source(path, "src/agent_master_post.rs"))
+        .map(|(_, text)| text.as_str())
+        .collect();
+    let admits = |text: &str| text.matches("QueuedAdmission::StockItem").count();
+    let recheck = |text| fn_body(text, "fn recheck_stock_item_for_dispatch(");
+    if posts.len() != 1 || admits(posts[0]) != 1 || admits(recheck(posts[0])) != 1 {
+        problems.push("the stock recheck must admit a queued stock item once, itself".into());
+    }
+    // The variant is named in full, so the counts above see every use: no
+    // import of the variants, no alias of the type and no impl of it outside
+    // its file.
+    for (path, text) in others {
+        let aliased = [
+            "QueuedAdmission::{",
+            "QueuedAdmission::*",
+            "QueuedAdmission as ",
+        ]
+        .iter()
+        .any(|form| text.contains(form))
+            || text.lines().any(|line| {
+                line.trim_start().starts_with("type ") && line.contains("QueuedAdmission")
+            });
+        let implemented = !is_source(path, "src/tally/approved_import.rs")
+            && impl_lines_naming(text, "QueuedAdmission") != 0;
+        if aliased || implemented {
+            problems.push(format!("{path} reaches QueuedAdmission by another name"));
+        }
+    }
+    if runtime.matches("read_stock_item_admission(").count() != 1 {
+        problems.push("the queue reads a stock approval's reads by one call".into());
+    }
+    problems
+}
+
+/// The text of the function that `signature` begins, to its closing brace at
+/// column one; empty if `source` has no such function.
+fn fn_body<'a>(source: &'a str, signature: &str) -> &'a str {
+    source.find(signature).map_or("", |start| {
+        let rest = &source[start..];
+        &rest[..rest.find("\n}\n").map_or(rest.len(), |end| end + 3)]
+    })
+}
+
+#[test]
+fn the_queue_reads_a_stock_approval_for_its_own_company_and_never_rebinds_it() {
+    let approvals = read("src-tauri/src/tally/approved_import.rs");
+    let runtime = read("src-tauri/src/tally/runtime.rs");
+    let runtime_masters = read("src-tauri/src/tally/runtime_masters.rs");
+    // The approvals holder too: no queued stock item is named there either.
+    let mut others = other_sources();
+    others.push((
+        "src-tauri/src/agent_import_approval.rs".into(),
+        read("src-tauri/src/agent_import_approval.rs"),
+    ));
+    assert_eq!(
+        stock_queue_problems(&approvals, &runtime, &runtime_masters, &others),
+        Vec::<String>::new()
+    );
+    let unchecked = runtime.replace(
+        STOCK_COMPANY_CHECK,
+        "                                super::approved_import::AdmittedWrites::StockItem(_) => true,",
+    );
+    let rebinds = approvals.replace(
+        "            if let MasterWrites::Ledgers(ledgers) = &mut masters.writes {
+                ledgers.batch_id = Some(batch_id.to_string());
+            }",
+        "            match &mut masters.writes {
+                MasterWrites::Ledgers(ledgers) => ledgers.batch_id = Some(batch_id.to_string()),
+                MasterWrites::StockItem(stock) => stock.batch_id = batch_id.to_string(),
+            }",
+    );
+    let widened = approvals.replace(
+        QUEUED_STOCK_ITEM_NEW,
+        &QUEUED_STOCK_ITEM_NEW.replace("pub(super)", "pub(crate)"),
+    );
+    let public = approvals.replace(
+        QUEUED_STOCK_ITEM_NEW,
+        &QUEUED_STOCK_ITEM_NEW.replace("pub(super)", "pub"),
+    );
+    for mutated in [&unchecked, &rebinds, &widened, &public] {
+        assert!(
+            *mutated != runtime && *mutated != approvals,
+            "the mutation changed nothing"
+        );
+    }
+    let mut rendered_again = others.clone();
+    rendered_again.push((
+        "src/elsewhere.rs".into(),
+        "let _ = render_stock_item_create(&prepared);".into(),
+    ));
+    let aim_sized = runtime.replace(
+        STOCK_READ_CALL,
+        &STOCK_READ_CALL.replace("&binding_marks.text,", "&before_marks.text,"),
+    );
+    let other_parser = runtime.replace(
+        STOCK_READ_CALL,
+        &STOCK_READ_CALL.replace("admission.parse_marks(),", "stock_company_marks,"),
+    );
+    let swapped = runtime.replace(
+        QUEUED_STOCK_ITEM_CALL,
+        &QUEUED_STOCK_ITEM_CALL
+            .replace("&binding_marks.text,", "&aim,")
+            .replace("&before_marks.text,", "&binding_marks.text,")
+            .replace("&aim,", "&before_marks.text,"),
+    );
+    for mutated in [&aim_sized, &other_parser, &swapped] {
+        assert_ne!(*mutated, runtime, "the mutation changed nothing");
+    }
+    let mut made_elsewhere = others.clone();
+    made_elsewhere.push((
+        "src/elsewhere.rs".into(),
+        "let _ = QueuedStockItem::new(a, c, g, u, b, m);".into(),
+    ));
+    let mut admitted_elsewhere = others.clone();
+    admitted_elsewhere.push((
+        "src-tauri/src/agent_master_post.rs".into(),
+        "let QueuedAdmission::StockItem(stock) = queued else { todo!() };".into(),
+    ));
+    let in_the_holder = |needle: &str| {
+        let mut mutated = others.clone();
+        let holder = mutated
+            .iter_mut()
+            .find(|(path, _)| is_source(path, "src/agent_import_approval.rs"))
+            .expect("the approvals holder is scanned");
+        holder.1.push_str(needle);
+        mutated
+    };
+    let made_in_holder = in_the_holder("\nfn f() { QueuedStockItem::new(a, c, g, u, b, m); }");
+    let admitted_in_holder = in_the_holder("\nfn f() { let QueuedAdmission::StockItem(s) = q; }");
+    let mut runtime_elsewhere = others.clone();
+    runtime_elsewhere.push((
+        "src-tauri/src/agent/runtime.rs".into(),
+        "let _ = QueuedStockItem::new(a, c, g, u, b, m);".into(),
+    ));
+    // Another file admitting a queued stock item, or reaching the variant by
+    // an import, an alias or an impl of its own.
+    let mut aliases = Vec::new();
+    for text in [
+        "let QueuedAdmission::StockItem(stock) = queued else { todo!() };",
+        "use crate::tally::approved_import::QueuedAdmission::{StockItem};",
+        "use crate::tally::approved_import::QueuedAdmission::*;",
+        "use crate::tally::approved_import::QueuedAdmission as Queued;",
+        "type Queued<'a> = crate::tally::approved_import::QueuedAdmission<'a>;",
+        "impl<'a> QueuedAdmission<'a> { fn f(self) { let Self::StockItem(_) = self; } }",
+    ] {
+        let mut mutated = others.clone();
+        mutated.push(("src-tauri/src/agent_master_tools.rs".into(), text.into()));
+        aliases.push(mutated);
+    }
+    let read_twice = runtime.replacen(
+        "masters::read_stock_item_admission(",
+        "masters::read_stock_item_admission(&reads, &identity, &before_marks.text, p, &mut e);\nmasters::read_stock_item_admission(",
+        1,
+    );
+    assert_ne!(read_twice, runtime, "the mutation changed nothing");
+    for mutated in &aliases {
+        assert!(!stock_queue_problems(&approvals, &runtime, &runtime_masters, mutated).is_empty());
+    }
+    assert!(!stock_queue_problems(&approvals, &read_twice, &runtime_masters, &others).is_empty());
+    let posts = format!("{runtime_masters}\nfn f() {{ wire.post_probe_xml(x); }}");
+    let locks = format!("{runtime_masters}\nfn f() {{ client.acquire_wire(); }}");
+    for (approvals, runtime, runtime_masters, others) in [
+        (&approvals, &unchecked, &runtime_masters, &others),
+        (&rebinds, &runtime, &runtime_masters, &others),
+        (&widened, &runtime, &runtime_masters, &others),
+        (&public, &runtime, &runtime_masters, &others),
+        (&approvals, &runtime, &runtime_masters, &rendered_again),
+        (&approvals, &runtime, &posts, &others),
+        (&approvals, &runtime, &locks, &others),
+        (&approvals, &aim_sized, &runtime_masters, &others),
+        (&approvals, &other_parser, &runtime_masters, &others),
+        (&approvals, &swapped, &runtime_masters, &others),
+        (&approvals, &runtime, &runtime_masters, &made_elsewhere),
+        (&approvals, &runtime, &runtime_masters, &admitted_elsewhere),
+        (&approvals, &runtime, &runtime_masters, &made_in_holder),
+        (&approvals, &runtime, &runtime_masters, &admitted_in_holder),
+        (&approvals, &runtime, &runtime_masters, &runtime_elsewhere),
+    ] {
+        assert!(!stock_queue_problems(approvals, runtime, runtime_masters, others).is_empty());
+    }
+}
+
+/// The stock recheck's token: debug only, private fields, so no copy, default,
+/// clone or deserialized value of it can exist.
+const STOCK_TOKEN: &str = "#[must_use]
+#[derive(Debug)]
+pub(super) struct StockItemRecheckPassed {";
+
+/// The token's fields, each private.
+const STOCK_TOKEN_FIELDS: &str =
+    "create_sha256: String, pre_image: PreImage, marks: Vec<MasterMark>, batch_id: String,";
+
+/// Problems with how the stock recheck's token is made and spent: one literal,
+/// in `recheck_stock_item_for_dispatch`; one spend, and one stock intent
+/// append, in `record_stock_item_intent`. `sources` is every non-test source,
+/// as [`other_sources`] gives them.
+fn stock_token_problems(sources: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let text_of = |source: &str| {
+        let found = sources.iter().find(|(path, _)| is_source(path, source));
+        found.map_or(String::new(), |(_, text)| text.clone())
+    };
+    let (post, journal) = (
+        text_of("src/agent_master_post.rs"),
+        text_of("src/agent_master_stock_item_journal.rs"),
+    );
+    let fields = post.find(STOCK_TOKEN).map(|start| {
+        let rest = &post[start + STOCK_TOKEN.len()..];
+        let body = &rest[..rest.find("\n}\n").unwrap_or(rest.len())];
+        (body.lines())
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    });
+    let attributes = attributes_above(&post, "pub(super) struct StockItemRecheckPassed {");
+    if post.matches(STOCK_TOKEN).count() != 1
+        || fields.as_deref() != Some(STOCK_TOKEN_FIELDS)
+        || attributes != ["#[must_use]", "#[derive(Debug)]"]
+    {
+        problems.push("the token's derive line and private fields are pinned".into());
+    }
+    // Its one inherent impl holds one fn, which consumes it and builds none.
+    let methods = fn_body(&post, "impl StockItemRecheckPassed {");
+    let spend = "    pub(super) fn into_intent_parts(self) -> (String, PreImage, Vec<MasterMark>, String) {";
+    if methods.matches("fn ").count() != 1 || !methods.contains(spend) || methods.contains("Self") {
+        problems.push("the token's impl holds only `into_intent_parts`".into());
+    }
+    let count = |needle: &str| -> usize {
+        sources
+            .iter()
+            .map(|(_, text)| text.matches(needle).count())
+            .sum()
+    };
+    let impls: usize = (sources.iter())
+        .map(|(_, text)| impl_lines_naming(text, "StockItemRecheckPassed"))
+        .sum();
+    if impls != 1 {
+        problems.push("one inherent impl of the token, and no trait impl".into());
+    }
+    let token = "StockItemRecheckPassed";
+    let literals: usize = (sources.iter())
+        .map(|(_, text)| literals_of(text, token))
+        .sum();
+    // An import or type alias may be split across lines, so each is looked
+    // for in the text with its whitespace flattened, as
+    // `held_stock_item_aliases` does: a type alias is a `type` item, to its
+    // `;`, that names the token.
+    let aliased = (sources.iter()).any(|(_, text)| {
+        let flat = flat(text);
+        flat.contains(&format!("{token} as "))
+            || (flat.match_indices("type ")).any(|(at, _)| {
+                let item = &flat[at..];
+                let item = &item[..item.find(';').unwrap_or(item.len())];
+                let word = at == 0 || flat[..at].ends_with([' ', '{', '(', ';']);
+                word && item.contains(token)
+            })
+    });
+    let mint = fn_body(&post, "fn recheck_stock_item_for_dispatch(");
+    // Its one literal, after the digest of the bytes the POST sends is required.
+    let digest = "sent_digest(stock.prepared(), stock.xml_sha256())?;";
+    if literals != 1
+        || aliased
+        || literals_of(mint, token) != 1
+        || mint.matches(digest).count() != 1
+    {
+        problems.push("the token is built once, in recheck_stock_item_for_dispatch".into());
+    }
+    // The existing recheck, run once as a statement whose refusal returns.
+    let call = "\n    recheck_stock_item_admission(StockItemRecheckInput {\n";
+    let returns = mint.find(call).is_some_and(|at| {
+        let close = mint[at..].find("\n    })").map_or(0, |end| at + end);
+        mint[close..].starts_with("\n    })?;\n")
+    });
+    if mint.matches(call).count() != 1 || !returns {
+        problems.push("the mint runs the stock recheck once and returns its refusal".into());
+    }
+    let writer = fn_body(&journal, "fn record_stock_item_intent(");
+    for (needle, in_writer) in [
+        ("into_intent_parts(", "passed.into_intent_parts()"),
+        (
+            "append_kind_intent::<StockItemBatch>",
+            "append_kind_intent::<StockItemBatch>(data_dir, lock, intent)",
+        ),
+    ] {
+        let calls = count(needle) - count(&format!("fn {needle}"));
+        if calls != 1 || writer.matches(in_writer).count() != 1 {
+            problems.push(format!(
+                "`{needle}` is called once, by the stock intent writer"
+            ));
+        }
+    }
+    problems
+}
+
+/// The lines above `item` in `source`, back over blank lines and doc and line
+/// comments to the end of the item before it (a line ending `}` or `;` once
+/// any trailing line comment is cut off), comments left out: its attributes,
+/// each line of a multi-line one too, and one a blank line separates still
+/// among them. An attribute line with a trailing comment is kept whole.
+fn attributes_above<'a>(source: &'a str, item: &str) -> Vec<&'a str> {
+    let start = source.find(item).unwrap_or(0);
+    // The code of a line: up to a `//` outside a string literal. A quote
+    // char literal is blanked first, at the same length. A raw string that
+    // holds a `"` is not told apart; no attribute this pins has one.
+    let code = |line: &str| {
+        let (mut quoted, mut escaped) = (false, false);
+        let blanked = line.replace("'\\\"'", "'__'").replace("'\"'", "'_'");
+        let bytes = blanked.as_bytes();
+        let cut = (0..bytes.len()).find(|&at| {
+            let byte = bytes[at];
+            if quoted {
+                quoted = escaped || byte != b'"';
+                escaped = !escaped && byte == b'\\';
+                return false;
+            }
+            quoted = byte == b'"';
+            byte == b'/' && bytes.get(at + 1) == Some(&b'/')
+        });
+        line[..cut.unwrap_or(line.len())].trim_end().to_owned()
+    };
+    let mut above = (source[..start].lines().rev().map(str::trim))
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .take_while(|line| !code(line).ends_with('}') && !code(line).ends_with(';'))
+        .collect::<Vec<_>>();
+    above.reverse();
+    above
+}
+
+/// How many times `name` is followed by `{`, whitespace allowed, in `text`,
+/// but not as the name a struct, an impl or a return type gives: its literals
+/// and patterns.
+fn literals_of(text: &str, name: &str) -> usize {
+    (text.match_indices(name))
+        .filter(|(at, _)| {
+            let before = text[..*at].trim_end();
+            text[at + name.len()..].trim_start().starts_with('{')
+                && !["struct", "impl", "->"]
+                    .iter()
+                    .any(|word| before.ends_with(word))
+        })
+        .count()
+}
+
+#[test]
+fn the_stock_recheck_token_is_made_once_and_spent_once_by_the_writer() {
+    let sources = other_sources();
+    assert_eq!(stock_token_problems(&sources), Vec::<String>::new());
+    let edit = |source: &str, from: &str, to: &str| {
+        let mut mutated = sources.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let post = "src/agent_master_post.rs";
+    let journal = "src/agent_master_stock_item_journal.rs";
+    let derive = "#[derive(Debug)]\npub(super) struct StockItemRecheckPassed {";
+    let mut mutations = Vec::new();
+    for derived in [
+        "Debug, Clone",
+        "Debug, Default",
+        "Debug, Clone, Copy",
+        "Debug, Deserialize",
+    ] {
+        let to = derive.replace("Debug", derived);
+        mutations.push(edit(post, derive, &to));
+    }
+    // A derive above the pinned two, after the doc comment or before it, with
+    // blank lines between or none.
+    let token = "#[must_use]\n#[derive(Debug)]\npub(super) struct StockItemRecheckPassed {";
+    for above in [
+        "#[derive(Clone)]",
+        "#[cfg_attr(test, derive(Clone))]",
+        // A trailing comment that ends in `;` is not the end of an item.
+        "#[derive(Clone)] // x;",
+        "#[derive(Clone)] // }",
+    ] {
+        mutations.push(edit(post, token, &format!("{above}\n{token}")));
+    }
+    let doc = "/// Proof that the queue's stock recheck passed";
+    // An item above whose string holds `//` still ends there.
+    let url = edit(
+        post,
+        doc,
+        &format!("const URL: &str = \"http://x\";\n{doc}"),
+    );
+    assert_eq!(stock_token_problems(&url), Vec::<String>::new());
+    for above in [
+        "#[derive(Clone)]\n",
+        "#[derive(Clone)]\n\n",
+        "#[derive(Clone)]\n\n\n",
+        "#[cfg_attr(test, derive(Clone))]\n\n",
+    ] {
+        mutations.push(edit(post, doc, &format!("{above}{doc}")));
+    }
+    // A second literal: through `Self` in its impl, without the space, through
+    // a type alias and through an import alias.
+    let fields = "create_sha256: String::new(), pre_image: todo!(), marks: Vec::new(), batch_id: String::new()";
+    let methods = "impl StockItemRecheckPassed {\n";
+    let again = format!("{methods}    fn again() -> Self {{ Self {{ {fields} }} }}\n");
+    mutations.push(edit(post, methods, &again));
+    for forged in [
+        format!("fn forge() -> anyhow::Result<StockItemRecheckPassed> {{ Ok(StockItemRecheckPassed{{ {fields} }}) }}"),
+        format!("type Proof = StockItemRecheckPassed;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+        format!("use self::StockItemRecheckPassed as Proof;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+        // The import alias split across lines.
+        format!("use self::StockItemRecheckPassed\n    as Proof;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+        // The type alias split across lines.
+        format!("type Proof =\n    StockItemRecheckPassed;\nfn forge() -> anyhow::Result<Proof> {{ Ok(Proof {{ {fields} }}) }}"),
+    ] {
+        let anchor = "\n/// The digest of `prepared`'s writes";
+        mutations.push(edit(post, anchor, &format!("\n{forged}{anchor}")));
+    }
+    // The existing recheck's refusal discarded.
+    let text = &sources
+        .iter()
+        .find(|(path, _)| is_source(path, post))
+        .unwrap()
+        .1;
+    let start = text
+        .find("    recheck_stock_item_admission(StockItemRecheckInput {\n        prepared: stock")
+        .unwrap();
+    let call = &text[start..start + text[start..].find("})?;").unwrap() + "})?;".len()];
+    let discarded = format!("    let _ = {}", call.trim_start()).replace("})?;", "});");
+    mutations.push(edit(post, call, &discarded));
+    let manual =
+        "\nimpl Clone for StockItemRecheckPassed { fn clone(&self) -> Self { todo!() } }\n";
+    mutations.push(edit(
+        post,
+        "\n/// The digest of `prepared`'s writes",
+        &format!("{manual}/// The digest of `prepared`'s writes"),
+    ));
+    mutations.push(edit(
+        post,
+        "    create_sha256: String,",
+        "    pub(super) create_sha256: String,",
+    ));
+    // The digest check dropped from the mint.
+    mutations.push(edit(
+        post,
+        "    let create_sha256 = sent_digest(stock.prepared(), stock.xml_sha256())?;",
+        "    let create_sha256 = stock.xml_sha256().to_owned();",
+    ));
+    // A second mint, in the standalone recheck.
+    mutations.push(edit(
+        post,
+        "    runtime\n        .read_and_recheck_stock_item(",
+        "    let _ = StockItemRecheckPassed { create_sha256, pre_image, marks, batch_id };\n    runtime\n        .read_and_recheck_stock_item(",
+    ));
+    // A second spend, and a second stock intent append, beside the writer.
+    for added in [
+        "fn spend(p: StockItemRecheckPassed) { let _ = p.into_intent_parts(); }",
+        "fn again(i: MasterDispatchIntent) { append_kind_intent::<StockItemBatch>(d, l, i); }",
+    ] {
+        mutations.push(edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            &format!("\n{added}\n#[cfg(test)]\n#[path"),
+        ));
+    }
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert!(!stock_token_problems(mutated).is_empty(), "mutation {at}");
+    }
+}
+
+/// `text` with each run of whitespace made one space, so a call or a
+/// signature split across lines reads as one line.
+fn flat(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// `text` with all its whitespace removed, so a call reads the same however
+/// it is spaced or split.
+fn squashed(text: &str) -> String {
+    text.split_whitespace().collect()
+}
+
+/// How many times `text` uses a `spend`: the identifier after a `.` or a `:`,
+/// whitespace allowed between (a method call, or a path to one, called or
+/// not), or directly followed by `(` and not after `fn` (a bare call). A
+/// definition `fn spend(` is not a use, and neither is the word in prose.
+fn spend_uses(text: &str) -> usize {
+    let ident = |c: char| c.is_alphanumeric() || c == '_';
+    (text.match_indices("spend"))
+        .filter(|(at, word)| {
+            let (before, after) = (&text[..*at], &text[at + word.len()..]);
+            let bounded = !before.ends_with(ident) && !after.starts_with(ident);
+            let before = before.trim_end();
+            let reached = before.ends_with('.') || before.ends_with(':');
+            let called = after.starts_with('(') && !before.ends_with("fn");
+            bounded && (reached || called)
+        })
+        .count()
+}
+
+/// `Redemption::spend`, which spends the approval the call took: its own batch
+/// and id, no other.
+const REDEMPTION_SPEND: &str = "pub(super) fn spend(&self) -> Result<(), UnderLockRefusal> { self.approvals.spend(&self.batch_id, self.id) }";
+
+/// The stock intent writer's signature: it takes the redemption, and no spend
+/// of the caller's.
+const STOCK_WRITER_SIGNATURE: &str = "fn record_stock_item_intent( data_dir: &Path, lock: &ExclusiveAdmission, batch: &StockItemBatch, passed: StockItemRecheckPassed, redemption: &Redemption<'_>, ) -> Result<RecordedIntent, StockIntentRefusal> {";
+
+/// Problems with how a stock approval is spent: `Redemption::spend` spends its
+/// own batch and id; the stock intent writer takes a redemption, refuses one of
+/// another batch, and spends it once, after the journal's admission and before
+/// the sidecar; and no other source spends an approval but the two posts that
+/// spend theirs by id. `approval` is the approvals holder, and `sources` every
+/// other non-test source, as [`other_sources`] gives them.
+fn stock_spend_problems(approval: &str, sources: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    if squashed(approval)
+        .matches(&squashed(REDEMPTION_SPEND))
+        .count()
+        != 1
+        || spend_uses(approval) != 1
+    {
+        problems.push("`Redemption::spend` spends its own batch and id, through the holder".into());
+    }
+    let text_of = |source: &str| {
+        let found = sources.iter().find(|(path, _)| is_source(path, source));
+        found.map_or(String::new(), |(_, text)| squashed(text))
+    };
+    // The writer's body is cut at its closing brace before it is flattened.
+    let journal = (sources.iter())
+        .find(|(path, _)| is_source(path, "src/agent_master_stock_item_journal.rs"))
+        .map_or("", |(_, text)| text.as_str());
+    let writer = flat(fn_body(journal, "fn record_stock_item_intent("));
+    let writer = writer.as_str();
+    let spend = "redemption.spend().map_err(Refused)?;";
+    let batch = "if batch_id != batch.batch_id || redemption.batch_id() != batch.batch_id { return Err(StockIntentRefusal::OtherBatch); }";
+    let at = |needle: &str| {
+        (writer.matches(needle).count() == 1)
+            .then(|| writer.find(needle))
+            .flatten()
+    };
+    let order = [
+        at(batch),
+        at(".check_intent_admissible(&current.batch, &marks)"),
+        at(spend),
+        at("write_pre_image("),
+    ];
+    let ordered =
+        order.iter().all(Option::is_some) && order.windows(2).all(|pair| pair[0] < pair[1]);
+    if !writer.starts_with(STOCK_WRITER_SIGNATURE) || spend_uses(writer) != 1 || !ordered {
+        problems.push(
+            "the stock writer takes a redemption, checks its batch, and spends it once, \
+             after the admission and before the sidecar"
+                .into(),
+        );
+    }
+    let spend_call = squashed(spend);
+    // Every spend in the other sources, a call or a path to one: the
+    // writer's, and the two posts'.
+    let pinned = [
+        (
+            "src/agent_import_post.rs",
+            ".post_approvals.spend(batch_id,id)",
+        ),
+        (
+            "src/agent_master_tools.rs",
+            "self.post_approvals.spend(&batch.batch_id,approval)",
+        ),
+        (
+            "src/agent_master_stock_item_journal.rs",
+            spend_call.as_str(),
+        ),
+    ];
+    let all: usize = sources.iter().map(|(_, text)| spend_uses(text)).sum();
+    if all != pinned.len()
+        || pinned
+            .iter()
+            .any(|(source, call)| text_of(source).matches(call).count() != 1)
+    {
+        problems.push("an approval is spent only by the writer and the two posts".into());
+    }
+    problems
+}
+
+#[test]
+fn a_stock_approval_is_spent_only_through_its_redemption_by_the_writer() {
+    let approval = read("src-tauri/src/agent_import_approval.rs");
+    let sources = other_sources();
+    assert_eq!(
+        stock_spend_problems(&approval, &sources),
+        Vec::<String>::new()
+    );
+    let edit = |source: &str, from: &str, to: &str| {
+        let mut mutated = sources.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(entry.1.matches(from).count(), 1, "the edit starts once");
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let journal = "src/agent_master_stock_item_journal.rs";
+    let spend = "    redemption.spend().map_err(Refused)?;\n";
+    let admissible = "    journal\n        .check_intent_admissible(";
+    let mut mutations = vec![
+        // The caller's spend back beside the redemption, or in its place.
+        edit(
+            journal,
+            "    redemption: &Redemption<'_>,\n",
+            "    redemption: &Redemption<'_>,\n    spend: impl FnOnce() -> Result<(), UnderLockRefusal>,\n",
+        ),
+        edit(journal, "redemption.spend()", "spend()"),
+        // Spent twice, or not at all.
+        edit(journal, spend, &format!("{spend}{spend}")),
+        edit(journal, spend, ""),
+        // The redemption's batch left unchecked.
+        edit(journal, " || redemption.batch_id() != batch.batch_id", ""),
+        // A second spend beside the writer, as a call and as a path.
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: &Redemption<'_>) { let _ = r.spend(); }\n#[cfg(test)]\n#[path",
+        ),
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: Option<&Redemption<'_>>) { r.map(Redemption::spend); }\n#[cfg(test)]\n#[path",
+        ),
+        // A second spend beside the writer, spaced or split so no `spend(`
+        // or `::spend` is in its text, and as a spaced path that is called.
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: &Redemption<'_>) { let _ = r.spend\n(); }\n#[cfg(test)]\n#[path",
+        ),
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: Option<&Redemption<'_>>) { r.map(Redemption :: spend); }\n#[cfg(test)]\n#[path",
+        ),
+        edit(
+            journal,
+            "\n#[cfg(test)]\n#[path",
+            "\nfn again(r: &Redemption<'_>) { let _ = Redemption :: spend(r); }\n#[cfg(test)]\n#[path",
+        ),
+        // A second spend in the writer itself, split across lines.
+        edit(
+            journal,
+            spend,
+            &format!("{spend}    let _ = redemption.spend\n    ();\n"),
+        ),
+        // A spend in another source, split across lines, before or after
+        // its parentheses.
+        edit(
+            "src/agent_master_post.rs",
+            "\n/// The digest of `prepared`'s writes",
+            "\nfn again(r: &super::approval::Redemption<'_>) { let _ = r\n    .spend(); }\n/// The digest of `prepared`'s writes",
+        ),
+        edit(
+            "src/agent_master_post.rs",
+            "\n/// The digest of `prepared`'s writes",
+            "\nfn again(r: &super::approval::Redemption<'_>) { let _ = r.spend\n    (); }\n/// The digest of `prepared`'s writes",
+        ),
+        // The ledger post's spend of another approval.
+        edit(
+            "src/agent_master_tools.rs",
+            ".spend(&batch.batch_id, approval)",
+            ".spend(&batch.batch_id, Uuid::nil())",
+        ),
+    ];
+    // The spend moved after the sidecar is written, or before the admission.
+    let moved = |to: &str| {
+        let without = edit(journal, spend, "");
+        let mut mutated = without.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, journal))
+            .unwrap();
+        entry.1 = entry.1.replacen(to, &format!("{spend}{to}"), 1);
+        assert_ne!(mutated, without, "the move changed nothing");
+        mutated
+    };
+    mutations.push(moved("    let intent = MasterDispatchIntent::new("));
+    mutations.push(moved(admissible));
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert_ne!(mutated, &sources, "mutation {at} changed nothing");
+        assert!(
+            !stock_spend_problems(&approval, mutated).is_empty(),
+            "mutation {at}"
+        );
+    }
+    // `Redemption::spend` spending another id, or another batch.
+    for (from, to) in [
+        (
+            "self.approvals.spend(&self.batch_id, self.id)",
+            "self.approvals.spend(&self.batch_id, Uuid::nil())",
+        ),
+        (
+            "self.approvals.spend(&self.batch_id, self.id)",
+            "self.approvals.spend(\"other\", self.id)",
+        ),
+    ] {
+        assert_eq!(approval.matches(from).count(), 1, "the edit starts once");
+        let mutated = approval.replacen(from, to, 1);
+        assert!(!stock_spend_problems(&mutated, &sources).is_empty(), "{to}");
+    }
+}
+
+/// Whether `path` from [`other_sources`] is the crate's `source`, whatever the
+/// separator.
+fn is_source(path: &str, source: &str) -> bool {
+    path.replace('\\', "/")
+        .ends_with(&format!("src-tauri/{source}"))
+}
+
 /// Every non-test source file of the crate but the approvals holder and the
 /// post path, as (path, text).
 fn other_sources() -> Vec<(String, String)> {
@@ -3389,8 +5468,8 @@ fn message_box_calls_are_system_modal(source: &str) -> Vec<bool> {
 fn every_windows_message_box_is_system_modal() {
     let calls = message_box_calls_are_system_modal(&read("src-tauri/src/tally/approved_import.rs"));
     assert!(
-        calls.len() >= 6,
-        "fewer MessageBoxW calls than the six known boxes: {calls:?}"
+        calls.len() >= 7,
+        "fewer MessageBoxW calls than the seven known boxes: {calls:?}"
     );
     assert!(
         calls.iter().all(|system_modal| *system_modal),

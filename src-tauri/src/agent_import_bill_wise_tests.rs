@@ -1155,6 +1155,7 @@ fn invoice_voucher() -> ImportVoucher {
             sales_ledgers: vec!["Sales".into()],
             hsn_warnings: Vec::new(),
         }),
+        e_invoice: None,
     });
     sale
 }

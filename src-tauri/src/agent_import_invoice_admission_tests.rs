@@ -5,7 +5,8 @@
 //! (the 9 Oct set, the company object `O` of 12 Oct and the ledger catalogue of
 //! 21 Oct), except the rates read `Q`, which is DERIVED: the lab's 21 Oct answer
 //! to the read restricted to the invoice ledgers' parents, cut to the invoice's
-//! ledgers (below).
+//! ledgers (below). The read-back `R` is also DERIVED: its registration name and
+//! GSTIN are inserted by `with_registration` and are not part of the capture.
 //!
 //! - The admission: the company list, the marks, the book extent, the
 //!   currencies, the ledger compliance listing, the paired listing, the
@@ -256,7 +257,14 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'U' => super::lab_number_months()[4].3,
         other => panic!("unknown kind {other}"),
     };
-    answer(utf16(bytes))
+    // DERIVED for the read-back: answered before the request fetched the
+    // registration (see `with_registration`).
+    match letter {
+        'R' => answer(crate::agent::agent_import::invoice::with_registration(
+            &utf16(bytes),
+        )),
+        _ => answer(utf16(bytes)),
+    }
 }
 
 /// The ledger catalogue the build reads, as the pilot lab answered it on
@@ -892,6 +900,27 @@ async fn a_customer_holding_the_companys_own_gstin_is_refused_and_another_regist
     );
 }
 
+/// Tally's own answers to the rate read the code sends for this invoice's six
+/// ledgers (lab row 2162-RW, 24 Nov 2026; protocol reference §12a.31), served
+/// in place of the derived `Q`: the answer of a fresh load, and the answer
+/// after the two service codes' voucher lists were opened from GSTR-1's HSN
+/// summary, whose two service sales ledgers carry zero per-unit fields. Every
+/// other answer is the 9 Oct set, so this is the later book's rate read beside
+/// the earlier book's other reads. The invoice is admitted on both.
+#[tokio::test]
+async fn the_captured_zero_per_unit_rate_answer_is_admitted_as_the_plain_one_is() {
+    let plain: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml");
+    let zero_per_unit: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml");
+    for (which, bytes) in [("plain", plain), ("zero per-unit", zero_per_unit)] {
+        let (seen, _, _) = admit_on(
+            pilot_lab_replacing('Q', utf16(bytes)),
+            pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+        )
+        .await;
+        assert_eq!(seen, Ok(()), "{which}");
+    }
+}
+
 /// A rate listing with no ledger row is a failed read under its own code, never
 /// "this ledger has no rate": the company's ledgers were listed just before it.
 /// The admission stops at that read (52 requests) and records no observation.
@@ -1130,10 +1159,12 @@ const READBACK_THEN_NUMBER_ORDER: &str = concat!(
     "e9s9seexsxseeysyseezszse"
 );
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
-/// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
-/// line's HSN/SAC and `ISPOSTDATED` (`R-0010.xml` of the 2162-S1 sheet, the
-/// request the code sends; the lab answered it on 3 Nov 2026).
-const LAB_R12_SHA256: &str = "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21";
+/// The read-back of `BP/26-27/0010` with the GSTR-1 status fields, each line's
+/// HSN/SAC, `ISPOSTDATED`, and the registration's `GSTREGISTRATION` and
+/// `CMPGSTIN` (`RC-0010.xml` of the 2464-GN sheet, the request the code sends:
+/// the 2162-S1 sheet's `R-0010.xml` with the last two names added; the lab
+/// answered it on 10 Nov 2026).
+const LAB_R12_SHA256: &str = "bd9717c7830df5217a21ef3d8f4fb1ffb1bc0bc150a7d66dc5cefe12ebe852b5";
 
 /// The posted invoice the pilot lab's book took, as the build saved it.
 fn pilot_saved(number: &str, observed: bool) -> ImportVoucher {
@@ -1144,6 +1175,23 @@ fn pilot_saved(number: &str, observed: bool) -> ImportVoucher {
             Some(serde_json::from_value(pilot_observed()).unwrap());
     }
     saved
+}
+
+#[tokio::test]
+async fn a_payment_with_invoice_detail_fails_before_read_back_and_month_reads() {
+    let lab = pilot_lab_over(READBACK_THEN_NUMBER_ORDER);
+    let mut saved = pilot_saved("BP/26-27/0010", true);
+    saved.voucher_type = VoucherType::Payment;
+    let (differences, ..) = lab
+        .server
+        .read_back_sales_invoice(&lab.identity, &lab.company, &saved)
+        .await
+        .expect("a read-back after a post is never an error");
+    assert_eq!(differences, ["invoice_readback_failed"]);
+    let requests = received(lab.simulator);
+    assert_eq!(requests.len(), "eMsMse".len());
+    assert!(sent_as(READBACK_THEN_NUMBER_ORDER, &requests, 'R').is_empty());
+    assert!(months_sent(READBACK_THEN_NUMBER_ORDER, &requests).is_empty());
 }
 
 /// A posted invoice's read-back, on the pilot lab's answers: the marks are
@@ -1778,6 +1826,25 @@ fn the_judge_asks_for_the_marks_first_and_the_listing_whatever_the_master_mark()
     assert_eq!(needs(&answers), invoice::Need::Listing);
     answers.marks = Some(pilot_marks(16, 900_000));
     assert_eq!(needs(&answers), invoice::Need::Listing);
+}
+
+#[test]
+fn a_payment_with_invoice_detail_cannot_plan_a_number_read() {
+    let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    voucher.voucher_type = VoucherType::Payment;
+    let catalogue = pilot_catalogue();
+    let control = ledger::NumberControl::NoneStanding;
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
+    let judge = InvoiceJudge {
+        identity: &identity,
+        voucher: &voucher,
+        catalogue: &catalogue,
+        control: &control,
+    };
+    assert!(matches!(
+        judge.request(invoice::Need::Number(0)),
+        Err(invoice::Verdict::Failed(code)) if code == "invoice_read_plan_inconsistent"
+    ));
 }
 
 /// `admit_queued_invoice` holds the plan the queue sent to the invoice's own

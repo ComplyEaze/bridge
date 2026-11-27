@@ -2,7 +2,8 @@
 //! check that flips it. Nothing here reads or sends anything.
 use super::super::verify::{judged_next_step, NEXT_LOAD_SAME_COMPANIES};
 use super::*;
-use crate::tally::ledger_create_item::{AdmittedDutyHead, MasterName, PartySide, VerifiedGstin};
+use crate::tally::ledger_create_item::{AdmittedDutyHead, PartySide, VerifiedGstin};
+use crate::tally::master_name::MasterName;
 use bridge_tally_protocol::GstDutyHead;
 
 const TARGET: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";

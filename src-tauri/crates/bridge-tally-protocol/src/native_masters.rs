@@ -25,6 +25,7 @@ use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::stock_tax_details::StockTaxLists;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
     name::QName,
@@ -236,17 +237,46 @@ const _: () = {
     }
 };
 
+const MASTERS_EXPORT_FORMAT: &str = "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>";
+const CANDIDATE_STOCK_ITEMS_FETCH: &str = "NAME, PARENT, GUID, MASTERID, ALTERID, BASEUNITS, GSTAPPLICABLE, GSTTYPEOFSUPPLY, HSNDETAILS.LIST, GSTDETAILS.LIST, LANGUAGENAME.LIST";
+
+fn render_masters_collection(
+    collection: &str,
+    is_modify: &str,
+    master_type: &str,
+    fetch: &str,
+    static_variables: &str,
+) -> String {
+    format!(
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="{collection}" ISMODIFY="{is_modify}"><TYPE>{master_type}</TYPE><FETCH>{fetch}</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+    )
+}
+
 /// Renders the collection request for one kind of master, binding the
 /// response to its company by the computed `BRIDGECOMPANYGUID`.
 pub fn render_native_masters_request(kind: NativeMasterKind, company: &str) -> String {
     let (collection, is_modify, master_type, fetch) = kind.request_shape();
-    format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME="{collection}" ISMODIFY="{is_modify}"><TYPE>{master_type}</TYPE><FETCH>{fetch}</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        static_variables = static_variables_for_unvalidated_company(
-            company,
-            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-            "",
-        ),
+    render_masters_collection(
+        collection,
+        is_modify,
+        master_type,
+        fetch,
+        &static_variables_for_unvalidated_company(company, MASTERS_EXPORT_FORMAT, ""),
+    )
+}
+
+/// The stock-items request with only the fetch list changed (#1381).
+/// Measured in one sitting, sent from a file to one synthetic book (PARTIAL):
+/// `tests/fixtures/agent/stock-create-lab/PROVENANCE.md`.
+/// No build has sent it, so nothing outside tests calls it yet.
+pub fn render_candidate_stock_items_request(company: &ValidatedCompanyName) -> String {
+    let (collection, is_modify, master_type, _) = NativeMasterKind::StockItems.request_shape();
+    render_masters_collection(
+        collection,
+        is_modify,
+        master_type,
+        CANDIDATE_STOCK_ITEMS_FETCH,
+        &company.xml_static_variables(MASTERS_EXPORT_FORMAT, ""),
     )
 }
 

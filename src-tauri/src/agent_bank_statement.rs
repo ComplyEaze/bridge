@@ -31,6 +31,7 @@
 //! vouchers then pass the same admission as inline vouchers, so nothing here
 //! decides what is admitted.
 
+use super::failure_code::{BankStatementCode, ProposalsCode};
 use super::*;
 use crate::local_files::local_disk_path::LocalDiskPath;
 use bridge_bank_statement::bank::Bank;
@@ -132,7 +133,7 @@ impl Server {
         let max_bytes = self.settings.max_bytes;
         let result = tokio::task::spawn_blocking(move || run(&request, &data_dir, max_bytes))
             .await
-            .map_err(|_| "statement_task_failed".to_string())??;
+            .map_err(|_| ToolFailure::from(BankStatementCode::TaskFailed))??;
         Ok(self.parsed_outcome(b"parse_bank_statement", result))
     }
 
@@ -228,7 +229,7 @@ impl OwnedRequest {
         }
     }
 
-    fn from_args(args: &Value) -> Result<Self, String> {
+    fn from_args(args: &Value) -> Result<Self, ToolFailure> {
         StatementChoices::validate_lists(args)?;
         let bank = Bank::from_name(required_string(args, "bank")?)
             .ok_or_else(|| "argument_invalid:bank".to_string())?;
@@ -242,7 +243,7 @@ impl OwnedRequest {
         )
         .map_err(|refusal| refused(&refusal))?;
         if bank.prints_totals() && controls.debits.is_none() {
-            return Err("statement_control_totals_required".into());
+            return Err(BankStatementCode::ControlTotalsRequired.into());
         }
         let choices = StatementChoices::from_args(args)?;
         Ok(Self {
@@ -271,12 +272,12 @@ impl StatementChoices {
         Ok(())
     }
 
-    fn from_args(args: &Value) -> Result<Self, String> {
+    fn from_args(args: &Value) -> Result<Self, ToolFailure> {
         let date_from = window_date(args, "from")?;
         let date_to = window_date(args, "to")?;
         if let (Some(from), Some(to)) = (date_from, date_to) {
             if from > to {
-                return Err("statement_reversed_date_window".into());
+                return Err(BankStatementCode::ReversedDateWindow.into());
             }
         }
         let rows = args
@@ -344,34 +345,34 @@ impl StatementChoices {
 /// by this user and carry no group or other permission bits. On Windows its owner must be this user
 /// or Administrators, and its access list must let no one but this user, SYSTEM and Administrators
 /// read, change or re-grant it.
-fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, String> {
+fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, ToolFailure> {
     let file = local_file::open_local_file(path.as_path(), false)
-        .map_err(|_| "statement_password_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileUnreadable))?;
     let metadata = file
         .metadata()
-        .map_err(|_| "statement_password_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileUnreadable))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         if metadata.permissions().mode() & 0o077 != 0 {
-            return Err("statement_password_file_permissions".into());
+            return Err(BankStatementCode::PasswordFilePermissions.into());
         }
     }
     #[cfg(windows)]
     match crate::local_files::access::private_to_this_user(&file) {
         Ok(Ok(())) => {}
-        Ok(Err(_)) => return Err("statement_password_file_permissions".into()),
-        Err(_) => return Err("statement_password_file_unreadable".into()),
+        Ok(Err(_)) => return Err(BankStatementCode::PasswordFilePermissions.into()),
+        Err(_) => return Err(BankStatementCode::PasswordFileUnreadable.into()),
     }
     if metadata.len() > MAX_PASSWORD_FILE_BYTES {
-        return Err("statement_password_file_too_large".into());
+        return Err(BankStatementCode::PasswordFileTooLarge.into());
     }
     let mut bytes = Zeroizing::new(Vec::with_capacity(MAX_PASSWORD_FILE_BYTES as usize));
     file.take(MAX_PASSWORD_FILE_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "statement_password_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileUnreadable))?;
     if bytes.len() as u64 > MAX_PASSWORD_FILE_BYTES {
-        return Err("statement_password_file_too_large".into());
+        return Err(BankStatementCode::PasswordFileTooLarge.into());
     }
     for ending in [&b"\r\n"[..], &b"\n"[..]] {
         if bytes.ends_with(ending) {
@@ -380,21 +381,21 @@ fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, String> {
             break;
         }
     }
-    let text =
-        std::str::from_utf8(&bytes).map_err(|_| "statement_password_file_not_utf8".to_string())?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileNotUtf8))?;
     Ok(Zeroizing::new(text.to_string()))
 }
 
-fn read_statement(path: &LocalDiskPath, limit: usize) -> Result<Vec<u8>, String> {
+fn read_statement(path: &LocalDiskPath, limit: usize) -> Result<Vec<u8>, ToolFailure> {
     let file = local_file::open_local_file(path.as_path(), false)
-        .map_err(|_| "statement_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::FileUnreadable))?;
     let limit = limit as u64;
     let mut bytes = Vec::new();
     file.take(limit + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "statement_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::FileUnreadable))?;
     if bytes.len() as u64 > limit {
-        return Err("statement_file_too_large".into());
+        return Err(BankStatementCode::FileTooLarge.into());
     }
     Ok(bytes)
 }
@@ -404,25 +405,25 @@ fn read_statement(path: &LocalDiskPath, limit: usize) -> Result<Vec<u8>, String>
 /// `BRIDGE_PDFIUM_LIBRARY`; any other build has no such lookup, which
 /// `scripts/check-no-test-seam.mjs` checks on the executables the Tauri
 /// bundle hook, CI's bundle job and the release workflow produce.
-fn pdfium_library() -> Result<PathBuf, String> {
+fn pdfium_library() -> Result<PathBuf, ToolFailure> {
     #[cfg(test)]
     if let Some(path) = env::var_os("BRIDGE_PDFIUM_LIBRARY") {
         let path = PathBuf::from(path);
         return if path.is_absolute() {
             Ok(path)
         } else {
-            Err("statement_pdf_engine_setting_invalid".into())
+            Err(BankStatementCode::PdfEngineSettingInvalid.into())
         };
     }
-    let executable =
-        env::current_exe().map_err(|_| "statement_pdf_engine_unavailable".to_string())?;
+    let executable = env::current_exe()
+        .map_err(|_| ToolFailure::from(BankStatementCode::PdfEngineUnavailable))?;
     let directory = executable
         .parent()
-        .ok_or_else(|| "statement_pdf_engine_unavailable".to_string())?;
+        .ok_or_else(|| ToolFailure::from(BankStatementCode::PdfEngineUnavailable))?;
     Ok(pdf::platform_library_path(directory))
 }
 
-fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Value, String> {
+fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Value, ToolFailure> {
     // Everything that can be refused without the PDF was refused already.
     let bytes = read_statement(&request.statement_path, MAX_PDF_BYTES)?;
     let text = {
@@ -445,7 +446,7 @@ fn written_and_summarised(
     parsed: &ParsedStatement,
     statement: &[u8],
     max_bytes: usize,
-) -> Result<Value, String> {
+) -> Result<Value, ToolFailure> {
     let statement_sha256 = sha256_hex(statement);
     let (proposals_id, file_sha256) = persist(data_dir, record, parsed, &statement_sha256)?;
     Ok(summary(
@@ -483,10 +484,10 @@ fn persist(
     request: &ParseRecord<'_>,
     parsed: &ParsedStatement,
     statement_sha256: &str,
-) -> Result<(String, String), String> {
+) -> Result<(String, String), ToolFailure> {
     let directory = data_dir.join(PROPOSALS_DIRECTORY);
     ensure_private_directory(&directory)
-        .map_err(|_| "statement_proposals_directory_unavailable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsDirectoryUnavailable))?;
     let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
     let mut document = json!({
         "schema": PROPOSALS_SCHEMA,
@@ -534,7 +535,7 @@ fn persist(
                 "basis": request.tie_out_basis,
             }),
             Some(Ok(Err(reason))) => json!({"state": "not_established", "reason": reason.code()}),
-            Some(Err(refusal)) => return Err(refused(&refusal)),
+            Some(Err(refusal)) => return Err(refused(&refusal).into()),
             None => Value::Null,
         };
         document["window"] = json!({
@@ -545,11 +546,11 @@ fn persist(
         });
     }
     let bytes = serde_json::to_vec_pretty(&document)
-        .map_err(|_| "statement_proposals_serialization_failed".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsSerializationFailed))?;
     let path = directory.join(format!("{proposals_id}.json"));
     let staged = directory.join(format!(".{proposals_id}.json.partial"));
     local_file::replace_private_file(&staged, &path, &bytes)
-        .map_err(|_| "statement_proposals_write_failed".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsWriteFailed))?;
     Ok((proposals_id, sha256_hex(&bytes)))
 }
 
@@ -849,8 +850,8 @@ fn read_statement_facts(
     document: &Value,
     records: &[Value],
     posts_nothing: bool,
-) -> Result<ResolvedStatement, String> {
-    let invalid = || "proposals_file_invalid".to_string();
+) -> Result<ResolvedStatement, ToolFailure> {
+    let invalid = || ToolFailure::from(ProposalsCode::FileInvalid);
     let bank_ledger = document["bank_ledger"].as_str().ok_or_else(invalid)?;
     let date = |text: &str| normalized_date(text).map_err(|_| invalid());
     // `coverage` is always written, null when no day was read in full
@@ -992,7 +993,7 @@ pub(super) fn load_proposals(
     data_dir: &Path,
     proposals_id: &Value,
     proposals_sha256: Option<&Value>,
-) -> Result<Value, String> {
+) -> Result<Value, ToolFailure> {
     let proposals_id = proposals_id
         .as_str()
         .filter(|id| {
@@ -1001,7 +1002,7 @@ pub(super) fn load_proposals(
         })
         .ok_or_else(|| "argument_invalid:proposals_id".to_string())?;
     let expected_sha256 = proposals_sha256
-        .ok_or_else(|| "proposals_sha256_required".to_string())?
+        .ok_or_else(|| ToolFailure::from(BankStatementCode::ProposalsSha256Required))?
         .as_str()
         .filter(|digest| {
             digest.len() == 64
@@ -1015,23 +1016,23 @@ pub(super) fn load_proposals(
         .join(format!("{proposals_id}.json"));
     let file = local_file::open_local_file(&path, false).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
-            "proposals_not_found".to_string()
+            ToolFailure::from(BankStatementCode::ProposalsNotFound)
         } else {
-            "proposals_file_unreadable".to_string()
+            ToolFailure::from(BankStatementCode::ProposalsFileUnreadable)
         }
     })?;
     let mut bytes = Vec::new();
     file.take(MAX_PROPOSALS_FILE_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "proposals_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsFileUnreadable))?;
     if bytes.len() as u64 > MAX_PROPOSALS_FILE_BYTES {
-        return Err("proposals_file_too_large".into());
+        return Err(BankStatementCode::ProposalsFileTooLarge.into());
     }
     if sha256_hex(&bytes) != expected_sha256 {
-        return Err("proposals_changed".into());
+        return Err(BankStatementCode::ProposalsChanged.into());
     }
-    let document: Value =
-        serde_json::from_slice(&bytes).map_err(|_| "proposals_file_invalid".to_string())?;
+    let document: Value = serde_json::from_slice(&bytes)
+        .map_err(|_| ToolFailure::from(ProposalsCode::FileInvalid))?;
     // a version 1 file is read too: what a caller may build from one is the
     // caller's to decide
     if !matches!(
@@ -1039,7 +1040,7 @@ pub(super) fn load_proposals(
         Some(PROPOSALS_SCHEMA | PROPOSALS_SCHEMA_V1)
     ) || document["proposals_id"] != proposals_id
     {
-        return Err("proposals_file_invalid".into());
+        return Err(ProposalsCode::FileInvalid.into());
     }
     Ok(document)
 }
@@ -1052,16 +1053,16 @@ pub(super) fn load_proposals(
 pub(super) fn resolve_import_arguments(
     data_dir: &Path,
     args: &Value,
-) -> Result<ResolvedImport, String> {
+) -> Result<ResolvedImport, ToolFailure> {
     let Some(object) = args.as_object() else {
-        return Err("argument_schema_invalid".into());
+        return Err(BankStatementCode::ArgumentSchemaInvalid.into());
     };
     let Some(proposals_id) = object.get("proposals_id") else {
         if object.contains_key("proposals_sha256") {
-            return Err("proposals_id_required".into());
+            return Err(ProposalsCode::IdRequired.into());
         }
         if !object.contains_key("vouchers") {
-            return Err("vouchers_required".into());
+            return Err(ProposalsCode::VouchersRequired.into());
         }
         return Ok(ResolvedImport {
             args: args.clone(),
@@ -1071,14 +1072,14 @@ pub(super) fn resolve_import_arguments(
         });
     };
     if object.contains_key("vouchers") {
-        return Err("proposals_id_with_vouchers".into());
+        return Err(BankStatementCode::ProposalsIdWithVouchers.into());
     }
     let document = load_proposals(data_dir, proposals_id, object.get("proposals_sha256"))?;
     let legacy = document["schema"] == PROPOSALS_SCHEMA_V1;
     let vouchers = document
         .get("vouchers")
         .filter(|vouchers| vouchers.is_array())
-        .ok_or_else(|| "proposals_file_invalid".to_string())?;
+        .ok_or_else(|| ToolFailure::from(ProposalsCode::FileInvalid))?;
     // A cash line nobody answered has no voucher; building the rest would
     // leave it out of the books silently. A file written before cash lines
     // were asked holds them with no answer recorded, and one written by an
@@ -1086,7 +1087,7 @@ pub(super) fn resolve_import_arguments(
     // is refused the same way.
     let records = document["records"]
         .as_array()
-        .ok_or_else(|| "proposals_file_invalid".to_string())?;
+        .ok_or_else(|| ToolFailure::from(ProposalsCode::FileInvalid))?;
     if records.iter().any(|record| {
         record["disposition"] == "needs_answer"
             || (record["party"]
@@ -1098,7 +1099,7 @@ pub(super) fn resolve_import_arguments(
                     .and_then(CashAnswer::parse)
                     .is_none())
     }) {
-        return Err("cash_questions_open".into());
+        return Err(BankStatementCode::CashQuestionsOpen.into());
     }
     // A file written before facts existed cannot say which rows were skipped or
     // which Contras it holds. Built anyway, its Contras would be invisible to
@@ -1113,7 +1114,7 @@ pub(super) fn resolve_import_arguments(
                     .any(|voucher| voucher["voucher_type"] == "Contra")
             }))
     {
-        return Err("proposals_legacy".into());
+        return Err(BankStatementCode::ProposalsLegacy.into());
     }
     // Every ledger a person named in an answer, bound to the voucher actually
     // built: that bridge_txn_id's voucher has the type the answer makes, with
@@ -1140,7 +1141,7 @@ pub(super) fn resolve_import_arguments(
                             ) == Some(row_id)
                         })
                         .ok_or_else(|| {
-                            failure_code::BankStatementImportCode::ProposalsFileInvalid
+                            failure_code::ProposalsCode::FileInvalid
                                 .as_str()
                                 .to_string()
                         })?,
@@ -1169,7 +1170,7 @@ pub(super) fn resolve_import_arguments(
                 })
             });
             if !built {
-                return Err("proposals_file_invalid".into());
+                return Err(ProposalsCode::FileInvalid.into());
             }
             cash_ledgers.push(need);
         }
@@ -1231,18 +1232,18 @@ impl ControlsSource {
     /// the file is read, so it takes no figures; every other source must give both. Only the
     /// file's own are not an independent control: a chain that starts and ends on them always
     /// agrees with itself, so a truncated export would pass.
-    fn figures(self, args: &Value) -> Result<Option<Controls>, String> {
+    fn figures(self, args: &Value) -> Result<Option<Controls>, ToolFailure> {
         let opening = optional_string(args, "opening_balance")?;
         let closing = optional_string(args, "closing_balance")?;
         match (self, opening.as_deref(), closing.as_deref()) {
             (Self::ThisFile, None, None) => Ok(None),
-            (Self::ThisFile, _, _) => Err("statement_control_figures_with_this_file".into()),
+            (Self::ThisFile, _, _) => Err(BankStatementCode::ControlFiguresWithThisFile.into()),
             (_, Some(opening), Some(closing)) => {
                 Controls::parse_optional(opening, closing, None, None)
                     .map(Some)
-                    .map_err(|refusal| refused(&refusal))
+                    .map_err(|refusal| ToolFailure::from(refused(&refusal)))
             }
-            _ => Err("statement_control_figures_required".into()),
+            _ => Err(BankStatementCode::ControlFiguresRequired.into()),
         }
     }
 }
@@ -1333,7 +1334,7 @@ struct CsvRequest {
 }
 
 impl CsvRequest {
-    fn from_args(args: &Value) -> Result<Self, String> {
+    fn from_args(args: &Value) -> Result<Self, ToolFailure> {
         StatementChoices::validate_lists(args)?;
         let controls_source = ControlsSource::parse(required_string(args, "controls_source")?)
             .ok_or_else(|| "argument_invalid:controls_source".to_string())?;
@@ -1358,7 +1359,7 @@ fn csv_failure(refusal: &Refusal) -> ToolFailure {
 /// The statement's bytes, read to the edge reader's own size bound and no
 /// further: one more byte is `statement_file_too_large`, as the reader's own
 /// bound would give.
-fn read_csv_file(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
+fn read_csv_file(path: &LocalDiskPath) -> Result<Vec<u8>, ToolFailure> {
     read_statement(path, csv_edge::MAX_FILE_BYTES)
 }
 
@@ -1384,7 +1385,7 @@ fn run_csv(request: &CsvRequest, data_dir: &Path, max_bytes: usize) -> Result<Va
         &request.choices.request(CsvLayout::BankA, controls),
     )
     .map_err(|refusal| refused(&refusal))?;
-    Ok(written_and_summarised(
+    written_and_summarised(
         data_dir,
         &ParseRecord {
             layout: CsvLayout::BankA.name(),
@@ -1396,7 +1397,7 @@ fn run_csv(request: &CsvRequest, data_dir: &Path, max_bytes: usize) -> Result<Va
         &parsed,
         &bytes,
         max_bytes,
-    )?)
+    )
 }
 
 impl Server {
@@ -1409,7 +1410,7 @@ impl Server {
         let max_bytes = self.settings.max_bytes;
         let result = tokio::task::spawn_blocking(move || run_csv(&request, &data_dir, max_bytes))
             .await
-            .map_err(|_| ToolFailure::from("statement_task_failed".to_string()))??;
+            .map_err(|_| ToolFailure::from(BankStatementCode::TaskFailed))??;
         Ok(self.parsed_outcome(b"parse_bank_statement_csv", result))
     }
 }

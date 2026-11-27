@@ -2911,6 +2911,7 @@ fn the_lab_month_reads_are_the_sent_ones_and_the_derived_august_drops_one_row() 
     for (from, to, pinned, _) in lab_number_months() {
         let rendered = invoice::render_invoice_window_numbers_request(
             "BRIDGE PILOT LAB",
+            InvoiceClass::Sales,
             (&stored_date(from), &stored_date(to)),
         );
         let sent = [0xFF, 0xFE]
@@ -4753,6 +4754,7 @@ fn the_batch_lead_claims_a_next_step_only_where_a_row_has_one() {
 async fn verify_saved_batch_after_dispatch(
     dispatched: bool,
     dispatch_response: Option<ledger::DispatchResponse>,
+    max_bytes: usize,
 ) -> (ToolResponse, ledger::BatchSnapshot, String) {
     let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
     let directory = tempfile::tempdir().expect("temporary data directory");
@@ -4763,7 +4765,7 @@ async fn verify_saved_batch_after_dispatch(
         },
         data_dir: directory.path().to_path_buf(),
         max_rows: 10,
-        max_bytes: 200_000,
+        max_bytes,
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
@@ -4819,7 +4821,8 @@ async fn verify_saved_batch_after_dispatch(
 #[tokio::test]
 async fn dispatched_verification_persists_reconciliation_for_missing_or_dirty_response() {
     for response in [None, Some(persisted_dispatch_response(0, 1))] {
-        let (outcome, snapshot, markdown) = verify_saved_batch_after_dispatch(true, response).await;
+        let (outcome, snapshot, markdown) =
+            verify_saved_batch_after_dispatch(true, response, 200_000).await;
         assert_eq!(outcome.value["isError"], true);
         assert_eq!(
             outcome.value["structuredContent"]["result"]["dispatch"]["state"],
@@ -4830,6 +4833,34 @@ async fn dispatched_verification_persists_reconciliation_for_missing_or_dirty_re
         assert!(markdown.contains("this report does not confirm posting"));
         assert!(markdown.contains("Error: `import_reconciliation_required`"));
     }
+}
+
+#[tokio::test]
+async fn response_missing_step_is_omitted_when_it_would_exceed_the_page_budget() {
+    // A budget the whole answer fits without the step, and its never-cut parts
+    // do not fit with it: the batch keeps its own code (#2556). The exact
+    // boundary is pinned in post's tests; here the answer's own cap would
+    // withhold the whole response first.
+    let (outcome, _, _) = verify_saved_batch_after_dispatch(true, None, 200_000).await;
+    let mut with_step = outcome.value["structuredContent"]["result"].clone();
+    with_step["items"] = json!([]);
+    let _ = super::super::drop_tally_line_error_text(&mut with_step);
+    let mut without_step = with_step.clone();
+    without_step["error"]
+        .as_object_mut()
+        .expect("reconciliation error")
+        .remove("next_step");
+    let max_bytes = without_step.to_string().len();
+    assert!(with_step.to_string().len() > max_bytes);
+
+    let (outcome, _, _) = verify_saved_batch_after_dispatch(true, None, max_bytes).await;
+    let error = &outcome.value["structuredContent"]["error"];
+    assert_eq!(
+        error["code"], "import_reconciliation_required",
+        "{}",
+        outcome.value
+    );
+    assert!(error.get("next_step").is_none(), "{}", outcome.value);
 }
 
 #[tokio::test]

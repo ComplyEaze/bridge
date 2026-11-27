@@ -4031,6 +4031,73 @@ async fn an_open_dialog_returns_pending_and_the_next_call_posts_the_click() {
     );
 }
 
+/// A No given while no call waits is returned once to the batch's next call
+/// with the kept cause and its step, in place of the step a No given in its
+/// own call carries (#2516). Apart from the cause and step the two answers are
+/// byte-equal, and the call after the kept one asks the person again.
+#[tokio::test]
+async fn a_kept_decline_says_it_was_given_earlier_and_the_next_call_asks_again() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let scripted = ScriptedApproval::held();
+    let pending = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    scripted.answer(false);
+    until_answered(&server, &batch.batch_id).await;
+    let kept = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    let again = ScriptedApproval::declining();
+    let asked = posting(&again, server.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(simulator);
+    assert_eq!(error_code(&kept), "master_approval_declined", "{kept}");
+    assert_eq!(scripted.masters().len(), 1, "the kept No asked nobody");
+    assert_eq!(again.masters().len(), 1, "the next call asked again");
+    assert_eq!(error_code(&asked), "master_approval_declined", "{asked}");
+    let asked_error = &result(&asked)["error"];
+    assert!(asked_error.get("cause").is_none(), "{asked}");
+    assert!(
+        asked_error["next_step"]
+            .as_str()
+            .unwrap()
+            .starts_with("Nothing was sent: the approval was declined."),
+        "{asked}"
+    );
+    let mut kept_error = result(&kept)["error"].clone();
+    assert_eq!(kept_error["cause"], "approval_answered_earlier", "{kept}");
+    assert_eq!(
+        kept_error["next_step"].as_str(),
+        crate::agent::refusal_remediation("approval_answered_earlier"),
+        "{kept}"
+    );
+    let mut asked_error = asked_error.clone();
+    for error in [&mut kept_error, &mut asked_error] {
+        let error = error.as_object_mut().unwrap();
+        error.remove("cause");
+        error.remove("next_step");
+    }
+    assert_eq!(kept_error, asked_error);
+    for field in ["attempt_recorded", "dispatch"] {
+        assert_eq!(result(&kept)[field], result(&asked)[field], "{field}");
+    }
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert_eq!(observed.len(), 2 * before_approval().len());
+}
+
 #[tokio::test]
 async fn the_next_step_of_an_approved_answer_names_the_master_tool() {
     let mut plans = before_approval();
@@ -4064,14 +4131,14 @@ async fn the_next_step_of_an_approved_answer_names_the_master_tool() {
 
 // --- before_dispatch, directly ---------------------------------------------
 
-fn aim_for_test() -> Mutex<Option<MasterAim>> {
-    Mutex::new(Some(MasterAim {
+fn aim_for_test() -> MasterAim {
+    MasterAim {
         pre_image: [(crate::synthetic_guid(0xaaaa).to_string(), 9)].into(),
         marks: vec![super::super::master_ledger::MasterMark {
             company_guid: GUID.into(),
             altmstid: 7,
         }],
-    }))
+    }
 }
 
 fn unit_server(directory: &std::path::Path) -> Server {
@@ -4095,7 +4162,7 @@ fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
     let kept = Mutex::new(None);
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
     let _licence = server
-        .record_master_intent(&batch, &request, approval, &aim_for_test(), &kept)
+        .record_master_intent(&batch, &request, approval, aim_for_test(), &kept)
         .expect("recorded");
     assert!(
         kept.lock().unwrap().is_none(),
@@ -4104,7 +4171,7 @@ fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
     // The same batch again: a send of it is on file.
     let again = server.post_approvals.redeeming_for_test(&batch.batch_id);
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, again, &aim_for_test(), &kept)),
+        refused(server.record_master_intent(&batch, &request, again, aim_for_test(), &kept)),
         UnderLockRefusal::AlreadyAttempted
     );
     let view = kept
@@ -4118,7 +4185,7 @@ fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
     let (rival, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&rival.batch_id);
     assert_eq!(
-        refused(server.record_master_intent(&rival, &request, approval, &aim_for_test(), &kept)),
+        refused(server.record_master_intent(&rival, &request, approval, aim_for_test(), &kept)),
         UnderLockRefusal::MasterOverlapsOpenDispatch
     );
     let view = kept
@@ -4176,7 +4243,7 @@ fn before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval() 
             &batch,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None),
         )
         .expect("recorded");
@@ -4197,6 +4264,47 @@ fn before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval() 
     );
 }
 
+/// The admission lock held by a read when the check under it begins: the
+/// lock's own refusal, with nothing recorded, no sidecar and the approval
+/// unspent, and the answer's code is the lock's.
+#[test]
+fn before_dispatch_refuses_a_busy_admission_lock_by_name_and_records_nothing() {
+    use crate::tally::approved_import::AdmissionLockRefusal;
+    let directory = tempfile::tempdir().unwrap();
+    let server = unit_server(directory.path());
+    let (batch, _) = saved_batch(&server, LEDGER);
+    let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
+    let held = server.lock_import_admission_shared().unwrap();
+    let refused = match server.record_master_intent(
+        &batch,
+        &expected_request(),
+        approval,
+        aim_for_test(),
+        &Mutex::new(None),
+    ) {
+        Err(BeforeDispatchError::Refused(refusal)) => refusal,
+        other => panic!("expected a named refusal, got {other:?}"),
+    };
+    drop(held);
+    assert_eq!(
+        refused,
+        UnderLockRefusal::Admission(AdmissionLockRefusal::Busy)
+    );
+    assert_eq!(
+        super::super::post::refusal_code(&anyhow::Error::from(refused)),
+        "import_admission_busy"
+    );
+    assert_eq!(record_types(directory.path()), ["master_batch"]);
+    assert!(!directory
+        .path()
+        .join(format!("master-pre-image-{}.json", batch.batch_id))
+        .exists());
+    assert_eq!(
+        server.post_approvals.spend(&batch.batch_id, approval),
+        Ok(())
+    );
+}
+
 #[test]
 fn before_dispatch_refusals_record_nothing() {
     use BeforeDispatchError::Refused;
@@ -4214,24 +4322,13 @@ fn before_dispatch_refusals_record_nothing() {
         .join(format!("master-pre-image-{}.json", batch.batch_id));
     let before = journal_bytes(directory.path());
 
-    // No aim left by the recheck.
-    assert_eq!(
-        refused(server.record_master_intent(
-            &batch,
-            &request,
-            approval,
-            &Mutex::new(None),
-            &Mutex::new(None)
-        )),
-        UnderLockRefusal::PreImageUnrecorded
-    );
     // An empty pre-image is a failed read, not an empty book.
-    let empty = Mutex::new(Some(MasterAim {
+    let empty = MasterAim {
         pre_image: Default::default(),
-        marks: aim_for_test().lock().unwrap().clone().unwrap().marks,
-    }));
+        marks: aim_for_test().marks,
+    };
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, approval, &empty, &Mutex::new(None))),
+        refused(server.record_master_intent(&batch, &request, approval, empty, &Mutex::new(None))),
         UnderLockRefusal::PreImageUnrecorded
     );
     // A batch the caller holds that is not the journal's.
@@ -4242,7 +4339,7 @@ fn before_dispatch_refusals_record_nothing() {
             &changed,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::BatchChanged
@@ -4254,7 +4351,7 @@ fn before_dispatch_refusals_record_nothing() {
             &renamed,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::BatchChanged
@@ -4267,7 +4364,7 @@ fn before_dispatch_refusals_record_nothing() {
             &unknown,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::BatchNotFound
@@ -4278,7 +4375,7 @@ fn before_dispatch_refusals_record_nothing() {
             &batch,
             &request,
             Uuid::new_v4(),
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::ApprovalRevoked
@@ -4294,7 +4391,7 @@ fn before_dispatch_refusals_record_nothing() {
             &batch,
             &request,
             approval,
-            &aim_for_test(),
+            aim_for_test(),
             &Mutex::new(None)
         )),
         UnderLockRefusal::AlreadyAttempted
@@ -4317,7 +4414,7 @@ fn before_dispatch_refuses_a_second_open_dispatch_of_the_same_ledger() {
         &second,
         &expected_request(),
         approval,
-        &aim_for_test(),
+        aim_for_test(),
         &Mutex::new(None),
     );
     assert!(
@@ -4352,24 +4449,20 @@ fn an_append_refusal_after_the_sidecar_was_written_leaves_no_sidecar() {
     let server = unit_server(directory.path());
     let (batch, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
-    let aim = aim_for_test();
-    {
-        // More company marks than one journal record may hold.
-        let mut aimed = aim.lock().unwrap();
-        let marks = &mut aimed.as_mut().unwrap().marks;
-        marks.extend(
-            (0..600_000_u32).map(|n| super::super::master_ledger::MasterMark {
-                company_guid: format!("{n:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}", 0, 0, 0, 0),
-                altmstid: 1,
-            }),
-        );
-    }
+    let mut aim = aim_for_test();
+    // More company marks than one journal record may hold.
+    aim.marks.extend(
+        (0..600_000_u32).map(|n| super::super::master_ledger::MasterMark {
+            company_guid: format!("{n:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}", 0, 0, 0, 0),
+            altmstid: 1,
+        }),
+    );
     let before = journal_bytes(directory.path());
     let result = server.record_master_intent(
         &batch,
         &expected_request(),
         approval,
-        &aim,
+        aim,
         &Mutex::new(None),
     );
     assert!(
@@ -4617,6 +4710,31 @@ fn the_busy_tally_step_is_given_only_when_nothing_was_sent() {
     assert_eq!(not_known["next_step"], NEXT_SEND_NOT_KNOWN);
 }
 
+/// Only the kept cause puts its step before the master tool's own (#2516). A
+/// refusal with any other cause that has a step of its own keeps the master
+/// step, so a later cause cannot change a master answer's step.
+#[test]
+fn only_the_kept_cause_takes_the_place_of_the_master_step() {
+    let next_step = |cause: &'static str| {
+        let mut failure = ToolFailure::from("master_approval_declined".to_string());
+        failure.cause = Some(cause);
+        let outcome =
+            master_failure_outcome("bridge-batch", GUID, failure, empty_evidence(), Some(false));
+        outcome.payload["result"]["error"]["next_step"].clone()
+    };
+    // Any cause with a step of its own in `refusal_remediation`.
+    let other = "statement_trial_balance_row_inconsistent";
+    assert!(crate::agent::refusal_remediation(other).is_some());
+    assert_eq!(
+        next_step(other),
+        master_next_step("master_approval_declined").unwrap()
+    );
+    assert_eq!(
+        next_step(crate::agent::APPROVAL_ANSWERED_EARLIER),
+        crate::agent::refusal_remediation(crate::agent::APPROVAL_ANSWERED_EARLIER).unwrap()
+    );
+}
+
 /// `tools/call post_ledger_creates` runs the master post, not the voucher
 /// post: an unknown batch is answered by the master tool.
 #[tokio::test]
@@ -4649,13 +4767,7 @@ fn recorded_intent_for(request: &MasterPostRequest) -> (RecordedIntent, String) 
     let (batch, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
     let intent = server
-        .record_master_intent(
-            &batch,
-            request,
-            approval,
-            &aim_for_test(),
-            &Mutex::new(None),
-        )
+        .record_master_intent(&batch, request, approval, aim_for_test(), &Mutex::new(None))
         .unwrap();
     (intent, batch.batch_id)
 }

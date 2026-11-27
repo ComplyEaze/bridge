@@ -1,8 +1,8 @@
 //! `outstandings` with `party` and `detail: open_bills` (#2377): one party's open
 //! bills from Tally's `Ledger Outstandings`, without the whole-book Bills reports.
 use super::*;
+use crate::tally::runtime::OpenBillsParty;
 use bridge_tally_core::TallyDate;
-use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 use bridge_tally_protocol::native_outstandings::{PartyBill, PartyBillReference};
 
 pub(super) const OPEN_BILLS_DETAIL: &str = "open_bills";
@@ -22,10 +22,19 @@ fn bill_json(bill: &PartyBill) -> Value {
     })
 }
 
-/// The resolved spelling as the name sent, or `party_name_not_admitted`.
-fn admitted_party(party: &str) -> Result<LedgerScopeName, ToolFailure> {
-    LedgerScopeName::new(party)
-        .map_err(|_| ToolFailure::from("party_name_not_admitted".to_string()))
+/// The resolved spelling as the name sent, or `party_name_not_admitted` with the reason as its
+/// cause: a mark or formula word not measured in this read, the spacing, or another ledger of
+/// `ledgers` (every name of every catalogue ledger) sharing its letters-and-digits key (#2480).
+fn admitted_party(party: &str, ledgers: &[Vec<String>]) -> Result<OpenBillsParty, ToolFailure> {
+    OpenBillsParty::admit(
+        party,
+        ledgers.iter().map(|names| names.iter().map(String::as_str)),
+    )
+    .map_err(|refusal| {
+        let mut failure = ToolFailure::from("party_name_not_admitted".to_string());
+        failure.cause = Some(refusal.code());
+        failure
+    })
 }
 
 impl Server {
@@ -62,8 +71,8 @@ impl Server {
             .await
             .map_err(|failure| late(failure, &evidence))?;
         evidence = combine_evidence(evidence, read);
-        let (catalogue, read) = self
-            .read_resolvable_ledgers(&identity, &company.name)
+        let (catalogue, names, read) = self
+            .read_resolvable_ledgers_with_names(&identity, &company.name)
             .await
             .map_err(|failure| late(failure, &evidence))?;
         evidence = combine_evidence(evidence, read);
@@ -71,11 +80,13 @@ impl Server {
             resolve_catalogue_ledger_or_refuse(&catalogue, party_argument, self.settings.redaction)
                 .map_err(|failure| late(failure, &evidence))?;
         // What is sent is the spelling the ledger's voucher rows carry, which the
-        // resolver returns, and only a name `LedgerScopeName` admits (DESIGN
-        // deviation of 8 Nov 2026). A trailing space, which Tally trims on
-        // create, is among its refusals. A row spelling the snapshot does not
-        // carry fails closed as `party_not_in_book`.
-        let scope = admitted_party(&party).map_err(|failure| late(failure, &evidence))?;
+        // resolver returns, and only a name `OpenBillsParty` admits: the marks
+        // measured in this report's `LedgerName` (protocol reference §12a.34),
+        // and for a name with any of them, no other ledger sharing its key. A
+        // trailing space, which Tally trims on create, is among its refusals. A
+        // row spelling the snapshot does not carry fails closed as
+        // `party_not_in_book`.
+        let scope = admitted_party(&party, &names).map_err(|failure| late(failure, &evidence))?;
         let load = self
             .runtime
             .fetch_party_bills(self.tally_config(), &identity, scope, to.clone())
@@ -121,7 +132,9 @@ impl Server {
                 "An On Account row is told by its reference text, which Tally writes as On Account; a real bill given that reference would be read as On Account (not measured)",
                 "Measured on one synthetic book on TallyPrime 7.2: a receivable party at two dates and parties with one bill each; a payable party, a party with bill-wise off and a foreign-currency ledger were not measured",
                 "What Tally answers for a party with no open bills is not measured, so an answer with no rows is refused (party_bills_no_rows_not_established), never told as no open bills",
-                "The party name sent is the book's own ledger name, and only one of ASCII letters, digits and single inner spaces; any other name is refused before anything is sent",
+                "The party name sent is the book's own ledger name. One of ASCII letters, digits and single inner spaces with no formula word is sent as before. Any other is sent only in a shape built from the names the lab read: it starts with a letter; its marks are among - . & / ( ) ' , _ \" + @ # : % * !, each beside the neighbours it was read beside, no more often than one read name holds it; a quote or a spaced bracket is paired within one word, and a bracket inside a word stands only in a name with no other mark, Devanagari or and; the word and appears once, in lower case, between two other words; Devanagari appears once, only as the one word read, not first; neighbouring words are only of kinds read side by side, so no two marks standing alone touch; and it is at most 72 characters. Anything else is refused before anything is sent (party_name_not_admitted, with the reason as its cause)",
+                "A name holding any of those marks, the word and or Devanagari is sent only when no other ledger of the catalogue, by any of its names, has the same letters and digits; otherwise it is refused (party_name_not_admitted, cause party_name_key_shared). Groups and other masters are not checked, and look-alike characters in other ledgers' names are not folded",
+                "Those shapes are the names of 23 kept captures from one synthetic book on TallyPrime 7.2, single-user edition (tally.exe 1.1.7.2), each read where no other ledger shared its letters and digits; they are not every shape a party name takes",
             ],
         });
         Ok(ToolOutcome {

@@ -892,6 +892,9 @@ struct ReadDetail {
     inconsistent_row: Option<crate::reports::statements::RowGap>,
     /// Which request of the party ledger read failed (#2265). A code from a closed set.
     failed_request: Option<&'static str>,
+    /// The named ledger a several-currency movement set aside, and the rule's code (#683). The
+    /// ledger is shown as a party name, so `mask_parties` masks it; no figure is carried.
+    set_aside: Option<(String, &'static str)>,
 }
 
 /// See [`ReadDetail::window_scope`]: whether the refusal is that of the read by the party's ledger
@@ -969,6 +972,12 @@ impl ToolFailure {
         {
             reads.certainly_refused = stretch;
         }
+        self
+    }
+
+    fn with_set_aside(mut self, ledger: &str, rule: &'static str) -> Self {
+        self.read_detail.get_or_insert_with(Box::default).set_aside =
+            Some((ledger.to_string(), rule));
         self
     }
 
@@ -1538,9 +1547,32 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              reads return (and ledger_movement's movements) name no currency, so ComplyEaze Bridge \
              refused before reading any ledger. ledger_masters with fields=compliance reads \
              such a book through the base currency Tally identifies: it returns the plain \
-             base-currency ledgers and names the ones it leaves out (#551). The basic read \
-             and ledger_movement do not support it yet (#716). Retrying this read refuses \
-             again.",
+             base-currency ledgers and names the ones it leaves out (#551). ledger_movement \
+             reads such a book only when from is the book's first day (books_from in \
+             list_companies), the same way (#683); a later from, and the basic read, are \
+             refused. Retrying this read refuses again.",
+        ),
+        "ledger_currency_set_aside" => Some(
+            "The ledger named is one this several-currency book keeps in another currency, or a \
+             base-currency ledger with a value Tally shows in another currency (set_aside_reason \
+             says which), so ComplyEaze Bridge gives no figure for it. \
+             ledger_movement without a ledger returns the base-currency ledgers and names the \
+             ones it leaves out. Retrying this read refuses again.",
+        ),
+        "ledger_currency_scope_inconclusive" => Some(
+            "On this several-currency book the ledger named has an opening or an entry in the \
+             window with a value in another currency (set_aside_reason says which), but the Trial \
+             Balance for the same window read it as a plain figure. The Trial Balance could then miss a ledger that only it shows in \
+             another currency, so ComplyEaze Bridge returned no movement. This has been seen after \
+             vouchers dated later than the window were saved and Tally's current date moved past \
+             it; repeating the same read is expected to refuse again.",
+        ),
+        "ledger_currency_scope_unmatched" => Some(
+            "On this several-currency book the Trial Balance and the ledger list did not name the \
+             same ledgers, so ComplyEaze Bridge could not tell which ledgers to leave out and \
+             returned no movement. The book may have changed between the two reads, so the same \
+             read may be repeated once; if it refuses again, this read does not support this \
+             book.",
         ),
         "gst_by_ledger_window_partial" => Some(
             "The voucher window was read but could not be checked against a separate count of its \
@@ -2070,6 +2102,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              read one day per call, and a longer period a day at a time. For a period's totals, \
              use trial_balance instead of reading its vouchers.",
         ),
+        // `open_bills` (#2480): the party's name was not sent; the cause says why, and its own step
+        // (`party_name_cause_remediation`) is chosen first. This is the step without one.
+        "party_name_not_admitted" => Some(
+            "The party's ledger name is not one ComplyEaze Bridge sends to Tally's bill report, \
+             so nothing was sent; the cause says why. Do not repeat the call or try another \
+             spelling of the party: the name sent is always the book's own. This party's open \
+             bills are still in outstandings without party (the book-wide bills), and its \
+             balance in ledger_masters or trial_balance.",
+        ),
         // `open_bills` (#2377): Tally's bill report sent nothing for the party, which it does for
         // a party it reports nothing for (protocol reference §12a.27). The ledger list decides
         // which refusal, and neither is told as no open bills.
@@ -2596,10 +2637,13 @@ fn shown_cause(
     })
 }
 
-/// The next step for a refusal: its own code's, else its cause's, and the outstandings
-/// causes' only under the outstandings code.
+/// The next step for a refusal: a party name's cause first under its code, else its own code's,
+/// else its cause's, and the outstandings causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
-    refusal_remediation(code)
+    (code == "party_name_not_admitted")
+        .then(|| cause.and_then(party_name_cause_remediation))
+        .flatten()
+        .or_else(|| refusal_remediation(code))
         .or_else(|| cause.and_then(refusal_remediation))
         .or_else(|| {
             (code == "native_outstandings_read_failed")
@@ -2611,6 +2655,69 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
                 .then(|| cause.and_then(party_ledger_master_cause_remediation))
                 .flatten()
         })
+}
+
+/// The next step for a cause of `party_name_not_admitted` (#2480), chosen only under that code:
+/// why the party's name was not sent, without repeating it, and what can still be read. The name
+/// sent is always the book's own, so another spelling of it does not help.
+fn party_name_cause_remediation(cause: &str) -> Option<&'static str> {
+    macro_rules! step {
+        ($reason:literal) => {
+            concat!(
+                $reason,
+                " Do not repeat the call or try another spelling of the party: the name sent \
+                 is always the book's own, so it refuses again. This party's open bills are \
+                 still in outstandings without party (the book-wide bills), and its balance in \
+                 ledger_masters or trial_balance."
+            )
+        };
+    }
+    match cause {
+        "party_name_mark_not_measured" => Some(step!(
+            "The party's ledger name holds a character ComplyEaze Bridge has not seen Tally \
+             read in this report's party name, so nothing was sent."
+        )),
+        "party_name_position_not_measured" => Some(step!(
+            "The party's ledger name holds a mark, or starts with a character, in a place \
+             ComplyEaze Bridge has not seen Tally read in this report's party name, so \
+             nothing was sent."
+        )),
+        "party_name_formula_word_not_measured" => Some(step!(
+            "The party's ledger name holds a word on ComplyEaze Bridge's own list of words \
+             Tally's formulas may read as operators, a list that errs wide, where ComplyEaze \
+             Bridge has not seen Tally read it as part of a name, so nothing was sent."
+        )),
+        "party_name_marked_too_long" => Some(step!(
+            "The party's ledger name holds a mark, a word Tally's formulas may read (and, or, not \
+             and the like), or Devanagari, and is longer than any such name ComplyEaze Bridge has \
+             seen Tally read in this report (72 characters), so nothing was sent."
+        )),
+        "party_name_key_shared" => Some(step!(
+            "The party's ledger name is not the letters and digits of exactly one ledger in \
+             ComplyEaze Bridge's list of this company's ledgers: another ledger shares them, or \
+             no ledger in that list has them. ComplyEaze Bridge has seen Tally read such a name \
+             only where exactly one ledger had them, so nothing was sent."
+        )),
+        "party_name_spacing" => Some(step!(
+            "The party's ledger name starts or ends with a space, or holds two in a row. \
+             This is ComplyEaze Bridge's own refusal: in this report a trailing space was \
+             read once, matching the name without it, and a doubled inner space once, \
+             answering as the exact name; no leading space was read. Nothing was sent."
+        )),
+        "party_name_combination_not_measured" => Some(step!(
+            "The party's ledger name holds marks or words together in a way ComplyEaze Bridge \
+             has not seen Tally read in this report's party name (a quote or bracket left \
+             open, a mark repeated, or marks or words side by side), so nothing was sent."
+        )),
+        "party_name_empty" => Some(step!(
+            "The party's ledger name is empty, so nothing was sent."
+        )),
+        "party_name_too_long" => Some(step!(
+            "The party's ledger name is longer than ComplyEaze Bridge's own limit for a ledger \
+             name it sends (1024 characters), so nothing was sent."
+        )),
+        _ => None,
+    }
 }
 
 /// The next step for a cause of `party_ledger_master_read_failed` (#2071). It is chosen only under
@@ -3297,6 +3404,7 @@ impl Server {
                     window_scope,
                     inconsistent_row,
                     failed_request,
+                    set_aside,
                 ) = read_detail
                     .map(|detail| {
                         (
@@ -3307,9 +3415,16 @@ impl Server {
                             detail.window_scope,
                             detail.inconsistent_row,
                             detail.failed_request,
+                            detail.set_aside,
                         )
                     })
                     .unwrap_or_default();
+                if let Some((ledger, rule)) = set_aside {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["ledger"] = party_name_value(ledger);
+                        error["set_aside_reason"] = json!(rule);
+                    }
+                }
                 if let Some(request) = failed_request {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["failed_request"] = json!(request);

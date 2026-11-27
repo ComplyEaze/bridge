@@ -302,7 +302,6 @@ failure_codes! {
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn stock_item_catalogue_refusal_code(
     error: &StockItemCatalogueError,
 ) -> StockItemCreateCode {
@@ -315,7 +314,6 @@ pub(crate) fn stock_item_catalogue_refusal_code(
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn item_name_refusal_code(error: &ItemNameNotAbsent) -> StockItemCreateCode {
     match error {
         ItemNameNotAbsent::Taken(_) => StockItemCreateCode::NameTaken,
@@ -323,7 +321,6 @@ pub(crate) fn item_name_refusal_code(error: &ItemNameNotAbsent) -> StockItemCrea
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn sibling_refusal_code(error: &SiblingRefusal) -> StockItemCreateCode {
     match error {
         SiblingRefusal::NotFound => StockItemCreateCode::SiblingNotFound,
@@ -334,7 +331,6 @@ pub(crate) fn sibling_refusal_code(error: &SiblingRefusal) -> StockItemCreateCod
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn not_goods_refusal_code(error: &NotGoodsSibling) -> StockItemCreateCode {
     match error {
         NotGoodsSibling::NotGoods => StockItemCreateCode::SiblingNotGoods,
@@ -343,7 +339,6 @@ pub(crate) fn not_goods_refusal_code(error: &NotGoodsSibling) -> StockItemCreate
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn draft_refusal_code(error: &DraftRefusal) -> StockItemCreateCode {
     match error {
         DraftRefusal::OtherCatalogue => StockItemCreateCode::CatalogueChanged,
@@ -363,7 +358,6 @@ pub(crate) fn draft_refusal_code(error: &DraftRefusal) -> StockItemCreateCode {
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn create_render_refusal_code(error: &CreateRenderRefusal) -> StockItemCreateCode {
     match error {
         CreateRenderRefusal::TextNotPlain { .. } => StockItemCreateCode::TextNotPlain,
@@ -425,7 +419,6 @@ failure_codes! {
 failure_codes! {
     /// The refusals of the stock-item post before anything is sent (#1381), the strings the ledger
     /// post writes for the same refusals.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) enum MasterPostCode {
         BatchIdInvalid = "import_batch_identifier_invalid",
         BatchNotFound = "master_batch_not_found",

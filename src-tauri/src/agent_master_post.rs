@@ -55,7 +55,6 @@ struct StockItemRecheckInput<'a> {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) enum StockItemRecheckError {
     #[error("stock reads are for another company")]
     OtherCompany,
@@ -154,9 +153,8 @@ pub(crate) async fn recheck_shown_stock_item(
 /// under its lock rebuild the approved draft ([`recheck_stock_item_admission`]),
 /// the prepared writes digest to the bytes the POST sends, and the candidate
 /// read and the aim give the pre-image and marks the intent records. Anything
-/// but a queued stock item is `AdmissionInconsistent`. No shipped caller passes
-/// it to the queue yet.
-#[cfg_attr(not(test), allow(dead_code))]
+/// but a queued stock item is `AdmissionInconsistent`. The stock post passes
+/// it to the queue.
 pub(super) fn recheck_stock_item_for_dispatch(
     queued: QueuedAdmission<'_>,
 ) -> anyhow::Result<StockItemRecheckPassed> {

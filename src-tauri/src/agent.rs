@@ -525,9 +525,10 @@ struct Settings {
     posting: Posting,
     /// `BRIDGE_AGENT_ENABLE_MASTER_WRITES`, in force only together with
     /// posting (`BRIDGE_AGENT_ENABLE_WRITES`, `Posting::On`): lets
-    /// `prepare_ledger_creates` and `post_ledger_creates` be listed and
-    /// called. Off by default and not in the extension's settings until a
-    /// one-ledger create through Bridge is proved on a live book.
+    /// `prepare_ledger_creates`, `post_ledger_creates`, `prepare_stock_item`
+    /// and `post_stock_item` be listed and called. Off by default and not in
+    /// the extension's settings until a one-ledger create through Bridge is
+    /// proved on a live book.
     master_writes_enabled: bool,
     /// Whether the tax-audit tool (`audit_test_run`) is listed and callable. Off by default:
     /// the extension's setting turns it on.
@@ -3517,8 +3518,13 @@ impl Server {
         if name == "post_import" && self.settings.posting == Posting::RetiredSettingPresent {
             return Err("setting_retired".to_string().into());
         }
-        if matches!(name, "post_ledger_creates" | "prepare_ledger_creates")
-            && !self.settings.master_writes_enabled
+        if matches!(
+            name,
+            "post_ledger_creates"
+                | "post_stock_item"
+                | "prepare_ledger_creates"
+                | "prepare_stock_item"
+        ) && !self.settings.master_writes_enabled
         {
             return Err("master_writes_disabled".to_string().into());
         }
@@ -3581,7 +3587,19 @@ impl Server {
             }
             "post_import" => in_own_frame(|| self.post_import(args)).await,
             "post_ledger_creates" => in_own_frame(|| self.post_ledger_creates(args)).await,
+            "post_stock_item" => {
+                let batch_id = required_string(args, "batch_id")?;
+                in_own_frame(|| self.post_stock_item(batch_id)).await
+            }
             "prepare_ledger_creates" => in_own_frame(|| self.prepare_ledger_creates(args)).await,
+            "prepare_stock_item" => {
+                let guid = required_string(args, "company_guid")?;
+                let (name, sibling) = (
+                    required_string(args, "name")?,
+                    required_string(args, "sibling")?,
+                );
+                in_own_frame(|| self.prepare_stock_item(guid, name, sibling)).await
+            }
             "profit_and_loss" => in_own_frame(|| self.profit_and_loss(args)).await,
             "purchase_register" => {
                 in_own_frame(|| self.register(register::RegisterKind::Purchase, args)).await

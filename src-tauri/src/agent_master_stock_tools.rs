@@ -1,5 +1,6 @@
 //! `prepare_stock_item` (#1381): the stock twin of `prepare_ledger_creates`.
-//! No tool is registered for it yet, so nothing shipped calls it.
+//! Like the ledger pair, both stock tools are listed only while master writes
+//! are in force, and refuse `master_writes_disabled` otherwise.
 //!
 //! It verifies the company, reads the company's stock reads once in one queued
 //! execution, builds the stock-item draft from those reads, builds the preview
@@ -19,10 +20,9 @@
 //! The answer's evidence is the company-list read of the identity check only:
 //! the stock reads keep none, and no declared reason code says so.
 //!
-//! `post_stock_item` is the stock twin of the ledger post's pass, and nothing
-//! registers it either. It reads the batch from the stock journal, verifies the
-//! company, shows the item again from the book as it stands through the same
-//! read as above, refuses unless the batch that item makes is the stored one,
+//! `post_stock_item` is the stock twin of the ledger post's pass. It reads the
+//! batch from the stock journal, verifies the company, shows the item again
+//! from the book as it stands through the same read as above, refuses unless the batch that item makes is the stored one,
 //! and refuses a name an open stock dispatch holds. Then it asks and holds the
 //! person's approval as the ledger post does, takes it, and sends the one
 //! Create through the shared queue with the stock recheck and the stock intent
@@ -59,9 +59,8 @@ use crate::tally::stock_item_create::{
 };
 use crate::tally::stock_item_verified::StockItemImportOutcome;
 
-/// What a caller is told after a stock item is prepared. It names no tool: none
-/// posts a stock item yet.
-const PREPARED_STOCK_NEXT_STEP: &str = "Nothing was written to Tally. This stock item is recorded for approval; the local user must approve it in a native dialog before it is created.";
+/// What a caller is told after a stock item is prepared.
+const PREPARED_STOCK_NEXT_STEP: &str = "Nothing was written to Tally. To create this stock item, call post_stock_item with this batch_id: the local user must approve it in a native dialog first.";
 
 /// What a caller is told after the one stock-item Create was answered and the
 /// book could not be read back at all.
@@ -112,7 +111,6 @@ pub(super) const STOCK_CANCELLED: CancelledTexts = CancelledTexts {
 impl Server {
     /// Prepare ONE stock item, a copy of the sibling stock item `sibling` under
     /// `name`, in the company `company_guid`. Nothing is written to Tally.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(in crate::agent) async fn prepare_stock_item(
         &self,
         company_guid: &str,
@@ -184,7 +182,6 @@ impl Server {
     /// Ask the person and, once approved, send the one stock-item Create of
     /// `batch_id`, in at most two passes as the ledger post does. See the
     /// module documentation.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(in crate::agent) async fn post_stock_item(
         &self,
         batch_id: &str,

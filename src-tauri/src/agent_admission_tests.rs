@@ -149,6 +149,8 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         ("acknowledge_post_review", false, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also adds proof files and status records there, replacing and deleting nothing; writes nothing to Tally."),
         // A new record of the prepared ledger each call, replacing nothing: additive.
         ("prepare_ledger_creates", false, "Reads the company's ledger and group names from Tally once, then writes one record of the prepared ledger to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
+        // A new record of the prepared stock item each call, replacing nothing: additive.
+        ("prepare_stock_item", false, "Reads the company's stock items, stock groups and units from Tally once, then writes one record of the prepared stock item to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
     ];
     let definitions = registered_tool_definitions(true, true);
     let published: Vec<&str> = definitions
@@ -162,6 +164,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     expected.extend(LOCAL_WRITERS.iter().map(|(name, _, _)| *name));
     expected.push("post_import");
     expected.push("post_ledger_creates");
+    expected.push("post_stock_item");
     let mut published_sorted = published.clone();
     published_sorted.sort_unstable();
     expected.sort_unstable();
@@ -221,10 +224,13 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
             );
             assert!(!description.contains(READ_SENTENCE), "{name}");
         } else {
-            // post_import and post_ledger_creates: each long description says it
-            // posts to Tally, and takes no appended sentence.
+            // post_import, post_ledger_creates and post_stock_item: each long
+            // description says it posts to Tally, and takes no appended sentence.
             assert!(
-                matches!(name, "post_import" | "post_ledger_creates"),
+                matches!(
+                    name,
+                    "post_import" | "post_ledger_creates" | "post_stock_item"
+                ),
                 "{name}"
             );
             assert_eq!(annotation(tool, "readOnlyHint"), json!(false), "{name}");
@@ -1784,7 +1790,7 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// `listed_tool_definitions` serves it: the extension default (the list every
 /// desktop extension user carries, its settings read from the manifest below),
 /// then import and posting on, then import, posting and the tax audit on, then
-/// all of those and master writes (the two ledger tools) on. The
+/// all of those and master writes (the ledger and stock item tools) on. The
 /// answer is sent whole at the start of every session, so its size is a cost to
 /// every conversation; raising a budget is argued in the pull request that
 /// needs it. Each must also stay under the control-message ceiling, or
@@ -1879,9 +1885,14 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// up by 609, so the margins stayed 431, 263, 254 and 377. Merged with master at d5b34fd1 the
 /// same day, they measured 214,931, 241,099, 243,608 and 248,985, leaving margins of 578, 410,
 /// 401 and 524.
+/// On 27 Nov 2026 the stock item pair (#1381) entered the master-writes list only: its
+/// entries are 1,987 bytes (`prepare_stock_item`) and 1,599 (`post_stock_item`), with a
+/// comma each, 3,588 in all. The lists measured 214,930, 241,098, 243,607 and 248,984
+/// before and 214,930, 241,098, 243,607 and 252,572 after. Only the fourth budget went up,
+/// by those 3,588 bytes, so its margin stayed 525.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [215_509, 241_509, 244_009, 249_509];
+const TOOL_LIST_BUDGETS: [usize; 4] = [215_509, 241_509, 244_009, 253_097];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

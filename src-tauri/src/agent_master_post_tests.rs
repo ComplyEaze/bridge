@@ -1203,8 +1203,11 @@ fn stock_recheck_reuses_the_typed_aim_refusals() {
     ));
 }
 
+/// The stock reads and rechecks are reached only through the two registered
+/// stock tools: each entry point is named only by its owner files, and the
+/// tools' methods are called only by their dispatch arms in `agent.rs`.
 #[test]
-fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
+fn the_stock_read_and_recheck_are_reached_only_through_the_two_stock_tools() {
     use std::collections::BTreeMap;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1212,7 +1215,8 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
     // Each entry point with the exact number of times each production file may
     // name it: its definition, its doc links and its one designed caller. Every
     // other production file must not name it, and one more naming in an owner
-    // file (a new caller there) fails as well.
+    // file (a new caller there) fails as well. The two tools' methods are
+    // pinned by their calls: one each, in its dispatch arm.
     const ALLOWED: &[(&str, &[(&str, usize)])] = &[
         (
             "admit_candidate_stock_item_read",
@@ -1252,17 +1256,12 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             ],
         ),
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
-        // The stock prepare: its definition and its module's title, no caller.
-        ("prepare_stock_item", &[("agent_master_stock_tools.rs", 2)]),
-        // The stock post: its definition, its pass, the module's notes, the
-        // tool it names in the approval answer and its two cancelled steps, and
-        // the post tool list a cancellation reads; no caller.
-        (
-            "post_stock_item",
-            &[("agent_master_stock_tools.rs", 7), ("agent_protocol.rs", 1)],
-        ),
+        // The stock prepare and the stock post: each called once, by its
+        // registered tool's dispatch arm.
+        ("self.prepare_stock_item(", &[("agent.rs", 1)]),
+        ("self.post_stock_item(", &[("agent.rs", 1)]),
         // The in-queue stock recheck and the stock intent writer: their one
-        // caller is the stock post, which has none.
+        // caller is the stock post.
         (
             "recheck_stock_item_for_dispatch",
             &[

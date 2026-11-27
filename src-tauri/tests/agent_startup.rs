@@ -317,15 +317,21 @@ fn session_output(master: &str, writes: &str, request: &str) -> String {
 
 #[test]
 fn the_master_tools_are_served_only_when_the_setting_and_posting_are_both_on() {
+    const MASTER_TOOLS: [&str; 4] = [
+        "post_ledger_creates",
+        "post_stock_item",
+        "prepare_ledger_creates",
+        "prepare_stock_item",
+    ];
     let has_master = |tools: &[String]| {
-        ["post_ledger_creates", "prepare_ledger_creates"]
+        MASTER_TOOLS
             .iter()
             .all(|name| tools.iter().any(|tool| tool == name))
     };
     let none_master = |tools: &[String]| {
         !tools
             .iter()
-            .any(|tool| tool == "post_ledger_creates" || tool == "prepare_ledger_creates")
+            .any(|tool| MASTER_TOOLS.contains(&tool.as_str()))
     };
     assert!(has_master(&served_tools("true", "true")));
     assert!(none_master(&served_tools("false", "true")));

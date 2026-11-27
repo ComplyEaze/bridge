@@ -99,8 +99,10 @@ ledger existed, the second answer of each pair, and the Bills Receivable reads.
 
 Tests: `src/native_outstandings/party_name_tests.rs` builds each name, compares Bridge's request with the lab's,
 parses the answer and ties it to that name's row of the snapshot. Its test of the rule reads every kept request's
-`LedgerName`, and holds the admitted placings of each mark and the marked-name length cap (72 characters, the
-longest kept marked name) to exactly what those names show.
+`LedgerName` and requires the type's tables to equal what those names show: each mark's placings, that no placing
+appears twice, each mark's most per name, the pairs of neighbouring word kinds, `and` and the Devanagari word at most
+once, and the marked-name length cap (72 characters, the longest kept marked name). The pairing of quotes and
+brackets is checked against those names but chosen, not derived from them.
 
 Confidence, with the markers of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`: PARTIAL for every finding here (protocol
 reference §12a.34). Each was observed live, request and answer captured, on one synthetic book, one release, in four

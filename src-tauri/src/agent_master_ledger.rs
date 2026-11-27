@@ -80,6 +80,7 @@ use super::ledger::{self, MAX_RECORD_BYTES};
 use super::persistence::{self, RecordOnce};
 use super::{append_private_import_ledger, set_private_file, valid_batch_id};
 use crate::agent::{local_file, sha256_hex};
+use crate::tally::approved_import::AdmissionLockRefusal;
 use bridge_tally_core::master_binding::{absence_key, canonical_master_key, MasterNameKeys};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -99,9 +100,9 @@ const PRE_IMAGE_PREFIX: &str = "master-pre-image-";
 
 /// Proof that the import admission lock is held exclusively. Built only by
 /// [`ExclusiveAdmission::acquire`]; it holds the locked file for as long as it
-/// lives. It duplicates the few lines of `Server::lock_import_admission` rather
-/// than wrapping a `File`, because a `File` may hold a shared lock and carries
-/// nothing that says which.
+/// lives. It takes the lock itself, as `Server::lock_import_admission` does,
+/// rather than wrapping a `File`, because a `File` may hold a shared lock and
+/// carries nothing that says which.
 #[derive(Debug)]
 pub(super) struct ExclusiveAdmission {
     /// Held for its lock; closing it releases the lock.
@@ -112,13 +113,13 @@ impl ExclusiveAdmission {
     /// Take the admission lock of `data_dir` exclusively, without waiting:
     /// contention is a refusal, as for a voucher post.
     pub(super) fn acquire(data_dir: &Path) -> Result<Self, String> {
-        let path = data_dir.join("agent-import-admission.lock");
-        let file = local_file::open_local_file(&path, true)
-            .map_err(|_| "import_admission_lock_unavailable".to_string())?;
-        file.try_lock()
-            .map_err(super::import_admission_lock_error)?;
-        persistence::require_settled(&data_dir.join("imports"))?;
-        Ok(Self { _held: file })
+        Self::acquire_or_refuse(data_dir).map_err(|refusal| refusal.code().to_string())
+    }
+
+    /// [`Self::acquire`], refused by name: none of its refusals has written
+    /// anything, so a post's check under the lock answers it as itself.
+    pub(super) fn acquire_or_refuse(data_dir: &Path) -> Result<Self, AdmissionLockRefusal> {
+        super::admit_exclusively(data_dir).map(|file| Self { _held: file })
     }
 
     /// For tests that exercise a write on a directory of their own.

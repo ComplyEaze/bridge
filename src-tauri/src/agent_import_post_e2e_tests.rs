@@ -2995,6 +2995,281 @@ async fn a_post_whose_response_cannot_be_journaled_still_reports_where_it_landed
         result["post_location"]["state"], "target_only",
         "{response}"
     );
+    // Sent: the busy refusal's step to post the same batch again is never
+    // offered after a send.
+    assert_eq!(result["attempt_recorded"], json!(true), "{response}");
+    assert!(result["error"].get("next_step").is_none(), "{response}");
+}
+
+/// The parsed `ENVELOPE/HEADER/TALLYREQUEST` of one request body, in either
+/// encoding the gateway sends; `None` for a body with no such header.
+fn tally_request_kind(body: &[u8]) -> Option<String> {
+    let text = if body.contains(&0) {
+        captured(body)
+    } else {
+        String::from_utf8(body.to_vec()).expect("a UTF-8 request body")
+    };
+    let mut reader = quick_xml::Reader::from_str(text.trim_start_matches('\u{feff}'));
+    let mut path = Vec::<Vec<u8>>::new();
+    loop {
+        match reader.read_event().expect("the request is well-formed XML") {
+            quick_xml::events::Event::Start(event) => {
+                let name = event.name().as_ref().as_bytes().to_vec();
+                if path == [b"ENVELOPE".to_vec(), b"HEADER".to_vec()] && name == b"TALLYREQUEST" {
+                    return Some(reader.read_text(event.name()).unwrap().trim().to_string());
+                }
+                path.push(name);
+            }
+            quick_xml::events::Event::End(_) => {
+                path.pop();
+            }
+            quick_xml::events::Event::Eof => return None,
+            _ => {}
+        }
+    }
+}
+
+/// What a post did when something happened to its data folder at the moment
+/// its queue was about to take the admission lock.
+struct AtTheLock {
+    response: Value,
+    /// Requests that reached Tally's import endpoint, by parsed header.
+    imports: usize,
+    /// Dispatch intents the journal holds for the batch.
+    intents: usize,
+    /// The `record_type` of each record the post appended.
+    appended: Vec<String>,
+    /// Whether the post's approval lapsed unspent (a note of it was written).
+    lapsed: bool,
+}
+
+/// A post whose queue reaches the admission lock just after `at_the_lock` ran
+/// on a second server of the same data folder: it may hold the lock, as a read
+/// tool or a writer would, until the post has answered, or change the folder
+/// and hold nothing. The aim snapshot, the last queue read before the send, is
+/// held back so `at_the_lock` runs before the queue's closure takes the lock.
+async fn post_with_this_at_the_lock(
+    at_the_lock: impl FnOnce(&Server, &std::path::Path) -> Option<std::fs::File>,
+) -> AtTheLock {
+    let mut plans = before_approval();
+    let mut after = after_approval(xml(created_one()));
+    let post_at = plans.len() + after.len() - 1;
+    let aim_at = post_at - 1;
+    let aim = after.len() - 2;
+    after[aim] = marks_before().with_delivery(Delivery::SlowHeaders(Duration::from_secs(2)));
+    plans.extend(after);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let before = journal(directory.path());
+    let other = server_at(simulator.address(), directory.path());
+    let post = SCRIPTED_APPROVAL.scope(
+        ScriptedApproval::approving(),
+        server.call_tool("post_import", args),
+    );
+    let at_aim = async {
+        let started = std::time::Instant::now();
+        // The aim snapshot has been received and its answer is held back:
+        // the queue is past every read and has not yet tried the lock.
+        while simulator.received() <= aim_at {
+            assert!(
+                started.elapsed() < Duration::from_secs(20),
+                "the aim snapshot never arrived"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        let lock = at_the_lock(&other, directory.path());
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        drop(lock);
+    };
+    let (response, ()) = tokio::join!(post, at_aim);
+    let imports = sent(simulator)
+        .iter()
+        .filter(|request| {
+            tally_request_kind(&request.request_body)
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("Import Data"))
+        })
+        .count();
+    let after = journal(directory.path());
+    let intents = String::from_utf8(after.clone())
+        .unwrap()
+        .lines()
+        .map(|record| serde_json::from_str::<Value>(record).unwrap())
+        .filter(|record| {
+            record["record_type"] == "dispatch_intent"
+                && record["batch_id"] == line.batch_id.as_str()
+        })
+        .count();
+    AtTheLock {
+        response,
+        imports,
+        intents,
+        appended: appended_kinds(&before, &after),
+        lapsed: server.post_approvals.lapse_note(&line.batch_id).is_some(),
+    }
+}
+
+/// Nothing was recorded or sent, and the answer names `code`, the lock's own.
+fn assert_refused_at_the_lock(run: &AtTheLock, code: &str) {
+    let response = &run.response;
+    assert_eq!(
+        run.imports, 0,
+        "nothing reached the import endpoint: {response}"
+    );
+    assert_eq!(
+        run.intents, 0,
+        "no dispatch intent was recorded: {response}"
+    );
+    assert!(
+        !run.appended.iter().any(|kind| kind == "dispatch_intent"),
+        "{:?}",
+        run.appended
+    );
+    assert!(run.lapsed, "the approval lapsed unspent: {response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], code,
+        "{response}"
+    );
+}
+
+/// A read tool holds the admission lock shared at the moment the queue's
+/// closure tries it exclusively: the post is refused before its intent, so
+/// nothing was recorded and nothing reached the import endpoint, and the answer
+/// says so and that the same batch is posted again.
+#[tokio::test]
+async fn a_post_whose_admission_lock_is_held_shared_answers_what_the_journal_shows() {
+    let run = post_with_this_at_the_lock(|other, _| {
+        Some(
+            other
+                .lock_import_admission_shared()
+                .expect("no one holds the lock while the aim is held back"),
+        )
+    })
+    .await;
+    assert_refused_at_the_lock(&run, "import_admission_busy");
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(result["attempt_recorded"], json!(false), "{}", run.response);
+    assert_eq!(
+        result["error"]["next_step"], ADMISSION_BUSY_BEFORE_ATTEMPT_NEXT_STEP,
+        "{}",
+        run.response
+    );
+}
+
+/// A writer holds it exclusively, through the post's answer: the refusal is
+/// the same, but the journal cannot be read back for the answer either, so
+/// whether an attempt was recorded is not stated and no step is offered.
+#[tokio::test]
+async fn a_post_whose_admission_lock_is_held_exclusively_answers_busy_without_a_step() {
+    let run = post_with_this_at_the_lock(|other, _| {
+        Some(
+            other
+                .lock_import_admission()
+                .expect("no one holds the lock while the aim is held back"),
+        )
+    })
+    .await;
+    assert_refused_at_the_lock(&run, "import_admission_busy");
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(result["attempt_recorded"], Value::Null, "{}", run.response);
+    assert!(
+        result["error"].get("next_step").is_none(),
+        "{}",
+        run.response
+    );
+}
+
+/// A publication left unsettled when the lock is taken refuses it with that
+/// publication's own code, before anything is recorded.
+#[tokio::test]
+async fn a_publication_unsettled_at_the_lock_is_refused_by_its_own_code() {
+    let run = post_with_this_at_the_lock(|_, directory| {
+        let marker = directory.join("imports").join(".proof-publication");
+        fs::create_dir(&marker).unwrap();
+        fs::write(marker.join("update.json"), b"{}").unwrap();
+        None
+    })
+    .await;
+    assert_refused_at_the_lock(&run, "proof_publication_recovery_required");
+    // The marker still stands when the answer reads the journal back, so that
+    // read is refused too: no attempt is stated and no step is offered.
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(result["attempt_recorded"], Value::Null, "{}", run.response);
+    assert!(
+        result["error"].get("next_step").is_none(),
+        "{}",
+        run.response
+    );
+}
+
+/// A lock file that cannot be opened refuses the lock as unavailable, before
+/// anything is recorded.
+#[tokio::test]
+async fn a_lock_file_that_cannot_be_opened_at_the_lock_is_refused_as_unavailable() {
+    let run = post_with_this_at_the_lock(|_, directory| {
+        let lock = directory.join("agent-import-admission.lock");
+        fs::remove_file(&lock).unwrap();
+        fs::create_dir(&lock).unwrap();
+        None
+    })
+    .await;
+    assert_refused_at_the_lock(&run, "import_admission_lock_unavailable");
+    // The lock file still cannot be opened when the answer reads the journal
+    // back, so no attempt is stated and no step is offered.
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(result["attempt_recorded"], Value::Null, "{}", run.response);
+    assert!(
+        result["error"].get("next_step").is_none(),
+        "{}",
+        run.response
+    );
+}
+
+/// The intent's append itself keeps the catch-all (#711): the journal is made
+/// read-only once the queue is past every read, so the reads under the lock
+/// pass and the append, after the approval is spent, fails. A failed append may
+/// have written part of the record, so the answer never says nothing was sent.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_intent_append_that_fails_keeps_the_unknown_outcome() {
+    use std::os::unix::fs::PermissionsExt;
+    let run = post_with_this_at_the_lock(|_, directory| {
+        fs::set_permissions(
+            directory.join("agent-import-ledger.jsonl"),
+            fs::Permissions::from_mode(0o400),
+        )
+        .unwrap();
+        None
+    })
+    .await;
+    let response = &run.response;
+    assert_eq!(run.imports, 0, "{response}");
+    assert_eq!(run.intents, 0, "{response}");
+    // The absence check's record before the approval, and nothing after it.
+    assert_eq!(run.appended, ["verification_status"], "{response}");
+    // Spent at the lock, so the failure came after every check: at the append.
+    assert!(!run.lapsed, "the approval was spent: {response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_dispatch_outcome_unknown",
+        "{response}"
+    );
+}
+
+/// The same run with nothing done at the lock posts once: the counts above see
+/// an import and an intent when there is one.
+#[tokio::test]
+async fn the_held_admission_harness_counts_a_post_that_was_sent() {
+    let run = post_with_this_at_the_lock(|_, _| None).await;
+    assert_eq!(run.imports, 1, "{}", run.response);
+    assert_eq!(run.intents, 1, "{}", run.response);
+    assert!(!run.lapsed, "{}", run.response);
+    assert_eq!(
+        run.response["structuredContent"]["result"]["attempt_recorded"],
+        json!(true),
+        "{}",
+        run.response
+    );
 }
 
 /// The simulated POST answer every test above posts against must be one Tally

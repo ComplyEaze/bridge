@@ -1810,26 +1810,8 @@ const ROWS: &[Row] = &[
             ))
         },
     },
-    // The same request after two vouchers dated 30 April were saved and Tally's current date had
-    // moved to 30 April (row 683-LD): every ledger plain.
-    Row {
-        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
-        source: Source::Captured,
-        parser: "parse_native_trial_balance",
-        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
-    },
-    Row {
-        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
-        source: Source::Captured,
-        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
-        parse: |_, text| {
-            typed(parse_native_trial_balance_with_currency(
-                text,
-                FOREXGROUP_GUID,
-                &forexgroup_base(),
-            ))
-        },
-    },
+    // The same request after two vouchers dated 30 April were saved has no row (row 683-LD):
+    // FOREX_FIRST_DAY_ALL_PLAIN says why and which test pins it.
     // Built-in Cash Flow reports: src/native_cash_flow_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_cash_flow_probe_b_fy_live.utf16le.xml",
@@ -3744,8 +3726,20 @@ const APP_ALL_MARKS: &str = "recorded by the app crate's record (#1198 slice 2):
 const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
 const APP_MOVEMENT_FIRST_DAY: &str = "recorded by the app crate's record (#1198 slice 2): \
-     parse_agent_changed_rows and parse_agent_changed_rows_naming_composite_ledgers (a \
-     ledger_movement window of a several-currency book from its first day, #683)";
+     parse_agent_changed_rows (a ledger_movement window of a several-currency book from its first \
+     day, #683); parse_agent_changed_rows_naming_composite_ledgers has no row there, as its \
+     rendering would hold the book's rupee amounts, which the merge gate's privacy scan reads as \
+     an identifier shape: the_first_day_windows_parse_each_entry_as_tally_sent_it in \
+     src/agent_movement_currency_tests.rs pins every field of each row it returns";
+const FOREX_FIRST_DAY_ALL_PLAIN: &str =
+    "a currency Trial Balance of BRIDGE FOREXGROUP LAB from its \
+     first day, read after two vouchers dated 30 April were saved (row 683-LD, #683), with no row \
+     here: its rendering would hold the book's rupee amounts, which the merge gate's privacy scan \
+     reads as an identifier shape; the_all_plain_trial_balance_reads_each_row_as_tally_sent_it in \
+     the app crate's src/agent_movement_currency_tests.rs parses it with \
+     parse_native_trial_balance and parse_native_trial_balance_with_currency and pins every \
+     field of each row and the empty currency sets; FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md \
+     says what it is";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
 const APP_STOCK_LINE_ROWS: &str = "recorded by the app crate's record (#1198 slice 2): \
@@ -3980,6 +3974,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/native/bills_receivable_forex_settled_supplier.utf16le.xml",
         FOREX_OPEN_BILL,
+    ),
+    (
+        "tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+        FOREX_FIRST_DAY_ALL_PLAIN,
     ),
     // The audit read's live answers on the pilot lab (the company object has a row).
     (

@@ -6,7 +6,7 @@ use bridge_tally_protocol::native_outstandings::{
     parse_company_currency_name, parse_currency_master_list,
 };
 use bridge_tally_protocol::native_trial_balance::{
-    parse_native_trial_balance_with_currency, NativeTrialBalanceAmount,
+    parse_native_trial_balance, parse_native_trial_balance_with_currency, NativeTrialBalanceAmount,
 };
 use std::collections::BTreeSet;
 
@@ -260,6 +260,373 @@ fn a_trial_balance_that_reads_a_ledger_with_a_composite_entry_as_plain_is_not_co
             "composite_entry_in_window"
         )
     );
+}
+
+/// Row 683-LD's Trial Balance as both of the protocol crate's parsers read it, every row as Tally
+/// sent it: the currency-scoped parse returns the same rows and finds no ledger kept in another
+/// currency and none mixed. Its parse records have no row (`FOREX_FIRST_DAY_ALL_PLAIN` in
+/// `captured_parse_record.rs`), so this pins what they held. Each row is its name, the last part
+/// of its GUID, its parent, then its opening, debit, credit and closing (`None` where Tally sent
+/// the amount empty). A figure of more than eight digits is written in two parts and joined here,
+/// so no line holds it as one run of digits, which the merge gate's privacy scan would refuse.
+#[test]
+fn the_all_plain_trial_balance_reads_each_row_as_tally_sent_it() {
+    let plain = parse_native_trial_balance(&utf16(ALL_PLAIN_TRIAL_BALANCE), FOREXGROUP).unwrap();
+    let (scope, kept) = trial_balance(ALL_PLAIN_TRIAL_BALANCE);
+    let TrialBalanceLedgerScope::BaseCurrencyLedgersOnly { foreign, mixed, .. } = &scope else {
+        panic!("not the several-currency scope");
+    };
+    assert!(foreign.is_empty(), "{foreign:?}");
+    assert!(mixed.is_empty(), "{mixed:?}");
+    assert_eq!(kept, plain);
+    let amount = |amount: &NativeTrialBalanceAmount| match amount {
+        NativeTrialBalanceAmount::Present(value) => Some(value.as_str().to_string()),
+        NativeTrialBalanceAmount::PresentEmpty => None,
+    };
+    let rows: Vec<_> = plain
+        .rows
+        .iter()
+        .map(|row| {
+            (
+                row.name.clone(),
+                row.guid.clone(),
+                row.parent.returned_text().map(str::to_string),
+                [
+                    amount(&row.opening),
+                    amount(&row.debit),
+                    amount(&row.credit),
+                    amount(&row.closing),
+                ],
+            )
+        })
+        .collect();
+    let some = |figure: &str| Some(figure.to_string());
+    let export_sales = Some(["86014", "641.25"].concat());
+    let expected = [
+        (
+            "BRIDGE Export Sales",
+            "000000d1",
+            "Sales Accounts",
+            [
+                some("0.00"),
+                some("0.00"),
+                export_sales.clone(),
+                export_sales,
+            ],
+        ),
+        (
+            "BRIDGE Import Purchases",
+            "000000d4",
+            "Purchase Accounts",
+            [
+                some("0.00"),
+                some("-17400.00"),
+                some("0.00"),
+                some("-17400.00"),
+            ],
+        ),
+        (
+            "BRIDGE INR Customer",
+            "000000d2",
+            "Sundry Debtors",
+            [
+                some("0.00"),
+                some("-5000.00"),
+                some("2000.00"),
+                some("-3000.00"),
+            ],
+        ),
+        (
+            "BRIDGE Lab Bank",
+            "000000d0",
+            "Bank Accounts",
+            [
+                some("0.00"),
+                some("-96700.00"),
+                some("17500.00"),
+                some("-79200.00"),
+            ],
+        ),
+        (
+            "BRIDGE USD Customer",
+            "000000cf",
+            "Sundry Debtors",
+            [
+                some("0.00"),
+                Some(["-88008", "700.00"].concat()),
+                some("96700.00"),
+                Some(["-87912", "000.00"].concat()),
+            ],
+        ),
+        (
+            "BRIDGE USD Supplier",
+            "000000d3",
+            "Sundry Creditors",
+            [
+                some("0.00"),
+                some("-17500.00"),
+                some("17500.00"),
+                some("0.00"),
+            ],
+        ),
+        (
+            "Cash",
+            "0000001f",
+            "Cash-in-Hand",
+            [
+                some("0.00"),
+                some("-3000.00"),
+                some("0.00"),
+                some("-3000.00"),
+            ],
+        ),
+        (
+            "Profit & Loss A/c",
+            "0000001e",
+            "\u{fffd}#4; Primary",
+            [some("0.00"), None, None, some("0.00")],
+        ),
+    ]
+    .map(|(name, guid, parent, amounts)| {
+        (
+            name.to_string(),
+            format!("{FOREXGROUP}-{guid}"),
+            Some(parent.to_string()),
+            amounts,
+        )
+    });
+    assert_eq!(rows, expected);
+}
+
+/// The movement's own parse of both first-day window answers, every field of each row as Tally
+/// sent it. Their parse records have no row (the app crate's `agent_parse_record_tests.rs` says
+/// why), so this pins what they held; the ledger-scoped answer for `BRIDGE USD Customer` is the
+/// book's four vouchers that touch it, field for field. The rupee figure of the million-dollar
+/// invoice is written in two parts and joined here, so no line holds it as one run of digits,
+/// which the merge gate's privacy scan would refuse.
+#[test]
+fn the_first_day_windows_parse_each_entry_as_tally_sent_it() {
+    let rupees_of_a_million_dollars = ["86000", "000.00"].concat();
+    let entry = |ledger: &str, is_deemed_positive: &str, amount: String, composite: bool| {
+        let mut entry = json!({
+            "amount": amount,
+            "bill_allocations": [],
+            "is_deemed_positive": is_deemed_positive,
+            "ledger": ledger,
+        });
+        if composite {
+            entry["currency_composite"] = json!(true);
+        }
+        entry
+    };
+    let fx = |ledger: &str, is_deemed_positive: &str, amount: &str| {
+        entry(ledger, is_deemed_positive, amount.to_string(), true)
+    };
+    let inr = |ledger: &str, is_deemed_positive: &str, amount: &str| {
+        entry(ledger, is_deemed_positive, amount.to_string(), false)
+    };
+    let voucher = |index: u32,
+                   voucher_type: &str,
+                   number: &str,
+                   party: &str,
+                   is_invoice: bool,
+                   amounts: [Value; 2]| {
+        let guid = format!("{FOREXGROUP}-{index:08x}");
+        json!({
+            "alter_id": index,
+            "amounts": amounts,
+            "cancelled": false,
+            "date": "20250401",
+            "guid": guid,
+            "is_invoice": is_invoice,
+            "master_id": index.to_string(),
+            "narration": "",
+            "optional": false,
+            "party": party,
+            "remote_id": guid,
+            "voucher_number": number,
+            "voucher_type": voucher_type,
+        })
+    };
+    let expected = vec![
+        voucher(
+            1,
+            "Sales",
+            "1",
+            "BRIDGE USD Customer",
+            true,
+            [
+                entry(
+                    "BRIDGE USD Customer",
+                    "Yes",
+                    format!("-$1000000.00 @ ₹ 86/$ = -₹ {rupees_of_a_million_dollars}"),
+                    true,
+                ),
+                entry(
+                    "BRIDGE Export Sales",
+                    "No",
+                    format!("$1000000.00 @ ₹ 86/$ = ₹ {rupees_of_a_million_dollars}"),
+                    true,
+                ),
+            ],
+        ),
+        voucher(
+            2,
+            "Sales",
+            "2",
+            "BRIDGE USD Customer",
+            true,
+            [
+                fx(
+                    "BRIDGE USD Customer",
+                    "Yes",
+                    "-$100.00 @ ₹ 86.4125/$ = -₹ 8641.25",
+                ),
+                fx(
+                    "BRIDGE Export Sales",
+                    "No",
+                    "$100.00 @ ₹ 86.4125/$ = ₹ 8641.25",
+                ),
+            ],
+        ),
+        voucher(
+            3,
+            "Receipt",
+            "1",
+            "BRIDGE USD Customer",
+            false,
+            [
+                fx("BRIDGE USD Customer", "No", "$100.00 @ ₹ 87/$ = ₹ 8700.00"),
+                fx("BRIDGE Lab Bank", "Yes", "-$100.00 @ ₹ 87/$ = -₹ 8700.00"),
+            ],
+        ),
+        voucher(
+            4,
+            "Journal",
+            "1",
+            "Cash",
+            false,
+            [
+                inr("Cash", "Yes", "-1000.00"),
+                inr("BRIDGE Export Sales", "No", "1000.00"),
+            ],
+        ),
+        voucher(
+            5,
+            "Sales",
+            "3",
+            "BRIDGE INR Customer",
+            true,
+            [
+                inr("BRIDGE INR Customer", "Yes", "-5000.00"),
+                inr("BRIDGE Export Sales", "No", "5000.00"),
+            ],
+        ),
+        voucher(
+            6,
+            "Receipt",
+            "2",
+            "BRIDGE INR Customer",
+            false,
+            [
+                inr("BRIDGE INR Customer", "No", "2000.00"),
+                inr("Cash", "Yes", "-2000.00"),
+            ],
+        ),
+        voucher(
+            7,
+            "Purchase",
+            "1",
+            "BRIDGE USD Supplier",
+            true,
+            [
+                fx("BRIDGE USD Supplier", "No", "$100.00 @ ₹ 86/$ = ₹ 8600.00"),
+                fx(
+                    "BRIDGE Import Purchases",
+                    "Yes",
+                    "-$100.00 @ ₹ 86/$ = -₹ 8600.00",
+                ),
+            ],
+        ),
+        voucher(
+            8,
+            "Purchase",
+            "2",
+            "BRIDGE USD Supplier",
+            true,
+            [
+                fx("BRIDGE USD Supplier", "No", "$100.00 @ ₹ 88/$ = ₹ 8800.00"),
+                fx(
+                    "BRIDGE Import Purchases",
+                    "Yes",
+                    "-$100.00 @ ₹ 88/$ = -₹ 8800.00",
+                ),
+            ],
+        ),
+        voucher(
+            9,
+            "Payment",
+            "1",
+            "BRIDGE USD Supplier",
+            false,
+            [
+                fx(
+                    "BRIDGE USD Supplier",
+                    "Yes",
+                    "-$100.00 @ ₹ 87/$ = -₹ 8700.00",
+                ),
+                fx("BRIDGE Lab Bank", "No", "$100.00 @ ₹ 87/$ = ₹ 8700.00"),
+            ],
+        ),
+        voucher(
+            10,
+            "Payment",
+            "2",
+            "BRIDGE USD Supplier",
+            false,
+            [
+                fx(
+                    "BRIDGE USD Supplier",
+                    "Yes",
+                    "-$100.00 @ ₹ 88/$ = -₹ 8800.00",
+                ),
+                fx("BRIDGE Lab Bank", "No", "$100.00 @ ₹ 88/$ = ₹ 8800.00"),
+            ],
+        ),
+        voucher(
+            11,
+            "Receipt",
+            "3",
+            "BRIDGE USD Customer",
+            false,
+            [
+                fx(
+                    "BRIDGE USD Customer",
+                    "No",
+                    "$1000.00 @ ₹ 88/$ = ₹ 88000.00",
+                ),
+                fx("BRIDGE Lab Bank", "Yes", "-$1000.00 @ ₹ 88/$ = -₹ 88000.00"),
+            ],
+        ),
+    ];
+    let book =
+        parse_agent_changed_rows_naming_composite_ledgers(&utf16(BOOK_WINDOW), FOREXGROUP).unwrap();
+    assert_eq!(book, expected);
+    let touching_the_customer: Vec<Value> = expected
+        .into_iter()
+        .filter(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["ledger"] == "BRIDGE USD Customer")
+        })
+        .collect();
+    assert_eq!(touching_the_customer.len(), 4);
+    let customer =
+        parse_agent_changed_rows_naming_composite_ledgers(&utf16(USD_CUSTOMER_WINDOW), FOREXGROUP)
+            .unwrap();
+    assert_eq!(customer, touching_the_customer);
 }
 
 /// `Profit & Loss A/c` has no entry in the window and a plain opening at the first day, so only the

@@ -19,9 +19,10 @@
 //!   second signal: the same invoice date or the same invoice value.
 //! - A financial year written into a number (`2025-26`, `25/26`, `FY26`, a leading or trailing
 //!   `2025`) is left out of the loose form and the serial, so a copy keyed without it, or with the
-//!   year written another way, is still found. A running number from 2000 to 2099 at the end is
-//!   read as a year, so `B2/2045` and `B2/2046` with a shared date or value need a person to
-//!   release a possible match.
+//!   year written another way, is still found. The cost: a running number from 2000 to 2099 at
+//!   either end is read as a year whenever the rest still holds a digit, so `B2/2045` and
+//!   `B2/2046` (or `2045/B2` and `2046/B2`) with a shared date or value need a person to release
+//!   a possible match; `B/2045` keeps its year as its number.
 //! - A number with no non-zero digit outside a named year (`NA`, `Cash`, `0`, `NA/2025-26`) is a
 //!   placeholder, not a supplier's number. A named year is an `FY` part with or without its year
 //!   (`FY26`, `FY25-26`, `FY0001`), or two neighbouring two- or four-digit runs a year apart
@@ -168,8 +169,10 @@ impl SupplierInvoiceRef {
 
     /// No non-zero digit outside a named year: an `FY` part with or without its year, or two
     /// neighbouring two- or four-digit runs a year apart, so `10/11` and `FY0001` are placeholders.
-    /// A trailing 2000-to-2099 running number is read as a year for the loose form, which can make
-    /// a possible match need a person; a lone four-digit run still counts as a number.
+    /// A 2000-to-2099 run at either end is read as a year for the loose form, which can make a
+    /// possible match need a person; a lone four-digit run still counts as a number here. The
+    /// cost: an identical placeholder copy with neither the date nor the value shared is
+    /// `Different`, so it is not found.
     fn is_placeholder(&self) -> bool {
         self.placeholder
     }

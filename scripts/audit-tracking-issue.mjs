@@ -283,7 +283,7 @@ export function requireBaselineSettings(report) {
   }
   // A key neither captured report holds is a setting this baseline does not
   // know, so what it does to the findings is unknown: refused the same way.
-  const unknown = Object.keys(report.settings).filter((key) => key !== "ignore" && !(key in BASELINE_SETTINGS));
+  const unknown = Object.keys(report.settings).filter((key) => key !== "ignore" && !Object.hasOwn(BASELINE_SETTINGS, key));
   if (unknown.length) {
     throw new Error(
       `audit-tracking-issue: the report's settings hold ${JSON.stringify(unknown.sort())}, which the captured ` +

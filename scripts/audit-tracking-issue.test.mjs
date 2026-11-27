@@ -591,6 +591,12 @@ test("a report whose other settings differ from the captured baseline is refused
   assert.throws(() => requireBaselineSettings({ settings: extra }), /settings hold \["deny"\].*refusing/);
   assert.throws(() => acceptedEntries([{ ...ACCEPTED_REPORT, settings: extra }], ACCEPTED_TOML), /settings hold \["deny"\]/);
   assert.throws(() => acceptedEntries([ACCEPTED_REPORT, { ...ACCEPTED_REPORT, settings: extra }], ACCEPTED_TOML), /settings hold \["deny"\]/);
+  // Names an object inherits are keys like any other: parsed from JSON, each is the report's own.
+  for (const name of ["__proto__", "constructor", "toString"]) {
+    const parsed = JSON.parse(JSON.stringify(ACCEPTED_REPORT.settings).replace(/^\{/, `{"${name}":1,`));
+    assert.ok(Object.hasOwn(parsed, name), name);
+    assert.throws(() => requireBaselineSettings({ settings: parsed }), new RegExp(`settings hold \\["${name}"\\]`));
+  }
 });
 
 test("a recorded line naming the same entries twice repairs silently, and bad rows are not echoed", () => {

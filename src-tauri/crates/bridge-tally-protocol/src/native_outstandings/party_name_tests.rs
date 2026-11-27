@@ -10,6 +10,7 @@ use crate::native_outstandings::{
     parse_ledger_outstandings_answer, parse_native_ledger_snapshot_for_company,
     render_ledger_outstandings_request, PartyBillReference,
 };
+use crate::xml_read_profiles::ValidatedCompanyName;
 use bridge_tally_primitives::{ExactDecimal, TallyDate};
 
 const FIXTURES: &str = concat!(
@@ -45,7 +46,7 @@ fn reads_as_its_own_ledger(row: &str, id: &str, name: &str, number: &str) {
     assert_eq!(party.as_str(), name);
     let to = date("20260801");
     assert_eq!(
-        render_ledger_outstandings_request(BOOK, &party, &to),
+        render_ledger_outstandings_request(&ValidatedCompanyName::new(BOOK).unwrap(), &party, &to,),
         capture(&format!(
             "ledger-outstandings-2480-{row}-{id}-20260801.request.utf16le.xml"
         )),

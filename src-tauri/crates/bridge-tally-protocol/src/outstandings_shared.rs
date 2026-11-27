@@ -21,7 +21,6 @@ use bridge_tally_primitives::{ExactDecimal, TallyDate};
 use serde::{Deserialize, Serialize};
 
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
-use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use crate::xml_read_profiles::ValidatedCompanyName;
 
 /// Whether a `BILLALLOCATIONS.LIST` row that carries no `BILLTYPE` is one of
@@ -750,7 +749,7 @@ const COMPANY_EXTENT_V2_COLLECTION_NAME: &str = "BridgeCompanyBookExtentV2";
 pub(crate) const COMPANY_EXTENT_V2_FETCH: &str =
     "Name, GUID, CompanyNumber, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID";
 
-pub(crate) fn render_company_book_extent_v2(company: &str) -> String {
+pub(crate) fn render_company_book_extent_v2(company: &ValidatedCompanyName) -> String {
     render_company_book_extent_with_contract(
         company,
         COMPANY_EXTENT_V2_COLLECTION_NAME,
@@ -763,7 +762,7 @@ pub(crate) fn render_company_book_extent_v2(company: &str) -> String {
 /// fixed in Bridge's code; a run-time string cannot be passed without leaking it
 /// or holding it in a static.
 fn render_company_book_extent_with_contract(
-    company: &str,
+    company: &ValidatedCompanyName,
     collection: &'static str,
     fetch: &'static str,
 ) -> String {
@@ -776,11 +775,8 @@ fn render_company_book_extent_with_contract(
   </DESC></BODY>
 </ENVELOPE>"#,
         collection = collection,
-        static_variables = static_variables_for_unvalidated_company(
-            company,
-            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-            "",
-        ),
+        static_variables =
+            company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "",),
         fetch = fetch,
     )
 }
@@ -794,7 +790,7 @@ const COMPANY_LEDGER_COUNT_FETCH: &str = "Name, GUID, NUMLEDGERS";
 /// collection shape as the company extent, fetching only the company's name and
 /// GUID and its `NUMLEDGERS`. It is deliberately not part of the extent request,
 /// which every reader shares and whose equality is the read bracket.
-pub fn render_company_ledger_count_request(company: &str) -> String {
+pub fn render_company_ledger_count_request(company: &ValidatedCompanyName) -> String {
     render_company_book_extent_with_contract(
         company,
         COMPANY_LEDGER_COUNT_COLLECTION_NAME,

@@ -2297,11 +2297,11 @@ pub(crate) mod coordinator {
             ),
             bridge_tally_protocol::native_masters::render_native_masters_request(
                 bridge_tally_protocol::native_masters::NativeMasterKind::StockGroups,
-                identity.display_name(),
+                identity.company_name(),
             ),
             bridge_tally_protocol::native_masters::render_native_masters_request(
                 bridge_tally_protocol::native_masters::NativeMasterKind::Units,
-                identity.display_name(),
+                identity.company_name(),
             ),
         ];
         let opening = chain_before_the_stock_reads().await;

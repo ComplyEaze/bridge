@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn company_book_extent_template_has_only_the_verified_fetch_list() {
-    let v2 = render_company_book_extent_v2("Synthetic & Company");
+    let v2 =
+        render_company_book_extent_v2(&ValidatedCompanyName::new("Synthetic & Company").unwrap());
     assert!(v2.contains("<ID>BridgeCompanyBookExtentV2</ID>"));
     assert!(v2.contains("Synthetic &amp; Company"));
     assert!(v2.contains(

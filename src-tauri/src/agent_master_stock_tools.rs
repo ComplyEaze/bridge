@@ -98,6 +98,18 @@ const STOCK_HOLD_NEXT_STEP: &str = "When the stock item creates that hold the na
 /// The step after a hold check that could not read the journal.
 const STOCK_UNREAD_NEXT_STEP: &str = "Post this batch again later: the journal is read again then. Do not create the stock item in Tally by hand meanwhile.";
 
+/// What a stock post withdrawn by its caller is told, by what the stock
+/// journal showed of its batch, as the ledger post's three cases.
+const STOCK_CANCELLED_NOT_SENT: &str =
+    "The request was cancelled. No send is recorded for this prepared stock item.";
+const STOCK_CANCELLED_SENT: &str = "The request was cancelled after a send of this batch was recorded. The stock item create may have been sent to Tally: never send this batch again.";
+const STOCK_CANCELLED_NOT_KNOWN: &str = "The request was cancelled, and whether a send of this batch was recorded is not known: the journal could not be read just now, or holds no such batch. Check the company's stock items in Tally.";
+/// The step after a cancelled stock post whose send is recorded.
+const STOCK_CANCELLED_SENT_STEP: &str = "The stock item has not been read back. Call post_stock_item with this batch_id again once Tally is idle to read it back (it sends nothing), or look at the company's stock items in Tally. Do not create the stock item in Tally by hand meanwhile: the create may still be waiting in Tally. Never post this batch again.";
+/// The step after a cancelled stock post when whether a send is recorded is
+/// not known: a later call is the right one either way.
+const STOCK_CANCELLED_NOT_KNOWN_STEP: &str = "Call post_stock_item with this batch_id again. If a send of this batch was recorded, that call sends nothing: it reads the book back, or reports the outcome already recorded; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the stock item in Tally by hand meanwhile: a create that has not run yet may still be waiting in Tally.";
+
 impl Server {
     /// Prepare ONE stock item, a copy of the sibling stock item `sibling` under
     /// `name`, in the company `company_guid`. Nothing is written to Tally.
@@ -368,6 +380,66 @@ impl Server {
 }
 
 impl Server {
+    /// Whether the stock journal records a send of the batch `args` names:
+    /// `Some(false)` is known not sent. Only a busy journal is an error, which
+    /// a cancellation waits out; anything else not known is `None`, and the
+    /// post then drains rather than be taken as unsent.
+    pub(super) fn recorded_stock_attempt(&self, args: &Value) -> Result<Option<bool>, ToolFailure> {
+        let Some(batch_id) = args.get("batch_id").and_then(Value::as_str) else {
+            return Ok(None);
+        };
+        match self.read_kind_journal_shared(read_stock_item_journal) {
+            Ok(journal) => Ok(journal.state(batch_id).map(|state| state.intent.is_some())),
+            Err(error) if error == "import_admission_busy" => Err(error.into()),
+            Err(_) => Ok(None),
+        }
+    }
+
+    /// The answer to a stock post withdrawn before its intent: the ledger
+    /// post's three cases, read from the stock journal.
+    pub(super) fn cancelled_stock_for_response(
+        &self,
+        args: &Value,
+    ) -> Result<ToolOutcome, ToolFailure> {
+        let batch_id = required_string(args, "batch_id")?;
+        let attempted = self.recorded_stock_attempt(args)?;
+        let company_guid =
+            (self.read_kind_journal_shared(read_stock_item_journal).ok()).and_then(|journal| {
+                (journal.state(batch_id)).map(|state| state.batch.company().guid.clone())
+            });
+        let mut evidence = empty_evidence();
+        evidence.state = "partial";
+        evidence.reason_code = Some("request_cancelled".into());
+        let (message, next_step) = match attempted {
+            Some(false) => (STOCK_CANCELLED_NOT_SENT, None),
+            Some(true) => (STOCK_CANCELLED_SENT, Some(STOCK_CANCELLED_SENT_STEP)),
+            None => (
+                STOCK_CANCELLED_NOT_KNOWN,
+                Some(STOCK_CANCELLED_NOT_KNOWN_STEP),
+            ),
+        };
+        let mut error = json!({"code": "request_cancelled", "message": message});
+        if let Some(step) = next_step {
+            error["next_step"] = json!(step);
+        }
+        let dispatch = if attempted == Some(false) {
+            "not_dispatched"
+        } else {
+            "reconciliation_required"
+        };
+        Ok(ToolOutcome {
+            payload: json!({"result": {
+                "batch_id": batch_id,
+                "attempt_recorded": attempted,
+                "dispatch": {"state": dispatch, "resent": false},
+                "error": error,
+            }}),
+            evidence,
+            company_guid,
+            truncated: false,
+        })
+    }
+
     /// After the one Create was answered: the answer recorded once, then the
     /// book read back and judged with it in hand. Else NOT verified.
     async fn answer_stock_send(

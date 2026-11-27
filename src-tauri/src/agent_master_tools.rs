@@ -46,6 +46,7 @@ use super::master_post::{
 use super::master_review::{masked_review_text, master_review_text};
 use super::post::{refusal_cause, refusal_code, ApprovalTarget, Entry, Pass, Step};
 use super::*;
+use crate::agent::agent_protocol::PostTool;
 use crate::agent::evidence_from_runtime_read;
 use crate::agent::read_profiles::{ledger_name_index_read, native_group_snapshot_read};
 use crate::agent::shown_cause;
@@ -484,10 +485,15 @@ impl Server {
         tool: &str,
         args: &Value,
     ) -> Result<Option<bool>, ToolFailure> {
-        if tool == "post_ledger_creates" {
-            self.recorded_master_attempt(args)
-        } else {
-            self.recorded_import_attempt(args)
+        match PostTool::of(tool) {
+            Some(PostTool::Vouchers) => self.recorded_import_attempt(args),
+            Some(PostTool::Ledger) => self.recorded_master_attempt(args),
+            Some(PostTool::Stock) => self.recorded_stock_attempt(args),
+            // Not known, so the post drains: never the voucher journal's answer.
+            None => {
+                debug_assert!(false, "{tool} is not a post tool");
+                Ok(None)
+            }
         }
     }
 
@@ -497,8 +503,11 @@ impl Server {
         tool: &str,
         args: &Value,
     ) -> Result<ToolOutcome, ToolFailure> {
-        if tool != "post_ledger_creates" {
-            return self.cancelled_import_for_response(args);
+        match PostTool::of(tool) {
+            Some(PostTool::Ledger) => {}
+            Some(PostTool::Vouchers) => return self.cancelled_import_for_response(args),
+            Some(PostTool::Stock) => return self.cancelled_stock_for_response(args),
+            None => return Err("tool_not_found".to_string().into()),
         }
         let batch_id = required_string(args, "batch_id")?;
         let attempted = self.recorded_master_attempt(args)?;

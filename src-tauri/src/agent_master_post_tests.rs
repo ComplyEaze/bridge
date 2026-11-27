@@ -1254,9 +1254,13 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
         ("recheck_shown_stock_item", &[("agent_master_post.rs", 2)]),
         // The stock prepare: its definition and its module's title, no caller.
         ("prepare_stock_item", &[("agent_master_stock_tools.rs", 2)]),
-        // The stock post: its definition, its pass, the module's notes and the
-        // tool it names in the approval answer, no caller.
-        ("post_stock_item", &[("agent_master_stock_tools.rs", 5)]),
+        // The stock post: its definition, its pass, the module's notes, the
+        // tool it names in the approval answer and its two cancelled steps, and
+        // the post tool list a cancellation reads; no caller.
+        (
+            "post_stock_item",
+            &[("agent_master_stock_tools.rs", 7), ("agent_protocol.rs", 1)],
+        ),
         // The in-queue stock recheck and the stock intent writer: their one
         // caller is the stock post, which has none.
         (

@@ -1190,6 +1190,26 @@ async fn a_batch_posted_elsewhere_releases_its_hold() {
     assert!(!scripted.is_waiting(), "its dialog was closed");
 }
 
+/// Opens a held response when dropped, so that no read is left held however a
+/// test's wait for the effect that releases it ends, a panic included.
+struct OpenOnDrop<'a>(Option<&'a tally_protocol_simulator::DeliveryGate>);
+
+impl Drop for OpenOnDrop<'_> {
+    fn drop(&mut self) {
+        if let Some(gate) = self.0 {
+            gate.open();
+        }
+    }
+}
+
+/// Whether `batch_id`'s approval has lapsed for `reason`: the observable
+/// effect a test waits on before it lets a held read go.
+fn lapsed_for(approvals: &PostApprovals, batch_id: &str, reason: &str) -> bool {
+    approvals
+        .lapse_note(batch_id)
+        .is_some_and(|note| note["reason"] == reason)
+}
+
 /// `post_import` over the stdio path every agent post takes, cancelled once
 /// `simulator` has received `after` requests when that is given, and failed
 /// if it has not ended within `bound`. A post that ends before that request
@@ -1208,21 +1228,16 @@ async fn post_over_stdio(
     held: Option<&tally_protocol_simulator::DeliveryGate>,
     bound: Duration,
 ) -> ToolCallEnd {
-    /// Opens the held response when the wait for the withdrawal ends.
-    struct Release<'a>(Option<&'a tally_protocol_simulator::DeliveryGate>);
-    impl Drop for Release<'_> {
-        fn drop(&mut self) {
-            if let Some(gate) = self.0 {
-                gate.open();
-            }
-        }
-    }
+    // A held read is let go on the batch's withdrawal, so a post with no
+    // batch to name fails here rather than waiting out its bound.
+    let batch_id = args["batch_id"].as_str();
+    assert!(
+        held.is_none() || batch_id.is_some(),
+        "a held post names its batch: {args}"
+    );
     let withdrawn = || {
-        args["batch_id"].as_str().is_some_and(|batch_id| {
-            server
-                .post_approvals
-                .lapse_note(batch_id)
-                .is_some_and(|note| note["reason"] == "request_cancelled")
+        batch_id.is_some_and(|batch_id| {
+            lapsed_for(&server.post_approvals, batch_id, "request_cancelled")
         })
     };
     let started = std::time::Instant::now();
@@ -1250,7 +1265,7 @@ async fn post_over_stdio(
         end
     };
     let canceller = async {
-        let _release = Release(held);
+        let _release = OpenOnDrop(held);
         if let Some((simulator, after)) = cancel {
             while simulator.received() <= after {
                 if ended.get() {
@@ -1504,14 +1519,19 @@ async fn a_withdrawn_post_s_receipt_carries_the_trail_of_the_sends_that_ran() {
         let mut plans = before_approval();
         let held = plans.len();
         let mut lease = after_approval(xml(created_one()));
-        lease[0] = lease[0]
-            .clone()
-            .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+        let gate = tally_protocol_simulator::DeliveryGate::new();
+        lease[0] = lease[0].clone().with_delivery(Delivery::Held(gate.clone()));
         plans.extend(lease);
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
-        let server = server_at(simulator.address(), directory.path());
-        let (_, args) = saved_batch(&server);
+        let mut server = server_at(simulator.address(), directory.path());
+        // Posted in the answering call however long its reads took (#2542).
+        server.post_approvals = std::sync::Arc::new(PostApprovals::with_measured_post(
+            directory.path(),
+            Duration::ZERO,
+        ));
+        let (line, args) = saved_batch(&server);
+        let approvals = std::sync::Arc::clone(&server.post_approvals);
         let (client, source) = tokio::io::duplex(1 << 16);
         let (client_read, mut client_write) = tokio::io::split(client);
         let (source_read, mut source_write) = tokio::io::split(source);
@@ -1528,10 +1548,17 @@ async fn a_withdrawn_post_s_receipt_carries_the_trail_of_the_sends_that_ran() {
                 .write_all(format!("{initialize}\n{call}\n").as_bytes())
                 .await
                 .unwrap();
+            // The held read goes only once the cancel has withdrawn the post:
+            // ordered by events, not by a delay (#2542).
+            let release = OpenOnDrop(Some(&gate));
             while simulator.received() <= held {
                 tokio::time::sleep(Duration::from_millis(2)).await;
             }
             client_write.write_all(CANCEL_7).await.unwrap();
+            while !lapsed_for(&approvals, &line.batch_id, "request_cancelled") {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+            drop(release);
             let mut lines = BufReader::new(client_read).lines();
             if !close_input {
                 while let Some(line) = lines.next_line().await.unwrap() {
@@ -1624,19 +1651,27 @@ async fn an_approval_revoked_between_take_and_spend_is_refused_by_its_own_code()
     let lease_start = plans.len();
     let mut lease = after_approval(xml(created_one()));
     let held_at = 5;
-    lease[held_at] =
-        xml(catalogue()).with_delivery(Delivery::SlowHeaders(Duration::from_millis(400)));
+    let gate = tally_protocol_simulator::DeliveryGate::new();
+    lease[held_at] = xml(catalogue()).with_delivery(Delivery::Held(gate.clone()));
     let post_at = lease_start + lease.len() - 1;
     plans.extend(lease);
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = server_at(simulator.address(), directory.path());
+    let mut server = server_at(simulator.address(), directory.path());
+    // Taken in the answering call however long its reads took (#2542).
+    server.post_approvals = std::sync::Arc::new(PostApprovals::with_measured_post(
+        directory.path(),
+        Duration::ZERO,
+    ));
     let (line, args) = saved_batch(&server);
     let post = SCRIPTED_APPROVAL.scope(
         ScriptedApproval::approving(),
         server.call_tool("post_import", args),
     );
     let revoke = async {
+        // The held read goes only once the revocation has lapsed the approval:
+        // ordered by events, not by a delay (#2542).
+        let release = OpenOnDrop(Some(&gate));
         tokio::time::timeout(HANG_GUARD, async {
             while simulator.received() <= lease_start + held_at {
                 tokio::time::sleep(Duration::from_millis(2)).await;
@@ -1656,6 +1691,11 @@ async fn an_approval_revoked_between_take_and_spend_is_refused_by_its_own_code()
         server
             .post_approvals
             .revoke(&line.batch_id, "revoked_elsewhere");
+        assert!(
+            lapsed_for(&server.post_approvals, &line.batch_id, "revoked_elsewhere"),
+            "the revocation lapsed the taken approval"
+        );
+        drop(release);
     };
     let (refused, ()) = tokio::join!(post, revoke);
     let observed = sent(simulator);

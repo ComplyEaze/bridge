@@ -281,6 +281,16 @@ export function requireBaselineSettings(report) {
       );
     }
   }
+  // A key neither captured report holds is a setting this baseline does not
+  // know, so what it does to the findings is unknown: refused the same way.
+  const unknown = Object.keys(report.settings).filter((key) => key !== "ignore" && !(key in BASELINE_SETTINGS));
+  if (unknown.length) {
+    throw new Error(
+      `audit-tracking-issue: the report's settings hold ${JSON.stringify(unknown.sort())}, which the captured ` +
+        "reports do not; an unknown setting may change what cargo-audit reports, so refusing " +
+        "(a deliberate change updates BASELINE_SETTINGS in scripts/audit-tracking-issue.mjs)",
+    );
+  }
 }
 
 // The accepted entries for the issue: the file's entries, once every report's

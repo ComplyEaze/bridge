@@ -586,6 +586,11 @@ test("a report whose other settings differ from the captured baseline is refused
     assert.throws(() => acceptedEntries([{ ...ACCEPTED_REPORT, settings }], ACCEPTED_TOML), pattern);
     assert.throws(() => acceptedEntries([ACCEPTED_REPORT, { ...ACCEPTED_REPORT, settings }], ACCEPTED_TOML), pattern);
   }
+  // A setting the captured reports do not hold is refused, naming it.
+  const extra = { ...ACCEPTED_REPORT.settings, deny: ["warnings"] };
+  assert.throws(() => requireBaselineSettings({ settings: extra }), /settings hold \["deny"\].*refusing/);
+  assert.throws(() => acceptedEntries([{ ...ACCEPTED_REPORT, settings: extra }], ACCEPTED_TOML), /settings hold \["deny"\]/);
+  assert.throws(() => acceptedEntries([ACCEPTED_REPORT, { ...ACCEPTED_REPORT, settings: extra }], ACCEPTED_TOML), /settings hold \["deny"\]/);
 });
 
 test("a recorded line naming the same entries twice repairs silently, and bad rows are not echoed", () => {

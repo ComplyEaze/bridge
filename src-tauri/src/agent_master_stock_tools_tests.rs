@@ -816,6 +816,40 @@ mod post {
         assert!(run.server.post_approvals.holds(batch_id));
     }
 
+    /// Seeding for the post cancellation tests, which cannot reach the stock
+    /// journal or the stock approval helpers.
+    impl Server {
+        /// Records the rebound draft's stock batch under `batch_id` in this
+        /// server's data folder, with its send's intent too when `sent`, and
+        /// returns the batch's company GUID.
+        pub(in crate::agent) async fn record_stock_batch_for_test(
+            &self,
+            batch_id: &str,
+            sent: bool,
+        ) -> String {
+            let origin = crate::agent::canonical_loopback_origin(&self.settings.endpoint).unwrap();
+            let batch =
+                (rebound_shown(&shape_identity(), &origin).batch(batch_id.to_string())).unwrap();
+            record(&self.settings.data_dir, &batch);
+            if sent {
+                dispatch_open(&self.settings.data_dir, &batch).await;
+            }
+            batch.company().guid.clone()
+        }
+
+        /// Holds an approved stock approval, of the masters kind, for
+        /// `batch_id` in this server's approvals holder.
+        pub(in crate::agent) async fn hold_stock_approval_for_test(&self, batch_id: &str) {
+            let origin = crate::agent::canonical_loopback_origin(&self.settings.endpoint).unwrap();
+            let fresh = rebound_shown(&shape_identity(), &origin).binding();
+            let (_, held, approved, answered) =
+                approved_stock_item_for(STOCK_PROPOSED, batch_id.to_string()).await;
+            (self.post_approvals)
+                .hold_approved(batch_id, fresh, approved, held, answered)
+                .unwrap();
+        }
+    }
+
     /// A batch whose send is recorded, with an approval held for it: the
     /// approval is withdrawn, and the batch is reconciled: the company
     /// checked, the book read back and judged, never verified, and nothing

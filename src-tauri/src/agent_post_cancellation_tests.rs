@@ -58,8 +58,13 @@ fn server(path: &Path) -> Server {
 }
 
 fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
+    saved_batch_as(server, "bridge-00000000-0000-4000-8000-000000000001")
+}
+
+/// [`saved_batch`] under `batch_id`.
+fn saved_batch_as(server: &Server, batch_id: &str) -> (ImportLedgerLine, Value) {
     let line: ImportLedgerLine = serde_json::from_value(json!({
-        "batch_id":"bridge-00000000-0000-4000-8000-000000000001", "identity_scheme":"batch_v1",
+        "batch_id":batch_id, "identity_scheme":"batch_v1",
         "company_guid":"00000000-0000-4000-8000-000000000002",
         "endpoint_origin":"http://127.0.0.1:9",
         "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"},
@@ -74,7 +79,7 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
     .unwrap();
     let args = json!({
         "company_guid":"00000000-0000-4000-8000-000000000002",
-        "batch_id":"bridge-00000000-0000-4000-8000-000000000001"
+        "batch_id":batch_id
     });
     server.append_import_ledger(&line).unwrap();
     (line, args)
@@ -593,4 +598,237 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
         assert!(cancellation.is_cancelled());
         assert!(!server.post_approvals.holds(&batch_id));
     }
+}
+
+// --- post_stock_item: classified from the stock journal (#1381) ---
+
+/// A stock batch's id, and the arguments a `post_stock_item` call takes.
+fn stock_call(serial: u16) -> (&'static str, Value) {
+    let batch_id = crate::synthetic_batch_id(serial);
+    (batch_id, json!({ "batch_id": batch_id }))
+}
+
+/// A stock post cancelled after its intent is recorded may have been sent: it
+/// is drained to its own answer, never withdrawn, and the approval held for
+/// its batch is left alone.
+#[tokio::test]
+async fn a_stock_post_cancelled_after_its_intent_drains_and_keeps_its_approval() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let (batch_id, args) = stock_call(0x5a01);
+    server.record_stock_batch_for_test(batch_id, true).await;
+    server.hold_stock_approval_for_test(batch_id).await;
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let (client, source) = tokio::io::duplex(4096);
+    let (client_read, mut client_write) = tokio::io::split(client);
+    let (source_read, mut source_write) = tokio::io::split(source);
+    let mut reader = BufReader::new(source_read);
+    let mut pending = std::collections::VecDeque::new();
+    let (complete, wait_for_completion) = tokio::sync::oneshot::channel();
+    let id = json!(7);
+    let mut framer = Framer::default();
+    let serve = await_post(
+        async move {
+            wait_for_completion.await.unwrap();
+            stand_in_response()
+        },
+        PostRequest {
+            tool: "post_stock_item",
+            id: &id,
+            args: &args,
+            cancellation: &cancellation,
+        },
+        &server,
+        &mut reader,
+        &mut framer,
+        &mut pending,
+        &mut source_write,
+    );
+    let client = async {
+        client_write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"ping\"}\n").await.unwrap();
+        let mut response = String::new();
+        BufReader::new(client_read)
+            .read_line(&mut response)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&response).unwrap(),
+            json!({"jsonrpc":"2.0","id":8,"result":{}})
+        );
+        complete.send(()).unwrap();
+    };
+    let (outcome, ()) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        tokio::join!(serve, client)
+    })
+    .await
+    .unwrap();
+    assert!(matches!(outcome.unwrap(), ToolCallEnd::Answered(_)));
+    assert!(
+        !cancellation.is_cancelled(),
+        "a drained post is not withdrawn"
+    );
+    assert!(server.post_approvals.holds(batch_id), "nothing is revoked");
+    assert_eq!(
+        post_dispatch_state(&server, "post_stock_item", &args),
+        PostDispatchState::MayHaveDispatched
+    );
+}
+
+/// A stock post cancelled before its intent is withdrawn, and the approval it
+/// holds, of the masters kind, is revoked as one: a withdrawal of the voucher
+/// kind would leave it held.
+#[tokio::test]
+async fn a_stock_post_cancelled_before_its_intent_is_withdrawn_and_revoked_as_a_master_post() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let (batch_id, args) = stock_call(0x5a02);
+    server.record_stock_batch_for_test(batch_id, false).await;
+    server.hold_stock_approval_for_test(batch_id).await;
+    // The control: the voucher kind's withdrawal does not reach this approval.
+    (server.post_approvals).revoke_of(
+        crate::tally::approved_import::PostKind::Vouchers,
+        batch_id,
+        "request_cancelled",
+    );
+    assert!(server.post_approvals.holds(batch_id));
+    assert_eq!(
+        post_dispatch_state(&server, "post_stock_item", &args),
+        PostDispatchState::NotDispatched
+    );
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let input = &b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n"[..];
+    let result = stops(await_post(
+        stand_in(cancellation.clone()),
+        PostRequest {
+            tool: "post_stock_item",
+            id: &json!(7),
+            args: &args,
+            cancellation: &cancellation,
+        },
+        &server,
+        &mut BufReader::new(input),
+        &mut Framer::default(),
+        &mut std::collections::VecDeque::new(),
+        &mut Vec::new(),
+    ))
+    .await;
+    assert!(matches!(result.unwrap(), ToolCallEnd::Withdrawn { .. }));
+    assert!(cancellation.is_cancelled());
+    assert!(!server.post_approvals.holds(batch_id), "revoked as masters");
+}
+
+/// The answer to a stock post cancelled before it started says whether a send
+/// is recorded from the stock journal, in its three cases, with the batch's
+/// company, and names no ledger tool.
+#[tokio::test]
+async fn a_cancelled_stock_post_is_answered_from_the_stock_journal() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let (unsent, unsent_args) = stock_call(0x5a03);
+    let (sent, sent_args) = stock_call(0x5a04);
+    let guid = server.record_stock_batch_for_test(unsent, false).await;
+    server.record_stock_batch_for_test(sent, true).await;
+    let cancelled = |args: &Value| {
+        let outcome = server
+            .cancelled_post_for_response("post_stock_item", args)
+            .unwrap();
+        let result = outcome.payload["result"].clone();
+        let text = result["error"].to_string();
+        assert!(!text.contains("ledger"), "{text}");
+        assert_eq!(result["error"]["code"], "request_cancelled");
+        assert_eq!(result["dispatch"]["resent"], false);
+        (result, outcome.company_guid)
+    };
+    let (nothing, company) = cancelled(&unsent_args);
+    assert_eq!(nothing["batch_id"], unsent);
+    assert_eq!(nothing["attempt_recorded"], false);
+    assert_eq!(nothing["dispatch"]["state"], "not_dispatched");
+    assert!(nothing["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("stock item"));
+    assert_eq!(company.as_deref(), Some(guid.as_str()));
+    let (recorded, company) = cancelled(&sent_args);
+    assert_eq!(recorded["attempt_recorded"], true);
+    assert_eq!(recorded["dispatch"]["state"], "reconciliation_required");
+    assert!(recorded["error"]["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("post_stock_item"));
+    assert_eq!(company.as_deref(), Some(guid.as_str()));
+    corrupt_stock_journal(directory.path());
+    let (unread, _) = cancelled(&unsent_args);
+    assert!(unread["attempt_recorded"].is_null(), "{unread}");
+    assert_eq!(unread["dispatch"]["state"], "reconciliation_required");
+    assert!(unread["error"]["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("post_stock_item"));
+}
+
+/// A stock batch is read from the stock journal only: a voucher batch of the
+/// same id whose send is recorded does not make the stock batch attempted.
+#[tokio::test]
+async fn a_voucher_intent_of_the_same_id_is_not_a_stock_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let (batch_id, _) = stock_call(0x5a05);
+    server.record_stock_batch_for_test(batch_id, false).await;
+    let (line, args) = saved_batch_as(&server, batch_id);
+    let admission = server.lock_import_admission().unwrap();
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&line))
+        .unwrap();
+    drop(admission);
+    // The control: the voucher journal shows this id sent.
+    assert_eq!(
+        server.recorded_post_attempt("post_import", &args).unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        server
+            .recorded_post_attempt("post_stock_item", &args)
+            .unwrap(),
+        Some(false)
+    );
+    assert_eq!(
+        post_dispatch_state(&server, "post_stock_item", &args),
+        PostDispatchState::NotDispatched
+    );
+}
+
+/// A stock journal that cannot be read is not "not sent": the post drains. A
+/// busy one is waited on.
+#[tokio::test]
+async fn an_unreadable_stock_journal_answers_may_have_dispatched() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let (batch_id, args) = stock_call(0x5a06);
+    server.record_stock_batch_for_test(batch_id, false).await;
+    assert_eq!(
+        post_dispatch_state(&server, "post_stock_item", &args),
+        PostDispatchState::NotDispatched
+    );
+    let admission = server.lock_import_admission().unwrap();
+    assert_eq!(
+        post_dispatch_state(&server, "post_stock_item", &args),
+        PostDispatchState::AdmissionBusy
+    );
+    drop(admission);
+    corrupt_stock_journal(directory.path());
+    assert_eq!(
+        post_dispatch_state(&server, "post_stock_item", &args),
+        PostDispatchState::MayHaveDispatched
+    );
+}
+
+/// Appends a torn line to the stock journal in `directory`.
+fn corrupt_stock_journal(directory: &Path) {
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(directory.join("agent-master-stock-item.jsonl"))
+        .unwrap();
+    file.write_all(br#"{"record_type":"master_dispatch_intent","batch_id":"bridge-"#)
+        .unwrap();
 }

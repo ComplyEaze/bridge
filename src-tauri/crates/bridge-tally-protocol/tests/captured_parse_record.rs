@@ -59,6 +59,7 @@ use bridge_tally_protocol::{
     export_status, parse_companies_from_collection, parse_company_gateway_capability_observation,
     parse_import_evidence, parse_import_outcome, parse_import_result, parse_ledger_census_slice,
     parse_ledger_name_index, parse_native_group_source_records_with_evidence,
+    parse_native_ledger_source_records_keeping_composite_openings,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
@@ -499,6 +500,169 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-trailing-space.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    // src/native_outstandings/party_name_tests.rs (#2480): names with marks, one synthetic book.
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-mx-al-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nc-al-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nc-sm-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-am-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-ap-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-dd-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-dt-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-hy-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-lp-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-op-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-rp-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-sc-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-ns-sl-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-at-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-cl-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-cm-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-dq-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-ex-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-hs-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-pc-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-ps-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-st-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-2480-nx-us-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20260401..20260801)",
+        parse: |_, text| party_bills(text, "20260401", "20260801"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-2480-mx-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-2480-nc-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-2480-ns-20260801.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-2480-nx-20260801.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot",
         parse: |_, text| typed(parse_native_ledger_snapshot(text)),
@@ -1770,6 +1934,47 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683): the currency Trial Balance from the book's first
+    // day, as found and with a dollar opening keyed on one new ledger master
+    // (FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md; src/agent_movement_currency_tests.rs).
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    // The same request after two vouchers dated 30 April were saved has no row (row 683-LD):
+    // FOREX_FIRST_DAY_ALL_PLAIN says why and which test pins it.
     // Built-in Cash Flow reports: src/native_cash_flow_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_cash_flow_probe_b_fy_live.utf16le.xml",
@@ -2754,6 +2959,43 @@ const ROWS: &[Row] = &[
         parser: "parse_native_ledger_source_records_with_evidence(Validation Lab)",
         parse: |_, text| ledger_sources(text, "c6afd306-00e1-4f51-802a-babe44daddd3"),
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683): the movement's opening export at the book's
+    // first day, as found and with a dollar opening on one master, which only the first-day parse
+    // keeps as text (src/native_ledger_collection_tests.rs).
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_with_evidence(FOREXGROUP)",
+        parse: |_, text| ledger_sources(text, FOREXGROUP_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_keeping_composite_openings(FOREXGROUP)",
+        parse: |_, text| {
+            untyped(parse_native_ledger_source_records_keeping_composite_openings(
+                text,
+                FOREXGROUP_GUID,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_with_evidence(FOREXGROUP)",
+        parse: |_, text| ledger_sources(text, FOREXGROUP_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_source_records_keeping_composite_openings(FOREXGROUP)",
+        parse: |_, text| {
+            untyped(parse_native_ledger_source_records_keeping_composite_openings(
+                text,
+                FOREXGROUP_GUID,
+            ))
+        },
+    },
     Row {
         fixture: "tests/fixtures/native/ledgers_native_master_fields_lab.utf8.xml",
         source: Source::Captured,
@@ -3646,6 +3888,21 @@ const APP_ALL_MARKS: &str = "recorded by the app crate's record (#1198 slice 2):
      parse_all_company_marks (a company ALTMSTID read of a book that holds no voucher)";
 const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
+const APP_MOVEMENT_FIRST_DAY: &str = "recorded by the app crate's record (#1198 slice 2): \
+     parse_agent_changed_rows (a ledger_movement window of a several-currency book from its first \
+     day, #683); parse_agent_changed_rows_naming_composite_ledgers has no row there, as its \
+     rendering would hold the book's rupee amounts, which the merge gate's privacy scan reads as \
+     an identifier shape: the_first_day_windows_parse_each_entry_as_tally_sent_it in \
+     src/agent_movement_currency_tests.rs pins every field of each row it returns";
+const FOREX_FIRST_DAY_ALL_PLAIN: &str =
+    "a currency Trial Balance of BRIDGE FOREXGROUP LAB from its \
+     first day, read after two vouchers dated 30 April were saved (row 683-LD, #683), with no row \
+     here: its rendering would hold the book's rupee amounts, which the merge gate's privacy scan \
+     reads as an identifier shape; the_all_plain_trial_balance_reads_each_row_as_tally_sent_it in \
+     the app crate's src/agent_movement_currency_tests.rs parses it with \
+     parse_native_trial_balance and parse_native_trial_balance_with_currency and pins every \
+     field of each row and the empty currency sets; FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md \
+     says what it is";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
 const APP_STOCK_LINE_ROWS: &str = "recorded by the app crate's record (#1198 slice 2): \
@@ -3880,6 +4137,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/native/bills_receivable_forex_settled_supplier.utf16le.xml",
         FOREX_OPEN_BILL,
+    ),
+    (
+        "tests/fixtures/native/trial_balance_currency_forexgroup_first_day_all_plain.utf16le.xml",
+        FOREX_FIRST_DAY_ALL_PLAIN,
     ),
     // The audit read's live answers on the pilot lab (the company object has a row).
     (
@@ -4921,6 +5182,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml",
         APP_FOREX_VOUCHERS,
+    ),
+    (
+        "tests/fixtures/agent/movement-forexgroup-book-20250401.utf16le.xml",
+        APP_MOVEMENT_FIRST_DAY,
+    ),
+    (
+        "tests/fixtures/agent/movement-forexgroup-usd-customer-20250401.utf16le.xml",
+        APP_MOVEMENT_FIRST_DAY,
     ),
     // Voucher exports captured for the removed voucher-scan parser.
     (

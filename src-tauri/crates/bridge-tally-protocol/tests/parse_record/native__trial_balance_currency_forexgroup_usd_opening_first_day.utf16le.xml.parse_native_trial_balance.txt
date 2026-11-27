@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/trial_balance_currency_forexgroup_usd_opening_first_day.utf16le.xml
+# parser: parse_native_trial_balance
+# source: captured
+Err(InvalidAmount)

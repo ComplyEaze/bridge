@@ -189,6 +189,20 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals `ledger_movement` adds for a book with several Currency masters, read from its
+    /// first day (#683). Its date range and drift refusals are [`ReadCode`]'s `InvalidDateRange`
+    /// and `LedgerSnapshotDrifted`, the same strings.
+    pub(crate) enum MovementCurrencyCode {
+        /// The currency-scoped Trial Balance and the movement's catalogue name different ledgers.
+        ScopeUnmatched = "ledger_currency_scope_unmatched",
+        /// A composite opening or window entry is on a ledger the Trial Balance reads as plain.
+        ScopeInconclusive = "ledger_currency_scope_inconclusive",
+        /// The ledger asked for is set aside, so no figure is given for it.
+        SetAside = "ledger_currency_set_aside",
+    }
+}
+
+failure_codes! {
     /// The refusals of `voucher_presence` itself.
     pub(crate) enum PresenceCode {
         /// The ledger catalogue the check needs was not read whole.

@@ -2,8 +2,8 @@
 //! (`tests/fixtures/agent/party-bills/PROVENANCE.md`).
 
 use super::*;
-use crate::ledger_scope::LedgerScopeNameError;
 use crate::native_outstandings::parse_native_ledger_snapshot;
+use crate::native_outstandings::LedgerOutstandingsPartyError;
 
 const FIXTURES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -54,7 +54,7 @@ fn total(bills: &[PartyBill]) -> ExactDecimal {
 
 #[test]
 fn the_request_is_the_lab_request_without_its_indentation() {
-    let party = LedgerScopeName::new("Lab Party P1").expect("admitted");
+    let party = LedgerOutstandingsParty::new("Lab Party P1").expect("admitted");
     assert_eq!(
         render_ledger_outstandings_request("BRIDGE BILLTRAIL LAB", &party, &date("20260331")),
         concat!(
@@ -74,10 +74,10 @@ fn a_party_name_with_a_trailing_space_is_never_sent() {
     // Tally holds such a party without the space, and a tie by the spaced name
     // finds no ledger; the book's own name is what is sent.
     assert_eq!(
-        LedgerScopeName::new("L5 Trail "),
-        Err(LedgerScopeNameError::Spacing)
+        LedgerOutstandingsParty::new("L5 Trail "),
+        Err(LedgerOutstandingsPartyError::Spacing)
     );
-    assert!(LedgerScopeName::new("L5 Trail").is_ok());
+    assert!(LedgerOutstandingsParty::new("L5 Trail").is_ok());
 }
 
 #[test]

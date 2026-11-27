@@ -146,6 +146,18 @@ const MOVEMENT: &[(MovementCode, &str)] = &[
     (MovementCode::ReadFailed, "ledger_movement_read_failed"),
 ];
 
+const MOVEMENT_CURRENCY: &[(MovementCurrencyCode, &str)] = &[
+    (
+        MovementCurrencyCode::ScopeUnmatched,
+        "ledger_currency_scope_unmatched",
+    ),
+    (
+        MovementCurrencyCode::ScopeInconclusive,
+        "ledger_currency_scope_inconclusive",
+    ),
+    (MovementCurrencyCode::SetAside, "ledger_currency_set_aside"),
+];
+
 const PRESENCE: &[(PresenceCode, &str)] = &[
     (
         PresenceCode::LedgerCatalogueIncomplete,
@@ -637,6 +649,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(OUTSTANDINGS),
         of(INVOICE_NUMBER_AFTER_POST),
         of(MOVEMENT),
+        of(MOVEMENT_CURRENCY),
         of(PRESENCE),
         of(TIE_OUT),
         of(IMPORT_LEDGER),
@@ -677,6 +690,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
             InvoiceNumberAfterPostCode::ALL,
         ),
         of("MovementCode", MovementCode::ALL),
+        of("MovementCurrencyCode", MovementCurrencyCode::ALL),
         of("PresenceCode", PresenceCode::ALL),
         of("TieOutCode", TieOutCode::ALL),
         of("ImportLedgerCode", ImportLedgerCode::ALL),
@@ -736,7 +750,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        22,
+        23,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -761,6 +775,7 @@ fn every_variant_has_one_pinned_string() {
     );
     assert_eq!(variants(PROPOSALS), ProposalsCode::ALL);
     assert_eq!(variants(MOVEMENT), MovementCode::ALL);
+    assert_eq!(variants(MOVEMENT_CURRENCY), MovementCurrencyCode::ALL);
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
     assert_eq!(variants(BANK_STATEMENT), BankStatementCode::ALL);
@@ -806,6 +821,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     );
     check_pins(PROPOSALS, ProposalsCode::as_str);
     check_pins(MOVEMENT, MovementCode::as_str);
+    check_pins(MOVEMENT_CURRENCY, MovementCurrencyCode::as_str);
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
     check_pins(BANK_STATEMENT, BankStatementCode::as_str);
@@ -835,9 +851,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 5].iter().sum();
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 5].iter().sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 5].iter().sum();
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 5].iter().sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

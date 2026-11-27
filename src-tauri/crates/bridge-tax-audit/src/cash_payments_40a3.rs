@@ -470,9 +470,11 @@ payment, summed: the debits, not the cash paid.",
                 iso(d)
             )
         } else {
+            // The row sums the payee ledger's debits on vouchers with a cash payment, not the
+            // cash paid: a voucher may pay the same debit partly by bank (#772).
             format!(
-                "Cash paid to one payee ledger (tag {h}) on {}, summed across every \
-population voucher that day.",
+                "Debits to one payee ledger (tag {h}) on {}, on population vouchers with a cash \
+payment, summed: the debits, not the cash paid.",
                 iso(d)
             )
         };
@@ -541,7 +543,8 @@ s.40A(3) daily limit on {}: the cash paid, and whether it went to one person, ar
                 )
             } else {
                 format!(
-                    "Cash paid to one payee over the s.40A(3) daily limit on {}",
+                    "Debits to one payee ledger on vouchers with a cash payment total over the \
+s.40A(3) daily limit on {}: the cash paid is not shown",
                     iso(d)
                 )
             },
@@ -1482,6 +1485,77 @@ mod tests {
             assert_eq!((title.as_str(), paise), (over, 22_000_000));
             assert_eq!(definition.starts_with("Cash"), party == "Customer A");
         }
+    }
+
+    /// #772, declared in `provenance/cp-repin.md`: a s.40A(3) row on a payee ledger sums the
+    /// ledger's debits on vouchers with a cash payment, not the cash. A debit of Rs 30,000 paid Rs
+    /// 6,000 in cash and Rs 24,000 by bank is a row of Rs 30,000, and its title and definition say
+    /// it is the debits.
+    #[test]
+    fn a_named_s40a3_row_says_it_sums_the_debits_not_the_cash() {
+        use crate::book::{LedgerLine, VoucherStatus};
+        let line = |ledger: &str, amount_paise: i64| LedgerLine {
+            ledger: ledger.to_string(),
+            amount_paise,
+        };
+        let book = Book {
+            ledgers: [invented_ledger("Supplier X", "Sundry Creditors")]
+                .into_iter()
+                .map(|l| (l.name.clone(), l))
+                .collect(),
+            vouchers: vec![Voucher {
+                guid: "g1".to_string(),
+                date: TallyDate::parse("20250601").unwrap(),
+                base_type: "Payment".to_string(),
+                status: VoucherStatus::Regular,
+                lines: vec![
+                    line("Cash", -600_000),
+                    line("Bank", -2_400_000),
+                    line("Supplier X", 3_000_000),
+                ],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let set = |names: &[&str]| -> BTreeSet<String> {
+            names.iter().map(|n| (*n).to_string()).collect()
+        };
+        let r = run(
+            &book,
+            &Rules::vendored().unwrap(),
+            &set(&["Cash"]),
+            &set(&["Bank"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+        )
+        .unwrap();
+        let finding = r
+            .findings
+            .iter()
+            .find(|f| f.id.starts_with(&format!("{TEST_ID}/s40a3/")))
+            .unwrap();
+        assert_eq!(
+            finding.title,
+            "Debits to one payee ledger on vouchers with a cash payment total over the s.40A(3) \
+             daily limit on 2025-06-01: the cash paid is not shown"
+        );
+        let amount = r
+            .figures
+            .iter()
+            .find(|f| f.id == finding.facts[0].1)
+            .unwrap();
+        assert_eq!(amount.value, Value::Int(3_000_000));
+        assert!(
+            amount
+                .definition
+                .starts_with("Debits to one payee ledger (tag ")
+                && amount.definition.ends_with(
+                    ") on 2025-06-01, on population vouchers with a cash payment, summed: the \
+                     debits, not the cash paid."
+                ),
+            "{}",
+            amount.definition
+        );
     }
 
     /// Characterises the receipt leg of the s.269ST walk (`high_value_register::cash_269st_rows`),

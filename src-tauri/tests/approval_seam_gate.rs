@@ -5247,7 +5247,7 @@ fn a_stock_approval_is_spent_only_through_its_redemption_by_the_writer() {
 /// The stock post's one dispatch, its whitespace removed: the stock recheck
 /// as the queue's recheck, and the stock intent writer in `before_dispatch`,
 /// with the redemption the pass took.
-const STOCK_POST_CALL: &str = ".post_approved_import(self.tally_config(),&identity,approved,recheck_stock_item_for_dispatch,|passed|{letlock=ExclusiveAdmission::acquire(data_dir).map_err(BeforeDispatchError::Other)?;record_stock_item_intent(data_dir,&lock,&batch,passed,&taken).map_err(stock_intent_refusal)},)";
+const STOCK_POST_CALL: &str = ".post_approved_import(self.tally_config(),&identity,approved,recheck_stock_item_for_dispatch,|passed|{letlock=ExclusiveAdmission::acquire_or_refuse(data_dir).map_err(|refusal|{BeforeDispatchError::Refused(UnderLockRefusal::Admission(refusal))})?;record_stock_item_intent(data_dir,&lock,&batch,passed,&taken).map_err(stock_intent_refusal)},)";
 
 /// The stock post's take: on the server's own approvals holder.
 const STOCK_POST_TAKE: &str =

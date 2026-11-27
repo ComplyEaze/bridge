@@ -900,44 +900,34 @@ mod post {
         }
     }
 
-    /// The admission lock held by a read when the stock writer begins: the
-    /// lock's own refusal, with no intent and no sidecar, and the answer's
-    /// code is the lock's.
+    /// A read holds the admission lock shared through the post, so the queue's
+    /// closure finds it busy after every queue read: the lock's own code, no
+    /// import, no intent and no sidecar.
     #[tokio::test]
-    async fn the_stock_writer_refuses_a_busy_admission_lock_by_name_and_records_nothing() {
-        use crate::tally::approved_import::AdmissionLockRefusal;
-        let directory = tempfile::tempdir().unwrap();
-        let dir = directory.path();
-        let batch = shape_batch(A, "http://127.0.0.1:9000");
-        record(dir, &batch);
-        let holder = tempfile::tempdir().unwrap();
-        let approvals = stock_approvals(holder.path());
-        let taken = taken_stock_approval(&approvals, batch.batch_id()).await;
-        let passed = minted(batch.batch_id()).await;
-        let held = std::fs::File::open(dir.join("agent-import-admission.lock")).unwrap();
-        held.lock_shared().unwrap();
-        let refused = match record_under_lock(dir, &batch, passed, &taken) {
-            Err(BeforeDispatchError::Refused(refusal)) => refusal,
-            Err(BeforeDispatchError::Other(code)) => panic!("expected a named refusal, got {code}"),
-            Ok(_) => panic!("expected a named refusal, got an intent"),
-        };
+    async fn a_post_whose_admission_lock_is_held_shared_answers_busy_and_records_nothing() {
+        let mut plans = post_reads();
+        plans.extend(passing_answers());
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let held = (run.server.lock_import_admission_shared())
+            .expect("no one holds the lock before the post");
+        let scripted = ScriptedApproval::approving();
+        let outcome = run.post(&scripted, id(A)).await;
         drop(held);
-        assert_eq!(
-            refused,
-            UnderLockRefusal::Admission(AdmissionLockRefusal::Busy)
-        );
-        assert_eq!(
-            super::super::super::super::post::refusal_code(&anyhow::Error::from(refused)),
-            "import_admission_busy"
-        );
-        let journal = std::fs::read(dir.join(STOCK_JOURNAL)).unwrap();
-        let records: Vec<_> = (journal_lines(&journal).iter())
-            .map(|line| line["record_type"].as_str().unwrap().to_string())
-            .collect();
-        assert_eq!(records, ["master_batch"]);
-        assert!(!dir
-            .join(format!("master-pre-image-{}.json", batch.batch_id()))
+        assert_eq!(refused_code(&outcome), "import_admission_busy");
+        assert_eq!(scripted.stock_items().len(), 1, "asked once");
+        assert_eq!(run.records(), ["master_batch"], "no intent");
+        assert!(!run
+            .dir()
+            .join(format!("master-pre-image-{}.json", id(A)))
             .exists());
+        let observed = run.finish();
+        assert_eq!(imports(&observed).len(), 0, "no import request");
+        assert_eq!(
+            sent(&observed),
+            [every_request(), QUEUE_READS.to_vec()].concat(),
+            "the queue read everything before the lock"
+        );
     }
 
     /// The writer's refusals as the queue takes them: a token or approval of

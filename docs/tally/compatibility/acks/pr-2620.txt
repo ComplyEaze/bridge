@@ -1,0 +1,2 @@
+src-tauri/src/agent_bank_statement.rs
+reviewer: lamemustafa

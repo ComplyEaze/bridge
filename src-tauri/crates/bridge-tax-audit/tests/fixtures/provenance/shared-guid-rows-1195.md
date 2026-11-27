@@ -40,7 +40,7 @@ The six books are hand-written scenarios, not generated from any data (the two #
 | `hvr_journal_suffix.json` | 4,632 | `decb99c08c123609308ca2b5b0bec86799e163ffa650dbfd143ca9550bc1c1c1` | `edge-books/hvr_journal_suffix.json` |
 | `ep_shared_guid_row.json` | 2,336 | `a80224594076fd25e6993c9c53be050c0f1b505ad1db3286b768206862a62bed` | `edge-books/ep_shared_guid_row.json` |
 | `cc_repeat_row.json` | 2,707 | `d960aa8b1c19c4dad87b5f4528fcc3b6c7321f9ffa2184c90a6e0373df990210` | `edge-books/cc_repeat_row.json` |
-| `edge.cp_shared_guid_row.cash_payments_40a3.json` | 37,149 | `dc1015adebf64413dc5864a33adad27d18a05777e88754f466f92e47da39b20a` | `golden/edge.cp_shared_guid_row.cash_payments_40a3.json` |
+| `edge.cp_shared_guid_row.cash_payments_40a3.json` | 37,351 | `1fa80e0fe684ed2c52d49edbe60778ebec1643b0757ed7df61f6b709fb5d2992` | `golden/edge.cp_shared_guid_row.cash_payments_40a3.json` |
 | `edge.hvr_shared_guid_row.high_value_register.json` | 32,123 | `fa79b3c0976c87854c4f80ad676cf0608326eb14d6abe6d6b4990a12a56b7cc6` | `golden/edge.hvr_shared_guid_row.high_value_register.json` |
 | `edge.hvr_shared_guid_voucher.high_value_register.json` | 47,314 | `6c298bd35098591b3379690f91d0bc421430e91780a08580457cf17aea6d52de` | `golden/edge.hvr_shared_guid_voucher.high_value_register.json` |
 | `edge.hvr_journal_suffix.high_value_register.json` | 68,989 | `693175f7eb1e9ef3f93ee3a1effb03c95958718c4a3c67158034e46c36032793` | `golden/edge.hvr_journal_suffix.high_value_register.json` |

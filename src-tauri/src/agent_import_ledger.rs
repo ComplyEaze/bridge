@@ -1,5 +1,6 @@
 //! Legacy full batch records plus compact, hash-bound verification status updates.
 use super::*;
+use crate::agent::failure_code::ImportLedgerCode;
 use std::io::BufRead;
 
 // The MCP frame is at most 5,000,000 bytes. This also leaves room for worst-case
@@ -54,7 +55,7 @@ impl TryFrom<String> for ProofName {
     type Error = String;
 
     fn try_from(text: String) -> Result<Self, Self::Error> {
-        let invalid = || "import_ledger_invalid".to_string();
+        let invalid = || ImportLedgerCode::Invalid.as_str().to_string();
         let (stamp, sha256) = text.split_once('.').ok_or_else(invalid)?;
         let digits = |range: std::ops::Range<usize>| {
             stamp
@@ -150,6 +151,12 @@ enum StatusKind {
 
 /// The status a stop release record carries. It is not a batch status.
 const STOP_RELEASE_STATUS: &str = "stop_released";
+
+/// The batch status a dispatch intent records: the post started.
+const DISPATCH_STARTED_STATUS: &str = "dispatch_started";
+
+/// The batch status a dispatch response records: Tally's answer arrived.
+const RESPONSE_RECEIVED_STATUS: &str = "response_received";
 
 /// The status a content review record carries. It is not a batch status.
 const CONTENT_REVIEW_STATUS: &str = "content_reviewed";
@@ -326,7 +333,7 @@ impl StatusRecord {
             record_type: StatusKind::DispatchIntent,
             batch_id: batch.batch_id.clone(),
             batch_sha256: batch.sha256.clone(),
-            status: "dispatch_started".into(),
+            status: DISPATCH_STARTED_STATUS.into(),
             response: None,
             native_request_sha256: Some(request_sha256),
             native_remote_id: Some(remote_id.hyphenated().to_string()),
@@ -570,7 +577,7 @@ impl StatusRecord {
             record_type: StatusKind::DispatchResponse,
             batch_id: batch.batch_id.clone(),
             batch_sha256: batch.sha256.clone(),
-            status: "response_received".into(),
+            status: RESPONSE_RECEIVED_STATUS.into(),
             response: Some(response),
             native_request_sha256: None,
             native_remote_id: None,
@@ -803,7 +810,7 @@ pub(super) fn find_batch_id_by_sha256(
         }
     })?;
     match batch_id.as_deref() {
-        Some("") => Err("import_batch_digest_ambiguous".into()),
+        Some("") => Err(ImportLedgerCode::BatchDigestAmbiguous.as_str().into()),
         Some(id) => Ok(Some(id.to_string())),
         None => Ok(None),
     }
@@ -1566,32 +1573,32 @@ fn scan_records_at(
     let mut ordinal = 0_usize;
     line_read.set(1);
     while read_record(&mut reader, &mut line)? {
-        let text =
-            std::str::from_utf8(&line).map_err(|_| "import_ledger_unavailable".to_string())?;
-        let value: Value =
-            serde_json::from_str(text).map_err(|_| "import_ledger_invalid".to_string())?;
+        let text = std::str::from_utf8(&line)
+            .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
+        let value: Value = serde_json::from_str(text)
+            .map_err(|_| ImportLedgerCode::Invalid.as_str().to_string())?;
         let record = if value.get("record_type").is_some() {
-            let update: StatusRecord =
-                serde_json::from_value(value).map_err(|_| "import_ledger_invalid".to_string())?;
+            let update: StatusRecord = serde_json::from_value(value)
+                .map_err(|_| ImportLedgerCode::Invalid.as_str().to_string())?;
             let Some((batch_sha256, voucher_count)) = latest.get(&update.batch_id) else {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             };
             if *batch_sha256 != update.batch_sha256 {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             if let Some(hash) = &update.native_request_sha256 {
                 if !matches!(update.record_type, StatusKind::DispatchIntent)
                     || hash.len() != 64
                     || !hash.bytes().all(|byte| byte.is_ascii_hexdigit())
                 {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             }
             // A recorded REMOTEID belongs only to a native dispatch intent,
             // beside its request hash, and must be a canonical UUID.
             if let Some(remote_id) = &update.native_remote_id {
                 if update.native_request_sha256.is_none() || !is_canonical_remote_id(remote_id) {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             }
             // A batch's REMOTEIDs follow the same rule, and are distinct, one
@@ -1608,7 +1615,7 @@ fn scan_records_at(
                         .iter()
                         .all(|remote_id| is_canonical_remote_id(remote_id))
                 {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             }
             if matches!(update.record_type, StatusKind::DispatchIntent)
@@ -1619,14 +1626,14 @@ fn scan_records_at(
                     )
                     .is_some()
             {
-                return Err("import_ledger_duplicate_dispatch".into());
+                return Err(ImportLedgerCode::DuplicateDispatch.as_str().into());
             }
             // A pre-POST mark belongs only to a native dispatch intent.
             if update.pre_post_voucher_mark.is_some()
                 && !(matches!(update.record_type, StatusKind::DispatchIntent)
                     && update.native_request_sha256.is_some())
             {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             if update.pre_post_voucher_mark.is_some() {
                 marked.insert(update.batch_id.clone());
@@ -1647,10 +1654,10 @@ fn scan_records_at(
                     || update.bindings.is_some()
                     || update.binding_refusal.is_some()
                 {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             } else if update.release_seen.is_some() {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             // A content review follows a native dispatch intent that recorded
             // a pre-POST mark, is made only while the batch is not verified and
@@ -1682,10 +1689,10 @@ fn scan_records_at(
                     || update.binding_refusal.is_some()
                     || !reviewed.insert(update.batch_id.clone())
                 {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             } else if update.reviewed_binding.is_some() {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             // A person settlement follows a native dispatch intent that
             // recorded a pre-POST mark and an answer that reported none of the
@@ -1701,7 +1708,7 @@ fn scan_records_at(
                     || update.status != PERSON_SETTLEMENT_STATUS
                     || !settled.insert(update.batch_id.clone()))
             {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             // A rollback-seen record follows a native dispatch intent that
             // recorded a pre-POST mark, names a count of records it had read no
@@ -1726,10 +1733,10 @@ fn scan_records_at(
                     || update.bindings.is_some()
                     || update.binding_refusal.is_some()
                 {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             } else if update.mark_read.is_some() || update.records_before_read.is_some() {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             // A row release follows a native dispatch intent that recorded a
             // pre-POST mark, names the cover it rests on and the batch's
@@ -1746,16 +1753,16 @@ fn scan_records_at(
                     || update.release_cover.is_none()
                     || !released.insert(update.batch_id.clone())
                 {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             } else if update.release_cover.is_some() {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             // A saved proof belongs only to a verification status record.
             if update.proof.is_some()
                 && !matches!(update.record_type, StatusKind::VerificationStatus)
             {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             if matches!(update.record_type, StatusKind::PostSpanVerdict) {
                 admit_post_span_verdict(
@@ -1778,7 +1785,7 @@ fn scan_records_at(
                     bound.insert(update.batch_id.clone());
                 }
             } else if update.bindings.is_some() || update.binding_refusal.is_some() {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             if matches!(update.record_type, StatusKind::DispatchResponse) {
                 let request_hash = dispatched
@@ -1801,10 +1808,10 @@ fn scan_records_at(
                     .as_ref()
                     .is_some_and(|hash| hash != &response.request_sha256)
                 {
-                    return Err("import_ledger_invalid".into());
+                    return Err(ImportLedgerCode::Invalid.as_str().into());
                 }
             } else if update.response.is_some() {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             if update.sets_status() {
                 if update.status == "posted_verified" {
@@ -1822,7 +1829,7 @@ fn scan_records_at(
             if dispatched.contains_key(&batch.batch_id)
                 && latest.get(&batch.batch_id).map(|(sha256, _)| sha256) != Some(&batch.sha256)
             {
-                return Err("import_ledger_invalid".into());
+                return Err(ImportLedgerCode::Invalid.as_str().into());
             }
             latest.insert(
                 batch.batch_id.clone(),
@@ -1848,7 +1855,7 @@ fn scan_records_at(
         visit(record, VerificationGeneration(ordinal));
         ordinal = ordinal
             .checked_add(1)
-            .ok_or_else(|| "import_ledger_invalid".to_string())?;
+            .ok_or_else(|| ImportLedgerCode::Invalid.as_str().to_string())?;
         line_read.set(ordinal.saturating_add(1));
     }
     Ok(())
@@ -1920,8 +1927,8 @@ pub(super) fn content_review_after(
     reader: impl BufRead,
     record: &StatusRecord,
 ) -> Result<Option<ReviewedBinding>, String> {
-    let mut appended =
-        serde_json::to_vec(record).map_err(|_| "import_ledger_serialization_failed".to_string())?;
+    let mut appended = serde_json::to_vec(record)
+        .map_err(|_| ImportLedgerCode::SerializationFailed.as_str().to_string())?;
     appended.push(b'\n');
     content_review(
         reader.chain(std::io::Cursor::new(appended)),
@@ -1990,8 +1997,8 @@ pub(super) fn person_settlement_after(
     reader: impl BufRead,
     record: &StatusRecord,
 ) -> Result<bool, String> {
-    let mut appended =
-        serde_json::to_vec(record).map_err(|_| "import_ledger_serialization_failed".to_string())?;
+    let mut appended = serde_json::to_vec(record)
+        .map_err(|_| ImportLedgerCode::SerializationFailed.as_str().to_string())?;
     appended.push(b'\n');
     person_settlement(
         reader.chain(std::io::Cursor::new(appended)),
@@ -2027,8 +2034,8 @@ pub(super) fn row_release_after(
     if !matches!(record.record_type, StatusKind::RowRelease) {
         return Ok(false);
     }
-    let mut appended =
-        serde_json::to_vec(record).map_err(|_| "import_ledger_serialization_failed".to_string())?;
+    let mut appended = serde_json::to_vec(record)
+        .map_err(|_| ImportLedgerCode::SerializationFailed.as_str().to_string())?;
     appended.push(b'\n');
     let reader = reader.chain(std::io::Cursor::new(appended));
     let mut rollbacks = RollbackFacts::empty();
@@ -2433,7 +2440,7 @@ fn admit_post_span_verdict(
     responded: bool,
     with_verdict: &mut BTreeSet<String>,
 ) -> Result<(), String> {
-    let invalid = || "import_ledger_invalid".to_string();
+    let invalid = || ImportLedgerCode::Invalid.as_str().to_string();
     if update.status != POST_SPAN_VERDICT_STATUS
         || !responded
         || update.native_request_sha256.is_some()
@@ -2488,20 +2495,20 @@ pub(super) fn read_record(reader: &mut impl BufRead, line: &mut Vec<u8>) -> Resu
     loop {
         let available = reader
             .fill_buf()
-            .map_err(|_| "import_ledger_unavailable".to_string())?;
+            .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
         if available.is_empty() {
             return if line.is_empty() {
                 Ok(false)
             } else {
                 // Even a complete JSON value needs its record delimiter;
                 // otherwise the next append would concatenate two objects.
-                Err("import_ledger_invalid".into())
+                Err(ImportLedgerCode::Invalid.as_str().into())
             };
         }
         let newline = available.iter().position(|byte| *byte == b'\n');
         let length = newline.map_or(available.len(), |index| index + 1);
         if length > MAX_RECORD_BYTES.saturating_sub(line.len()) {
-            return Err("import_ledger_record_too_large".into());
+            return Err(ImportLedgerCode::RecordTooLarge.as_str().into());
         }
         line.extend_from_slice(&available[..length]);
         reader.consume(length);

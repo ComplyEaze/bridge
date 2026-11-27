@@ -21,7 +21,7 @@ use std::path::Path;
 const PINNED: &[(&str, usize)] = &[
     ("src/agent.rs", 39),
     ("src/agent_audit_run.rs", 2),
-    ("src/agent_bank_statement.rs", 46),
+    ("src/agent_bank_statement.rs", 4),
     ("src/agent_bill_trail.rs", 2),
     ("src/agent_cash_flow.rs", 1),
     ("src/agent_cash_projection.rs", 4),
@@ -40,7 +40,7 @@ const PINNED: &[(&str, usize)] = &[
     ("src/agent_import_approval.rs", 12),
     ("src/agent_import_content_review.rs", 4),
     ("src/agent_import_invoice.rs", 21),
-    ("src/agent_import_ledger.rs", 36),
+    ("src/agent_import_ledger.rs", 0),
     ("src/agent_import_numbering.rs", 1),
     ("src/agent_import_persistence.rs", 12),
     ("src/agent_import_post.rs", 56),

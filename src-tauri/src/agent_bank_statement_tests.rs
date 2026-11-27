@@ -765,7 +765,9 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         persist(directory.path(), &request.record(), &open, &"0".repeat(64)).unwrap();
     let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
     assert_eq!(
-        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).err(),
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest))
+            .err()
+            .map(|failure| failure.code),
         Some("cash_questions_open".to_string())
     );
 
@@ -879,13 +881,17 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     args["cash_answers"] = json!([{"bridge_txn_id": id, "answer": "business_cash",
         "ledger": "Cash", "cash_ledger": "Cash"}]);
     assert_eq!(
-        OwnedRequest::from_args(&args).err(),
+        OwnedRequest::from_args(&args)
+            .err()
+            .map(|failure| failure.code),
         Some("statement_cash_ledger_not_used".to_string())
     );
     args["cash_answers"] = json!([{"bridge_txn_id": id, "answer": "paid_to_someone",
         "ledger": "Synthetic Wages"}]);
     assert_eq!(
-        OwnedRequest::from_args(&args).err(),
+        OwnedRequest::from_args(&args)
+            .err()
+            .map(|failure| failure.code),
         Some("statement_cash_answer_without_cash_ledger".to_string())
     );
 }
@@ -940,7 +946,9 @@ fn a_cash_payment_answer_binds_its_contra_and_its_cash_payment() {
         ),
     ] {
         assert_eq!(
-            resolve_import_arguments(directory.path(), &publish(paid_to, debit)).err(),
+            resolve_import_arguments(directory.path(), &publish(paid_to, debit))
+                .err()
+                .map(|failure| failure.code),
             Some("proposals_file_invalid".to_string())
         );
     }
@@ -993,7 +1001,9 @@ fn a_cash_payment_answer_cannot_bind_another_rows_cash_payment() {
     let resolved = resolve_import_arguments(directory.path(), &publish("st-1-cash")).unwrap();
     assert_eq!(resolved.cash_ledgers.len(), 6);
     assert_eq!(
-        resolve_import_arguments(directory.path(), &publish("st-2-cash")).err(),
+        resolve_import_arguments(directory.path(), &publish("st-2-cash"))
+            .err()
+            .map(|failure| failure.code),
         Some("proposals_file_invalid".to_string())
     );
 }
@@ -1153,7 +1163,9 @@ fn a_deposit_answer_binds_the_credit_leg_of_its_receipt() {
         .collect::<Vec<_>>();
     assert_eq!(named, [("st-1", "Synthetic Customer", false)]);
     assert_eq!(
-        resolve_import_arguments(directory.path(), &publish("Dr")).err(),
+        resolve_import_arguments(directory.path(), &publish("Dr"))
+            .err()
+            .map(|failure| failure.code),
         Some("proposals_file_invalid".to_string())
     );
 }
@@ -1357,7 +1369,8 @@ fn version_two_facts_are_read_strictly_and_a_skip_only_file_is_told() {
     let none_skipped = publish(v2, &|document| document["records"] = json!([])).unwrap();
     assert!(!none_skipped.statement.unwrap().is_skip_only());
 
-    let invalid = |result: Result<ResolvedImport, String>| result.err();
+    let invalid =
+        |result: Result<ResolvedImport, ToolFailure>| result.err().map(|failure| failure.code);
     let bad = Some("proposals_file_invalid".to_string());
     assert_eq!(
         invalid(publish(v2, &|document| {

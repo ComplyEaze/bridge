@@ -2292,7 +2292,7 @@ pub(crate) mod coordinator {
         let requests = [
             render_candidate_stock_items_request(identity.company_name()),
             bridge_tally_protocol::native_stock_summary::render_company_inventory_flags_request(
-                identity.display_name(),
+                identity.company_name(),
                 identity.company_guid_value(),
             ),
             bridge_tally_protocol::native_masters::render_native_masters_request(

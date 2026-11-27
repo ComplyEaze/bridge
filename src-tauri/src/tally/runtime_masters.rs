@@ -779,7 +779,7 @@ pub(super) async fn read_stock_item_admission(
         encoded_sha256,
     };
     let count_request = render_company_inventory_flags_request(
-        identity.display_name(),
+        identity.company_name(),
         identity.company_guid_value(),
     );
     let count_pair = client

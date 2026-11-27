@@ -425,13 +425,26 @@ fn with_sentinel(mut plans: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
 
 /// Data requests a run actually made (a cancel's wake-up connection has no method).
 fn sent(simulator: SequenceSimulator) -> Vec<tally_protocol_simulator::ObservedRequest> {
+    sent_after(simulator, &"not given")
+}
+
+/// `sent`, for a test that already has its own outcome: a simulator that fails
+/// to finish names that outcome as well as its own error (#2551), so a missing
+/// plan is never the only thing the failure shows.
+fn sent_after(
+    simulator: SequenceSimulator,
+    outcome: &dyn std::fmt::Display,
+) -> Vec<tally_protocol_simulator::ObservedRequest> {
     simulator.cancel();
-    simulator
-        .finish()
-        .unwrap()
-        .into_iter()
-        .filter(|request| !request.method.is_empty())
-        .collect()
+    match simulator.finish() {
+        Ok(observed) => observed
+            .into_iter()
+            .filter(|request| !request.method.is_empty())
+            .collect(),
+        Err(error) => {
+            panic!("the simulator did not finish ({error}); the test's outcome: {outcome}")
+        }
+    }
 }
 
 /// With no scripted decision in scope the test build's approval declines at

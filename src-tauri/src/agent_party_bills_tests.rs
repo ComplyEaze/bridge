@@ -204,3 +204,31 @@ fn a_folded_party_name_is_told_as_a_case_or_spacing_match() {
         );
     }
 }
+
+/// Each reason a party's name is not sent has its own next step under
+/// `party_name_not_admitted`, and none repeats the name refused.
+#[test]
+fn each_party_name_refusal_has_its_own_next_step() {
+    let book = ledgers(&[&["Ak & Am"], &["Ak Am"], &["Cash"]]);
+    let mut steps = std::collections::BTreeSet::new();
+    for party in [
+        "Ak ; Am",
+        "Ak &Am",
+        "Ak Or Am",
+        &format!("Ak{}", " & Ak".repeat(15)),
+        "Ak & Am",
+        "Ak  Am",
+        "",
+    ] {
+        let Err(failure) = admitted_party(party, &book) else {
+            panic!("{party:?} was admitted");
+        };
+        let step = super::remediation_for(&failure.code, failure.cause)
+            .unwrap_or_else(|| panic!("a step for {:?}", failure.cause));
+        assert!(party.is_empty() || !step.contains(party), "{party:?}");
+        assert!(!step.contains("Ak"), "{party:?}");
+        steps.insert(step);
+    }
+    assert_eq!(steps.len(), 7, "each cause has its own step");
+    assert!(super::remediation_for("party_name_not_admitted", None).is_some());
+}

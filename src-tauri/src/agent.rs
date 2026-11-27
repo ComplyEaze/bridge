@@ -2070,6 +2070,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              read one day per call, and a longer period a day at a time. For a period's totals, \
              use trial_balance instead of reading its vouchers.",
         ),
+        // `open_bills` (#2480): the party's name was not sent; the cause says why, and its own step
+        // (`party_name_cause_remediation`) is chosen first. This is the step without one.
+        "party_name_not_admitted" => Some(
+            "The party's ledger name is not one ComplyEaze Bridge sends to Tally's bill report, \
+             so nothing was sent; the cause says why. Do not repeat the call or try another \
+             spelling of the party: the name sent is always the book's own. This party's open \
+             bills are still in outstandings without party (the book-wide bills), and its \
+             balance in ledger_masters or trial_balance.",
+        ),
         // `open_bills` (#2377): Tally's bill report sent nothing for the party, which it does for
         // a party it reports nothing for (protocol reference §12a.27). The ledger list decides
         // which refusal, and neither is told as no open bills.
@@ -2596,10 +2605,13 @@ fn shown_cause(
     })
 }
 
-/// The next step for a refusal: its own code's, else its cause's, and the outstandings
-/// causes' only under the outstandings code.
+/// The next step for a refusal: a party name's cause first under its code, else its own code's,
+/// else its cause's, and the outstandings causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
-    refusal_remediation(code)
+    (code == "party_name_not_admitted")
+        .then(|| cause.and_then(party_name_cause_remediation))
+        .flatten()
+        .or_else(|| refusal_remediation(code))
         .or_else(|| cause.and_then(refusal_remediation))
         .or_else(|| {
             (code == "native_outstandings_read_failed")
@@ -2611,6 +2623,57 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
                 .then(|| cause.and_then(party_ledger_master_cause_remediation))
                 .flatten()
         })
+}
+
+/// The next step for a cause of `party_name_not_admitted` (#2480), chosen only under that code:
+/// why the party's name was not sent, without repeating it, and what can still be read. The name
+/// sent is always the book's own, so another spelling of it does not help.
+fn party_name_cause_remediation(cause: &str) -> Option<&'static str> {
+    macro_rules! step {
+        ($reason:literal) => {
+            concat!(
+                $reason,
+                " Do not repeat the call or try another spelling of the party: the name sent \
+                 is always the book's own, so it refuses again. This party's open bills are \
+                 still in outstandings without party (the book-wide bills), and its balance in \
+                 ledger_masters or trial_balance."
+            )
+        };
+    }
+    match cause {
+        "party_name_mark_not_measured" => Some(step!(
+            "The party's ledger name holds a character ComplyEaze Bridge has not seen Tally \
+             read in this report's party name, so nothing was sent."
+        )),
+        "party_name_position_not_measured" => Some(step!(
+            "The party's ledger name holds a mark, or starts with a character, in a place \
+             ComplyEaze Bridge has not seen Tally read in this report's party name, so \
+             nothing was sent."
+        )),
+        "party_name_formula_word_not_measured" => Some(step!(
+            "The party's ledger name holds a word Tally's formulas read as an operator, \
+             where ComplyEaze Bridge has not seen Tally read it as part of a name, so nothing \
+             was sent."
+        )),
+        "party_name_marked_too_long" => Some(step!(
+            "The party's ledger name holds marks and is longer than any such name ComplyEaze \
+             Bridge has seen Tally read in this report, so nothing was sent."
+        )),
+        "party_name_key_shared" => Some(step!(
+            "Another ledger of this company has the same letters and digits as the party's \
+             ledger name, and ComplyEaze Bridge has seen Tally read such a name only where no \
+             other ledger shared them, so nothing was sent."
+        )),
+        "party_name_spacing" => Some(step!(
+            "The party's ledger name starts or ends with a space, or holds two in a row, \
+             which Tally does not keep in a name, so nothing was sent."
+        )),
+        "party_name_empty" | "party_name_too_long" => Some(step!(
+            "The party's ledger name is empty or longer than any name Tally keeps, so nothing \
+             was sent."
+        )),
+        _ => None,
+    }
 }
 
 /// The next step for a cause of `party_ledger_master_read_failed` (#2071). It is chosen only under

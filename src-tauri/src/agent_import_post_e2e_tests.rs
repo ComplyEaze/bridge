@@ -2997,6 +2997,135 @@ async fn a_post_whose_response_cannot_be_journaled_still_reports_where_it_landed
     );
 }
 
+/// The parsed `ENVELOPE/HEADER/TALLYREQUEST` of one request body, in either
+/// encoding the gateway sends; `None` for a body with no such header.
+fn tally_request_kind(body: &[u8]) -> Option<String> {
+    let text = if body.contains(&0) {
+        captured(body)
+    } else {
+        String::from_utf8(body.to_vec()).expect("a UTF-8 request body")
+    };
+    let mut reader = quick_xml::Reader::from_str(text.trim_start_matches('\u{feff}'));
+    let mut path = Vec::<Vec<u8>>::new();
+    loop {
+        match reader.read_event().expect("the request is well-formed XML") {
+            quick_xml::events::Event::Start(event) => {
+                let name = event.name().as_ref().as_bytes().to_vec();
+                if path == [b"ENVELOPE".to_vec(), b"HEADER".to_vec()] && name == b"TALLYREQUEST" {
+                    return Some(reader.read_text(event.name()).unwrap().trim().to_string());
+                }
+                path.push(name);
+            }
+            quick_xml::events::Event::End(_) => {
+                path.pop();
+            }
+            quick_xml::events::Event::Eof => return None,
+            _ => {}
+        }
+    }
+}
+
+/// A post whose queue reaches the admission lock while a second server on the
+/// same data folder holds it (`hold` takes it, as a read tool or a writer
+/// would; `None` holds nothing). The aim snapshot, the last queue read before
+/// the send, is held back so the lock is taken before the queue's closure tries
+/// it. Returns the answer,
+/// how many requests reached Tally's import endpoint (by parsed header) and how
+/// many dispatch intents the journal holds for the batch.
+async fn post_while_the_admission_is_held(
+    hold: impl FnOnce(&Server) -> Option<std::fs::File>,
+) -> (Value, usize, usize) {
+    let mut plans = before_approval();
+    let mut after = after_approval(xml(created_one()));
+    let post_at = plans.len() + after.len() - 1;
+    let aim_at = post_at - 1;
+    let aim = after.len() - 2;
+    after[aim] = marks_before().with_delivery(Delivery::SlowHeaders(Duration::from_secs(2)));
+    plans.extend(after);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let other = server_at(simulator.address(), directory.path());
+    let post = SCRIPTED_APPROVAL.scope(
+        ScriptedApproval::approving(),
+        server.call_tool("post_import", args),
+    );
+    let hold_lock = async {
+        let started = std::time::Instant::now();
+        // The aim snapshot has been received and its answer is held back:
+        // the queue is past every read and has not yet tried the lock.
+        while simulator.received() <= aim_at {
+            assert!(
+                started.elapsed() < Duration::from_secs(20),
+                "the aim snapshot never arrived"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        let lock = hold(&other);
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        drop(lock);
+    };
+    let (response, ()) = tokio::join!(post, hold_lock);
+    let imports = sent(simulator)
+        .iter()
+        .filter(|request| {
+            tally_request_kind(&request.request_body)
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("Import Data"))
+        })
+        .count();
+    let intents = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|record| serde_json::from_str::<Value>(record).unwrap())
+        .filter(|record| {
+            record["record_type"] == "dispatch_intent"
+                && record["batch_id"] == line.batch_id.as_str()
+        })
+        .count();
+    (response, imports, intents)
+}
+
+/// A read tool holds the admission lock shared at the moment the queue's
+/// closure tries it exclusively: the post is refused before its intent, so
+/// nothing was recorded and nothing reached the import endpoint.
+#[tokio::test]
+async fn a_post_whose_admission_lock_is_held_shared_answers_what_the_journal_shows() {
+    let (response, imports, intents) = post_while_the_admission_is_held(|other| {
+        Some(
+            other
+                .lock_import_admission_shared()
+                .expect("the lock is free while the aim is held back"),
+        )
+    })
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        imports, 0,
+        "nothing reached the import endpoint: {response}"
+    );
+    assert_eq!(intents, 0, "no dispatch intent was recorded: {response}");
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(
+        result["error"]["code"], "import_admission_busy",
+        "{response}"
+    );
+}
+
+/// The same run with the lock left free posts once: the counts above see an
+/// import and an intent when there is one.
+#[tokio::test]
+async fn the_held_admission_harness_counts_a_post_that_was_sent() {
+    let (response, imports, intents) = post_while_the_admission_is_held(|_| None).await;
+    assert_eq!(imports, 1, "{response}");
+    assert_eq!(intents, 1, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["attempt_recorded"],
+        json!(true),
+        "{response}"
+    );
+}
+
 /// The simulated POST answer every test above posts against must be one Tally
 /// actually sends, and must parse as exactly one clean create. When it did not
 /// parse, every test here ran the post with no parsed outcome, so none of them

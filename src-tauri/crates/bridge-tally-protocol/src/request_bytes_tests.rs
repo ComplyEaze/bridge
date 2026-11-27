@@ -27,7 +27,6 @@ use crate::ledger_census::{
     StockGroups, StockItems,
 };
 use crate::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
-use crate::ledger_scope::LedgerScopeName;
 use crate::native_cash_flow::{render_native_cash_flow_request, WholeMonthWindow};
 use crate::native_company_features::render_company_features_request;
 use crate::native_funds_flow::render_native_funds_flow_request;
@@ -52,8 +51,8 @@ use crate::native_outstandings::{
     render_party_ledger_master_request_for_parents_with_gst_details,
     render_party_ledger_master_request_for_parents_with_mailing_details,
     render_party_ledger_master_request_with_gst_details,
-    render_party_ledger_master_request_with_mailing_details, NativeBillsReportKind,
-    NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod,
+    render_party_ledger_master_request_with_mailing_details, LedgerOutstandingsParty,
+    NativeBillsReportKind, NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod,
 };
 use crate::native_statement_reports::{
     render_built_in_report_request, render_exploded_stock_summary_request,
@@ -508,7 +507,7 @@ fn built_requests() -> Vec<(String, String)> {
         .expect("a twelve-month window");
     let parents = parent_part();
     let ledgers = ledger_part();
-    let party = LedgerScopeName::new("Lab Party P1").expect("an admitted ledger name");
+    let party = LedgerOutstandingsParty::new("Lab Party P1").expect("an admitted ledger name");
     let item = MeasuredItemName::new("Kit & Co Item").expect("an admitted item name");
     let guid = company_guid();
 

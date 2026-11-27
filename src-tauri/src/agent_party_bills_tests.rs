@@ -102,18 +102,85 @@ fn the_none_reported_next_step_does_not_treat_an_empty_closing_as_zero() {
     );
 }
 
+/// One ledger per entry, each as the names it answers to.
+fn ledgers(names: &[&[&str]]) -> Vec<Vec<String>> {
+    names
+        .iter()
+        .map(|names| names.iter().map(|name| name.to_string()).collect())
+        .collect()
+}
+
+/// Each refusal of the name is `party_name_not_admitted`, with its reason as the cause.
 #[test]
-fn a_name_the_scope_type_refuses_is_refused_before_anything_is_sent() {
-    for party in ["L5 Trail ", " L5 Trail", "L5  Trail", "L5 Amp & Co", ""] {
-        let Err(failure) = admitted_party(party) else {
+fn a_name_the_party_type_refuses_is_refused_before_anything_is_sent() {
+    let book = ledgers(&[&["Lab Party P1"]]);
+    let overlong = "L".repeat(1025);
+    for (party, cause) in [
+        (overlong.as_str(), "party_name_too_long"),
+        ("L5 Amp & & Co", "party_name_combination_not_measured"),
+        ("L5 Trail ", "party_name_spacing"),
+        (" L5 Trail", "party_name_spacing"),
+        ("L5  Trail", "party_name_spacing"),
+        ("", "party_name_empty"),
+        ("L5 Amp ; Co", "party_name_mark_not_measured"),
+        ("L5 Amp \u{2019}s", "party_name_mark_not_measured"),
+        ("Salary Not Paid", "party_name_formula_word_not_measured"),
+    ] {
+        let Err(failure) = admitted_party(party, &book) else {
             panic!("{party:?} was admitted");
         };
-        assert_eq!(failure.code, "party_name_not_admitted");
+        assert_eq!(failure.code, "party_name_not_admitted", "{party:?}");
+        assert_eq!(failure.cause, Some(cause), "{party:?}");
     }
     assert_eq!(
-        admitted_party("Lab Party P1").unwrap().as_str(),
+        admitted_party("Lab Party P1", &book).unwrap().as_str(),
         "Lab Party P1"
     );
+}
+
+/// Before #2480 the ampersand name was refused here; it holds a measured mark,
+/// and its key is the book's alone, so it is admitted now.
+#[test]
+fn a_name_with_measured_marks_is_admitted_when_its_key_is_its_own() {
+    let book = ledgers(&[
+        &["L5 Amp & Co"],
+        &["Cash"],
+        &["BRIDGE Mx Ak, Am & Co"],
+        &["Printing and Stationery"],
+    ]);
+    for party in [
+        "L5 Amp & Co",
+        "BRIDGE Mx Ak, Am & Co",
+        "Printing and Stationery",
+    ] {
+        assert_eq!(admitted_party(party, &book).unwrap().as_str(), party);
+    }
+}
+
+/// The lab read every marked name where no other ledger had its letters and
+/// digits. Another ledger that has them, by its row spelling, its stored name
+/// or an alias, refuses the name; a name with no mark keeps its old admission.
+#[test]
+fn a_marked_name_whose_key_another_ledger_shares_is_refused() {
+    for book in [
+        ledgers(&[&["Ak & Am"], &["Ak Am"]]),
+        ledgers(&[&["Ak & Am"], &["Old Name", "AK-AM"]]),
+        ledgers(&[&["Ak & Am"], &["Other", "Other Stored", "ak.am"]]),
+        // A catalogue that does not hold the party at all.
+        ledgers(&[&["Cash"]]),
+    ] {
+        let Err(failure) = admitted_party("Ak & Am", &book) else {
+            panic!("admitted against {book:?}");
+        };
+        assert_eq!(failure.code, "party_name_not_admitted");
+        assert_eq!(failure.cause, Some("party_name_key_shared"));
+    }
+    // A ledger that answers to two names with the key is still one ledger.
+    let book = ledgers(&[&["Ak & Am", "Ak, Am"], &["Cash"]]);
+    assert!(admitted_party("Ak & Am", &book).is_ok());
+    // A plain name is admitted as before #2480, whatever shares its key.
+    let book = ledgers(&[&["Ak Am"], &["Ak & Am"]]);
+    assert_eq!(admitted_party("Ak Am", &book).unwrap().as_str(), "Ak Am");
 }
 
 /// Review P2-1: a padded, lower-case request binds by the case-and-spaces fold,
@@ -128,11 +195,45 @@ fn a_folded_party_name_is_told_as_a_case_or_spacing_match() {
         resolve_catalogue_ledger_or_refuse(&catalogue, " lab party p1 ", Redaction::None).unwrap();
     assert!(matches!(found, LedgerMatch::CaseOrSpacing { .. }));
     assert_eq!(party, "Lab Party P1");
-    assert_eq!(admitted_party(&party).unwrap().as_str(), "Lab Party P1");
+    let book = ledgers(&[&["Lab Party P1"], &["Cash"]]);
+    assert_eq!(
+        admitted_party(&party, &book).unwrap().as_str(),
+        "Lab Party P1"
+    );
     for redaction in [Redaction::None, Redaction::MaskParties] {
         assert_eq!(
             ledger_match_json(&found, &party, redaction)["matched"],
             "case_or_spacing"
         );
     }
+}
+
+/// Each reason a party's name is not sent has its own next step under
+/// `party_name_not_admitted`, and none repeats the name refused.
+#[test]
+fn each_party_name_refusal_has_its_own_next_step() {
+    let book = ledgers(&[&["Ak & Am"], &["Ak Am"], &["Cash"]]);
+    let mut steps = std::collections::BTreeSet::new();
+    for party in [
+        "Ak ; Am",
+        "Ak &Am",
+        "Ak Or Am",
+        &format!("Ak{}", " & Ak".repeat(15)),
+        "Ak & Am",
+        "Ak  Am",
+        "",
+        &"L".repeat(1025),
+        "Ak & & Am",
+    ] {
+        let Err(failure) = admitted_party(party, &book) else {
+            panic!("{party:?} was admitted");
+        };
+        let step = super::remediation_for(&failure.code, failure.cause)
+            .unwrap_or_else(|| panic!("a step for {:?}", failure.cause));
+        assert!(party.is_empty() || !step.contains(party), "{party:?}");
+        assert!(!step.contains("Ak"), "{party:?}");
+        steps.insert(step);
+    }
+    assert_eq!(steps.len(), 9, "each cause has its own step");
+    assert!(super::remediation_for("party_name_not_admitted", None).is_some());
 }

@@ -77,7 +77,7 @@ mod negative_ledgers;
 pub(crate) use negative_ledgers::NegativeLedgersReadError;
 #[path = "runtime_party_bills.rs"]
 mod party_bills;
-pub(crate) use party_bills::PartyBillsReadError;
+pub(crate) use party_bills::{OpenBillsParty, PartyBillsReadError};
 
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;

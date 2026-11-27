@@ -1,0 +1,668 @@
+# fixture: tests/fixtures/agent/party-bills/ledger-snapshot-2480-mx-20260801.utf16le.xml
+# parser: parse_native_ledger_snapshot
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "BRIDGE CGST 2.5%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "540.41",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE CGST 9%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "63.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Goods 18%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "700.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx \"Dk\" Dm & Dn",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Ak, Am & Co",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Bk & Sons (Bm), Bn",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Ek 50% + Em",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Fk #2, Fm-Fn",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Gk @ Gm.",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Hk: Hm's (Hn)",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Jk! Jm *",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Lk, Lm_Ln \"Lp\" + Lq @ Lr #4: 6% * Ls! & Lt. Lu-Lv/Lw (Lx) Ly's",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx M/s. Ck_Cm, Cn",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Mx Plain",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1051.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Output CGST XML",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Purchase Svc 5%",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Round Off",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "1.92",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE SGST 2.5%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "540.39",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE SGST 9%",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "63.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Supplier RJ",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 4D 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 998313 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "16010.80",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 998314 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "5604.80",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc 998315 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc INH2 5%",
+        parent: Some(
+            "BRIDGE Sales Sub",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Svc INH 5%",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE Walk-in",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-11963.32",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "22317.52",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+])

@@ -174,7 +174,7 @@ fn pilot_identity() -> VerifiedCompanyIdentity {
 fn outstandings_request() -> String {
     render_ledger_outstandings_request(
         "BRIDGE PILOT LAB",
-        &LedgerScopeName::new("BRIDGE Supplier RJ").unwrap(),
+        &LedgerOutstandingsParty::new("BRIDGE Supplier RJ").unwrap(),
         &TallyDate::parse("20260731").unwrap(),
     )
 }
@@ -218,7 +218,7 @@ async fn an_ordinary_report_read_of_the_empty_answer_fails_as_before() {
         port: address.port(),
     })
     .unwrap();
-    let party = LedgerScopeName::new("Lab Party Q9").unwrap();
+    let party = LedgerOutstandingsParty::new("Lab Party Q9").unwrap();
     let to = TallyDate::parse("20260331").unwrap();
     let Err(error) = client
         .fetch_native_report_paired(render_ledger_outstandings_request(
@@ -307,7 +307,7 @@ async fn the_runtime_read_refuses_two_empty_bills_answers_as_none_reported() {
         .fetch_party_bills(
             config,
             &pilot_identity(),
-            LedgerScopeName::new("BRIDGE Supplier RJ").unwrap(),
+            OpenBillsParty::admit("BRIDGE Supplier RJ", [["BRIDGE Supplier RJ"]]).unwrap(),
             TallyDate::parse("20260731").unwrap(),
         )
         .await
@@ -525,4 +525,24 @@ fn a_body_is_tied_to_the_snapshot_as_before() {
         ),
         Err(PartyBillsReadError::NotInSnapshot)
     ));
+}
+
+#[test]
+fn an_open_bills_party_is_refused_by_its_own_variant() {
+    assert_eq!(
+        OpenBillsParty::admit("Ak & Am", [["Ak & Am"], ["Ak Am"]]),
+        Err(OpenBillsPartyRefusal::KeyShared)
+    );
+    assert_eq!(
+        OpenBillsParty::admit("Ak ; Am", [["Ak ; Am"]]),
+        Err(OpenBillsPartyRefusal::Name(
+            LedgerOutstandingsPartyError::UnmeasuredMark(';')
+        ))
+    );
+    assert_eq!(
+        OpenBillsParty::admit("Ak & Am", [["Ak & Am"]])
+            .unwrap()
+            .as_str(),
+        "Ak & Am"
+    );
 }

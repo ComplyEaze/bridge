@@ -527,20 +527,20 @@ impl StockItemCatalogue {
         }
         let mut masters = Vec::with_capacity(items.len());
         for (item, row) in items.iter().enumerate() {
-            if !is_lowercase_hex_and_hyphens(&row.guid) {
+            if !is_lowercase_hex_and_hyphens(row.guid()) {
                 return Err(StockItemCatalogueError::GuidNotLowercase { item });
             }
-            if row.names.is_empty() {
+            if row.names().is_empty() {
                 return Err(StockItemCatalogueError::NoNameEntry { item });
             }
-            let mut names = row.names.clone();
-            if !names.contains(&row.name) {
-                names.push(row.name.clone());
+            let mut names = row.names().to_vec();
+            if !names.iter().any(|alias| alias == row.name()) {
+                names.push(row.name().to_owned());
             }
             masters.push(IndexedMaster {
                 kind: MasterKind::StockItem,
-                guid: row.guid.clone(),
-                alter_id: row.alter_id,
+                guid: row.guid().to_owned(),
+                alter_id: row.alter_id(),
                 names,
             });
         }
@@ -725,18 +725,18 @@ fn non_blank_text(text: &str) -> bool {
 fn read_parent(item: &CandidateStockItem) -> Option<&str> {
     // The parser gives no parent for one that is empty after `str::trim`
     // (`native_masters.rs`), so `Some` is never blank here.
-    item.parent.as_deref()
+    item.parent()
 }
 
 fn read_unit(item: &CandidateStockItem) -> Option<&str> {
-    match &item.base_units {
+    match item.base_units() {
         ScalarObservation::Text(unit) if non_blank_text(unit) => Some(unit.as_str()),
         _ => None,
     }
 }
 
 fn read_applicability(item: &CandidateStockItem) -> Option<&str> {
-    match &item.gst_applicable {
+    match item.gst_applicable() {
         ScalarObservation::Text(applicability) if non_blank_text(applicability) => {
             Some(applicability.as_str())
         }
@@ -745,14 +745,14 @@ fn read_applicability(item: &CandidateStockItem) -> Option<&str> {
 }
 
 fn read_supply(item: &CandidateStockItem) -> Option<&str> {
-    match &item.gst_type_of_supply {
+    match item.gst_type_of_supply() {
         ScalarObservation::Text(supply) if non_blank_text(supply) => Some(supply.as_str()),
         _ => None,
     }
 }
 
 fn read_gst(item: &CandidateStockItem) -> Option<&[GstDetailsEntry]> {
-    let gst = match &item.gst {
+    let gst = match item.gst() {
         GstDetailsObservation::Entries { entries } if !entries.is_empty() => entries.as_slice(),
         _ => return None,
     };
@@ -775,7 +775,7 @@ fn read_gst(item: &CandidateStockItem) -> Option<&[GstDetailsEntry]> {
 }
 
 fn read_hsn(item: &CandidateStockItem) -> Option<&[HsnDetailsEntry]> {
-    let hsn = match &item.hsn {
+    let hsn = match item.hsn() {
         HsnDetailsObservation::Entries { entries } if !entries.is_empty() => entries.as_slice(),
         _ => return None,
     };
@@ -818,7 +818,8 @@ impl<'a> SiblingGst<'a> {
             .items
             .iter()
             .filter(|item| {
-                item.name == name.as_str() || item.names.iter().any(|alias| alias == name.as_str())
+                item.name() == name.as_str()
+                    || item.names().iter().any(|alias| alias == name.as_str())
             })
             .collect();
         let item = match exact.as_slice() {
@@ -869,12 +870,12 @@ impl<'a> SiblingGst<'a> {
 
     /// The item's GUID as read.
     pub(crate) fn guid(&self) -> &'a str {
-        &self.item.guid
+        self.item.guid()
     }
 
     /// The item's row name as read.
     pub(crate) fn name(&self) -> &'a str {
-        &self.item.name
+        self.item.name()
     }
 
     /// The exact row name or alias by which this sibling was selected.

@@ -1065,6 +1065,36 @@ mod post {
         assert_eq!(sent(&observed[read_at + 4..]), every_request());
     }
 
+    /// The read-back at post time is answered in full, but its aim marks
+    /// answer does not parse (the ALTMSTID of 290 made `x`, a constructed edit
+    /// of the captured marks): the verdict is unconfirmed, not open.
+    #[tokio::test]
+    async fn a_read_back_whose_marks_do_not_parse_is_unconfirmed() {
+        let mark = "<ALTMSTID TYPE=\"Number\"> 290</ALTMSTID>";
+        let unparsed = marks_at(290).replacen(mark, "<ALTMSTID TYPE=\"Number\">x</ALTMSTID>", 1);
+        assert_ne!(unparsed, marks_at(290));
+        let mut plans = post_reads();
+        plans.extend(dispatch());
+        let answers = stock_answers_at(rebound_after(), 3, marks_at(290), unparsed);
+        plans.extend(standalone(answers));
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let posted = run.post(&ScriptedApproval::approving(), id(A)).await;
+        let result = posted.expect("the answer").payload["result"].clone();
+        assert_eq!(
+            result["state"], "masters_after_post_unconfirmed",
+            "{result}"
+        );
+        assert_eq!(result["verification"]["read_back"]["state"], "unparsed");
+        assert_eq!(
+            result["verification"]["reasons"],
+            json!(["masters_unconfirmed"])
+        );
+        assert_eq!(run.records(), RECORDED);
+        let observed = run.finish();
+        assert_eq!(imports(&observed), [create_bytes()], "sent once");
+    }
+
     /// Tally's answer cannot be recorded, after the send and again under the
     /// verdict's lock: a clean read-back is NOT verified (the journal admits no
     /// verified verdict without the answer), and the answer says so. Refused
@@ -1100,7 +1130,10 @@ mod post {
                 assert_eq!(result["answer_recorded"], false);
                 assert_eq!(result["verification"]["settled"], false);
                 assert_eq!(result["verification"]["verdict_recorded"], false);
-                assert!(result["note"].as_str().unwrap().contains("NOT verified"));
+                assert_eq!(result["note"], UNRECORDED_NOTE);
+                let step = result["next_step"].as_str().unwrap();
+                assert!(step.contains(STOCK_VERDICT_UNRECORDED), "{step}");
+                assert!(step.contains(STOCK_ANSWER_UNRECORDED), "{step}");
                 assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
             }
             assert_eq!(imports(&run.finish()), [create_bytes()], "sent once");

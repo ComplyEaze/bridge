@@ -73,6 +73,8 @@ const STOCK_VERDICT_UNRECORDED: &str = " ComplyEaze Bridge could not record this
 const VERIFIED_NOTE: &str = "ComplyEaze Bridge read the book back after the one create: exactly one new stock item of this name, with the parent, unit, GST details and HSN details as sent; no stock item that existed before changed; the company's master mark moved by exactly one; and no other loaded company's master mark moved.";
 const VERIFIED_STEP: &str =
     "Nothing more is needed for this stock item. Do not post this batch again.";
+/// The read-back matched, but its verdict could not be recorded.
+const UNRECORDED_NOTE: &str = "ComplyEaze Bridge read the stock item back and it matched what was sent, but the verdict could not be recorded, so the stock item is NOT verified: the batch stays open, and a later call for this batch_id cannot verify it.";
 const UNCONFIRMED_NOTE: &str =
     "The book could not be read back, so the stock item is NOT verified.";
 const OPEN_NOTE: &str =
@@ -534,12 +536,12 @@ fn stock_verification_result(
     let verified = judged == PostedVerified;
     let (reported, note, step) = match judged {
         PostedVerified if verdict.is_ok() => ("posted_verified", VERIFIED_NOTE, VERIFIED_STEP),
-        PostedVerified => ("posted_unverified", POSTED_STOCK_NOTE, STOCK_NEXT_STEP),
+        PostedVerified => ("posted_unverified", UNRECORDED_NOTE, OPEN_STEP),
         Unconfirmed => (verdict_state_code(judged), UNCONFIRMED_NOTE, OPEN_STEP),
         _ => (verdict_state_code(judged), OPEN_NOTE, OPEN_STEP),
     };
     let mut next_step = step.to_string();
-    if verdict.is_err() && !verified {
+    if verdict.is_err() {
         next_step.push_str(STOCK_VERDICT_UNRECORDED);
     }
     if moment.is_some() && !answer_recorded {

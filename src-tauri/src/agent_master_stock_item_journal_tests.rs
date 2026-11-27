@@ -683,6 +683,8 @@ mod judge {
 
     /// Another loaded company's GUID: synthetic.
     const OTHER: &str = "0f0e0d0c-0b0a-4909-8807-060504030201";
+    /// A third loaded company's GUID: synthetic.
+    const THIRD: &str = "1a2b3c4d-5e6f-4a0b-9c1d-2e3f4a5b6c7d";
 
     fn marks(pairs: &[(&str, u64)]) -> Vec<MasterMark> {
         (pairs.iter())
@@ -895,6 +897,15 @@ mod judge {
         }
         let judgement = judged(&sent(), &clean(), (&both, &both), &fresh);
         assert_open(&judgement, &["company_scope_changed"], "a company more");
+        // A third company in one answer only, the other answer the stored set.
+        let third = [(COMPANY_GUID, 211), (OTHER, 5), (THIRD, 1)];
+        for (case, binding, aim) in [
+            ("in the binding answer", &third[..], &both[..]),
+            ("in the aim answer", &both[..], &third[..]),
+        ] {
+            let judgement = judged(&read_back, &clean(), (binding, aim), &fresh);
+            assert_open(&judgement, &["company_scope_changed"], case);
+        }
         let judgement = judged(&read_back, &clean(), MOVED, &fresh);
         assert_open(&judgement, &["company_scope_changed"], "a company fewer");
     }

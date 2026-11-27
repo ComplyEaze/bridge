@@ -4268,6 +4268,47 @@ fn before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval() 
     );
 }
 
+/// The admission lock held by a read when the check under it begins: the
+/// lock's own refusal, with nothing recorded, no sidecar and the approval
+/// unspent, and the answer's code is the lock's.
+#[test]
+fn before_dispatch_refuses_a_busy_admission_lock_by_name_and_records_nothing() {
+    use crate::tally::approved_import::AdmissionLockRefusal;
+    let directory = tempfile::tempdir().unwrap();
+    let server = unit_server(directory.path());
+    let (batch, _) = saved_batch(&server, LEDGER);
+    let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
+    let held = server.lock_import_admission_shared().unwrap();
+    let refused = match server.record_master_intent(
+        &batch,
+        &expected_request(),
+        approval,
+        aim_for_test(),
+        &Mutex::new(None),
+    ) {
+        Err(BeforeDispatchError::Refused(refusal)) => refusal,
+        other => panic!("expected a named refusal, got {other:?}"),
+    };
+    drop(held);
+    assert_eq!(
+        refused,
+        UnderLockRefusal::Admission(AdmissionLockRefusal::Busy)
+    );
+    assert_eq!(
+        super::super::post::refusal_code(&anyhow::Error::from(refused)),
+        "import_admission_busy"
+    );
+    assert_eq!(record_types(directory.path()), ["master_batch"]);
+    assert!(!directory
+        .path()
+        .join(format!("master-pre-image-{}.json", batch.batch_id))
+        .exists());
+    assert_eq!(
+        server.post_approvals.spend(&batch.batch_id, approval),
+        Ok(())
+    );
+}
+
 #[test]
 fn before_dispatch_refusals_record_nothing() {
     use BeforeDispatchError::Refused;

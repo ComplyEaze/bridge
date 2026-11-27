@@ -51,8 +51,9 @@ pub use party_bills::{
     PartyBillReference, PartyBillsAnswer, PartyBillsAnswerError, PartyBillsRead, PartyBillsRefusal,
 };
 pub use party_name::{
-    LedgerOutstandingsParty, LedgerOutstandingsPartyError, Neighbour, MARKED_NAME_MAX_CHARS,
-    MEASURED_DEVANAGARI_WORD, MEASURED_FORMULA_WORDS, MEASURED_MARKS, MEASURED_MARK_PLACES,
+    Combination, LedgerOutstandingsParty, LedgerOutstandingsPartyError, Neighbour, WordKind,
+    MARKED_NAME_MAX_CHARS, MEASURED_DEVANAGARI_WORD, MEASURED_FORMULA_WORDS, MEASURED_MARKS,
+    MEASURED_MARK_MOST, MEASURED_MARK_PLACES, MEASURED_WORD_PAIRS,
 };
 pub use request::{
     ledger_guid_filter_parts, parent_filter_parts, render_company_base_currency_request,

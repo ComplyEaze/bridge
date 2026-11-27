@@ -276,12 +276,13 @@ fn each_refusal_has_its_own_code() {
         LedgerOutstandingsPartyError::UnmeasuredFormulaWord("or"),
         LedgerOutstandingsPartyError::UnmeasuredPosition('&'),
         LedgerOutstandingsPartyError::MarkedNameTooLong,
+        LedgerOutstandingsPartyError::UnmeasuredCombination(Combination::Adjacent),
     ]
     .map(LedgerOutstandingsPartyError::code);
     let mut sorted = codes.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 7);
+    assert_eq!(sorted.len(), 8);
 }
 
 /// The names every kept request sent, as Tally read them: the text of each
@@ -327,15 +328,43 @@ fn beside(character: Option<char>) -> Neighbour {
     }
 }
 
-/// The rule is exactly what the kept captures show: each of their names is
-/// admitted, the placings it admits are the placings those names hold, and
-/// its length cap is their longest. A rule wider or narrower than the
-/// evidence fails here.
+/// What a space-separated word of a kept name is, read here apart from the type.
+fn kind(word: &str) -> WordKind {
+    if word == "and" {
+        WordKind::And
+    } else if word == MEASURED_DEVANAGARI_WORD {
+        WordKind::Devanagari
+    } else if word.chars().count() == 1 && MEASURED_MARKS.contains(&word.chars().next().unwrap()) {
+        WordKind::Mark(word.chars().next().unwrap())
+    } else {
+        assert!(
+            word.contains(|c: char| c.is_ascii_alphanumeric()),
+            "{word:?}"
+        );
+        WordKind::Word
+    }
+}
+
+/// The tables are what the kept captures show: each of their names is
+/// admitted; the placings, each placing's and each mark's most per name, the
+/// pairs of neighbouring word kinds, the most `and` and Devanagari words per
+/// name, and the length cap are each derived here from those names and must
+/// equal the type's. The pairing rule is not derived: the captures show each
+/// `"` and spaced bracket paired within one word, and two brackets inside a
+/// word, each the only bracket in its name; the rule admits only those
+/// shapes, the narrower choice.
 #[test]
-fn the_rule_is_the_shapes_the_kept_captures_show() {
+fn the_tables_are_what_the_kept_captures_show() {
+    use std::collections::{BTreeMap, BTreeSet};
     let names = kept_names();
     assert_eq!(names.len(), 23, "every kept request is read");
-    let mut places = std::collections::BTreeSet::new();
+    let mut places = BTreeSet::new();
+    let mut most_per_place = BTreeMap::new();
+    let mut most_per_mark = BTreeMap::new();
+    let mut pairs = BTreeSet::new();
+    let mut most_and = 0;
+    let mut most_devanagari = 0;
+    let mut spaced_pairs = 0;
     for name in &names {
         assert!(
             crate::ledger_scope::LedgerScopeName::new(name).is_err(),
@@ -351,49 +380,119 @@ fn the_rule_is_the_shapes_the_kept_captures_show() {
             "{name:?}"
         );
         let characters = name.chars().collect::<Vec<_>>();
+        let mut in_name = BTreeMap::new();
         for (at, mark) in characters.iter().copied().enumerate() {
             if MEASURED_MARKS.contains(&mark) {
                 let before = at.checked_sub(1).map(|before| characters[before]);
-                places.insert((
+                let placing = (
                     mark,
                     beside(before),
                     beside(characters.get(at + 1).copied()),
-                ));
+                );
+                places.insert(placing);
+                *in_name.entry(placing).or_insert(0) += 1;
             }
         }
+        for (placing, count) in in_name {
+            let most = most_per_place.entry(placing).or_insert(0);
+            *most = count.max(*most);
+        }
+        for mark in MEASURED_MARKS {
+            let count = characters.iter().filter(|c| **c == mark).count();
+            let most = most_per_mark.entry(mark).or_insert(0);
+            *most = count.max(*most);
+        }
+        let kinds = std::iter::once(WordKind::Edge)
+            .chain(name.split(' ').map(kind))
+            .chain(std::iter::once(WordKind::Edge))
+            .collect::<Vec<_>>();
+        for pair in kinds.windows(2) {
+            pairs.insert((pair[0], pair[1]));
+        }
+        most_and = most_and.max(kinds.iter().filter(|k| **k == WordKind::And).count());
+        most_devanagari =
+            most_devanagari.max(kinds.iter().filter(|k| **k == WordKind::Devanagari).count());
+        spaced_pairs += name
+            .split(' ')
+            .filter(|word| {
+                (word.starts_with('"') && word.ends_with('"'))
+                    || (word.starts_with('(') && word.ends_with(')'))
+            })
+            .count();
     }
-    assert_eq!(
-        places,
-        MEASURED_MARK_PLACES.into_iter().collect(),
-        "the admitted placings are the kept ones"
+    assert_eq!(places, MEASURED_MARK_PLACES.into_iter().collect());
+    assert!(
+        most_per_place.values().all(|most| *most == 1),
+        "each placing at most once: {most_per_place:?}"
     );
-    for mark in MEASURED_MARKS {
-        assert!(
-            places.iter().any(|(placed, ..)| *placed == mark),
-            "{mark:?}"
-        );
-    }
+    assert_eq!(
+        most_per_mark,
+        MEASURED_MARK_MOST.into_iter().collect::<BTreeMap<_, _>>()
+    );
+    assert_eq!(pairs, MEASURED_WORD_PAIRS.into_iter().collect());
+    assert_eq!((most_and, most_devanagari), (1, 1), "each at most once");
+    assert!(spaced_pairs >= 3, "the pairs the rule admits are read");
     assert_eq!(
         names.iter().map(|name| name.chars().count()).max(),
         Some(MARKED_NAME_MAX_CHARS)
     );
-    let words = names
-        .iter()
-        .flat_map(|name| {
-            let words = name.split(' ').collect::<Vec<_>>();
-            let last = words.len() - 1;
-            words
-                .into_iter()
-                .enumerate()
-                .map(move |(at, word)| (at, at == last, word.to_string()))
-        })
-        .collect::<Vec<_>>();
-    assert!(words
-        .iter()
-        .any(|(at, last, word)| *at > 0 && !*last && word == "and"));
-    assert!(words
-        .iter()
-        .any(|(at, _, word)| *at > 0 && word == MEASURED_DEVANAGARI_WORD));
+}
+
+/// Every character in a measured place, together in a way no kept name shows:
+/// each is refused by the limit it passes.
+#[test]
+fn a_combination_no_kept_name_shows_is_refused_by_its_limit() {
+    use Combination::{Adjacent, Repeated, RepeatedWord, Unpaired};
+    let word = MEASURED_DEVANAGARI_WORD;
+    for (name, limit) in [
+        // Two marks standing alone side by side.
+        ("Ak & & Am".to_string(), Repeated('&')),
+        ("Ak * + @ & Am".to_string(), Adjacent),
+        ("Ak & + Am".to_string(), Adjacent),
+        // `and` twice, or beside a mark standing alone.
+        ("Ak and and Am".to_string(), RepeatedWord),
+        ("Ak and Am and Bm".to_string(), RepeatedWord),
+        ("Ak & and Am".to_string(), Adjacent),
+        ("Ak and & Am".to_string(), Adjacent),
+        // The Devanagari word twice, beside a mark it was not read beside, or
+        // before another word.
+        (format!("Ak {word} {word} Am"), RepeatedWord),
+        (format!("Ak & {word}"), Adjacent),
+        (format!("Ak {word} Am"), Adjacent),
+        (format!("Ak {word} + Am"), Adjacent),
+        // A quote or bracket not paired within one word.
+        ("Ak \"Am Bm".to_string(), Unpaired('"')),
+        ("Ak\" Am".to_string(), Unpaired('"')),
+        ("Ak (Am".to_string(), Unpaired('(')),
+        ("Ak Am) Bm".to_string(), Unpaired(')')),
+        ("Ak (Am Bm) Cm".to_string(), Unpaired('(')),
+        ("Ak \"Am Bm\" Cm".to_string(), Unpaired('"')),
+        ("Ak(Am \"Bm\" Cm".to_string(), Unpaired('(')),
+        ("Ak(Am Bm)Cm".to_string(), Unpaired('(')),
+        // One placing, or one mark, more often than any kept name holds it.
+        ("Ak.Bm.Cm.Dm".to_string(), Repeated('.')),
+        ("Ak & Bm & Cm & Dm".to_string(), Repeated('&')),
+        ("Ak.Bm Cm.".to_string(), Repeated('.')),
+        ("Ak-Bm-Cm".to_string(), Repeated('-')),
+        ("Ak \"Bm\" \"Cm\" Dm".to_string(), Repeated('"')),
+    ] {
+        assert_eq!(
+            LedgerOutstandingsParty::new(&name),
+            Err(LedgerOutstandingsPartyError::UnmeasuredCombination(limit)),
+            "{name:?}"
+        );
+    }
+    for name in [
+        "Ak \"Bm\" Cm".to_string(),
+        "Ak (Bm) Cm".to_string(),
+        "Ak(Bm".to_string(),
+        "Ak & Bm".to_string(),
+        "Ak-Bm 2023-24".to_string(),
+        format!("Ak {word} & Bm"),
+        format!("Ak {word}"),
+    ] {
+        assert!(LedgerOutstandingsParty::new(&name).is_ok(), "{name:?}");
+    }
 }
 
 /// A measured mark where no kept name holds it, or a name that starts other
@@ -457,9 +556,20 @@ fn and_is_refused_first_last_or_beside_a_mark() {
         );
     }
     assert!(LedgerOutstandingsParty::new("Ak and Am & Co").is_ok());
+    // First, a Devanagari character no row read is still refused by that
+    // character; one of the word read, first, is refused by its place.
+    assert_eq!(
+        LedgerOutstandingsParty::new("\u{0915} Ak"),
+        Err(LedgerOutstandingsPartyError::UnmeasuredMark('\u{0915}'))
+    );
+    assert_eq!(
+        LedgerOutstandingsParty::new("\u{0909} Ak"),
+        Err(LedgerOutstandingsPartyError::UnmeasuredPosition('\u{0909}'))
+    );
 }
 
-/// Devanagari was read only as the one whole word, after another word.
+/// Devanagari was read only as the one whole word, after another word; what may
+/// stand beside it is held by the word pairs.
 #[test]
 fn devanagari_other_than_the_whole_word_read_is_refused() {
     let word = MEASURED_DEVANAGARI_WORD;
@@ -480,14 +590,14 @@ fn devanagari_other_than_the_whole_word_read_is_refused() {
             "{name:?}"
         );
     }
-    assert!(LedgerOutstandingsParty::new(&format!("Ak {word} Am")).is_ok());
+    assert!(LedgerOutstandingsParty::new(&format!("Ak {word} & Am")).is_ok());
 }
 
 /// A marked name is held to the longest marked name read; a plain name keeps
 /// the narrower type's limit.
 #[test]
 fn a_marked_name_longer_than_any_read_is_refused() {
-    let longest = format!("Ak{}", " & Ak".repeat(14));
+    let longest = format!("Ak & {}", "B".repeat(MARKED_NAME_MAX_CHARS - 5));
     assert_eq!(longest.chars().count(), MARKED_NAME_MAX_CHARS);
     assert!(LedgerOutstandingsParty::new(&longest).is_ok());
     assert_eq!(

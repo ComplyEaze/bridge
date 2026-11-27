@@ -18,6 +18,7 @@
 //! and so did changing a bill allocation's reference, adding a cost-centre
 //! allocation and setting a bank-reconciliation date (PARTIAL): one run each,
 //! protocol reference §11c.5.
+use super::super::failure_code::ImportAckCode;
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount, REVIEW_BUTTON};
 
@@ -128,12 +129,12 @@ fn read_step_records(imports: &Path, batch_id: &str) -> MastersRecord {
 fn select_doubt(
     requested: Option<DoubtKind>,
     states: &[(DoubtKind, MastersRecord)],
-) -> Result<DoubtKind, &'static str> {
+) -> Result<DoubtKind, ImportAckCode> {
     if let Some(kind) = requested {
         return if states.iter().any(|(possible, _)| *possible == kind) {
             Ok(kind)
         } else {
-            Err("ack_no_observed_doubt")
+            Err(ImportAckCode::NoObservedDoubt)
         };
     }
     let observed = states
@@ -157,8 +158,8 @@ fn select_doubt(
             .iter()
             .find(|(_, state)| *state != MastersRecord::NoDoubt)
             .map_or(DoubtKind::Masters, |(kind, _)| *kind)),
-        [_, ..] if observed.iter().all(unavailable) => Err("ack_doubt_record_unavailable"),
-        _ => Err("ack_doubt_ambiguous"),
+        [_, ..] if observed.iter().all(unavailable) => Err(ImportAckCode::DoubtRecordUnavailable),
+        _ => Err(ImportAckCode::DoubtAmbiguous),
     }
 }
 
@@ -172,8 +173,8 @@ fn doubt_states(imports: &Path, line: &ImportLedgerLine) -> Vec<(DoubtKind, Mast
 }
 
 /// A doubt-choice refusal, naming the two kinds when it is the ambiguity.
-fn with_doubt_cause(mut failure: ToolFailure, code: &str) -> ToolFailure {
-    if code == "ack_doubt_ambiguous" {
+fn with_doubt_cause(mut failure: ToolFailure, code: ImportAckCode) -> ToolFailure {
+    if code == ImportAckCode::DoubtAmbiguous {
         failure.cause = Some("masters_and_batch_step");
     }
     failure
@@ -187,7 +188,7 @@ fn with_doubt_cause(mut failure: ToolFailure, code: &str) -> ToolFailure {
 /// naming it while another stands. So two observed doubts refuse as
 /// [`select_doubt`] refuses them before any read. One or none leaves the
 /// choice to the checks that follow, as before.
-fn still_the_only_doubt(after: &[(DoubtKind, MastersRecord)]) -> Result<(), &'static str> {
+fn still_the_only_doubt(after: &[(DoubtKind, MastersRecord)]) -> Result<(), ImportAckCode> {
     let observed = after
         .iter()
         .filter(|(_, state)| {
@@ -422,29 +423,28 @@ fn admit_review(
     rows: &[ReadVoucher],
     kind: DoubtKind,
     bindings: Bindings<'_>,
-) -> Result<ReviewSnapshot, String> {
+) -> Result<ReviewSnapshot, ImportAckCode> {
     let doubt_raw = match kind.read(imports, &line.batch_id) {
         MastersRecord::Doubt { raw } => raw,
-        MastersRecord::Pending => return Err("ack_check_pending".into()),
+        MastersRecord::Pending => return Err(ImportAckCode::CheckPending),
         MastersRecord::Unreadable => {
             return Err(match kind {
-                DoubtKind::Masters => "ack_masters_record_unreadable",
-                DoubtKind::BatchStep => "ack_step_record_unreadable",
-            }
-            .into())
+                DoubtKind::Masters => ImportAckCode::MastersRecordUnreadable,
+                DoubtKind::BatchStep => ImportAckCode::StepRecordUnreadable,
+            })
         }
-        MastersRecord::NoDoubt => return Err("ack_no_observed_doubt".into()),
-        MastersRecord::DoubtRecordUnavailable => return Err("ack_doubt_record_unavailable".into()),
+        MastersRecord::NoDoubt => return Err(ImportAckCode::NoObservedDoubt),
+        MastersRecord::DoubtRecordUnavailable => return Err(ImportAckCode::DoubtRecordUnavailable),
     };
     let result = &payload["result"];
     if result["dispatch"]["response_state"] != "response_clean" {
-        return Err("ack_response_not_clean".into());
+        return Err(ImportAckCode::ResponseNotClean);
     }
     // `verify_batch` today reports `posted_verified` only for a voucher that
     // is neither cancelled nor optional. This checks it again here rather than
     // rely on that staying true.
     if verification_status(result, line.vouchers.len()) != "posted_verified" {
-        return Err("ack_readback_not_matched".into());
+        return Err(ImportAckCode::ReadbackNotMatched);
     }
     let vouchers = line
         .vouchers
@@ -461,7 +461,7 @@ fn admit_review(
             })
         })
         .collect::<Option<Vec<_>>>()
-        .ok_or_else(|| "ack_readback_not_matched".to_string())?;
+        .ok_or(ImportAckCode::ReadbackNotMatched)?;
     Ok(ReviewSnapshot {
         doubt_raw,
         vouchers,
@@ -476,12 +476,12 @@ fn review_preview(
     company_name: &str,
     doubt: &Value,
     row: &ReadVoucher,
-) -> Result<String, String> {
+) -> Result<String, ImportAckCode> {
     let preview = render_review_text(batch_id, marker, company_name, doubt, row)?;
     if caps_exceeded(&preview).is_empty() {
         Ok(preview)
     } else {
-        Err("ack_review_too_large".into())
+        Err(ImportAckCode::ReviewTooLarge)
     }
 }
 
@@ -492,7 +492,7 @@ fn render_review_text(
     company_name: &str,
     doubt: &Value,
     row: &ReadVoucher,
-) -> Result<String, String> {
+) -> Result<String, ImportAckCode> {
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let doubted = doubt["ledgers"]
         .as_array()
@@ -558,7 +558,7 @@ fn render_review_text(
         .zip(entry_names)
         .map(|(entry, ledger)| {
             let amount = ExactDecimal::parse(entry.amount.clone())
-                .map_err(|_| "ack_readback_not_matched".to_string())?;
+                .map_err(|_| ImportAckCode::ReadbackNotMatched)?;
             let (side, shown) = if entry.is_deemed_positive.eq_ignore_ascii_case("yes") {
                 ("Dr", negated_as_written(&amount))
             } else {
@@ -566,7 +566,7 @@ fn render_review_text(
             };
             Ok(format!("{side} {shown}  {}", ledger.shown()))
         })
-        .collect::<Result<Vec<_>, String>>()?
+        .collect::<Result<Vec<_>, ImportAckCode>>()?
         .join("\n");
     let preview = format!(
         "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\n{narration_pointer}\n{entries}{note}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.\n{}\n{narration_text}",
@@ -598,7 +598,10 @@ fn render_review_text(
 /// on one line or in quoted parts split only at a space. A narration that
 /// cannot be split stays whole on one line, and the dialog's caps refuse it
 /// as before. Returns the pointer line and the lines under the heading.
-fn narration_lines(narration: Option<&str>, whole: &str) -> Result<(String, String), String> {
+fn narration_lines(
+    narration: Option<&str>,
+    whole: &str,
+) -> Result<(String, String), ImportAckCode> {
     let lines = match post::narration_lines(narration) {
         Ok(lines) => lines,
         Err(post::VoucherTextRefusal::Layout) => {
@@ -614,10 +617,10 @@ fn narration_lines(narration: Option<&str>, whole: &str) -> Result<(String, Stri
 }
 
 /// The code an acknowledgement dialog refuses a value with.
-fn ack_text_refusal(refusal: post::ReviewTextRefusal) -> String {
+fn ack_text_refusal(refusal: post::ReviewTextRefusal) -> ImportAckCode {
     match refusal {
-        post::ReviewTextRefusal::Layout => "ack_review_layout_text".into(),
-        post::ReviewTextRefusal::Format => "ack_review_format_text".into(),
+        post::ReviewTextRefusal::Layout => ImportAckCode::ReviewLayoutText,
+        post::ReviewTextRefusal::Format => ImportAckCode::ReviewFormatText,
     }
 }
 
@@ -630,7 +633,7 @@ fn batch_review_preview(
     company_name: &str,
     doubt: &Value,
     rows: &[&ReadVoucher],
-) -> Result<String, String> {
+) -> Result<String, ImportAckCode> {
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let doubted_ledgers = doubt["ledgers"]
         .as_array()
@@ -665,7 +668,7 @@ fn batch_review_preview(
         BTreeMap::<post::ReviewLedgerName, (ExactDecimal, ExactDecimal, usize)>::new();
     for (entry, name) in rows.iter().flat_map(|row| &row.entries).zip(entry_names) {
         let amount = ExactDecimal::parse(entry.amount.clone())
-            .map_err(|_| "ack_readback_not_matched".to_string())?;
+            .map_err(|_| ImportAckCode::ReadbackNotMatched)?;
         let totals = ledgers
             .entry(*name)
             .or_insert_with(|| (ExactDecimal::zero(), ExactDecimal::zero(), 0));
@@ -678,7 +681,7 @@ fn batch_review_preview(
         } else {
             totals.1.checked_add(&amount).map(|cr| totals.1 = cr)
         };
-        summed.map_err(|_| "ack_readback_not_matched".to_string())?;
+        summed.map_err(|_| ImportAckCode::ReadbackNotMatched)?;
     }
     let dates = rows.iter().map(|row| row.date.as_str());
     let alter_ids = rows.iter().filter_map(|row| row.alter_id);
@@ -772,7 +775,7 @@ fn batch_review_preview(
             .iter()
             .any(|line| line.chars().count() > post::BATCH_REVIEW_MAX_LINE_CHARS)
     {
-        return Err("ack_review_too_large".into());
+        return Err(ImportAckCode::ReviewTooLarge);
     }
     if !post::line_break_names_are_marked(&preview, shown_names.iter().copied()) {
         return Err(ack_text_refusal(post::ReviewTextRefusal::Layout));
@@ -833,10 +836,12 @@ impl RecordedReview {
     /// Why a review of `doubt_raw` is refused while this record is on file.
     /// Records are never overwritten, so a record covering another doubt is
     /// refused as stale, never as this doubt's review.
-    fn answer(&self, doubt_raw: &[u8]) -> &'static str {
+    fn answer(&self, doubt_raw: &[u8]) -> ImportAckCode {
         match self {
-            Self::Covers(sha256) if *sha256 != sha256_hex(doubt_raw) => "ack_recorded_review_stale",
-            _ => "ack_already_recorded",
+            Self::Covers(sha256) if *sha256 != sha256_hex(doubt_raw) => {
+                ImportAckCode::RecordedReviewStale
+            }
+            _ => ImportAckCode::AlreadyRecorded,
         }
     }
 }
@@ -848,10 +853,10 @@ fn write_record_once(
     path: &Path,
     bytes: &[u8],
     _approval: ReviewAcknowledged,
-) -> Result<(), String> {
+) -> Result<(), ImportAckCode> {
     persistence::write_record_once(path, bytes).map_err(|refused| match refused {
-        persistence::RecordOnce::Exists => "ack_already_recorded".into(),
-        persistence::RecordOnce::Failed => "import_file_write_failed".into(),
+        persistence::RecordOnce::Exists => ImportAckCode::AlreadyRecorded,
+        persistence::RecordOnce::Failed => ImportAckCode::ImportFileWriteFailed,
     })
 }
 
@@ -1054,10 +1059,10 @@ impl Server {
             ..
         } = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or(ImportAckCode::ImportBatchNotFound)?;
         // Refused before any read or dialog: nothing was posted.
         if !dispatched || line.vouchers.is_empty() {
-            return Err("ack_batch_not_posted".to_string().into());
+            return Err(ImportAckCode::BatchNotPosted.into());
         }
         let requested = match args.get("doubt") {
             None | Some(Value::Null) => None,
@@ -1065,12 +1070,12 @@ impl Server {
                 value
                     .as_str()
                     .and_then(DoubtKind::parse)
-                    .ok_or_else(|| "ack_doubt_invalid".to_string())?,
+                    .ok_or(ImportAckCode::DoubtInvalid)?,
             ),
         };
         let states = doubt_states(&imports, &line);
         let kind = select_doubt(requested, &states)
-            .map_err(|code| with_doubt_cause(ToolFailure::from(code.to_string()), code))?;
+            .map_err(|code| with_doubt_cause(ToolFailure::from(code), code))?;
         let state = states
             .iter()
             .find(|(state_kind, _)| *state_kind == kind)
@@ -1083,7 +1088,7 @@ impl Server {
         // one has its verdict. A check the read below finishes as a doubt
         // whose file cannot be written is refused after it, by `admit_review`.
         if state == Some(&MastersRecord::DoubtRecordUnavailable) {
-            return Err("ack_doubt_record_unavailable".to_string().into());
+            return Err(ImportAckCode::DoubtRecordUnavailable.into());
         }
         // A record already answers it only if it covers this doubt (#808).
         // The path is built from the journal's batch id, never the argument.
@@ -1091,7 +1096,7 @@ impl Server {
         let batch = line.vouchers.len() > 1;
         match (recorded_review(&ack_path), state) {
             (Some(recorded), Some(MastersRecord::Doubt { raw })) => {
-                return Err(recorded.answer(raw).to_string().into())
+                return Err(recorded.answer(raw).into())
             }
             // A pending masters check can finish as a doubt in the read below,
             // and the record is compared with that doubt after it. A batch's
@@ -1100,7 +1105,7 @@ impl Server {
             (Some(RecordedReview::Covers(_)), Some(MastersRecord::Pending))
                 if !(batch && kind == DoubtKind::BatchStep) => {}
             (None, _) => {}
-            (Some(_), _) => return Err("ack_already_recorded".to_string().into()),
+            (Some(_), _) => return Err(ImportAckCode::AlreadyRecorded.into()),
         }
         // For a batch, what no read can change is refused before any read: no
         // doubt of the named kind, or a step verdict left pending, which only
@@ -1109,10 +1114,10 @@ impl Server {
         if batch {
             match (kind, state) {
                 (_, Some(MastersRecord::NoDoubt)) => {
-                    return Err("ack_no_observed_doubt".to_string().into())
+                    return Err(ImportAckCode::NoObservedDoubt.into())
                 }
                 (DoubtKind::BatchStep, Some(MastersRecord::Pending)) => {
-                    return Err("ack_check_pending".to_string().into())
+                    return Err(ImportAckCode::CheckPending.into())
                 }
                 _ => {}
             }
@@ -1121,13 +1126,16 @@ impl Server {
         let mut rows = None;
         let first = self.verify_for_review(args, &mut rows).await?;
         let evidence = first.evidence.clone();
-        let fail = |code: String| ToolFailure::from(code).with_prior_evidence(evidence.clone());
+        let fail =
+            |code: ImportAckCode| ToolFailure::from(code).with_prior_evidence(evidence.clone());
+        let fail_string =
+            |code: String| ToolFailure::from(code).with_prior_evidence(evidence.clone());
         let rows = rows.unwrap_or_default();
         // The verification just made may have bound the post to its span: read
         // the binding after it, never from the snapshot taken before.
         let bound = match self
             .latest_import_snapshot(batch_id)
-            .map_err(&fail)?
+            .map_err(&fail_string)?
             .and_then(|snapshot| snapshot.span_verdict)
         {
             Some(ledger::PostSpanVerdict::Bound(bound)) => Some(bound),
@@ -1136,14 +1144,14 @@ impl Server {
         let bindings = bound.as_deref();
         if requested.is_none() {
             still_the_only_doubt(&doubt_states(&imports, &line))
-                .map_err(|code| with_doubt_cause(fail(code.to_string()), code))?;
+                .map_err(|code| with_doubt_cause(fail(code), code))?;
         }
         let shown =
             admit_review(&imports, &line, &first.payload, &rows, kind, bindings).map_err(fail)?;
         // Read again, not reused: a review recorded by another call during
         // the read answers here, before the dialog.
         if let Some(recorded) = recorded_review(&ack_path) {
-            return Err(fail(recorded.answer(&shown.doubt_raw).to_string()));
+            return Err(fail(recorded.answer(&shown.doubt_raw)));
         }
         let doubt: Value = serde_json::from_slice(&shown.doubt_raw).unwrap_or_default();
         let company_name = line
@@ -1187,17 +1195,17 @@ impl Server {
 
         // The dialog's title names how many vouchers it shows (#746).
         let count = VoucherCount::new(reviewed_rows.len())
-            .ok_or_else(|| fail("ack_readback_not_matched".to_string()))?;
+            .ok_or_else(|| fail(ImportAckCode::ReadbackNotMatched))?;
         let approval = ReviewAcknowledged::confirm(ReviewKind::Review, count, &preview)
             .await
-            .map_err(fail)?;
+            .map_err(fail_string)?;
 
         // What was approved must still be what Tally and the records hold.
         let mut rows_after = None;
         let second = self.verify_for_review(args, &mut rows_after).await?;
         let evidence = combine_evidence(evidence.clone(), second.evidence.clone());
         let fail =
-            |code: &str| ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone());
+            |code: ImportAckCode| ToolFailure::from(code).with_prior_evidence(evidence.clone());
         let rows_after = rows_after.unwrap_or_default();
         // A check that stayed pending through the first read (its catalogue
         // read failed) can finish as a second doubt now (#756).
@@ -1214,7 +1222,7 @@ impl Server {
             bindings,
         );
         if again.as_ref() != Ok(&shown) {
-            return Err(fail("ack_changed_while_reviewing"));
+            return Err(fail(ImportAckCode::ChangedWhileReviewing));
         }
         let local_account_label = std::env::var("USER")
             .or_else(|_| std::env::var("USERNAME"))
@@ -1251,8 +1259,8 @@ impl Server {
                 local_account_label,
             })
         }
-        .map_err(|_| fail("proof_serialization_failed"))?;
-        write_record_once(&ack_path, &bytes, approval).map_err(|code| fail(&code))?;
+        .map_err(|_| fail(ImportAckCode::ProofSerializationFailed))?;
+        write_record_once(&ack_path, &bytes, approval).map_err(fail)?;
         Ok(ToolOutcome {
             payload: json!({
                 "company": second.payload["company"],

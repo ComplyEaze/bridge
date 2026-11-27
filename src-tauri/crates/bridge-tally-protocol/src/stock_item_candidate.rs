@@ -22,20 +22,69 @@ pub enum ScalarObservation {
     Text(String),
 }
 
-/// One stock item with the fields needed to consider copying it.
+/// One stock item with the fields needed to consider copying it. Only
+/// [`parse_candidate_stock_items`] builds one, so every candidate a caller holds was read
+/// from an answer the closed masters parser admitted; callers read it through the accessors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CandidateStockItem {
-    pub name: String,
-    pub guid: String,
-    pub master_id: u64,
-    pub alter_id: u64,
-    pub parent: Option<String>,
-    pub base_units: ScalarObservation,
-    pub gst_applicable: ScalarObservation,
-    pub gst_type_of_supply: ScalarObservation,
-    pub names: Vec<String>,
-    pub hsn: HsnDetailsObservation,
-    pub gst: GstDetailsObservation,
+    name: String,
+    guid: String,
+    master_id: u64,
+    alter_id: u64,
+    parent: Option<String>,
+    base_units: ScalarObservation,
+    gst_applicable: ScalarObservation,
+    gst_type_of_supply: ScalarObservation,
+    names: Vec<String>,
+    hsn: HsnDetailsObservation,
+    gst: GstDetailsObservation,
+}
+
+impl CandidateStockItem {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn guid(&self) -> &str {
+        &self.guid
+    }
+
+    pub fn master_id(&self) -> u64 {
+        self.master_id
+    }
+
+    pub fn alter_id(&self) -> u64 {
+        self.alter_id
+    }
+
+    pub fn parent(&self) -> Option<&str> {
+        self.parent.as_deref()
+    }
+
+    pub fn base_units(&self) -> &ScalarObservation {
+        &self.base_units
+    }
+
+    pub fn gst_applicable(&self) -> &ScalarObservation {
+        &self.gst_applicable
+    }
+
+    pub fn gst_type_of_supply(&self) -> &ScalarObservation {
+        &self.gst_type_of_supply
+    }
+
+    /// Every language name, in document order.
+    pub fn names(&self) -> &[String] {
+        &self.names
+    }
+
+    pub fn hsn(&self) -> &HsnDetailsObservation {
+        &self.hsn
+    }
+
+    pub fn gst(&self) -> &GstDetailsObservation {
+        &self.gst
+    }
 }
 
 struct ObservedRow {

@@ -126,9 +126,9 @@ edition, a synthetic company with accounts integrated with inventory, a master b
 The refused voucher was a Journal debiting a ledger under Stock-in-Hand, and Bridge's own checks
 before approval passed it. Tally refused it in the answer, with one `LINEERROR` naming the ledger.
 
-The counters below are from the import answers, which are committed. Every statement about the
-marks, the created vouchers' IDs or the rows found is something the lab read, without committing the
-reads.
+The counters below are from the import answers of these 2026-11-11 posts, which are committed.
+Every statement about these posts' marks, the created vouchers' IDs or the rows found is something
+the lab read, without committing the reads.
 
 - **Alone:** `CREATED 0, EXCEPTIONS 1`, `LASTVCHID` 0. The lab read, without committing the reads,
   that neither mark moved.
@@ -138,7 +138,7 @@ reads.
   - the two created vouchers took AlterID and MasterID 2 and 3, in request order;
   - no row was found for the refused one.
 - **Between two identical Journals:** `CREATED 2, EXCEPTIONS 1`, `LASTVCHID` 5. The lab read,
-  without committing the reads, that both identical vouchers were created.
+  without committing the reads, that both identical vouchers had a row.
 - **In all three:** all seven counters present, and `COMBINED` and `LASTMID` 0.
 
 So `EXCEPTIONS` counted the refused voucher for this cause too. Each request, as Bridge rendered it,

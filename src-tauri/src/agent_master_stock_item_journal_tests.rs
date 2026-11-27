@@ -663,3 +663,320 @@ mod writer {
         assert_eq!(observed.len(), reads + 1);
     }
 }
+
+/// The stock read-back judge, on the captured reads and answer, with each
+/// constructed edit marked. The intent records the batch company's captured
+/// mark, 210, so a mark of 211 is one above it: a constructed edit, since the
+/// marks after a Create were not captured.
+mod judge {
+    use super::super::super::remove_pre_image;
+    use super::super::{Answer, StockJudgement, StockReadBack};
+    use super::*;
+    use MasterVerdictState::{
+        MastersAfterPostUnconfirmed as Unconfirmed, PostedVerified, ReconciliationRequired as Open,
+    };
+
+    /// Another loaded company's GUID: synthetic.
+    const OTHER: &str = "0f0e0d0c-0b0a-4909-8807-060504030201";
+
+    fn marks(pairs: &[(&str, u64)]) -> Vec<MasterMark> {
+        (pairs.iter())
+            .map(|(guid, altmstid)| MasterMark {
+                company_guid: (*guid).to_string(),
+                altmstid: *altmstid,
+            })
+            .collect()
+    }
+
+    /// The read-back of a batch dispatched with the sidecar of `read`, as the
+    /// company `company` is verified now.
+    fn read_back_of(read: &StockItemCatalogue, company: &str) -> StockReadBack {
+        let batch = stock_batch(0x90);
+        let directory = dispatched_folder(&batch, read);
+        let journal = read_kind_journal::<StockItemBatch>(directory.path()).unwrap();
+        StockReadBack::of(
+            directory.path(),
+            &journal,
+            &batch.batch_id,
+            &identity(company),
+        )
+    }
+
+    fn sent() -> StockReadBack {
+        read_back_of(&catalogue(BEFORE), COMPANY)
+    }
+
+    /// The captured answer, `edit` made to it.
+    fn answered(edit: impl Fn(&str) -> String) -> Answer {
+        let parsed = parse_import_outcome(&edit(&decode(ANSWER))).unwrap();
+        Answer::Posted(Some(StockItemImportOutcome::of(&parsed)))
+    }
+
+    fn clean() -> Answer {
+        answered(str::to_string)
+    }
+
+    /// `read_back` judged on `answer`, the marks `binding` and `aim`, and the
+    /// items `fresh`.
+    fn judged(
+        read_back: &StockReadBack,
+        answer: &Answer,
+        (binding, aim): (&[(&str, u64)], &[(&str, u64)]),
+        fresh: &StockItemCatalogue,
+    ) -> StockJudgement {
+        let (binding, aim) = (marks(binding), marks(aim));
+        read_back.judge(answer, Some((&binding, &aim, fresh)))
+    }
+
+    /// The batch company's mark one above the intent's, in both answers.
+    const MOVED: (&[(&str, u64)], &[(&str, u64)]) =
+        (&[(COMPANY_GUID, 211)], &[(COMPANY_GUID, 211)]);
+
+    fn assert_open(judgement: &StockJudgement, reasons: &[&str], case: &str) {
+        assert_eq!(judgement.state(), Open, "{case}");
+        assert_eq!(judgement.reasons(), reasons, "{case}");
+        assert_eq!(judgement.guid(), None, "{case}");
+    }
+
+    /// The decoded MARKED read with `from` made `to`: a hand edit.
+    fn marked_edited(from: &str, to: &str) -> StockItemCatalogue {
+        let text = hand_edit(&decode(MARKED), from, to);
+        StockItemCatalogue::from_candidate_read(&identity(COMPANY), &text).unwrap()
+    }
+
+    #[test]
+    fn only_the_post_with_a_clean_answer_and_every_check_clean_verifies() {
+        let judgement = judged(&sent(), &clean(), MOVED, &catalogue(MARKED));
+        assert_eq!(judgement.state(), PostedVerified);
+        assert_eq!(judgement.guid(), Some(MARKED_GUID));
+        assert!(judgement.reasons().is_empty());
+        let later = judged(&sent(), &Answer::Later, MOVED, &catalogue(MARKED));
+        assert_open(&later, &["later_call_does_not_verify"], "a later call");
+    }
+
+    /// Rule 1: no read, an unpaired mark (the aim answer one above the
+    /// binding's, a constructed edit), the batch company absent from both
+    /// answers, or a company given twice.
+    #[test]
+    fn a_failed_or_unpaired_read_is_unconfirmed_first() {
+        let cases: [(&str, &[(&str, u64)], &[(&str, u64)]); 4] = [
+            ("unpaired", &[(COMPANY_GUID, 211)], &[(COMPANY_GUID, 212)]),
+            ("absent", &[(OTHER, 5)], &[(OTHER, 5)]),
+            ("binding only", &[(COMPANY_GUID, 211)], &[(OTHER, 5)]),
+            (
+                "given twice",
+                &[(COMPANY_GUID, 211), (COMPANY_GUID, 211)],
+                &[(COMPANY_GUID, 211)],
+            ),
+        ];
+        let unread = sent().judge(&clean(), None);
+        let mut judgements = vec![("not read", unread)];
+        for (case, binding, aim) in cases {
+            judgements.push((
+                case,
+                judged(&sent(), &clean(), (binding, aim), &catalogue(MARKED)),
+            ));
+        }
+        for (case, judgement) in judgements {
+            assert_eq!(judgement.state(), Unconfirmed, "{case}");
+            assert_eq!(judgement.reasons(), ["masters_unconfirmed"], "{case}");
+            assert_eq!(judgement.guid(), None, "{case}");
+        }
+    }
+
+    /// Rule 2, after rule 1: the sidecar removed after the intent.
+    #[test]
+    fn an_unreadable_pre_image_is_open_unless_the_read_failed() {
+        let batch = stock_batch(0x91);
+        let directory = dispatched_folder(&batch, &catalogue(BEFORE));
+        remove_pre_image(directory.path(), &lock(), &batch.batch_id).unwrap();
+        let journal = read_kind_journal::<StockItemBatch>(directory.path()).unwrap();
+        let read_back = StockReadBack::of(
+            directory.path(),
+            &journal,
+            &batch.batch_id,
+            &identity(COMPANY),
+        );
+        let judgement = judged(&read_back, &clean(), MOVED, &catalogue(MARKED));
+        assert_open(&judgement, &["pre_image_unreadable"], "pre-image");
+        let unread = read_back.judge(&clean(), None);
+        assert_eq!(unread.state(), Unconfirmed);
+    }
+
+    /// Rule 4, one cause at a time, each with its one static reason.
+    #[test]
+    fn each_other_cause_is_open_with_its_reason() {
+        let fresh = catalogue(MARKED);
+        let at = |mark| -> (Vec<(&str, u64)>, Vec<(&str, u64)>) {
+            (vec![(COMPANY_GUID, mark)], vec![(COMPANY_GUID, mark)])
+        };
+        for (mark, reason) in [
+            (210, "target_mark_unmoved"),
+            (209, "target_mark_moved_back"),
+            (212, "target_mark_moved_more_than_once"),
+        ] {
+            let (binding, aim) = at(mark);
+            let judgement = judged(&sent(), &clean(), (&binding, &aim), &fresh);
+            assert_open(&judgement, &[reason], reason);
+        }
+        // E: the sibling's ALTERID 210 made 215 (a hand edit).
+        let changed = marked_edited(
+            "<ALTERID TYPE=\"Number\"> 210</ALTERID>",
+            "<ALTERID TYPE=\"Number\"> 215</ALTERID>",
+        );
+        let judgement = judged(&sent(), &clean(), MOVED, &changed);
+        assert_open(&judgement, &["earlier_item_changed"], "earlier changed");
+        // E: a pre-image GUID of the company the fresh read lacks (a
+        // constructed sidecar: BEFORE's rows and one more).
+        let batch = stock_batch(0x92);
+        let directory = tempfile::tempdir().unwrap();
+        let dir = directory.path();
+        append(dir, &lock(), JournalRecord::Batch(batch.clone())).unwrap();
+        let extra = format!("{COMPANY_GUID}-000000ff");
+        let before = catalogue(BEFORE);
+        let rows = (before.items().iter())
+            .map(|item| (item.guid.clone(), item.alter_id))
+            .chain([(extra, 1)]);
+        let intent = intent_with(dir, &batch, &PreImage::new(rows).unwrap());
+        let _recorded = append_kind_intent::<StockItemBatch>(dir, &lock(), intent).unwrap();
+        let journal = read_kind_journal::<StockItemBatch>(dir).unwrap();
+        let read_back = StockReadBack::of(dir, &journal, &batch.batch_id, &identity(COMPANY));
+        let judgement = judged(&read_back, &clean(), MOVED, &fresh);
+        assert_open(&judgement, &["earlier_item_missing"], "earlier missing");
+        // B: the item absent (the read before the Create), already in the
+        // sidecar, read for another company, or read with another unit (the
+        // new row's first BASEUNITS after its GUID made Pcs, a hand edit).
+        let not_found = judged(&sent(), &clean(), MOVED, &catalogue(BEFORE));
+        assert_open(&not_found, &["item_not_found_once"], "not found");
+        let not_new = judged(&read_back_of(&fresh, COMPANY), &clean(), MOVED, &fresh);
+        assert_open(&not_new, &["item_not_new"], "not new");
+        let elsewhere =
+            StockItemCatalogue::from_candidate_read(&identity("Another Company"), &decode(MARKED))
+                .unwrap();
+        let other = judged(&sent(), &clean(), MOVED, &elsewhere);
+        assert_open(&other, &["read_of_another_company"], "another company");
+        let text = decode(MARKED);
+        let at = text.find(MARKED_GUID).unwrap();
+        let unit = "<BASEUNITS TYPE=\"String\">Nos</BASEUNITS>";
+        let (head, tail) = text.split_at(at);
+        let edited = format!(
+            "{head}{}",
+            tail.replacen(unit, "<BASEUNITS TYPE=\"String\">Pcs</BASEUNITS>", 1)
+        );
+        let differs = StockItemCatalogue::from_candidate_read(&identity(COMPANY), &edited).unwrap();
+        let differs = judged(&sent(), &clean(), MOVED, &differs);
+        assert_open(&differs, &["item_differs"], "differs");
+        // The company verified now under another name.
+        let renamed = read_back_of(&catalogue(BEFORE), "Renamed Company");
+        let judgement = judged(&renamed, &clean(), MOVED, &fresh);
+        assert_open(&judgement, &["company_identity_changed"], "renamed");
+    }
+
+    /// O: another company's mark moved, in either answer, or the set of
+    /// companies changed. The intent here records two companies' marks, a
+    /// constructed edit of what the post records.
+    #[test]
+    fn another_companys_mark_or_the_company_set_is_open() {
+        let fresh = catalogue(MARKED);
+        let mut read_back = sent();
+        read_back.stored = marks(&[(COMPANY_GUID, 210), (OTHER, 5)]);
+        let both = [(COMPANY_GUID, 211), (OTHER, 5)];
+        let still = judged(&read_back, &clean(), (&both, &both), &fresh);
+        assert_eq!(still.state(), PostedVerified, "the other mark unmoved");
+        let moved = [(COMPANY_GUID, 211), (OTHER, 6)];
+        for (case, binding, aim) in [
+            ("both", &moved, &moved),
+            ("binding", &moved, &both),
+            ("aim", &both, &moved),
+        ] {
+            let judgement = judged(&read_back, &clean(), (binding, aim), &fresh);
+            assert_open(&judgement, &["other_company_mark_moved"], case);
+        }
+        let judgement = judged(&sent(), &clean(), (&both, &both), &fresh);
+        assert_open(&judgement, &["company_scope_changed"], "a company more");
+        let judgement = judged(&read_back, &clean(), MOVED, &fresh);
+        assert_open(&judgement, &["company_scope_changed"], "a company fewer");
+    }
+
+    /// R: each answer that is not clean (hand edits of the captured answer,
+    /// and the application failure constructed), and none parsed.
+    #[test]
+    fn an_answer_that_is_not_clean_is_open() {
+        let fresh = catalogue(MARKED);
+        let edit =
+            |from: &'static str, to: &'static str| move |text: &str| hand_edit(text, from, to);
+        let altered = |text: &str| {
+            let text = hand_edit(text, "<CREATED>1</CREATED>", "<CREATED>0</CREATED>");
+            hand_edit(&text, "<ALTERED>0</ALTERED>", "<ALTERED>1</ALTERED>")
+        };
+        let failed = Answer::Posted(Some(StockItemImportOutcome::ApplicationFailure));
+        for (answer, reason) in [
+            (failed, "tally_reported_failure"),
+            (answered(altered), "tally_reported_altered"),
+            (
+                answered(edit("<ERRORS>0</ERRORS>", "<ERRORS>1</ERRORS>")),
+                "counters_not_clean",
+            ),
+            (
+                answered(edit("<CANCELLED>0</CANCELLED>", "")),
+                "counters_not_reported",
+            ),
+            (Answer::Posted(None), "answer_not_parsed"),
+        ] {
+            let judgement = judged(&sent(), &answer, MOVED, &fresh);
+            assert_open(&judgement, &[reason], reason);
+        }
+    }
+
+    /// The five other terminal states, each on its typical input, are never
+    /// given: each is open.
+    #[test]
+    fn no_excluded_terminal_state_is_ever_given() {
+        let (marked, before) = (catalogue(MARKED), catalogue(BEFORE));
+        let other_moved = [(COMPANY_GUID, 210), (OTHER, 6)];
+        let mut two = sent();
+        two.stored = marks(&[(COMPANY_GUID, 210), (OTHER, 5)]);
+        let altered = |text: &str| {
+            let text = hand_edit(text, "<CREATED>1</CREATED>", "<CREATED>0</CREATED>");
+            hand_edit(&text, "<ALTERED>0</ALTERED>", "<ALTERED>1</ALTERED>")
+        };
+        let unmoved: (&[(&str, u64)], &[(&str, u64)]) =
+            (&[(COMPANY_GUID, 210)], &[(COMPANY_GUID, 210)]);
+        let cases = [
+            // The answer lost, the item found once and new.
+            (
+                "posted_unattributed",
+                judged(&sent(), &Answer::Later, MOVED, &marked),
+            ),
+            // The answer lost, the item absent and the mark unmoved.
+            (
+                "confirmed_absent",
+                judged(&sent(), &Answer::Later, unmoved, &before),
+            ),
+            // The item absent and the mark moved.
+            (
+                "confirmed_absent_after_change",
+                judged(&sent(), &Answer::Later, MOVED, &before),
+            ),
+            // Tally reported an alteration of an item already in the sidecar.
+            (
+                "posted_into_existing_master",
+                judged(
+                    &read_back_of(&marked, COMPANY),
+                    &answered(altered),
+                    unmoved,
+                    &marked,
+                ),
+            ),
+            // The mark moved for another company only, the item absent.
+            (
+                "master_write_located_elsewhere",
+                judged(&two, &clean(), (&other_moved, &other_moved), &before),
+            ),
+        ];
+        for (excluded, judgement) in cases {
+            assert_eq!(judgement.state(), Open, "{excluded}: {judgement:?}");
+            assert!(!judgement.reasons().is_empty(), "{excluded}");
+        }
+    }
+}

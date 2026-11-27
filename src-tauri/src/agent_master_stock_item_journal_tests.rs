@@ -676,6 +676,11 @@ mod judge {
         MastersAfterPostUnconfirmed as Unconfirmed, PostedVerified, ReconciliationRequired as Open,
     };
 
+    /// Company marks, by GUID, as one marks answer gives them.
+    type Marks<'a> = &'a [(&'a str, u64)];
+    /// The binding and the aim marks answers.
+    type Answers<'a> = (Marks<'a>, Marks<'a>);
+
     /// Another loaded company's GUID: synthetic.
     const OTHER: &str = "0f0e0d0c-0b0a-4909-8807-060504030201";
 
@@ -721,7 +726,7 @@ mod judge {
     fn judged(
         read_back: &StockReadBack,
         answer: &Answer,
-        (binding, aim): (&[(&str, u64)], &[(&str, u64)]),
+        (binding, aim): Answers<'_>,
         fresh: &StockItemCatalogue,
     ) -> StockJudgement {
         let (binding, aim) = (marks(binding), marks(aim));
@@ -729,8 +734,7 @@ mod judge {
     }
 
     /// The batch company's mark one above the intent's, in both answers.
-    const MOVED: (&[(&str, u64)], &[(&str, u64)]) =
-        (&[(COMPANY_GUID, 211)], &[(COMPANY_GUID, 211)]);
+    const MOVED: Answers<'static> = (&[(COMPANY_GUID, 211)], &[(COMPANY_GUID, 211)]);
 
     fn assert_open(judgement: &StockJudgement, reasons: &[&str], case: &str) {
         assert_eq!(judgement.state(), Open, "{case}");
@@ -759,7 +763,7 @@ mod judge {
     /// answers, or a company given twice.
     #[test]
     fn a_failed_or_unpaired_read_is_unconfirmed_first() {
-        let cases: [(&str, &[(&str, u64)], &[(&str, u64)]); 4] = [
+        let cases: [(&str, Marks<'_>, Marks<'_>); 4] = [
             ("unpaired", &[(COMPANY_GUID, 211)], &[(COMPANY_GUID, 212)]),
             ("absent", &[(OTHER, 5)], &[(OTHER, 5)]),
             ("binding only", &[(COMPANY_GUID, 211)], &[(OTHER, 5)]),
@@ -807,16 +811,13 @@ mod judge {
     #[test]
     fn each_other_cause_is_open_with_its_reason() {
         let fresh = catalogue(MARKED);
-        let at = |mark| -> (Vec<(&str, u64)>, Vec<(&str, u64)>) {
-            (vec![(COMPANY_GUID, mark)], vec![(COMPANY_GUID, mark)])
-        };
         for (mark, reason) in [
             (210, "target_mark_unmoved"),
             (209, "target_mark_moved_back"),
             (212, "target_mark_moved_more_than_once"),
         ] {
-            let (binding, aim) = at(mark);
-            let judgement = judged(&sent(), &clean(), (&binding, &aim), &fresh);
+            let both = [(COMPANY_GUID, mark)];
+            let judgement = judged(&sent(), &clean(), (&both, &both), &fresh);
             assert_open(&judgement, &[reason], reason);
         }
         // E: the sibling's ALTERID 210 made 215 (a hand edit).
@@ -940,8 +941,7 @@ mod judge {
             let text = hand_edit(text, "<CREATED>1</CREATED>", "<CREATED>0</CREATED>");
             hand_edit(&text, "<ALTERED>0</ALTERED>", "<ALTERED>1</ALTERED>")
         };
-        let unmoved: (&[(&str, u64)], &[(&str, u64)]) =
-            (&[(COMPANY_GUID, 210)], &[(COMPANY_GUID, 210)]);
+        let unmoved: Answers<'_> = (&[(COMPANY_GUID, 210)], &[(COMPANY_GUID, 210)]);
         let cases = [
             // The answer lost, the item found once and new.
             (

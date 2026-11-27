@@ -396,7 +396,7 @@ impl Server {
                         self.verify_stock_batch(&journal, state, identity, &answer, unrecorded);
                     return verified.await;
                 }
-                _ => "master_batch_not_found".to_string(),
+                _ => MasterPostCode::BatchNotFound.as_str().to_string(),
             },
             Err(code) => code,
         };
@@ -440,7 +440,7 @@ impl Server {
             Ok((company, identity, identity_evidence)) => {
                 evidence = combine_evidence(evidence.clone(), identity_evidence);
                 if !same_company(&company.name, &identity, state.batch.company()) {
-                    let code = "company_identity_mismatch";
+                    let code = MasterPostCode::CompanyIdentityMismatch.as_str();
                     return stock_sent(batch_id, guid, evidence, code, Some(true));
                 }
                 identity

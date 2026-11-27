@@ -86,7 +86,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         (
             "native_stock_summary::render_company_inventory_flags_request",
             render_company_inventory_flags_request(
-                NAME,
+                &company,
                 &bridge_tally_primitives::company_guid::CompanyGuid::parse(
                     "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
                 )

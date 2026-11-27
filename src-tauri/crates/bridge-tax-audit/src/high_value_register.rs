@@ -69,6 +69,13 @@ const LOANS_LIABILITY_GROUP: &str = "Loans (Liability)";
 pub const UNIDENTIFIED_PARTY: &str = "‹cash leg with no identified party›";
 /// How a finding cites that bucket: a `row`, never a `ledger` (EVID-1).
 const UNIDENTIFIED_PARTY_ROW: &str = "high_value_register:unidentified_party";
+/// How a bank row cites that bucket: its key and tag stay `UNIDENTIFIED_PARTY`'s, and only the
+/// label names the leg it holds (#772).
+const UNIDENTIFIED_BANK_PARTY: &str = "‹bank leg with no identified party›";
+/// The asks a cash row with a party ledger makes of that one party. A row with no party ledger
+/// removes them by these constants, never by a copy of their text (#772).
+const ASK_RECEIPT_ONE_PARTY: &str = "Confirm whether this receipt is genuinely from one party.";
+const ASK_PAYMENT_ONE_PARTY: &str = "Confirm whether this payment is genuinely to one party.";
 
 /// Counterparty types the form excludes from Clause 31(ba)-(bd).
 const COUNTERPARTY_TYPES_EXCLUDED_FROM_269ST: [&str; 3] =
@@ -472,14 +479,10 @@ fn voucher_evidence(vouchers: &BTreeMap<(String, String), &Voucher>) -> Vec<Evid
 }
 
 /// The party a finding names: a `ledger` ref, or the `row` ref for the unidentified bucket, which
-/// carries the row's printed-name label.
-fn party_ref(ledger: &str, row: &Row<'_>) -> EvidenceRef {
+/// carries `bucket` and the row's printed names as its label.
+fn party_ref(ledger: &str, row: &Row<'_>, bucket: &str) -> EvidenceRef {
     if ledger == UNIDENTIFIED_PARTY {
-        EvidenceRef::with_label(
-            "row",
-            UNIDENTIFIED_PARTY_ROW,
-            &row.names.label(UNIDENTIFIED_PARTY),
-        )
+        EvidenceRef::with_label("row", UNIDENTIFIED_PARTY_ROW, &row.names.label(bucket))
     } else {
         EvidenceRef::new("ledger", ledger)
     }
@@ -712,7 +715,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                                single transaction) and (c) (receipts relating to one event or occasion) need \
                                bill-wise/event linkage the books do not carry (see the single-transaction and \
                                event views below).".to_string()],
-                         vec!["Confirm whether this receipt is genuinely from one party.".to_string(),
+                         vec![ASK_RECEIPT_ONE_PARTY.to_string(),
                               "Confirm whether limbs (b)/(c) apply (documents needed).".to_string()])
                     } else if is_cash {
                         (format!("Cash paid to one party at or over the s.269ST(a) limb (a) person-per-day \
@@ -724,7 +727,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                                only (limb (a): aggregate per person per day).".to_string(),
                               "Books test covers limb (a) only. Limbs (b)/(c) need bill-wise/event linkage the \
                                books do not carry.".to_string()],
-                         vec!["Confirm whether this payment is genuinely to one party.".to_string(),
+                         vec![ASK_PAYMENT_ONE_PARTY.to_string(),
                               "Confirm whether limbs (b)/(c) apply (documents needed).".to_string()])
                     } else {
                         (format!("Bank {dir} at or over the CA-set vouching threshold on {day}"),
@@ -767,13 +770,19 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                         ));
                         limits.push(limit);
                     }
+                    // Money moves by bank; the bank neither receives nor pays it (#772).
+                    let (lead, to_from) = match (is_cash, direction) {
+                        (true, Direction::Receipt) => ("Cash received", "from"),
+                        (true, Direction::Payment) => ("Cash paid", "to"),
+                        (false, Direction::Receipt) => ("Received into the bank", "from"),
+                        (false, Direction::Payment) => ("Paid from the bank", "to"),
+                    };
                     // Proven under the threshold on the line: a ledger-true title; the tags, limits,
                     // asks and facts stay (parity/PORT-NOTE-HVR.md).
                     if data.over(row_threshold)? == Over::PartySideOnly {
                         title = format!(
-                            "{} {moved} one party on {day}: the party's side is at or over the {over_what}, \
-                             but the {mode_name} {verb} on these vouchers is below it",
-                            capitalize(mode_name)
+                            "{lead} {to_from} one party on {day}: the party's side is at or over the \
+                             {over_what}, but the {mode_name} {verb} on these vouchers is below it"
                         );
                     }
                     if unnamed {
@@ -783,15 +792,8 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                             Direction::Receipt => ("payer", "paid"),
                             Direction::Payment => ("payee", "was paid"),
                         };
-                        let did = if direction == Direction::Receipt {
-                            "received"
-                        } else {
-                            "paid"
-                        };
-                        let opening = format!(
-                            "{} {did} on {day} on vouchers that do not name the {who}: ",
-                            capitalize(mode_name)
-                        );
+                        let opening =
+                            format!("{lead} on {day} on vouchers that do not name the {who}: ");
                         // Proven under the limit on the line, the sentence says so and asks nothing
                         // it disproves.
                         title = if data.over(row_threshold)? == Over::PartySideOnly {
@@ -799,26 +801,33 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                                 "{opening}{side} is at or over the {over_what}, but the {mode_name} \
                                  {verb} on these vouchers is below it"
                             )
-                        } else {
+                        } else if is_cash {
                             format!(
                                 "{opening}the total is at or over the {over_what}; whether any one \
                                  person {act} that much is not known"
                             )
+                        } else {
+                            // The vouching threshold is not a test per person (#772).
+                            format!("{opening}the total is at or over the {over_what}")
                         };
-                        ask.retain(|a| {
-                            a != "Confirm whether this receipt is genuinely from one party."
-                                && a != "Confirm whether this payment is genuinely to one party."
-                        });
+                        ask.retain(|a| a != ASK_RECEIPT_ONE_PARTY && a != ASK_PAYMENT_ONE_PARTY);
                         limits.push("No party ledger is on these vouchers -- the books cannot name the \
                                      counterparty. The row holds every voucher of the day with no party \
                                      ledger, whatever name it prints (each usable printed name is shown \
                                      with the row), so it may be one person's money or several people's; \
                                      none is dropped or scattered across its tax/round-off lines."
                             .to_string());
-                        ask.push(format!(
-                            "Who {act} on each of these vouchers, and did any one person reach the \
-                             {over_what} this day? Supply each counterparty's name and PAN."
-                        ));
+                        ask.push(if is_cash {
+                            format!(
+                                "Who {act} on each of these vouchers, and did any one person reach \
+                                 the {over_what} this day? Supply each counterparty's name and PAN."
+                            )
+                        } else {
+                            format!(
+                                "Who {act} on each of these vouchers? Supply each counterparty's \
+                                 name and PAN."
+                            )
+                        });
                     }
                     let f_date = r.fig(
                         &format!("{prefix}_row_date_{rid}"),
@@ -827,8 +836,13 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                         "Date of the party-day total above.",
                         vec![],
                     )?;
+                    let bucket = if is_cash {
+                        UNIDENTIFIED_PARTY
+                    } else {
+                        UNIDENTIFIED_BANK_PARTY
+                    };
                     let mut evidence = voucher_evidence(&data.vouchers);
-                    evidence.push(party_ref(ledger, data));
+                    evidence.push(party_ref(ledger, data, bucket));
                     let mut facts =
                         vec![("amount".to_string(), f_amt), ("date".to_string(), f_date)];
                     if let Some(f_line) = f_line {
@@ -888,12 +902,28 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
         for ((reference, h), ledger, data) in keyed {
             let rh = hash8(&reference);
             let rid = format!("{dir}_{rh}_{h}");
-            let f_amt = r.fig(&format!("cash_{dir}_single_transaction_amount_{rid}"), Value::Int(data.paise),
+            // A row with no party ledger pools whatever its vouchers print (#772).
+            let definition = if ledger.as_str() == UNIDENTIFIED_PARTY {
+                let side = match direction {
+                    Direction::Receipt => "the payers' side",
+                    Direction::Payment => "the payees' side",
+                };
+                format!("Cash {dir}s on vouchers with no party ledger (tag {h}) sharing voucher reference \
+                         (tag {rh}), whatever name they print, summed across every date: {side} of each \
+                         voucher.")
+            } else {
+                format!("Cash {dir}s from/to one party ledger (tag {h}) sharing voucher reference (tag {rh}), \
+                         summed across every date.")
+            };
+            let f_amt = r.fig(
+                &format!("cash_{dir}_single_transaction_amount_{rid}"),
+                Value::Int(data.paise),
                 Unit::Paise,
-                &format!("Cash {dir}s from/to one party ledger (tag {h}) sharing voucher reference (tag {rh}), \
-                          summed across every date."), voucher_evidence(&data.vouchers))?;
+                &definition,
+                voucher_evidence(&data.vouchers),
+            )?;
             let mut evidence = voucher_evidence(&data.vouchers);
-            evidence.push(party_ref(ledger, data));
+            evidence.push(party_ref(ledger, data, UNIDENTIFIED_PARTY));
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/single_transaction/{rid}"),
                 clauses: vec![clause.to_string()],
@@ -1587,9 +1617,9 @@ mod tests {
         );
         assert_eq!(
             finding_on("2025-06-04", "bank_receipt").title,
-            "Bank received on 2025-06-04 on vouchers that do not name the payer: the payers' side \
-             is at or over the CA-set vouching threshold, but the bank debited on these vouchers is \
-             below it"
+            "Received into the bank on 2025-06-04 on vouchers that do not name the payer: the \
+             payers' side is at or over the CA-set vouching threshold, but the bank debited on these \
+             vouchers is below it"
         );
         assert_eq!(
             figure("bank_receipt_day_at_or_over_threshold_count"),
@@ -1599,5 +1629,198 @@ mod tests {
             figure("bank_receipt_day_party_side_over_line_below_count"),
             Some(Value::Int(1))
         );
+    }
+
+    /// #772, declared in `provenance/hvr-repin.md`: a bank row says the money moved by bank, a
+    /// pooled bank row asks no per-person question (the vouching threshold is not a test per
+    /// person) and is labelled as the bank leg, a pooled limb (b) row says it sums the payers'
+    /// side of vouchers with no party ledger, and a pooled cash row drops the one-party asks by
+    /// their constants while a row with a party ledger keeps them.
+    #[test]
+    fn a_bank_row_names_the_bank_as_the_way_money_moved_and_a_pooled_row_says_what_it_sums() {
+        use crate::book::{LedgerLine, VoucherStatus};
+        let voucher =
+            |guid: &str, on: &str, base_type: &str, reference: &str, lines: &[(&str, i64)]| {
+                Voucher {
+                    guid: guid.to_string(),
+                    date: TallyDate::parse(on).unwrap(),
+                    base_type: base_type.to_string(),
+                    reference: reference.to_string(),
+                    status: VoucherStatus::Regular,
+                    lines: lines
+                        .iter()
+                        .map(|(ledger, amount_paise)| LedgerLine {
+                            ledger: (*ledger).to_string(),
+                            amount_paise: *amount_paise,
+                        })
+                        .collect(),
+                    ..Default::default()
+                }
+            };
+        let book = Book {
+            vouchers: vec![
+                // No party, Rs 2.5 lakh by bank each way: over the Rs 2 lakh vouching threshold.
+                voucher(
+                    "g1",
+                    "20250605",
+                    "Receipt",
+                    "",
+                    &[("Bank", 25_000_000), ("Round Off", -25_000_000)],
+                ),
+                voucher(
+                    "g2",
+                    "20250606",
+                    "Payment",
+                    "",
+                    &[("Bank", -25_000_000), ("Round Off", 25_000_000)],
+                ),
+                // Customer A, Rs 1 lakh by bank and Rs 1.5 lakh in cash: over on the party's side,
+                // under on the bank line.
+                voucher(
+                    "g3",
+                    "20250607",
+                    "Receipt",
+                    "",
+                    &[
+                        ("Bank", 10_000_000),
+                        ("Cash", 15_000_000),
+                        ("Customer A", -25_000_000),
+                    ],
+                ),
+                // No party, Rs 2.5 lakh in cash each way, the receipt under one reference.
+                voucher(
+                    "g4",
+                    "20250608",
+                    "Receipt",
+                    "R-1",
+                    &[("Cash", 25_000_000), ("Round Off", -25_000_000)],
+                ),
+                voucher(
+                    "g5",
+                    "20250609",
+                    "Payment",
+                    "",
+                    &[("Cash", -25_000_000), ("Round Off", 25_000_000)],
+                ),
+            ],
+            ..Default::default()
+        };
+        let (cash, bank) = (
+            BTreeSet::from(["Cash".to_string()]),
+            BTreeSet::from(["Bank".to_string()]),
+        );
+        let (none, no_types) = (BTreeSet::new(), BTreeMap::new());
+        let round_off = BTreeSet::from(["Round Off".to_string()]);
+        let inputs = Inputs {
+            cash: &cash,
+            bank: &bank,
+            threshold_paise: None,
+            bank_statement: &BankStatementLoad::NotSupplied,
+            s194n_narration_terms: &none,
+            ais_rows: &[],
+            s194n_recipient_type: None,
+            round_off_ledgers: &round_off,
+            counterparty_type_by_ledger: &no_types,
+        };
+        let r = run(&book, &Rules::vendored().unwrap(), &inputs).unwrap();
+        let finding_on = |day: &str, what: &str| {
+            let f = r
+                .findings
+                .iter()
+                .find(|f| f.id.contains(&format!("{what}_day_{day}")));
+            f.unwrap_or_else(|| panic!("no {what} finding on {day}"))
+        };
+        let label = |f: &Finding| {
+            let row = f.evidence.iter().find(|e| e.kind == "row");
+            row.map(|e| e.label.clone())
+        };
+        let one_party = [ASK_RECEIPT_ONE_PARTY, ASK_PAYMENT_ONE_PARTY];
+
+        let received = finding_on("2025-06-05", "bank_receipt");
+        assert_eq!(
+            received.title,
+            "Received into the bank on 2025-06-05 on vouchers that do not name the payer: the \
+             total is at or over the CA-set vouching threshold"
+        );
+        assert_eq!(
+            received.ask_client,
+            [
+                "Vouch this entry to the bank statement and the underlying document.",
+                "Who paid on each of these vouchers? Supply each counterparty's name and PAN."
+            ]
+        );
+        assert_eq!(label(received).as_deref(), Some(UNIDENTIFIED_BANK_PARTY));
+        let paid = finding_on("2025-06-06", "bank_payment");
+        assert_eq!(
+            paid.title,
+            "Paid from the bank on 2025-06-06 on vouchers that do not name the payee: the total \
+             is at or over the CA-set vouching threshold"
+        );
+        assert_eq!(
+            paid.ask_client[1],
+            "Who was paid on each of these vouchers? Supply each counterparty's name and PAN."
+        );
+        assert_eq!(
+            finding_on("2025-06-07", "bank_receipt").title,
+            "Received into the bank from one party on 2025-06-07: the party's side is at or over \
+             the CA-set vouching threshold, but the bank debited on these vouchers is below it"
+        );
+        // A cash row with a party ledger keeps its one-party ask.
+        assert_eq!(
+            finding_on("2025-06-07", "cash_receipt").ask_client[0],
+            ASK_RECEIPT_ONE_PARTY
+        );
+
+        let pooled_receipt = finding_on("2025-06-08", "cash_receipt");
+        assert_eq!(
+            pooled_receipt.title,
+            "Cash received on 2025-06-08 on vouchers that do not name the payer: the total is at \
+             or over the s.269ST(a) limit; whether any one person paid that much is not known"
+        );
+        assert_eq!(label(pooled_receipt).as_deref(), Some(UNIDENTIFIED_PARTY));
+        let pooled_payment = finding_on("2025-06-09", "cash_payment");
+        assert_eq!(
+            pooled_payment.title,
+            "Cash paid on 2025-06-09 on vouchers that do not name the payee: the total is at or \
+             over the s.269ST(a) limit; whether any one person was paid that much is not known"
+        );
+        for f in [pooled_receipt, pooled_payment] {
+            assert!(
+                f.ask_client
+                    .iter()
+                    .all(|a| !one_party.contains(&a.as_str())),
+                "{:?}",
+                f.ask_client
+            );
+            assert!(f
+                .ask_client
+                .last()
+                .is_some_and(|a| a.contains("did any one person reach the s.269ST(a) limit")));
+        }
+
+        let single = r
+            .findings
+            .iter()
+            .find(|f| {
+                f.id.starts_with(&format!("{TEST_ID}/single_transaction/receipt_"))
+            })
+            .expect("the reference R-1 row is over the limit");
+        let amount = r
+            .figures
+            .iter()
+            .find(|f| f.id == single.facts[0].1)
+            .unwrap();
+        assert!(
+            amount
+                .definition
+                .starts_with("Cash receipts on vouchers with no party ledger (tag ")
+                && amount.definition.ends_with(
+                    "), whatever name they print, summed across every date: the payers' side \
+                     of each voucher."
+                ),
+            "{}",
+            amount.definition
+        );
+        assert_eq!(label(single).as_deref(), Some(UNIDENTIFIED_PARTY));
     }
 }

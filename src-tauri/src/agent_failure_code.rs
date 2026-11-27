@@ -437,6 +437,63 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the bank-statement parse and proposals-loading tools.
+    pub(crate) enum BankStatementCode {
+        /// The blocking statement parse task failed.
+        TaskFailed = "statement_task_failed",
+        /// A bank whose statements print control totals was not given both.
+        ControlTotalsRequired = "statement_control_totals_required",
+        /// The statement window's `from` is after its `to`.
+        ReversedDateWindow = "statement_reversed_date_window",
+        /// The password file could not be read.
+        PasswordFileUnreadable = "statement_password_file_unreadable",
+        /// The password file is not private to the user.
+        PasswordFilePermissions = "statement_password_file_permissions",
+        /// The password file exceeds the size bound.
+        PasswordFileTooLarge = "statement_password_file_too_large",
+        /// The password file is not UTF-8.
+        PasswordFileNotUtf8 = "statement_password_file_not_utf8",
+        /// The statement file could not be read.
+        FileUnreadable = "statement_file_unreadable",
+        /// The statement file exceeds the reader's size bound.
+        FileTooLarge = "statement_file_too_large",
+        /// The test-only PDF engine setting is not an absolute path.
+        #[cfg_attr(not(test), allow(dead_code))]
+        PdfEngineSettingInvalid = "statement_pdf_engine_setting_invalid",
+        /// The PDF engine's location could not be established.
+        PdfEngineUnavailable = "statement_pdf_engine_unavailable",
+        /// The private proposals directory could not be prepared.
+        ProposalsDirectoryUnavailable = "statement_proposals_directory_unavailable",
+        /// The proposals document could not be serialized.
+        ProposalsSerializationFailed = "statement_proposals_serialization_failed",
+        /// The private proposals file could not be written.
+        ProposalsWriteFailed = "statement_proposals_write_failed",
+        /// No proposals SHA-256 was given.
+        ProposalsSha256Required = "proposals_sha256_required",
+        /// No proposals file with the requested id exists.
+        ProposalsNotFound = "proposals_not_found",
+        /// The proposals file could not be read.
+        ProposalsFileUnreadable = "proposals_file_unreadable",
+        /// The proposals file exceeds the size bound.
+        ProposalsFileTooLarge = "proposals_file_too_large",
+        /// The proposals file's hash differs from the digest the parse returned.
+        ProposalsChanged = "proposals_changed",
+        /// The tool arguments are not an object.
+        ArgumentSchemaInvalid = "argument_schema_invalid",
+        /// Both a proposals id and inline vouchers were given.
+        ProposalsIdWithVouchers = "proposals_id_with_vouchers",
+        /// A cash line still needs an answer.
+        CashQuestionsOpen = "cash_questions_open",
+        /// The legacy proposals file lacks facts needed for its transfers.
+        ProposalsLegacy = "proposals_legacy",
+        /// Control figures were supplied although this file is their source.
+        ControlFiguresWithThisFile = "statement_control_figures_with_this_file",
+        /// The selected control source requires opening and closing figures.
+        ControlFiguresRequired = "statement_control_figures_required",
+    }
+}
+
+failure_codes! {
     /// The refusals of the import journal's readers and writers.
     pub(crate) enum ImportLedgerCode {
         /// A journal record or its place in the journal is invalid.

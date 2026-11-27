@@ -133,7 +133,7 @@ fn approved_import(companies: &str, date: &str) -> ApprovedImport {
     .expect("static catalog read is admitted");
     let currency_request = AgentReadRequest::parse(
         bridge_tally_protocol::native_outstandings::render_company_currency_request(
-            identity.display_name(),
+            identity.company_name(),
         ),
     )
     .expect("currency read is admitted");
@@ -279,7 +279,7 @@ async fn queued_education_change_refuses_before_final_absence_reads() {
             &identity(&companies),
             approved_import(&companies, "20260915"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -341,7 +341,7 @@ async fn queued_company_refusal_retains_captured_source_and_final_identity_evide
             &identity(&companies),
             approved_import(&companies, "20260901"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -425,7 +425,7 @@ async fn queued_catalogue_rename_refuses_before_intent_or_post() {
                     .expect("renamed captured catalog remains structurally valid"));
                 Err(ApprovedImportAdmissionError::LedgerIdentityChanged.into())
             },
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -485,7 +485,7 @@ async fn queued_import_keeps_admission_separate_from_raw_import_wire() {
             &identity(&companies),
             approved_import(&companies, "20260901"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -562,7 +562,7 @@ async fn queued_import_refuses_attribution_after_final_profile_and_catalogue_rea
                 assert_eq!(second, journal.as_str());
                 Err(ApprovedImportAdmissionError::PreexistingIdentity.into())
             },
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -640,7 +640,7 @@ async fn a_post_refused_by_a_busy_wire_lock_records_nothing_and_sends_nothing() 
                 *other_holder.lock().unwrap() = Some(file);
                 Ok(())
             },
-            move || {
+            move |()| {
                 guard.store(true, Ordering::Release);
                 Ok(())
             },
@@ -700,7 +700,7 @@ async fn the_wire_lock_is_held_across_the_record_and_released_after_the_post() {
             &identity(&companies),
             approved_import(&companies, "20260901"),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 let probe = crate::local_files::file::open_local_file(&probe_path, true).map_err(
                     |error| {
                         crate::tally::approved_import::BeforeDispatchError::Other(error.to_string())
@@ -755,7 +755,7 @@ async fn a_withdrawal_as_the_intent_is_recorded_still_sends_the_post() {
                 &identity(&companies),
                 approved_import(&companies, "20260901"),
                 |_: QueuedAdmission<'_>| Ok(()),
-                move || {
+                move |()| {
                     withdraw.cancel();
                     Ok(())
                 },
@@ -851,7 +851,8 @@ fn masters_queue_plans(
 }
 
 fn masters_item() -> crate::tally::ledger_create_item::LedgerCreateItem {
-    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
+    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+    use crate::tally::master_name::MasterName;
     LedgerCreateItem::new(
         MasterName::new("Queue Test Suspense").unwrap(),
         AdmittedLedgerKind::Suspense,
@@ -914,7 +915,7 @@ async fn a_master_post_in_education_mode_is_refused_before_any_other_read() {
                 recheck_flag.store(true, Ordering::Release);
                 Ok(())
             },
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(())
             },
@@ -960,7 +961,7 @@ async fn a_master_post_whose_book_turns_to_education_is_refused_at_the_closing_o
                 recheck_flag.store(true, Ordering::Release);
                 Ok(())
             },
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(())
             },
@@ -974,6 +975,65 @@ async fn a_master_post_whose_book_turns_to_education_is_refused_at_the_closing_o
     assert!(!rechecked.load(Ordering::Acquire));
     assert!(!dispatched.load(Ordering::Acquire));
     assert_eq!(simulator.finish().unwrap().len(), 31);
+}
+
+/// A stock-item Create for a company other than the queue's identity is a
+/// wiring fault: the runtime refuses it with the typed refusal before any
+/// request, so nothing is read, rechecked, recorded or sent.
+#[tokio::test]
+async fn a_stock_item_create_for_another_company_is_refused_before_any_request() {
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+    fn never_parsed(_: &str) -> anyhow::Result<Vec<crate::tally::runtime::CompanyMasterMark>> {
+        unreachable!("no marks are read for another company")
+    }
+    let prepared = crate::tally::stock_item_create::tests::captured_prepared("SC Copied Marked");
+    // The captured licensed book, not the stock lab book the item was drafted in.
+    let identity = identity(&captured_companies());
+    assert_ne!(prepared.company(), &identity);
+    let marks = marks_request(prepared.company().display_name());
+    let approved = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            ApprovedImport::confirm_stock_item(
+                prepared,
+                "Create stock".into(),
+                marks,
+                never_parsed,
+                master_batch().to_string(),
+            ),
+        )
+        .await
+        .expect("the scripted dialog approves");
+    let simulator = SequenceSimulator::spawn(vec![status_plan()]).unwrap();
+    let rechecked = Arc::new(AtomicBool::new(false));
+    let dispatched = Arc::new(AtomicBool::new(false));
+    let (recheck_flag, dispatch_flag) = (rechecked.clone(), dispatched.clone());
+    let error = TallyRuntime::default()
+        .post_approved_import(
+            TallyConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            &identity,
+            approved,
+            move |_: QueuedAdmission<'_>| {
+                recheck_flag.store(true, Ordering::Release);
+                Ok(())
+            },
+            move |()| {
+                dispatch_flag.store(true, Ordering::Release);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("a stock-item Create for another company is refused");
+    assert!(error.chain().any(|cause| matches!(
+        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+    )));
+    assert!(!rechecked.load(Ordering::Acquire));
+    assert!(!dispatched.load(Ordering::Acquire));
+    assert_eq!(simulator.received(), 0);
 }
 
 fn master_batch() -> &'static str {
@@ -1007,7 +1067,7 @@ async fn a_master_post_with_the_voucher_licence_sends_nothing() {
             &identity(&companies),
             approved_masters(&companies),
             |_: QueuedAdmission<'_>| Ok(()),
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(())
             },
@@ -1064,7 +1124,7 @@ async fn a_recorded_intent_of_another_batch_or_other_bytes_sends_nothing() {
                 &identity(&companies),
                 approved,
                 |_: QueuedAdmission<'_>| Ok(()),
-                move || {
+                move |()| {
                     Ok(
                         crate::tally::approved_import::RecordedIntent::issued_for_test(
                             batch, &digest,
@@ -1146,7 +1206,7 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
                 assert_eq!(company_marks, seen.2);
                 Ok(())
             },
-            move || {
+            move |()| {
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(
                     crate::tally::approved_import::RecordedIntent::issued_for_test(
@@ -1188,7 +1248,8 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
 /// another: refused before any request is sent.
 #[tokio::test]
 async fn a_master_post_for_another_company_is_refused_before_any_request() {
-    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
+    use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+    use crate::tally::master_name::MasterName;
     let companies = captured_companies();
     let other =
         VerifiedCompanyIdentity::test_fixture("Some Other Company", crate::synthetic_guid(0x1111));
@@ -1214,7 +1275,7 @@ async fn a_master_post_for_another_company_is_refused_before_any_request() {
             &identity(&companies),
             approved,
             |_: QueuedAdmission<'_>| Ok(()),
-            || Ok(()),
+            |()| Ok(()),
         )
         .await
         .expect_err("a request rendered for another company is not posted here");
@@ -1251,7 +1312,7 @@ async fn a_post_is_refused_before_the_terms_are_accepted_and_goes_on_after() {
                     recheck.store(true, Ordering::Release);
                     Ok(())
                 },
-                move || {
+                move |()| {
                     dispatch.store(true, Ordering::Release);
                     Ok(())
                 },

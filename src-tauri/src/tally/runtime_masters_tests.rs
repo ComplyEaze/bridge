@@ -5,8 +5,10 @@
 //! second collection, the series-level numbering, as a second pair between the
 //! first and the closing extent.
 use super::masters::{
-    admit_masters_size, check_masters_premise, check_numbering_premise, limit_for,
-    sized_before_the_read, MastersRead,
+    admit_candidate_stock_item_read, admit_masters_size, admit_stock_groups, admit_stock_units,
+    check_masters_premise, check_numbering_premise, limit_for, sized_before_the_read,
+    AdmittedCandidateRead, MastersRead, StockItemCountMismatch, StockItemReadKind,
+    StockItemReadKindError, StockItemReadSize,
 };
 use super::trial_balance_tests::{
     companies, config, decode, education, extents, identity, pair, status, xml, GUID,
@@ -20,6 +22,7 @@ use bridge_tally_protocol::native_voucher_type_numbering::{
     parse_voucher_type_numbering, render_voucher_type_numbering_request, DuplicateSetting,
     NumberingJoinError, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
+use bridge_tally_protocol::{decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding};
 use tally_protocol_simulator::{
     encode, ObservedRequest, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -298,6 +301,24 @@ fn largest_admitted_mark(kind: NativeMasterKind) -> u64 {
     u64::try_from(MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(kind)).unwrap()
 }
 
+/// The requests the Tally double saw, or a message carrying both the double's error and the
+/// runtime answer already obtained, so a failed `finish()` never hides what the runtime said.
+fn observed_or_message(
+    result: &dyn std::fmt::Debug,
+    finished: std::io::Result<Vec<ObservedRequest>>,
+) -> Result<Vec<ObservedRequest>, String> {
+    finished.map_err(|error| {
+        format!("the simulator's finish failed: {error:?}; the runtime had answered: {result:?}")
+    })
+}
+
+fn observed_or_panic(
+    result: &dyn std::fmt::Debug,
+    finished: std::io::Result<Vec<ObservedRequest>>,
+) -> Vec<ObservedRequest> {
+    observed_or_message(result, finished).unwrap_or_else(|message| panic!("{message}"))
+}
+
 async fn run(
     plans: Vec<ScenarioPlan>,
     kind: MastersKind,
@@ -306,7 +327,8 @@ async fn run(
     let result = TallyRuntime::default()
         .fetch_masters_with_extent(config(&simulator), &identity(), kind)
         .await;
-    (result, simulator.finish().unwrap().len())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished.len())
 }
 
 /// As [`run`], with the requests the Tally double received.
@@ -321,7 +343,8 @@ async fn run_observed(
     let result = TallyRuntime::default()
         .fetch_masters_with_extent(config(&simulator), &identity(), kind)
         .await;
-    (result, simulator.finish().unwrap())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished)
 }
 
 /// The body hash the Tally double records for `request`.
@@ -536,7 +559,7 @@ async fn a_book_over_the_budget_is_refused_before_the_collection_request() {
         let (result, dispatched) =
             run(opening(extent_with_mark(mark)), MastersKind::Native(kind)).await;
 
-        let error = result.err().expect("refused");
+        let error = result.expect_err("refused");
         let row_bytes = u64::try_from(masters_worst_row_bytes(kind)).unwrap();
         assert!(
             matches!(
@@ -564,7 +587,7 @@ async fn education_is_refused_before_identity_or_extent_dispatch() {
     let (result, dispatched) =
         run(vec![status(), xml(education(&companies()))], GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<MastersReadError>(&error),
         Some(MastersReadError::EducationUnqualified)
@@ -580,7 +603,7 @@ async fn a_book_that_moved_during_the_read_is_refused_and_keeps_the_completed_so
     )
     .await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert_eq!(changed.safe_code(), "masters_extent_changed");
@@ -601,7 +624,7 @@ async fn a_collection_that_changed_between_its_paired_reads_is_refused() {
     ]);
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(
         changed,
@@ -617,7 +640,7 @@ async fn a_transport_failure_stays_a_transport_failure() {
     plans.push(xml(godowns()).with_http_status(500));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<bridge_tally_transport::TallyTransportError>(&error),
         Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 500 })
@@ -641,7 +664,7 @@ async fn a_response_with_no_collection_is_the_parsers_typed_refusal() {
     pair(&mut plans, xml(absent));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::CollectionAbsent)
@@ -666,7 +689,7 @@ async fn a_group_answer_bridge_cannot_read_refuses_at_once() {
     pair(&mut plans, xml(absent));
     let (result, dispatched) = run(plans, MastersKind::Groups).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(cause::<PairedReadValidationError>(&error).is_none());
     assert!(cause::<MastersReadError>(&error).is_none());
     // Mode probe and identity (3), opening extent (4), the group pair (4).
@@ -689,7 +712,7 @@ async fn a_voucher_type_answer_with_no_rows_is_refused_at_once() {
     let (result, dispatched) =
         run(plans, MastersKind::Native(NativeMasterKind::VoucherTypes)).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::VoucherTypesEmpty)
@@ -703,7 +726,7 @@ async fn a_response_that_breaks_the_marks_premise_is_refused_after_the_read() {
     let plans = through_closing_extent(extent_with_mark(2), godowns(), extent_with_mark(2));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let violated = cause::<MastersReadError>(&error).expect("a premise refusal");
     assert!(matches!(
         violated,
@@ -725,7 +748,7 @@ async fn a_response_that_breaks_the_marks_premise_is_refused_after_the_read() {
     );
     let plans = through_closing_extent(extent_with_mark(213), padded, extent_with_mark(213));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<MastersReadError>(&error),
         Some(MastersReadError::PremiseViolated(
@@ -749,7 +772,7 @@ async fn a_row_longer_than_the_assumed_worst_row_is_the_parsers_typed_refusal() 
     pair(&mut plans, xml(long_row));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::RowExceedsBound)
@@ -780,7 +803,7 @@ async fn a_book_that_moved_during_the_read_is_reported_as_moved_not_as_what_its_
     let plans = through_closing_extent(extent_with_mark(150), godowns(), extent_with_mark(260));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert_eq!(changed.safe_code(), "masters_extent_changed");
@@ -826,7 +849,9 @@ async fn voucher_types_send_the_masters_request_then_the_numbering_request_betwe
         NativeMasterKind::VoucherTypes,
         &name,
     ));
-    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     assert_ne!(masters, numbering);
     assert_eq!(observed.len(), VOUCHER_TYPES_SEQUENCE);
     let hash = |at: usize| observed[at].request_body_sha256.as_str();
@@ -847,7 +872,9 @@ async fn voucher_types_send_the_masters_request_then_the_numbering_request_betwe
 #[tokio::test]
 async fn every_other_kind_sends_no_numbering_request() {
     let name = identity().display_name().to_string();
-    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     for kind in NativeMasterKind::ALL {
         if kind == NativeMasterKind::VoucherTypes {
             continue;
@@ -972,7 +999,6 @@ async fn the_numbering_read_adds_its_own_evidence() {
 async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_request() {
     let masters = capture(NativeMasterKind::VoucherTypes);
     let numbering = numbering_for(&masters);
-    let name = identity().display_name().to_string();
     // A read that ends after the masters read: its evidence is the mode probe's
     // and the masters pair's (the premise breaks, and the closing extent is read).
     let (result, _) = run(
@@ -980,7 +1006,7 @@ async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_req
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let masters_only = result.err().expect("refused");
+    let masters_only = result.expect_err("refused");
     let masters_only = &masters_only
         .downcast_ref::<RuntimeReadFailure>()
         .unwrap()
@@ -996,7 +1022,7 @@ async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_req
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let with_numbering = result.err().expect("refused");
+    let with_numbering = result.expect_err("refused");
     let with_numbering = &with_numbering
         .downcast_ref::<RuntimeReadFailure>()
         .unwrap()
@@ -1004,7 +1030,9 @@ async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_req
     assert_ne!(with_numbering.request_sha256, masters_only.request_sha256);
     // The chain is `<earlier>:<next request>`: the numbering request's own hash,
     // the bytes `render_voucher_type_numbering_request` renders, is the next link.
-    let numbering_request = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering_request = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     assert_eq!(
         with_numbering.request_sha256,
         sha256_hex(format!("{}:{numbering_request}", masters_only.request_sha256).as_bytes())
@@ -1025,7 +1053,7 @@ async fn a_numbering_pair_that_changed_between_its_reads_refuses_the_whole_read(
     ]);
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(
         changed,
@@ -1167,7 +1195,7 @@ async fn a_voucher_types_pair_that_disagrees_twice_is_refused_after_one_more_pai
     });
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(
         changed,
@@ -1194,7 +1222,7 @@ async fn a_failure_of_the_second_voucher_types_pair_stays_a_transport_failure() 
     });
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<bridge_tally_transport::TallyTransportError>(&error),
         Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 500 })
@@ -1214,7 +1242,7 @@ async fn a_book_that_moved_during_a_repeated_voucher_types_read_is_still_reporte
     });
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_reported_as_moved(&result.expect_err("refused"));
     // Refused at the closing extent: 3 + 4, two collection pairs, the numbering
     // pair and the closing extent.
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4 + 4);
@@ -1321,7 +1349,7 @@ async fn a_numbering_answer_that_does_not_parse_refuses_at_once_with_the_parsers
             VOUCHER_TYPES_KIND,
         )
         .await;
-        let error = result.err().expect("refused: no rows come back");
+        let error = result.expect_err("refused: no rows come back");
         assert_eq!(cause::<NativeMastersError>(&error), Some(&expected));
         // The masters pair and the numbering pair were read, nothing after.
         assert_eq!(dispatched, 3 + 4 + 4 + 4);
@@ -1342,7 +1370,7 @@ async fn a_numbering_answer_that_does_not_parse_refuses_at_once_with_the_parsers
     )
     .await;
     assert_eq!(
-        cause::<NativeMastersError>(&result.err().expect("refused")),
+        cause::<NativeMastersError>(&result.expect_err("refused")),
         Some(&NativeMastersError::Malformed(
             "masters_numbering_guid_missing"
         ))
@@ -1369,7 +1397,7 @@ async fn a_numbering_answer_that_does_not_join_refuses_the_whole_read_after_the_
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     let refused = cause::<MastersReadError>(&error).expect("a join refusal");
     assert!(matches!(
         refused,
@@ -1399,7 +1427,7 @@ async fn a_numbering_answer_that_does_not_join_refuses_the_whole_read_after_the_
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let refused = cause::<MastersReadError>(&error).expect("a join refusal");
     assert!(matches!(
         refused,
@@ -1419,7 +1447,7 @@ async fn a_numbering_answer_that_does_not_join_refuses_the_whole_read_after_the_
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert!(cause::<MastersReadError>(&error).is_none());
@@ -1440,7 +1468,7 @@ async fn a_book_that_moved_between_the_two_reads_is_reported_as_moved() {
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert_eq!(changed.safe_code(), "masters_extent_changed");
@@ -1466,7 +1494,7 @@ async fn a_numbering_answer_that_repeats_a_guid_is_refused_at_once_by_the_parser
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::DuplicateGuid)
@@ -1577,21 +1605,21 @@ async fn a_numbering_answer_with_more_rows_than_the_mark_is_a_premise_refusal() 
     );
 
     let (result, dispatched) = read_with_numbering(numbering.clone(), mark, mark).await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     assert_numbering_premise_refusal(&error, "masters_numbering_rows_exceed_master_mark");
     // Held until the closing extent was read, and it had not moved.
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 
     // The book moved between the reads: reported as moved.
     let (result, dispatched) = read_with_numbering(numbering, mark, mark + 1).await;
-    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_reported_as_moved(&result.expect_err("refused"));
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 
     // One row fewer is within the premise: the read goes on to the join, which
     // refuses the extra types as a numbering with no masters row.
     let within = numbering_with_extra_types(&numbering_for(&masters), extra - 1);
     let (result, _) = read_with_numbering(within, mark, mark).await;
-    let error = result.err().expect("refused by the join");
+    let error = result.expect_err("refused by the join");
     assert!(matches!(
         cause::<MastersReadError>(&error),
         Some(MastersReadError::NumberingJoin(
@@ -1612,12 +1640,12 @@ async fn a_numbering_answer_over_the_admitted_bytes_is_a_premise_refusal() {
     );
 
     let (result, dispatched) = read_with_numbering(numbering.clone(), 50_000_000, 50_000_000).await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     assert_numbering_premise_refusal(&error, "masters_numbering_response_over_admitted_bytes");
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 
     let (result, dispatched) = read_with_numbering(numbering, 50_000_000, 50_000_001).await;
-    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_reported_as_moved(&result.expect_err("refused"));
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 }
 
@@ -1646,7 +1674,8 @@ async fn run_numbering(
     let result = TallyRuntime::default()
         .fetch_voucher_type_numbering(config(&simulator), &identity(), master_mark)
         .await;
-    (result, simulator.finish().unwrap())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished)
 }
 
 /// The largest AlterID among the voucher types of the real numbering capture.
@@ -1664,6 +1693,36 @@ fn captured_highest_alter_id() -> u64 {
     .unwrap()
 }
 
+// Waits out the simulator's fixed 30-second plan deadline: it has no shorter option, and none is
+// added to production code for this test.
+#[tokio::test]
+async fn a_failed_finish_reports_the_runtime_answer_as_well_as_the_simulators_error() {
+    let mut plans = numbering_read_plans(masters_for_numbering_capture(), numbering_capture());
+    plans.push(status());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = TallyRuntime::default()
+        .fetch_voucher_type_numbering(config(&simulator), &identity(), captured_highest_alter_id())
+        .await;
+    assert!(result.is_ok(), "the runtime read must succeed: {result:?}");
+    let message = observed_or_message(&result, simulator.finish())
+        .expect_err("the extra plan is never asked");
+    assert!(
+        message.contains("NoRequestForPlan { plan: 14, plans: 15 }"),
+        "{message}"
+    );
+    assert!(message.contains(&format!("{result:?}")), "{message}");
+}
+
+// As above, through the helper the numbering tests use, so a helper that goes back to a bare
+// `finish().unwrap()` fails here. Waits out the same 30-second plan deadline.
+#[tokio::test]
+#[should_panic(expected = "the runtime had answered: Ok(")]
+async fn the_numbering_helper_shows_the_runtime_answer_when_its_finish_fails() {
+    let mut plans = numbering_read_plans(masters_for_numbering_capture(), numbering_capture());
+    plans.push(status());
+    let _ = run_numbering(plans, captured_highest_alter_id()).await;
+}
+
 #[tokio::test]
 async fn the_numbering_read_sends_the_masters_pair_then_the_numbering_pair_and_no_extent() {
     let mark = captured_highest_alter_id();
@@ -1679,7 +1738,9 @@ async fn the_numbering_read_sends_the_masters_pair_then_the_numbering_pair_and_n
         NativeMasterKind::VoucherTypes,
         &name,
     ));
-    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    let numbering = request_hash(&render_voucher_type_numbering_request(
+        identity().company_name(),
+    ));
     let posts = observed
         .iter()
         .filter(|request| request.method == "POST")
@@ -1837,7 +1898,7 @@ async fn a_tally_error_inside_a_stock_item_list_is_refused_at_once() {
     pair(&mut plans, xml(failed));
     let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::TallyReportedFailure)
@@ -1865,7 +1926,7 @@ async fn a_stock_item_row_with_too_many_real_entries_is_the_parsers_typed_refusa
     pair(&mut plans, xml(long_row));
     let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::RowExceedsBound),
@@ -1887,4 +1948,481 @@ fn stock_items_are_named_by_their_kind_and_only_by_it() {
     }
     assert_eq!(MastersKind::parse("stock_item"), None);
     assert_eq!(MastersKind::parse("Stock_Items"), None);
+}
+
+const SHAPE_ITEMS_BASELINE: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml"
+);
+const SHAPE_ITEMS_TWO_DATES: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml"
+);
+const SHAPE_COUNT: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml"
+);
+const STOCK_CREATE_ITEMS_BEFORE: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-items-before.utf16le.xml"
+);
+const STOCK_CREATE_GROUPS: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-groups.utf16le.xml"
+);
+const STOCK_CREATE_UNITS: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/stock-create-lab-units.utf16le.xml"
+);
+const STOCK_CREATE_GUID: &str = "bac2b5e9-ada9-43c0-b8f8-a2812a813fa1";
+
+fn admission_capture(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("the committed UTF-16 capture decodes")
+    .text
+}
+
+fn shape_identity() -> VerifiedCompanyIdentity {
+    VerifiedCompanyIdentity::test_fixture("BRIDGE SHAPE LAB", CAPTURE_GUID)
+}
+
+fn stock_create_identity() -> VerifiedCompanyIdentity {
+    VerifiedCompanyIdentity::test_fixture("BRIDGE STOCK CREATE LAB", STOCK_CREATE_GUID)
+}
+
+fn stable_admission_pair(body: String) -> NativePairedRead {
+    let encoded_bytes = body.encode_utf16().count() * 2;
+    NativePairedRead::Stable {
+        body,
+        encoded_bytes,
+        encoded_sha256: String::new(),
+    }
+}
+
+fn drifted_admission_pair() -> NativePairedRead {
+    NativePairedRead::Drifted(RuntimeReadEvidence::empty())
+}
+
+/// The item and count files are real XML from one book but different capture
+/// times, and these item answers lack the three candidate scalars added for R1.
+/// They exercise admission logic, not a live eleven-field item/count pairing.
+fn admit_shape_candidate(
+    items: String,
+    count: String,
+    master_mark: u64,
+) -> anyhow::Result<AdmittedCandidateRead> {
+    admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, master_mark)?,
+        &shape_identity(),
+        stable_admission_pair(items),
+        stable_admission_pair(count),
+    )
+}
+
+fn with_stock_item_count(count: &str, value: Option<&str>) -> String {
+    assert_eq!(count.matches("<NUMSTOCKITEMS ").count(), 1);
+    let start = count.find("<NUMSTOCKITEMS ").unwrap();
+    let end = start + count[start..].find("</NUMSTOCKITEMS>").unwrap() + "</NUMSTOCKITEMS>".len();
+    let replacement = value.map_or_else(String::new, |value| {
+        format!("<NUMSTOCKITEMS TYPE=\"Number\">{value}</NUMSTOCKITEMS>")
+    });
+    format!("{}{}{}", &count[..start], replacement, &count[end..])
+}
+
+#[test]
+fn candidate_size_admission_keeps_the_489_mark_edge() {
+    let admitted = StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap();
+    assert_eq!(admitted.admitted_bytes(), 15_984_432);
+    assert!(matches!(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 490),
+        Err(MastersReadError::TooLarge {
+            master_alter_id: 490,
+            estimated_bytes: 16_017_120,
+            limit_bytes: 16_000_000,
+            limit_master_alter_id: 489,
+        })
+    ));
+}
+
+#[test]
+fn candidate_admission_requires_stable_item_and_count_pairs() {
+    let items = admission_capture(SHAPE_ITEMS_BASELINE);
+    let count = admission_capture(SHAPE_COUNT);
+    let candidate_drift = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &shape_identity(),
+        drifted_admission_pair(),
+        stable_admission_pair(count.clone()),
+    )
+    .expect_err("a drifted candidate is not admitted");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&candidate_drift),
+        Some(PairedReadValidationError::MastersCollection)
+    ));
+
+    let count_drift = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(items),
+        drifted_admission_pair(),
+    )
+    .expect_err("a drifted count is not admitted");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&count_drift),
+        Some(PairedReadValidationError::StockSummaryCollection)
+    ));
+}
+
+#[test]
+fn candidate_admission_refuses_an_unavailable_count() {
+    let items = admission_capture(SHAPE_ITEMS_BASELINE);
+    let count = admission_capture(SHAPE_COUNT);
+    for edited in [
+        with_stock_item_count(&count, None),
+        with_stock_item_count(&count, Some("")),
+        with_stock_item_count(&count, Some("eleven")),
+    ] {
+        let error = admit_shape_candidate(items.clone(), edited, 489)
+            .expect_err("an unavailable count is never zero or admitted");
+        assert!(matches!(
+            cause::<bridge_tally_protocol::native_stock_summary::NativeStockError>(&error),
+            Some(
+                bridge_tally_protocol::native_stock_summary::NativeStockError::ItemCountUnavailable
+            )
+        ));
+    }
+}
+
+#[test]
+fn candidate_admission_refuses_count_mismatch_in_either_direction() {
+    let items = admission_capture(SHAPE_ITEMS_BASELINE);
+    let count = admission_capture(SHAPE_COUNT);
+    for (reported, expected) in [(10, 10), (12, 12)] {
+        let error = admit_shape_candidate(
+            items.clone(),
+            with_stock_item_count(&count, Some(&reported.to_string())),
+            489,
+        )
+        .expect_err("a count in either mismatch direction refuses");
+        let mismatch = cause::<StockItemCountMismatch>(&error).expect("the typed mismatch");
+        assert_eq!(
+            mismatch,
+            &StockItemCountMismatch {
+                rows: 11,
+                tally_count: expected,
+            }
+        );
+    }
+}
+
+#[test]
+fn candidate_admission_binds_the_item_and_count_answers_to_one_company() {
+    let r1_items = admission_capture(STOCK_CREATE_ITEMS_BEFORE);
+    let shape_count = admission_capture(SHAPE_COUNT);
+    let wrong_items = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(r1_items.clone()),
+        stable_admission_pair(with_stock_item_count(&shape_count, Some("1"))),
+    )
+    .expect_err("another company's item rows refuse");
+    assert_eq!(
+        cause::<NativeMastersError>(&wrong_items),
+        Some(&NativeMastersError::RowGuidForeign)
+    );
+
+    let wrong_count = admit_candidate_stock_item_read(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 489).unwrap(),
+        &stock_create_identity(),
+        stable_admission_pair(r1_items),
+        stable_admission_pair(shape_count),
+    )
+    .expect_err("a count answer not naming the target refuses");
+    assert!(matches!(
+        cause::<bridge_tally_protocol::native_stock_summary::NativeStockError>(&wrong_count),
+        Some(bridge_tally_protocol::native_stock_summary::NativeStockError::CompanyFlagsNotOneRow)
+    ));
+}
+
+#[test]
+fn candidate_admission_enforces_the_mark_and_encoded_byte_premises() {
+    let items = admission_capture(SHAPE_ITEMS_TWO_DATES);
+    let count = with_stock_item_count(&admission_capture(SHAPE_COUNT), Some("12"));
+    let above_mark = admit_shape_candidate(items.clone(), count.clone(), 293)
+        .expect_err("the capture's AlterID 294 is above mark 293");
+    assert!(matches!(
+        cause::<MastersReadError>(&above_mark),
+        Some(MastersReadError::PremiseViolated(
+            "masters_alter_id_above_master_mark"
+        ))
+    ));
+
+    // The count edit and artificial byte limit are logic vectors, not a captured
+    // same-sitting count or a Tally limit.
+    let pair = stable_admission_pair(items);
+    let encoded_bytes = match &pair {
+        NativePairedRead::Stable { encoded_bytes, .. } => *encoded_bytes,
+        NativePairedRead::Drifted(_) => unreachable!(),
+    };
+    let over_bytes = admit_candidate_stock_item_read(
+        StockItemReadSize::with_limit_for_test(
+            StockItemReadKind::Candidate,
+            294,
+            u64::try_from(encoded_bytes - 1).unwrap(),
+        ),
+        &shape_identity(),
+        pair,
+        stable_admission_pair(count),
+    )
+    .expect_err("one byte over the artificial admitted limit refuses");
+    assert!(matches!(
+        cause::<MastersReadError>(&over_bytes),
+        Some(MastersReadError::PremiseViolated(
+            "masters_response_over_admitted_bytes"
+        ))
+    ));
+}
+
+#[test]
+fn support_reads_are_paired_sized_company_bound_and_of_their_own_kind() {
+    let groups = admission_capture(STOCK_CREATE_GROUPS);
+    let units = admission_capture(STOCK_CREATE_UNITS);
+    let identity = stock_create_identity();
+    let admitted_groups = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, 210).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .unwrap();
+    assert_eq!(admitted_groups.rows().len(), 1);
+    assert_eq!(admitted_groups.rows()[0].name, "SC Goods Group");
+    assert_eq!(admitted_groups.sized_mark(), 210);
+    let admitted_units = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Units, 210).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .unwrap();
+    assert_eq!(admitted_units.rows().len(), 1);
+    assert_eq!(admitted_units.rows()[0].name, "Nos");
+    assert_eq!(admitted_units.sized_mark(), 210);
+
+    for (kind, edge) in [
+        (StockItemReadKind::StockGroups, 1_160),
+        (StockItemReadKind::Units, 1_168),
+    ] {
+        assert!(StockItemReadSize::new(kind, edge).is_ok());
+        assert!(matches!(
+            StockItemReadSize::new(kind, edge + 1),
+            Err(MastersReadError::TooLarge {
+                master_alter_id,
+                limit_master_alter_id,
+                ..
+            }) if master_alter_id == edge + 1 && limit_master_alter_id == edge
+        ));
+    }
+
+    for drifted in [
+        admit_stock_groups(
+            StockItemReadSize::new(StockItemReadKind::StockGroups, 210).unwrap(),
+            &identity,
+            drifted_admission_pair(),
+        )
+        .expect_err("drifted groups refuse"),
+        admit_stock_units(
+            StockItemReadSize::new(StockItemReadKind::Units, 210).unwrap(),
+            &identity,
+            drifted_admission_pair(),
+        )
+        .expect_err("drifted units refuse"),
+    ] {
+        assert!(matches!(
+            cause::<PairedReadValidationError>(&drifted),
+            Some(PairedReadValidationError::MastersCollection)
+        ));
+    }
+
+    let foreign_groups = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("foreign groups refuse");
+    let foreign_units = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Units, 489).unwrap(),
+        &shape_identity(),
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("foreign units refuse");
+    for error in [foreign_groups, foreign_units] {
+        assert_eq!(
+            cause::<NativeMastersError>(&error),
+            Some(&NativeMastersError::RowGuidForeign)
+        );
+    }
+
+    let wrong_group_token = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::Units, 210).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("a unit token admits no groups");
+    assert!(cause::<StockItemReadKindError>(&wrong_group_token).is_some());
+    let wrong_unit_token = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, 210).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("a group token admits no units");
+    assert!(cause::<StockItemReadKindError>(&wrong_unit_token).is_some());
+    // The candidate read takes only its own token, and neither support read
+    // takes the candidate's.
+    for kind in [StockItemReadKind::StockGroups, StockItemReadKind::Units] {
+        let wrong_candidate_token = admit_candidate_stock_item_read(
+            StockItemReadSize::new(kind, 489).unwrap(),
+            &shape_identity(),
+            stable_admission_pair(admission_capture(SHAPE_ITEMS_BASELINE)),
+            stable_admission_pair(admission_capture(SHAPE_COUNT)),
+        )
+        .expect_err("a support token admits no candidate read");
+        assert!(cause::<StockItemReadKindError>(&wrong_candidate_token).is_some());
+    }
+    let candidate_token_groups = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 210).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("a candidate token admits no groups");
+    assert!(cause::<StockItemReadKindError>(&candidate_token_groups).is_some());
+    let candidate_token_units = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Candidate, 210).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("a candidate token admits no units");
+    assert!(cause::<StockItemReadKindError>(&candidate_token_units).is_some());
+
+    // These AlterID and byte faults are constructed admission vectors, not new
+    // captures. Both support reads use the same shared premise reasons.
+    let group_mark =
+        parse_native_masters(NativeMasterKind::StockGroups, &groups, STOCK_CREATE_GUID)
+            .unwrap()
+            .rows[0]
+            .alter_id
+            - 1;
+    let unit_mark = parse_native_masters(NativeMasterKind::Units, &units, STOCK_CREATE_GUID)
+        .unwrap()
+        .rows[0]
+        .alter_id
+        - 1;
+    let group_above = admit_stock_groups(
+        StockItemReadSize::new(StockItemReadKind::StockGroups, group_mark).unwrap(),
+        &identity,
+        stable_admission_pair(groups.clone()),
+    )
+    .expect_err("a group above its token's mark refuses");
+    let unit_above = admit_stock_units(
+        StockItemReadSize::new(StockItemReadKind::Units, unit_mark).unwrap(),
+        &identity,
+        stable_admission_pair(units.clone()),
+    )
+    .expect_err("a unit above its token's mark refuses");
+    for error in [group_above, unit_above] {
+        assert!(matches!(
+            cause::<MastersReadError>(&error),
+            Some(MastersReadError::PremiseViolated(
+                "masters_alter_id_above_master_mark"
+            ))
+        ));
+    }
+
+    for (kind, body) in [
+        (StockItemReadKind::StockGroups, groups),
+        (StockItemReadKind::Units, units),
+    ] {
+        let pair = stable_admission_pair(body);
+        let encoded_bytes = match &pair {
+            NativePairedRead::Stable { encoded_bytes, .. } => *encoded_bytes,
+            NativePairedRead::Drifted(_) => unreachable!(),
+        };
+        let size = StockItemReadSize::with_limit_for_test(
+            kind,
+            210,
+            u64::try_from(encoded_bytes - 1).unwrap(),
+        );
+        let result = match kind {
+            StockItemReadKind::StockGroups => admit_stock_groups(size, &identity, pair).map(|_| ()),
+            StockItemReadKind::Units => admit_stock_units(size, &identity, pair).map(|_| ()),
+            StockItemReadKind::Candidate => unreachable!(),
+        };
+        let error = result.expect_err("one byte over the support token's limit refuses");
+        assert!(matches!(
+            cause::<MastersReadError>(&error),
+            Some(MastersReadError::PremiseViolated(
+                "masters_response_over_admitted_bytes"
+            ))
+        ));
+    }
+}
+
+#[test]
+fn a_zero_row_candidate_with_zero_count_is_no_items_not_a_complete_catalogue() {
+    // Structurally removing the eleven rows and changing the count to zero are
+    // constructed vectors; no captured zero-row candidate response is claimed.
+    let baseline = admission_capture(SHAPE_ITEMS_BASELINE);
+    let mut rest = baseline.as_str();
+    let mut without_rows = String::new();
+    let mut removed = 0;
+    while let Some(start) = rest.find("<STOCKITEM ") {
+        let end = rest[start..].find("</STOCKITEM>").unwrap() + "</STOCKITEM>".len();
+        without_rows.push_str(&rest[..start]);
+        rest = &rest[start + end..];
+        removed += 1;
+    }
+    without_rows.push_str(rest);
+    assert_eq!(removed, 11);
+    assert!(!without_rows.contains("<STOCKITEM "));
+    let admitted = admit_shape_candidate(
+        without_rows,
+        with_stock_item_count(&admission_capture(SHAPE_COUNT), Some("0")),
+        489,
+    )
+    .expect("zero rows and Tally's reported zero agree at admission");
+    let error =
+        crate::tally::stock_item_create::CompleteStockItemCatalogue::from_admitted(admitted)
+            .expect_err("zero rows never constructs a complete catalogue");
+    assert!(matches!(
+        error,
+        crate::tally::stock_item_create::StockItemCatalogueError::NoItems
+    ));
+
+    let start = baseline.find("<COLLECTION").unwrap();
+    let end = baseline.find("</COLLECTION>").unwrap() + "</COLLECTION>".len();
+    let absent = format!("{}{}", &baseline[..start], &baseline[end..]);
+    let error = admit_shape_candidate(absent, admission_capture(SHAPE_COUNT), 489)
+        .expect_err("an absent collection is malformed, not a zero-row answer");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::CollectionAbsent)
+    );
+}
+
+#[test]
+fn an_admitted_candidate_read_carries_its_sized_mark_into_the_complete_catalogue() {
+    // The shape lab's item and count files are one book's answers at
+    // different capture times (see admit_shape_candidate); the count file
+    // reports the eleven items the item file holds.
+    let admitted = admit_shape_candidate(
+        admission_capture(SHAPE_ITEMS_BASELINE),
+        admission_capture(SHAPE_COUNT),
+        489,
+    )
+    .expect("eleven rows and Tally's count of eleven admit");
+    assert_eq!(admitted.sized_mark(), 489);
+    assert_eq!(admitted.company(), &shape_identity());
+    let complete =
+        crate::tally::stock_item_create::CompleteStockItemCatalogue::from_admitted(admitted)
+            .expect("an admitted non-empty read is a complete catalogue");
+    assert_eq!(complete.sized_mark(), 489);
+    assert_eq!(complete.catalogue().items().len(), 11);
+    assert_eq!(complete.catalogue().company(), &shape_identity());
 }

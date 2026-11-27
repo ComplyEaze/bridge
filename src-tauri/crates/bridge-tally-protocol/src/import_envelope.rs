@@ -4,7 +4,7 @@
 //! envelope and differ only in the report name, so they share this one
 //! function. The company is escaped here, once; `messages` is inserted as
 //! given, so the caller must already have escaped the values inside it.
-use crate::xml_text::escape_text;
+use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 
 /// The report an import envelope names. A closed set, so no caller can put
 /// arbitrary text in `REPORTNAME`.
@@ -27,8 +27,8 @@ impl ImportReport {
 pub fn render_import_envelope(company: &str, report: ImportReport, messages: &str) -> String {
     let report_name = report.tally_name();
     format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>{report_name}</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>",
-        escape_text(company)
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>{report_name}</REPORTNAME>{}</REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>",
+        static_variables_for_unvalidated_company(company, "", "")
     )
 }
 

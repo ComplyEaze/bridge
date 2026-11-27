@@ -1,5 +1,6 @@
 //! A company's ledger and group names, indexed so a proposed new ledger name
 //! can be checked against every existing master before anything is written.
+//! A stock-item index is built apart, from stock items only (#1381).
 //!
 //! Tally resolves a supplied master name loosely (`TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md`
 //! §9.4b, §9.4d): case, `-` and `/` as a space, whitespace runs. That
@@ -40,6 +41,8 @@ use crate::master_binding::{absence_key, canonical_master_key, letters_and_digit
 pub enum MasterKind {
     Ledger,
     Group,
+    /// A stock item. It is indexed with other stock items only (#1381).
+    StockItem,
 }
 
 /// How a colliding name belongs to its master.
@@ -118,7 +121,7 @@ impl MasterNameIndex {
     /// Indexes `masters`, refusing a list the index could not answer for: a
     /// master without names, a blank name, a blank or whitespace-padded GUID
     /// (refused as given, never trimmed), or one GUID on two masters (compared
-    /// ASCII case-insensitively, across both kinds).
+    /// ASCII case-insensitively, across every kind).
     pub fn new(masters: Vec<IndexedMaster>) -> Result<Self, MasterNameIndexError> {
         let mut seen_guids = BTreeSet::new();
         for (master, entry) in masters.iter().enumerate() {

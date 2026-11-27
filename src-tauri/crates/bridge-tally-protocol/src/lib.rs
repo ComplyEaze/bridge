@@ -62,6 +62,7 @@ pub mod native_voucher_type_numbering;
 pub mod outstandings_shared;
 pub mod parent_partition;
 mod standard_ledger_catalog;
+pub mod stock_item_candidate;
 mod stock_tax_details;
 mod text_encoding;
 mod tolerant_xml;
@@ -520,9 +521,19 @@ fn parse_company_collection_row(
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<TallyCompany> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
-    let name = attr_value(element, b"NAME")
-        .map(|value| normalized_standard_value(&value, "company name"))
-        .transpose()?
+    // The name is kept exactly as Tally reported it: not trimmed, and not
+    // checked here. A name a request cannot carry still lists, and
+    // `ValidatedCompanyName::refusal` marks it, so one such company no longer
+    // refuses the whole list (#2433). Only an absent attribute is a shape error.
+    let name = element
+        .attributes()
+        .flatten()
+        .find(|attr| attr.key.as_ref().as_bytes().eq_ignore_ascii_case(b"NAME"))
+        .and_then(|attr| {
+            attr.normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                .ok()
+        })
+        .map(|value| value.into_owned())
         .ok_or_else(|| anyhow::anyhow!("company collection omitted the company name"))?;
     let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
     let mut guid = None::<String>;
@@ -2498,3 +2509,8 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 #[path = "company_name_escaping_tests.rs"]
 mod company_name_escaping_tests;
+
+/// The request bytes of every builder, pinned by hash (#2397).
+#[cfg(test)]
+#[path = "request_bytes_tests.rs"]
+mod request_bytes_tests;

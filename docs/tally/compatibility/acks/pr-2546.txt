@@ -1,0 +1,2 @@
+src-tauri/crates/bridge-tally-protocol/src/native_masters.rs
+reviewer: lamemustafa

@@ -41,8 +41,11 @@ personal information.
   run the native tests on Windows only, and a master push, the nightly run, a
   manual run and a release pull request (one that changes the version in
   `src-tauri/tauri.conf.json`) add macOS; a pull request runs the bundle and seam
-  jobs on Windows only unless it is a release pull request, and the queue and a
-  push add macOS only when a packaging path changes, named in the scope job; a draft pull request runs no native, bundle or seam job, reports
+  jobs on Windows only, and only when it changes a packaging path, a crate manifest,
+  the Windows resource script or the Windows setup action, or is a release
+  pull request (which adds macOS); the queue runs them for every change they cover,
+  and the queue and a push add macOS only when a packaging path changes, named in
+  the scope job; a draft pull request runs no native, bundle or seam job, reports
   its gate as `Required checks (draft)`, which is not a required context, and
   marking it ready starts a run that does); require the
   gate rather than those individual matrix contexts, because they are
@@ -50,6 +53,22 @@ personal information.
   directly makes documentation pull requests permanently unmergeable. The gate
   fails when a job the scope selected was skipped, so a skip it accepts is
   always one the scope chose.
+- A draft pull request's green run is never called a full run: it ran no
+  native, bundle or seam job.
+- Working rule for a ready pull request whose change the queue runs the bundle
+  and seam jobs for and its own pull-request run does not (#2455):
+  - The merge queue run is its bundle and seam proof.
+  - For that proof, a manual run of `ci.yml`
+    (`gh workflow run ci.yml --ref <branch>`) is requested before queueing only
+    when the author needs release-profile proof, and the author gives the
+    reason in the pull-request body. The manual run for macOS native evidence
+    in `AGENTS.md`, and the one after an ejection below, are separate.
+- After the queue ejects a pull request, it is not queued again until the
+  failing job has passed on the fixed head outside the queue, on the system it
+  failed on: in one manual run, or, for a Windows failure, in the pull-request
+  run if the pull request's whole change now selects that job. The exception is
+  a log that shows an infrastructure error, such as a download 5xx, a timeout or
+  a fetch failure.
 - Enable private vulnerability reporting.
 - Restrict merge permissions to maintainers.
 - Require issue and pull-request templates.

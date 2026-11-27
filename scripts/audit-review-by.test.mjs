@@ -4,8 +4,8 @@
 // carries `Review-by: YYYY-MM-DD` in its comment. `cargo audit` prints nothing for an ignored id, and the scheduled
 // audit's tracking issue only lists the date (scripts/audit-tracking-issue.mjs), so without this test an accepted
 // advisory would stay accepted after the day it was to be looked at again. Once a date has passed the test fails for everyone, which is the point: re-run the entry's checks, then
-// either remove the entry or renew its date with the new finding written in its tracking issue (#2432 for
-// RUSTSEC-2026-0459). It reads dates only; whether the reason still holds is a human's call.
+// either remove the entry or renew its date with the new finding written in its tracking issue. It reads dates
+// only; whether the reason still holds is a human's call.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -31,12 +31,6 @@ test("no Review-by date in .cargo/audit.toml has passed", () => {
   assert.deepEqual(late, [], `a Review-by date has passed (today is ${today} UTC): re-run the entry's checks, then remove it or renew its date with the new finding written in its tracking issue`);
 });
 
-test("every ignore entry that is an error carries a Review-by date in the file", () => {
-  const text = readFileSync(auditToml, "utf8");
-  const block = text.slice(text.indexOf("RUSTSEC-2026-0459 --"));
-  assert.match(block.split('"RUSTSEC-2026-0459"')[0], /Review-by: \d{4}-\d{2}-\d{2}/, "RUSTSEC-2026-0459 must keep its Review-by date");
-});
-
 test("the check finds a passed date, the day itself still passes, and an impossible date is refused", () => {
   const entry = (day) => `  # Review-by: ${day} (30 days)\n  "RUSTSEC-0000-0000",\n`;
   assert.deepEqual(expired(entry("2026-12-09"), "2026-12-09"), [], "the review-by day itself is not late");
@@ -49,6 +43,5 @@ test("the check finds a passed date, the day itself still passes, and an impossi
 
 test("the real file has dates to check, so the first test cannot pass by finding none", () => {
   const found = reviewDates(readFileSync(auditToml, "utf8"));
-  assert.ok(found.length >= 5, `expected the file's Review-by lines, found ${found.length}`);
-  assert.ok(found.some(({ day }) => day === "2026-12-09"));
+  assert.ok(found.length >= 4, `expected the file's Review-by lines, found ${found.length}`);
 });

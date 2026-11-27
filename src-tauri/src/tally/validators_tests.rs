@@ -1,17 +1,17 @@
-use super::{
-    normalize_company_guid, normalize_company_name, validate_company_name, validate_date_range,
-};
+use super::{normalize_company_guid, validate_company_name, validate_date_range};
 
 #[test]
 fn validates_company_selection() {
     assert!(validate_company_name("Synthetic Company").is_ok());
     assert!(validate_company_name("  ").is_err());
     assert!(validate_company_name("Synthetic\nCompany").is_err());
-    assert!(validate_company_name(&"x".repeat(256)).is_err());
-    assert_eq!(
-        normalize_company_name("  Synthetic Company  ").unwrap(),
-        "Synthetic Company"
-    );
+    assert!(validate_company_name(&"x".repeat(361)).is_err());
+    assert!(validate_company_name(&"x".repeat(360)).is_ok());
+    // The name is checked as given, never trimmed first: an edge control
+    // character is refused, not removed, and edge spaces are kept (#2433).
+    assert!(validate_company_name("Synthetic Company\t").is_err());
+    assert!(validate_company_name("\nSynthetic Company").is_err());
+    assert!(validate_company_name("  Synthetic Company  ").is_ok());
     assert_eq!(normalize_company_guid("  guid-1  ").unwrap(), "guid-1");
     assert!(normalize_company_guid("guid\n1").is_err());
     assert!(normalize_company_guid(&"g".repeat(257)).is_err());
@@ -23,4 +23,19 @@ fn validates_tally_date_ranges() {
     assert!(validate_date_range("20260229", "20260301").is_err());
     assert!(validate_date_range("20260430", "20260401").is_err());
     assert!(validate_date_range("2026-04-01", "20260430").is_err());
+}
+
+/// The one wording of the name rule states the limit the type enforces, and the
+/// blank case (#2433).
+#[test]
+fn the_name_rule_wording_states_the_limit() {
+    let rule = super::company_name_rule!();
+    let limit = bridge_tally_protocol::xml_read_profiles::MAX_COMPANY_NAME_BYTES;
+    assert!(rule.contains(&format!("at most {limit} bytes")), "{rule}");
+    assert!(rule.contains("not blank"), "{rule}");
+    assert!(rule.contains("no control characters"), "{rule}");
+    assert_eq!(
+        validate_company_name(&"x".repeat(limit + 1)).unwrap_err(),
+        format!("The Tally company needs {rule}.")
+    );
 }

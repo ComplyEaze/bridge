@@ -417,8 +417,7 @@ async fn object_part(answer: &str) -> Result<AuditPart, AuditPartFailure> {
         utf16(&lab.companies_xml),
     ])
     .unwrap();
-    let object =
-        super::super::agent_read_request::AgentReadRequest::company_object(&lab.identity).unwrap();
+    let object = super::super::agent_read_request::AgentReadRequest::company_object(&lab.identity);
     assert!(object.is_company_object());
     let result = TallyRuntime::default()
         .fetch_audit_part(

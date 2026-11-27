@@ -326,8 +326,9 @@ With posting on, native posting accepts one Journal, Payment, Receipt or
 Contra per approval, or a saved batch of 2 to 50 Journals, or of 2 to 50
 Payments, Receipts and Contras, after one approval of a summary (per-ledger
 totals, and a line for each voucher when there are ten or fewer and those lines
-fit), with existing ledgers and no supplied voucher number. One setting covers
-both. `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while posting is on and it is
+fit), with existing ledgers and no supplied voucher number. It also accepts one
+Sales invoice per approval, which carries its own number and is posted alone.
+One setting covers all of these. `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while posting is on and it is
 still set, `post_import` refuses as `setting_retired`; remove it.
 Batch posting through ComplyEaze Bridge has run live on a synthetic company on licensed
 TallyPrime Silver, 200 Journals in one import with a test build whose cap was

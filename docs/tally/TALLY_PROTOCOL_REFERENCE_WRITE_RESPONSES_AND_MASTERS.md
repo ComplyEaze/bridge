@@ -103,8 +103,66 @@ preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the sam
 So in these runs `EXCEPTIONS` counted rejected vouchers, not missing ledgers, and the `LINEERROR`
 never identified every rejected voucher. The first and third answers are preserved byte for byte as
 test fixtures (`batch-import-all-missing-ledgers`,
-`batch-import-two-missing-ledgers-in-one-voucher`). Not measured: any other cause of rejection, Gold
-and Education.
+`batch-import-two-missing-ledgers-in-one-voucher`). Not measured here: other editions, and Education
+mode. A second cause of rejection is measured below.
+
+**Another cause of rejection — PARTIAL, one run** (2026-11-05, TallyPrime 7.2, licensed, one synthetic
+company with inventory integrated). A Journal with one line on a ledger under Stock-in-Hand, which
+ComplyEaze Bridge's own checks admit, was sent once: `CREATED 0, EXCEPTIONS 1`, every other counter 0,
+and a `LINEERROR` reading "Cannot use '<ledger>': Ledger under Stock-in-Hand!" placed ahead of the
+counters. The lab read, in the same sitting and without committing the answers, that the voucher mark did
+not move, that no voucher was added and that no dialog showed. A Journal with a
+line on the Cash ledger, sent the same way, was stored (`CREATED 1`). So `EXCEPTIONS` again counted
+the rejected voucher, here for a cause other than a missing ledger, and the `LINEERROR` again named
+a ledger, not a voucher. The answer is preserved byte for byte as a test fixture
+(`single-import-stock-in-hand-journal`). Not measured in that run: a book not integrated with
+inventory; a Bank ledger on a Journal; Payment, Receipt or Contra; TallyPrime 7.1. The same line
+through `post_import`, alone, in a batch and between twins, is measured next.
+
+**The same cause through `post_import` — PARTIAL, one run each** (TallyPrime 7.2, single-user
+edition, a synthetic company with accounts integrated with inventory, a master build reporting
+0.7.0, 2026-11-11; bridge#1108).
+
+The refused voucher was a Journal debiting a ledger under Stock-in-Hand, and Bridge's own checks
+before approval passed it. Tally refused it in the answer, with one `LINEERROR` naming the ledger.
+
+The counters below are from the import answers of these 2026-11-11 posts, which are committed.
+Every statement about these posts' marks, the created vouchers' IDs or the rows found is something
+the lab read, without committing the reads.
+
+- **Alone:** `CREATED 0, EXCEPTIONS 1`, `LASTVCHID` 0. The lab read, without committing the reads,
+  that neither mark moved.
+- **Second of three Journals:** `CREATED 2, EXCEPTIONS 1`, every other counter 0, `LASTVCHID` 3.
+  The lab read, without committing the reads, that:
+  - the voucher mark stepped by 2 and the master mark did not move;
+  - the two created vouchers took AlterID and MasterID 2 and 3, in request order;
+  - no row was found for the refused one.
+- **Between two identical Journals:** `CREATED 2, EXCEPTIONS 1`, `LASTVCHID` 5. The lab read,
+  without committing the reads, that both identical vouchers had a row.
+- **In all three:** all seven counters present, and `COMBINED` and `LASTMID` 0.
+
+So `EXCEPTIONS` counted the refused voucher for this cause too. Each request, as Bridge rendered it,
+and each answer is preserved byte for byte as a test fixture (`import_post_partial_landing_*`).
+Bridge's own span, mark and verification reads of these 2026-11-11 posts were not kept as bytes and
+are not committed.
+
+**Refused voucher first, and last, of three Journals: PARTIAL, one run each.** The second-of-three
+post was run again, and then with the refused voucher first and with it last, on 2026-11-12
+(TallyPrime 7.2, single-user edition, a synthetic book with accounts integrated with inventory; rows
+R0, R1 and R2 of #1108).
+
+- In all three the import answer is byte-identical to the second-of-three answer above:
+  `CREATED 2, EXCEPTIONS 1`, `LASTVCHID` 3.
+- The voucher mark stepped from 1 to 3 and the master mark stayed at 213.
+- The verification read after each post held exactly the two other vouchers, with AlterID and
+  MasterID 2 and 3, and no row for the refused one, whichever position it had.
+
+For these three posts the requests and Bridge's own mark and verification reads are committed, under
+`tests/fixtures/agent/partial-landing-rows/` of the protocol crate; its `PROVENANCE.md` says what was
+changed in the bytes.
+
+Not measured: two refusals, a refusal of one of two identical vouchers, another release, and a
+multi-user edition.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 

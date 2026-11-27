@@ -350,6 +350,9 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readRoot = (path) => readFileSync(join(root, path), "utf8");
 const AUDIT_TOML = readRoot(".cargo/audit.toml");
+// The file the eleven-id report was captured beside, kept byte for byte: it still accepts
+// RUSTSEC-2026-0459, which the real file no longer does (see scripts/fixtures/README.md).
+const ACCEPTED_TOML = readRoot("scripts/fixtures/cargo-audit-config-0459-accepted.toml");
 const ACCEPTED_REPORT = JSON.parse(readRoot("scripts/fixtures/cargo-audit-report-0459-accepted.json"));
 const REPORTED_REPORT = JSON.parse(readRoot("scripts/fixtures/cargo-audit-report-0459-reported.json"));
 const ACCEPTED_ID = "RUSTSEC-2026-0459";
@@ -395,33 +398,49 @@ test("an empty or unparseable report file fails as a failed audit", () => {
   assert.deepEqual(parseReport("captured", text), ACCEPTED_REPORT);
 });
 
-test("every entry in the real file carries its date, and the accepted vulnerability names its issue", () => {
+test("every entry in the real file carries its date, and agrees with the report captured from it", () => {
   const entries = entriesFromAuditToml(AUDIT_TOML);
+  assert.deepEqual(
+    entries.map((e) => e.id),
+    acceptedFromReport(REPORTED_REPORT),
+  );
+  for (const e of entries) assert.match(e.review_by ?? "", /^\d{4}-\d{2}-\d{2}$/, e.id);
+  assert.ok(!entries.some((e) => e.id === ACCEPTED_ID), "the real file no longer accepts RUSTSEC-2026-0459");
+  // Five ids under one comment block share its date.
+  const unic = entries.filter((e) => e.id.startsWith("RUSTSEC-2025-"));
+  assert.equal(unic.length, 5);
+  assert.ok(unic.every((e) => e.review_by === "2026-12-15"));
+  assert.deepEqual(unic.map((e) => e.shared), [false, true, true, true, true]);
+  assert.deepEqual(acceptedEntries([REPORTED_REPORT], AUDIT_TOML), entries);
+});
+
+test("in the file the accepted report was captured beside, the accepted vulnerability names its issue", () => {
+  const entries = entriesFromAuditToml(ACCEPTED_TOML);
   assert.deepEqual(
     entries.map((e) => e.id),
     acceptedFromReport(ACCEPTED_REPORT),
   );
   for (const e of entries) assert.match(e.review_by ?? "", /^\d{4}-\d{2}-\d{2}$/, e.id);
   assert.deepEqual(entries.find((e) => e.id === ACCEPTED_ID), entry(ACCEPTED_ID, "2026-12-09", 2432));
-  // Five ids under one comment block share its date.
-  const unic = entries.filter((e) => e.id.startsWith("RUSTSEC-2025-"));
-  assert.equal(unic.length, 5);
-  assert.ok(unic.every((e) => e.review_by === "2026-12-15"));
-  assert.deepEqual(unic.map((e) => e.shared), [false, true, true, true, true]);
-  assert.deepEqual(acceptedEntries([ACCEPTED_REPORT], AUDIT_TOML), entries);
+  assert.deepEqual(acceptedEntries([ACCEPTED_REPORT], ACCEPTED_TOML), entries);
 });
 
 test("the file and the report disagreeing fails the run, whichever side has the extra id", () => {
-  // In the file, not the report: the captured report from master's file.
+  // In the file, not the report: the eleven-id file against the report captured from the ten-id one.
   assert.throws(
-    () => acceptedEntries([REPORTED_REPORT], AUDIT_TOML),
+    () => acceptedEntries([REPORTED_REPORT], ACCEPTED_TOML),
     /disagree \(only in the file: RUSTSEC-2026-0459; only in the report: none\)/,
   );
-  // In the report, not the file: the same file without that entry.
-  const start = AUDIT_TOML.indexOf("  # --- RUSTSEC-2026-0459 --");
-  const end = AUDIT_TOML.indexOf(`"${ACCEPTED_ID}",`) + `"${ACCEPTED_ID}",`.length;
+  // In the report, not the file: the real file, which dropped that entry, against the eleven-id report.
+  assert.throws(
+    () => acceptedEntries([ACCEPTED_REPORT], AUDIT_TOML),
+    /disagree \(only in the file: none; only in the report: RUSTSEC-2026-0459\)/,
+  );
+  // The same, from the eleven-id file with that entry cut out.
+  const start = ACCEPTED_TOML.indexOf("  # --- RUSTSEC-2026-0459 --");
+  const end = ACCEPTED_TOML.indexOf(`"${ACCEPTED_ID}",`) + `"${ACCEPTED_ID}",`.length;
   assert.ok(start > 0 && end > start);
-  const without = AUDIT_TOML.slice(0, start) + AUDIT_TOML.slice(end);
+  const without = ACCEPTED_TOML.slice(0, start) + ACCEPTED_TOML.slice(end);
   assert.ok(!entriesFromAuditToml(without).some((e) => e.id === ACCEPTED_ID));
   assert.throws(
     () => acceptedEntries([ACCEPTED_REPORT], without),
@@ -487,7 +506,7 @@ test("a new, a removed and a renewed entry are each named once in one comment", 
 // what it wrote, finds nothing moved, and makes no call at all.
 test("a re-run after a create or an update posts nothing", () => {
   const findings = findingsFromReport(ACCEPTED_REPORT);
-  const accepted = acceptedEntries([ACCEPTED_REPORT], AUDIT_TOML);
+  const accepted = acceptedEntries([ACCEPTED_REPORT], ACCEPTED_TOML);
   const created = fakeRun([]);
   apply(planAction(findings, null, accepted), created);
   const body = created.calls[0][created.calls[0].indexOf("--body") + 1];
@@ -534,11 +553,13 @@ test("ids sharing one comment block share its date, and two reports must each ag
   assert.equal(zbus.length, 3);
   assert.ok(zbus.every((e) => e.review_by === "2027-04-18" && e.issue === null));
   assert.deepEqual(zbus.map((e) => e.shared), [false, true, true]);
-  assert.deepEqual(acceptedEntries([ACCEPTED_REPORT, ACCEPTED_REPORT], AUDIT_TOML), entries);
-  assert.throws(() => acceptedEntries([ACCEPTED_REPORT, REPORTED_REPORT], AUDIT_TOML), /only in the file: RUSTSEC-2026-0459/);
+  assert.deepEqual(acceptedEntries([REPORTED_REPORT, REPORTED_REPORT], AUDIT_TOML), entries);
+  const accepted = entriesFromAuditToml(ACCEPTED_TOML);
+  assert.deepEqual(acceptedEntries([ACCEPTED_REPORT, ACCEPTED_REPORT], ACCEPTED_TOML), accepted);
+  assert.throws(() => acceptedEntries([ACCEPTED_REPORT, REPORTED_REPORT], ACCEPTED_TOML), /only in the file: RUSTSEC-2026-0459/);
   // An id the report repeats is still one id.
   const repeated = { settings: { ignore: [...ACCEPTED_REPORT.settings.ignore, ACCEPTED_ID] } };
-  assert.deepEqual(acceptedEntries([repeated], AUDIT_TOML), entries);
+  assert.deepEqual(acceptedEntries([repeated], ACCEPTED_TOML), accepted);
 });
 
 test("a recorded line naming the same entries twice repairs silently, and bad rows are not echoed", () => {
@@ -592,11 +613,11 @@ test("an id under another entry's comment is shown as sharing it, and an id with
 
   // An id added straight under RUSTSEC-2026-0459's entry borrows its date and
   // issue: it is named as sharing them, in the body and in the comment.
-  const added = AUDIT_TOML.replace(`"${ACCEPTED_ID}",\n`, `"${ACCEPTED_ID}",\n  "RUSTSEC-2099-0001",\n`);
-  assert.notEqual(added, AUDIT_TOML);
+  const added = ACCEPTED_TOML.replace(`"${ACCEPTED_ID}",\n`, `"${ACCEPTED_ID}",\n  "RUSTSEC-2099-0001",\n`);
+  assert.notEqual(added, ACCEPTED_TOML);
   const after = entriesFromAuditToml(added);
   assert.deepEqual(after.find((e) => e.id === "RUSTSEC-2099-0001"), entry("RUSTSEC-2099-0001", "2026-12-09", 2432, true));
-  const before = entriesFromAuditToml(AUDIT_TOML);
+  const before = entriesFromAuditToml(ACCEPTED_TOML);
   const plan = planAction([], { number: 2320, ids: [], accepted: before }, after);
   assert.equal(updateComment(plan), "Scheduled audit update -- newly accepted in .cargo/audit.toml: RUSTSEC-2099-0001 (shares the entry above).");
   assert.match(issueBody([], after), /^- `RUSTSEC-2099-0001` -- review-by 2026-12-09, #2432 \(shares the entry above\)$/m);

@@ -246,7 +246,8 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
         TallyDate::parse("20260331").unwrap(),
     )
     .unwrap();
-    let report_request = render_native_stock_summary_request(LAB, &period);
+    let report_request =
+        render_native_stock_summary_request(&ValidatedCompanyName::new(LAB).unwrap(), &period);
     assert_eq!(
         report_request,
         utf16le(
@@ -257,8 +258,12 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
     // report name differs.
     assert_eq!(
         report_request,
-        render_native_statement_request(NativeStatementKind::BalanceSheet, LAB, &period)
-            .replace("Balance Sheet", "Stock Summary")
+        render_native_statement_request(
+            NativeStatementKind::BalanceSheet,
+            &ValidatedCompanyName::new(LAB).unwrap(),
+            &period
+        )
+        .replace("Balance Sheet", "Stock Summary")
     );
     let company = ValidatedCompanyName::new(LAB).unwrap();
     let range = ValidatedDateRange::new("20250401", "20260331").unwrap();
@@ -271,14 +276,17 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
         utf16le(&include_bytes!("../tests/fixtures/stock_items_fy_request.utf16le.xml")[..])
     );
     assert_eq!(
-        render_company_inventory_flags_request(LAB, &company_guid(COMPANY)),
+        render_company_inventory_flags_request(&company, &company_guid(COMPANY)),
         utf16le(
             &include_bytes!("../tests/fixtures/company_inventory_flags_request.utf16le.xml")[..]
         )
     );
     // The same three requests as sent for the company with no stock item.
     assert_eq!(
-        render_native_stock_summary_request(EMPTY_BOOK_LAB, &period),
+        render_native_stock_summary_request(
+            &ValidatedCompanyName::new(EMPTY_BOOK_LAB).unwrap(),
+            &period
+        ),
         utf16le(
             &include_bytes!(
                 "../tests/fixtures/stock_summary_report_empty_book_fy_request.utf16le.xml"
@@ -297,7 +305,7 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
         )
     );
     assert_eq!(
-        render_company_inventory_flags_request(EMPTY_BOOK_LAB, &company_guid(EMPTY_BOOK)),
+        render_company_inventory_flags_request(&company, &company_guid(EMPTY_BOOK)),
         utf16le(
             &include_bytes!(
                 "../tests/fixtures/company_inventory_flags_empty_book_request.utf16le.xml"
@@ -309,7 +317,7 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
     let lab = ValidatedCompanyName::new(LAB).unwrap();
     let sent_and_kept: [(String, &[u8]); 6] = [
         (
-            render_native_stock_summary_request(LAB, &period),
+            render_native_stock_summary_request(&ValidatedCompanyName::new(LAB).unwrap(), &period),
             include_bytes!("../tests/fixtures/stock_summary_report_fy_request.utf16le.xml"),
         ),
         (
@@ -321,11 +329,14 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
             include_bytes!("../tests/fixtures/stock_items_fy_request.utf16le.xml"),
         ),
         (
-            render_company_inventory_flags_request(LAB, &company_guid(COMPANY)),
+            render_company_inventory_flags_request(&lab, &company_guid(COMPANY)),
             include_bytes!("../tests/fixtures/company_inventory_flags_request.utf16le.xml"),
         ),
         (
-            render_native_stock_summary_request(EMPTY_BOOK_LAB, &period),
+            render_native_stock_summary_request(
+                &ValidatedCompanyName::new(EMPTY_BOOK_LAB).unwrap(),
+                &period,
+            ),
             include_bytes!(
                 "../tests/fixtures/stock_summary_report_empty_book_fy_request.utf16le.xml"
             ),
@@ -339,7 +350,7 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
             include_bytes!("../tests/fixtures/stock_items_empty_book_fy_request.utf16le.xml"),
         ),
         (
-            render_company_inventory_flags_request(EMPTY_BOOK_LAB, &company_guid(EMPTY_BOOK)),
+            render_company_inventory_flags_request(&company, &company_guid(EMPTY_BOOK)),
             include_bytes!(
                 "../tests/fixtures/company_inventory_flags_empty_book_request.utf16le.xml"
             ),
@@ -362,7 +373,10 @@ fn the_flags_request_cannot_be_built_with_a_guid_that_could_break_its_formula_an
     for guid in ["", "abc\" OR 1", "a b", "ab;c", "ab\u{fc}", "a\"b"] {
         assert!(CompanyGuid::parse(guid).is_err(), "{guid:?}");
     }
-    let request = render_company_inventory_flags_request("A & <B>", &company_guid(COMPANY));
+    let request = render_company_inventory_flags_request(
+        &ValidatedCompanyName::new("A & <B>").unwrap(),
+        &company_guid(COMPANY),
+    );
     assert!(request.contains("<SVCURRENTCOMPANY>A &amp; &lt;B&gt;</SVCURRENTCOMPANY>"));
 }
 
@@ -2597,7 +2611,10 @@ fn the_nested_books_requests_are_the_builders_bytes_for_that_company() {
     let range = ValidatedDateRange::new("20250401", "20260331").unwrap();
     let sent_and_kept: [(String, &[u8]); 3] = [
         (
-            render_native_stock_summary_request(NESTED_LAB, &period),
+            render_native_stock_summary_request(
+                &ValidatedCompanyName::new(NESTED_LAB).unwrap(),
+                &period,
+            ),
             include_bytes!(
                 "../tests/fixtures/stock_summary_report_nested_lab_fy_request.utf16le.xml"
             ),
@@ -2611,7 +2628,7 @@ fn the_nested_books_requests_are_the_builders_bytes_for_that_company() {
             include_bytes!("../tests/fixtures/stock_items_nested_lab_fy_request.utf16le.xml"),
         ),
         (
-            render_company_inventory_flags_request(NESTED_LAB, &company_guid(NESTED_COMPANY)),
+            render_company_inventory_flags_request(&company, &company_guid(NESTED_COMPANY)),
             include_bytes!(
                 "../tests/fixtures/company_inventory_flags_nested_lab_request.utf16le.xml"
             ),
@@ -2733,7 +2750,7 @@ fn the_month_end_requests_are_the_builders_bytes_for_each_book_and_date() {
                 }
                 .render(),
             ),
-            sent(&render_native_stock_summary_request(company, &period)),
+            sent(&render_native_stock_summary_request(&name, &period)),
         )
     };
     let kept: [(&str, &str, &[u8], &[u8]); 4] = [
@@ -2787,7 +2804,7 @@ fn the_month_end_requests_are_the_builders_bytes_for_each_book_and_date() {
     }
     assert_eq!(
         sent(&render_company_inventory_flags_request(
-            TIEOUT_D_LAB,
+            &ValidatedCompanyName::new(TIEOUT_D_LAB).unwrap(),
             &company_guid(TIEOUT_D_COMPANY)
         )),
         include_bytes!("../tests/fixtures/company_inventory_flags_tieout_d_request.utf16le.xml")

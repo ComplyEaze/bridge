@@ -524,6 +524,9 @@ base revision.
 <a id="12a33-in-one-grown-state-of-tallys-rate-answer-the-build-without-the-rate-row-change-refused-the-test-invoice-and-the-build-with-it-admitted-it-partial"></a>
 
 [12a.33 In one grown state of Tally's rate answer, the build without the rate-row change refused the test invoice and the build with it admitted it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a33-in-one-grown-state-of-tallys-rate-answer-the-build-without-the-rate-row-change-refused-the-test-invoice-and-the-build-with-it-admitted-it-partial)
+<a id="12a34-ledger-outstandings-reads-a-ledgername-holding-measured-marks-as-that-ledger-when-no-other-ledger-shares-its-letters-and-digits-partial"></a>
+
+[12a.34 Ledger Outstandings reads a LedgerName holding measured marks as that ledger when no other ledger shares its letters and digits (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a34-ledger-outstandings-reads-a-ledgername-holding-measured-marks-as-that-ledger-when-no-other-ledger-shares-its-letters-and-digits-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

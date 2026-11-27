@@ -110,7 +110,7 @@ fn a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is() 
     let unreadable: ReadVoucher = serde_json::from_value(unreadable).unwrap();
     assert_eq!(
         review_preview(BATCH, MARKER, "Books", &doubt(), &unreadable),
-        Err("ack_readback_not_matched".to_string())
+        Err(ImportAckCode::ReadbackNotMatched)
     );
 }
 
@@ -146,7 +146,7 @@ fn each_review_cap_refuses_on_its_own() {
     ];
     for (cap, voucher, doubt, company) in cases {
         let preview = review_preview(BATCH, MARKER, company, &doubt, &voucher);
-        assert_eq!(preview, Err("ack_review_too_large".to_string()), "{cap}");
+        assert_eq!(preview, Err(ImportAckCode::ReviewTooLarge), "{cap}");
         let rendered = render_review_text(BATCH, MARKER, company, &doubt, &voucher).unwrap();
         assert_eq!(caps_exceeded(&rendered), [cap], "{cap}: only its own cap");
     }
@@ -159,7 +159,7 @@ fn a_review_too_long_to_show_is_refused_not_truncated() {
     assert!(review_preview(BATCH, MARKER, "Books", &doubt(), &row(9, "Paid")).is_ok());
     assert_eq!(
         review_preview(BATCH, MARKER, "Books", &doubt(), &row(40, "Paid")),
-        Err("ack_review_too_large".to_string())
+        Err(ImportAckCode::ReviewTooLarge)
     );
 }
 
@@ -169,10 +169,10 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
     // a CR LF, a line separator (U+2028), a zero-width space and a
     // right-to-left override.
     for (bad, code) in [
-        ("\r\n", "ack_review_layout_text"),
-        ("\u{2028}", "ack_review_layout_text"),
-        ("\u{200B}", "ack_review_format_text"),
-        ("\u{202E}", "ack_review_format_text"),
+        ("\r\n", ImportAckCode::ReviewLayoutText),
+        ("\u{2028}", ImportAckCode::ReviewLayoutText),
+        ("\u{200B}", ImportAckCode::ReviewFormatText),
+        ("\u{202E}", ImportAckCode::ReviewFormatText),
     ] {
         let text = format!("Pa{bad}id");
         let mut ledger = row_json(2, "Paid");
@@ -214,7 +214,7 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
                 review_preview(BATCH, MARKER, "Books", &doubt(), &typed),
             ),
         ] {
-            assert_eq!(preview, Err(code.to_string()), "{source} with {bad:?}");
+            assert_eq!(preview, Err(code), "{source} with {bad:?}");
         }
     }
 }
@@ -268,7 +268,7 @@ fn a_long_narration_is_reviewed_in_quoted_parts_under_the_heading() {
             &row(2, &format!("{} (2) end", "word ".repeat(20)))
         )
         .unwrap_err(),
-        "ack_review_layout_text"
+        ImportAckCode::ReviewLayoutText
     );
 }
 
@@ -455,7 +455,7 @@ fn each_readback_guard_refuses_on_its_own_even_under_posted_verified() {
         *row.pointer_mut(pointer).unwrap() = value.clone();
         assert_eq!(
             admit(row),
-            Err("ack_readback_not_matched".to_string()),
+            Err(ImportAckCode::ReadbackNotMatched),
             "{pointer} = {value}"
         );
     }
@@ -527,7 +527,10 @@ fn a_review_names_its_doubt_and_two_doubts_need_a_name() {
         (DoubtKind::Masters, doubt()),
         (DoubtKind::BatchStep, doubt()),
     ];
-    assert_eq!(select_doubt(None, &both), Err("ack_doubt_ambiguous"));
+    assert_eq!(
+        select_doubt(None, &both),
+        Err(ImportAckCode::DoubtAmbiguous)
+    );
     assert_eq!(
         select_doubt(Some(DoubtKind::BatchStep), &both),
         Ok(DoubtKind::BatchStep)
@@ -545,7 +548,7 @@ fn a_review_names_its_doubt_and_two_doubts_need_a_name() {
     ];
     assert_eq!(
         select_doubt(None, &masters_unavailable),
-        Err("ack_doubt_ambiguous")
+        Err(ImportAckCode::DoubtAmbiguous)
     );
     // The mirror: a masters doubt with its file, beside a step doubt without.
     let step_unavailable_beside = [
@@ -554,7 +557,7 @@ fn a_review_names_its_doubt_and_two_doubts_need_a_name() {
     ];
     assert_eq!(
         select_doubt(None, &step_unavailable_beside),
-        Err("ack_doubt_ambiguous")
+        Err(ImportAckCode::DoubtAmbiguous)
     );
     // Both held only by the check record: no name could be reviewed, so the
     // choice itself refuses as unavailable, not as ambiguous.
@@ -564,7 +567,7 @@ fn a_review_names_its_doubt_and_two_doubts_need_a_name() {
     ];
     assert_eq!(
         select_doubt(None, &both_unavailable),
-        Err("ack_doubt_record_unavailable")
+        Err(ImportAckCode::DoubtRecordUnavailable)
     );
     let step_unavailable = [
         (DoubtKind::Masters, NoDoubt),
@@ -579,7 +582,7 @@ fn a_review_names_its_doubt_and_two_doubts_need_a_name() {
     assert_eq!(select_doubt(None, &single), Ok(DoubtKind::Masters));
     assert_eq!(
         select_doubt(Some(DoubtKind::BatchStep), &single),
-        Err("ack_no_observed_doubt")
+        Err(ImportAckCode::NoObservedDoubt)
     );
     // None observed: the kind whose record says why is the one refused.
     let pending = [
@@ -628,17 +631,17 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
         admit_review(imports.path(), &line, payload, rows, kind, None).err()
     };
     assert_eq!(
-        refused(&verified(2), &rows, DoubtKind::BatchStep).as_deref(),
-        Some("ack_readback_not_matched")
+        refused(&verified(2), &rows, DoubtKind::BatchStep),
+        Some(ImportAckCode::ReadbackNotMatched)
     );
     assert_eq!(
-        refused(&verified(3), &rows[..2], DoubtKind::BatchStep).as_deref(),
-        Some("ack_readback_not_matched")
+        refused(&verified(3), &rows[..2], DoubtKind::BatchStep),
+        Some(ImportAckCode::ReadbackNotMatched)
     );
     // No masters doubt is recorded, so a masters review has nothing to cover.
     assert_eq!(
-        refused(&verified(3), &rows, DoubtKind::Masters).as_deref(),
-        Some("ack_no_observed_doubt")
+        refused(&verified(3), &rows, DoubtKind::Masters),
+        Some(ImportAckCode::NoObservedDoubt)
     );
     // A check the review's own read finished as a masters doubt whose file
     // could not be written: refused after that read, and never read as no
@@ -650,8 +653,8 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
     )
     .unwrap();
     assert_eq!(
-        refused(&verified(3), &rows, DoubtKind::Masters).as_deref(),
-        Some("ack_doubt_record_unavailable")
+        refused(&verified(3), &rows, DoubtKind::Masters),
+        Some(ImportAckCode::DoubtRecordUnavailable)
     );
 }
 
@@ -699,10 +702,8 @@ fn the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read() {
         .collect::<Vec<_>>();
     let wide = wide.iter().collect::<Vec<_>>();
     assert_eq!(
-        batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &wide)
-            .err()
-            .as_deref(),
-        Some("ack_review_too_large")
+        batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &wide).err(),
+        Some(ImportAckCode::ReviewTooLarge)
     );
     // The dates run first to last, whatever order the vouchers were read in.
     let mut dated = batch_rows(&line);
@@ -971,9 +972,8 @@ fn a_step_doubt_without_its_step_reads_unreadable() {
             DoubtKind::BatchStep,
             None,
         )
-        .err()
-        .as_deref(),
-        Some("ack_step_record_unreadable")
+        .err(),
+        Some(ImportAckCode::StepRecordUnreadable)
     );
     // Control: with its step, the same file is a doubt with no review yet.
     fs::write(&step_doubt, STEP_DOUBT).unwrap();
@@ -1099,15 +1099,15 @@ fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
     let doubt = || MastersRecord::Doubt {
         raw: b"{}".to_vec(),
     };
-    let cases: [([MastersRecord; 2], Result<(), &str>); 6] = [
-        ([doubt(), doubt()], Err("ack_doubt_ambiguous")),
+    let cases: [([MastersRecord; 2], Result<(), ImportAckCode>); 6] = [
+        ([doubt(), doubt()], Err(ImportAckCode::DoubtAmbiguous)),
         (
             [doubt(), DoubtRecordUnavailable],
-            Err("ack_doubt_ambiguous"),
+            Err(ImportAckCode::DoubtAmbiguous),
         ),
         (
             [DoubtRecordUnavailable, DoubtRecordUnavailable],
-            Err("ack_doubt_record_unavailable"),
+            Err(ImportAckCode::DoubtRecordUnavailable),
         ),
         ([NoDoubt, doubt()], Ok(())),
         ([Pending, doubt()], Ok(())),
@@ -1123,9 +1123,9 @@ fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
 /// size and is refused beyond it, never the other way round. The largest preview
 /// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
 fn largest_fit(
-    build: impl Fn(usize) -> Result<String, String>,
+    build: impl Fn(usize) -> Result<String, ImportAckCode>,
     max_pad: usize,
-) -> (String, Option<String>) {
+) -> (String, Option<ImportAckCode>) {
     let (mut fit, mut refusal) = (None, None);
     for pad in 0..=max_pad {
         match build(pad) {
@@ -1184,7 +1184,7 @@ fn row_named(names: &[String], narration: &str, number: &str) -> ReadVoucher {
 /// A batch review of one voucher with `count` ledgers, in a company, whose names
 /// are `filler` letters of the lengths `lengths` gives: the company, then each
 /// ledger.
-fn batch_review_of(lengths: &[usize], filler: &str) -> Result<String, String> {
+fn batch_review_of(lengths: &[usize], filler: &str) -> Result<String, ImportAckCode> {
     let line = posted_batch(2);
     let step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
     let names: Vec<String> = (0..lengths.len() - 1)
@@ -1227,7 +1227,7 @@ fn a_batch_review_fits_at_exactly_3200_characters_and_not_one_more() {
     let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 27 * 100);
     assert_eq!(fit.chars().count(), 3_200, "{fit}");
     assert_eq!(fit.lines().count(), 40, "{fit}");
-    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+    assert_eq!(refusal, Some(ImportAckCode::ReviewTooLarge));
 }
 
 /// The batch review's 7,000-byte cap binds before its character cap when the
@@ -1240,7 +1240,7 @@ fn a_batch_review_of_three_byte_names_is_refused_past_7000_bytes() {
     let fits = |lengths: &[usize]| batch_review_of(lengths, "न");
     let caps = field_caps(27, |lengths| fits(lengths).is_ok());
     let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 27 * 100);
-    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+    assert_eq!(refusal, Some(ImportAckCode::ReviewTooLarge));
     let bytes = fit.len();
     assert!(bytes <= 7_000 && bytes + 3 > 7_000, "{bytes} bytes");
     assert!(
@@ -1252,7 +1252,7 @@ fn a_batch_review_of_three_byte_names_is_refused_past_7000_bytes() {
 
 /// One single review whose fields have the lengths `lengths` gives: the company,
 /// nine entry ledgers, the narration, the voucher number and the doubted ledger.
-fn single_review_of(lengths: &[usize]) -> Result<String, String> {
+fn single_review_of(lengths: &[usize]) -> Result<String, ImportAckCode> {
     let names: Vec<String> = (0..9)
         .map(|entry| name_of(entry, lengths[1 + entry], "N"))
         .collect();
@@ -1285,7 +1285,7 @@ fn a_single_review_fits_at_exactly_1600_characters_and_not_one_more() {
     );
     assert_eq!(fit.chars().count(), 1_600, "{fit}");
     assert!(fit.lines().all(|line| line.chars().count() <= 100), "{fit}");
-    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+    assert_eq!(refusal, Some(ImportAckCode::ReviewTooLarge));
 }
 
 /// A native post carries no tag: its reviewed row is the one with the GUID and
@@ -1340,7 +1340,7 @@ fn only_a_batch_of_several_vouchers_can_name_a_step_doubt() {
     };
     assert_eq!(
         select_doubt(Some(DoubtKind::BatchStep), &states(1)),
-        Err("ack_no_observed_doubt")
+        Err(ImportAckCode::NoObservedDoubt)
     );
     assert_eq!(
         select_doubt(Some(DoubtKind::BatchStep), &states(2)),
@@ -1390,14 +1390,14 @@ async fn a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded()
     let missing = imports.path().join("missing").join("record.json");
     assert_eq!(
         write_record_once(&missing, b"{}", approve().await),
-        Err("import_file_write_failed".to_string())
+        Err(ImportAckCode::ImportFileWriteFailed)
     );
     // Control: a name that holds a record keeps it, and reads as recorded.
     let held = imports.path().join("record.json");
     fs::write(&held, b"before").unwrap();
     assert_eq!(
         write_record_once(&held, b"{}", approve().await),
-        Err("ack_already_recorded".to_string())
+        Err(ImportAckCode::AlreadyRecorded)
     );
     assert_eq!(fs::read(&held).unwrap(), b"before");
 }
@@ -1435,7 +1435,7 @@ fn a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more() {
     let (fit, refusal) = largest_fit(|pad| batch_review_of(&[1 + pad, 1], "N"), 100);
     let widest = fit.lines().map(|line| line.chars().count()).max();
     assert_eq!(widest, Some(100), "{fit}");
-    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+    assert_eq!(refusal, Some(ImportAckCode::ReviewTooLarge));
 }
 
 /// A masters record larger than `MAX_RECORD_BYTES` is unreadable, `Err(())`,
@@ -1556,11 +1556,7 @@ fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
             review_preview(BATCH, MARKER, "Books", &doubt(), &numbered),
         ),
     ] {
-        assert_eq!(
-            preview,
-            Err("ack_review_layout_text".to_string()),
-            "{source}"
-        );
+        assert_eq!(preview, Err(ImportAckCode::ReviewLayoutText), "{source}");
     }
 }
 
@@ -1656,7 +1652,7 @@ fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
             &masters,
             &plain_rows
         ),
-        Err("ack_review_layout_text".to_string())
+        Err(ImportAckCode::ReviewLayoutText)
     );
     for (value, spoil) in [
         (
@@ -1673,7 +1669,7 @@ fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
         let rows = rows.iter().collect::<Vec<_>>();
         assert_eq!(
             batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows),
-            Err("ack_review_layout_text".to_string()),
+            Err(ImportAckCode::ReviewLayoutText),
             "{value}"
         );
     }

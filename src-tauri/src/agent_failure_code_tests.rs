@@ -187,6 +187,52 @@ const TIE_OUT: &[(TieOutCode, &str)] = &[
     ),
 ];
 
+const IMPORT_ACK: &[(ImportAckCode, &str)] = &[
+    (ImportAckCode::NoObservedDoubt, "ack_no_observed_doubt"),
+    (
+        ImportAckCode::DoubtRecordUnavailable,
+        "ack_doubt_record_unavailable",
+    ),
+    (ImportAckCode::DoubtAmbiguous, "ack_doubt_ambiguous"),
+    (ImportAckCode::CheckPending, "ack_check_pending"),
+    (
+        ImportAckCode::MastersRecordUnreadable,
+        "ack_masters_record_unreadable",
+    ),
+    (
+        ImportAckCode::StepRecordUnreadable,
+        "ack_step_record_unreadable",
+    ),
+    (ImportAckCode::ResponseNotClean, "ack_response_not_clean"),
+    (
+        ImportAckCode::ReadbackNotMatched,
+        "ack_readback_not_matched",
+    ),
+    (ImportAckCode::ReviewTooLarge, "ack_review_too_large"),
+    (ImportAckCode::ReviewLayoutText, "ack_review_layout_text"),
+    (ImportAckCode::ReviewFormatText, "ack_review_format_text"),
+    (
+        ImportAckCode::RecordedReviewStale,
+        "ack_recorded_review_stale",
+    ),
+    (ImportAckCode::AlreadyRecorded, "ack_already_recorded"),
+    (
+        ImportAckCode::ImportFileWriteFailed,
+        "import_file_write_failed",
+    ),
+    (ImportAckCode::ImportBatchNotFound, "import_batch_not_found"),
+    (ImportAckCode::BatchNotPosted, "ack_batch_not_posted"),
+    (ImportAckCode::DoubtInvalid, "ack_doubt_invalid"),
+    (
+        ImportAckCode::ChangedWhileReviewing,
+        "ack_changed_while_reviewing",
+    ),
+    (
+        ImportAckCode::ProofSerializationFailed,
+        "proof_serialization_failed",
+    ),
+];
+
 const BANK_STATEMENT: &[(BankStatementCode, &str)] = &[
     (BankStatementCode::TaskFailed, "statement_task_failed"),
     (
@@ -660,6 +706,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(COMPANY_READ),
         of(CENSUS_REUSE),
         of(E_INVOICE_READBACK),
+        of(IMPORT_ACK),
         of(BANK_STATEMENT),
         of(MASTER_POST),
     ]
@@ -701,6 +748,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("CompanyReadCode", CompanyReadCode::ALL),
         of("CensusReuseCode", CensusReuseCode::ALL),
         of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
+        of("ImportAckCode", ImportAckCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("MasterPostCode", MasterPostCode::ALL),
     ];
@@ -750,7 +798,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        23,
+        24,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -785,6 +833,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(MASTER_POST), MasterPostCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
+    assert_eq!(variants(IMPORT_ACK), ImportAckCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -831,6 +880,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(MASTER_POST, MasterPostCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
+    check_pins(IMPORT_ACK, ImportAckCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -851,9 +901,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 5].iter().sum();
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 19, 5].iter().sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 5].iter().sum();
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 19, 5].iter().sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

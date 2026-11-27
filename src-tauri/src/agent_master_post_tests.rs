@@ -1260,6 +1260,27 @@ fn the_stock_read_and_recheck_are_reached_only_through_the_two_stock_tools() {
         // registered tool's dispatch arm.
         ("self.prepare_stock_item(", &[("agent.rs", 1)]),
         ("self.post_stock_item(", &[("agent.rs", 1)]),
+        // Their bare names, so a caller written another way (through another
+        // receiver, `Self::` or a path) is counted too: the catalog's entries,
+        // the gate and dispatch arm, the post tool list, and the module's
+        // definitions, notes and the texts that name the tool.
+        (
+            "prepare_stock_item",
+            &[
+                ("agent.rs", 4),
+                ("agent_catalog.rs", 11),
+                ("agent_master_stock_tools.rs", 2),
+            ],
+        ),
+        (
+            "post_stock_item",
+            &[
+                ("agent.rs", 4),
+                ("agent_catalog.rs", 7),
+                ("agent_master_stock_tools.rs", 8),
+                ("agent_protocol.rs", 1),
+            ],
+        ),
         // The in-queue stock recheck and the stock intent writer: their one
         // caller is the stock post.
         (

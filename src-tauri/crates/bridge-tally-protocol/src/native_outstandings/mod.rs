@@ -17,7 +17,7 @@
 //! - `party_bills` — one party's open bills through `Ledger Outstandings`,
 //!   tied to its ledger's closing (#2377).
 //! - `party_name` — the party name that report's `LedgerName` variable
-//!   admits: the marks the lab read there (#2480).
+//!   admits: the marks, and the places of each, the lab read there (#2480).
 //! - `compute` — assembles the report and the unallocated residual
 //!   cross-check.
 
@@ -51,8 +51,8 @@ pub use party_bills::{
     PartyBillReference, PartyBillsAnswer, PartyBillsAnswerError, PartyBillsRead, PartyBillsRefusal,
 };
 pub use party_name::{
-    LedgerOutstandingsParty, LedgerOutstandingsPartyError, MEASURED_DEVANAGARI,
-    MEASURED_FORMULA_WORDS, MEASURED_MARKS,
+    LedgerOutstandingsParty, LedgerOutstandingsPartyError, Neighbour, MARKED_NAME_MAX_CHARS,
+    MEASURED_DEVANAGARI_WORD, MEASURED_FORMULA_WORDS, MEASURED_MARKS, MEASURED_MARK_PLACES,
 };
 pub use request::{
     ledger_guid_filter_parts, parent_filter_parts, render_company_base_currency_request,

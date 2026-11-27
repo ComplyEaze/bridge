@@ -129,17 +129,16 @@ fn the_word_and_is_read() {
     reads_as_its_own_ledger("ns", "op", "BRIDGE Ns Ok and Om", "0229");
 }
 
-/// The one Devanagari word read holds each of the six characters admitted, and
-/// no other.
+/// The one Devanagari word read is the word admitted, whole.
 #[test]
 fn the_devanagari_word_is_read() {
     let name = "BRIDGE Ns \u{0909}\u{0926}\u{093E}\u{0939}\u{0930}\u{0923}";
-    let devanagari = name.chars().filter(|c| !c.is_ascii()).collect::<Vec<_>>();
-    assert_eq!(devanagari, MEASURED_DEVANAGARI);
+    let devanagari = name.chars().filter(|c| !c.is_ascii()).collect::<String>();
+    assert_eq!(devanagari, MEASURED_DEVANAGARI_WORD);
     reads_as_its_own_ledger("ns", "sc", name, "0231");
 }
 
-/// Three of the mixed names the lab read: the Devanagari word beside two
+/// The three mixed names kept, of the twenty rows NC and MX read: the Devanagari word beside two
 /// marks, every first-row mark with `and`, and all seventeen marks in one name.
 #[test]
 fn names_that_mix_measured_marks_are_read() {
@@ -275,10 +274,227 @@ fn each_refusal_has_its_own_code() {
         LedgerOutstandingsPartyError::Spacing,
         LedgerOutstandingsPartyError::UnmeasuredMark('<'),
         LedgerOutstandingsPartyError::UnmeasuredFormulaWord("or"),
+        LedgerOutstandingsPartyError::UnmeasuredPosition('&'),
+        LedgerOutstandingsPartyError::MarkedNameTooLong,
     ]
     .map(LedgerOutstandingsPartyError::code);
     let mut sorted = codes.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 5);
+    assert_eq!(sorted.len(), 7);
+}
+
+/// The names every kept request sent, as Tally read them: the text of each
+/// request's `LedgerName`, with its XML escapes undone.
+fn kept_names() -> Vec<String> {
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(FIXTURES).expect("fixture directory") {
+        let file = entry.expect("entry").file_name();
+        let file = file.to_str().expect("a UTF-8 file name");
+        if !(file.starts_with("ledger-outstandings-2480-")
+            && file.ends_with(".request.utf16le.xml"))
+        {
+            continue;
+        }
+        let request = capture(file);
+        let [_, rest] = request.split("<LedgerName>").collect::<Vec<_>>()[..] else {
+            panic!("{file} holds one LedgerName");
+        };
+        let [text, _] = rest.split("</LedgerName>").collect::<Vec<_>>()[..] else {
+            panic!("{file} closes its LedgerName once");
+        };
+        assert!(!text.contains("&#"), "{file} holds no character reference");
+        names.push(
+            text.replace("&quot;", "\"")
+                .replace("&apos;", "'")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&"),
+        );
+    }
+    names.sort();
+    names
+}
+
+/// What stands beside a mark in a kept name, read here apart from the type.
+fn beside(character: Option<char>) -> Neighbour {
+    match character {
+        None => Neighbour::Edge,
+        Some(' ') => Neighbour::Space,
+        Some(c) if c.is_ascii_alphabetic() => Neighbour::Letter,
+        Some(c) if c.is_ascii_digit() => Neighbour::Digit,
+        Some(c) => panic!("a kept name holds {c:?} beside a mark"),
+    }
+}
+
+/// The rule is exactly what the kept captures show: each of their names is
+/// admitted, the placings it admits are the placings those names hold, and
+/// its length cap is their longest. A rule wider or narrower than the
+/// evidence fails here.
+#[test]
+fn the_rule_is_the_shapes_the_kept_captures_show() {
+    let names = kept_names();
+    assert_eq!(names.len(), 23, "every kept request is read");
+    let mut places = std::collections::BTreeSet::new();
+    for name in &names {
+        assert!(
+            crate::ledger_scope::LedgerScopeName::new(name).is_err(),
+            "{name:?} needs this type"
+        );
+        assert_eq!(
+            LedgerOutstandingsParty::new(name).map(|party| party.as_str().to_string()),
+            Ok(name.clone()),
+            "{name:?}"
+        );
+        assert!(
+            name.starts_with(|c: char| c.is_ascii_alphabetic()),
+            "{name:?}"
+        );
+        let characters = name.chars().collect::<Vec<_>>();
+        for (at, mark) in characters.iter().copied().enumerate() {
+            if MEASURED_MARKS.contains(&mark) {
+                let before = at.checked_sub(1).map(|before| characters[before]);
+                places.insert((
+                    mark,
+                    beside(before),
+                    beside(characters.get(at + 1).copied()),
+                ));
+            }
+        }
+    }
+    assert_eq!(
+        places,
+        MEASURED_MARK_PLACES.into_iter().collect(),
+        "the admitted placings are the kept ones"
+    );
+    for mark in MEASURED_MARKS {
+        assert!(
+            places.iter().any(|(placed, ..)| *placed == mark),
+            "{mark:?}"
+        );
+    }
+    assert_eq!(
+        names.iter().map(|name| name.chars().count()).max(),
+        Some(MARKED_NAME_MAX_CHARS)
+    );
+    let words = names
+        .iter()
+        .flat_map(|name| {
+            let words = name.split(' ').collect::<Vec<_>>();
+            let last = words.len() - 1;
+            words
+                .into_iter()
+                .enumerate()
+                .map(move |(at, word)| (at, at == last, word.to_string()))
+        })
+        .collect::<Vec<_>>();
+    assert!(words
+        .iter()
+        .any(|(at, last, word)| *at > 0 && !*last && word == "and"));
+    assert!(words
+        .iter()
+        .any(|(at, _, word)| *at > 0 && word == MEASURED_DEVANAGARI_WORD));
+}
+
+/// A measured mark where no kept name holds it, or a name that starts other
+/// than with a letter, is refused by that character.
+#[test]
+fn a_mark_out_of_its_measured_place_is_refused_by_that_mark() {
+    for (name, mark) in [
+        ("&Ak Am", '&'),
+        ("Ak Am&", '&'),
+        ("Ak &Am", '&'),
+        ("Ak& Am", '&'),
+        ("Ak #Am", '#'),
+        ("Ak#12", '#'),
+        ("Ak %15", '%'),
+        ("Ak 15 % Am", '%'),
+        ("Ak - Am", '-'),
+        ("Ak-12", '-'),
+        ("Ak!!", '!'),
+        ("Ak...", '.'),
+        ("Ak \"Am\"", '"'),
+        ("Ak (Am)", ')'),
+        ("Ak' Am", '\''),
+        ("Ak 's Am", '\''),
+        ("Ak,Am", ','),
+        ("Ak:Am", ':'),
+        ("Ak_ Am", '_'),
+        ("Ak +Am", '+'),
+        ("Ak*Am", '*'),
+        ("Ak @Am", '@'),
+        ("Ak/ Am", '/'),
+        ("-Ak Am", '-'),
+        ("2023-24 Ak", '2'),
+        ("15% Ak", '1'),
+        ("(Ak) Am", '('),
+    ] {
+        assert_eq!(
+            LedgerOutstandingsParty::new(name),
+            Err(LedgerOutstandingsPartyError::UnmeasuredPosition(mark)),
+            "{name:?}"
+        );
+    }
+}
+
+/// `and` was read only as a word of its own between two others.
+#[test]
+fn and_is_refused_first_last_or_beside_a_mark() {
+    for name in [
+        "and Ak",
+        "Ak and",
+        "Ak and, Am",
+        "Ak/and Am",
+        "Ak (and) Am",
+        "Ak and-Am Co",
+        "Ak and.",
+        "Ak & and",
+    ] {
+        assert_eq!(
+            LedgerOutstandingsParty::new(name),
+            Err(LedgerOutstandingsPartyError::UnmeasuredFormulaWord("and")),
+            "{name:?}"
+        );
+    }
+    assert!(LedgerOutstandingsParty::new("Ak and Am & Co").is_ok());
+}
+
+/// Devanagari was read only as the one whole word, after another word.
+#[test]
+fn devanagari_other_than_the_whole_word_read_is_refused() {
+    let word = MEASURED_DEVANAGARI_WORD;
+    let reversed = word.chars().rev().collect::<String>();
+    let part = word.chars().skip(1).collect::<String>();
+    for (name, character) in [
+        (format!("Ak {part}"), '\u{0926}'),
+        (format!("Ak {reversed}"), '\u{0923}'),
+        (format!("Ak {word}s"), '\u{0909}'),
+        (format!("Ak{word}"), '\u{0909}'),
+        (format!("Ak {word}{word}"), '\u{0909}'),
+        (format!("Ak {word}&Am"), '&'),
+        (format!("{word} Ak"), '\u{0909}'),
+    ] {
+        assert_eq!(
+            LedgerOutstandingsParty::new(&name),
+            Err(LedgerOutstandingsPartyError::UnmeasuredPosition(character)),
+            "{name:?}"
+        );
+    }
+    assert!(LedgerOutstandingsParty::new(&format!("Ak {word} Am")).is_ok());
+}
+
+/// A marked name is held to the longest marked name read; a plain name keeps
+/// the narrower type's limit.
+#[test]
+fn a_marked_name_longer_than_any_read_is_refused() {
+    let longest = format!("Ak{}", " & Ak".repeat(14));
+    assert_eq!(longest.chars().count(), MARKED_NAME_MAX_CHARS);
+    assert!(LedgerOutstandingsParty::new(&longest).is_ok());
+    assert_eq!(
+        LedgerOutstandingsParty::new(&format!("{longest}m")),
+        Err(LedgerOutstandingsPartyError::MarkedNameTooLong)
+    );
+    let plain = format!("Ak{}", " Am".repeat(40));
+    assert!(plain.chars().count() > MARKED_NAME_MAX_CHARS);
+    assert!(LedgerOutstandingsParty::new(&plain).is_ok());
 }

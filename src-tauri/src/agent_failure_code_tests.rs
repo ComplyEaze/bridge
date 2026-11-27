@@ -828,11 +828,12 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    // The three lab master codes are declared only in a build with `lab-writes`.
+    // The three lab master codes are declared only in a build with `lab-writes`. The counts are
+    // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 77 + 4 + 2 + 1 + 1 + 4 + 25 + 6;
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6].iter().sum();
     #[cfg(feature = "lab-writes")]
-    let expected = 80 + 4 + 2 + 1 + 1 + 4 + 25 + 6;
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6].iter().sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

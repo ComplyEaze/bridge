@@ -506,6 +506,24 @@ failure_codes! {
     }
 }
 
+failure_codes! {
+    /// The refusals of the import journal's readers and writers.
+    pub(crate) enum ImportLedgerCode {
+        /// A journal record or its place in the journal is invalid.
+        Invalid = "import_ledger_invalid",
+        /// One persisted request digest names more than one batch.
+        BatchDigestAmbiguous = "import_batch_digest_ambiguous",
+        /// The journal's bytes could not be read.
+        Unavailable = "import_ledger_unavailable",
+        /// A batch has more than one dispatch intent.
+        DuplicateDispatch = "import_ledger_duplicate_dispatch",
+        /// A journal record could not be serialized.
+        SerializationFailed = "import_ledger_serialization_failed",
+        /// A journal record exceeds the byte bound.
+        RecordTooLarge = "import_ledger_record_too_large",
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_failure_code_tests.rs"]
 mod tests;

@@ -26,13 +26,21 @@
 //! and refuses a name an open stock dispatch holds. Then it asks and holds the
 //! person's approval as the ledger post does, takes it, and sends the one
 //! Create through the shared queue with the stock recheck and the stock intent
-//! writer. It reads nothing back: its answer is NOT verified, and it records no
-//! answer from Tally.
+//! writer. Then, as the ledger post does, it records Tally's answer, reads the
+//! book back through the same read, judges it (the stock journal's `verdict`
+//! module holds the table), records the verdict and answers by it. A later call
+//! on a batch whose send is recorded reads back and judges the same way, under
+//! the observation lease, and never verifies; a settled batch is answered from
+//! the journal alone. A send that failed is answered with no read.
 use super::super::master_ledger::read_stock_item_journal;
 use super::super::master_ledger::stock_item_journal::{
-    record_stock_item_intent, StockIntentRefusal, StockItemBatch,
+    record_stock_item_intent, Answer, StockIntentRefusal, StockItemBatch, StockJudgement,
+    StockReadBack,
 };
-use super::super::master_ledger::JournalRecord;
+use super::super::master_ledger::{
+    JournalBatchState, JournalRecord, MasterVerdict, MasterVerdictState,
+};
+use super::super::master_post::aim_master_marks;
 use super::super::master_post::StockItemRecheckError;
 use super::super::master_post::{recheck_stock_item_for_dispatch, stock_company_marks};
 use super::super::master_review::{show_stock_item_draft, ShownStockItem};
@@ -49,14 +57,28 @@ use crate::tally::runtime::{
 use crate::tally::stock_item_create::{
     CompleteStockItemCatalogue, GoodsSibling, SiblingGst, StockItemDraft,
 };
+use crate::tally::stock_item_verified::StockItemImportOutcome;
 
 /// What a caller is told after a stock item is prepared. It names no tool: none
 /// posts a stock item yet.
 const PREPARED_STOCK_NEXT_STEP: &str = "Nothing was written to Tally. This stock item is recorded for approval; the local user must approve it in a native dialog before it is created.";
 
-/// What a caller is told after the one stock-item Create was sent: nothing
-/// reads it back yet.
+/// What a caller is told after the one stock-item Create was answered and the
+/// book could not be read back at all.
 const POSTED_STOCK_NOTE: &str = "Tally answered the one stock item create (any counters it gave are here), but ComplyEaze Bridge has not read the stock item back: it is NOT verified. Check the stock item in Tally before relying on it, and never post this batch again.";
+/// Added when Tally's answer could not be recorded either.
+const STOCK_ANSWER_UNRECORDED: &str = " Tally's answer is not on file: keep the counters this answer reports, the only record of them.";
+/// Added when the verdict could not be recorded.
+const STOCK_VERDICT_UNRECORDED: &str = " ComplyEaze Bridge could not record this verdict: a later call for this batch_id reads the book back again and sends nothing.";
+const VERIFIED_NOTE: &str = "ComplyEaze Bridge read the book back after the one create: exactly one new stock item of this name, with the parent, unit, GST details and HSN details as sent; no stock item that existed before changed; the company's master mark moved by exactly one; and no other loaded company's master mark moved.";
+const VERIFIED_STEP: &str =
+    "Nothing more is needed for this stock item. Do not post this batch again.";
+const UNCONFIRMED_NOTE: &str =
+    "The book could not be read back, so the stock item is NOT verified.";
+const OPEN_NOTE: &str =
+    "The read-back did not settle the outcome (see the reasons): the stock item is NOT verified.";
+/// The step for either open state. A later call cannot verify the item.
+const OPEN_STEP: &str = "Check the stock item in Tally against the reasons given. A later call for this batch_id reads the book back and sends nothing, but it cannot verify this stock item, and the name stays held meanwhile. Do not create the stock item in Tally by hand, and never post this batch again.";
 /// The step after a send of a stock batch, by this call or an earlier one.
 const STOCK_NEXT_STEP: &str = "Check the company's stock items in Tally before relying on this one. Do not post this batch again, and do not create the stock item in Tally by hand meanwhile.";
 /// A stock batch this call did not send, a send of which is recorded.
@@ -175,11 +197,9 @@ impl Server {
         if !valid_batch_id(batch_id) {
             return Err(MasterPostCode::BatchIdInvalid.into());
         }
-        let state = (self.read_kind_journal_shared(read_stock_item_journal)?)
-            .state(batch_id)
-            .cloned()
-            .ok_or(MasterPostCode::BatchNotFound)?;
-        let batch = state.batch;
+        let journal = self.read_kind_journal_shared(read_stock_item_journal)?;
+        let state = (journal.state(batch_id).cloned()).ok_or(MasterPostCode::BatchNotFound)?;
+        let batch = state.batch.clone();
         let guid = batch.company().guid.clone();
         let mut accumulated = carried.unwrap_or_else(empty_evidence);
         let operation: Result<Step, ToolFailure> = async {
@@ -191,9 +211,8 @@ impl Server {
                     batch_id,
                     "batch_already_dispatched",
                 );
-                let code = UnderLockRefusal::AlreadyAttempted.code();
-                let sent = stock_sent(batch_id, &guid, accumulated.clone(), code, Some(true));
-                return Ok(Step::Done(Box::new(sent)));
+                let reconciled = self.reconcile_stock_batch(&journal, &state, accumulated.clone());
+                return Ok(Step::Done(Box::new(reconciled.await)));
             }
             let target = ApprovalTarget {
                 tool: "post_stock_item",
@@ -300,20 +319,12 @@ impl Server {
                     evidence_from_runtime_read(read.clone()),
                 );
             }
-            let outcome = bridge_tally_protocol::parse_import_outcome(&posted.body).ok();
-            let counters = reported_counters(outcome.as_ref());
+            let sha256 = &posted.response_evidence.response_sha256;
+            let mut payload =
+                (self.answer_stock_send(&batch, &identity, &posted.body, sha256)).await;
+            payload["result"]["preview"] = json!(preview);
             Ok(Step::Done(Box::new(ToolOutcome {
-                payload: json!({"result": {
-                    "batch_id": batch_id,
-                    "state": "posted_unverified",
-                    "attempt_recorded": true,
-                    "dispatch": {"state": "dispatched", "resent": false},
-                    "counters": counters_json(counters.as_ref()),
-                    "verification": {"attempted": false},
-                    "preview": preview,
-                    "note": POSTED_STOCK_NOTE,
-                    "next_step": STOCK_NEXT_STEP,
-                }}),
+                payload,
                 evidence: accumulated.clone(),
                 company_guid: Some(guid.clone()),
                 truncated: false,
@@ -349,6 +360,245 @@ impl Server {
                 attempted,
             ))),
         }
+    }
+}
+
+impl Server {
+    /// After the one Create was answered: the answer recorded once, then the
+    /// book read back and judged with it in hand. Else NOT verified.
+    async fn answer_stock_send(
+        &self,
+        batch: &StockItemBatch,
+        identity: &VerifiedCompanyIdentity,
+        body: &str,
+        response_sha256: &str,
+    ) -> Value {
+        let outcome = bridge_tally_protocol::parse_import_outcome(body).ok();
+        let counters = reported_counters(outcome.as_ref());
+        let response = MasterDispatchResponse {
+            batch_id: batch.batch_id().to_string(),
+            batch_sha256: batch.batch_sha256().to_string(),
+            response_sha256: response_sha256.to_string(),
+            counters,
+        };
+        // Tried once here, and once more under the verdict's lock if it failed.
+        let data_dir = &self.settings.data_dir;
+        let appended = ExclusiveAdmission::acquire(data_dir).and_then(|lock| {
+            let record = JournalRecord::<StockItemBatch>::DispatchResponse(response.clone());
+            append(data_dir, &lock, record).map_err(|error| error.code().to_string())
+        });
+        let answer = Answer::Posted(outcome.as_ref().map(StockItemImportOutcome::of));
+        let unrecorded = appended.is_err().then_some(&response);
+        let code = match self.read_kind_journal_after_answer(read_stock_item_journal) {
+            Ok(journal) => match journal.state(batch.batch_id()) {
+                Some(state) if state.intent.is_some() => {
+                    let verified =
+                        self.verify_stock_batch(&journal, state, identity, &answer, unrecorded);
+                    return verified.await;
+                }
+                _ => "master_batch_not_found".to_string(),
+            },
+            Err(code) => code,
+        };
+        let mut result = json!({
+            "batch_id": batch.batch_id(),
+            "state": "posted_unverified",
+            "attempt_recorded": true,
+            "answer_recorded": appended.is_ok(),
+            "dispatch": {"state": "dispatched", "resent": false},
+            "counters": counters_json(counters.as_ref()),
+            "verification": {"attempted": false, "error": {"code": code}},
+            "note": POSTED_STOCK_NOTE,
+            "next_step": STOCK_NEXT_STEP,
+        });
+        if let Err(code) = &appended {
+            result["verification"]["answer_record_error"] = json!(code);
+            result["next_step"] = json!(format!("{STOCK_NEXT_STEP}{STOCK_ANSWER_UNRECORDED}"));
+        }
+        json!({ "result": result })
+    }
+
+    /// A later call on a sent batch: a settled one is answered from the journal
+    /// alone; an open one is read back under the observation lease and judged.
+    async fn reconcile_stock_batch(
+        &self,
+        journal: &Journal<StockItemBatch>,
+        state: &JournalBatchState<StockItemBatch>,
+        mut evidence: Evidence,
+    ) -> ToolOutcome {
+        let (batch_id, guid) = (state.batch.batch_id(), &state.batch.company().guid);
+        if let Some(verdict) = (state.verdict.as_ref()).filter(|_| state.is_settled()) {
+            return stock_journal_report(state, verdict, evidence);
+        }
+        // As the ledger's reconcile: nothing is read while another process is
+        // dispatching on this endpoint. Unlike it, no verdict is written then.
+        let _observation = match dispatch_lease::acquire_observation(&self.settings.endpoint) {
+            Ok(lease) => lease,
+            Err(code) => return stock_sent(batch_id, guid, evidence, &code, Some(true)),
+        };
+        let identity = match self.verified_company(guid).await {
+            Ok((company, identity, identity_evidence)) => {
+                evidence = combine_evidence(evidence.clone(), identity_evidence);
+                if !same_company(&company.name, &identity, state.batch.company()) {
+                    let code = "company_identity_mismatch";
+                    return stock_sent(batch_id, guid, evidence, code, Some(true));
+                }
+                identity
+            }
+            Err(failure) => return stock_sent(batch_id, guid, evidence, &failure.code, Some(true)),
+        };
+        let verified = self.verify_stock_batch(journal, state, &identity, &Answer::Later, None);
+        ToolOutcome {
+            payload: verified.await,
+            evidence,
+            company_guid: Some(guid.clone()),
+            truncated: false,
+        }
+    }
+
+    /// Reads the book back, judges it, records the verdict and answers.
+    /// `unrecorded` is Tally's answer when its first append failed.
+    async fn verify_stock_batch(
+        &self,
+        journal: &Journal<StockItemBatch>,
+        state: &JournalBatchState<StockItemBatch>,
+        identity: &VerifiedCompanyIdentity,
+        answer: &Answer,
+        unrecorded: Option<&MasterDispatchResponse>,
+    ) -> Value {
+        let read_back = StockReadBack::of(
+            &self.settings.data_dir,
+            journal,
+            state.batch.batch_id(),
+            identity,
+        );
+        let judged = match stock_marks(identity) {
+            Ok(marks) => {
+                (self.runtime)
+                    .read_and_recheck_stock_item(
+                        self.tally_config(),
+                        identity,
+                        marks,
+                        stock_company_marks,
+                        |reads| {
+                            // Judged here, on this execution's own reads.
+                            let (candidate, _, _, at_binding, at_aim) = reads.into_parts();
+                            let catalogue = CompleteStockItemCatalogue::from_admitted(&candidate);
+                            let parsed = (catalogue.ok())
+                                .zip(aim_master_marks(&at_binding).ok())
+                                .zip(aim_master_marks(&at_aim).ok());
+                            Ok(match parsed {
+                                Some(((catalogue, binding), aim)) => {
+                                    let fresh = (&binding[..], &aim[..], catalogue.catalogue());
+                                    ("read", read_back.judge(answer, Some(fresh)))
+                                }
+                                None => ("unparsed", read_back.judge(answer, None)),
+                            })
+                        },
+                    )
+                    .await
+            }
+            Err(failure) => Err(anyhow::anyhow!(failure.code)),
+        };
+        let (status, judgement) =
+            judged.unwrap_or_else(|_| ("failed", read_back.judge(answer, None)));
+        // Tally's answer first when it is still unrecorded, then the verdict.
+        let verdict = MasterVerdict::stock(&state.batch, &judgement);
+        let mut answer_recorded = state.response.is_some();
+        let read = read_stock_item_journal;
+        let verdict =
+            self.append_kind_under_lock(state, verdict, unrecorded, &mut answer_recorded, read);
+        let recorded = (verdict, answer_recorded);
+        let counters = match (unrecorded, &state.response) {
+            (Some(response), _) | (None, Some(response)) => response.counters,
+            (None, None) => None,
+        };
+        let moment = matches!(answer, Answer::Posted(_)).then_some("after_post");
+        let status = json!({ "state": status });
+        stock_verification_result(state, &judgement, status, &recorded, moment, counters)
+    }
+}
+
+/// The answer on a judged stock batch, with the ledger answer's field names;
+/// verified only once the verdict is recorded. `moment` is `Some` at the post.
+fn stock_verification_result(
+    state: &JournalBatchState<StockItemBatch>,
+    judgement: &StockJudgement,
+    read_back: Value,
+    (verdict, answer_recorded): &(Result<bool, String>, bool),
+    moment: Option<&str>,
+    counters: Option<MasterCounters>,
+) -> Value {
+    use MasterVerdictState::{MastersAfterPostUnconfirmed as Unconfirmed, PostedVerified};
+    let judged = judgement.state();
+    let verified = judged == PostedVerified;
+    let (reported, note, step) = match judged {
+        PostedVerified if verdict.is_ok() => ("posted_verified", VERIFIED_NOTE, VERIFIED_STEP),
+        PostedVerified => ("posted_unverified", POSTED_STOCK_NOTE, STOCK_NEXT_STEP),
+        Unconfirmed => (verdict_state_code(judged), UNCONFIRMED_NOTE, OPEN_STEP),
+        _ => (verdict_state_code(judged), OPEN_NOTE, OPEN_STEP),
+    };
+    let mut next_step = step.to_string();
+    if verdict.is_err() && !verified {
+        next_step.push_str(STOCK_VERDICT_UNRECORDED);
+    }
+    if moment.is_some() && !answer_recorded {
+        next_step.push_str(STOCK_ANSWER_UNRECORDED);
+    }
+    let mut result = json!({
+        "batch_id": state.batch.batch_id(),
+        "state": reported,
+        "attempt_recorded": true,
+        "answer_recorded": answer_recorded,
+        "dispatch": {"state": "dispatched", "resent": false},
+        "verification": {
+            "moment": moment.unwrap_or("reconcile"),
+            "settled": verified && verdict.is_ok(),
+            "guid": judgement.guid(),
+            "reasons": judgement.reasons(),
+            "read_back": read_back,
+            "verdict_recorded": verdict.is_ok(),
+            "verdict_written": matches!(verdict, Ok(true)),
+        },
+        "counters": counters_json(counters.as_ref()),
+        "next_step": next_step,
+        "note": note,
+    });
+    if let Err(code) = verdict {
+        result["verification"]["verdict_record_error"] = json!(code);
+    }
+    json!({ "result": result })
+}
+
+/// The stock journal's own account of a settled batch, with no read.
+fn stock_journal_report(
+    state: &JournalBatchState<StockItemBatch>,
+    verdict: &MasterVerdict,
+    evidence: Evidence,
+) -> ToolOutcome {
+    let judged = verdict.state();
+    let (note, next_step) = match judged {
+        MasterVerdictState::PostedVerified => (VERIFIED_NOTE, VERIFIED_STEP),
+        _ => (OPEN_NOTE, OPEN_STEP),
+    };
+    let counters = (state.response.as_ref()).and_then(|response| response.counters);
+    ToolOutcome {
+        payload: json!({"result": {
+            "batch_id": state.batch.batch_id(),
+            "state": verdict_state_code(judged),
+            "attempt_recorded": true,
+            "dispatch": {"state": "dispatched", "resent": false},
+            "journal": {
+                "response_recorded": state.response.is_some(),
+                "counters": counters_json(counters.as_ref()),
+                "verdict": verdict_state_code(judged),
+            },
+            "note": note,
+            "next_step": next_step,
+        }}),
+        evidence,
+        company_guid: Some(state.batch.company().guid.clone()),
+        truncated: false,
     }
 }
 

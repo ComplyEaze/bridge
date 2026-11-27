@@ -1,0 +1,1 @@
+- The approval test that cancels a post inside its lease now holds the lease read at the simulator until the cancel has withdrawn the post, rather than delaying its response by 300 milliseconds, and measures the post at no cost, so a slow runner no longer leaves the approval for a later call; the wait for a held dialog's answer is now bounded only as a hang guard (#2542, #2551).

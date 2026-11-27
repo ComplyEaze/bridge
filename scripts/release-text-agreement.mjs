@@ -5,11 +5,11 @@
 // (docs/release-process.md, release step 5 and "When a listing exists"). This module parses each such
 // statement once into a record and applies the rules to the records; scripts/release-text-agreement.test.mjs
 // holds the repository to them. Importing it reads no files and asks nobody over the network. Running it
-// with --published TAG reads the two spans and registry/server.json, then asks GitHub for the releases.
+// with --published TAG reads the two spans and registry/server.json, then asks GitHub which release is marked latest.
 //
 // The statements:
 //   - two marked spans, `managed:current-release` in README.md and `managed:latest-preview` in SECURITY.md,
-//     each naming a tag and a date: the newest PUBLISHED build;
+//     each naming a tag and a date: the newest PUBLISHED build (with --published, the release GitHub marks latest);
 //   - registry/server.json's `version`: the build the registry lists, moved with the spans;
 //   - README.md's "At a glance, release X", "release X installs" and "current development source is version
 //     `X`": the build in SOURCE, which the version pull request moves to the manifest's version.
@@ -107,8 +107,10 @@ export function problemsIn({ manifestVersion, readme, security, registryVersion 
   return problems;
 }
 
-// Only the first page of releases is read.
-const RELEASES_URL = "https://api.github.com/repos/ComplyEaze/bridge/releases?per_page=100";
+// GitHub's own latest marker: the release the repository's releases page opens on, and the one the spans'
+// /releases/latest link opens. It is never a draft or a pre-release, and it need not be the release with the
+// greatest publication time (an older line may receive a later patch, or the marker may be set by hand).
+const LATEST_URL = "https://api.github.com/repos/ComplyEaze/bridge/releases/latest";
 const INDIA_OFFSET_MS = (5 * 60 + 30) * 60_000;
 
 async function fetchOk(url) {
@@ -120,36 +122,32 @@ async function fetchOk(url) {
 }
 
 function unreadableRelease(detail) {
-  return new ReleaseTextError("github_unreadable", `GitHub's releases answer cannot be read: ${detail}`);
+  return new ReleaseTextError("github_unreadable", `GitHub's latest-release answer cannot be read: ${detail}`);
 }
 
-async function publishedReleases(fetchText) {
+async function latestRelease(fetchText) {
   let body;
   try {
-    body = await fetchText(RELEASES_URL);
+    body = await fetchText(LATEST_URL);
   } catch (error) {
-    throw new ReleaseTextError("github_unavailable", `Could not ask GitHub for the releases: ${error.message}`);
+    throw new ReleaseTextError("github_unavailable", `Could not ask GitHub for the latest release: ${error.message}`);
   }
-  let answer;
+  let release;
   try {
-    answer = JSON.parse(body);
+    release = JSON.parse(body);
   } catch {
     throw unreadableRelease("the body is not JSON");
   }
-  if (!Array.isArray(answer)) throw unreadableRelease("the body is not a list");
-
-  return answer.flatMap((release, index) => {
-    if (release === null || typeof release !== "object" || typeof release.tag_name !== "string" || release.tag_name.length === 0 || typeof release.draft !== "boolean" || typeof release.prerelease !== "boolean") {
-      throw unreadableRelease(`entry ${index} has no readable tag, draft flag or pre-release flag`);
-    }
-    // A draft has no publication time and cannot be the newest published release.
-    if (release.draft) return [];
-    const publishedAt = typeof release.published_at === "string" ? Date.parse(release.published_at) : NaN;
-    if (!Number.isFinite(publishedAt) || `${new Date(publishedAt).toISOString().slice(0, 19)}Z` !== release.published_at) {
-      throw unreadableRelease(`${release.tag_name} has no readable publication time`);
-    }
-    return [{ tag: release.tag_name, prerelease: release.prerelease, publishedAt, date: new Date(publishedAt + INDIA_OFFSET_MS).toISOString().slice(0, 10) }];
-  });
+  if (release === null || typeof release !== "object" || Array.isArray(release) || typeof release.tag_name !== "string" || release.tag_name.length === 0 || typeof release.draft !== "boolean" || typeof release.prerelease !== "boolean") {
+    throw unreadableRelease("it has no readable tag, draft flag or pre-release flag");
+  }
+  // GitHub never marks a draft latest; one here is an answer this check does not understand.
+  if (release.draft) throw unreadableRelease(`${release.tag_name} is a draft`);
+  const publishedAt = typeof release.published_at === "string" ? Date.parse(release.published_at) : NaN;
+  if (!Number.isFinite(publishedAt) || `${new Date(publishedAt).toISOString().slice(0, 19)}Z` !== release.published_at) {
+    throw unreadableRelease(`${release.tag_name} has no readable publication time`);
+  }
+  return { tag: release.tag_name, prerelease: release.prerelease, date: new Date(publishedAt + INDIA_OFFSET_MS).toISOString().slice(0, 10) };
 }
 
 // Throws github_unavailable or github_unreadable when GitHub cannot supply a readable answer, and
@@ -158,18 +156,13 @@ export async function checkPublished({ readme, security, registryVersion }, tag,
   const readmeSpan = parseSpan(readme, "current-release", "README.md");
   const securitySpan = parseSpan(security, "latest-preview", "SECURITY.md");
   const registry = parseVersion(registryVersion, "registry/server.json");
-  const releases = await publishedReleases(fetchText);
-  const newest = releases.reduce((latest, release) => latest === null || release.publishedAt > latest.publishedAt ? release : latest, null);
-  const requested = releases.find((release) => release.tag === tag);
+  const latest = await latestRelease(fetchText);
+  const requested = latest.tag === tag ? latest : undefined;
   const problems = [];
 
-  // No non-draft release is a readable answer that disagrees, not a failed request or an empty success.
-  if (newest?.tag !== tag) {
-    problems.push(newest === null
-      ? `GitHub has no non-draft release, so ${tag} is not the newest published release.`
-      : `GitHub's newest non-draft release is ${newest.tag}, not ${tag}.`);
-  }
-  if (requested?.prerelease) problems.push(`GitHub still marks ${tag} as a pre-release.`);
+  // A pre-release is never GitHub's latest, so a requested pre-release is reported here as "not latest".
+  if (latest.tag !== tag) problems.push(`GitHub's latest release is ${latest.tag}, not ${tag}.`);
+  if (latest.prerelease) problems.push(`GitHub marks ${latest.tag} as both latest and a pre-release.`);
   if (readmeSpan.tag !== tag) problems.push(`README.md names ${readmeSpan.tag}, not ${tag}.`);
   if (securitySpan.tag !== tag) problems.push(`SECURITY.md names ${securitySpan.tag}, not ${tag}.`);
   if (`mcp-v${registry.text}` !== tag) problems.push(`registry/server.json names mcp-v${registry.text}, not ${tag}.`);
@@ -179,7 +172,7 @@ export async function checkPublished({ readme, security, registryVersion }, tag,
     }
   }
   if (problems.length > 0) throw new ReleaseTextError("release_disagrees", problems.join("\n"));
-  return newest;
+  return latest;
 }
 
 // Disagreement is a completed check; every refusal to determine the answer is distinct for callers.

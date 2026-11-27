@@ -67,4 +67,5 @@ jobs:
         run: >-
           node scripts/audit-tracking-issue.mjs
           --report src-tauri/Cargo.lock=audit-report.json
+          --audit-config .cargo/audit.toml
           --apply

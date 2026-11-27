@@ -1,0 +1,4 @@
+# fixture: agent/movement-forexgroup-book-20250401.utf16le.xml
+# parser: parse_agent_changed_rows(FX_72_LAB)
+# source: captured
+Err("voucher_amount_invalid")

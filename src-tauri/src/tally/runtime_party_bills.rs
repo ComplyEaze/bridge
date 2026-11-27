@@ -12,13 +12,74 @@
 //! neither is told as "no open bills".
 use super::*;
 use crate::tally::connection::PartyBillsAnswerBody;
+use bridge_tally_core::master_binding::letters_and_digits_key;
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 use bridge_tally_protocol::native_outstandings::{
     parse_ledger_outstandings_answer, parse_native_ledger_snapshot_for_company,
-    render_ledger_outstandings_request, render_native_ledger_snapshot_request, LedgerSnapshotEntry,
+    render_ledger_outstandings_request, render_native_ledger_snapshot_request,
+    LedgerOutstandingsParty, LedgerOutstandingsPartyError, LedgerSnapshotEntry,
     NativeLedgerSnapshotPeriod, NativeLedgerSnapshotPeriodError, PartyBillsAnswer,
     PartyBillsAnswerError, PartyBillsRead, PartyBillsRefusal,
 };
+
+/// The party a `Ledger Outstandings` read is sent for (#2480): a name
+/// [`LedgerOutstandingsParty`] admits and, when [`LedgerScopeName`] would not admit it, the one
+/// ledger of the company's catalogue that has its letters-and-digits key, by any name that
+/// ledger answers to. Every name with a mark the lab read through this report was read where no
+/// other ledger shared that key (protocol reference §12a.34); a name the narrower type admits is
+/// admitted as it was before.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OpenBillsParty(LedgerOutstandingsParty);
+
+/// Why a party is not sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OpenBillsPartyRefusal {
+    Name(LedgerOutstandingsPartyError),
+    /// The number of catalogue ledgers with the name's letters-and-digits key is not one: another
+    /// ledger shares it, or (a catalogue that does not hold the party) none has it.
+    KeyShared,
+}
+
+impl OpenBillsPartyRefusal {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Name(refusal) => refusal.code(),
+            Self::KeyShared => "party_name_key_shared",
+        }
+    }
+}
+
+impl OpenBillsParty {
+    /// `ledgers` is the company's whole ledger catalogue, each ledger as every name it answers
+    /// to: its row spelling, its stored name and its aliases.
+    pub(crate) fn admit<'a, L, N>(name: &str, ledgers: L) -> Result<Self, OpenBillsPartyRefusal>
+    where
+        L: IntoIterator<Item = N>,
+        N: IntoIterator<Item = &'a str>,
+    {
+        let party = LedgerOutstandingsParty::new(name).map_err(OpenBillsPartyRefusal::Name)?;
+        if LedgerScopeName::new(name).is_err() {
+            let key = letters_and_digits_key(name);
+            let sharing = ledgers
+                .into_iter()
+                .map(|names| {
+                    names
+                        .into_iter()
+                        .any(|spelling| letters_and_digits_key(spelling) == key)
+                })
+                .filter(|shares| *shares)
+                .count();
+            if sharing != 1 {
+                return Err(OpenBillsPartyRefusal::KeyShared);
+            }
+        }
+        Ok(Self(party))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
 
 /// A party's open bills, tied to its ledger at `to`.
 pub(crate) struct PartyBillsLoad {
@@ -104,7 +165,7 @@ impl TallyRuntime {
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
-        party: LedgerScopeName,
+        party: OpenBillsParty,
         to: TallyDate,
     ) -> anyhow::Result<PartyBillsLoad> {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -140,7 +201,7 @@ impl TallyRuntime {
                         parse_native_ledger_snapshot_for_company(&xml, identity.company_guid());
 
                     let request =
-                        render_ledger_outstandings_request(identity.display_name(), &party, &to);
+                        render_ledger_outstandings_request(identity.display_name(), &party.0, &to);
                     let (body, bytes, hash) =
                         client.fetch_party_bills_paired(request.clone()).await?;
                     evidence = evidence

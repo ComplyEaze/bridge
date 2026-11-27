@@ -3095,6 +3095,28 @@ impl Server {
         Ok((resolvable_ledgers(&catalogue), evidence))
     }
 
+    /// The same catalogue read, with every name each ledger answers to (row spelling, stored
+    /// name and aliases), one list per ledger, for the `open_bills` key check (#2480).
+    pub(super) async fn read_resolvable_ledgers_with_names(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<
+        (
+            Vec<super::ledger_candidates::CatalogueLedger>,
+            Vec<Vec<String>>,
+            Evidence,
+        ),
+        ToolFailure,
+    > {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        let names = catalogue
+            .names_by_ledger()
+            .map(|names| names.into_iter().map(str::to_string).collect())
+            .collect();
+        Ok((resolvable_ledgers(&catalogue), names, evidence))
+    }
+
     /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
     /// (`None` when it returned none), for the group summaries of `vouchers` (#1230).
     pub(super) async fn read_ledger_parents(

@@ -1195,12 +1195,35 @@ async fn a_batch_posted_elsewhere_releases_its_hold() {
 /// arrives is not waited for: nothing is left to cancel, and its answer goes
 /// to the caller's assertions (#2093). One that has not ended within `bound`
 /// fails saying where it stood.
+///
+/// When `held` is given, it is the gate of the response the cancel follows:
+/// the response is let go only once the post has been withdrawn, so the cancel
+/// lands while that read is held, by event and not by a delay (#2542). The gate
+/// is opened however the wait ends, so that no read is left held.
 async fn post_over_stdio(
     server: &Server,
     args: &Value,
     cancel: Option<(&SequenceSimulator, usize)>,
+    held: Option<&tally_protocol_simulator::DeliveryGate>,
     bound: Duration,
 ) -> ToolCallEnd {
+    /// Opens the held response when the wait for the withdrawal ends.
+    struct Release<'a>(Option<&'a tally_protocol_simulator::DeliveryGate>);
+    impl Drop for Release<'_> {
+        fn drop(&mut self) {
+            if let Some(gate) = self.0 {
+                gate.open();
+            }
+        }
+    }
+    let withdrawn = || {
+        args["batch_id"].as_str().is_some_and(|batch_id| {
+            server
+                .post_approvals
+                .lapse_note(batch_id)
+                .is_some_and(|note| note["reason"] == "request_cancelled")
+        })
+    };
     let started = std::time::Instant::now();
     let ended = std::cell::Cell::new(false);
     let (client, source) = tokio::io::duplex(1 << 16);
@@ -1226,6 +1249,7 @@ async fn post_over_stdio(
         end
     };
     let canceller = async {
+        let _release = Release(held);
         if let Some((simulator, after)) = cancel {
             while simulator.received() <= after {
                 if ended.get() {
@@ -1234,6 +1258,11 @@ async fn post_over_stdio(
                 tokio::time::sleep(Duration::from_millis(2)).await;
             }
             client_write.write_all(CANCEL_7).await.unwrap();
+            if held.is_some() {
+                while !withdrawn() && !ended.get() {
+                    tokio::time::sleep(Duration::from_millis(2)).await;
+                }
+            }
         }
     };
     let Ok((outcome, ())) =
@@ -1241,10 +1270,11 @@ async fn post_over_stdio(
     else {
         panic!(
             "the post had not ended {:?} after it started (bound {bound:?}): the simulator had \
-             received {:?} requests, and the cancel was to follow request {:?}",
+             received {:?} requests, and the cancel was to follow request {:?}; withdrawn: {}",
             started.elapsed(),
             cancel.map(|(simulator, _)| simulator.received()),
             cancel.map(|(_, after)| after),
+            withdrawn(),
         );
     };
     outcome.unwrap()
@@ -1282,6 +1312,7 @@ async fn a_post_that_ends_before_the_held_request_is_not_waited_for() {
         &server,
         &args,
         Some((&simulator, never)),
+        None,
         Duration::from_secs(20),
     )
     .await;
@@ -1314,6 +1345,7 @@ async fn a_post_that_has_not_ended_within_its_bound_says_where_it_stood() {
         &server,
         &args,
         Some((&simulator, 0)),
+        None,
         Duration::from_millis(50),
     )
     .await;
@@ -1325,6 +1357,13 @@ async fn a_post_that_has_not_ended_within_its_bound_says_where_it_stood() {
 /// written and no POST is sent, and the approval lapses as cancelled. Run with
 /// each of the lease's reads before the POST held in turn. The control, the
 /// same run never cancelled, posts: so the cancellation is what stopped it.
+///
+/// The order is set by events (#2542): the held read's response is not sent
+/// until the simulator has received that request, the cancel has been sent
+/// and the post has been withdrawn. The post is measured at no cost, so the
+/// approval is posted in the call that answered it however long the reads
+/// before it took; with the measured cost, a runner whose reads ran past about
+/// 24 seconds kept the approval for a later call, and no lease was started.
 #[test]
 fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;
@@ -1333,20 +1372,26 @@ fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
         let lease_start = plans.len();
         let mut lease = after_approval(xml(created_one()));
         let post_at = lease_start + lease.len() - 1;
+        let gate = tally_protocol_simulator::DeliveryGate::new();
         if let Some(held_at) = held_at {
             lease[held_at] = lease[held_at]
                 .clone()
-                .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+                .with_delivery(Delivery::Held(gate.clone()));
         }
         plans.extend(lease);
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
-        let server = server_at(simulator.address(), directory.path());
+        let mut server = server_at(simulator.address(), directory.path());
+        server.post_approvals = std::sync::Arc::new(PostApprovals::with_measured_post(
+            directory.path(),
+            Duration::ZERO,
+        ));
         let (line, args) = saved_batch(&server);
         let outcome = post_over_stdio(
             &server,
             &args,
             held_at.map(|held_at| (&simulator, lease_start + held_at)),
+            held_at.map(|_| &gate),
             bound,
         )
         .await;

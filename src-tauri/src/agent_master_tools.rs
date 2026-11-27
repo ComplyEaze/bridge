@@ -1036,7 +1036,8 @@ impl Server {
     ) -> Result<RecordedIntent, BeforeDispatchError> {
         use BeforeDispatchError::{Other, Refused};
         let data_dir = &self.settings.data_dir;
-        let lock = ExclusiveAdmission::acquire(data_dir).map_err(Other)?;
+        let lock = ExclusiveAdmission::acquire_or_refuse(data_dir)
+            .map_err(|refusal| Refused(UnderLockRefusal::Admission(refusal)))?;
         let journal = read_journal(data_dir)
             .map_err(|_| Refused(UnderLockRefusal::MasterJournalUnavailable))?;
         // Each refusal below is made before any byte of the intent is written,

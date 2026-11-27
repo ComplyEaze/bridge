@@ -6,6 +6,7 @@ use super::{
     VOUCHER_CHECKPOINT_NOT_OBSERVED,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
+use crate::tally::approved_import::AdmissionLockRefusal;
 use crate::tally::standard_ledger_catalog::{
     admit_standard_ledger_catalog_request, parse_import_ledger_catalog_response,
     parse_standard_ledger_catalog_response,
@@ -3720,14 +3721,7 @@ impl Server {
     }
 
     pub(super) fn lock_import_admission(&self) -> Result<std::fs::File, String> {
-        let path = self.settings.data_dir.join("agent-import-admission.lock");
-        let file = super::local_file::open_local_file(&path, true)
-            .map_err(|_| "import_admission_lock_unavailable".to_string())?;
-        // Never park the async request loop behind another process's network
-        // work. Contention is an in-band refusal, not a deferred posting request.
-        file.try_lock().map_err(import_admission_lock_error)?;
-        persistence::require_settled(&self.settings.data_dir.join("imports"))?;
-        Ok(file)
+        admit_exclusively(&self.settings.data_dir).map_err(|refusal| refusal.code().to_string())
     }
 
     fn lock_import_admission_shared(&self) -> Result<std::fs::File, String> {
@@ -4207,6 +4201,24 @@ fn validate_dispatched_import_endpoint(
         return Err("import_post_endpoint_mismatch".into());
     }
     Ok(())
+}
+
+/// The import admission lock of `data_dir`, taken exclusively. Never park the
+/// async request loop behind another process's network work: the lock is tried
+/// once, and contention is an in-band refusal, not a deferred posting request.
+/// No refusal has written the import journal: the lock file is opened and
+/// tried, and unsettled publications checked (`persistence::settled`), and
+/// nothing else is done.
+fn admit_exclusively(data_dir: &Path) -> Result<std::fs::File, AdmissionLockRefusal> {
+    let path = data_dir.join("agent-import-admission.lock");
+    let file = super::local_file::open_local_file(&path, true)
+        .map_err(|_| AdmissionLockRefusal::Unavailable)?;
+    file.try_lock().map_err(|error| match error {
+        std::fs::TryLockError::WouldBlock => AdmissionLockRefusal::Busy,
+        std::fs::TryLockError::Error(_) => AdmissionLockRefusal::Unavailable,
+    })?;
+    persistence::settled(&data_dir.join("imports")).map_err(AdmissionLockRefusal::Unsettled)?;
+    Ok(file)
 }
 
 fn append_private_import_ledger(

@@ -1326,9 +1326,13 @@ impl Server {
                     |()| {
                         // The file lock covers only the admission+synced append. It is not
                         // held over approval or network I/O. A competing process loses here.
-                        let _lock = self
-                            .lock_import_admission()
-                            .map_err(BeforeDispatchError::Other)?;
+                        // Its refusal is named: it comes before any byte of
+                        // the intent is written.
+                        let _lock = super::admit_exclusively(&self.settings.data_dir).map_err(
+                            |refusal| {
+                                BeforeDispatchError::Refused(UnderLockRefusal::Admission(refusal))
+                            },
+                        )?;
                         let current = self
                             .import_snapshot_while_admitted(Some(batch_id))
                             .map_err(BeforeDispatchError::Other)?
@@ -2172,6 +2176,11 @@ const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port wa
 /// (#2142): nothing was posted, and the approval has lapsed.
 const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that did not finish. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
+/// What a caller does when another action of this computer held the import
+/// journal and the journal shows nothing was sent: the lock is tried once, so
+/// this is a retry of the same batch, never a rebuild.
+const ADMISSION_BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: another action of ComplyEaze Bridge held the import journal. Call post_import with this same batch again once that action has finished. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+
 /// What a caller does when the port was busy and whether the post was sent
 /// could not be observed.
 const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
@@ -2221,6 +2230,11 @@ fn reconciliation_failure_payload(
     if code == "import_txn_already_posted" {
         payload["result"]["error"]["message"] = json!("Nothing was sent: another batch of this company already sent, or was found to have posted, a row of this batch.");
         payload["result"]["error"]["next_step"] = json!(TXN_ALREADY_POSTED_NEXT_STEP);
+    }
+    // Only with nothing recorded: the same code after a send (its answer could
+    // not be journaled) is reconciled, never posted again.
+    if code == "import_admission_busy" && attempted == Some(false) {
+        payload["result"]["error"]["next_step"] = json!(ADMISSION_BUSY_BEFORE_ATTEMPT_NEXT_STEP);
     }
     if code == "invoice_company_stopped" {
         payload["result"]["error"]["message"] = json!("Nothing was sent: an earlier invoice of this company was sent to Tally and is not verified posted, so no further invoice is posted until a person decides about it.");

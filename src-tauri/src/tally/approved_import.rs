@@ -1272,6 +1272,34 @@ pub(crate) enum UnderLockRefusal {
     /// dialog (#2233). The field is the cause; nothing was recorded or sent.
     #[error("import_journal_split")]
     JournalSplit(&'static str),
+    /// The exclusive admission lock itself was refused, the first step under
+    /// it: nothing of the intent was written and nothing was sent.
+    #[error("{}", .0.code())]
+    Admission(AdmissionLockRefusal),
+}
+
+/// Why the exclusive admission lock was not taken. Taking it writes no journal,
+/// so each is decided before any byte of a dispatch intent is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AdmissionLockRefusal {
+    /// Another holder, shared (a read) or exclusive (a writer), has it now:
+    /// the lock is tried once and never waited for.
+    Busy,
+    /// The lock file could not be opened, or locking it failed otherwise.
+    Unavailable,
+    /// Taken, then given up because a publication left unsettled blocks
+    /// admission: the field is that refusal's code.
+    Unsettled(&'static str),
+}
+
+impl AdmissionLockRefusal {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Busy => "import_admission_busy",
+            Self::Unavailable => "import_admission_lock_unavailable",
+            Self::Unsettled(code) => code,
+        }
+    }
 }
 
 impl UnderLockRefusal {
@@ -1294,6 +1322,7 @@ impl UnderLockRefusal {
             Self::CompanyStopped => "invoice_company_stopped",
             Self::Transfers(reason) => reason,
             Self::JournalSplit(_) => "import_journal_split",
+            Self::Admission(refusal) => refusal.code(),
         }
     }
 }
@@ -1305,9 +1334,9 @@ mod dispatch_license;
 pub(crate) use dispatch_license::{DispatchLicense, RecordedIntent};
 
 /// Why `before_dispatch` refused. Only a named check made before the intent
-/// append is `Refused`; the lock, the journal read and the append itself are
-/// `Other`, which keeps the catch-all because the append may have recorded an
-/// intent (#711).
+/// append is `Refused`, the admission lock's own refusal among them; the
+/// journal reads and the append itself are `Other`, which keeps the catch-all
+/// because the append may have recorded an intent (#711).
 /// Built explicitly at each site: this file holds no conversion (the approval
 /// seam gate refuses any `impl From`).
 #[derive(Debug)]

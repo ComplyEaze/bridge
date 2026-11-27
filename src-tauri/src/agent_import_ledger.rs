@@ -1790,8 +1790,11 @@ fn scan_records_at(
             if matches!(update.record_type, StatusKind::DispatchResponse) {
                 let request_hash = dispatched
                     .get(&update.batch_id)
-                    .ok_or("import_ledger_invalid")?;
-                let response = update.response.as_ref().ok_or("import_ledger_invalid")?;
+                    .ok_or(ImportLedgerCode::Invalid.as_str())?;
+                let response = update
+                    .response
+                    .as_ref()
+                    .ok_or(ImportLedgerCode::Invalid.as_str())?;
                 if let Some(outcome) = &response.outcome {
                     responded.insert(update.batch_id.clone());
                     reviewed.remove(&update.batch_id);

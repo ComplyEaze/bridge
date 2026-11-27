@@ -1704,10 +1704,23 @@ async fn a_failed_finish_reports_the_runtime_answer_as_well_as_the_simulators_er
         .fetch_voucher_type_numbering(config(&simulator), &identity(), captured_highest_alter_id())
         .await;
     assert!(result.is_ok(), "the runtime read must succeed: {result:?}");
-    let message =
-        observed_or_message(&result, simulator.finish()).expect_err("plan 11 never asked");
-    assert!(message.contains("NoRequestForPlan"), "{message}");
+    let message = observed_or_message(&result, simulator.finish())
+        .expect_err("the extra plan is never asked");
+    assert!(
+        message.contains("NoRequestForPlan { plan: 14, plans: 15 }"),
+        "{message}"
+    );
     assert!(message.contains(&format!("{result:?}")), "{message}");
+}
+
+// As above, through the helper the numbering tests use, so a helper that goes back to a bare
+// `finish().unwrap()` fails here. Waits out the same 30-second plan deadline.
+#[tokio::test]
+#[should_panic(expected = "the runtime had answered: Ok(")]
+async fn the_numbering_helper_shows_the_runtime_answer_when_its_finish_fails() {
+    let mut plans = numbering_read_plans(masters_for_numbering_capture(), numbering_capture());
+    plans.push(status());
+    let _ = run_numbering(plans, captured_highest_alter_id()).await;
 }
 
 #[tokio::test]

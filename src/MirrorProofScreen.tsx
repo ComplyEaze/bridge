@@ -470,7 +470,7 @@ export function MirrorProofScreen({
           </div>
           <div className="table-wrap" role="region" aria-label="Recent durable Core Accounting runs" tabIndex={0}>
             <table>
-              <caption>Showing up to 10 of {selectedRecentSnapshotRuns.length} loaded runs for {selectedCompanyRecord?.name}</caption>
+              <caption>Showing up to 10 of {selectedRecentSnapshotRuns.length} loaded runs for {selectedCompanyRecord?.shown_name}</caption>
               <thead><tr><th>Run</th><th>Pack</th><th>Phase</th><th>Executable windows</th><th>Worker</th><th>Action</th></tr></thead>
               <tbody>
                 {selectedRecentSnapshotRuns.slice(0, 10).map((run) => (

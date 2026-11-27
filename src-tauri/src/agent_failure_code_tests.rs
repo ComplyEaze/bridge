@@ -1,4 +1,12 @@
 use super::*;
+use crate::tally::stock_item_create::{
+    CreateRenderRefusal, DraftRefusal, DraftText, ItemNameNotAbsent, NotGoodsSibling, SiblingField,
+    SiblingRefusal, StockItemCatalogueError,
+};
+use crate::tally::stock_item_verified::{ReadBackVerdict, StockItemImportOutcome};
+use bridge_tally_core::master_name_index::{MasterKind, MasterNameIndexError, NameCollision, Via};
+use bridge_tally_protocol::native_masters::NativeMastersError;
+use bridge_tally_protocol::ImportCounters;
 
 /// Each declared variant beside the string its failure site wrote before it was typed, written out
 /// here rather than read from the enum, so a changed string fails a test (#1942).
@@ -17,11 +25,6 @@ const GST_UNCERTAIN: &[(GstUncertainCode, &str)] = &[
     ),
 ];
 
-const BANK_STATEMENT_IMPORT: &[(BankStatementImportCode, &str)] = &[(
-    BankStatementImportCode::ProposalsFileInvalid,
-    "proposals_file_invalid",
-)];
-
 const READ: &[(ReadCode, &str)] = &[
     (ReadCode::InvalidDateRange, "invalid_date_range"),
     (ReadCode::ReadProtocolInvalid, "agent_read_protocol_invalid"),
@@ -30,6 +33,21 @@ const READ: &[(ReadCode, &str)] = &[
     (ReadCode::WindowNotHonoured, "window_not_honoured"),
     (ReadCode::CurrentDateInvalid, "current_date_invalid"),
     (ReadCode::InvalidAsOf, "invalid_as_of"),
+    (
+        ReadCode::CompanyIdentityIncomplete,
+        "company_identity_incomplete",
+    ),
+    (ReadCode::InvalidDate, "invalid_date"),
+    (
+        ReadCode::VoucherEntriesUnbalanced,
+        "voucher_entries_unbalanced",
+    ),
+];
+
+const PROPOSALS: &[(ProposalsCode, &str)] = &[
+    (ProposalsCode::FileInvalid, "proposals_file_invalid"),
+    (ProposalsCode::IdRequired, "proposals_id_required"),
+    (ProposalsCode::VouchersRequired, "vouchers_required"),
 ];
 
 const GST_STATUS: &[(GstStatusCode, &str)] = &[
@@ -93,6 +111,12 @@ const INVOICE_NUMBER_AFTER_POST: &[(InvoiceNumberAfterPostCode, &str)] = &[
     ),
 ];
 
+/// The invoice build's own refusal (#2574).
+const INVOICE_BUILD: &[(InvoiceBuildCode, &str)] = &[(
+    InvoiceBuildCode::ReviewTooLargeWithEInvoice,
+    "invoice_review_too_large_with_e_invoice",
+)];
+
 /// The lab master tool's refusals that name what they refused (#2499).
 #[cfg(feature = "lab-writes")]
 const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
@@ -110,6 +134,384 @@ const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
     ),
 ];
 
+const MOVEMENT: &[(MovementCode, &str)] = &[
+    (
+        MovementCode::VoucherSnapshotDrifted,
+        "voucher_snapshot_drifted",
+    ),
+    (
+        MovementCode::OpeningBalanceNotObserved,
+        "opening_balance_not_observed",
+    ),
+    (MovementCode::ReadFailed, "ledger_movement_read_failed"),
+];
+
+const PRESENCE: &[(PresenceCode, &str)] = &[
+    (
+        PresenceCode::LedgerCatalogueIncomplete,
+        "ledger_catalogue_incomplete",
+    ),
+    (
+        PresenceCode::NumberingMethodDiffers,
+        "presence_numbering_method_differs_from_book",
+    ),
+    (PresenceCode::NumberingRequired, "numbering_required"),
+    (
+        PresenceCode::ImportIdentityIncomplete,
+        "presence_import_identity_incomplete",
+    ),
+];
+
+const TIE_OUT: &[(TieOutCode, &str)] = &[
+    (
+        TieOutCode::ArithmeticOutOfRange,
+        "tie_out_arithmetic_out_of_range",
+    ),
+    (TieOutCode::LedgerOpeningInvalid, "ledger_opening_invalid"),
+    (TieOutCode::LedgerOpeningMissing, "ledger_opening_missing"),
+    (
+        TieOutCode::LedgerNameDuplicated,
+        "ledger_name_duplicated_in_catalogue",
+    ),
+];
+
+const STOCK_ITEM_CREATE: &[(StockItemCreateCode, &str)] = &[
+    (
+        StockItemCreateCode::ReadUnreadable,
+        "stock_item_read_unreadable",
+    ),
+    (StockItemCreateCode::NoItems, "stock_item_no_items"),
+    (
+        StockItemCreateCode::NoNameEntry,
+        "stock_item_name_entry_missing",
+    ),
+    (
+        StockItemCreateCode::NameIndexInvalid,
+        "stock_item_name_index_invalid",
+    ),
+    (
+        StockItemCreateCode::GuidNotLowercase,
+        "stock_item_guid_not_lowercase",
+    ),
+    (
+        StockItemCreateCode::NameUnchecked,
+        "stock_item_name_unchecked",
+    ),
+    (StockItemCreateCode::NameTaken, "master_name_taken"),
+    (
+        StockItemCreateCode::SiblingNotFound,
+        "stock_item_sibling_not_found",
+    ),
+    (
+        StockItemCreateCode::SiblingAmbiguous,
+        "stock_item_sibling_ambiguous",
+    ),
+    (
+        StockItemCreateCode::SiblingOnlyByFold,
+        "stock_item_sibling_only_by_fold",
+    ),
+    (
+        StockItemCreateCode::SiblingIncomplete,
+        "stock_item_sibling_incomplete",
+    ),
+    (
+        StockItemCreateCode::SiblingNotGoods,
+        "stock_item_sibling_not_goods",
+    ),
+    (
+        StockItemCreateCode::SiblingNotTaxable,
+        "stock_item_sibling_not_taxable",
+    ),
+    (
+        StockItemCreateCode::SiblingGstNotApplicable,
+        "stock_item_sibling_gst_not_applicable",
+    ),
+    (
+        StockItemCreateCode::CatalogueChanged,
+        "stock_item_catalogue_changed",
+    ),
+    (
+        StockItemCreateCode::GroupsUnreadable,
+        "stock_item_groups_unreadable",
+    ),
+    (
+        StockItemCreateCode::ParentNotInBook,
+        "stock_item_parent_not_in_book",
+    ),
+    (
+        StockItemCreateCode::UnitsUnreadable,
+        "stock_item_units_unreadable",
+    ),
+    (
+        StockItemCreateCode::UnitNotInBook,
+        "stock_item_unit_not_in_book",
+    ),
+    (
+        StockItemCreateCode::ShapeNotMeasured,
+        "stock_item_shape_not_measured",
+    ),
+    (
+        StockItemCreateCode::TextNotPlain,
+        "stock_item_text_not_plain",
+    ),
+    (
+        StockItemCreateCode::TextNeedsEscaping,
+        "stock_item_text_needs_escaping",
+    ),
+    (
+        StockItemCreateCode::ReviewLayoutText,
+        "import_review_layout_text",
+    ),
+    (
+        StockItemCreateCode::ReviewFormatText,
+        "import_review_format_text",
+    ),
+    (
+        StockItemCreateCode::ReviewTooLarge,
+        "master_review_too_large",
+    ),
+    (
+        StockItemCreateCode::CreateApplicationFailure,
+        "stock_item_create_application_failure",
+    ),
+    (
+        StockItemCreateCode::AlteredExisting,
+        "stock_item_altered_existing",
+    ),
+    (
+        StockItemCreateCode::CountersNotClean,
+        "stock_item_counters_not_clean",
+    ),
+    (
+        StockItemCreateCode::CountersUnreported,
+        "stock_item_counters_unreported",
+    ),
+    (
+        StockItemCreateCode::ReadBackDiffers,
+        "stock_item_read_back_differs",
+    ),
+    (
+        StockItemCreateCode::ReadBackNotFoundOnce,
+        "stock_item_read_back_not_found_once",
+    ),
+    (
+        StockItemCreateCode::ReadBackNotNew,
+        "stock_item_read_back_not_new",
+    ),
+    (
+        StockItemCreateCode::ReadBackOtherCompany,
+        "stock_item_read_back_other_company",
+    ),
+];
+
+#[test]
+fn stock_code_strings_match_addendum() {
+    let variants: Vec<StockItemCreateCode> =
+        STOCK_ITEM_CREATE.iter().map(|(code, _)| *code).collect();
+    assert_eq!(variants, StockItemCreateCode::ALL);
+    check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
+}
+
+#[test]
+fn every_stock_refusal_variant_has_exactly_one_code() {
+    let unreadable = NativeMastersError::CollectionAbsent;
+    let index = || MasterNameIndexError::NoNames { master: 0 };
+    let counters = ImportCounters {
+        created: 0,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+    };
+
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::Unreadable(unreadable)),
+        StockItemCreateCode::ReadUnreadable
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::NoItems),
+        StockItemCreateCode::NoItems
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::NoNameEntry { item: 0 }),
+        StockItemCreateCode::NoNameEntry
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::Index(index())),
+        StockItemCreateCode::NameIndexInvalid
+    );
+    assert_eq!(
+        stock_item_catalogue_refusal_code(&StockItemCatalogueError::GuidNotLowercase { item: 0 }),
+        StockItemCreateCode::GuidNotLowercase
+    );
+
+    assert_eq!(
+        item_name_refusal_code(&ItemNameNotAbsent::Taken(NameCollision {
+            kind: MasterKind::StockItem,
+            via: Via::Name,
+            guid: crate::synthetic_guid(1).to_string(),
+            name: "SC Existing".to_string(),
+        })),
+        StockItemCreateCode::NameTaken
+    );
+    assert_eq!(
+        item_name_refusal_code(&ItemNameNotAbsent::Unchecked(index())),
+        StockItemCreateCode::NameUnchecked
+    );
+
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::NotFound),
+        StockItemCreateCode::SiblingNotFound
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::Ambiguous { items: 1 }),
+        StockItemCreateCode::SiblingAmbiguous
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::OnlyByFold { items: 1 }),
+        StockItemCreateCode::SiblingOnlyByFold
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::Incomplete(SiblingField::Parent)),
+        StockItemCreateCode::SiblingIncomplete
+    );
+    assert_eq!(
+        sibling_refusal_code(&SiblingRefusal::Unchecked(index())),
+        StockItemCreateCode::NameUnchecked
+    );
+
+    assert_eq!(
+        not_goods_refusal_code(&NotGoodsSibling::NotGoods),
+        StockItemCreateCode::SiblingNotGoods
+    );
+    assert_eq!(
+        not_goods_refusal_code(&NotGoodsSibling::NotTaxable { entry: 0 }),
+        StockItemCreateCode::SiblingNotTaxable
+    );
+    assert_eq!(
+        not_goods_refusal_code(&NotGoodsSibling::GstNotApplicable),
+        StockItemCreateCode::SiblingGstNotApplicable
+    );
+
+    for (refusal, code) in [
+        (
+            DraftRefusal::OtherCatalogue,
+            StockItemCreateCode::CatalogueChanged,
+        ),
+        (
+            DraftRefusal::GroupsUnreadable(unreadable),
+            StockItemCreateCode::GroupsUnreadable,
+        ),
+        (
+            DraftRefusal::ParentNotInBook,
+            StockItemCreateCode::ParentNotInBook,
+        ),
+        (
+            DraftRefusal::UnitsUnreadable(unreadable),
+            StockItemCreateCode::UnitsUnreadable,
+        ),
+        (
+            DraftRefusal::UnitNotInBook,
+            StockItemCreateCode::UnitNotInBook,
+        ),
+        (
+            DraftRefusal::GstEntriesNotMeasured { entries: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::GstSourceNotMeasured,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::ItcNotMeasured,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::StateNotAny,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::DutyHeadNotMeasured { row: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::ValuationNotMeasured { row: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::RateNotMeasured { row: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::HsnEntriesNotMeasured { entries: 0 },
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+        (
+            DraftRefusal::HsnNotMeasured,
+            StockItemCreateCode::ShapeNotMeasured,
+        ),
+    ] {
+        assert_eq!(draft_refusal_code(&refusal), code);
+    }
+
+    assert_eq!(
+        create_render_refusal_code(&CreateRenderRefusal::TextNotPlain {
+            field: DraftText::HsnDescription,
+        }),
+        StockItemCreateCode::TextNotPlain
+    );
+    assert_eq!(
+        create_render_refusal_code(&CreateRenderRefusal::TextNeedsEscaping {
+            field: DraftText::HsnDescription,
+        }),
+        StockItemCreateCode::TextNeedsEscaping
+    );
+
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::ApplicationFailure),
+        Some(StockItemCreateCode::CreateApplicationFailure)
+    );
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::AlteredExisting {
+            counters,
+            line_errors: 0,
+        }),
+        Some(StockItemCreateCode::AlteredExisting)
+    );
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::NotClean {
+            counters,
+            line_errors: 0,
+        }),
+        Some(StockItemCreateCode::CountersNotClean)
+    );
+    assert_eq!(
+        stock_item_outcome_code(&StockItemImportOutcome::Unreported),
+        Some(StockItemCreateCode::CountersUnreported)
+    );
+
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::Differs {
+            fields: vec![SiblingField::Parent],
+        }),
+        Some(StockItemCreateCode::ReadBackDiffers)
+    );
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::NotFoundOnce { rows: 1 }),
+        Some(StockItemCreateCode::ReadBackNotFoundOnce)
+    );
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::NotNew),
+        Some(StockItemCreateCode::ReadBackNotNew)
+    );
+    assert_eq!(
+        stock_item_read_back_code(&ReadBackVerdict::OtherCompany),
+        Some(StockItemCreateCode::ReadBackOtherCompany)
+    );
+}
+
 /// Every pin of every enum, as the failure code its variant makes, beside the pinned string.
 fn pinned() -> Vec<(FailureCode, &'static str)> {
     fn of<C: Copy + Into<FailureCode>>(
@@ -121,13 +523,23 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     }
     let pins = [
         of(GST_UNCERTAIN),
-        of(BANK_STATEMENT_IMPORT),
         of(READ),
+        of(PROPOSALS),
         of(GST_STATUS),
         of(GST_BY_LEDGER),
         of(REGISTER),
         of(OUTSTANDINGS),
         of(INVOICE_NUMBER_AFTER_POST),
+        of(MOVEMENT),
+        of(PRESENCE),
+        of(TIE_OUT),
+        of(STOCK_ITEM_CREATE),
+        of(INVOICE_BUILD),
+        of(INVOICE_REGISTRATION),
+        of(INVOICE_ITEM_LINE),
+        of(COMPANY_READ),
+        of(CENSUS_REUSE),
+        of(E_INVOICE_READBACK),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -135,25 +547,87 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     pins
 }
 
+/// Every declared variant of every enum, as the failure code it makes, each enum under its name.
+fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
+    fn of<C: Copy + Into<FailureCode>>(
+        name: &'static str,
+        all: &[C],
+    ) -> (&'static str, Vec<FailureCode>) {
+        (name, all.iter().map(|code| (*code).into()).collect())
+    }
+    let enums = vec![
+        of("GstUncertainCode", GstUncertainCode::ALL),
+        of("ReadCode", ReadCode::ALL),
+        of("ProposalsCode", ProposalsCode::ALL),
+        of("GstStatusCode", GstStatusCode::ALL),
+        of("GstByLedgerCode", GstByLedgerCode::ALL),
+        of("RegisterCode", RegisterCode::ALL),
+        of("OutstandingsCode", OutstandingsCode::ALL),
+        of(
+            "InvoiceNumberAfterPostCode",
+            InvoiceNumberAfterPostCode::ALL,
+        ),
+        of("MovementCode", MovementCode::ALL),
+        of("PresenceCode", PresenceCode::ALL),
+        of("TieOutCode", TieOutCode::ALL),
+        of("StockItemCreateCode", StockItemCreateCode::ALL),
+        of("InvoiceBuildCode", InvoiceBuildCode::ALL),
+        of("InvoiceRegistrationCode", InvoiceRegistrationCode::ALL),
+        of("InvoiceItemLineCode", InvoiceItemLineCode::ALL),
+        of("CompanyReadCode", CompanyReadCode::ALL),
+        of("CensusReuseCode", CensusReuseCode::ALL),
+        of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
+    ];
+    #[cfg(feature = "lab-writes")]
+    let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
+    enums
+}
+
 /// Every declared variant of every enum, as the failure code it makes.
 fn declared() -> Vec<FailureCode> {
-    fn of<C: Copy + Into<FailureCode>>(all: &[C]) -> Vec<FailureCode> {
-        all.iter().map(|code| (*code).into()).collect()
+    declared_by_enum()
+        .into_iter()
+        .flat_map(|(_, codes)| codes)
+        .collect()
+}
+
+/// Every enum the `failure_codes!` macro declares in `agent_failure_code.rs` is in
+/// [`declared_by_enum`], so the uniqueness test walks it (#2558). The enum names are read from the
+/// source, counting an enum whether or not a `cfg` gates it, so a block added without a line in
+/// the list fails here.
+#[test]
+fn every_enum_the_macro_declares_is_walked_by_declared() {
+    let source = include_str!("agent_failure_code.rs");
+    let source = &source[..source
+        .find("#[cfg(test)]\n#[path")
+        .expect("the tests module")];
+    let mut in_declaration = false;
+    let mut found = Vec::new();
+    for line in source.lines() {
+        if line.starts_with("failure_codes! {") {
+            in_declaration = true;
+        } else if in_declaration {
+            if let Some(rest) = line.trim().strip_prefix("pub(crate) enum ") {
+                found.push(rest.trim_end_matches(" {").to_string());
+                in_declaration = false;
+            }
+        }
     }
-    let codes = [
-        of(GstUncertainCode::ALL),
-        of(BankStatementImportCode::ALL),
-        of(ReadCode::ALL),
-        of(GstStatusCode::ALL),
-        of(GstByLedgerCode::ALL),
-        of(RegisterCode::ALL),
-        of(OutstandingsCode::ALL),
-        of(InvoiceNumberAfterPostCode::ALL),
-    ]
-    .concat();
-    #[cfg(feature = "lab-writes")]
-    let codes = [codes, of(LabMastersCode::ALL)].concat();
-    codes
+    let mut walked: Vec<String> = declared_by_enum()
+        .into_iter()
+        .map(|(name, _)| name.to_string())
+        .collect();
+    // Declared in a build without `lab-writes` too, as source text.
+    #[cfg(not(feature = "lab-writes"))]
+    walked.push("LabMastersCode".to_string());
+    found.sort();
+    walked.sort();
+    assert_eq!(
+        found.len(),
+        19,
+        "the failure_codes! blocks found in the source"
+    );
+    assert_eq!(found, walked);
 }
 
 /// The pins cover every variant, once each and in declaration order, so a variant added without a
@@ -164,10 +638,6 @@ fn every_variant_has_one_pinned_string() {
         pins.iter().map(|(code, _)| *code).collect()
     }
     assert_eq!(variants(GST_UNCERTAIN), GstUncertainCode::ALL);
-    assert_eq!(
-        variants(BANK_STATEMENT_IMPORT),
-        BankStatementImportCode::ALL
-    );
     assert_eq!(variants(READ), ReadCode::ALL);
     assert_eq!(variants(GST_STATUS), GstStatusCode::ALL);
     assert_eq!(variants(GST_BY_LEDGER), GstByLedgerCode::ALL);
@@ -177,6 +647,12 @@ fn every_variant_has_one_pinned_string() {
         variants(INVOICE_NUMBER_AFTER_POST),
         InvoiceNumberAfterPostCode::ALL
     );
+    assert_eq!(variants(PROPOSALS), ProposalsCode::ALL);
+    assert_eq!(variants(MOVEMENT), MovementCode::ALL);
+    assert_eq!(variants(PRESENCE), PresenceCode::ALL);
+    assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
+    assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
+    assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -204,7 +680,6 @@ where
 #[test]
 fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(GST_UNCERTAIN, GstUncertainCode::as_str);
-    check_pins(BANK_STATEMENT_IMPORT, BankStatementImportCode::as_str);
     check_pins(READ, ReadCode::as_str);
     check_pins(GST_STATUS, GstStatusCode::as_str);
     check_pins(GST_BY_LEDGER, GstByLedgerCode::as_str);
@@ -214,6 +689,12 @@ fn each_declared_code_is_the_string_its_site_wrote() {
         INVOICE_NUMBER_AFTER_POST,
         InvoiceNumberAfterPostCode::as_str,
     );
+    check_pins(PROPOSALS, ProposalsCode::as_str);
+    check_pins(MOVEMENT, MovementCode::as_str);
+    check_pins(PRESENCE, PresenceCode::as_str);
+    check_pins(TIE_OUT, TieOutCode::as_str);
+    check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
+    check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
 }
@@ -235,9 +716,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 27;
+    let expected = 77 + 4 + 2 + 1 + 1 + 4;
     #[cfg(feature = "lab-writes")]
-    let expected = 30;
+    let expected = 80 + 4 + 2 + 1 + 1 + 4;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();
@@ -251,11 +732,83 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     }
 }
 
+/// The read-back's registration differences (#2464), declared new, so each string is pinned as
+/// declared, with every check above made for them too.
+const INVOICE_REGISTRATION: &[(InvoiceRegistrationCode, &str)] = &[
+    (
+        InvoiceRegistrationCode::Missing,
+        "invoice_registration_missing",
+    ),
+    (
+        InvoiceRegistrationCode::Differs,
+        "invoice_registration_differs",
+    ),
+];
+
+#[test]
+fn the_registration_codes_are_pinned_and_have_the_receipts_code_shape() {
+    let pinned: Vec<InvoiceRegistrationCode> =
+        INVOICE_REGISTRATION.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, InvoiceRegistrationCode::ALL);
+    let mut seen = GstUncertainCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    for (code, string) in INVOICE_REGISTRATION {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()), "{string}");
+        assert!(
+            string
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+            "{string}"
+        );
+        assert!(seen.insert(string), "{string} is declared twice");
+    }
+}
+
+/// The read-back's item-line differences (#1379), declared new, so each string is pinned as
+/// declared, with every check above made for them too.
+const INVOICE_ITEM_LINE: &[(InvoiceItemLineCode, &str)] = &[
+    (InvoiceItemLineCode::NotSent, "invoice_line_item_not_sent"),
+    (InvoiceItemLineCode::Several, "invoice_line_items_several"),
+    (InvoiceItemLineCode::Differs, "invoice_line_item_differs"),
+    (InvoiceItemLineCode::Batch, "invoice_line_item_batch"),
+];
+
+#[test]
+fn the_item_line_codes_are_pinned_and_have_the_receipts_code_shape() {
+    let pinned: Vec<InvoiceItemLineCode> =
+        INVOICE_ITEM_LINE.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, InvoiceItemLineCode::ALL);
+    let mut seen = GstUncertainCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    for (code, string) in INVOICE_ITEM_LINE {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()), "{string}");
+        assert!(
+            string
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+            "{string}"
+        );
+        assert!(seen.insert(string), "{string} is declared twice");
+    }
+}
+
 /// The company-read code, pinned as above (#2433).
+const COMPANY_READ: &[(CompanyReadCode, &str)] =
+    &[(CompanyReadCode::NameInvalid, "company_name_invalid")];
+
 #[test]
 fn the_company_read_code_is_pinned() {
-    let pinned: &[(CompanyReadCode, &str)] =
-        &[(CompanyReadCode::NameInvalid, "company_name_invalid")];
+    let pinned = COMPANY_READ;
     assert_eq!(
         pinned.iter().map(|(code, _)| *code).collect::<Vec<_>>(),
         CompanyReadCode::ALL
@@ -283,5 +836,45 @@ fn the_census_reuse_code_is_pinned_once_and_is_the_string_a_caller_sees() {
         assert!(string
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'));
+    }
+}
+
+/// [`EInvoiceReadbackCode`]'s variants beside their strings, as [`GST_UNCERTAIN`] pins its own.
+const E_INVOICE_READBACK: &[(EInvoiceReadbackCode, &str)] = &[
+    (
+        EInvoiceReadbackCode::ReadFailed,
+        "e_invoice_readback_failed",
+    ),
+    (
+        EInvoiceReadbackCode::Unreadable,
+        "e_invoice_readback_unreadable",
+    ),
+    (EInvoiceReadbackCode::NotFound, "e_invoice_not_found"),
+    (EInvoiceReadbackCode::NotUnique, "e_invoice_not_unique"),
+];
+
+/// The e-invoice read's codes: pinned once each in order, each its string, each of the receipt's
+/// shape and none shared with another declared code.
+#[test]
+fn every_e_invoice_readback_code_is_pinned_and_shaped() {
+    let pinned: Vec<EInvoiceReadbackCode> =
+        E_INVOICE_READBACK.iter().map(|(code, _)| *code).collect();
+    assert_eq!(pinned, EInvoiceReadbackCode::ALL);
+    let mut seen: std::collections::BTreeSet<&str> = GstUncertainCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect();
+    for (code, string) in E_INVOICE_READBACK {
+        assert_eq!(code.as_str(), *string);
+        assert_eq!(FailureCode::from(*code).as_str(), *string);
+        assert_eq!(super::super::ToolFailure::from(*code).code, *string);
+        assert!((1..=64).contains(&string.len()), "{string}");
+        assert!(
+            string
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+            "{string}"
+        );
+        assert!(seen.insert(string), "{string} is declared twice");
     }
 }

@@ -153,7 +153,17 @@ fn invoice_schema() -> Value {
                 "not":{"pattern":LINE_TERMINATORS},
                 "description":"The state the supply is made in, as Tally names it (invoice_place_of_supply_unknown otherwise). Only a supply within the company's own state is built (invoice_place_of_supply_not_company_state)."
             },
-            "round_off_ledger":name("The ledger that carries the invoice's round off, when its total is rounded. It must also be one of the voucher's entries (invoice_round_off_ledger_invalid otherwise).")
+            "round_off_ledger":name("The ledger that carries the invoice's round off, when its total is rounded. It must also be one of the voucher's entries (invoice_round_off_ledger_invalid otherwise)."),
+            "e_invoice":{
+                "type":"object", "additionalProperties":false,
+                "required":["irn","ack_no","ack_date"],
+                "description":"Only for an invoice the e-invoice portal has already registered: its IRN, acknowledgement number and date, written into the invoice as given and read back after the post. ComplyEaze Bridge generates none of them and sends nothing to the portal. A value of another form is refused (voucher_schema_invalid).",
+                "properties":{
+                    "irn":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+                    "ack_no":{"type":"string","pattern":"^[0-9]{1,20}$"},
+                    "ack_date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+                }
+            }
         }
     })
 }
@@ -197,16 +207,32 @@ mod tests {
         fields.sort();
         assert_eq!(
             fields,
-            ["place_of_supply", "round_off_ledger", "voucher_type_name"]
+            [
+                "e_invoice",
+                "place_of_supply",
+                "round_off_ledger",
+                "voucher_type_name"
+            ]
         );
+        assert_eq!(
+            invoice["properties"]["e_invoice"]["required"],
+            json!(["irn", "ack_no", "ack_date"])
+        );
+        // The values row 2162-IRN9 imported and Tally stored as sent.
         let every_field = json!({
             "voucher_type_name": "Sales",
             "place_of_supply": "Rajasthan",
-            "round_off_ledger": "Round Off"
+            "round_off_ledger": "Round Off",
+            "e_invoice": {
+                "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+                "ack_no": "445566",
+                "ack_date": "2025-04-03"
+            }
         });
         let read: super::super::invoice::InvoiceDetail =
             serde_json::from_value(every_field).expect("the build reads every offered field");
         assert!(read.observed.is_none());
+        assert!(read.e_invoice.is_some());
         let only_required = json!({"voucher_type_name": "Sales", "place_of_supply": "Rajasthan"});
         serde_json::from_value::<super::super::invoice::InvoiceDetail>(only_required)
             .expect("the required fields alone are enough");

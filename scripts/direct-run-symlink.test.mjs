@@ -66,6 +66,7 @@ const PROBES = [
   { script: "nightly-outside-inputs.mjs", args: ["--bogus"], status: 2, pattern: /usage: nightly-outside-inputs\.mjs/ },
   { script: "check-ai-attribution.mjs", status: 2, pattern: /check-ai-attribution: the input is not the expected JSON object/ },
   { script: "check-release-date-changed.mjs", status: 2, pattern: /usage: node scripts\/check-release-date-changed\.mjs/ },
+  { script: "release-text-agreement.mjs", args: ["--bogus"], status: 2, pattern: /^usage\nUsage: node scripts\/release-text-agreement\.mjs --published/ },
 ];
 
 function environment(extra = {}) {

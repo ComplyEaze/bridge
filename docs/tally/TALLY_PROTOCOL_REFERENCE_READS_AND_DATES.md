@@ -841,7 +841,7 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
 
 **Scope: TallyPrime 7.2 Silver, licensed; synthetic company `BRIDGE EINVOICE LAB`, e-invoicing on in its GST registration; two Sales invoices keyed by hand, with invented details. Nothing reached the e-invoice portal.**
 
-- **Where they sit.** `IRN` and `IRNACKNO` (`TYPE="String"`) and `IRNACKDATE` (`TYPE="Date"`, `YYYYMMDD`) are direct children of `VOUCHER`. A window read returns them only when its `FETCH` names them, so Bridge names them only for a `vouchers` call with `include_e_invoice` and in its invoice-number read (below). The `vouchers` request, the full window list with these three added, was read from the bytes sent and answered in full on one book (`lab/1378-read-answers` at 95b0a2e5): the invoice with details gave each typed value, the invoice without gave all three `absent`, the Payment carried no `e_invoice` key, and every other key of each row equalled the read without the argument.
+- **Where they sit.** `IRN` and `IRNACKNO` (`TYPE="String"`) and `IRNACKDATE` (`TYPE="Date"`, `YYYYMMDD`) are direct children of `VOUCHER`. A window read returns them only when its `FETCH` names them, so Bridge names them only for a `vouchers` call with `include_e_invoice`, in its invoice-number read (below), and in the e-invoice read after an invoice post (below). The `vouchers` request, the full window list with these three added, was read from the bytes sent and answered in full on one book (`lab/1378-read-answers` at 95b0a2e5): the invoice with details gave each typed value, the invoice without gave all three `absent`, the Payment carried no `e_invoice` key, and every other key of each row equalled the read without the argument.
 - **Empty is the answer for no details.** An invoice without details has all three elements, empty, so presence says nothing and the value does. Bridge reports `present`, `absent` for an element sent empty, and `not_reported` for an element not sent.
 - **Keyed by hand, with no portal.** The three take typed values on the voucher's `Statutory Details` sub-screen. Tally then lists the invoice under `IRN Generated` in its e-Invoice report and does not offer to generate one on save; the invoice without details drew that offer. Whether Tally checks their form was not tried.
 - **On the invoice-number read.** The build's duplicate-number read (`render_invoice_number_request`) with the three added to its `FETCH` was sent for numbers 1 and 2 on the same book, then holding the two invoices and a Payment numbered 1 (`lab/2162-irn-read-answers` at 9a20049b, R1). Each row carried each of the three once, the invoice with details its typed values and the others all three empty, and each answer was otherwise the answer without them. Bridge says a number in use is held by a Sales voucher with an IRN only when an `IRN` came back with text; an empty or missing one claims nothing, and the number is refused either way.
@@ -849,7 +849,7 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
   - The invoice sent with the three stored each as sent: the 64-character `IRN` equal to the one sent, and the acknowledgement number and date. The other came back with all three empty, as a keyed invoice without details does. Read by the window read with the three named and by a full native read.
   - The import set no other element of the e-invoice family: `IRNQRCODE` and `IRNIRPSOURCE` empty, `ISEINVOVERRIDDEN` No, the rest empty, No or 0, as on the invoice keyed by hand. The two full reads differ in the three and the voucher's own identifiers only.
   - Tally's e-Invoice report then listed the imported invoice with details under `IRN Generated` > `IRN updated without QR Code`, beside the keyed one. The imported invoice without details was listed under `Uncertain Transactions (Corrections needed)` > `Applicable Tax Ledger is not selected`, beside the keyed one without; on this book that cause is its IGST ledger, which holds no rate, so this placement alone says nothing about an invoice with a clean tax line (the next bullet measures one).
-  - Bridge does not send the three: no builder writes them. A builder that does is its own reviewed change (AGENTS.md P7).
+  - **Bridge's import and read-back.** `render_sales_invoice_xml` writes the three through `EInvoiceDetails::render` immediately after `ISINVOICE`. After the post, `read_back_sales_invoice` calls `read_back_e_invoice`, which sends the measured window read over the invoice's one date; `readback_differences` finds the returned voucher by its GUID and compares each element's text with the value sent. That comparison takes the text as Tally returned it, so a space before or after a returned value is a difference; the `vouchers` tool returns the same text without such spaces, as before. The captured answer to this read (`einvoice-lab-readback`) holds no such space. The import of the three and the read of them were each measured on its own lab row above. The two together on a built executable are **PARTIAL** (20 Nov 2026, the same book and release; one invoice, one sitting; `lab/2440-composed-answers-2` at fd6d9c8b, row 2440-CP). The release-candidate build posted one invoice with the three through `post_import`. It answered `posted_verified` with `created` 1 and no `invoice_fields` difference, and `verify_import` agreed. The full native read then held the 64-character `IRN` equal to the one sent, `IRNACKNO` 445577 and `IRNACKDATE` 20250403, and `vouchers` with `include_e_invoice` returned them. A second invoice without details posted the same way and stored all three empty. A returned value that differs from the one sent was not tried live; the tests drive that branch.
 - **With a clean tax line (PARTIAL, 9 Nov 2026, the same book and release).** The IGST ledger's Tax type was set on Tally's screen, its only change, and one invoice without the three was imported raw (`lab/2162-irn-pending-answers` at 7df0c661, row 2162-IRN10). "Clean" here is the outcome: Tally then computed the IGST and stopped naming the ledger as the cause. The ledger's percentage of calculation read `0 %` before the change, and no other field was changed.
   - The earlier invoice without details (Sales `2`, keyed by hand per the bullet above) then left `Applicable Tax Ledger is not selected`; Tally listed it under `Missing/Invalid Information` > `Information required for e-Invoice not provided`, with its IGST now computed. The `Uncertain Transactions` line was gone. The invoice with details stayed under `IRN Generated` > `IRN updated without QR Code`.
   - The imported invoice without details was listed beside it, under the same cause. So on this book an imported invoice and a keyed one without details are placed alike, and the earlier placement followed from the IGST ledger's empty Tax type (PARTIAL: the ledger's other fields were not changed one at a time).
@@ -1023,8 +1023,8 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   at the same state and the marks unchanged, in three of three tries. A mailing read cut at the 20 s limit, and the
   drain after one, were not reached on that book (they were on another, below). Since #2142 an oversize Tally declares owes the drain, because its
   body is left unread (§11c.2). After one, the party/ledger master export reads the book once more with the standard
-  request inside the same operation (#2214), once the drain clears; neither that read nor those probes have been run
-  against Tally. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
+  request inside the same operation (#2214), once the drain clears; that read was run against Tally once after an
+  oversize, on one synthetic book on 2026-11-18 (the entry of that date below), and the probes after the other failures were not. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
   still be working on that read; a cut at the time limit has since been seen live (the next entry). After any other failure of that read
   it reads the book once more without the details, and the workbook names the failure (the maintainers' ruling on
   #2074; none reached on this book): an answer that broke off, could not be read, did not decode or never came, an
@@ -1036,8 +1036,9 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   the export waits and tries again, for at most 60 s, a bound not measured on this read, and fails past it. The
   standard read keeps every refusal it has without the mailing details.
 - **A mailing read cut at the 20 s limit owes the drain, and the standard read admitted after it answers whole.
-  PARTIAL: TallyPrime 7.2 Silver, 2026-11-03 and 2026-11-08, one synthetic book, two sittings, master builds at
-  a6c64b8b and 1f5dc024 (`lab/2074-2214-export-cut-answers`, `lab/2074-2214-w4-answers`).** The book held about 172
+  PARTIAL: TallyPrime 7.2 Silver, 2026-11-03, 2026-11-08 and 2026-11-19, one synthetic book, three sittings, master
+  builds at a6c64b8b and 1f5dc024 and the 0.7.0 desktop app (`lab/2074-2214-export-cut-answers`,
+  `lab/2074-2214-w4-answers`, `lab/2214-export-cut-current-app-answers`).** The book held about 172
   ledgers and 32,000 dated entries; on 2026-11-03 its mailing answer, about 30 MB, came whole in three pages with
   Tally idle. An import of Journals sent by another client just ahead kept Tally busy, and Bridge cut the mailing
   read's post at the 20 s limit. On 2026-11-03 this was `ledger_masters` with `include_mailing_details`, three times,
@@ -1051,8 +1052,40 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   draining and admitted the fifth, ending 68 s after the owed record, whole. The export failed with its withheld
   message and wrote no file, but the desktop app that ran it was a 2026-10-30 build (0.6.1), older than the export's
   re-read without the details (#2188), so that step is not evidence for later builds; the server rows ran on the
-  bundle's own server. Not measured: the export step on a later build, a cut with no other client's work ahead of it,
-  a cut of another read, the export's retry after a declared oversize, another book, and another release.
+  bundle's own server. On 2026-11-19 the same step ran on the installed 0.7.0 desktop app and server, with the book
+  at 13 ledgers: a front of 3,000 Journals went in just ahead of the export's mailing read, Bridge cut the mailing
+  post 19.672 s after it was forwarded, and nothing more went out on that connection. The export failed with its
+  withheld message and `[tally_request_deadline_exceeded]`, and wrote no file. The drain record read owed, six
+  standard calls were refused `tally_endpoint_draining` (`retry_after_s` 10) with no master post sent, and the
+  seventh was admitted and read the book whole, ending 93.9 s after the owed record, 13 of 13 rows equal to a
+  whole read after it with the snapshot left out (`lab/2214-export-cut-current-app-answers` at 0a4cc166,
+  RESULTS.md, W4). Not measured: a cut with no other client's work ahead of it, a cut of another read, another
+  book, and another release.
+- **The party/ledger master workbook read the mailing details by the ledger count past a master mark of 4,266, read
+  about 30 MB of them whole, and, past 32 MiB, was written again without them with its note. PARTIAL: TallyPrime 7.2 on
+  Windows, 2026-11-18, one synthetic book, one sitting, the desktop app 0.7.0, built from master a83ee02d on the run
+  lead's word: the row hashed the installed app and did not record its build run
+  (`lab/2074-2214-w-answers` at b8422a36, RESULTS.md).** The book's master mark was taken to 4,400 by 4,174
+  alterations, with 13 ledgers. The workbook export then sent a count read (the ledgers' name, GUID and parent) twice
+  and then the master post that named `LEDMAILINGDETAILS.LIST` twice, each answered whole (36,444 bytes), and no
+  master post with the standard fetch; the workbook carried one party's entry (from 20260405, in force) and "no mailing details" on a
+  ledger without one, and its header held no failed-read note. After 160 more parties of 200 entries each, the same
+  export's mailing answer was 30,125,084 bytes, came whole in 2.906 s and 1.891 s, and the workbook held 173 ledger
+  rows with the latest entry of one party in force. After 40 more parties, the mailing answer was 37,647,244 bytes:
+  Tally's first byte came 3.4 s after the post, the app closed that connection, and a new one sent three status
+  requests 2 s apart and then the standard master post, which answered 401,694 bytes; 8.375 s passed from the
+  mailing post to the standard post. Every time in this entry is as seen through the row's proxy between the app and
+  Tally, which holds each answer until it is whole. The workbook held 213 ledgers (the sheet's 215 counted two ledgers of other
+  parts, not of this sitting), every Mailing status "not observed", and its header said the details were asked for,
+  Tally's answer to that read passed the 32 MiB limit, the book was read again without them, and the empty Mailing
+  columns are not the same as no address; the app's notice read the same. The master mark did not move across the
+  oversize read (4,600) and the drain record read clear after it. The proxy that sat between the app and Tally
+  logged a `ConnectionAbortedError` (WinError 10053) on that mailing post and a `ConnectionResetError` (WinError
+  10054) when the app was closed; neither is explained. RESULTS.md does not record whether Tally declared the length
+  in the head of the 37,647,244-byte answer. Not measured: a cut at the time limit on this build, an oversize
+  Tally did not declare, a mark just past 4,266 (this book's were 4,400 and 4,600), the wait after
+  an HTTP error status, a broken-off answer or one that did not decode, the 60 s bound, a ledger count near the
+  count path's bound, another book, another platform, and another release.
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
   `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one

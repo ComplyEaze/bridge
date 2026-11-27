@@ -12,6 +12,7 @@ mod agent_import;
 pub use crate::tally::approved_import::{
     run_confirmation, run_masters_confirmation, run_release_confirmation,
     run_release_rows_confirmation, run_review_confirmation, run_settle_confirmation,
+    run_stock_item_confirmation,
 };
 pub(crate) use agent_import::desktop_journal_review as desktop_journal;
 
@@ -1214,6 +1215,9 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 Transport::InvalidEncoding {
                     code: code @ "response_content_type_unsupported",
                 } => Some(Unanswered(code)),
+                // The same missing type, on the one empty head a reader asks for by name
+                // (protocol reference §12a.27); any other reader reports it as before.
+                Transport::EmptyAnswer => Some(Unanswered("response_content_type_unsupported")),
                 Transport::InvalidEncoding { .. }
                 | Transport::PolicyInvalid { .. }
                 | Transport::ClientInitializationFailed
@@ -1424,6 +1428,12 @@ const LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET: usize = 16_384;
 const MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED: &str = "movement_catalogue_deadline_exceeded";
 const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 
+/// The cause a kept approval refusal's answer carries (#2516): its code is the
+/// answer of a box an earlier call for this batch opened, given or ended after
+/// that call had returned, and the call that reads it showed no box. Set only
+/// from a kept refusal (`agent_import_approval.rs`). It carries no data.
+const APPROVAL_ANSWERED_EARLIER: &str = "approval_answered_earlier";
+
 /// Guidance for refusals whose remedy a caller cannot derive from the code alone.
 ///
 /// Deliberately sparse. A code without a documented, concrete next step returns
@@ -1435,6 +1445,15 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        // A kept approval refusal (#2516): no approval code has a step of its
+        // own, so this is the step its answer carries.
+        APPROVAL_ANSWERED_EARLIER => Some(
+            "This call showed no approval box. The approval box an earlier call opened for this \
+             batch was answered No, ran out of time or ended unanswered after that call had \
+             returned, and this answer is that one, returned once. Nothing was sent. If the \
+             person still wants it, call the same tool again with the same batch_id: that call \
+             asks them again in a new approval box.",
+        ),
         // Only `derive_statements` raises it, under `profit_and_loss` and `balance_sheet`.
         "statement_trial_balance_row_inconsistent" => Some(
             "No statement figure was returned: ComplyEaze Bridge derives the statements only from \
@@ -2051,6 +2070,24 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              read one day per call, and a longer period a day at a time. For a period's totals, \
              use trial_balance instead of reading its vouchers.",
         ),
+        // `open_bills` (#2377): Tally's bill report sent nothing for the party, which it does for
+        // a party it reports nothing for (protocol reference §12a.27). The ledger list decides
+        // which refusal, and neither is told as no open bills.
+        "party_bills_none_reported" => Some(
+            "The ledger list carries this party, bill-wise, with an empty closing at as_of, and \
+             Tally's bill report sent nothing for it. ComplyEaze Bridge does not state that the \
+             party has no open bills: an empty closing is not established to be zero, and even a \
+             zero balance may hold an open bill set against an on-account advance; that answer is \
+             not measured. For the party's balance, read \
+             ledger_masters or trial_balance. The same call refuses again.",
+        ),
+        "party_bills_answer_missing" => Some(
+            "The ledger list carries a closing figure for this bill-wise party at as_of, but \
+             Tally's bill report sent nothing for it, which has not been seen on a party with a \
+             closing figure, so \
+             no bills were returned. For the party's balance, read ledger_masters or \
+             trial_balance. The same call refuses again.",
+        ),
         // The `outstandings` party detail (#945) refuses, never cuts, an answer
         // over its row limit; each kind has its own code and its own remedy.
         "trail_too_large" => Some(
@@ -2263,6 +2300,18 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              cannot be approved or posted, and no file was written. Ask the user to shorten \
              the narration or reference, then build the invoice again; do not offer to import \
              it by hand.",
+        ),
+        // The details' route in Tally is the one TALLY_PROTOCOL_REFERENCE section 8.2j measured
+        // on invoices keyed there, not on one posted from here (#2574).
+        "invoice_review_too_large_with_e_invoice" => Some(
+            "The approval text for this invoice does not fit in one native dialog because of its \
+             e-invoice details: the IRN takes a line of its own. The same invoice without them \
+             fits. It cannot be approved or posted with them, and no file was written. Ask the \
+             user whether to build the invoice again without e_invoice, so ComplyEaze Bridge \
+             neither sends nor checks the IRN, ack number and ack date, and to enter them in \
+             Tally on the voucher's Statutory Details screen after the post. Tally took them \
+             there on an invoice keyed in Tally; adding them to an invoice posted from here was \
+             not tried. Do not offer to import it by hand.",
         ),
         "invoice_post_not_enabled" => Some(
             "An invoice is posted by post_import and in no other way, and voucher posting is \

@@ -1,9 +1,11 @@
+#!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
 // Files that name "the newest published release" must agree with each other and with the manifest
 // (docs/release-process.md, release step 5 and "When a listing exists"). This module parses each such
 // statement once into a record and applies the rules to the records; scripts/release-text-agreement.test.mjs
-// holds the repository to them. It reads text and writes nothing, and asks nobody over the network.
+// holds the repository to them. Importing it reads no files and asks nobody over the network. Running it
+// with --published TAG reads the two spans and registry/server.json, then asks GitHub for the releases.
 //
 // The statements:
 //   - two marked spans, `managed:current-release` in README.md and `managed:latest-preview` in SECURITY.md,
@@ -13,6 +15,11 @@
 //     `X`": the build in SOURCE, which the version pull request moves to the manifest's version.
 // The spans and the registry file may be behind the manifest (between the version pull request and the
 // post-release pull request the manifest is ahead). They may not be ahead of it, and they must name one version.
+
+import { existsSync, realpathSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const SPAN_BODY = new RegExp(
@@ -98,4 +105,123 @@ export function problemsIn({ manifestVersion, readme, security, registryVersion 
     }
   }
   return problems;
+}
+
+// Only the first page of releases is read.
+const RELEASES_URL = "https://api.github.com/repos/ComplyEaze/bridge/releases?per_page=100";
+const INDIA_OFFSET_MS = (5 * 60 + 30) * 60_000;
+
+async function fetchOk(url) {
+  // A token supplied by the person running the command lifts GitHub's anonymous rate limit.
+  const headers = process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {};
+  const response = await fetch(url, { redirect: "follow", headers, signal: AbortSignal.timeout(20_000) });
+  if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+  return response.text();
+}
+
+function unreadableRelease(detail) {
+  return new ReleaseTextError("github_unreadable", `GitHub's releases answer cannot be read: ${detail}`);
+}
+
+async function publishedReleases(fetchText) {
+  let body;
+  try {
+    body = await fetchText(RELEASES_URL);
+  } catch (error) {
+    throw new ReleaseTextError("github_unavailable", `Could not ask GitHub for the releases: ${error.message}`);
+  }
+  let answer;
+  try {
+    answer = JSON.parse(body);
+  } catch {
+    throw unreadableRelease("the body is not JSON");
+  }
+  if (!Array.isArray(answer)) throw unreadableRelease("the body is not a list");
+
+  return answer.flatMap((release, index) => {
+    if (release === null || typeof release !== "object" || typeof release.tag_name !== "string" || release.tag_name.length === 0 || typeof release.draft !== "boolean" || typeof release.prerelease !== "boolean") {
+      throw unreadableRelease(`entry ${index} has no readable tag, draft flag or pre-release flag`);
+    }
+    // A draft has no publication time and cannot be the newest published release.
+    if (release.draft) return [];
+    const publishedAt = typeof release.published_at === "string" ? Date.parse(release.published_at) : NaN;
+    if (!Number.isFinite(publishedAt) || `${new Date(publishedAt).toISOString().slice(0, 19)}Z` !== release.published_at) {
+      throw unreadableRelease(`${release.tag_name} has no readable publication time`);
+    }
+    return [{ tag: release.tag_name, prerelease: release.prerelease, publishedAt, date: new Date(publishedAt + INDIA_OFFSET_MS).toISOString().slice(0, 10) }];
+  });
+}
+
+// Throws github_unavailable or github_unreadable when GitHub cannot supply a readable answer, and
+// release_disagrees with every disagreement when it can. Local text faults retain their parse codes.
+export async function checkPublished({ readme, security, registryVersion }, tag, fetchText) {
+  const readmeSpan = parseSpan(readme, "current-release", "README.md");
+  const securitySpan = parseSpan(security, "latest-preview", "SECURITY.md");
+  const registry = parseVersion(registryVersion, "registry/server.json");
+  const releases = await publishedReleases(fetchText);
+  const newest = releases.reduce((latest, release) => latest === null || release.publishedAt > latest.publishedAt ? release : latest, null);
+  const requested = releases.find((release) => release.tag === tag);
+  const problems = [];
+
+  // No non-draft release is a readable answer that disagrees, not a failed request or an empty success.
+  if (newest?.tag !== tag) {
+    problems.push(newest === null
+      ? `GitHub has no non-draft release, so ${tag} is not the newest published release.`
+      : `GitHub's newest non-draft release is ${newest.tag}, not ${tag}.`);
+  }
+  if (requested?.prerelease) problems.push(`GitHub still marks ${tag} as a pre-release.`);
+  if (readmeSpan.tag !== tag) problems.push(`README.md names ${readmeSpan.tag}, not ${tag}.`);
+  if (securitySpan.tag !== tag) problems.push(`SECURITY.md names ${securitySpan.tag}, not ${tag}.`);
+  if (`mcp-v${registry.text}` !== tag) problems.push(`registry/server.json names mcp-v${registry.text}, not ${tag}.`);
+  if (requested !== undefined) {
+    for (const [file, span] of [["README.md", readmeSpan], ["SECURITY.md", securitySpan]]) {
+      if (span.date !== requested.date) problems.push(`${file} dates ${tag} ${span.date}, but its GitHub publication date is ${requested.date} in India time.`);
+    }
+  }
+  if (problems.length > 0) throw new ReleaseTextError("release_disagrees", problems.join("\n"));
+  return newest;
+}
+
+// Disagreement is a completed check; every refusal to determine the answer is distinct for callers.
+export function exitStatus(error) {
+  return error instanceof ReleaseTextError && error.code === "release_disagrees" ? 1 : 2;
+}
+
+async function readLocal(root, path) {
+  try {
+    return await readFile(resolve(root, path), "utf8");
+  } catch (error) {
+    throw new ReleaseTextError("local_file_unreadable", `${path} cannot be read: ${error.message}`);
+  }
+}
+
+// args are the command-line arguments after the script name. Resolves to the line to print; rejects
+// with a ReleaseTextError for a usage mistake, an unreadable input or a disagreement.
+export async function run(args, { root = resolve(import.meta.dirname, ".."), fetchText = fetchOk } = {}) {
+  if (args.length !== 2 || args[0] !== "--published" || !args[1] || args[1].startsWith("--")) {
+    throw new ReleaseTextError("usage", "Usage: node scripts/release-text-agreement.mjs --published mcp-vX.Y.Z");
+  }
+  const [readme, security, registryText] = await Promise.all([
+    readLocal(root, "README.md"),
+    readLocal(root, "SECURITY.md"),
+    readLocal(root, "registry/server.json"),
+  ]);
+  let registry;
+  try {
+    registry = JSON.parse(registryText);
+  } catch {
+    throw new ReleaseTextError("registry_unreadable", "registry/server.json is not JSON");
+  }
+  const release = await checkPublished({ readme, security, registryVersion: registry?.version }, args[1], fetchText);
+  return `README.md, SECURITY.md and registry/server.json agree with ${release.tag} (published ${release.date} in India time)`;
+}
+
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  try {
+    console.log(await run(process.argv.slice(2)));
+  } catch (error) {
+    console.error(error instanceof ReleaseTextError ? error.code : "unexpected");
+    console.error(error instanceof ReleaseTextError ? error.message : String(error));
+    process.exitCode = exitStatus(error);
+  }
 }

@@ -51,7 +51,8 @@ use crate::agent::read_profiles::{
 };
 use crate::agent::voucher_parse::{EInvoiceFields, NamedVoucherFields, VoucherGstFields};
 use crate::agent::voucher_window::AlterIdSpan;
-use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
+use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+use crate::tally::master_name::MasterName;
 use crate::tally::VerifiedCompanyIdentity;
 
 /// Every variant of a fieldless enum, in the order named: the list a table
@@ -179,7 +180,7 @@ const TABLE: &[(&str, &str)] = &[
     ),
     (
         "render_invoice_readback_request",
-        "56a684c7e091a04d0596a82d85d85732ef313c027743f5d330ebb0aea2b9cfdd",
+        "aa8ebaaf2d0f229bea484c67eb68135afc98c77fe587d9fb2a16a4172cb479cc",
     ),
     (
         "render_company_registration_request",
@@ -371,12 +372,27 @@ fn built_requests() -> Vec<(String, String)> {
     // `plain/plain/no_classes` reaches the same request as the
     // `render_agent_vouchers_in_span/span` row, and `plain/plain/classes` the
     // same as `render_agent_class_vouchers_in_span/span`: different entry points.
-    for e_invoice in every!(EInvoiceFields: NotAsked, Asked) {
+    for e_invoice in every!(EInvoiceFields: NotAsked, Asked, AskedAsReturned) {
         for gst in every!(VoucherGstFields: NotAsked, Asked) {
             for classes in [false, true] {
                 let e = match e_invoice {
                     EInvoiceFields::NotAsked => "plain",
                     EInvoiceFields::Asked => "e_invoice",
+                    // Only how the answer is parsed differs: the request is the `Asked` one.
+                    EInvoiceFields::AskedAsReturned => {
+                        let render = |e_invoice| {
+                            render_agent_named_vouchers_in_span(
+                                COMPANY,
+                                &from,
+                                &to,
+                                span,
+                                NamedVoucherFields { e_invoice, gst },
+                                classes,
+                            )
+                        };
+                        assert_eq!(render(e_invoice), render(EInvoiceFields::Asked));
+                        continue;
+                    }
                 };
                 let g = match gst {
                     VoucherGstFields::NotAsked => "plain",

@@ -1140,7 +1140,7 @@ pub(super) fn resolve_import_arguments(
                             ) == Some(row_id)
                         })
                         .ok_or_else(|| {
-                            failure_code::BankStatementImportCode::ProposalsFileInvalid
+                            failure_code::ProposalsCode::FileInvalid
                                 .as_str()
                                 .to_string()
                         })?,

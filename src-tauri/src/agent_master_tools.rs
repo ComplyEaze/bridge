@@ -54,11 +54,14 @@ use crate::tally::approved_import::{
 };
 use crate::tally::ledger_create_item::{
     AdmittedDutyHead, AdmittedLedgerKind, GstinError, LedgerCreateBatch, LedgerCreateBatchError,
-    LedgerCreateItem, MasterName, MasterNameError, PartySide, VerifiedGstin,
+    LedgerCreateItem, PartySide, VerifiedGstin,
 };
+use crate::tally::master_name::{MasterName, MasterNameError};
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 
+#[path = "agent_master_stock_tools.rs"]
+mod stock_tools;
 #[path = "agent_master_verdict.rs"]
 pub(super) mod verdict;
 #[path = "agent_master_verify.rs"]
@@ -517,6 +520,13 @@ impl Server {
         })
     }
 
+    /// The Tally endpoint a master preview names: the configured endpoint's
+    /// canonical loopback origin.
+    fn master_preview_origin(&self) -> Result<String, ToolFailure> {
+        super::super::canonical_loopback_origin(&self.settings.endpoint)
+            .map_err(|_| "host_setting_invalid".to_string().into())
+    }
+
     /// Prepare ONE ledger for creation. Nothing is written to Tally.
     pub(in crate::agent) async fn prepare_ledger_creates(
         &self,
@@ -527,8 +537,7 @@ impl Server {
         let creates = parse_ledger_creates(args)?;
         let (company, identity, identity_evidence) = self.verified_company(guid).await?;
         let mut accumulated = identity_evidence;
-        let origin = super::super::canonical_loopback_origin(&self.settings.endpoint)
-            .map_err(|_| "host_setting_invalid".to_string())?;
+        let origin = self.master_preview_origin()?;
         // The proposed name against the book as it stands, once. The queue
         // makes the binding check again, twice, at the post.
         let (ledgers, evidence, profile) = self
@@ -539,7 +548,10 @@ impl Server {
             .await?;
         accumulated = combine_evidence(accumulated, evidence);
         let (groups, evidence) = self
-            .post_read(&identity, native_group_snapshot_read(&company.name))
+            .post_read(
+                &identity,
+                native_group_snapshot_read(identity.company_name()),
+            )
             .await?;
         accumulated = combine_evidence(accumulated, evidence);
         require_licensed_mode(profile)?;
@@ -733,7 +745,7 @@ impl Server {
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             let (groups, evidence) = self
-                .post_read(&identity, native_group_snapshot_read(&company.name))
+                .post_read(&identity, native_group_snapshot_read(identity.company_name()))
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), evidence);
             require_licensed_mode(profile)?;
@@ -811,15 +823,14 @@ impl Server {
                 return Err("import_approval_binding_changed".to_string().into());
             }
             let _endpoint_dispatch_lease = dispatch_lease::acquire(&self.settings.endpoint)?;
-            let aim = Mutex::new(None::<MasterAim>);
             let posted = self
                 .runtime
                 .post_approved_import(
                     self.tally_config(),
                     &identity,
                     approved,
-                    |queued| recheck_master_for_dispatch(queued, &aim),
-                    || self.record_master_intent(&batch, &request, taken.id(), &aim, &under_lock),
+                    recheck_master_for_dispatch,
+                    |aim| self.record_master_intent(&batch, &request, taken.id(), aim, &under_lock),
                 )
                 .await;
             // An approval this post did not spend lapses: it is never offered
@@ -1007,6 +1018,7 @@ impl Server {
     }
 
     /// `before_dispatch` of a master post, under the exclusive admission lock.
+    /// `aimed` is what the queue's recheck saw last before the POST.
     ///
     /// Refuses a batch the journal shows dispatched or changed, spends the
     /// approval, writes the pre-image sidecar and appends the dispatch intent;
@@ -1019,12 +1031,13 @@ impl Server {
         batch: &MasterBatch,
         request: &MasterPostRequest,
         approval: Uuid,
-        aim: &Mutex<Option<MasterAim>>,
+        aimed: MasterAim,
         under_lock: &Mutex<Option<UnderLockView>>,
     ) -> Result<RecordedIntent, BeforeDispatchError> {
         use BeforeDispatchError::{Other, Refused};
         let data_dir = &self.settings.data_dir;
-        let lock = ExclusiveAdmission::acquire(data_dir).map_err(Other)?;
+        let lock = ExclusiveAdmission::acquire_or_refuse(data_dir)
+            .map_err(|refusal| Refused(UnderLockRefusal::Admission(refusal)))?;
         let journal = read_journal(data_dir)
             .map_err(|_| Refused(UnderLockRefusal::MasterJournalUnavailable))?;
         // Each refusal below is made before any byte of the intent is written,
@@ -1046,12 +1059,6 @@ impl Server {
         if current.batch.batch_sha256 != batch.batch_sha256 || current.batch != *batch {
             return Err(refused(UnderLockRefusal::BatchChanged));
         }
-        // What the queue's recheck saw last before the POST; none is a fault.
-        let aimed = aim
-            .lock()
-            .ok()
-            .and_then(|mut aimed| aimed.take())
-            .ok_or_else(|| refused(UnderLockRefusal::PreImageUnrecorded))?;
         let pre_image = PreImage::new(aimed.pre_image)
             .map_err(|_| refused(UnderLockRefusal::PreImageUnrecorded))?;
         // Every refusal the journal would raise for this intent, decided against
@@ -1241,7 +1248,7 @@ impl Server {
 /// How the master journal's refusal of a dispatch intent is told apart: `Ok` for
 /// one raised before any byte of the intent was written (nothing is recorded),
 /// `Err` with its code for one after which the intent may be in the file.
-fn journal_refusal(error: MasterLedgerError) -> Result<UnderLockRefusal, String> {
+pub(super) fn journal_refusal(error: MasterLedgerError) -> Result<UnderLockRefusal, String> {
     match error {
         MasterLedgerError::OpenDispatchOverlaps => Ok(UnderLockRefusal::MasterOverlapsOpenDispatch),
         MasterLedgerError::DuplicateDispatch => Ok(UnderLockRefusal::AlreadyAttempted),
@@ -1596,11 +1603,20 @@ fn master_failure_outcome(
     }
     match attempted {
         Some(false) => {
-            if let Some(next_step) = master_next_step(&failure.code).or_else(|| {
-                failure
-                    .unanswered
-                    .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
-            }) {
+            // A kept refusal's step (#2516) comes first: the code's own step
+            // reads as if this call's box had been answered.
+            let kept = failure
+                .cause
+                .filter(|cause| *cause == crate::agent::APPROVAL_ANSWERED_EARLIER)
+                .and_then(crate::agent::refusal_remediation);
+            if let Some(next_step) =
+                kept.or_else(|| master_next_step(&failure.code))
+                    .or_else(|| {
+                        failure
+                            .unanswered
+                            .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
+                    })
+            {
                 error["next_step"] = json!(next_step);
             }
         }

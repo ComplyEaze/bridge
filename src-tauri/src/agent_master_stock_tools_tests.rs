@@ -851,6 +851,35 @@ mod post {
         );
     }
 
+    /// A later call whose company check fails (the company list answered
+    /// unpaired, its second copy in Education: a constructed edit): it answers
+    /// as a recorded send with the check's code, reads nothing back and records
+    /// nothing.
+    #[tokio::test]
+    async fn a_reconcile_whose_company_check_fails_reads_nothing_back() {
+        let mut plans = identity_answers(false);
+        plans[2] = identity_answers(true).remove(2);
+        let run = posting(plans, Redaction::None);
+        let a = shape_batch(A, &run.origin);
+        record(run.dir(), &a);
+        dispatch_open(run.dir(), &a).await;
+        let outcome = run.post(&ScriptedApproval::approving(), id(A)).await;
+        let result = outcome.expect("the answer").payload["result"].clone();
+        assert_eq!(
+            result["dispatch"]["state"], "reconciliation_required",
+            "{result}"
+        );
+        assert_eq!(result["verification"]["attempted"], false);
+        assert_eq!(result["attempt_recorded"], true);
+        assert_eq!(result["error"]["code"], "company_collection_invalid");
+        assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+        assert_eq!(
+            sent(&run.finish()),
+            IDENTITY_READ,
+            "the identity read alone"
+        );
+    }
+
     /// The name appears in the book between the ask and the dispatch: the
     /// queue's stock recheck refuses it, and the answer is the prepare's
     /// name-taken code, with nothing imported and no intent.

@@ -39,31 +39,40 @@ pub(in crate::agent::agent_import) enum Answer {
     Later,
 }
 
-/// What the judge decided: only the three states the table gives, the
-/// verified item's lower-case GUID, and static reasons (none when verified).
+/// The only three states the table gives; the verified item's lower-case GUID.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Outcome {
+    Verified(String),
+    Unconfirmed,
+    Open,
+}
+
+/// What the judge decided, with static reasons (none when verified).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(in crate::agent::agent_import) struct StockJudgement {
-    state: MasterVerdictState,
-    guid: Option<String>,
+    outcome: Outcome,
     reasons: Vec<&'static str>,
 }
 
 impl StockJudgement {
     fn open(reasons: Vec<&'static str>) -> Self {
-        let state = MasterVerdictState::ReconciliationRequired;
-        Self {
-            state,
-            guid: None,
-            reasons,
-        }
+        let outcome = Outcome::Open;
+        Self { outcome, reasons }
     }
 
     pub(in crate::agent::agent_import) fn state(&self) -> MasterVerdictState {
-        self.state
+        match self.outcome {
+            Outcome::Verified(_) => MasterVerdictState::PostedVerified,
+            Outcome::Unconfirmed => MasterVerdictState::MastersAfterPostUnconfirmed,
+            Outcome::Open => MasterVerdictState::ReconciliationRequired,
+        }
     }
 
     pub(in crate::agent::agent_import) fn guid(&self) -> Option<&str> {
-        self.guid.as_deref()
+        match &self.outcome {
+            Outcome::Verified(guid) => Some(guid),
+            Outcome::Unconfirmed | Outcome::Open => None,
+        }
     }
 
     pub(in crate::agent::agent_import) fn reasons(&self) -> &[&'static str] {
@@ -108,8 +117,8 @@ impl StockReadBack {
     ) -> StockJudgement {
         let company = self.company_guid.as_str();
         let unconfirmed = StockJudgement {
-            state: MasterVerdictState::MastersAfterPostUnconfirmed,
-            ..StockJudgement::open(vec!["masters_unconfirmed"])
+            outcome: Outcome::Unconfirmed,
+            reasons: vec!["masters_unconfirmed"],
         };
         // Rule 1.
         let Some((Some(at_binding), Some(now), catalogue)) = fresh
@@ -194,9 +203,8 @@ impl StockReadBack {
         };
         match basis.verify(outcome.clone(), catalogue) {
             Ok(item) if is_canonical_guid(&item.guid().to_ascii_lowercase()) => StockJudgement {
-                state: MasterVerdictState::PostedVerified,
-                guid: Some(item.guid().to_ascii_lowercase()),
-                ..StockJudgement::open(Vec::new())
+                outcome: Outcome::Verified(item.guid().to_ascii_lowercase()),
+                reasons: Vec::new(),
             },
             Ok(_) => StockJudgement::open(vec!["item_guid_not_canonical"]),
             Err(_) => StockJudgement::open(vec!["item_not_verified"]),

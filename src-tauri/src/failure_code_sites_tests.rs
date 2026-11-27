@@ -80,7 +80,7 @@ const PINNED: &[(&str, usize)] = &[
     ("src/agent_voucher_search.rs", 3),
     ("src/agent_voucher_summary.rs", 19),
     ("src/agent_voucher_type_class.rs", 9),
-    ("src/agent_voucher_window.rs", 12),
+    ("src/agent_voucher_window.rs", 6),
     ("src/agent_vouchers.rs", 13),
     ("src/commands.rs", 3),
     ("src/endpoint_coordination.rs", 3),

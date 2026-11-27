@@ -57,6 +57,7 @@ impl MastersKind {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum MastersRows {
     /// The rows of one native kind other than voucher types.
     Native(NativeMasters),
@@ -67,6 +68,7 @@ pub(crate) enum MastersRows {
 }
 
 /// A completed observation of one kind of master.
+#[derive(Debug)]
 pub(crate) struct MastersRead {
     pub(crate) rows: MastersRows,
     pub(crate) evidence: RuntimeReadEvidence,

@@ -301,6 +301,24 @@ fn largest_admitted_mark(kind: NativeMasterKind) -> u64 {
     u64::try_from(MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(kind)).unwrap()
 }
 
+/// The requests the Tally double saw, or a message carrying both the double's error and the
+/// runtime answer already obtained, so a failed `finish()` never hides what the runtime said.
+fn observed_or_message(
+    result: &dyn std::fmt::Debug,
+    finished: std::io::Result<Vec<ObservedRequest>>,
+) -> Result<Vec<ObservedRequest>, String> {
+    finished.map_err(|error| {
+        format!("the simulator's finish failed: {error:?}; the runtime had answered: {result:?}")
+    })
+}
+
+fn observed_or_panic(
+    result: &dyn std::fmt::Debug,
+    finished: std::io::Result<Vec<ObservedRequest>>,
+) -> Vec<ObservedRequest> {
+    observed_or_message(result, finished).unwrap_or_else(|message| panic!("{message}"))
+}
+
 async fn run(
     plans: Vec<ScenarioPlan>,
     kind: MastersKind,
@@ -309,7 +327,8 @@ async fn run(
     let result = TallyRuntime::default()
         .fetch_masters_with_extent(config(&simulator), &identity(), kind)
         .await;
-    (result, simulator.finish().unwrap().len())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished.len())
 }
 
 /// As [`run`], with the requests the Tally double received.
@@ -324,7 +343,8 @@ async fn run_observed(
     let result = TallyRuntime::default()
         .fetch_masters_with_extent(config(&simulator), &identity(), kind)
         .await;
-    (result, simulator.finish().unwrap())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished)
 }
 
 /// The body hash the Tally double records for `request`.
@@ -539,7 +559,7 @@ async fn a_book_over_the_budget_is_refused_before_the_collection_request() {
         let (result, dispatched) =
             run(opening(extent_with_mark(mark)), MastersKind::Native(kind)).await;
 
-        let error = result.err().expect("refused");
+        let error = result.expect_err("refused");
         let row_bytes = u64::try_from(masters_worst_row_bytes(kind)).unwrap();
         assert!(
             matches!(
@@ -567,7 +587,7 @@ async fn education_is_refused_before_identity_or_extent_dispatch() {
     let (result, dispatched) =
         run(vec![status(), xml(education(&companies()))], GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<MastersReadError>(&error),
         Some(MastersReadError::EducationUnqualified)
@@ -583,7 +603,7 @@ async fn a_book_that_moved_during_the_read_is_refused_and_keeps_the_completed_so
     )
     .await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert_eq!(changed.safe_code(), "masters_extent_changed");
@@ -604,7 +624,7 @@ async fn a_collection_that_changed_between_its_paired_reads_is_refused() {
     ]);
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(
         changed,
@@ -620,7 +640,7 @@ async fn a_transport_failure_stays_a_transport_failure() {
     plans.push(xml(godowns()).with_http_status(500));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<bridge_tally_transport::TallyTransportError>(&error),
         Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 500 })
@@ -644,7 +664,7 @@ async fn a_response_with_no_collection_is_the_parsers_typed_refusal() {
     pair(&mut plans, xml(absent));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::CollectionAbsent)
@@ -669,7 +689,7 @@ async fn a_group_answer_bridge_cannot_read_refuses_at_once() {
     pair(&mut plans, xml(absent));
     let (result, dispatched) = run(plans, MastersKind::Groups).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(cause::<PairedReadValidationError>(&error).is_none());
     assert!(cause::<MastersReadError>(&error).is_none());
     // Mode probe and identity (3), opening extent (4), the group pair (4).
@@ -692,7 +712,7 @@ async fn a_voucher_type_answer_with_no_rows_is_refused_at_once() {
     let (result, dispatched) =
         run(plans, MastersKind::Native(NativeMasterKind::VoucherTypes)).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::VoucherTypesEmpty)
@@ -706,7 +726,7 @@ async fn a_response_that_breaks_the_marks_premise_is_refused_after_the_read() {
     let plans = through_closing_extent(extent_with_mark(2), godowns(), extent_with_mark(2));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let violated = cause::<MastersReadError>(&error).expect("a premise refusal");
     assert!(matches!(
         violated,
@@ -728,7 +748,7 @@ async fn a_response_that_breaks_the_marks_premise_is_refused_after_the_read() {
     );
     let plans = through_closing_extent(extent_with_mark(213), padded, extent_with_mark(213));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<MastersReadError>(&error),
         Some(MastersReadError::PremiseViolated(
@@ -752,7 +772,7 @@ async fn a_row_longer_than_the_assumed_worst_row_is_the_parsers_typed_refusal() 
     pair(&mut plans, xml(long_row));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::RowExceedsBound)
@@ -783,7 +803,7 @@ async fn a_book_that_moved_during_the_read_is_reported_as_moved_not_as_what_its_
     let plans = through_closing_extent(extent_with_mark(150), godowns(), extent_with_mark(260));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert_eq!(changed.safe_code(), "masters_extent_changed");
@@ -986,7 +1006,7 @@ async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_req
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let masters_only = result.err().expect("refused");
+    let masters_only = result.expect_err("refused");
     let masters_only = &masters_only
         .downcast_ref::<RuntimeReadFailure>()
         .unwrap()
@@ -1002,7 +1022,7 @@ async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_req
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let with_numbering = result.err().expect("refused");
+    let with_numbering = result.expect_err("refused");
     let with_numbering = &with_numbering
         .downcast_ref::<RuntimeReadFailure>()
         .unwrap()
@@ -1033,7 +1053,7 @@ async fn a_numbering_pair_that_changed_between_its_reads_refuses_the_whole_read(
     ]);
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(
         changed,
@@ -1175,7 +1195,7 @@ async fn a_voucher_types_pair_that_disagrees_twice_is_refused_after_one_more_pai
     });
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(
         changed,
@@ -1202,7 +1222,7 @@ async fn a_failure_of_the_second_voucher_types_pair_stays_a_transport_failure() 
     });
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert!(matches!(
         cause::<bridge_tally_transport::TallyTransportError>(&error),
         Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 500 })
@@ -1222,7 +1242,7 @@ async fn a_book_that_moved_during_a_repeated_voucher_types_read_is_still_reporte
     });
     let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
 
-    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_reported_as_moved(&result.expect_err("refused"));
     // Refused at the closing extent: 3 + 4, two collection pairs, the numbering
     // pair and the closing extent.
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4 + 4);
@@ -1329,7 +1349,7 @@ async fn a_numbering_answer_that_does_not_parse_refuses_at_once_with_the_parsers
             VOUCHER_TYPES_KIND,
         )
         .await;
-        let error = result.err().expect("refused: no rows come back");
+        let error = result.expect_err("refused: no rows come back");
         assert_eq!(cause::<NativeMastersError>(&error), Some(&expected));
         // The masters pair and the numbering pair were read, nothing after.
         assert_eq!(dispatched, 3 + 4 + 4 + 4);
@@ -1350,7 +1370,7 @@ async fn a_numbering_answer_that_does_not_parse_refuses_at_once_with_the_parsers
     )
     .await;
     assert_eq!(
-        cause::<NativeMastersError>(&result.err().expect("refused")),
+        cause::<NativeMastersError>(&result.expect_err("refused")),
         Some(&NativeMastersError::Malformed(
             "masters_numbering_guid_missing"
         ))
@@ -1377,7 +1397,7 @@ async fn a_numbering_answer_that_does_not_join_refuses_the_whole_read_after_the_
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     let refused = cause::<MastersReadError>(&error).expect("a join refusal");
     assert!(matches!(
         refused,
@@ -1407,7 +1427,7 @@ async fn a_numbering_answer_that_does_not_join_refuses_the_whole_read_after_the_
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let refused = cause::<MastersReadError>(&error).expect("a join refusal");
     assert!(matches!(
         refused,
@@ -1427,7 +1447,7 @@ async fn a_numbering_answer_that_does_not_join_refuses_the_whole_read_after_the_
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert!(cause::<MastersReadError>(&error).is_none());
@@ -1448,7 +1468,7 @@ async fn a_book_that_moved_between_the_two_reads_is_reported_as_moved() {
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
     assert!(matches!(changed, PairedReadValidationError::MastersExtent));
     assert_eq!(changed.safe_code(), "masters_extent_changed");
@@ -1474,7 +1494,7 @@ async fn a_numbering_answer_that_repeats_a_guid_is_refused_at_once_by_the_parser
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::DuplicateGuid)
@@ -1585,21 +1605,21 @@ async fn a_numbering_answer_with_more_rows_than_the_mark_is_a_premise_refusal() 
     );
 
     let (result, dispatched) = read_with_numbering(numbering.clone(), mark, mark).await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     assert_numbering_premise_refusal(&error, "masters_numbering_rows_exceed_master_mark");
     // Held until the closing extent was read, and it had not moved.
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 
     // The book moved between the reads: reported as moved.
     let (result, dispatched) = read_with_numbering(numbering, mark, mark + 1).await;
-    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_reported_as_moved(&result.expect_err("refused"));
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 
     // One row fewer is within the premise: the read goes on to the join, which
     // refuses the extra types as a numbering with no masters row.
     let within = numbering_with_extra_types(&numbering_for(&masters), extra - 1);
     let (result, _) = read_with_numbering(within, mark, mark).await;
-    let error = result.err().expect("refused by the join");
+    let error = result.expect_err("refused by the join");
     assert!(matches!(
         cause::<MastersReadError>(&error),
         Some(MastersReadError::NumberingJoin(
@@ -1620,12 +1640,12 @@ async fn a_numbering_answer_over_the_admitted_bytes_is_a_premise_refusal() {
     );
 
     let (result, dispatched) = read_with_numbering(numbering.clone(), 50_000_000, 50_000_000).await;
-    let error = result.err().expect("refused: no rows come back");
+    let error = result.expect_err("refused: no rows come back");
     assert_numbering_premise_refusal(&error, "masters_numbering_response_over_admitted_bytes");
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 
     let (result, dispatched) = read_with_numbering(numbering, 50_000_000, 50_000_001).await;
-    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_reported_as_moved(&result.expect_err("refused"));
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 }
 
@@ -1654,7 +1674,8 @@ async fn run_numbering(
     let result = TallyRuntime::default()
         .fetch_voucher_type_numbering(config(&simulator), &identity(), master_mark)
         .await;
-    (result, simulator.finish().unwrap())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished)
 }
 
 /// The largest AlterID among the voucher types of the real numbering capture.
@@ -1670,6 +1691,36 @@ fn captured_highest_alter_id() -> u64 {
     .map(|row| row.alter_id)
     .max()
     .unwrap()
+}
+
+// Waits out the simulator's fixed 30-second plan deadline: it has no shorter option, and none is
+// added to production code for this test.
+#[tokio::test]
+async fn a_failed_finish_reports_the_runtime_answer_as_well_as_the_simulators_error() {
+    let mut plans = numbering_read_plans(masters_for_numbering_capture(), numbering_capture());
+    plans.push(status());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = TallyRuntime::default()
+        .fetch_voucher_type_numbering(config(&simulator), &identity(), captured_highest_alter_id())
+        .await;
+    assert!(result.is_ok(), "the runtime read must succeed: {result:?}");
+    let message = observed_or_message(&result, simulator.finish())
+        .expect_err("the extra plan is never asked");
+    assert!(
+        message.contains("NoRequestForPlan { plan: 14, plans: 15 }"),
+        "{message}"
+    );
+    assert!(message.contains(&format!("{result:?}")), "{message}");
+}
+
+// As above, through the helper the numbering tests use, so a helper that goes back to a bare
+// `finish().unwrap()` fails here. Waits out the same 30-second plan deadline.
+#[tokio::test]
+#[should_panic(expected = "the runtime had answered: Ok(")]
+async fn the_numbering_helper_shows_the_runtime_answer_when_its_finish_fails() {
+    let mut plans = numbering_read_plans(masters_for_numbering_capture(), numbering_capture());
+    plans.push(status());
+    let _ = run_numbering(plans, captured_highest_alter_id()).await;
 }
 
 #[tokio::test]
@@ -1847,7 +1898,7 @@ async fn a_tally_error_inside_a_stock_item_list_is_refused_at_once() {
     pair(&mut plans, xml(failed));
     let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::TallyReportedFailure)
@@ -1875,7 +1926,7 @@ async fn a_stock_item_row_with_too_many_real_entries_is_the_parsers_typed_refusa
     pair(&mut plans, xml(long_row));
     let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
 
-    let error = result.err().expect("refused");
+    let error = result.expect_err("refused");
     assert_eq!(
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::RowExceedsBound),

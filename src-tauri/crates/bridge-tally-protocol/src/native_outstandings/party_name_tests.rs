@@ -614,6 +614,13 @@ fn a_marked_name_longer_than_any_read_is_refused() {
         LedgerOutstandingsParty::new(&format!("{longest}m")),
         Err(LedgerOutstandingsPartyError::MarkedNameTooLong)
     );
+    // A long name whose only reason to leave the narrower type is a formula word
+    // other than `and` meets the same limit first.
+    let formula_word = format!("Ak or {}", "B".repeat(MARKED_NAME_MAX_CHARS));
+    assert_eq!(
+        LedgerOutstandingsParty::new(&formula_word),
+        Err(LedgerOutstandingsPartyError::MarkedNameTooLong)
+    );
     let plain = format!("Ak{}", " Am".repeat(40));
     assert!(plain.chars().count() > MARKED_NAME_MAX_CHARS);
     assert!(LedgerOutstandingsParty::new(&plain).is_ok());

@@ -114,7 +114,10 @@ fn ledgers(names: &[&[&str]]) -> Vec<Vec<String>> {
 #[test]
 fn a_name_the_party_type_refuses_is_refused_before_anything_is_sent() {
     let book = ledgers(&[&["Lab Party P1"]]);
+    let overlong = "L".repeat(1025);
     for (party, cause) in [
+        (overlong.as_str(), "party_name_too_long"),
+        ("L5 Amp & & Co", "party_name_combination_not_measured"),
         ("L5 Trail ", "party_name_spacing"),
         (" L5 Trail", "party_name_spacing"),
         ("L5  Trail", "party_name_spacing"),
@@ -219,6 +222,8 @@ fn each_party_name_refusal_has_its_own_next_step() {
         "Ak & Am",
         "Ak  Am",
         "",
+        &"L".repeat(1025),
+        "Ak & & Am",
     ] {
         let Err(failure) = admitted_party(party, &book) else {
             panic!("{party:?} was admitted");
@@ -229,6 +234,6 @@ fn each_party_name_refusal_has_its_own_next_step() {
         assert!(!step.contains("Ak"), "{party:?}");
         steps.insert(step);
     }
-    assert_eq!(steps.len(), 7, "each cause has its own step");
+    assert_eq!(steps.len(), 9, "each cause has its own step");
     assert!(super::remediation_for("party_name_not_admitted", None).is_some());
 }

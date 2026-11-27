@@ -2668,9 +2668,17 @@ fn party_name_cause_remediation(cause: &str) -> Option<&'static str> {
             "The party's ledger name starts or ends with a space, or holds two in a row, \
              which Tally does not keep in a name, so nothing was sent."
         )),
-        "party_name_empty" | "party_name_too_long" => Some(step!(
-            "The party's ledger name is empty or longer than any name Tally keeps, so nothing \
-             was sent."
+        "party_name_combination_not_measured" => Some(step!(
+            "The party's ledger name holds marks or words together in a way ComplyEaze Bridge \
+             has not seen Tally read in this report's party name (a quote or bracket left \
+             open, a mark repeated, or marks or words side by side), so nothing was sent."
+        )),
+        "party_name_empty" => Some(step!(
+            "The party's ledger name is empty, so nothing was sent."
+        )),
+        "party_name_too_long" => Some(step!(
+            "The party's ledger name is longer than ComplyEaze Bridge's own limit for a ledger \
+             name it sends (1024 characters), so nothing was sent."
         )),
         _ => None,
     }

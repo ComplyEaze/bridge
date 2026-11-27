@@ -307,7 +307,7 @@ mod post {
     use super::*;
     use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
     use std::time::Duration;
-    use tally_protocol_simulator::{Delivery, ObservedRequest};
+    use tally_protocol_simulator::{Delivery, DeliveryGate, ObservedRequest};
 
     const A: u16 = 0xa1;
     const B: u16 = 0xb2;
@@ -1169,6 +1169,97 @@ mod post {
                 assert!(step.contains(STOCK_VERDICT_UNRECORDED), "{step}");
                 assert!(step.contains(STOCK_ANSWER_UNRECORDED), "{step}");
                 assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+            }
+            assert_eq!(imports(&run.finish()), [create_bytes()], "sent once");
+        }
+    }
+
+    /// Another action holds the admission lock shared from after the Create is
+    /// sent (its request read in full, Tally's answer held) until the post
+    /// returns: a real held lock, no injected fault. The answer's append after
+    /// the send finds the lock busy, and so does the retry under the verdict's
+    /// lock, so nothing past the intent is recorded. A clean read-back is then
+    /// NOT verified, and the answer is a recorded send, never "nothing sent".
+    /// Released while the read-back's first answer is held, after the first
+    /// append failed, the retry records Tally's answer and the verdict, and the
+    /// item is verified.
+    #[tokio::test]
+    async fn an_answer_append_under_an_admission_lock_held_after_the_send_is_a_recorded_send() {
+        for released_before_retry in [false, true] {
+            let (sent_gate, read_gate) = (DeliveryGate::new(), DeliveryGate::new());
+            let mut plans = post_reads();
+            plans.extend(passing_answers());
+            let posted_at = plans.len();
+            plans.push(import_answer().with_delivery(Delivery::Held(sent_gate.clone())));
+            let mut reads = read_back();
+            if released_before_retry {
+                reads[0] = reads[0]
+                    .clone()
+                    .with_delivery(Delivery::Held(read_gate.clone()));
+            } else {
+                read_gate.open();
+            }
+            plans.extend(reads);
+            let run = posting(plans, Redaction::None);
+            record(run.dir(), &shape_batch(A, &run.origin));
+            let simulator = &run.simulator;
+            let until_received = move |count: usize| async move {
+                tokio::time::timeout(Duration::from_secs(20), async {
+                    while simulator.received() < count {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                })
+                .await
+                .expect("the request was read");
+            };
+            let other_action = async {
+                until_received(posted_at + 1).await;
+                assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+                let held = (run.server.lock_import_admission_shared())
+                    .expect("the post holds no lock while Tally's answer is held");
+                sent_gate.open();
+                if released_before_retry {
+                    until_received(posted_at + 2).await;
+                    drop(held);
+                    read_gate.open();
+                    None
+                } else {
+                    Some(held)
+                }
+            };
+            let scripted = ScriptedApproval::approving();
+            let (outcome, held) = tokio::join!(run.post(&scripted, id(A)), other_action);
+            drop(held);
+            let result = outcome.expect("not a refusal").payload["result"].clone();
+            assert_eq!(result["attempt_recorded"], true, "{result}");
+            assert_eq!(result["dispatch"]["state"], "dispatched");
+            assert_eq!(result["verification"]["read_back"]["state"], "read");
+            assert_eq!(result["counters"]["created"], 1);
+            let text = result.to_string();
+            for not_sent in ["Nothing was sent", "sent nothing", "Nothing was written"] {
+                assert!(!text.contains(not_sent), "{not_sent}: {result}");
+            }
+            if released_before_retry {
+                assert_eq!(result["state"], "posted_verified", "{result}");
+                assert_eq!(result["answer_recorded"], true);
+                assert_eq!(run.records(), RECORDED, "recorded on the retry");
+            } else {
+                assert_eq!(result["state"], "posted_unverified", "{result}");
+                assert_eq!(result["answer_recorded"], false);
+                assert_eq!(result["verification"]["verdict_recorded"], false);
+                assert_eq!(
+                    result["verification"]["verdict_record_error"],
+                    "import_admission_busy"
+                );
+                assert_eq!(result["note"], UNRECORDED_NOTE);
+                let step = result["next_step"].as_str().unwrap();
+                assert!(step.contains("never post this batch again"), "{step}");
+                assert!(step.contains(STOCK_ANSWER_UNRECORDED), "{step}");
+                assert_eq!(
+                    run.records(),
+                    ["master_batch", "master_dispatch_intent"],
+                    "not recorded on the retry either"
+                );
             }
             assert_eq!(imports(&run.finish()), [create_bytes()], "sent once");
         }

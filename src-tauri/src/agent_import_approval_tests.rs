@@ -1403,15 +1403,16 @@ async fn a_post_that_has_not_ended_within_its_bound_says_where_it_stood() {
 /// until the simulator has received that request, the cancel has been sent
 /// and the post has been withdrawn. The post is measured at no cost, so the
 /// approval is posted in the call that answered it unless the reads before it
-/// took the call's whole 45-second ceiling; with the measured cost, a runner
+/// took more than the call's 45-second ceiling; with the measured cost, a runner
 /// whose reads ran past about 24 seconds kept the approval for a later call,
 /// and no lease was started.
 ///
 /// A post that ends before the held request sends no cancel, so it fails as
 /// that, with the requests the simulator served, and not as a cancellation
 /// that did not take: on one Windows runner a read about twenty requests
-/// before the approval failed, and the test said only that the post was not
-/// withdrawn (#2551).
+/// before the approval appears to have failed (the answer's request and
+/// response digests match a fault injected there), and the test said only
+/// that the post was not withdrawn (#2551).
 #[test]
 fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;

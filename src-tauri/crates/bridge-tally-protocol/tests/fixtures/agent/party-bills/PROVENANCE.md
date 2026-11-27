@@ -92,17 +92,26 @@ number. The control of each row, a plain name, is not kept.
 The request files are the lab's, as sent: UTF-16LE with a byte-order mark. The answers and snapshots are as received,
 without one. The tests strip the mark before comparing a request with the one Bridge builds.
 
+Kept: twenty-three marked names, NS's ten and NX's ten, two of NC's eleven names and one of MX's eleven (each row's
+eleven being ten mixes and a plain control), each with its request, one answer and the row's snapshot. Not kept: NS's
+and NX's controls, NC's other nine names and MX's other ten (their controls among them), the answers before each
+ledger existed, the second answer of each pair, and the Bills Receivable reads.
+
 Tests: `src/native_outstandings/party_name_tests.rs` builds each name, compares Bridge's request with the lab's,
-parses the answer and ties it to that name's row of the snapshot.
+parses the answer and ties it to that name's row of the snapshot. Its test of the rule reads every kept request's
+`LedgerName`, and holds the admitted placings of each mark and the marked-name length cap (72 characters, the
+longest kept marked name) to exactly what those names show.
 
 Confidence, with the markers of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`: PARTIAL for every finding here (protocol
 reference §12a.34). Each was observed live, request and answer captured, on one synthetic book, one release, in four
 sittings; Bridge's own transport did not send these requests.
 
 Not established: a name whose letters-and-digits key another ledger shares, through this report, for any mark but
-`'` and `_` (rows 2480-SK and 2480-SC, not kept here); any mix not read, a mark in another position (`"` other than as
-a pair, `#` other than before a digit, `%` other than after digits); any mark, formula word or Devanagari character
-not named above; any other book, release or edition; Bridge's own transport.
+`'` and `_` (rows 2480-SK and 2480-SC, not kept here); a mark placed other than in a kept name (first, beside another
+mark or beside Devanagari, or between other neighbours), a name of marks only, a marked name starting with a digit or
+longer than 72 characters; `and` first, last, beside a mark or in another case; Devanagari other than the whole word
+read, or first; any mark or formula word not named above; groups and other masters sharing a key, and look-alike
+characters in other ledgers' names; any other book, release or edition; Bridge's own transport.
 
 | Fixture | Bytes | SHA-256 | Source (lab file) | What it is |
 | --- | ---: | --- | --- | --- |

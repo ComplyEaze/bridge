@@ -301,6 +301,24 @@ fn largest_admitted_mark(kind: NativeMasterKind) -> u64 {
     u64::try_from(MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(kind)).unwrap()
 }
 
+/// The requests the Tally double saw, or a message carrying both the double's error and the
+/// runtime answer already obtained, so a failed `finish()` never hides what the runtime said.
+fn observed_or_message(
+    result: &dyn std::fmt::Debug,
+    finished: std::io::Result<Vec<ObservedRequest>>,
+) -> Result<Vec<ObservedRequest>, String> {
+    finished.map_err(|error| {
+        format!("the simulator's finish failed: {error:?}; the runtime had answered: {result:?}")
+    })
+}
+
+fn observed_or_panic(
+    result: &dyn std::fmt::Debug,
+    finished: std::io::Result<Vec<ObservedRequest>>,
+) -> Vec<ObservedRequest> {
+    observed_or_message(result, finished).unwrap_or_else(|message| panic!("{message}"))
+}
+
 async fn run(
     plans: Vec<ScenarioPlan>,
     kind: MastersKind,
@@ -309,7 +327,8 @@ async fn run(
     let result = TallyRuntime::default()
         .fetch_masters_with_extent(config(&simulator), &identity(), kind)
         .await;
-    (result, simulator.finish().unwrap().len())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished.len())
 }
 
 /// As [`run`], with the requests the Tally double received.
@@ -324,7 +343,8 @@ async fn run_observed(
     let result = TallyRuntime::default()
         .fetch_masters_with_extent(config(&simulator), &identity(), kind)
         .await;
-    (result, simulator.finish().unwrap())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished)
 }
 
 /// The body hash the Tally double records for `request`.
@@ -1654,7 +1674,8 @@ async fn run_numbering(
     let result = TallyRuntime::default()
         .fetch_voucher_type_numbering(config(&simulator), &identity(), master_mark)
         .await;
-    (result, simulator.finish().unwrap())
+    let finished = observed_or_panic(&result, simulator.finish());
+    (result, finished)
 }
 
 /// The largest AlterID among the voucher types of the real numbering capture.
@@ -1670,6 +1691,23 @@ fn captured_highest_alter_id() -> u64 {
     .map(|row| row.alter_id)
     .max()
     .unwrap()
+}
+
+// Waits out the simulator's fixed 30-second plan deadline: it has no shorter option, and none is
+// added to production code for this test.
+#[tokio::test]
+async fn a_failed_finish_reports_the_runtime_answer_as_well_as_the_simulators_error() {
+    let mut plans = numbering_read_plans(masters_for_numbering_capture(), numbering_capture());
+    plans.push(status());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = TallyRuntime::default()
+        .fetch_voucher_type_numbering(config(&simulator), &identity(), captured_highest_alter_id())
+        .await;
+    assert!(result.is_ok(), "the runtime read must succeed: {result:?}");
+    let message =
+        observed_or_message(&result, simulator.finish()).expect_err("plan 11 never asked");
+    assert!(message.contains("NoRequestForPlan"), "{message}");
+    assert!(message.contains(&format!("{result:?}")), "{message}");
 }
 
 #[tokio::test]

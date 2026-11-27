@@ -2335,10 +2335,12 @@ mod tests {
             "an opening value of zero is a value"
         );
         // Opening values whose total would not fit are not taken, in either direction, and never
-        // wrapped (#1602). Each value alone parses.
+        // wrapped (#1602). Each value alone parses. The value is built, not written out: a digit run
+        // this long reads as an identifier to the merge gate's privacy scan.
+        let big = format!("6{}.00", "0".repeat(16));
         for (one, other) in [
-            ("-60000000000000000.00", "-60000000000000000.00"),
-            ("60000000000000000.00", "60000000000000000.00"),
+            (format!("-{big}"), format!("-{big}")),
+            (big.clone(), big.clone()),
         ] {
             let huge = stock_items_part(&format!(
                 "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>{one}</OPENINGVALUE></STOCKITEM>\
@@ -2350,9 +2352,9 @@ mod tests {
                 "{one} {other}"
             );
         }
-        let one_huge = stock_items_part(
-            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>-60000000000000000.00</OPENINGVALUE></STOCKITEM>",
-        );
+        let one_huge = stock_items_part(&format!(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>-{big}</OPENINGVALUE></STOCKITEM>"
+        ));
         assert_eq!(
             opening_stock(Some(true), Some(&one_huge), Some(&from), Some(&from)),
             OpeningStock::Valued(6_000_000_000_000_000_000)

@@ -32,6 +32,7 @@
 //! on a batch whose send is recorded reads back and judges the same way, under
 //! the observation lease, and never verifies; a settled batch is answered from
 //! the journal alone. A send that failed is answered with no read.
+use super::super::approval::Redemption;
 use super::super::master_ledger::read_stock_item_journal;
 use super::super::master_ledger::stock_item_journal::{
     record_stock_item_intent, Answer, StockIntentRefusal, StockItemBatch, StockJudgement,
@@ -42,7 +43,9 @@ use super::super::master_ledger::{
 };
 use super::super::master_post::aim_master_marks;
 use super::super::master_post::StockItemRecheckError;
-use super::super::master_post::{recheck_stock_item_for_dispatch, stock_company_marks};
+use super::super::master_post::{
+    recheck_stock_item_for_dispatch, stock_company_marks, StockItemRecheckPassed,
+};
 use super::super::master_review::{show_stock_item_draft, ShownStockItem};
 use super::*;
 use crate::agent::failure_code::{
@@ -302,12 +305,7 @@ impl Server {
                     &identity,
                     approved,
                     recheck_stock_item_for_dispatch,
-                    |passed| {
-                        let lock = ExclusiveAdmission::acquire(data_dir)
-                            .map_err(BeforeDispatchError::Other)?;
-                        record_stock_item_intent(data_dir, &lock, &batch, passed, &taken)
-                            .map_err(stock_intent_refusal)
-                    },
+                    |passed| record_under_lock(data_dir, &batch, passed, &taken),
                 )
                 .await;
             // An approval this post did not use lapses: it is never offered
@@ -620,6 +618,19 @@ fn owed_digest(approved: &ApprovedImport, batch: &StockItemBatch) -> Result<(), 
         return Err(MasterPostCode::BatchChanged.into());
     }
     Ok(())
+}
+
+/// The stock intent, written under the admission lock. A lock it cannot take
+/// is refused by name before any byte is written, as the ledger post's is.
+fn record_under_lock(
+    data_dir: &Path,
+    batch: &StockItemBatch,
+    passed: StockItemRecheckPassed,
+    taken: &Redemption<'_>,
+) -> Result<RecordedIntent, BeforeDispatchError> {
+    let lock = ExclusiveAdmission::acquire_or_refuse(data_dir)
+        .map_err(|refusal| BeforeDispatchError::Refused(UnderLockRefusal::Admission(refusal)))?;
+    record_stock_item_intent(data_dir, &lock, batch, passed, taken).map_err(stock_intent_refusal)
 }
 
 /// The stock writer's refusal as the queue takes it: a token or an approval of

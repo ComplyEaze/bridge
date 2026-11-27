@@ -1176,6 +1176,46 @@ mod post {
         }
     }
 
+    /// The admission lock held by a read when the stock writer begins: the
+    /// lock's own refusal, with no intent and no sidecar, and the answer's
+    /// code is the lock's.
+    #[tokio::test]
+    async fn the_stock_writer_refuses_a_busy_admission_lock_by_name_and_records_nothing() {
+        use crate::tally::approved_import::AdmissionLockRefusal;
+        let directory = tempfile::tempdir().unwrap();
+        let dir = directory.path();
+        let batch = shape_batch(A, "http://127.0.0.1:9000");
+        record(dir, &batch);
+        let holder = tempfile::tempdir().unwrap();
+        let approvals = stock_approvals(holder.path());
+        let taken = taken_stock_approval(&approvals, batch.batch_id()).await;
+        let passed = minted(batch.batch_id()).await;
+        let held = std::fs::File::open(dir.join("agent-import-admission.lock")).unwrap();
+        held.lock_shared().unwrap();
+        let refused = match record_under_lock(dir, &batch, passed, &taken) {
+            Err(BeforeDispatchError::Refused(refusal)) => refusal,
+            Err(BeforeDispatchError::Other(code)) => panic!("expected a named refusal, got {code}"),
+            Ok(_) => panic!("expected a named refusal, got an intent"),
+        };
+        drop(held);
+        assert_eq!(
+            refused,
+            UnderLockRefusal::Admission(AdmissionLockRefusal::Busy)
+        );
+        assert_eq!(
+            super::super::super::super::post::refusal_code(&anyhow::Error::from(refused)),
+            "import_admission_busy"
+        );
+        let journal = std::fs::read(dir.join(STOCK_JOURNAL)).unwrap();
+        let records: Vec<_> = (journal_lines(&journal).iter())
+            .map(|line| line["record_type"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(records, ["master_batch"]);
+        assert!(!dir
+            .join(format!("master-pre-image-{}.json", batch.batch_id()))
+            .exists());
+    }
+
     /// The writer's refusals as the queue takes them: a token or approval of
     /// another batch, or another digest, is a changed batch; the rest pass
     /// through.

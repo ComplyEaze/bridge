@@ -1,0 +1,1 @@
+- A failed `finish()` in the masters runtime tests now reports the simulator's error together with the runtime answer already obtained, instead of panicking before that answer is shown (#2550).

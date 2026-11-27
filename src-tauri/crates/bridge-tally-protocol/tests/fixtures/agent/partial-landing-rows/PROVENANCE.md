@@ -2,7 +2,7 @@
 
 These files are the requests and answers around three posts of the same three Journals. The book was `BRIDGE STOCK CREATE LAB`, one synthetic company with accounts integrated with inventory. The release was TallyPrime 7.2, single-user edition. The rows ran on 12 Nov 2026, each row once. Each post went through `post_import` and was approved once at its box. A relaying proxy kept every request and answer whole.
 
-The middle voucher of R0 held a ledger under Stock-in-Hand, which Tally refused. R1 sent that voucher first and R2 last. Each post landed in part. Each import answer reports `CREATED` 2 and `EXCEPTIONS` 1 and names no voucher.
+The middle voucher of R0 held a ledger under Stock-in-Hand, which Tally refused. R1 sent that voucher first and R2 last. Each post landed in part. Each import answer reports `CREATED` 2 and `EXCEPTIONS` 1. Its one `LINEERROR` names the refused ledger (`Cannot use 'A1 Closing Stock': Ledger under Stock-in-Hand!`), not a voucher.
 
 ## Source and transformation
 
@@ -48,7 +48,7 @@ Partial: one run per row, one book.
 
 ## What they do not establish
 
-- That this book held no other voucher on that date.
+- That the book held no voucher on that date that the verification read's date filter would not return.
 - Another release, another fault kind, a book not integrated with inventory, or a multi-user edition.
 - Two refusals in one post, or a refusal of one of two identical vouchers.
-- What the `<VOUCHER>` count in `CMPINFO` counts. It reads 1 then 3 in R0 and 0 then 2 in R1 and R2. The lab's report does not explain it; the lab's own voucher reads show the same three vouchers in every row.
+- What the `<VOUCHER>` count in `CMPINFO` counts. In the marks answers it reads 1 then 3 in R0, and 0 then 2 in R1 and R2. The verification answers show the same counts. The lab's report does not explain it; the lab's own voucher reads show the same three vouchers in every row.

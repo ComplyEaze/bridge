@@ -57,6 +57,7 @@ impl MastersKind {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum MastersRows {
     /// The rows of one native kind other than voucher types.
     Native(NativeMasters),
@@ -67,6 +68,7 @@ pub(crate) enum MastersRows {
 }
 
 /// A completed observation of one kind of master.
+#[derive(Debug)]
 pub(crate) struct MastersRead {
     pub(crate) rows: MastersRows,
     pub(crate) evidence: RuntimeReadEvidence,
@@ -779,7 +781,7 @@ pub(super) async fn read_stock_item_admission(
         encoded_sha256,
     };
     let count_request = render_company_inventory_flags_request(
-        identity.display_name(),
+        identity.company_name(),
         identity.company_guid_value(),
     );
     let count_pair = client

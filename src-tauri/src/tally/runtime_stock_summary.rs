@@ -353,7 +353,7 @@ async fn count_by_span<C: CensusCollection + Copy>(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,
     mark: u64,
-    render: fn(&str, &CensusSlice<C>) -> String,
+    render: fn(&ValidatedCompanyName, &CensusSlice<C>) -> String,
     parse: fn(&str, &str, u64) -> Result<Vec<String>, StandardLedgerCatalogError>,
     none_is_a_count: bool,
     evidence: &mut RuntimeReadEvidence,
@@ -364,7 +364,7 @@ async fn count_by_span<C: CensusCollection + Copy>(
     let plan = CensusPlan::<C>::new(mark, STOCK_CENSUS_LIMITS).map_err(refused)?;
     let mut census = Census::new(plan);
     while let Some(slice) = census.next_slice() {
-        let request = render(identity.display_name(), &slice);
+        let request = render(identity.company_name(), &slice);
         let (body, bytes, sha256) = client.fetch_census_slice(request.clone()).await?;
         *evidence = evidence
             .clone()
@@ -545,7 +545,7 @@ impl TallyRuntime {
                         stock_summary_period(profile, &as_of, extent.books_from(), &today)?;
 
                     let request = render_company_inventory_flags_request(
-                        identity.display_name(),
+                        identity.company_name(),
                         identity.company_guid_value(),
                     );
                     let (xml, bytes, hash) = client

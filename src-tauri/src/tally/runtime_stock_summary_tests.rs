@@ -23,7 +23,7 @@ use bridge_tally_protocol::native_stock_summary::{
     NativeItemCountCrossCheck, NativeItemCountStatus, NativeStockError, NativeStockGate,
     NativeStockItemCount, NativeStockReport, StockSummaryAsOf,
 };
-use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
+use bridge_tally_protocol::xml_read_profiles::ValidatedDateRange;
 use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
 
 /// The synthetic book the stock captures came from. Its GUID is replaced by the
@@ -250,7 +250,7 @@ fn body_hash(request: &str) -> String {
 
 /// The three requests a read of the test company sends over 20250401 to 20260331.
 fn sent_requests() -> [String; 3] {
-    let name = identity().display_name().to_string();
+    let identity = identity();
     let period = stock_summary_period(
         DateBoundaryProfile::ModeAgnostic,
         &StockSummaryAsOf::new(TallyDate::parse(AS_OF).unwrap()).unwrap(),
@@ -258,16 +258,16 @@ fn sent_requests() -> [String; 3] {
         &TallyDate::parse(TODAY).unwrap(),
     )
     .unwrap();
-    let company = ValidatedCompanyName::new(name.as_str()).unwrap();
+    let company = identity.company_name();
     let range = ValidatedDateRange::new("20250401", "20260331").unwrap();
     [
-        render_company_inventory_flags_request(&name, &crate::tally::test_company_guid(GUID)),
+        render_company_inventory_flags_request(company, &crate::tally::test_company_guid(GUID)),
         ReadOnlyProfile::AuditStockItemsV1 {
-            company: &company,
+            company,
             period: &range,
         }
         .render(),
-        render_native_stock_summary_request(&company, &period),
+        render_native_stock_summary_request(company, &period),
     ]
 }
 
@@ -599,10 +599,10 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
         },
     )
     .unwrap();
-    let name = identity().display_name().to_string();
+    let identity = identity();
     assert!(was_sent(
         &observed,
-        &render_stock_item_census_slice_request(&name, &census.slices()[0])
+        &render_stock_item_census_slice_request(identity.company_name(), &census.slices()[0])
     ));
     let [_, items, report] = sent_requests();
     assert!(!was_sent(&observed, &items));
@@ -668,11 +668,11 @@ async fn a_book_past_the_mark_is_counted_then_read_whole() {
         slice_width: 4_000,
         max_slices: 100,
     };
-    let name = identity().display_name().to_string();
+    let identity = identity();
     assert!(was_sent(
         &observed,
         &render_stock_item_census_slice_request(
-            &name,
+            identity.company_name(),
             &CensusPlan::<StockItems>::new(mark, limits)
                 .unwrap()
                 .slices()[0]
@@ -681,7 +681,7 @@ async fn a_book_past_the_mark_is_counted_then_read_whole() {
     assert!(was_sent(
         &observed,
         &bridge_tally_protocol::ledger_census::render_stock_group_census_slice_request(
-            &name,
+            identity.company_name(),
             &CensusPlan::<bridge_tally_protocol::ledger_census::StockGroups>::new(mark, limits)
                 .unwrap()
                 .slices()[0]

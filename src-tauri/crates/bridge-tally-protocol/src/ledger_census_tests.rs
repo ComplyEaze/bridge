@@ -237,7 +237,7 @@ fn the_slice_request_is_the_request_that_was_sent_live() {
     let second = plan.slices()[1];
     assert_eq!((second.after(), second.through()), (500, 508));
     let sent = crate::encode_tally_xml_request_utf16le(&render_ledger_census_slice_request(
-        "BRIDGE SIZE 2K",
+        &ValidatedCompanyName::new("BRIDGE SIZE 2K").unwrap(),
         &second,
     ));
     assert_eq!(sent.len(), 1906);
@@ -254,7 +254,7 @@ fn the_slice_request_is_the_request_that_was_sent_live() {
     )
     .unwrap();
     let sent = crate::encode_tally_xml_request_utf16le(&render_ledger_census_slice_request(
-        "BRIDGE SIZE 2K",
+        &ValidatedCompanyName::new("BRIDGE SIZE 2K").unwrap(),
         &first_captured.slices()[0],
     ));
     assert_eq!(sent.len(), 1898);
@@ -267,7 +267,10 @@ fn the_slice_request_is_the_request_that_was_sent_live() {
 #[test]
 fn the_company_name_is_escaped_and_the_formula_is_digits_only() {
     let plan = plan(10).unwrap();
-    let request = render_ledger_census_slice_request("A & B <LAB>", &plan.slices()[0]);
+    let request = render_ledger_census_slice_request(
+        &ValidatedCompanyName::new("A & B <LAB>").unwrap(),
+        &plan.slices()[0],
+    );
     assert!(request.contains("<SVCURRENTCOMPANY>A &amp; B &lt;LAB&gt;</SVCURRENTCOMPANY>"));
     assert!(request.contains(r#"NAME="BridgeSpan">$AlterID &gt; 0 AND $AlterID &lt;= 10</SYSTEM>"#));
     assert!(request.contains("<FILTERS>BridgeSpan</FILTERS>"));
@@ -350,7 +353,10 @@ fn a_stock_item_census_tiles_and_counts_as_the_ledger_census_does() {
 #[test]
 fn the_stock_item_slice_request_is_the_ledger_formula_over_stock_items() {
     let plan = CensusPlan::<StockItems>::new(10, LIMITS).unwrap();
-    let request = render_stock_item_census_slice_request("A & B <LAB>", &plan.slices()[0]);
+    let request = render_stock_item_census_slice_request(
+        &ValidatedCompanyName::new("A & B <LAB>").unwrap(),
+        &plan.slices()[0],
+    );
     assert!(request.contains("<SVCURRENTCOMPANY>A &amp; B &lt;LAB&gt;</SVCURRENTCOMPANY>"));
     assert!(request.contains(r#"NAME="BridgeSpan">$AlterID &gt; 0 AND $AlterID &lt;= 10</SYSTEM>"#));
     assert!(request.contains("<TYPE>StockItem</TYPE><FETCH>GUID</FETCH>"));
@@ -375,7 +381,7 @@ fn the_stock_item_slice_request_keeps_its_bytes() {
     )
     .unwrap();
     let sent = crate::encode_tally_xml_request_utf16le(&render_stock_item_census_slice_request(
-        "BRIDGE STOCK LAB",
+        &ValidatedCompanyName::new("BRIDGE STOCK LAB").unwrap(),
         &plan.slices()[0],
     ));
     assert_eq!(sent.len(), 1278);
@@ -390,9 +396,12 @@ fn the_stock_item_slice_request_keeps_its_bytes() {
 #[test]
 fn the_stock_group_slice_request_is_the_stock_item_shape_over_stock_groups() {
     let plan = CensusPlan::<StockGroups>::new(10, LIMITS).unwrap();
-    let groups = render_stock_group_census_slice_request("A & B <LAB>", &plan.slices()[0]);
+    let groups = render_stock_group_census_slice_request(
+        &ValidatedCompanyName::new("A & B <LAB>").unwrap(),
+        &plan.slices()[0],
+    );
     let items = render_stock_item_census_slice_request(
-        "A & B <LAB>",
+        &ValidatedCompanyName::new("A & B <LAB>").unwrap(),
         &CensusPlan::<StockItems>::new(10, LIMITS).unwrap().slices()[0],
     );
     assert_eq!(

@@ -826,3 +826,70 @@ fn the_full_width_full_stop_low_line_and_reverse_solidus_fold_like_their_ascii_f
         );
     }
 }
+
+#[test]
+fn a_trailing_run_from_2000_to_2099_is_kept_as_a_year_so_b2_2045_and_b2_2046_need_a_person() {
+    // A trailing 2000-to-2099 running number stays a year when another digit remains.
+    // Same-date, same-value B2/2045 and B2/2046 need a person to release PossiblyBooked.
+    // This is kept until real books are measured (issue 2557).
+    let new = incoming("B2/2045", "20251201");
+    let copy = booked("B2/2046", Some("20251201"), "20251203");
+    assert_eq!(compare(&new, &copy), InvoiceMatch::PossiblyBooked);
+}
+
+#[test]
+fn two_digit_year_pairs_and_fy_years_stay_placeholders_so_identical_copies_need_a_person() {
+    // Neighbouring two-digit runs a year apart stay named years; FY0001 stays an FY year.
+    // With no other non-zero digit they are placeholders. The cost: an identical copy with
+    // neither the date nor the value shared is Different, so it is not found; with the same date
+    // and value it is PossiblyBooked and needs a person.
+    // This is kept until real books are measured (issue 2557).
+    for placeholder in ["10/11", "INV/45/46", "FY0001"] {
+        assert!(reference(placeholder).is_placeholder(), "{placeholder}");
+        let new = incoming(placeholder, "20251201");
+        let mut without_signal = booked(placeholder, Some("20251205"), "20251206");
+        without_signal.value = Some(value("100.00"));
+        assert_eq!(
+            compare(&new, &without_signal),
+            InvoiceMatch::Different,
+            "{placeholder} without a second signal"
+        );
+        let with_signals = booked(placeholder, Some("20251201"), "20251203");
+        assert_eq!(
+            compare(&new, &with_signals),
+            InvoiceMatch::PossiblyBooked,
+            "{placeholder} with the same date and value"
+        );
+    }
+}
+
+#[test]
+fn placeholder_year_spellings_stay_different_so_shared_date_and_value_do_not_prompt_a_person() {
+    // The year in a placeholder is not normalised across two- and four-digit spellings.
+    // INV/2025-26 and INV/25-26 stay Different even with the same date and value. The cost: a
+    // copy keyed with the year spelt the other way is not found, and no person is asked.
+    // This is kept until real books are measured (issue 2557).
+    let new = incoming("INV/2025-26", "20251201");
+    let copy = booked("INV/25-26", Some("20251201"), "20251203");
+    assert!(new.reference.is_placeholder());
+    assert!(copy.reference.is_placeholder());
+    assert_eq!(compare(&new, &copy), InvoiceMatch::Different);
+}
+
+#[test]
+fn the_kept_year_rules_have_the_edges_they_name() {
+    // Two-digit runs not a year apart are a number, not a named year.
+    assert!(!reference("10/12").is_placeholder());
+    // A leading 2000-to-2099 run is read as a year as a trailing one is.
+    let new = incoming("2045/B2", "20251201");
+    let copy = booked("2046/B2", Some("20251201"), "20251203");
+    assert_eq!(compare(&new, &copy), InvoiceMatch::PossiblyBooked);
+    // The range ends at 2099: a trailing 2100 is the number, so the two are different.
+    let new = incoming("B2/2100", "20251201");
+    let copy = booked("B2/2101", Some("20251201"), "20251203");
+    assert_eq!(compare(&new, &copy), InvoiceMatch::Different);
+    // With no other digit the run is kept as the number, so B/2045 and B/2046 are different.
+    let new = incoming("B/2045", "20251201");
+    let copy = booked("B/2046", Some("20251201"), "20251203");
+    assert_eq!(compare(&new, &copy), InvoiceMatch::Different);
+}

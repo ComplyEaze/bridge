@@ -94,6 +94,7 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
         "edit",
         "posting",
         "deletion",
+        "vanished",
         "incomplete",
     ] {
         let changed = !matches!(change, "stable" | "zero");
@@ -125,6 +126,19 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             }
             "posting" => before.fixture = Fixture::SyntheticXml(reduced.clone()),
             "deletion" => after.fixture = Fixture::SyntheticXml(reduced.clone()),
+            "vanished" => {
+                // Every voucher gone from the replay. The ledger-scoped replay of the same parts
+                // finds none, which asks for the book's window; on the replay that is drift, and
+                // the refusal is the replay's own, not the first read's comparison.
+                let mut emptied = original.to_string();
+                while let Some(start) = emptied.find("<VOUCHER ") {
+                    let end =
+                        start + emptied[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+                    emptied.replace_range(start..end, "");
+                }
+                assert_ne!(emptied, original);
+                after.fixture = Fixture::SyntheticXml(emptied);
+            }
             "incomplete" => {
                 // Omit one balancing side in both paired responses. Keep the
                 // selected WR2 Sales entry, so selection cannot hide refusal.

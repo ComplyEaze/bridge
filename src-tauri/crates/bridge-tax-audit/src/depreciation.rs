@@ -1122,6 +1122,11 @@ mod tests {
         }
         Rules {
             version: "test".to_string(),
+            assessment_year: "2026-27".to_string(),
+            previous_year: (
+                TallyDate::parse("20250401").unwrap(),
+                TallyDate::parse("20260331").unwrap(),
+            ),
             turnover_threshold_paise: 0,
             turnover_threshold_low_cash_paise: 0,
             cash_share_limit_bp: 0,

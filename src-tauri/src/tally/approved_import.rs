@@ -1,6 +1,10 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
 use super::ledger_create_item::{LedgerCreateBatch, RenderedLedgerCreate, MAX_LEDGERS_PER_BATCH};
+use super::runtime::{
+    AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits, CompanyMarksParser,
+};
+use super::stock_item_create::{render_stock_item_create, PreparedStockItem};
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
@@ -82,6 +86,26 @@ fn masters_words(count: VoucherCount) -> Option<(String, String)> {
         Some(_) => None,
     }
 }
+
+/// The same for the stock-item dialog (#1381), distinct from every other.
+const STOCK_ITEM_TOKEN_PREFIX: &str = "bridge-create-stock-item:";
+/// The stock-item dialog's title. The Windows box has no custom labels, so the
+/// title asks the question there as well.
+const STOCK_ITEM_TITLE: &str = "ComplyEaze Bridge — create one stock item?";
+/// The stock-item dialog's Mac button.
+const STOCK_ITEM_BUTTON: &str = "Create stock item";
+/// The count the stock-item dialog is told: it is only ever about one item.
+const ONE_STOCK_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
+
+/// The stock-item dialog's title and its Mac button. Only one item is ever
+/// asked about: any other count has no words, and no box is shown.
+fn stock_item_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((STOCK_ITEM_TITLE.into(), STOCK_ITEM_BUTTON.into())),
+        Some(_) => None,
+    }
+}
+
 /// The same for the invoice-stop release dialog, distinct from both.
 const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
 /// The same for the settle dialog (#1709), distinct from every other.
@@ -192,8 +216,13 @@ pub(crate) struct InvoiceReadPlan {
     /// so it is unchanged when one is regrouped; this is how the queue tells.
     pub(crate) ledger_parents: Vec<(String, String)>,
     pub(crate) voucher_types: AgentReadRequest,
-    pub(crate) number: AgentReadRequest,
-    /// The same read for the invoice the journal held as the number's control.
+    /// The invoice's financial year read for its Sales rows one calendar
+    /// month at a time, in order: the number is looked for in these answers
+    /// (#2162 item 11).
+    pub(crate) number: Vec<AgentReadRequest>,
+    /// The same read of the month of the invoice the journal held as the
+    /// number's control, when that invoice is dated outside the year above;
+    /// one dated inside it is checked in that month's answer.
     pub(crate) number_control: Option<AgentReadRequest>,
     pub(crate) registration: AgentReadRequest,
     /// The company object the HSN/SAC check reads once the classification
@@ -230,7 +259,8 @@ pub(crate) struct InvoiceAnswers {
     pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
     pub(crate) rates: Option<String>,
     pub(crate) voucher_types: Option<String>,
-    pub(crate) number: Option<String>,
+    /// The answers to the plan's month reads, in order, as far as read.
+    pub(crate) number: Vec<String>,
     pub(crate) number_control: Option<String>,
     pub(crate) registration: Option<String>,
     pub(crate) company_hsn: Option<String>,
@@ -271,15 +301,68 @@ impl VoucherAdmission {
     }
 }
 
-/// A master post's admission: one request of ledger `Create`s, rendered once.
+/// A master post's admission: one request of ledger `Create`s, or one stock
+/// item `Create`, rendered once, and the journal batch it is bound to.
 ///
-/// `rendered` is produced once, when the admission is built, and never again,
+/// The bytes are produced once, when the admission is built, and never again,
 /// so the bytes the POST sends are the bytes whose digest the dispatch intent
-/// records. The only production constructor is [`ApprovedImport::confirm_masters`],
-/// which builds it before the dialog and holds it only if the person approves,
-/// so no code holds an approved masters kind without that answer (P2).
+/// records. The only production constructors are [`ApprovedImport::confirm_masters`]
+/// and [`ApprovedImport::confirm_stock_item`], which build it before the dialog
+/// and hold it only if the person approves, so no code holds an approved
+/// masters kind without that answer (P2).
 #[derive(Clone)]
 pub(super) struct MasterAdmission {
+    writes: MasterWrites,
+}
+
+/// What a master admission creates: ledgers, or one stock item with the bytes
+/// its one renderer gave. Nothing shipped sends a stock item yet: only the
+/// stock recheck admits one, and it has no shipped caller.
+#[derive(Clone)]
+enum MasterWrites {
+    Ledgers(LedgerAdmission),
+    StockItem(StockItemAdmission),
+}
+
+/// What a master admission creates, by reference, for the runtime to match
+/// once at each site.
+pub(super) enum AdmittedWrites<'a> {
+    Ledgers(&'a LedgerAdmission),
+    StockItem(&'a StockItemAdmission),
+}
+
+/// One stock item `Create`: the value it was rendered from, the bytes rendered
+/// from it once, the parser the queue reads the all-company marks with, and the
+/// master journal batch it was approved for. The batch is set at birth and
+/// nothing rebinds it ([`ApprovedImport::bound_to_batch`]), so every clone of
+/// the approval carries the batch it was approved for.
+#[derive(Clone)]
+pub(super) struct StockItemAdmission {
+    prepared: PreparedStockItem,
+    rendered: String,
+    parse_marks: CompanyMarksParser,
+    batch_id: String,
+}
+
+impl StockItemAdmission {
+    /// The company the item is created in, as its draft was read.
+    pub(super) fn company(&self) -> &VerifiedCompanyIdentity {
+        self.prepared.company()
+    }
+
+    pub(super) fn parse_marks(&self) -> CompanyMarksParser {
+        self.parse_marks
+    }
+}
+
+/// One request of ledger `Create`s, rendered once, with the two index reads
+/// the queue rechecks it on.
+#[derive(Clone)]
+pub(super) struct LedgerAdmission {
+    /// The master journal batch this approval is for, once the tool binds it
+    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
+    /// batch is licensed by no intent.
+    batch_id: Option<String>,
     batch: LedgerCreateBatch,
     rendered: RenderedLedgerCreate,
     /// The ledger name index read (the V3 catalogue request).
@@ -287,13 +370,54 @@ pub(super) struct MasterAdmission {
     /// The group name index read (the group snapshot request).
     group_index_request: AgentReadRequest,
     company: VerifiedCompanyIdentity,
-    /// The master journal batch this approval is for, once the tool binds it
-    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
-    /// batch is licensed by no intent.
-    batch_id: Option<String>,
 }
 
 impl MasterAdmission {
+    /// The ledger admission, rendered once, with the two index reads.
+    fn new(
+        batch: LedgerCreateBatch,
+        company: &VerifiedCompanyIdentity,
+    ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
+        Ok(Self {
+            writes: MasterWrites::Ledgers(LedgerAdmission::new(batch, company)?),
+        })
+    }
+
+    /// The stock-item admission, rendered once, bound at birth to the batch
+    /// it is approved for.
+    fn stock_item(
+        prepared: PreparedStockItem,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
+        let rendered = render_stock_item_create(&prepared);
+        Self {
+            writes: MasterWrites::StockItem(StockItemAdmission {
+                prepared,
+                rendered,
+                parse_marks,
+                batch_id,
+            }),
+        }
+    }
+
+    /// What this admission creates: the ledger admission, or the stock item's.
+    pub(super) fn writes(&self) -> AdmittedWrites<'_> {
+        match &self.writes {
+            MasterWrites::Ledgers(ledgers) => AdmittedWrites::Ledgers(ledgers),
+            MasterWrites::StockItem(stock) => AdmittedWrites::StockItem(stock),
+        }
+    }
+
+    fn xml(&self) -> &str {
+        match self.writes() {
+            AdmittedWrites::Ledgers(ledgers) => ledgers.rendered.xml(),
+            AdmittedWrites::StockItem(stock) => &stock.rendered,
+        }
+    }
+}
+
+impl LedgerAdmission {
     /// Renders the request once, with the two index reads for the company.
     fn new(
         batch: LedgerCreateBatch,
@@ -305,6 +429,7 @@ impl MasterAdmission {
             ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
         let rendered = batch.render_import(company);
         Ok(Self {
+            batch_id: None,
             batch,
             rendered,
             ledger_index_request: AgentReadRequest::parse(
@@ -315,11 +440,10 @@ impl MasterAdmission {
             )?,
             group_index_request: AgentReadRequest::parse(
                 bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
-                    company.display_name(),
+                    company.company_name(),
                 ),
             )?,
             company: company.clone(),
-            batch_id: None,
         })
     }
 
@@ -370,6 +494,85 @@ pub(crate) enum QueuedAdmission<'a> {
         company_marks_at_binding: &'a str,
         company_marks: &'a str,
     },
+    /// A stock item `Create` and the stock reads the queue made for it. Only
+    /// the stock recheck (`recheck_stock_item_for_dispatch`) admits one; every
+    /// other recheck refuses it.
+    StockItem(QueuedStockItem<'a>),
+}
+
+/// What the queue read for a stock item `Create`, with the approval's own
+/// values: the prepared item, the digest of the bytes the POST would send, and
+/// the batch it was approved for. Only the queue makes one, from its own reads,
+/// so a recheck that takes it runs on what the queue read under its lock.
+pub(crate) struct QueuedStockItem<'a> {
+    prepared: &'a PreparedStockItem,
+    xml_sha256: String,
+    batch_id: &'a str,
+    candidate: &'a AdmittedCandidateRead,
+    groups: &'a AdmittedStockGroups,
+    units: &'a AdmittedStockUnits,
+    company_marks_at_binding: &'a str,
+    company_marks: &'a str,
+}
+
+impl<'a> QueuedStockItem<'a> {
+    pub(super) fn new(
+        admission: &'a StockItemAdmission,
+        candidate: &'a AdmittedCandidateRead,
+        groups: &'a AdmittedStockGroups,
+        units: &'a AdmittedStockUnits,
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+    ) -> Self {
+        Self {
+            prepared: &admission.prepared,
+            xml_sha256: bridge_tally_protocol::sha256_hex(admission.rendered.as_bytes()),
+            batch_id: &admission.batch_id,
+            candidate,
+            groups,
+            units,
+            company_marks_at_binding,
+            company_marks,
+        }
+    }
+}
+
+/// What the stock recheck reads.
+impl<'a> QueuedStockItem<'a> {
+    pub(crate) fn prepared(&self) -> &'a PreparedStockItem {
+        self.prepared
+    }
+
+    /// The lowercase hex digest of the bytes the POST would send.
+    pub(crate) fn xml_sha256(&self) -> &str {
+        &self.xml_sha256
+    }
+
+    pub(crate) fn batch_id(&self) -> &'a str {
+        self.batch_id
+    }
+
+    pub(crate) fn candidate(&self) -> &'a AdmittedCandidateRead {
+        self.candidate
+    }
+
+    pub(crate) fn groups(&self) -> &'a AdmittedStockGroups {
+        self.groups
+    }
+
+    pub(crate) fn units(&self) -> &'a AdmittedStockUnits {
+        self.units
+    }
+
+    /// The all-company marks read as the binding reads began.
+    pub(crate) fn company_marks_at_binding(&self) -> &'a str {
+        self.company_marks_at_binding
+    }
+
+    /// The all-company marks read last before the recheck, the aim.
+    pub(crate) fn company_marks(&self) -> &'a str {
+        self.company_marks
+    }
 }
 
 /// Whether the profile accepts every voucher's date, and there is at least
@@ -455,6 +658,28 @@ impl ApprovedImport {
         })
     }
 
+    /// The stock-item Create's approval: the stock-item dialog, answered only
+    /// by its own token. On the person's approval this holds, as the masters
+    /// kind, `prepared` and the bytes rendered from it once, with the marks
+    /// parser the queue sizes its reads by and the journal batch `batch_id` it
+    /// is approved for; any other answer is a typed refusal and holds nothing.
+    /// The request is rendered before the dialog. `preview` is built from the
+    /// draft `prepared` was made from, by the caller's review builder.
+    pub(crate) async fn confirm_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Result<Self, StockItemDialogRefusal> {
+        let admission = MasterAdmission::stock_item(prepared, parse_marks, batch_id);
+        approve_stock_item(&preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Masters(Box::new(admission)),
+            company_marks_request,
+        })
+    }
+
     /// Which request this approval is for.
     pub(crate) fn post_kind(&self) -> PostKind {
         match &self.kind {
@@ -464,12 +689,13 @@ impl ApprovedImport {
     }
 
     /// The bytes the one POST sends, whatever the kind. For masters they are
-    /// the bytes rendered once in [`MasterAdmission::new`], whose digest the
+    /// the bytes rendered once, in [`MasterAdmission::new`] for ledgers or in
+    /// [`MasterAdmission::stock_item`] for a stock item, whose digest the
     /// dispatch intent records.
     pub(super) fn xml(&self) -> &str {
         match &self.kind {
             ApprovedKind::Vouchers(vouchers) => &vouchers.xml,
-            ApprovedKind::Masters(masters) => masters.rendered.xml(),
+            ApprovedKind::Masters(masters) => masters.xml(),
         }
     }
 
@@ -486,11 +712,14 @@ impl ApprovedImport {
 
     /// This approval bound to the master journal batch it was taken for, so the
     /// intent that licenses its send must be that batch's. A voucher approval is
-    /// returned as it is.
+    /// returned as it is, and so is a stock item's: it was bound at birth, and a
+    /// clone of it keeps that batch, which licenses no other batch's intent.
     #[must_use]
     pub(crate) fn bound_to_batch(mut self, batch_id: &str) -> Self {
         if let ApprovedKind::Masters(masters) = &mut self.kind {
-            masters.batch_id = Some(batch_id.to_string());
+            if let MasterWrites::Ledgers(ledgers) = &mut masters.writes {
+                ledgers.batch_id = Some(batch_id.to_string());
+            }
         }
         self
     }
@@ -499,7 +728,10 @@ impl ApprovedImport {
     /// approval that was bound.
     pub(crate) fn master_batch_id(&self) -> Option<&str> {
         match &self.kind {
-            ApprovedKind::Masters(masters) => masters.batch_id.as_deref(),
+            ApprovedKind::Masters(masters) => match masters.writes() {
+                AdmittedWrites::Ledgers(ledgers) => ledgers.batch_id.as_deref(),
+                AdmittedWrites::StockItem(stock) => Some(&stock.batch_id),
+            },
             ApprovedKind::Vouchers(_) => None,
         }
     }
@@ -609,9 +841,9 @@ pub(crate) struct PendingPostApproval {
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
     /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there but the masters twin below and the one
-    /// note of a box that did not fit, which the caller gives and only the dialog
-    /// task calls.
+    /// task. Nothing else can be run there but the two masters twins below (the
+    /// ledger dialog and the stock-item dialog) and the one note of a box that
+    /// did not fit, which the caller gives and only the dialog task calls.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
         xml: String,
@@ -658,6 +890,33 @@ impl PendingPostApproval {
             async move {
                 ApprovedImport::confirm_masters(batch, &company, &preview, company_marks_request)
                     .await
+            },
+            None,
+        )
+    }
+
+    /// The same for the stock-item dialog: [`ApprovedImport::confirm_stock_item`]
+    /// with exactly these arguments, on its own task. A refusal is stamped as
+    /// the ledger dialog's code for the same answer, and a box that does not
+    /// fit is refused with nothing to note: one item has no shorter form.
+    pub(crate) fn ask_stock_item(
+        prepared: PreparedStockItem,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+        parse_marks: CompanyMarksParser,
+        batch_id: String,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_stock_item(
+                    prepared,
+                    preview,
+                    company_marks_request,
+                    parse_marks,
+                    batch_id,
+                )
+                .await
+                .map_err(|refusal| refusal.code().to_string())
             },
             None,
         )
@@ -971,9 +1230,9 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
-    /// A master post reached the lock without the pre-image its queue recheck
-    /// was to leave for the intent: no sidecar can be named, so no intent is
-    /// recorded and nothing is sent.
+    /// The pre-image a master post's queue recheck handed to the intent cannot
+    /// be recorded (an empty one is a failed read, not an empty book): no
+    /// sidecar can be named, so no intent is recorded and nothing is sent.
     #[error("master_pre_image_unrecorded")]
     PreImageUnrecorded,
     /// The pre-image sidecar could not be written. Refused before the intent:
@@ -1013,6 +1272,34 @@ pub(crate) enum UnderLockRefusal {
     /// dialog (#2233). The field is the cause; nothing was recorded or sent.
     #[error("import_journal_split")]
     JournalSplit(&'static str),
+    /// The exclusive admission lock itself was refused, the first step under
+    /// it: nothing of the intent was written and nothing was sent.
+    #[error("{}", .0.code())]
+    Admission(AdmissionLockRefusal),
+}
+
+/// Why the exclusive admission lock was not taken. Taking it writes no journal,
+/// so each is decided before any byte of a dispatch intent is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AdmissionLockRefusal {
+    /// Another holder, shared (a read) or exclusive (a writer), has it now:
+    /// the lock is tried once and never waited for.
+    Busy,
+    /// The lock file could not be opened, or locking it failed otherwise.
+    Unavailable,
+    /// Taken, then given up because a publication left unsettled blocks
+    /// admission: the field is that refusal's code.
+    Unsettled(&'static str),
+}
+
+impl AdmissionLockRefusal {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Busy => "import_admission_busy",
+            Self::Unavailable => "import_admission_lock_unavailable",
+            Self::Unsettled(code) => code,
+        }
+    }
 }
 
 impl UnderLockRefusal {
@@ -1035,6 +1322,7 @@ impl UnderLockRefusal {
             Self::CompanyStopped => "invoice_company_stopped",
             Self::Transfers(reason) => reason,
             Self::JournalSplit(_) => "import_journal_split",
+            Self::Admission(refusal) => refusal.code(),
         }
     }
 }
@@ -1046,9 +1334,9 @@ mod dispatch_license;
 pub(crate) use dispatch_license::{DispatchLicense, RecordedIntent};
 
 /// Why `before_dispatch` refused. Only a named check made before the intent
-/// append is `Refused`; the lock, the journal read and the append itself are
-/// `Other`, which keeps the catch-all because the append may have recorded an
-/// intent (#711).
+/// append is `Refused`, the admission lock's own refusal among them; the
+/// journal reads and the append itself are `Other`, which keeps the catch-all
+/// because the append may have recorded an intent (#711).
 /// Built explicitly at each site: this file holds no conversion (the approval
 /// seam gate refuses any `impl From`).
 #[derive(Debug)]
@@ -1081,6 +1369,14 @@ use confirm_masters_dialog as approve_masters;
 #[cfg(test)]
 use test_seam::approve_masters;
 
+/// The native stock-item dialog every stock-item approval goes through, gated
+/// exactly as [`approve`] is.
+#[cfg(not(test))]
+use confirm_stock_item_dialog as approve_stock_item;
+
+#[cfg(test)]
+use test_seam::approve_stock_item;
+
 /// What a post dialog's own task runs under (#725). Outside this crate's unit
 /// tests it is the dialog alone: nothing is carried into the task.
 #[cfg(not(test))]
@@ -1092,6 +1388,34 @@ use test_seam::carry_approval_scope;
 #[cfg(not(test))]
 fn carry_nothing<F>(dialog: F) -> F {
     dialog
+}
+
+/// Why the stock-item dialog approved nothing. Nothing was created.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StockItemDialogRefusal {
+    /// The person declined, or closed the box.
+    Declined,
+    /// No dialog could be asked, or an executable that is not this dialog
+    /// answered.
+    Unavailable,
+    /// The dialog did not answer in time.
+    TimedOut,
+    /// The text is over the dialog's byte limit, or its box did not fit the
+    /// screen.
+    TooLarge,
+}
+
+impl StockItemDialogRefusal {
+    /// The ledger dialog's code for the same answer, so a held stock dialog
+    /// is refused as a held ledger dialog is.
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Declined => "master_approval_declined",
+            Self::Unavailable => "master_approval_unavailable",
+            Self::TimedOut => "master_approval_timed_out",
+            Self::TooLarge => "master_review_too_large",
+        }
+    }
 }
 
 /// A scripted answer to the native approval, for this crate's unit tests only
@@ -1142,6 +1466,7 @@ pub(crate) mod test_seam {
         /// The ledger count each ledger dialog was asked about, in the same
         /// order as `masters`: a box for ten ledgers must not say one.
         master_counts: Arc<Mutex<Vec<usize>>>,
+        stock_items: Arc<Mutex<Vec<String>>>,
         review_kinds: Arc<Mutex<Vec<super::ReviewKind>>>,
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
@@ -1244,6 +1569,7 @@ pub(crate) mod test_seam {
                 counts: Arc::default(),
                 review_counts: Arc::default(),
                 master_counts: Arc::default(),
+                stock_items: Arc::default(),
                 review_kinds: Arc::default(),
                 while_pending: None,
                 held: None,
@@ -1274,6 +1600,10 @@ pub(crate) mod test_seam {
 
         pub(crate) fn master_counts(&self) -> Vec<usize> {
             self.master_counts.lock().unwrap().clone()
+        }
+
+        pub(crate) fn stock_items(&self) -> Vec<String> {
+            self.stock_items.lock().unwrap().clone()
         }
 
         /// Which use of the review dialog each review was asked for.
@@ -1367,6 +1697,26 @@ pub(crate) mod test_seam {
             Ok(())
         } else {
             Err("master_approval_declined".into())
+        }
+    }
+
+    /// The test-build stock-item dialog, scripted by the same decision and
+    /// declining the same way when unscoped.
+    pub(super) async fn approve_stock_item(
+        preview: &str,
+    ) -> Result<(), super::StockItemDialogRefusal> {
+        let decision = scripted_decision(|scripted| {
+            scripted
+                .stock_items
+                .lock()
+                .unwrap()
+                .push(preview.to_string());
+        })
+        .await;
+        if decision {
+            Ok(())
+        } else {
+            Err(super::StockItemDialogRefusal::Declined)
         }
     }
 
@@ -1960,6 +2310,177 @@ pub(crate) mod test_seam {
         assert_ne!(nonces[0], nonces[1]);
     }
 
+    #[tokio::test]
+    async fn the_real_stock_item_approval_refuses_an_oversized_preview_before_starting_a_process() {
+        let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
+        assert_eq!(
+            super::confirm_stock_item_with(
+                std::path::Path::new("/nonexistent/never-started"),
+                &oversized,
+            )
+            .await,
+            Err(super::StockItemDialogRefusal::TooLarge)
+        );
+        assert_eq!(
+            super::confirm_stock_item_dialog(&oversized).await,
+            Err(super::StockItemDialogRefusal::TooLarge)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_stock_item_create_is_approved_only_by_the_token_for_its_nonce() {
+        let directory = standin_directory();
+        for (name, exit_code, answer) in [
+            ("a person's decline: no token, exit 1", 1, ""),
+            (
+                "the token, but a failing exit",
+                1,
+                "bridge-create-stock-item:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), exit_code, answer);
+            assert_eq!(
+                super::confirm_stock_item_with(&path, "Create").await,
+                Err(super::StockItemDialogRefusal::Declined),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        let another_nonce = format!("bridge-create-stock-item:{}\n", crate::synthetic_guid(0));
+        for (name, answer) in [
+            ("an executable ignoring the flag exits 0", ""),
+            ("an echo of the input", "{NONCE}\n1\nCreate"),
+            ("a token for another nonce", another_nonce.as_str()),
+            (
+                "the post dialog's token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+            (
+                "the review dialog's token for this nonce",
+                "bridge-review-acknowledged:{NONCE}\n",
+            ),
+            (
+                "the ledger dialog's token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
+            ),
+            (
+                "the stop release dialog's token for this nonce",
+                "bridge-stop-release-acknowledged:{NONCE}\n",
+            ),
+            (
+                "the settle dialog's token for this nonce",
+                "bridge-batch-settle-acknowledged:{NONCE}\n",
+            ),
+            (
+                "the row release dialog's token for this nonce",
+                "bridge-row-release-acknowledged:{NONCE}\n",
+            ),
+            (
+                "a log line, then the token",
+                "starting\nbridge-create-stock-item:{NONCE}\n",
+            ),
+            (
+                "the token, then more output",
+                "bridge-create-stock-item:{NONCE}\nmore\n",
+            ),
+            (
+                "the token with CRLF",
+                "bridge-create-stock-item:{NONCE}\r\n",
+            ),
+            (
+                "the token without its newline",
+                "bridge-create-stock-item:{NONCE}",
+            ),
+        ] {
+            let path = standin(directory.path(), 0, answer);
+            assert_eq!(
+                super::confirm_stock_item_with(&path, "Create").await,
+                Err(super::StockItemDialogRefusal::Unavailable),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        let approves = standin(directory.path(), 0, "bridge-create-stock-item:{NONCE}\n");
+        assert_eq!(
+            super::confirm_stock_item_with(&approves, "Create").await,
+            Ok(())
+        );
+        assert_ran_to_its_end(&approves, "Create", "the control");
+    }
+
+    #[tokio::test]
+    async fn the_stock_item_token_approves_no_other_dialog() {
+        let directory = standin_directory();
+        let answers = standin(directory.path(), 0, "bridge-create-stock-item:{NONCE}\n");
+        assert_eq!(
+            super::confirm_with(&answers, ONE, "Post").await,
+            Err("import_approval_unavailable".to_string())
+        );
+        assert_eq!(
+            super::confirm_review_with(&answers, super::ReviewKind::Review, ONE, "Review").await,
+            Err("ack_review_unavailable".to_string())
+        );
+        assert_eq!(
+            super::confirm_masters_with(&answers, ONE, "Create").await,
+            Err("master_approval_unavailable".to_string())
+        );
+        let ledger = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        assert_eq!(
+            super::confirm_stock_item_with(&ledger, "Create").await,
+            Err(super::StockItemDialogRefusal::Unavailable)
+        );
+    }
+
+    #[tokio::test]
+    async fn the_stock_item_dialog_is_started_in_its_own_mode_and_told_one_item() {
+        let directory = standin_directory();
+        let approves = standin(directory.path(), 0, "bridge-create-stock-item:{NONCE}\n");
+        let mut nonces = Vec::new();
+        for _ in 0..2 {
+            assert_eq!(
+                super::confirm_stock_item_with(&approves, "Create").await,
+                Ok(())
+            );
+            let args =
+                std::fs::read_to_string(beside(&approves, ".args")).expect("the stand-in ran");
+            assert_eq!(args, "--confirm-stock-item");
+            let input = standin_input(&approves).expect("the stand-in ran");
+            let (nonce, shown, text) = super::dialog_input(&input).expect("the parent's shape");
+            assert_eq!((shown, text), (ONE, "Create"));
+            nonces.push(nonce.to_string());
+        }
+        assert_ne!(nonces[0], nonces[1]);
+    }
+
+    #[tokio::test]
+    async fn a_stock_item_box_that_did_not_fit_is_refused_whatever_it_printed() {
+        let directory = standin_directory();
+        let status = crate::tally::box_fit::DOES_NOT_FIT_EXIT;
+        for (name, answer) in [
+            ("no token", ""),
+            (
+                "the stock-item token for this nonce",
+                "bridge-create-stock-item:{NONCE}\n",
+            ),
+            (
+                "the ledger token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
+            ),
+            (
+                "the post token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_stock_item_with(&path, "Create").await,
+                Err(super::StockItemDialogRefusal::TooLarge),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+    }
+
     /// Each dialog child is told the voucher count its title and button
     /// name, on the line after the nonce, and then the preview (#746). The
     /// stand-in saves the bytes the parent sent, and the child's own parser
@@ -2389,6 +2910,8 @@ enum Shown {
     RowRelease,
     /// The ledger dialog: one ledger, or a batch by its count.
     Masters,
+    /// The stock-item dialog: always one item (#1381).
+    StockItem,
 }
 
 /// The kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
@@ -2475,6 +2998,10 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
             },
             "Nothing is created until you answer.",
         ),
+        Shown::StockItem => (
+            "create this stock item in Tally".into(),
+            "Nothing is created until you answer.",
+        ),
     }
 }
 
@@ -2499,6 +3026,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Settle => SETTLE_BUTTON.to_string(),
         Shown::RowRelease => RELEASE_ROWS_BUTTON.to_string(),
         Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
+        Shown::StockItem => stock_item_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -2608,6 +3136,12 @@ fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
 #[cfg(test)]
 pub(crate) fn review_text(kind: ReviewKind, count: VoucherCount, preview: &str) -> String {
     displayed_text(kind.shown(), count, preview)
+}
+
+/// What the stock-item dialog shows for `preview`, for the caller's tests.
+#[cfg(test)]
+pub(crate) fn stock_item_dialog_text(preview: &str) -> String {
+    displayed_text(Shown::StockItem, ONE_STOCK_ITEM, preview)
 }
 
 /// What the dialog shows: the answer text, then the preview. A stop release
@@ -2756,6 +3290,44 @@ async fn confirm_masters_with(
     }
 }
 
+/// The stock-item dialog (#1381), answered exactly as the ledger dialog is: by
+/// the token for this call's nonce and a clean exit together. It is only ever
+/// about one item, and its first lines say what each answer does.
+async fn confirm_stock_item_dialog(preview: &str) -> Result<(), StockItemDialogRefusal> {
+    let executable = std::env::current_exe().map_err(|_| StockItemDialogRefusal::Unavailable)?;
+    let shown = displayed_text(Shown::StockItem, ONE_STOCK_ITEM, preview);
+    confirm_stock_item_with(&executable, &shown).await
+}
+
+async fn confirm_stock_item_with(
+    executable: &std::path::Path,
+    preview: &str,
+) -> Result<(), StockItemDialogRefusal> {
+    if preview.len() > MAX_PREVIEW_BYTES {
+        return Err(StockItemDialogRefusal::TooLarge);
+    }
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-stock-item",
+        STOCK_ITEM_TOKEN_PREFIX,
+        ONE_STOCK_ITEM,
+        preview,
+    )
+    .await
+    {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the ledger's box.
+        Ok(answer) if answer.box_did_not_fit => Err(StockItemDialogRefusal::TooLarge),
+        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
+        // A person's decline is no token and exit 1. A clean exit without the
+        // token is an executable that is not this dialog.
+        Ok(answer) if answer.exited_cleanly => Err(StockItemDialogRefusal::Unavailable),
+        Ok(_) => Err(StockItemDialogRefusal::Declined),
+        Err(DialogFailure::Unavailable) => Err(StockItemDialogRefusal::Unavailable),
+        Err(DialogFailure::TimedOut) => Err(StockItemDialogRefusal::TimedOut),
+    }
+}
+
 /// What a dialog subprocess answered: whether it printed exactly the token
 /// for this call's nonce, whether it exited cleanly, and whether it exited
 /// with the status that says its box did not fit the screen (#1832).
@@ -2857,6 +3429,16 @@ pub fn run_masters_confirmation() -> bool {
     answer_with_token(
         MASTERS_TOKEN_PREFIX,
         show_create_ledger,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the stock-item dialog's subprocess, under the same rules.
+pub fn run_stock_item_confirmation() -> bool {
+    answer_with_token(
+        STOCK_ITEM_TOKEN_PREFIX,
+        show_create_stock_item,
         std::io::stdin(),
         std::io::stdout(),
     )
@@ -3437,10 +4019,8 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // was seen not to hold when the box opened seconds after the
                 // last input went to Tally. With MB_SYSTEMMODAL added the box
                 // held it in one lab run on Windows 10, where Tally still took a
-                // click and a key while the box was open (#1780). That run did
-                // not test what else a system-modal box changes: the taskbar
-                // showed no task buttons while it was open, cause not tested
-                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // click and a key while the box was open (#1780). It is also
+                // owned by `guarded`'s hidden topmost
                 // window, the other way a stand-in box was seen to stay on top
                 // (#1780); an owned box has no taskbar button. When Windows lets it,
                 // MB_SETFOREGROUND also gives the box the foreground, so a key
@@ -3512,6 +4092,66 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
                 // As for the post's box (`show_review`): topmost with
                 // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
                 // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The stock-item dialog, for one item only: any other count has no title or
+/// button and shows nothing.
+#[cfg(not(windows))]
+fn show_create_stock_item(count: VoucherCount, preview: &str) -> bool {
+    let Some((title, button)) = stock_item_words(count) else {
+        return false;
+    };
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(title)
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        // The Cancel label supplies the native Escape action. Creating
+        // requires the explicitly matched positive button.
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            button.clone(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(button)
+}
+
+#[cfg(windows)]
+fn show_create_stock_item(count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    // As for the ledger dialog: No is the default, Escape and close are Cancel.
+    let Some((title, _)) = stock_item_words(count) else {
+        return false;
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
+    // As for `show_create_ledger`: measured when it opens, never returning if
+    // it is not wholly on the screen, and brought to the front once it appears.
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button.
                 MB_YESNOCANCEL
                     | MB_DEFBUTTON2
                     | MB_ICONWARNING

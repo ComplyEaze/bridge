@@ -1021,3 +1021,55 @@ async fn a_withdrawal_this_year_also_ends_last_years_offer() {
         .decisions()
         .is_empty());
 }
+
+/// The company name is checked by the one company-name rule and stored as given (#2433): a name
+/// longer than this store's old 256-byte cap, and up to the shared 360-byte limit, records; a name
+/// with edge spaces is stored with them; a blank one, a control character, or 361 bytes is refused.
+#[tokio::test]
+async fn the_company_name_is_stored_as_given_up_to_the_shared_limit() {
+    let workbook = book(
+        "20260731",
+        vec![row("Term loan", "Loans (Liability)", "500")],
+    );
+    let event = || {
+        set(
+            &workbook,
+            "Term loan",
+            ScheduleIIIHead::OtherCurrentLiabilities,
+        )
+    };
+    let edge = "  Synthetic Books  ".to_string();
+    for name in ["x".repeat(257), "x".repeat(360), edge] {
+        let repository = repository().await;
+        let mut named = context(key("20250401"), 2026);
+        named.company_display_name = name.clone();
+        repository
+            .record_grouping_events(&named, &[event()])
+            .await
+            .unwrap_or_else(|error| panic!("{} bytes: {error:?}", name.len()));
+        let history = repository
+            .grouping_history(&key("20250401"), FY_2026)
+            .await
+            .unwrap();
+        assert_eq!(
+            history[0].company_display_name, name,
+            "stored byte for byte"
+        );
+    }
+    for name in [
+        "x".repeat(361),
+        "   ".to_string(),
+        "Synthetic\tBooks".to_string(),
+    ] {
+        let repository = repository().await;
+        let mut named = context(key("20250401"), 2026);
+        named.company_display_name = name.clone();
+        assert!(
+            matches!(
+                repository.record_grouping_events(&named, &[event()]).await,
+                Err(GroupingStoreError::Refused("grouping_company_display_name"))
+            ),
+            "{name:?}"
+        );
+    }
+}

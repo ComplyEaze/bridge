@@ -5,6 +5,7 @@ import { formatCommandErrorMessage } from "./tally-command-error";
 
 type Company = {
   name: string;
+  shown_name: string;
   guid: string;
   company_number: string;
   books_from_yyyymmdd: string;
@@ -375,7 +376,7 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
       <div className="panel wide trial-balance-hero">
         <div>
           <h2 id="trial-balance-heading">Trial Balance</h2>
-          <p className="panel-description">Native ledger totals for {company.name}. Empty source amounts remain empty; they are not treated as zero.</p>
+          <p className="panel-description">Native ledger totals for {company.shown_name}. Empty source amounts remain empty; they are not treated as zero.</p>
         </div>
         <div className="trial-balance-actions">
           <button className="primary" type="button" onClick={() => void refresh()} disabled={disabled}><RefreshCw size={17} aria-hidden="true" />{loading ? "Reading…" : "Refresh report"}</button>
@@ -397,7 +398,7 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
       {!loading && !result && !error && <div className="panel wide trial-balance-empty"><p>Refresh to read the native report for this company and date range.</p></div>}
       {read && currency && (
         <div className="panel wide trial-balance-report">
-          <div className="trial-balance-meta"><span>{read.company_name}</span><span>{toInputDate(read.from)} → {toInputDate(read.to)}</span><span>Fresh at {new Date(read.read_at).toLocaleString()}</span><span>Capture source: {read.report.rows.length} ledger rows · {read.evidence.bytes.toLocaleString()} bytes · expires within 15 minutes</span></div>
+          <div className="trial-balance-meta"><span>{company.shown_name}</span><span>{toInputDate(read.from)} → {toInputDate(read.to)}</span><span>Fresh at {new Date(read.read_at).toLocaleString()}</span><span>Capture source: {read.report.rows.length} ledger rows · {read.evidence.bytes.toLocaleString()} bytes · expires within 15 minutes</span></div>
           <div className="toolbar trial-balance-parent-query">
             <label>Find a parent<input type="search" value={parentSearch} onChange={(event) => setParentSearch(event.target.value)} placeholder="Search parent values" aria-describedby="trial-balance-parent-search-note" disabled={disabled} /></label>
             <label>Parent returned by this capture<select value={selectedParentKey} onChange={(event) => { const next = visibleOptions.find((option) => option.key === event.target.value) ?? (selectedOutsideSearch && selectedParent?.key === event.target.value ? selectedParent : null); setSelectedParentKey(event.target.value); setSelectedParent(next); setParentQuery(null); setParentQueryError(null); setPage(0); }} disabled={disabled} aria-describedby="trial-balance-parent-search-note"><option value="">All captured rows</option>{selectedOutsideSearch && <option value={selectedParent.key}>{selectedParent.displayLabel} ({selectedParent.rowCount} rows · current selection)</option>}{visibleOptions.map((option) => <option key={option.key} value={option.key}>{option.displayLabel} ({option.rowCount} rows)</option>)}</select></label>

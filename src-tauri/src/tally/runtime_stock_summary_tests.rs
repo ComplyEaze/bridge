@@ -5,7 +5,8 @@
 //! extent (4), identity and mode again (3).
 use super::stock_summary::{
     admit_counted_stock, admit_stock_summary_size, check_stock_premise,
-    stock_report_worst_line_bytes, stock_summary_period, CountedAdmission, StockSummaryRead,
+    stock_report_worst_line_bytes, stock_summary_period, CountedAdmission, StatementStockWindow,
+    StockSummaryRead,
 };
 use super::trial_balance_tests::{
     companies as captured_companies, config, decode, education, extents as captured_extents, pair,
@@ -22,7 +23,7 @@ use bridge_tally_protocol::native_stock_summary::{
     NativeItemCountCrossCheck, NativeItemCountStatus, NativeStockError, NativeStockGate,
     NativeStockItemCount, NativeStockReport, StockSummaryAsOf,
 };
-use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
+use bridge_tally_protocol::xml_read_profiles::ValidatedDateRange;
 use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
 
 /// The synthetic book the stock captures came from. Its GUID is replaced by the
@@ -249,7 +250,7 @@ fn body_hash(request: &str) -> String {
 
 /// The three requests a read of the test company sends over 20250401 to 20260331.
 fn sent_requests() -> [String; 3] {
-    let name = identity().display_name().to_string();
+    let identity = identity();
     let period = stock_summary_period(
         DateBoundaryProfile::ModeAgnostic,
         &StockSummaryAsOf::new(TallyDate::parse(AS_OF).unwrap()).unwrap(),
@@ -257,16 +258,16 @@ fn sent_requests() -> [String; 3] {
         &TallyDate::parse(TODAY).unwrap(),
     )
     .unwrap();
-    let company = ValidatedCompanyName::new(name.as_str()).unwrap();
+    let company = identity.company_name();
     let range = ValidatedDateRange::new("20250401", "20260331").unwrap();
     [
-        render_company_inventory_flags_request(&name, &crate::tally::test_company_guid(GUID)),
+        render_company_inventory_flags_request(company, &crate::tally::test_company_guid(GUID)),
         ReadOnlyProfile::AuditStockItemsV1 {
-            company: &company,
+            company,
             period: &range,
         }
         .render(),
-        render_native_stock_summary_request(&name, &period),
+        render_native_stock_summary_request(company, &period),
     ]
 }
 
@@ -333,6 +334,80 @@ async fn a_whole_read_ties_through_every_bracket_and_sends_the_builders_requests
         assert_eq!(observed[first + 2].request_body_sha256, hash, "{first}");
         assert_eq!(observed[first + 1].method, "GET", "{first}");
     }
+}
+
+#[test]
+fn a_statements_stock_window_is_only_1_april_to_a_month_end_in_that_year() {
+    // #692's rule 2: the 5 Nov run's windows w1 to w3 are admitted; its October to March (w4)
+    // and two years together (w5) are not, and nor is any window the stock read was not
+    // measured over.
+    let window = |from, to| {
+        StatementStockWindow::of(
+            &NativeLedgerSnapshotPeriod::new(
+                DateBoundaryProfile::ModeAgnostic,
+                date(from),
+                date(to),
+            )
+            .unwrap(),
+            &date("20200401"),
+            &date("20261109"),
+        )
+        .map(|window| window.period().clone())
+    };
+    for (from, to) in [
+        ("20240401", "20250331"),
+        ("20250401", "20260331"),
+        ("20250401", "20250930"),
+        ("20250401", "20250430"),
+    ] {
+        let period = window(from, to).unwrap_or_else(|| panic!("{from} to {to}"));
+        assert_eq!((period.from(), period.to()), (&date(from), &date(to)));
+    }
+    for (from, to) in [
+        ("20251001", "20260331"),
+        ("20240401", "20260331"),
+        ("20250501", "20250930"),
+        ("20250401", "20250915"),
+        ("20250402", "20250930"),
+    ] {
+        assert_eq!(window(from, to), None, "{from} to {to}");
+    }
+}
+
+fn statement_window(from: &str, to: &str, books_from: &str, today: &str) -> bool {
+    let period =
+        NativeLedgerSnapshotPeriod::new(DateBoundaryProfile::ModeAgnostic, date(from), date(to))
+            .unwrap();
+    StatementStockWindow::of(&period, &date(books_from), &date(today)).is_some()
+}
+
+#[test]
+fn a_statements_stock_window_ending_after_the_hosts_today_builds_nothing() {
+    // stock_summary's bound: the read's end is not after the host's today.
+    assert!(statement_window(
+        "20260401", "20261031", "20200401", "20261031"
+    ));
+    assert!(!statement_window(
+        "20260401", "20261130", "20200401", "20261109"
+    ));
+    assert!(!statement_window(
+        "20260401", "20270331", "20200401", "20261109"
+    ));
+}
+
+#[test]
+fn a_statements_stock_window_before_the_books_builds_nothing() {
+    // stock_summary's bound: the read starts no earlier than the book. A window
+    // ending before the book's start, or a book that starts after its 1 April.
+    assert!(statement_window(
+        "20250401", "20250930", "20250401", "20261109"
+    ));
+    assert!(!statement_window(
+        "20240401", "20250331", "20250401", "20261109"
+    ));
+    assert!(!statement_window(
+        "20250401", "20250930", "20250501", "20261109"
+    ));
 }
 
 #[test]
@@ -524,10 +599,10 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
         },
     )
     .unwrap();
-    let name = identity().display_name().to_string();
+    let identity = identity();
     assert!(was_sent(
         &observed,
-        &render_stock_item_census_slice_request(&name, &census.slices()[0])
+        &render_stock_item_census_slice_request(identity.company_name(), &census.slices()[0])
     ));
     let [_, items, report] = sent_requests();
     assert!(!was_sent(&observed, &items));
@@ -593,11 +668,11 @@ async fn a_book_past_the_mark_is_counted_then_read_whole() {
         slice_width: 4_000,
         max_slices: 100,
     };
-    let name = identity().display_name().to_string();
+    let identity = identity();
     assert!(was_sent(
         &observed,
         &render_stock_item_census_slice_request(
-            &name,
+            identity.company_name(),
             &CensusPlan::<StockItems>::new(mark, limits)
                 .unwrap()
                 .slices()[0]
@@ -606,7 +681,7 @@ async fn a_book_past_the_mark_is_counted_then_read_whole() {
     assert!(was_sent(
         &observed,
         &bridge_tally_protocol::ledger_census::render_stock_group_census_slice_request(
-            &name,
+            identity.company_name(),
             &CensusPlan::<bridge_tally_protocol::ledger_census::StockGroups>::new(mark, limits)
                 .unwrap()
                 .slices()[0]

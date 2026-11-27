@@ -414,3 +414,77 @@ fn no_step_is_reported_unless_each_snapshot_holds_exactly_one_target() {
     let located = state(&book(), &namesake);
     assert_eq!(located["target_voucher_step"]["step"], 1, "{located}");
 }
+
+/// A company is one company across the snapshots whatever the case of its
+/// GUID or the outer spacing and ASCII case of its name, and the target is
+/// found by its GUID in any case.
+#[test]
+fn a_company_keeps_its_identity_across_guid_case_and_name_spacing_and_case() {
+    let target = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+    let other = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+    let before = vec![
+        marks("Synthetic Target", &target.to_ascii_uppercase(), 10),
+        marks("Synthetic Other", other, 20),
+    ];
+    let after = vec![
+        marks("Synthetic Target", &target.to_ascii_uppercase(), 11),
+        marks(" SYNTHETIC OTHER ", &other.to_ascii_uppercase(), 20),
+    ];
+    assert_eq!(
+        admit_post_target(&before, target, "Synthetic Target"),
+        Ok(())
+    );
+    let located =
+        classify_post_location(&before, Some(&after), target, "Synthetic Target", Some(1));
+    assert_eq!(located["state"], "target_only", "{located}");
+    assert_eq!(located["companies_added"], json!([]), "{located}");
+    assert_eq!(located["companies_removed"], json!([]), "{located}");
+}
+
+/// A target missing from the snapshot before the post, or there only under
+/// another name, is a change of the target's scope, and the company that
+/// appeared is listed.
+#[test]
+fn a_target_absent_or_named_otherwise_before_the_post_is_a_scope_change() {
+    let after = with_vouchers(&book(), TARGET, 11);
+    let unloaded: Vec<_> = book()
+        .into_iter()
+        .filter(|row| row.guid != TARGET)
+        .collect();
+    let located = state(&unloaded, &after);
+    assert_eq!(located["state"], "target_scope_changed", "{located}");
+    assert_eq!(
+        located["companies_added"],
+        json!([{"name": "Synthetic Target", "guid": TARGET}])
+    );
+    assert_eq!(located["companies_removed"], json!([]));
+
+    let mut renamed = book();
+    renamed[0].name = "Synthetic Target Before".into();
+    let located = state(&renamed, &after);
+    assert_eq!(located["state"], "target_scope_changed", "{located}");
+}
+
+/// Another loaded company under the target's GUID and another name is not
+/// the target: its voucher mark moving is another company's.
+#[test]
+fn a_company_sharing_the_targets_guid_under_another_name_is_not_the_target() {
+    let mut before = book();
+    before.push(marks("Synthetic Target Copy", TARGET, 40));
+    let mut after = before.clone();
+    after[3].vouchers = 41;
+    let located = state(&before, &after);
+    assert_eq!(located["state"], "suspected_other_company", "{located}");
+    assert_eq!(located["target_moved"], false);
+    assert_eq!(
+        located["other_companies_moved"][0]["name"],
+        "Synthetic Target Copy"
+    );
+}
+
+/// A snapshot that does not read is not one that omits the voucher mark.
+#[test]
+fn an_unreadable_snapshot_does_not_count_as_omitting_the_voucher_mark() {
+    assert!(!omits_voucher_mark("", TARGET));
+    assert!(!omits_voucher_mark("<ENVELOPE></ENVELOPE>", TARGET));
+}

@@ -1,0 +1,1 @@
+- On Windows, an approval window that would open minimised is now restored before it is measured and brought to the front (#2569).

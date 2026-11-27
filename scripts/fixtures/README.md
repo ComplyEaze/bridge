@@ -59,6 +59,12 @@ vulnerability). `-accepted` used the file of #2435's head `b2f6497a` (eleven ign
 reported). `scripts/audit-tracking-issue.test.mjs` reads them for what the report's `settings.ignore`
 holds. They hold no customer data: crate names, versions and public advisory text only.
 
+`cargo-audit-config-0459-accepted.toml` is not a capture. It is `.cargo/audit.toml` as it stood at
+`6439ea09`, copied byte for byte from git: its ignore list is the same eleven ids as `b2f6497a`'s, the
+file `-accepted` was run beside. The real file dropped RUSTSEC-2026-0459 in #2573, so the tests pair
+`-accepted` with this copy and `-reported` with the real file, whose ten ids are the ones `-reported`
+applied.
+
 ## Integrity digests
 
 Each row is the SHA-256 of the file's committed bytes, which
@@ -73,3 +79,4 @@ repeats only what this note says above.
 | `source-draft-capture-bindings.json` | 1,936 | `8e7b43f90a93086ece50c270b9747c83ba473ee1fc4246c8d23cf160592dfe2e` | not a capture, as above |
 | `cargo-audit-report-0459-accepted.json` | 1,538 | `5906d9e201595bbf27606a0c1fa54fc1fcdcb165391b13ec1e749833ead20028` | captured, byte-exact: cargo-audit 0.22.2 output, see below |
 | `cargo-audit-report-0459-reported.json` | 4,533 | `ac589a231229de06bbb7518c7b67daccc6ee205bde75e25d152d3163c8e34f8c` | captured, byte-exact: cargo-audit 0.22.2 output, see below |
+| `cargo-audit-config-0459-accepted.toml` | 10,676 | `b01c72173238ea3e9a30546e9d4afc0ae6b8c671cfdaa37185169a5e2ef4aa5a` | not a capture: a copy from git of `.cargo/audit.toml` at `6439ea09`, see above |

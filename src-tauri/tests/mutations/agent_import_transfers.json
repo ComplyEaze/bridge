@@ -1,0 +1,2270 @@
+{
+  "file": "src-tauri/src/agent_import_transfers.rs",
+  "base_commit": "de54a0f2",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again). A tool mutant that survived was run again in the whole_set and survivors_again runs as the same edit written as text, under the id named in its run's command.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 819,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_transfers.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/transfer|skip|withdraw|contra|responses|failure_code|statement|verif/)'",
+      "time": "2026-11-11T14:01:45Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 819,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/transfer|skip|withdraw|contra|responses|failure_code|statement|verif/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5079,
+      "command": "as the hand run with every bridge test (-E 'all()', --no-fail-fast for the batch), for the tool's three missed mutants (T1 is 312:21, T2 is 604:5 with Some(\"\"), T3 is 604:5 with Some(\"xyzzy\")) and the thirty-six hand-written ones that survived. T1, T2, T3, X15, X20 and X24 were each run alone; X69 was run alone (its edit overlaps X68's) and the other thirty-two were applied together as one batch of independent edits that touch no common text, and a batch that passes every test means each edit passes every test alone. X82 and X86 each first read caught by financial_mode_tests::a_draining_refusal_after_part_of_the_standard_read_was_sent_is_not_waited_out, a test of another module that failed alone; the batch, which has both edits, passed all 5079 tests, and that is the verdict recorded",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 47,
+      "command": "as the hand run for the same thirty-nine, with -E 'test(/agent_import::transfers::tests/)' (the 47 tests of the module, the only module whose tests can see these edits, and a killer is a test failing there); then the seven still missed (X82, X86, X93, X107, X110, X118, X121) applied together as one batch against every bridge test (5096), which passed",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 129,
+      "missed": 0,
+      "unviable": 13
+    },
+    "hand": {
+      "caught": 105,
+      "missed": 7
+    },
+    "survived_at_base": {
+      "tool": 3,
+      "hand": 36
+    },
+    "equivalent": {
+      "hand": 6
+    },
+    "accepted_not_equivalent": {
+      "hand": 1
+    }
+  },
+  "tool_results": {
+    "28:5: replace take_withdraw_skips -> Result<BTreeSet<String>, String> with Ok(BTreeSet::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "28:5: replace take_withdraw_skips -> Result<BTreeSet<String>, String> with Ok(BTreeSet::from_iter([String::new()]))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified",
+      "killer_at": "base"
+    },
+    "28:5: replace take_withdraw_skips -> Result<BTreeSet<String>, String> with Ok(BTreeSet::from_iter([\"xyzzy\".into()]))": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified",
+      "killer_at": "base"
+    },
+    "36:20: replace > with == in take_withdraw_skips": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::withdraw_skips_are_distinct_statement_row_ids",
+      "killer_at": "base"
+    },
+    "36:20: replace > with < in take_withdraw_skips": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "36:20: replace > with >= in take_withdraw_skips": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::withdraw_skips_are_distinct_statement_row_ids",
+      "killer_at": "base"
+    },
+    "45:12: delete ! in take_withdraw_skips": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "73:9: replace OpenState::label -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "73:9: replace OpenState::label -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "90:9: replace OpenState::step -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_contras_batch",
+      "killer_at": "base"
+    },
+    "90:9: replace OpenState::step -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_contras_batch",
+      "killer_at": "base"
+    },
+    "110:5: replace batches_holding -> BTreeSet<Option<&BatchId>> with BTreeSet::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "110:5: replace batches_holding -> BTreeSet<Option<&BatchId>> with BTreeSet::from_iter([None])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "110:5: replace batches_holding -> BTreeSet<Option<&BatchId>> with BTreeSet::from_iter([Some(Box::leak(Box::new(Default::default())))])": {
+      "verdict": "unviable",
+      "reason": "does not compile: mismatched types"
+    },
+    "147:9: replace TransferSummary::of -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferSummary: std::default::Default` is not satisfied"
+    },
+    "158:28: replace += with -= in TransferSummary::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "158:28: replace += with *= in TransferSummary::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "185:24: replace += with -= in TransferSummary::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bank_tests::a_skip_only_record_holds_the_canonical_company_guid",
+      "killer_at": "base"
+    },
+    "185:24: replace += with *= in TransferSummary::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "244:9: replace TransferSummary::with_day_reads -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferSummary: std::default::Default` is not satisfied"
+    },
+    "266:9: replace TransferSummary::render -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "296:75: replace + with - in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "296:75: replace + with * in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "296:49: replace + with - in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_verified_after_a_hand_import_carries_no_headline",
+      "killer_at": "base"
+    },
+    "296:49: replace + with * in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "311:51: replace + with - in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "311:51: replace + with * in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "312:21: replace > with == in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "312:21: replace > with < in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "312:21: replace > with >= in TransferSummary::render": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_budget_that_holds_the_frame_and_exactly_k_rows_lists_k_rows",
+      "killer_at": "this_commit"
+    },
+    "315:18: replace -= with += in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "315:18: replace -= with /= in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "318:34: replace - with + in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "318:34: replace - with / in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_verified_after_a_hand_import_carries_no_headline",
+      "killer_at": "base"
+    },
+    "319:20: replace > with == in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_contras_batch",
+      "killer_at": "base"
+    },
+    "319:20: replace > with < in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "319:20: replace > with >= in TransferSummary::render": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_contras_batch",
+      "killer_at": "base"
+    },
+    "346:5: replace trim_section -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "352:65: replace + with - in trim_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "352:65: replace + with * in trim_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "352:73: replace - with + in trim_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "352:73: replace - with / in trim_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "354:16: replace > with == in trim_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::trimming_a_section_adds_to_what_was_already_left_out",
+      "killer_at": "base"
+    },
+    "354:16: replace > with < in trim_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::trimming_a_section_adds_to_what_was_already_left_out",
+      "killer_at": "base"
+    },
+    "354:16: replace > with >= in trim_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::trimming_a_section_adds_to_what_was_already_left_out",
+      "killer_at": "base"
+    },
+    "363:5: replace counts_only_section -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_build_names_the_rows_ledgers_from_its_catalogue_for_the_days_it_reads",
+      "killer_at": "base"
+    },
+    "364:76: replace > with == in counts_only_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::trimming_a_section_adds_to_what_was_already_left_out",
+      "killer_at": "base"
+    },
+    "364:76: replace > with < in counts_only_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::trimming_a_section_adds_to_what_was_already_left_out",
+      "killer_at": "base"
+    },
+    "364:76: replace > with >= in counts_only_section": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::trimming_a_section_adds_to_what_was_already_left_out",
+      "killer_at": "base"
+    },
+    "376:5: replace check_not_run_section -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_is_not_about_transfers_goes_on_when_the_view_cannot_be_read",
+      "killer_at": "base"
+    },
+    "391:5: replace transfers_budget -> usize with 0": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "391:5: replace transfers_budget -> usize with 1": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "391:16: replace / with % in transfers_budget": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "391:16: replace / with * in transfers_budget": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::the_budget_is_what_the_cap_leaves_counting_the_text_copy_and_at_most_a_quarter",
+      "killer_at": "base"
+    },
+    "393:24: replace / with % in transfers_budget": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "393:24: replace / with * in transfers_budget": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::the_budget_is_what_the_cap_leaves_counting_the_text_copy_and_at_most_a_quarter",
+      "killer_at": "base"
+    },
+    "433:9: replace TransferRefusal::reason -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "433:9: replace TransferRefusal::reason -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "442:9: replace TransferRefusal::for_send -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferRefusal: std::default::Default` is not satisfied"
+    },
+    "442:40: replace == with != in TransferRefusal::for_send": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "453:41: replace == with != in TransferRefusal::for_send": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "460:16: delete field next_step from struct Self expression in TransferRefusal::for_send": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "465:9: replace TransferRefusal::into_parts -> (&'static str, Value, String) with (\"\", Default::default(), String::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "465:9: replace TransferRefusal::into_parts -> (&'static str, Value, String) with (\"\", Default::default(), \"xyzzy\".into())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "465:9: replace TransferRefusal::into_parts -> (&'static str, Value, String) with (\"xyzzy\", Default::default(), String::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "465:9: replace TransferRefusal::into_parts -> (&'static str, Value, String) with (\"xyzzy\", Default::default(), \"xyzzy\".into())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "474:9: replace TransferRefusal::outcome -> ToolOutcome with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `agent::ToolOutcome: std::default::Default` is not satisfied"
+    },
+    "519:9: replace Admitted::summary_with_days_read -> TransferSummary with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferSummary: std::default::Default` is not satisfied"
+    },
+    "535:35: replace && with || in Admitted::summary_with_days_read": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "566:9: replace TransferInput::candidate_build -> Option<&str> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_is_refused_after_the_first_batch_was_sent_or_found",
+      "killer_at": "base"
+    },
+    "566:9: replace TransferInput::candidate_build -> Option<&str> with Some(\"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_with_one_reference_refuses_the_second_build",
+      "killer_at": "base"
+    },
+    "566:9: replace TransferInput::candidate_build -> Option<&str> with Some(\"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_with_one_reference_refuses_the_second_build",
+      "killer_at": "base"
+    },
+    "576:9: replace TransferInput::needs_the_view -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_that_is_not_about_transfers_is_not_held_by_an_unreadable_view",
+      "killer_at": "base"
+    },
+    "576:9: replace TransferInput::needs_the_view -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "576:65: replace || with && in TransferInput::needs_the_view": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "576:32: replace || with && in TransferInput::needs_the_view": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "576:35: delete ! in TransferInput::needs_the_view": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_that_is_not_about_transfers_is_not_held_by_an_unreadable_view",
+      "killer_at": "base"
+    },
+    "576:68: delete ! in TransferInput::needs_the_view": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_that_is_not_about_transfers_is_not_held_by_an_unreadable_view",
+      "killer_at": "base"
+    },
+    "583:5: replace without_facts -> Admission with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `agent::agent_import::transfers::Admission: std::default::Default` is not satisfied"
+    },
+    "604:5: replace send_wording -> Option<&'static str> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "604:5: replace send_wording -> Option<&'static str> with Some(\"\")": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "604:5: replace send_wording -> Option<&'static str> with Some(\"xyzzy\")": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "605:9: delete match arm \"skip_row_already_posted\" in send_wording": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build",
+      "killer_at": "base"
+    },
+    "606:9: delete match arm \"skip_row_paired_elsewhere\" in send_wording": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "607:9: delete match arm \"withdraw_skip_invalid\" in send_wording": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build",
+      "killer_at": "base"
+    },
+    "608:9: delete match arm \"transfer_double_booked\" in send_wording": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build",
+      "killer_at": "base"
+    },
+    "634:9: replace Carrier::label -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "634:9: replace Carrier::label -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "644:9: replace Carrier::step -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "644:9: replace Carrier::step -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "653:9: replace Carrier::among -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_withdrawal_of_carried_rows_is_told_what_each_state_needs",
+      "killer_at": "base"
+    },
+    "653:9: replace Carrier::among -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_withdrawal_of_carried_rows_is_told_what_each_state_needs",
+      "killer_at": "base"
+    },
+    "663:9: replace Carrier::refusal_step_restored -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "663:9: replace Carrier::refusal_step_restored -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "674:9: replace Carrier::refusal_step -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "674:9: replace Carrier::refusal_step -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "690:5: replace rows_listed -> (Vec<String>, usize) with (vec![], 0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "690:5: replace rows_listed -> (Vec<String>, usize) with (vec![], 1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "690:5: replace rows_listed -> (Vec<String>, usize) with (vec![String::new()], 0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "690:5: replace rows_listed -> (Vec<String>, usize) with (vec![String::new()], 1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "690:5: replace rows_listed -> (Vec<String>, usize) with (vec![\"xyzzy\".into()], 0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "690:5: replace rows_listed -> (Vec<String>, usize) with (vec![\"xyzzy\".into()], 1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "692:29: replace - with + in rows_listed": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_refusal_lists_fifty_rows_and_counts_the_rest",
+      "killer_at": "base"
+    },
+    "692:29: replace - with / in rows_listed": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawal_must_name_a_skip_of_the_company_and_a_row_of_the_build",
+      "killer_at": "base"
+    },
+    "697:5: replace rows_listed_json -> (Vec<Value>, usize) with (vec![], 0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "697:5: replace rows_listed_json -> (Vec<Value>, usize) with (vec![], 1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "697:5: replace rows_listed_json -> (Vec<Value>, usize) with (vec![Default::default()], 0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "697:5: replace rows_listed_json -> (Vec<Value>, usize) with (vec![Default::default()], 1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "710:5: replace held_carrier_view -> Result<TransferView, crate::agent::transfer_pairing::PairingInputError> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferView: std::default::Default` is not satisfied"
+    },
+    "722:5: replace double_booked_with -> Option<&'a str> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_with_one_reference_refuses_the_second_build",
+      "killer_at": "base"
+    },
+    "722:5: replace double_booked_with -> Option<&'a str> with Some(\"\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "722:5: replace double_booked_with -> Option<&'a str> with Some(\"xyzzy\")": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "723:25: replace != with == in double_booked_with": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_batch_is_sent",
+      "killer_at": "base"
+    },
+    "725:47: replace == with != in double_booked_with": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_is_refused_after_the_first_batch_was_sent_or_found",
+      "killer_at": "base"
+    },
+    "727:48: replace == with != in double_booked_with": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_is_refused_after_the_first_batch_was_sent_or_found",
+      "killer_at": "base"
+    },
+    "738:9: replace Server::skip_file_while_admitted -> Result<Box<dyn std::io::BufRead>, String> with Ok(Box::new(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: cannot call associated function on trait without specifying the corresponding `impl` type"
+    },
+    "741:27: replace match guard error.kind() == std::io::ErrorKind::NotFound with true in Server::skip_file_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_file_that_cannot_be_read_refuses_a_build_that_needs_the_view",
+      "killer_at": "base"
+    },
+    "741:27: replace match guard error.kind() == std::io::ErrorKind::NotFound with false in Server::skip_file_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "741:40: replace == with != in Server::skip_file_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "757:9: replace Server::transfer_input_while_admitted -> Result<(TransferFacts, PairingInput), TransferFactsError> with Ok((Default::default(), Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferFacts: std::default::Default` is not satisfied"
+    },
+    "778:9: replace Server::transfer_view_while_admitted -> Result<(TransferFacts, TransferView), TransferFactsError> with Ok((Default::default(), Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferFacts: std::default::Default` is not satisfied"
+    },
+    "793:9: replace Server::admit_transfers_while_admitted -> Result<Admission, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `agent::agent_import::transfers::Admission: std::default::Default` is not satisfied"
+    },
+    "793:12: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send",
+      "killer_at": "base"
+    },
+    "835:61: replace || with && in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_refusal_lists_fifty_rows_and_counts_the_rest",
+      "killer_at": "base"
+    },
+    "835:27: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "835:64: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "838:12: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "859:44: replace == with != in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "882:57: replace == with != in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "895:49: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "908:12: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "938:13: delete match arm (Candidate::Build(line), Some(_)) in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_send",
+      "killer_at": "base"
+    },
+    "951:60: replace == with != in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_send",
+      "killer_at": "base"
+    },
+    "953:45: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "964:21: replace && with || in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "964:56: replace || with && in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "964:25: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "968:12: delete ! in Server::admit_transfers_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "1013:9: replace Server::transfers_refusal_for_send_while_admitted -> Result<Option<TransferRefusal>, String> with Ok(None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "1013:9: replace Server::transfers_refusal_for_send_while_admitted -> Result<Option<TransferRefusal>, String> with Ok(Some(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `TransferRefusal: std::default::Default` is not satisfied"
+    },
+    "1052:12: delete ! in Server::transfers_refusal_for_send_while_admitted": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "1070:9: replace Server::transfers_for_verification -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_posted_without_the_withdrawal_stays_open_in_the_verification_section",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "X01": {
+      "what": "WITHDRAW_SKIPS_KEY: the argument is named withdraw_rows",
+      "edits": [
+        {
+          "from": "pub(super) const WITHDRAW_SKIPS_KEY: &str = \"withdraw_skips\";",
+          "to": "pub(super) const WITHDRAW_SKIPS_KEY: &str = \"withdraw_rows\";"
+        }
+      ],
+      "mutation": "01c5e848c14d5306fe7e70101f1a70db",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "X02": {
+      "what": "take_withdraw_skips: a malformed argument takes another code",
+      "edits": [
+        {
+          "from": "let invalid = || \"argument_schema_invalid\".to_string();",
+          "to": "let invalid = || \"argument_invalid\".to_string();"
+        }
+      ],
+      "mutation": "ed271504411cae79e0d22b98a29f73c8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_malformed_withdrawal_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "X03": {
+      "what": "take_withdraw_skips: the argument is read but left in the payload",
+      "edits": [
+        {
+          "from": ".and_then(|map| map.remove(WITHDRAW_SKIPS_KEY))",
+          "to": ".and_then(|map| map.get(WITHDRAW_SKIPS_KEY).cloned())"
+        }
+      ],
+      "mutation": "2374f57eb65a0db9dbfdfd0675e20517",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "X04": {
+      "what": "take_withdraw_skips: a repeated row is accepted",
+      "edits": [
+        {
+          "from": "        if !rows.insert(row.to_string()) {\n            return Err(invalid());\n        }\n",
+          "to": "        rows.insert(row.to_string());\n"
+        }
+      ],
+      "mutation": "262fe415f3cd6be79069993a8d6ebf1f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_malformed_withdrawal_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "X05": {
+      "what": "take_withdraw_skips: any string is taken as a statement row id",
+      "edits": [
+        {
+          "from": ".filter(|row| bridge_bank_statement::proposals::is_statement_txn_id(row))",
+          "to": ".filter(|_| true)"
+        }
+      ],
+      "mutation": "79b13a7357b73d6f69e0b993355ad27a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::withdraw_skips_are_distinct_statement_row_ids",
+      "killer_at": "base"
+    },
+    "X06": {
+      "what": "OpenState::PostedAgainstSkip: its label reads posted_against_a_skip",
+      "edits": [
+        {
+          "from": "Self::PostedAgainstSkip => \"posted_against_skip\",",
+          "to": "Self::PostedAgainstSkip => \"posted_against_a_skip\","
+        }
+      ],
+      "mutation": "7381c5128e74febd3d904a6bcec0a115",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_posted_without_the_withdrawal_stays_open_in_the_verification_section",
+      "killer_at": "base"
+    },
+    "X07": {
+      "what": "TransferSummary::of: a skip held by an unverified batch reads posted_against_skip and one held by a posted batch reads held_elsewhere",
+      "edits": [
+        {
+          "from": "                    HeldBy::UnverifiedBatch => OpenState::HeldElsewhere,\n                    HeldBy::PostedBatch => OpenState::PostedAgainstSkip,",
+          "to": "                    HeldBy::UnverifiedBatch => OpenState::PostedAgainstSkip,\n                    HeldBy::PostedBatch => OpenState::HeldElsewhere,"
+        }
+      ],
+      "mutation": "135ca2536afd03f6800129402083218e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_held_by_a_batch_not_found_posted_cannot_be_withdrawn_beside_a_paired_contra",
+      "killer_at": "base"
+    },
+    "X08": {
+      "what": "TransferSummary::of: a held row is never marked restored",
+      "edits": [
+        {
+          "from": "restored: facts.restored.contains(held.holder.as_str()),",
+          "to": "restored: false,"
+        }
+      ],
+      "mutation": "746746584e6222e1e177b2a6695cd12c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_row_naming_a_restored_batch_is_marked_and_the_note_is_paid_for",
+      "killer_at": "base"
+    },
+    "X09": {
+      "what": "TransferSummary::of: open rows are ordered by id, then date",
+      "edits": [
+        {
+          "from": "open.sort_by(|left, right| (&left.date, &left.id).cmp(&(&right.date, &right.id)));",
+          "to": "open.sort_by(|left, right| (&left.id, &left.date).cmp(&(&right.id, &right.date)));"
+        }
+      ],
+      "mutation": "7da1c0ee442fc2e79a1ba1febcf7f6ff",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_row_whose_amount_reverses_the_same_day_is_listed_once_for_each_batch_holding_a_candidate",
+      "killer_at": "base"
+    },
+    "X10": {
+      "what": "TransferSummary::of: held skips are not counted as open",
+      "edits": [
+        {
+          "from": "let mut skips_open = facts.held.len();",
+          "to": "let mut skips_open = 0;"
+        }
+      ],
+      "mutation": "29c6e13ef8037392958c0c46450766ee",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_that_a_batch_found_posted_contradicts_stays_open_and_is_listed",
+      "killer_at": "base"
+    },
+    "X11": {
+      "what": "TransferSummary::of: retired skips are counted as none",
+      "edits": [
+        {
+          "from": "retired: facts.retired_skips,",
+          "to": "retired: 0,"
+        }
+      ],
+      "mutation": "9382b858dbff4d67869ea4ac06a2595e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_with_the_withdrawal",
+      "killer_at": "base"
+    },
+    "X12": {
+      "what": "TransferSummary::of: a double-booked row is marked restored by its own batch, not the other",
+      "edits": [
+        {
+          "from": "restored: facts.restored.contains(other.batch.as_str()),",
+          "to": "restored: facts.restored.contains(this.batch.as_str()),"
+        }
+      ],
+      "mutation": "8a3e7bf18056c2bb3f602f2c8c700cfb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_row_naming_a_restored_batch_is_marked_and_the_note_is_paid_for",
+      "killer_at": "base"
+    },
+    "X13": {
+      "what": "TransferSummary::of: a double-booked row names its own batch, not the other",
+      "edits": [
+        {
+          "from": "batch: Some(other.batch.as_str().to_string()),",
+          "to": "batch: Some(this.batch.as_str().to_string()),"
+        }
+      ],
+      "mutation": "1c62627d8c4cf338686293e7e0ad62cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_row_naming_a_restored_batch_is_marked_and_the_note_is_paid_for",
+      "killer_at": "base"
+    },
+    "X14": {
+      "what": "render: the restored note needs every open row to be restored",
+      "edits": [
+        {
+          "from": "if open.iter().any(|row| row.restored) {",
+          "to": "if open.iter().all(|row| row.restored) {"
+        }
+      ],
+      "mutation": "74fb801f2276382e31faec5f2c3bb2fd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skipped_row_is_listed_until_the_other_statement_is_built_and_verified_and_then_pairs",
+      "killer_at": "base"
+    },
+    "X15": {
+      "what": "render: the frame pays no margin",
+      "edits": [
+        {
+          "from": "let frame_len = frame.to_string().len() + OPEN_OMITTED_STEP.len() + 32;",
+          "to": "let frame_len = frame.to_string().len() + OPEN_OMITTED_STEP.len();"
+        }
+      ],
+      "mutation": "2cbeabd44d00b2ddf7006301da140f56",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_budget_that_holds_the_frame_and_exactly_k_rows_lists_k_rows",
+      "killer_at": "this_commit"
+    },
+    "X16": {
+      "what": "render: a row is costed without its comma",
+      "edits": [
+        {
+          "from": "let cost = rendered.to_string().len() + 1;",
+          "to": "let cost = rendered.to_string().len();"
+        }
+      ],
+      "mutation": "4fb3b4fe40bffe86d3bb0e7a704bcc40",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_budget_cuts_the_open_rows_and_counts_what_it_left_out",
+      "killer_at": "base"
+    },
+    "X17": {
+      "what": "trim_section: the rows already left out are forgotten",
+      "edits": [
+        {
+          "from": "let omitted = section[\"open_omitted\"].as_u64().unwrap_or(0) + (rows - keep) as u64;",
+          "to": "let omitted = (rows - keep) as u64;"
+        }
+      ],
+      "mutation": "f737b649631b7c8481b0fbe446f3ffbe",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "X18": {
+      "what": "transfers_budget: the section may use a third of the cap",
+      "edits": [
+        {
+          "from": ".min(max_bytes / 4)",
+          "to": ".min(max_bytes / 3)"
+        }
+      ],
+      "mutation": "d639a322dcf1a299990d861c46f5d682",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::the_budget_is_what_the_cap_leaves_counting_the_text_copy_and_at_most_a_quarter",
+      "killer_at": "base"
+    },
+    "X19": {
+      "what": "check_not_run_section: the recorded and unrecorded steps swap",
+      "edits": [
+        {
+          "from": "\"next_steps\": {\"check_not_run\": if recorded {\n            CHECK_NOT_RUN_RECORDED_STEP\n        } else {\n            CHECK_NOT_RUN_STEP\n        }},",
+          "to": "\"next_steps\": {\"check_not_run\": if recorded {\n            CHECK_NOT_RUN_STEP\n        } else {\n            CHECK_NOT_RUN_RECORDED_STEP\n        }},"
+        }
+      ],
+      "mutation": "b81f57015d988650022a63b4a4c7e6ce",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_is_not_about_transfers_goes_on_when_the_view_cannot_be_read",
+      "killer_at": "base"
+    },
+    "X20": {
+      "what": "NOT_ESTABLISHED_STEP: the instruction to keep the skip when a batch without statement records carries the transfer is dropped",
+      "edits": [
+        {
+          "from": " If a batch without statement records already carries this transfer, keep the skip.\";",
+          "to": "\";"
+        }
+      ],
+      "mutation": "3ff1fca490c715200c458be888d56c6e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::the_steps_of_the_states_keep_their_closing_instructions",
+      "killer_at": "this_commit"
+    },
+    "X21": {
+      "what": "CHECK_NOT_RUN_STEP: the advice to raise the cap is dropped",
+      "edits": [
+        {
+          "from": "\"Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES.\"",
+          "to": "\"Not run, or cut to fit: verify again.\""
+        }
+      ],
+      "mutation": "726641e510adb256c2812abd3d7f64d9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_is_not_about_transfers_goes_on_when_the_view_cannot_be_read",
+      "killer_at": "base"
+    },
+    "X22": {
+      "what": "CHECK_NOT_RUN_RECORDED_STEP: it no longer says when the check shows",
+      "edits": [
+        {
+          "from": "the transfer check will show on the next build or verification for this company.",
+          "to": "the transfer check will show later."
+        }
+      ],
+      "mutation": "ead079cdd144461c942d6f4dee7a6a2e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::a_section_that_did_not_run_names_the_call_that_made_it",
+      "killer_at": "base"
+    },
+    "X23": {
+      "what": "OPEN_OMITTED_STEP: it no longer says how to list every open row",
+      "edits": [
+        {
+          "from": "Raise BRIDGE_AGENT_MAX_BYTES to list every open row.",
+          "to": "Raise the cap."
+        }
+      ],
+      "mutation": "1eda85a168a9efe4cf5a7c9d229a981c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "X24": {
+      "what": "RESTORED_NOTE: it no longer says not to build or amend the rows",
+      "edits": [
+        {
+          "from": "do not name it in withdraw_skips, and do not build or amend its rows.",
+          "to": "do not name it in withdraw_skips."
+        }
+      ],
+      "mutation": "a955434e5605196134ea302c8ab998b4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::the_steps_of_the_states_keep_their_closing_instructions",
+      "killer_at": "this_commit"
+    },
+    "X25": {
+      "what": "SKIP_ROW_ALREADY_POSTED_NEXT_STEP: the instruction not to skip the rows is dropped",
+      "edits": [
+        {
+          "from": "Do not skip the rows listed in skipped_rows. ",
+          "to": ""
+        }
+      ],
+      "mutation": "b6d97900618cd6376ca9b7810bdc6b24",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refused_build_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X26": {
+      "what": "SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP: the instruction not to post the rows is dropped",
+      "edits": [
+        {
+          "from": "Do not post these rows. Parse the statement again with those rows mapped skip",
+          "to": "Parse the statement again with those rows mapped skip"
+        }
+      ],
+      "mutation": "e68fab23c9686ef3463c75cf80845c1b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refused_build_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X27": {
+      "what": "WITHDRAW_SKIP_INVALID_NEXT_STEP: it no longer says to build again with only valid rows",
+      "edits": [
+        {
+          "from": "Build again with withdraw_skips naming only rows that are both, or without it.\";",
+          "to": "Build again.\";"
+        }
+      ],
+      "mutation": "802aeb1644fd84c4be616a37a577efaa",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refused_build_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X28": {
+      "what": "TRANSFER_DOUBLE_BOOKED_NEXT_STEP: the instruction not to build the Contra is dropped",
+      "edits": [
+        {
+          "from": "Do not build this Contra: run verify_import",
+          "to": "Run verify_import"
+        }
+      ],
+      "mutation": "4c1bd8e8e16081b41d983b2447a794fd",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refused_build_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X29": {
+      "what": "TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: the instruction not to build again is dropped",
+      "edits": [
+        {
+          "from": "otherwise report it with the error named here, and do not build this statement again until it is fixed.\";",
+          "to": "otherwise report it with the error named here.\";"
+        }
+      ],
+      "mutation": "d07b2ac5cf7627e7566f0b342e82305e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refused_build_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X30": {
+      "what": "send_wording skip_row_already_posted: the instruction to parse again without the skip is dropped",
+      "edits": [
+        {
+          "from": "Then parse the statement again with the rows listed in skipped_rows not skipped (a row that batch holds is then refused as import_txn_already_posted, unless a person released that batch's rows with acknowledge_post_review, doubt rolled_back: then it is built as a new batch).\"),\n        \"skip_row_paired_elsewhere\"",
+          "to": "\"),\n        \"skip_row_paired_elsewhere\""
+        }
+      ],
+      "mutation": "11b159f37c2d0dc79bb5e12e53fa843e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X31": {
+      "what": "send_wording skip_row_paired_elsewhere: the instruction to ask for each row is dropped",
+      "edits": [
+        {
+          "from": "ask for each, and never name a row on their behalf.\"),\n        \"withdraw_skip_invalid\"",
+          "to": "\"),\n        \"withdraw_skip_invalid\""
+        }
+      ],
+      "mutation": "f250791c246257325a9b41d3299039af",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X32": {
+      "what": "send_wording withdraw_skip_invalid: it no longer says to name none",
+      "edits": [
+        {
+          "from": "Name in withdraw_skips only rows that are both, or none.",
+          "to": "Name in withdraw_skips only rows that are both."
+        }
+      ],
+      "mutation": "11393c9fd208096a5ecef507fb394a3c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X33": {
+      "what": "send_wording transfer_double_booked: it no longer says sending both books it twice",
+      "edits": [
+        {
+          "from": "Sending both books it twice. Run verify_import",
+          "to": "Run verify_import"
+        }
+      ],
+      "mutation": "5199211734365ddf661b1fb70498288c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_at_send_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X34": {
+      "what": "TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP: it no longer says no batch can be sent until it is fixed",
+      "edits": [
+        {
+          "from": " No batch of this company that posts a statement row can be sent until it is fixed, as it already blocks every build that needs the view.\";",
+          "to": "\";"
+        }
+      ],
+      "mutation": "3d25a549d3c0f03ed4a358fc9c275916",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_unreadable_view_stops_the_send_of_a_statement_row",
+      "killer_at": "base"
+    },
+    "X35": {
+      "what": "TRANSFERS_CHANGED_UNDER_LOCK_STEP: it no longer says the call gives the whole reason before asking",
+      "edits": [
+        {
+          "from": " Call post_import again: it gives the whole reason before asking.\";",
+          "to": " Call post_import again.\";"
+        }
+      ],
+      "mutation": "d4f7f93e6bac4d5b0425753e59f10b55",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "X36": {
+      "what": "TRANSFER_REFUSED_MESSAGE: it no longer says asking again refuses the same way",
+      "edits": [
+        {
+          "from": " Asking for approval again refuses the same way.\";",
+          "to": "\";"
+        }
+      ],
+      "mutation": "6a77a6bc8e4397d122edd9ad1740de72",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refused_build_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X37": {
+      "what": "TRANSFER_VIEW_REFUSED_MESSAGE: it no longer names the later release",
+      "edits": [
+        {
+          "from": "Building it again meets the same record: report it, or send with the later release that wrote it.\";",
+          "to": "Building it again meets the same record: report it.\";"
+        }
+      ],
+      "mutation": "8bc75ec7e88c13776ca5ae80e4a5c491",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refused_build_keeps_what_it_tells_the_person_to_do",
+      "killer_at": "this_commit"
+    },
+    "X38": {
+      "what": "NOTHING_SENT: it no longer says the approval is withdrawn",
+      "edits": [
+        {
+          "from": "const NOTHING_SENT: &str =\n    \"Nothing was sent to Tally, and any approval of this batch is withdrawn.\";",
+          "to": "const NOTHING_SENT: &str = \"Nothing was sent to Tally.\";"
+        }
+      ],
+      "mutation": "6626e1c7b58ead35520c4033861a8907",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "X39": {
+      "what": "SEND_ENDING: it no longer says to build again",
+      "edits": [
+        {
+          "from": "const SEND_ENDING: &str = \"This batch cannot be sent as built: build it again.\";",
+          "to": "const SEND_ENDING: &str = \"This batch cannot be sent as built.\";"
+        }
+      ],
+      "mutation": "bad749bff7da0bd9949feaa9784f5871",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "X40": {
+      "what": "NOTHING_WRITTEN: it no longer says nothing was recorded",
+      "edits": [
+        {
+          "from": "const NOTHING_WRITTEN: &str = \"No file was written and nothing was recorded.\";",
+          "to": "const NOTHING_WRITTEN: &str = \"No file was written.\";"
+        }
+      ],
+      "mutation": "79c27c1b9a626cb5e981c66d40ac93e1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "X41": {
+      "what": "Carrier::Paired step: the caution about a skip a batch holds is dropped",
+      "edits": [
+        {
+          "from": " (for a skip that a batch holds, it may carry it: ComplyEaze Bridge judges that skip alone, and another skipped row could share that Contra)",
+          "to": ""
+        }
+      ],
+      "mutation": "cda098ee5943bcf36775af3836986f04",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_the_windows_cover",
+      "killer_at": "base"
+    },
+    "X42": {
+      "what": "OpenState::ReferenceDiffers step: the advice to verify the batch first is dropped",
+      "edits": [
+        {
+          "from": " If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally",
+          "to": " Check that Contra in Tally"
+        }
+      ],
+      "mutation": "ceea4482a944981312e74d18d880e244",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_beside_a_verified_contra_of_another_reference_is_listed_and_withdrawn_on_the_persons_word",
+      "killer_at": "base"
+    },
+    "X43": {
+      "what": "OpenState::MatchedUnconfirmed step: the instruction to keep the skip is dropped",
+      "edits": [
+        {
+          "from": "is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided",
+          "to": "is not established, because the statement records of the two accounts do not both cover this date. The row can be decided"
+        }
+      ],
+      "mutation": "205dd0b690e9e7ca50243bc9e6c73d4a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_contras_batch",
+      "killer_at": "base"
+    },
+    "X44": {
+      "what": "OpenState::DoubleBooked step: it no longer says the two statements each booked the transfer",
+      "edits": [
+        {
+          "from": "Two statements each booked this transfer as a Contra. No step",
+          "to": "No step"
+        }
+      ],
+      "mutation": "1dfb40aafd26886ce8cabb4055063a5c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::the_steps_of_the_states_keep_their_closing_instructions",
+      "killer_at": "this_commit"
+    },
+    "X45": {
+      "what": "OpenState::PostedAgainstSkip step: the instruction to tell the person is dropped",
+      "edits": [
+        {
+          "from": " for it no step inside ComplyEaze Bridge clears the row. Tell the person.\",",
+          "to": " for it no step inside ComplyEaze Bridge clears the row.\","
+        }
+      ],
+      "mutation": "e9e406671df9e3dc27e547f59a74da9b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::the_steps_of_the_states_keep_their_closing_instructions",
+      "killer_at": "this_commit"
+    },
+    "X46": {
+      "what": "OpenState::HeldElsewhere step: the instruction to verify the batch is dropped",
+      "edits": [
+        {
+          "from": "and has not been found posted. Verify that batch. The skip is retired once",
+          "to": "and has not been found posted. The skip is retired once"
+        }
+      ],
+      "mutation": "ad1c8b92911c1b496401f3cb9d54462d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::the_steps_of_the_states_keep_their_closing_instructions",
+      "killer_at": "this_commit"
+    },
+    "X47": {
+      "what": "OpenState::TallyUnchecked step: the instruction to tell the person is dropped",
+      "edits": [
+        {
+          "from": "Tell the person what you found and keep the skip. Do not book this transfer",
+          "to": "Keep the skip. Do not book this transfer"
+        }
+      ],
+      "mutation": "e9f28b66108d4e9ff892b51ca2f7a635",
+      "verdict": "caught",
+      "killer": "agent::agent_import::transfers::tests::each_next_step_says_what_was_decided",
+      "killer_at": "base"
+    },
+    "X50": {
+      "what": "admit: skip_row_already_posted takes the code skip_row_held",
+      "edits": [
+        {
+          "from": "reason: \"skip_row_already_posted\",",
+          "to": "reason: \"skip_row_held\","
+        }
+      ],
+      "mutation": "e964706fdb9f036f31755392a56850c5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send",
+      "killer_at": "base"
+    },
+    "X51": {
+      "what": "admit: withdraw_skip_invalid takes the code withdraw_skip_unknown",
+      "edits": [
+        {
+          "from": "reason: \"withdraw_skip_invalid\",",
+          "to": "reason: \"withdraw_skip_unknown\","
+        }
+      ],
+      "mutation": "a3fcf0ce1fa20d8d3c656a272c6c0826",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_refusal_lists_fifty_rows_and_counts_the_rest",
+      "killer_at": "base"
+    },
+    "X52": {
+      "what": "admit: withdraw_skip_paired takes the code withdraw_skip_carried",
+      "edits": [
+        {
+          "from": "reason: \"withdraw_skip_paired\",",
+          "to": "reason: \"withdraw_skip_carried\","
+        }
+      ],
+      "mutation": "e0c1c231857221e3d9cefd8438c1dceb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "X53": {
+      "what": "admit: skip_row_paired_elsewhere takes the code skip_row_paired_other",
+      "edits": [
+        {
+          "from": "reason: \"skip_row_paired_elsewhere\",",
+          "to": "reason: \"skip_row_paired_other\","
+        }
+      ],
+      "mutation": "8966e12d9a7d25cc53fa7ca4f48cc893",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "X54": {
+      "what": "admit: transfer_double_booked takes the code transfer_booked_twice",
+      "edits": [
+        {
+          "from": "reason: \"transfer_double_booked\",",
+          "to": "reason: \"transfer_booked_twice\","
+        }
+      ],
+      "mutation": "7872a0926181aade2fc09cffeeedda52",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_with_one_reference_refuses_the_second_build",
+      "killer_at": "base"
+    },
+    "X55": {
+      "what": "without_facts: transfer_view_not_established takes the code transfer_view_unknown",
+      "edits": [
+        {
+          "from": "reason: \"transfer_view_not_established\",\n            detail",
+          "to": "reason: \"transfer_view_unknown\",\n            detail"
+        }
+      ],
+      "mutation": "cd553acd58728ca943cd655fb31ed9de",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_unreadable_view_stops_the_send_of_a_statement_row",
+      "killer_at": "base"
+    },
+    "X56": {
+      "what": "for_send: the unreadable-view code is compared with another",
+      "edits": [
+        {
+          "from": "let next_step = if self.reason == \"transfer_view_not_established\" {",
+          "to": "let next_step = if self.reason == \"transfer_view_unknown\" {"
+        }
+      ],
+      "mutation": "23201f2415e75d98c579d3ced812d4cb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_unreadable_view_stops_the_send_of_a_statement_row",
+      "killer_at": "base"
+    },
+    "X57": {
+      "what": "for_send: the paired-withdrawal ending is chosen for another code",
+      "edits": [
+        {
+          "from": "let ending = if self.reason == \"withdraw_skip_paired\" {",
+          "to": "let ending = if self.reason == \"withdraw_skip_invalid\" {"
+        }
+      ],
+      "mutation": "91692c35ec24fae8de793eb5ded37001",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_batch_is_sent",
+      "killer_at": "base"
+    },
+    "X58": {
+      "what": "SEND_REFUSALS: the unreadable-view code is spelt differently",
+      "edits": [
+        {
+          "from": "    \"transfer_view_not_established\",\n];",
+          "to": "    \"transfer_view_unknown\",\n];"
+        }
+      ],
+      "mutation": "d04085a405633af0afaf4289b21b2315",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::the_desktop_is_told_when_the_transfer_records_cannot_be_read",
+      "killer_at": "base"
+    },
+    "X59": {
+      "what": "SEND_REFUSALS: the paired-withdrawal code is spelt differently",
+      "edits": [
+        {
+          "from": "    \"withdraw_skip_paired\",\n    \"skip_row_paired_elsewhere\",",
+          "to": "    \"withdraw_skip_carried\",\n    \"skip_row_paired_elsewhere\","
+        }
+      ],
+      "mutation": "2996fd1bc41f2bdd498e9d43eb451408",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::the_codes_a_transfer_check_refuses_a_send_with_are_these_six",
+      "killer_at": "this_commit"
+    },
+    "X60": {
+      "what": "REFUSAL_ROWS_LISTED: a refusal lists 51 rows",
+      "edits": [
+        {
+          "from": "const REFUSAL_ROWS_LISTED: usize = 50;",
+          "to": "const REFUSAL_ROWS_LISTED: usize = 51;"
+        }
+      ],
+      "mutation": "4de6d8a4d6a96c408fc053270c3583be",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_refusal_lists_fifty_rows_and_counts_the_rest",
+      "killer_at": "base"
+    },
+    "X61": {
+      "what": "skip_row_already_posted detail: the blocking batch is named blocking_batch",
+      "edits": [
+        {
+          "from": "json!({\"blocking_batch_id\": batch, \"skipped_rows\": listed,",
+          "to": "json!({\"blocking_batch\": batch, \"skipped_rows\": listed,"
+        }
+      ],
+      "mutation": "65006ef03ecc07a3309e25fe69e6dc39",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send",
+      "killer_at": "base"
+    },
+    "X62": {
+      "what": "withdraw_skip_invalid detail: the omitted count is named invalid_rows_more",
+      "edits": [
+        {
+          "from": "\"invalid_rows_omitted\": omitted",
+          "to": "\"invalid_rows_more\": omitted"
+        }
+      ],
+      "mutation": "b846814d42a683e305c1084fe6654ccc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_refusal_lists_fifty_rows_and_counts_the_rest",
+      "killer_at": "base"
+    },
+    "X63": {
+      "what": "withdraw_skip_paired detail: the omitted count is named paired_omitted",
+      "edits": [
+        {
+          "from": "\"paired_rows_omitted\": omitted",
+          "to": "\"paired_omitted\": omitted"
+        }
+      ],
+      "mutation": "b2fdd4b3e67666d2d480a0a955ed03a3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_the_windows_cover",
+      "killer_at": "base"
+    },
+    "X64": {
+      "what": "transfer_double_booked detail: the other batch is named other_batch",
+      "edits": [
+        {
+          "from": "json!({\"other_batch_id\": other})",
+          "to": "json!({\"other_batch\": other})"
+        }
+      ],
+      "mutation": "e3c6bcc6e0aaed815031b4b8e8f6b73a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_with_one_reference_refuses_the_second_build",
+      "killer_at": "base"
+    },
+    "X65": {
+      "what": "skip_row_paired_elsewhere detail: the omitted count is named skipped_omitted",
+      "edits": [
+        {
+          "from": "detail: json!({\"skipped_rows\": listed, \"skipped_rows_omitted\": omitted}),",
+          "to": "detail: json!({\"skipped_rows\": listed, \"skipped_omitted\": omitted}),"
+        }
+      ],
+      "mutation": "cfaf33ea5c2bedd974312f5cc060497a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_refusal_lists_fifty_rows_and_counts_the_rest",
+      "killer_at": "base"
+    },
+    "X66": {
+      "what": "without_facts detail: the check is named checked",
+      "edits": [
+        {
+          "from": "json!({\"error\": error.variant(), \"check\": error.check(),",
+          "to": "json!({\"error\": error.variant(), \"checked\": error.check(),"
+        }
+      ],
+      "mutation": "61eb14c18926f33c37a903e15c603e6f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_needs_the_view_is_refused_when_it_cannot_be_read",
+      "killer_at": "base"
+    },
+    "X67": {
+      "what": "TransferRefusal::outcome: the state reads rejected",
+      "edits": [
+        {
+          "from": "let mut result = json!({\"state\": \"refused\", \"reason\": self.reason});",
+          "to": "let mut result = json!({\"state\": \"rejected\", \"reason\": self.reason});"
+        }
+      ],
+      "mutation": "fbee328605d128cec7ea391c706035fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_needs_the_view_is_refused_when_it_cannot_be_read",
+      "killer_at": "base"
+    },
+    "X68": {
+      "what": "TransferRefusal::outcome: the outcome names no company",
+      "edits": [
+        {
+          "from": "company_guid: Some(company_guid.to_string()),",
+          "to": "company_guid: None,"
+        }
+      ],
+      "mutation": "c302bc66a990b40b08be28b06ee4782f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_outcome_names_the_company_it_was_judged_for",
+      "killer_at": "this_commit"
+    },
+    "X69": {
+      "what": "TransferRefusal::outcome: the outcome is marked truncated",
+      "edits": [
+        {
+          "from": "company_json(company, std::slice::from_ref(company)),\n                \"result\": result}),\n            evidence: evidence.clone(),\n            company_guid: Some(company_guid.to_string()),\n            truncated: false,",
+          "to": "company_json(company, std::slice::from_ref(company)),\n                \"result\": result}),\n            evidence: evidence.clone(),\n            company_guid: Some(company_guid.to_string()),\n            truncated: true,"
+        }
+      ],
+      "mutation": "c0a8a3d34b43a2a424eccbb8741e87d3",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_refusal_outcome_names_the_company_it_was_judged_for",
+      "killer_at": "this_commit"
+    },
+    "X70": {
+      "what": "Carrier::label: paired reads paired_with_contra",
+      "edits": [
+        {
+          "from": "Self::Paired => \"paired\",",
+          "to": "Self::Paired => \"paired_with_contra\","
+        }
+      ],
+      "mutation": "5b60fdd392d24ceb4f03c28a19d4123b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "X80": {
+      "what": "admit C5b: an amendment's own lineage is not passed",
+      "edits": [
+        {
+          "from": "                    input.own_lineage.as_deref(),\n                    &input.skip_rows,",
+          "to": "                    None,\n                    &input.skip_rows,"
+        }
+      ],
+      "mutation": "4135f32ab0f58d0baeab0dfb4d199d86",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::an_amendment_cannot_skip_a_row_its_own_lineage_built",
+      "killer_at": "base"
+    },
+    "X81": {
+      "what": "admit C5a: the subject batch is not left out of the facts",
+      "edits": [
+        {
+          "from": "            &input.company_guid,\n            None,\n            input.subject.as_deref(),\n        ) {\n            Ok(view) => view,",
+          "to": "            &input.company_guid,\n            None,\n            None,\n        ) {\n            Ok(view) => view,"
+        }
+      ],
+      "mutation": "8f3452fd3d1f43693c45dcf6bc8a8479",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "X82": {
+      "what": "admit C6: the subject batch is not left out of the facts",
+      "edits": [
+        {
+          "from": "            Some(input.candidate),\n            input.subject.as_deref(),",
+          "to": "            Some(input.candidate),\n            None,"
+        }
+      ],
+      "mutation": "e988367cebc8dec850f0b013d277918d",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "X83": {
+      "what": "admit: a withdrawal is valid when its skip is live, not merely mentioned",
+      "edits": [
+        {
+          "from": ".filter(|row| !mentioned.contains(row.as_str()) || !input.voucher_rows.contains(*row))",
+          "to": ".filter(|row| !live.contains(row.as_str()) || !input.voucher_rows.contains(*row))"
+        }
+      ],
+      "mutation": "2ff0295d18d9ff763c1d65d7e88f65f8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_with_the_withdrawal",
+      "killer_at": "base"
+    },
+    "X84": {
+      "what": "admit: a withdrawal is valid when its row is skipped by this build, not posted",
+      "edits": [
+        {
+          "from": ".filter(|row| !mentioned.contains(row.as_str()) || !input.voucher_rows.contains(*row))",
+          "to": ".filter(|row| !mentioned.contains(row.as_str()) || !input.skip_rows.contains(*row))"
+        }
+      ],
+      "mutation": "74bc20aca8c5d50d937332ad3791a1d8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "X85": {
+      "what": "admit: a withdrawal is never judged against the held skips",
+      "edits": [
+        {
+          "from": "        let held_view = if input.withdraw.is_empty() {\n            None\n        } else {",
+          "to": "        let held_view = if true {\n            None\n        } else {"
+        }
+      ],
+      "mutation": "92cd11b3408ebde3f411f58b20debb45",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_held_by_a_batch_not_found_posted_cannot_be_withdrawn_beside_a_paired_contra",
+      "killer_at": "base"
+    },
+    "X86": {
+      "what": "admit: an unreadable held view is admitted when the build does not need the view",
+      "edits": [
+        {
+          "from": "return Ok(without_facts(input.needs_the_view(), &error.into()));",
+          "to": "return Ok(without_facts(false, &error.into()));"
+        }
+      ],
+      "mutation": "f916ace0b0e01f4536f1e9afb0b7bc7d",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "X87": {
+      "what": "admit: a verified Contra matched by date is carried as paired",
+      "edits": [
+        {
+          "from": "vec![(&contra.batch, Carrier::MatchedUnconfirmed)]",
+          "to": "vec![(&contra.batch, Carrier::Paired)]"
+        }
+      ],
+      "mutation": "30bee56410881618e550326862200e5a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_the_windows_cover",
+      "killer_at": "base"
+    },
+    "X88": {
+      "what": "admit: a paired skip is carried as other_side_unverified",
+      "edits": [
+        {
+          "from": "SkipState::Paired { contra, .. } => vec![(&contra.batch, Carrier::Paired)],",
+          "to": "SkipState::Paired { contra, .. } => vec![(&contra.batch, Carrier::OtherSideUnverified)],"
+        }
+      ],
+      "mutation": "720b17d363806219f41cddf69d447e13",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference",
+      "killer_at": "base"
+    },
+    "X89": {
+      "what": "admit: an unverified other side is carried as paired",
+      "edits": [
+        {
+          "from": "vec![(batch, Carrier::OtherSideUnverified)]",
+          "to": "vec![(batch, Carrier::Paired)]"
+        }
+      ],
+      "mutation": "4bae6bb753e85c44cc58c189b67ba828",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_the_other_statement_already_carries_cannot_be_withdrawn",
+      "killer_at": "base"
+    },
+    "X90": {
+      "what": "admit: an unverified candidate is carried as paired",
+      "edits": [
+        {
+          "from": ".map(|candidate| (&candidate.batch, Carrier::OtherSideUnverified))",
+          "to": ".map(|candidate| (&candidate.batch, Carrier::Paired))"
+        }
+      ],
+      "mutation": "9d3a2543849a1e7540f24be78603e91f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "X91": {
+      "what": "admit: verified candidates are carried too",
+      "edits": [
+        {
+          "from": ".filter(|candidate| !verified.contains(candidate))",
+          "to": ".filter(|_| true)"
+        }
+      ],
+      "mutation": "6566ecfadd352f865ef608f901cd0046",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state",
+      "killer_at": "base"
+    },
+    "X92": {
+      "what": "admit: the held skips are not read beside the main view",
+      "edits": [
+        {
+          "from": "                    .chain(held_view.iter().flat_map(|view| view.skips.iter()))\n",
+          "to": ""
+        }
+      ],
+      "mutation": "c06f3d2ae957a14f954e659e8022d4f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_held_by_a_batch_not_found_posted_cannot_be_withdrawn_beside_a_paired_contra",
+      "killer_at": "base"
+    },
+    "X93": {
+      "what": "admit: a restored batch marks the refusal only when every row names one",
+      "edits": [
+        {
+          "from": "                .any(|(_, batch, _)| before.restored.contains(batch.as_str()));",
+          "to": "                .all(|(_, batch, _)| before.restored.contains(batch.as_str()));"
+        }
+      ],
+      "mutation": "e0a6f65b0d95889adc9a6e69ced33a19",
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "X94": {
+      "what": "admit: a withdrawal for a saved batch is judged stale only for a build with no subject",
+      "edits": [
+        {
+          "from": "(Candidate::Build(line), Some(_)) => {",
+          "to": "(Candidate::Build(line), None) => {"
+        }
+      ],
+      "mutation": "45836827e45724f29d3b00d7a4c5a7cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_send",
+      "killer_at": "base"
+    },
+    "X95": {
+      "what": "admit: an unparsable build time is admitted when the build does not need the view",
+      "edits": [
+        {
+          "from": "Ok(built) => built,\n                    Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),",
+          "to": "Ok(built) => built,\n                    Err(error) => return Ok(without_facts(false, &error)),"
+        }
+      ],
+      "mutation": "37c0b5bd2996a6f06badf04777c23929",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_withdrawal_whose_batch_has_no_readable_build_time_is_refused_at_send",
+      "killer_at": "this_commit"
+    },
+    "X96": {
+      "what": "admit: a withdrawal is stale only when every recorded skip is newer",
+      "edits": [
+        {
+          "from": ".any(|recorded| !statement_facts::withdrawal_counts(&built, recorded))",
+          "to": ".all(|recorded| !statement_facts::withdrawal_counts(&built, recorded))"
+        }
+      ],
+      "mutation": "f972e575f1fe8d2a7a238631a43b956b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_withdrawal_older_than_one_of_two_skips_of_the_row_is_refused_at_send",
+      "killer_at": "this_commit"
+    },
+    "X97": {
+      "what": "admit: a row is posted against a skip that is mentioned, not only live",
+      "edits": [
+        {
+          "from": "live.contains(row.as_str())\n                    && (",
+          "to": "mentioned.contains(row.as_str())\n                    && ("
+        }
+      ],
+      "mutation": "2155c3f872d21b6df9da39d9f951bba2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send",
+      "killer_at": "base"
+    },
+    "X98": {
+      "what": "admit: a stale withdrawal excuses the row",
+      "edits": [
+        {
+          "from": "&& (!input.withdraw.contains(*row) || stale_withdrawals.contains(row.as_str()))",
+          "to": "&& !input.withdraw.contains(*row)"
+        }
+      ],
+      "mutation": "e47cfe2659a4095de98f452b168c94d5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_send",
+      "killer_at": "base"
+    },
+    "X99": {
+      "what": "double_booked_with: a pair that is only listed refuses the build",
+      "edits": [
+        {
+          "from": "if booked.class != DoubleBookedClass::RefuseAtBuild {",
+          "to": "if booked.class != DoubleBookedClass::List {"
+        }
+      ],
+      "mutation": "c75d0f68a464db614db9d3f2c488200f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_batch_is_sent",
+      "killer_at": "base"
+    },
+    "X100": {
+      "what": "admit C6: the build's own batch is not looked for in a double booking",
+      "edits": [
+        {
+          "from": "let candidate_batch = input.candidate_build().map(str::to_string);",
+          "to": "let candidate_batch: Option<String> = None;"
+        }
+      ],
+      "mutation": "6f577797cf74442cb78fc0661c7d1743",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::the_same_transfer_booked_twice_with_one_reference_refuses_the_second_build",
+      "killer_at": "base"
+    },
+    "X101": {
+      "what": "admit C6: an unreadable view with the build in it is admitted when the build does not need the view",
+      "edits": [
+        {
+          "from": "Err(error) => return Ok(without_facts(needs_the_view, &error)),",
+          "to": "Err(error) => return Ok(without_facts(false, &error)),"
+        }
+      ],
+      "mutation": "ccc8c23540b30fd18edcd02b98d8a543",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_batch_whose_own_facts_fail_the_check_is_refused_at_send",
+      "killer_at": "this_commit"
+    },
+    "X102": {
+      "what": "admit: the facts the build was admitted on are not kept",
+      "edits": [
+        {
+          "from": "        Ok(Admission::Admitted(Admitted(Some(Box::new((\n            facts, checked,\n        ))))))",
+          "to": "        Ok(Admission::Admitted(Admitted(None)))"
+        }
+      ],
+      "mutation": "10e8bbad8f0d0bca70507ff40d616a64",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large",
+      "killer_at": "base"
+    },
+    "X103": {
+      "what": "needs_the_view: a build carrying statement facts does not need the view",
+      "edits": [
+        {
+          "from": "self.carries_statement || !self.voucher_rows.is_empty() || !self.withdraw.is_empty()",
+          "to": "!self.voucher_rows.is_empty() || !self.withdraw.is_empty()"
+        }
+      ],
+      "mutation": "5b3100b40764884d8093a9cf91f7396f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_that_needs_the_view_is_refused_when_it_cannot_be_read",
+      "killer_at": "base"
+    },
+    "X104": {
+      "what": "skip_file_while_admitted: an unreadable skip file takes another code",
+      "edits": [
+        {
+          "from": "Err(_) => Err(\"import_ledger_unavailable\".to_string()),",
+          "to": "Err(_) => Err(\"import_ledger_invalid\".to_string()),"
+        }
+      ],
+      "mutation": "2ac16d76d643fc8381783c95209e5622",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_skip_file_that_cannot_be_opened_is_named_import_ledger_unavailable",
+      "killer_at": "this_commit"
+    },
+    "X105": {
+      "what": "skip_file_while_admitted: the skip file is opened writable",
+      "edits": [
+        {
+          "from": "open_local_file(&path, false)",
+          "to": "open_local_file(&path, true)"
+        }
+      ],
+      "mutation": "3dbd57536017bdf5ae2dd68a69b107dc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::skipping_a_row_a_sent_or_found_batch_holds_is_refused_naming_the_batch",
+      "killer_at": "base"
+    },
+    "X106": {
+      "what": "transfer_view_while_admitted: the view looks one more day either side",
+      "edits": [
+        {
+          "from": "let view = input.view(&TallyDays::none(), TRANSFER_K_DAYS);\n        Ok((facts, view))",
+          "to": "let view = input.view(&TallyDays::none(), TRANSFER_K_DAYS + 1);\n        Ok((facts, view))"
+        }
+      ],
+      "mutation": "200197d668267a206ac594a16d6df5bc",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_contra_a_day_from_a_skipped_row_is_not_its_pair",
+      "killer_at": "this_commit"
+    },
+    "X107": {
+      "what": "admit C6: the view with the build in it looks one more day either side",
+      "edits": [
+        {
+          "from": "let view = checked.view(&TallyDays::none(), TRANSFER_K_DAYS);",
+          "to": "let view = checked.view(&TallyDays::none(), TRANSFER_K_DAYS + 1);"
+        }
+      ],
+      "mutation": "0ee15fdbfb105f0b693124cc5f8173a9",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "X110": {
+      "what": "transfers_refusal_for_send: the batch's company GUID is not made canonical",
+      "edits": [
+        {
+          "from": "company_guid: canonical_batch_guid(&line.company_guid),",
+          "to": "company_guid: line.company_guid.clone(),"
+        }
+      ],
+      "mutation": "215863f46cdbb0fbfb3cb3c293eb45d6",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "X111": {
+      "what": "transfers_refusal_for_send: an unparsable statement is admitted when the batch needs no view",
+      "edits": [
+        {
+          "from": "return Ok(match without_facts(true, &error) {",
+          "to": "return Ok(match without_facts(false, &error) {"
+        }
+      ],
+      "mutation": "8314e01d07473da9243254377bdc6934",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_saved_statement_that_cannot_be_read_back_is_refused_at_send",
+      "killer_at": "this_commit"
+    },
+    "X112": {
+      "what": "transfers_refusal_for_send: the skipped rows of the statement are not passed",
+      "edits": [
+        {
+          "from": "            skip_rows: statement\n                .iter()\n                .flat_map(|statement| &statement.skip_rows)\n                .map(|skip| skip.bridge_txn_id.clone())\n                .collect(),",
+          "to": "            skip_rows: BTreeSet::new(),"
+        }
+      ],
+      "mutation": "872a0f4ddb9222283fba04dbd1a3e35d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send",
+      "killer_at": "base"
+    },
+    "X113": {
+      "what": "transfers_refusal_for_send: every voucher of the batch is a statement row",
+      "edits": [
+        {
+          "from": "                .filter(|voucher| {\n                    bridge_bank_statement::proposals::is_statement_txn_id(&voucher.bridge_txn_id)\n                })\n",
+          "to": ""
+        }
+      ],
+      "mutation": "f5b0a7d323eb3caac519926b15e1ac90",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_that_is_not_about_transfers_is_not_held_by_an_unreadable_view",
+      "killer_at": "base"
+    },
+    "X114": {
+      "what": "transfers_refusal_for_send: the rows the batch withdrew are not passed",
+      "edits": [
+        {
+          "from": "withdraw: line.withdrawn_skips.iter().flatten().cloned().collect(),",
+          "to": "withdraw: BTreeSet::new(),"
+        }
+      ],
+      "mutation": "0d6a7bafd01b744e0403dabb1b52f024",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "X115": {
+      "what": "transfers_refusal_for_send: an amendment's lineage is not passed",
+      "edits": [
+        {
+          "from": "own_lineage: line.amends_batch_id.clone(),",
+          "to": "own_lineage: None,"
+        }
+      ],
+      "mutation": "c251c0712f304f364dc020362a18bee9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::an_amendment_that_skips_a_row_its_own_lineage_built_is_refused_at_send",
+      "killer_at": "this_commit"
+    },
+    "X116": {
+      "what": "transfers_refusal_for_send: the batch is not marked as carrying a statement",
+      "edits": [
+        {
+          "from": "carries_statement: statement.is_some(),",
+          "to": "carries_statement: false,"
+        }
+      ],
+      "mutation": "de9bb2e043d2fd4d456c5f33046e3e3d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_batch_whose_own_facts_fail_the_check_is_refused_at_send",
+      "killer_at": "this_commit"
+    },
+    "X117": {
+      "what": "transfers_refusal_for_send: the batch is judged with its own records in the journal",
+      "edits": [
+        {
+          "from": "subject: Some(line.batch_id.clone()),",
+          "to": "subject: None,"
+        }
+      ],
+      "mutation": "4e12314fe3cfc6bafa5512d5c3478ee9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_batch_with_a_found_status_keeps_its_withdrawal_at_send",
+      "killer_at": "base"
+    },
+    "X118": {
+      "what": "transfers_refusal_for_send: a batch about no transfers is judged all the same",
+      "edits": [
+        {
+          "from": "        if !input.needs_the_view() {\n            return Ok(None);\n        }\n        Ok(match self.admit_transfers_while_admitted(input)? {",
+          "to": "        Ok(match self.admit_transfers_while_admitted(input)? {"
+        }
+      ],
+      "mutation": "72e5c28f0cb7de6f51c4a3886b96de68",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "X119": {
+      "what": "transfers_refusal_for_send: a refusal is given as the build worded it",
+      "edits": [
+        {
+          "from": "        Ok(match self.admit_transfers_while_admitted(input)? {\n            Admission::Refused(refusal) => Some(refusal.for_send()),",
+          "to": "        Ok(match self.admit_transfers_while_admitted(input)? {\n            Admission::Refused(refusal) => Some(refusal),"
+        }
+      ],
+      "mutation": "aa5a37bd787ae10f3a6427ff4ab7ddf0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog",
+      "killer_at": "base"
+    },
+    "X120": {
+      "what": "transfers_refusal_for_send: an unparsable statement is refused as the build worded it",
+      "edits": [
+        {
+          "from": "                        Admission::Refused(refusal) => Some(refusal.for_send()),\n                        Admission::Admitted(_) => None,\n                    });",
+          "to": "                        Admission::Refused(refusal) => Some(refusal),\n                        Admission::Admitted(_) => None,\n                    });"
+        }
+      ],
+      "mutation": "4a56180a6b75d79fe2e1b606509eeb39",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::transfers::tests::a_saved_statement_that_cannot_be_read_back_is_refused_at_send",
+      "killer_at": "this_commit"
+    },
+    "X121": {
+      "what": "transfers_for_verification: the company GUID is not made canonical",
+      "edits": [
+        {
+          "from": "&canonical_batch_guid(company_guid),",
+          "to": "company_guid,"
+        }
+      ],
+      "mutation": "889eed4970e683f6634727b89049b5de",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "X122": {
+      "what": "transfers_for_verification: the budget takes the cap and the essential length the wrong way round",
+      "edits": [
+        {
+          "from": "summary.render(transfers_budget(self.settings.max_bytes, essential_len))",
+          "to": "summary.render(transfers_budget(essential_len, self.settings.max_bytes))"
+        }
+      ],
+      "mutation": "2bd160b64c7eb8d267775711886d4316",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_row_posted_without_the_withdrawal_stays_open_in_the_verification_section",
+      "killer_at": "base"
+    },
+    "X123": {
+      "what": "summary_with_days_read: the book's voucher mark is not passed to the reads",
+      "edits": [
+        {
+          "from": "with_days_read(reader, identity, company, &input, &names, voucher_mark).await;",
+          "to": "with_days_read(reader, identity, company, &input, &names, None).await;"
+        }
+      ],
+      "mutation": "31c6ced6c489aae33276e6e8eb17381e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    },
+    "X124": {
+      "what": "summary_with_days_read: a ledger is named by its name, not its GUID",
+      "edits": [
+        {
+          "from": ".map(|(name, guid, _)| (guid, name)),",
+          "to": ".map(|(name, guid, _)| (name, guid)),"
+        }
+      ],
+      "mutation": "72444af035e94112ec9b0186ac222719",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_skip_only_record_renders_not_found_from_the_lab_runs_captured_days",
+      "killer_at": "base"
+    },
+    "X125": {
+      "what": "summary_with_days_read: reads kept but not whole show no day reads",
+      "edits": [
+        {
+          "from": "if reads.whole.is_empty() && reads.kept.is_empty() {",
+          "to": "if reads.whole.is_empty() {"
+        }
+      ],
+      "mutation": "5881d01a71b16558a03e64f055bb878b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::transfer_flow_tests::a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "X82": {
+      "mutation": "e988367cebc8dec850f0b013d277918d",
+      "reason": "equivalent: the batch sent is the journal's own latest record, so reading it again merges unchanged with the record already read (a changed record would raise BatchRecordChanged in the fold, which this edit does not touch), and the double-booking check reads only the statement's bank, the lineage and the references, never a status, so the subject batch named or not gives the same pairs"
+    },
+    "X86": {
+      "mutation": "f916ace0b0e01f4536f1e9afb0b7bc7d",
+      "reason": "equivalent, unreachable: the held view is read only when the build withdraws a skip, which is when the build needs the view, so this edit would admit where base refuses; but a held skip comes from the journal's map of skip keys (no key twice) and is checked for a positive amount and two different ledgers when it is saved, so held_carrier_view never fails for a saved journal"
+    },
+    "X93": {
+      "mutation": "e0a6f65b0d95889adc9a6e69ced33a19",
+      "reason": "not killed, and not equivalent: any and all differ only when one refusal lists rows from two or more batches and only some of them were restored, which needs a journal with a recorded rollback covering one of two batches that carry skipped rows; no fixture here builds that journal, and a refusal with one batch, or with every batch restored or none, reads the same under both"
+    },
+    "X107": {
+      "mutation": "0ee15fdbfb105f0b693124cc5f8173a9",
+      "reason": "equivalent: the only pairs read from the view with the build in it are RefuseAtBuild pairs, which are two equal references from two statements and do not depend on the date, so one more day either side of the build lists the same pairs"
+    },
+    "X110": {
+      "mutation": "215863f46cdbb0fbfb3cb3c293eb45d6",
+      "reason": "equivalent: the company GUID is compared case-insensitively, and canonical_batch_guid only fixes the case, so a lower or upper case GUID in the saved line reaches the same facts and the same section; the upper-case test passes on base and on this mutant"
+    },
+    "X118": {
+      "mutation": "72e5c28f0cb7de6f51c4a3886b96de68",
+      "reason": "equivalent: the early return only avoids reads for a batch about no transfers, and no check can refuse a batch that carries no transfer, so the full admission returns the same None"
+    },
+    "X121": {
+      "mutation": "889eed4970e683f6634727b89049b5de",
+      "reason": "equivalent: the company GUID is compared case-insensitively where the facts are read, so passing it as given or made canonical reads the same facts; the upper-case test passes on base and on this mutant"
+    }
+  }
+}

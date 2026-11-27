@@ -193,7 +193,7 @@ fn every_request_is_byte_equal_to_its_committed_capture() {
         (window("20250601", "20250630"), JUNE_REQUEST),
     ] {
         assert_eq!(
-            render_native_cash_flow_request(LAB, &window),
+            render_native_cash_flow_request(&ValidatedCompanyName::new(LAB).unwrap(), &window),
             text(committed)
         );
     }

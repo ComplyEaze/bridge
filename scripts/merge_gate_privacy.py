@@ -83,6 +83,15 @@ PUBLIC_AGENT_ATTRIBUTION_DOMAIN = "anthropic.com"
 PUBLIC_AGENT_ATTRIBUTION_ADDRESS = (
     PUBLIC_AGENT_ATTRIBUTION_LOCAL_PART + "@" + PUBLIC_AGENT_ATTRIBUTION_DOMAIN
 )
+# The one sign-off line Dependabot ends its commit messages with: key, name and address all exact. This is a single
+# known public automated-contributor identity too, eligible only as a terminal trailer by the same rules as the one
+# above; its components are separate here for the same reason.
+PUBLIC_BOT_SIGNOFF_LOCAL_PART = "support"
+PUBLIC_BOT_SIGNOFF_DOMAIN = "github.com"
+PUBLIC_BOT_SIGNOFF_ADDRESS = PUBLIC_BOT_SIGNOFF_LOCAL_PART + "@" + PUBLIC_BOT_SIGNOFF_DOMAIN
+PUBLIC_BOT_SIGNOFF_TRAILER_RE = re.compile(
+    r"^Signed-off-by: dependabot\[bot\] <" + re.escape(PUBLIC_BOT_SIGNOFF_ADDRESS) + r">$"
+)
 GIT_TRAILER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9-]*:[ \t]+[^\r\n]+$")
 PUBLIC_AGENT_COAUTHOR_TRAILER_RE = re.compile(
     r"^(?i:Co-Authored-By):[ \t]+(?P<name>\S(?:.*\S)?)[ \t]+<"
@@ -338,7 +347,7 @@ def customer_email_count(text):
 
 
 def redact_public_agent_attribution_trailer(message):
-    """Redact the known public-agent address from a terminal Git trailer.
+    """Redact the known public-agent and Dependabot sign-off addresses from a terminal Git trailer.
 
     A merge commit made with conflicts ends with git's own comment block
     (``# Conflicts:`` and ``#<TAB>path`` lines) after the trailer. That block is
@@ -363,7 +372,7 @@ def redact_public_agent_attribution_trailer(message):
 
 
 def _redact_terminal_trailer(message):
-    """Redact only the known public-agent address from a terminal Git trailer.
+    """Redact only the two known public addresses (agent attribution, Dependabot sign-off) from a terminal Git trailer.
 
     A trailer-shaped line elsewhere in the commit message is ordinary scanned
     content.  The entire footer must be well-formed trailers and the exact
@@ -389,11 +398,15 @@ def _redact_terminal_trailer(message):
         return message
     redacted = []
     for line in lines:
-        match = PUBLIC_AGENT_COAUTHOR_TRAILER_RE.fullmatch(line)
-        if match:
+        marker = None
+        if PUBLIC_AGENT_COAUTHOR_TRAILER_RE.fullmatch(line):
+            marker = "public-agent-attribution"
+        elif PUBLIC_BOT_SIGNOFF_TRAILER_RE.fullmatch(line):
+            marker = "public-bot-signoff"
+        if marker:
             start = line.rfind("<") + 1
             end = line.rfind(">")
-            redacted.append(line[:start] + "public-agent-attribution" + line[end:])
+            redacted.append(line[:start] + marker + line[end:])
         else:
             redacted.append(line)
     return prefix + line_ending.join(redacted) + trailing_newlines

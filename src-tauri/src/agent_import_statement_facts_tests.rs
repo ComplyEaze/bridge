@@ -3842,3 +3842,459 @@ fn a_withdrawal_counts_only_when_built_strictly_after_the_skip() {
         &skip
     ));
 }
+
+// ---- the checks the mutation record (#2058) holds ----------------------------------
+
+/// A field this release does not write is refused at every level of the facts,
+/// not only at the top: a later release's addition fails the read loudly.
+#[test]
+fn an_unknown_field_is_refused_at_every_level_of_the_facts() {
+    let written_facts = facts(B1)
+        .window("20260901", "20260930")
+        .contra(&st(1), None)
+        .skip(skip_row(&st(2), "5.00", B2, None));
+    let written = statement_record(&written_facts);
+    assert_eq!(
+        serde_json::from_value::<StatementFacts>(written.clone()).unwrap(),
+        written_facts
+    );
+    for at in ["", "/coverage", "/contra_rows/0", "/skip_rows/0"] {
+        let mut value = written.clone();
+        value.pointer_mut(at).unwrap()["extra"] = json!(1);
+        assert!(
+            serde_json::from_value::<StatementFacts>(value).is_err(),
+            "{at:?}"
+        );
+    }
+    // in the journal, the batch that holds such facts fails the view
+    let mut line = build(1)
+        .voucher(contra(&st(1), N2, N1, "1.00"))
+        .facts(written_facts)
+        .line();
+    line.statement.as_mut().unwrap()["contra_rows"][0]["extra"] = json!(1);
+    assert_eq!(
+        Journal::default().push(&line).read().unwrap_err(),
+        TransferFactsError::Facts {
+            source_id: batch_id(1),
+            error: FactsError::Unparsable
+        }
+    );
+}
+
+/// What a statement leaves empty is not written: no window, no Contra row and
+/// no skipped row are absent keys, not nulls or empty lists.
+#[test]
+fn the_facts_written_leave_out_what_is_empty() {
+    assert_eq!(
+        statement_record(&facts(B1)),
+        json!({"bank_ledger_guid": B1})
+    );
+    assert_eq!(
+        statement_record(&facts(B1).contra(&st(1), None)),
+        json!({"bank_ledger_guid": B1, "contra_rows": [{"bridge_txn_id": st(1)}]})
+    );
+}
+
+/// A window of one day ends where it starts, and is admitted.
+#[test]
+fn a_window_of_one_day_is_admitted() {
+    let mut one_day = valid();
+    one_day.coverage = Some(StatementWindow {
+        from: date("20260901"),
+        to: date("20260901"),
+    });
+    assert_eq!(
+        validate_statement_facts(&one_day, None).unwrap().window,
+        Some(ParseWindow {
+            from: date("20260901"),
+            to: date("20260901")
+        })
+    );
+}
+
+/// The places of an amount are counted as written: a third place that is a
+/// zero is still a third place.
+#[test]
+fn an_amount_is_refused_for_a_third_place_whatever_its_digit() {
+    for bad in ["1.500", "1.000", "0.010"] {
+        let mut facts = valid();
+        facts.skip_rows[0].amount = bad.into();
+        assert_eq!(
+            validate_statement_facts(&facts, None).unwrap_err(),
+            FactsError::AmountInadmissible { txn: st(2) },
+            "{bad:?}"
+        );
+    }
+}
+
+/// A ledger GUID is compared as written, in the skip's two ledgers and in the
+/// batch's binding of the statement's bank.
+#[test]
+fn ledger_guids_are_compared_as_written() {
+    let upper = B1.to_ascii_uppercase();
+    let mut row_in_upper = valid();
+    row_in_upper.skip_rows[0].other_ledger_guid = upper.clone();
+    let checked = validate_statement_facts(&row_in_upper, None).unwrap();
+    assert_eq!(
+        checked.skips[0].other_ledger,
+        LedgerGuid::new(upper.as_str())
+    );
+
+    let skips_only = facts(B1).skip(skip_row(&st(2), "5.00", B2, None));
+    let exact = bound(&[(N1, B1)]);
+    assert!(validate_statement_facts(&skips_only, Some(shape(&[], Some(&exact)))).is_ok());
+    let other_case = bound(&[(N1, upper.as_str())]);
+    assert_eq!(
+        validate_statement_facts(&skips_only, Some(shape(&[], Some(&other_case)))).unwrap_err(),
+        FactsError::BankLedgerUnbound
+    );
+}
+
+/// A withdrawn row must carry a statement row id even when the batch holds a
+/// voucher of that id.
+#[test]
+fn a_withdrawn_row_the_batch_holds_is_refused_unless_it_is_a_statement_row() {
+    let batch = build(60)
+        .voucher(contra("txn-001", N2, N1, "1.00"))
+        .withdrew(&["txn-001".to_string()]);
+    assert_eq!(
+        Journal::default().batch(&batch).read().unwrap_err(),
+        TransferFactsError::Facts {
+            source_id: batch_id(60),
+            error: FactsError::WithdrawnRowNotVoucher {
+                txn: "txn-001".into()
+            },
+        }
+    );
+}
+
+/// A record with no endpoint is named by the failure, batch or skip-only record.
+#[test]
+fn a_missing_endpoint_names_its_record() {
+    let blind =
+        build(61)
+            .endpoint(None)
+            .facts(facts(B1).skip(skip_row(&st(5), "500.00", B2, None)));
+    let error = Journal::default().batch(&blind).read().unwrap_err();
+    assert_eq!(error.record_id(), Some(batch_id(61).as_str()));
+    assert_eq!(error.variant(), "missing_endpoint");
+    let record = skip_record(
+        13,
+        "",
+        "2026-09-02T10:00:00Z",
+        facts(B1).skip(skip_row(&st(5), "500.00", B2, None)),
+    );
+    let error = Journal::default()
+        .read_with(&skip_file(std::slice::from_ref(&record)), company())
+        .unwrap_err();
+    assert_eq!(
+        error,
+        TransferFactsError::MissingEndpoint {
+            source_id: record.record_id.clone()
+        }
+    );
+    assert_eq!(error.record_id(), Some(record.record_id.as_str()));
+}
+
+/// A batch's facts are as old as its latest full record: appended again later,
+/// its skip is newer than another lineage's built in between.
+#[test]
+fn a_batch_s_facts_take_the_build_time_of_its_latest_full_record() {
+    let first = build(50).facts(facts(B1).skip(skip_row(&st(9), "500.00", B2, Some(ref_a()))));
+    let between = build(51).facts(facts(B1).skip(skip_row(&st(9), "500.00", B2, Some(ref_b()))));
+    let mut again = first.line();
+    again.built_at = "2026-09-01T10:01:00Z".into();
+    let found = Journal::default()
+        .batch(&first)
+        .batch(&between)
+        .push(&again)
+        .read()
+        .unwrap();
+    let [skip] = &found.skips[..] else {
+        panic!("one skip");
+    };
+    assert_eq!(skip.lineage, LineageId::new(batch_id(50)));
+    assert_eq!(
+        skip.reference.as_ref().map(ToString::to_string).as_deref(),
+        Some(ref_a())
+    );
+}
+
+/// A Contra of more than two entries is left out even when its first two are
+/// a transfer on the statement's bank.
+#[test]
+fn a_contra_of_four_entries_is_left_out_though_two_of_them_pair() {
+    let four = voucher(
+        &st(62),
+        "Contra",
+        &[
+            (N2, "100.00", "Dr"),
+            (N1, "100.00", "Cr"),
+            (N3, "5.00", "Dr"),
+            (N3, "5.00", "Cr"),
+        ],
+        "20260901",
+    );
+    let batch = build(62)
+        .voucher(contra(&st(63), N2, N1, "5.00"))
+        .voucher(four)
+        .facts(facts(B2).contra(&st(63), None).contra(&st(62), None))
+        .status("posted_verified");
+    let found = Journal::default().batch(&batch).read().unwrap();
+    assert_eq!(found.contras.len(), 1);
+    assert_eq!(found.contras[0].key.txn, TxnId::new(st(63)));
+    assert_eq!(found.contras_not_two_leg, 1);
+}
+
+/// A leg is read through its build's binding by the exact name: the same name
+/// in another case is a ledger the build did not bind.
+#[test]
+fn a_leg_named_in_another_case_is_a_ledger_the_build_did_not_bind() {
+    let batch = build(64)
+        .voucher(contra(&st(64), N2, "BANK ONE", "100.00"))
+        .facts(facts(B2).contra(&st(64), None));
+    assert_eq!(
+        Journal::default().batch(&batch).read().unwrap_err(),
+        TransferFactsError::LegLedgerUnbound {
+            batch_id: batch_id(64),
+            ledger: "BANK ONE".into()
+        }
+    );
+}
+
+/// A Contra the facts cannot see (no facts entry, or left out) makes its day no
+/// cover on its lineage's statement bank, even when it names neither leg there:
+/// another statement of that bank cannot vouch for the day.
+#[test]
+fn a_contra_the_facts_cannot_see_blocks_its_statement_bank_though_it_names_other_ledgers() {
+    // no facts entry: B0 booked the row as a Payment, B1 retyped it as a Contra
+    // between Bank Three and Bank One
+    let b0 = build(65)
+        .voucher(payment("txn-57", "9.00"))
+        .facts(facts(B2))
+        .status("posted_verified");
+    let b1 = build(66)
+        .amends(65)
+        .voucher(contra("txn-57", N3, N1, "9.00"))
+        .status("posted_verified");
+    let journal = Journal::default()
+        .batch(&b0)
+        .batch(&b1)
+        .batch(&september_of_bank_two(67));
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+    // left out: Bank Two's statement records a Contra between the other two
+    let left_out = build(68)
+        .voucher(contra("txn-58", N3, N1, "9.00"))
+        .facts(facts(B2).contra("txn-58", None))
+        .status("posted_verified");
+    let journal = Journal::default()
+        .batch(&left_out)
+        .batch(&september_of_bank_two(69));
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+    // the same statement of Bank Two alone is cover
+    assert_eq!(
+        state_given(Journal::default().batch(&september_of_bank_two(69)), ""),
+        SkipState::NotFound
+    );
+}
+
+/// A lineage holding a row the facts cannot see adds no window, even when the
+/// row's day is outside the window.
+#[test]
+fn a_lineage_with_a_row_the_facts_cannot_see_adds_no_window_whatever_the_row_s_day() {
+    let window = |f: StatementFacts| f.window("20260901", "20260910");
+    let left_out = build(70)
+        .voucher(three_leg("txn-55", "20260925"))
+        .facts(window(facts(B2)).contra("txn-55", None))
+        .status("posted_verified");
+    assert_eq!(
+        state_given(Journal::default().batch(&left_out), ""),
+        SkipState::NotEstablished
+    );
+    let payment_then_contra = [
+        build(71)
+            .voucher(voucher(
+                "txn-56",
+                "Payment",
+                &[("Expense", "9.00", "Dr"), (N1, "9.00", "Cr")],
+                "20260925",
+            ))
+            .facts(window(facts(B2)))
+            .status("posted_verified"),
+        build(72)
+            .amends(71)
+            .voucher(contra_on("txn-56", N2, N1, "9.00", "20260925"))
+            .status("posted_verified"),
+    ];
+    let journal = Journal::default()
+        .batch(&payment_then_contra[0])
+        .batch(&payment_then_contra[1]);
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+    // the first build alone covers the skip's day
+    assert_eq!(
+        state_given(Journal::default().batch(&payment_then_contra[0]), ""),
+        SkipState::NotFound
+    );
+}
+
+/// A ledger a batch without facts names in another case than its binding is a
+/// ledger it did not bind, and blocks every ledger.
+#[test]
+fn a_ledger_named_in_another_case_than_the_binding_blocks_every_ledger() {
+    let other_case = build(73).voucher(contra("txn-1", "BANK THREE", N1, "500.00"));
+    assert_eq!(beside_bank_two(other_case), SkipState::NotEstablished);
+    let exact = build(74).voucher(contra("txn-1", N3, N1, "500.00"));
+    assert_eq!(beside_bank_two(exact), SkipState::NotFound);
+}
+
+/// Only the asked company's skip-only records name statement banks: a Journal
+/// to a bank only another company's record holds is no transfer.
+#[test]
+fn another_company_s_skip_only_record_names_no_statement_bank() {
+    let mut record = skip_record(
+        14,
+        ENDPOINT,
+        "2026-09-01T11:00:00Z",
+        facts(B3).skip(skip_row(&st(9), "1.00", B1, None)),
+    );
+    record.company_guid = other_company().into();
+    let journal = Journal::default()
+        .batch(&bank_two_statement(75, "posted_verified"))
+        .batch(&build(76).voucher(bank_journal(N3, N2)));
+    assert_eq!(
+        state_given(journal.clone(), &skip_file(&[record.clone()])),
+        SkipState::NotFound
+    );
+    // the asked company's own record makes Bank Three a statement bank
+    record.company_guid = company().into();
+    assert_eq!(
+        state_given(journal, &skip_file(&[record])),
+        SkipState::NotEstablished
+    );
+}
+
+/// A skip-only record written in another case than the asked company GUID is
+/// read for it.
+#[test]
+fn a_skip_only_record_is_read_for_the_company_asked_in_another_case() {
+    let mut record = skip_record(
+        15,
+        ENDPOINT,
+        "2026-09-02T10:00:00Z",
+        facts(B1).skip(skip_row(&st(15), "500.00", B2, None)),
+    );
+    record.company_guid = company().to_ascii_uppercase();
+    let found = Journal::default()
+        .read_with(&skip_file(&[record]), company())
+        .unwrap();
+    assert_eq!(found.skips.len(), 1);
+}
+
+/// A lineage that recorded a withdrawal more than once is judged by its newest.
+#[test]
+fn a_lineage_s_newest_withdrawal_is_the_one_compared() {
+    // built at :11, :12 and :13: the skip falls between the two withdrawals
+    let first = holder_of_row_nine(71)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let skipped = skipping(72, 9);
+    let amendment = holder_of_row_nine(73)
+        .amends(71)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&first)
+        .batch(&skipped)
+        .batch(&amendment)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+/// A skip a posted batch contradicts is judged against the Contras.
+#[test]
+fn a_skip_a_posted_batch_contradicts_pairs() {
+    let found = Journal::default()
+        .batch(&skipping(77, 9))
+        .batch(&holder_of_row_nine(78).status("posted_verified"))
+        .read()
+        .unwrap();
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
+    assert!(held.pairs);
+}
+
+/// Of two holders a recorded rollback covers, the later is named.
+#[test]
+fn the_latest_restored_holder_is_named() {
+    let skipped = build(79).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let first = build(80).placed().voucher(payment(&st(6), "500.00"));
+    let second = build(81).placed().voucher(payment(&st(6), "500.00"));
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&first)
+        .sent_natively(&first)
+        .status(&first, "posted_verified")
+        .batch(&second)
+        .sent_natively(&second)
+        .status(&second, "posted_verified")
+        .restored(&second)
+        .read()
+        .unwrap();
+    assert_eq!(found.restored, BTreeSet::from([batch_id(80), batch_id(81)]));
+    assert_eq!(found.held[0].holder, BatchId::new(batch_id(81)));
+}
+
+/// The Contras are given in key order, batch then row, not in lineage order.
+#[test]
+fn the_contras_are_given_in_key_order() {
+    // lineage 16 sorts first, but its row is decided by its amendment 48,
+    // which sorts after lineage 32
+    let original = build(16)
+        .voucher(contra(&st(1), N2, N1, "1.00"))
+        .facts(facts(B2).contra(&st(1), None));
+    let amendment = build(48)
+        .amends(16)
+        .voucher(contra(&st(1), N2, N1, "2.00"))
+        .facts(facts(B2).contra(&st(1), None));
+    let other = build(32)
+        .voucher(contra(&st(2), N2, N1, "3.00"))
+        .facts(facts(B2).contra(&st(2), None));
+    let found = Journal::default()
+        .batch(&original)
+        .batch(&amendment)
+        .batch(&other)
+        .read()
+        .unwrap();
+    let keys: Vec<_> = found.contras.iter().map(|fact| fact.key.clone()).collect();
+    assert_eq!(keys, [contra_key(32, 2), contra_key(48, 1)]);
+}
+
+/// A day blocked before a window says nothing of the window.
+#[test]
+fn a_day_blocked_before_a_window_leaves_it_whole() {
+    let mut late = skip_row(&st(1), "500.00", B2, None);
+    late.date = date("20260920");
+    let skipped = build(82).facts(facts(B1).window("20260901", "20260930").skip(late));
+    let bank_two = build(83)
+        .facts(facts(B2).window("20260910", "20260930"))
+        .status("posted_verified");
+    let state = |day: &str| {
+        let blocker = build(84).voucher(contra_on("txn-2", N2, N1, "5.00", day));
+        let found = Journal::default()
+            .batch(&skipped)
+            .batch(&bank_two)
+            .batch(&blocker)
+            .read()
+            .unwrap();
+        let tally = TallyDays::clean_for(&found.skips);
+        transfer_pairing_view_with(&found.skips, &found.contras, &found.coverage, &tally, 0)
+            .unwrap()
+            .skips[&key(B1, 1)]
+            .clone()
+    };
+    assert_eq!(state("20260905"), SkipState::NotFound);
+    assert_eq!(state("20260910"), SkipState::NotEstablished);
+}

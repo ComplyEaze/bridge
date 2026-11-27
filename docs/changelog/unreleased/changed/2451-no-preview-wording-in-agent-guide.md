@@ -1,0 +1,1 @@
+- The agent guide no longer calls the product "a preview", and the 0.3.0 known limit no longer says it is "for evaluation, not production". A new test fails when text a person reads makes a claim the release process forbids about signing, notarization, readiness for production, preview status or evaluation use, unless the same sentence denies it (#2451).

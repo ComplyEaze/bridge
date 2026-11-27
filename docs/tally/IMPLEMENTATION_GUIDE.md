@@ -689,6 +689,17 @@ Returned `CREATED=1`, and readback confirmed `NAME=BRIDGE-INV-0001`, `BILLTYPE=N
 `New Ref` to open a bill and `Agst Ref` to settle one. Omitting `BILLALLOCATIONS.LIST` entirely
 yields `On Account`, which carries no bill identity.
 
+**An `Agst Ref` is not checked against the customer's bills.** PARTIAL: row 2346-AR, 10 Nov
+2026, one synthetic book, one release, one import of each shape (#2346). A Credit Note's `Agst
+Ref` against a bill the customer had already settled was created and stored as sent. One naming
+a bill the customer does not hold was created, with its allocation stored as a `New Ref` under
+that name. Both answered `CREATED=1`, `ERRORS=0`, `EXCEPTIONS=0`, with no `LINEERROR` and no
+dialog. So the build's refusal before the post is the only guard. Write an `Agst Ref` only to a
+bill that the customer's tied bills read lists as open, as a debit. Use the name the read
+returned, and an amount no greater than the bill's balance. Read again at the post. The
+read-back after the post sees the second case, because the `BILLTYPE` differs, but never the
+first.
+
 ### 3.4 There is no natural voucher idempotency — **narrowed by §3.3a**
 
 Re-sending an identical payload with the same voucher number created a **second voucher**. There
@@ -1190,6 +1201,7 @@ zero; fail closed or quarantine.
 | `ACTION="Alter"` + `REMOTEID` | Creates a duplicate. `Create` upserts a **byte-identical** repeat; a *corrected* payload is UNVERIFIED and may overwrite, partially update or duplicate | §3.3a |
 | Master name outside an exact or qualified directional comparison | Voucher rejected, master NOT auto-created | §3.3b |
 | Omitting `BILLALLOCATIONS.LIST` | Allocation becomes `On Account` with no bill identity | §3.3c |
+| `Agst Ref` to a settled bill, or to a name the customer does not hold | `CREATED=1`, no error: the bill is settled again, or a `New Ref` opens under that name | §3.3c |
 | A collection that references itself in a `$$` function | Gateway blocked, empty reply | I1, §5.3b |
 | `<COMPUTE>` used for a per-request constant | Per-row work; request exceeds deadline | §2.3a |
 | A company-level import without a pinned current company | **Renames the loaded company** instead of creating one; `CREATED=0, ALTERED=1, ERRORS=0` | I2, §9.10d; Bridge sends no company-level import |
@@ -1210,6 +1222,7 @@ zero; fail closed or quarantine.
 | Date | Change |
 | --- | --- |
 | 2026-07-30 | Created from the 2026-07-29/30 live-probe programme against TallyPrime Edit Log 7.0 EDU. |
+| 2026-11-10 | §3.3c and §8: an `Agst Ref` is not checked against the customer's bills (row 2346-AR, #2346). |
 
 ---
 

@@ -139,7 +139,7 @@ impl TallyRuntime {
                     let estimate = admit_size(mark)?;
 
                     let request =
-                        render_native_negative_stock_request(identity.display_name(), &period);
+                        render_native_negative_stock_request(identity.company_name(), &period);
                     let (xml, bytes, hash) = client
                         .fetch_native_report_paired(request.clone())
                         .await?

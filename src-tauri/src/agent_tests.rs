@@ -37,6 +37,7 @@ fn movement_native_parser_rejects_missing_flags_and_out_of_window_cancelled_rows
     assert_eq!(
         parse_movement_vouchers(&cancelled, "20260902", "20260902", "voucher")
             .err()
+            .map(|failure| failure.code)
             .as_deref(),
         Some("window_not_honoured")
     );
@@ -1935,7 +1936,8 @@ fn ledger_movement_opening_export_is_pinned_to_admitted_books_from() {
         last_voucher.clone(),
     )
     .expect("an admitted BOOKSFROM period");
-    let request = render_native_ledger_export_request("Book", &matching);
+    let request =
+        render_native_ledger_export_request(&ValidatedCompanyName::new("Book").unwrap(), &matching);
     assert!(request.contains("<SVFROMDATE TYPE=\"Date\">20260401</SVFROMDATE>"));
 
     assert_eq!(
@@ -2240,9 +2242,10 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
     assert_eq!(error["code"], "voucher_type_shapes_mixed", "{response}");
     assert_eq!(
         error["remediation"],
-        "A batch holds either Journals only, or Payment, Receipt and Contra vouchers only \
-         (those three may share a batch). Split the vouchers into one batch of each kind \
-         and build them separately; nothing was written or sent.",
+        "A batch holds Journals only, or Payment, Receipt and Contra vouchers only \
+         (those three may share a batch), or one Sales invoice alone. Split the vouchers \
+         into one batch of each kind and build them separately; nothing was written or \
+         sent.",
         "{response}"
     );
     assert_eq!(response["isError"], true);

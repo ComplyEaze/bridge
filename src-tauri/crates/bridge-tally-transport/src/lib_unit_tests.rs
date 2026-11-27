@@ -130,6 +130,7 @@ fn every_transport_error_is_classed_for_the_drain() {
         ),
         (E::UnsupportedContentEncoding, true),
         (E::InvalidEncoding { code: "x" }, true),
+        (E::EmptyAnswer, false),
         (E::EndpointInvalid { code: "x" }, false),
         (E::PolicyInvalid { code: "x" }, false),
         (E::ClientInitializationFailed, false),
@@ -145,4 +146,111 @@ fn every_transport_error_is_classed_for_the_drain() {
     ] {
         assert_eq!(drain::owes_drain(&error), owes, "{error:?}");
     }
+}
+
+#[test]
+fn an_empty_answer_owes_no_drain_while_an_invalid_encoding_does() {
+    use TallyTransportError as E;
+    assert!(!drain::owes_drain(&E::EmptyAnswer));
+    assert!(drain::owes_drain(&E::InvalidEncoding { code: "x" }));
+}
+
+/// #2377: the empty answer's head is exactly the one the lab captured (protocol reference
+/// §12a.27), and each of its conditions, missed alone, leaves the head refused as before.
+#[test]
+fn only_the_captured_empty_head_can_be_the_empty_answer() {
+    use reqwest::header::{HeaderMap, HeaderValue, CONNECTION, TRANSFER_ENCODING};
+    use reqwest::StatusCode;
+    fn head(lengths: &[&'static str], content_type: Option<&'static str>) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONNECTION, HeaderValue::from_static("KEEP-ALIVE"));
+        for length in lengths {
+            headers.append(CONTENT_LENGTH, HeaderValue::from_static(length));
+        }
+        if let Some(content_type) = content_type {
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
+        }
+        headers
+    }
+    assert!(is_empty_answer_head(StatusCode::OK, &head(&["0"], None)));
+
+    // Status: exactly 200.
+    for status in [StatusCode::CREATED, StatusCode::NO_CONTENT] {
+        assert!(
+            !is_empty_answer_head(status, &head(&["0"], None)),
+            "{status}"
+        );
+    }
+    // A Content-Type, even one Bridge decodes.
+    assert!(!is_empty_answer_head(
+        StatusCode::OK,
+        &head(&["0"], Some("text/xml; charset=utf-16"))
+    ));
+    assert!(!is_empty_answer_head(
+        StatusCode::OK,
+        &head(&["0"], Some(""))
+    ));
+    // A Content-Type that is sent twice, or that is not text: present, so never the empty answer.
+    let mut twice = head(&["0"], Some("text/xml; charset=utf-16"));
+    twice.append(
+        CONTENT_TYPE,
+        HeaderValue::from_static("text/xml; charset=utf-16"),
+    );
+    assert!(!is_empty_answer_head(StatusCode::OK, &twice));
+    let mut not_text = head(&["0"], None);
+    not_text.insert(CONTENT_TYPE, HeaderValue::from_bytes(b"text/\xff").unwrap());
+    assert!(!is_empty_answer_head(StatusCode::OK, &not_text));
+    // Exactly one Content-Length, whose value is the byte 0.
+    for lengths in [
+        &[][..],
+        &["0", "0"],
+        &["1"],
+        &["00"],
+        &[" 0"],
+        &["0 "],
+        &["+0"],
+    ] {
+        assert!(
+            !is_empty_answer_head(StatusCode::OK, &head(lengths, None)),
+            "{lengths:?}"
+        );
+    }
+    // No Transfer-Encoding, whatever its value: the body is not framed as the captured head's was.
+    let transfer_codings = ["chunked", "identity", ""].map(|transfer_encoding| {
+        let mut headers = head(&["0"], None);
+        headers.insert(
+            TRANSFER_ENCODING,
+            HeaderValue::from_static(transfer_encoding),
+        );
+        is_empty_answer_head(StatusCode::OK, &headers)
+    });
+    assert_eq!(transfer_codings, [false, false, false]);
+}
+
+/// #2377: the empty answer is told only after its body was read to the end with no byte. A body
+/// that held a byte, or that could not be read, is the refusal a missing type always had.
+#[test]
+fn the_empty_answer_needs_its_body_read_whole_and_empty() {
+    assert_eq!(
+        empty_answer_after_body(Some(0)),
+        TallyTransportError::EmptyAnswer
+    );
+    for read in [Some(1), Some(2), None] {
+        assert_eq!(
+            empty_answer_after_body(read),
+            TallyTransportError::InvalidEncoding {
+                code: "response_content_type_unsupported"
+            },
+            "{read:?}"
+        );
+    }
+    // Callers that do not ask for it by name see what they saw before it existed.
+    assert_eq!(
+        TallyTransportError::EmptyAnswer.to_string(),
+        CONTENT_TYPE_MISSING.to_string()
+    );
+    assert_eq!(
+        TallyTransportError::EmptyAnswer.safe_code(),
+        CONTENT_TYPE_MISSING.safe_code()
+    );
 }

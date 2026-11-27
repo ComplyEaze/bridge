@@ -80,12 +80,15 @@ function runRequiredChecks(needs, { live = "true", ghExit = "0" } = {}) {
 // The jobs gated on a scope output, and the output that gates each.
 const SCOPED = { native: "native", "bundle-smoke": "bundle", "seam-control": "bundle", "tax-audit-mutations": "tax_audit" };
 const UNCONDITIONAL = ["changes", "frontend", "rust-format", "workflow-consistency", "tally-portable"];
+// Jobs that run only on some events (the cache pruner on master, the PDFium cache writer on a push, dispatch or schedule): they may
+// succeed or be skipped, never fail or be cancelled.
+const OPTIONAL = ["compiler-cache-retention", "pdfium-cache"];
 // A run in which every job did what its scope said: selected jobs succeeded, the rest were skipped.
 function run(scope, { results = {}, master = false } = {}) {
   const needs = {};
   for (const job of requiredChecksNeeds()) {
     const result = Object.hasOwn(SCOPED, job) ? (scope[SCOPED[job]] === "true" ? "success" : "skipped")
-      : job === "compiler-cache-retention" ? (master ? "success" : "skipped") : "success";
+      : OPTIONAL.includes(job) ? (master ? "success" : "skipped") : "success";
     needs[job] = { result, outputs: {} };
   }
   needs.changes.outputs = { draft: "false", ...scope };
@@ -106,7 +109,7 @@ const fails = (needs, message, label, options) => {
 };
 
 test("every job required-checks needs is classified here, so each case below covers it", () => {
-  const classified = new Set([...Object.keys(SCOPED), ...UNCONDITIONAL, "compiler-cache-retention"]);
+  const classified = new Set([...Object.keys(SCOPED), ...UNCONDITIONAL, ...OPTIONAL]);
   assert.deepEqual(requiredChecksNeeds().filter((job) => !classified.has(job)), []);
 });
 
@@ -157,9 +160,12 @@ test("a job without a condition must succeed", () => {
   }
 });
 
-test("the cache pruner may succeed or be skipped, never fail or be cancelled", () => {
-  for (const result of ["failure", "cancelled"]) {
-    fails(run(FULL, { results: { "compiler-cache-retention": result } }), `compiler-cache-retention: ${result}, required success or skipped`, result);
+test("the cache pruner and the PDFium cache writer may succeed or be skipped, never fail or be cancelled", () => {
+  for (const job of OPTIONAL) {
+    for (const result of ["success", "skipped"]) passes(run(FULL, { results: { [job]: result } }), `${job} ${result}`);
+    for (const result of ["failure", "cancelled"]) {
+      fails(run(FULL, { results: { [job]: result } }), `${job}: ${result}, required success or skipped`, `${job} ${result}`);
+    }
   }
 });
 

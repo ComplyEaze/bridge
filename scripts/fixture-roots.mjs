@@ -27,6 +27,7 @@ export const FIXTURE_ROOTS = [
   "src-tauri/crates/bridge-tax-audit/tests/fixtures",
   "src-tauri/crates/bridge-tally-protocol/tests/fixtures",
   "src-tauri/crates/tally-protocol-simulator/fixtures",
+  "src-tauri/src/db/fixtures",
   "scripts/fixtures",
   "scripts/testdata",
 ];

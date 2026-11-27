@@ -78,7 +78,7 @@ impl TallyRuntime {
                     }
 
                     let request =
-                        render_native_negative_ledgers_request(identity.display_name(), &period);
+                        render_native_negative_ledgers_request(identity.company_name(), &period);
                     let (xml, bytes, hash) = client
                         .fetch_native_report_paired(request.clone())
                         .await?

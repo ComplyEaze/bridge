@@ -135,6 +135,7 @@ fn an_answered_cash_line_has_no_counterparty_to_name() {
             bridge_txn_id: id.clone(),
             answer: answer.to_string(),
             ledger: ledger.map(str::to_string),
+            cash_ledger: None,
         }])
         .unwrap();
         let built = build(&withdrawal, Bank::Sbi, &mapping(&[]), &options(&given)).unwrap();

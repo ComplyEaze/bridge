@@ -31,7 +31,7 @@ use bridge_tally_protocol::{
     group_ancestry::{AncestryGap, GroupIndex},
     is_tally_reserved_root,
     native_statement_reports::{NativeStatement, NativeStatementAmount, NativeStatementKind},
-    native_stock_summary::{NativeFlag, NativeInventoryFlags},
+    native_stock_summary::{NativeFlag, NativeInventoryFlags, NativeStockReport},
     native_trial_balance::{
         NativeTrialBalanceAmount, NativeTrialBalanceMovements, NativeTrialBalanceRow,
     },
@@ -272,18 +272,26 @@ const OPENING_STOCK_LINE: &str = "Opening Stock";
 /// is the group's own name.
 const STOCK_PURCHASE_LINE: &str = "Add: Purchase Accounts";
 const CLOSING_STOCK_USED: &str = "tally_closing_stock_used";
+const OPENING_STOCK_USED: &str = "tally_opening_stock_used";
 /// Where the figure came from, as the result names it.
 pub const CLOSING_STOCK_SOURCE: &str = "tally_profit_and_loss_less_closing_stock";
+/// Where the opening figure came from, as the result names it.
+pub const OPENING_STOCK_SOURCE: &str = "tally_profit_and_loss_opening_stock";
 
-/// Tally's own closing-stock figure, a debit (negative), read from the
-/// `Less: Closing Stock` line of its Profit and Loss. It cannot be built from
-/// anything else, and only from a statement whose shape is the one captured:
-/// one such line with the amount in its sub column alone, an `Opening
-/// Stock` line shown empty (a book with opening stock is not measured) and the
-/// `Cost of Sales :` heading present once.
+/// Tally's own stock figures, read from its Profit and Loss: the closing stock,
+/// a debit (negative), from the `Less: Closing Stock` line, and the opening
+/// stock from the `Opening Stock` line, a debit or shown empty. They cannot be
+/// built from anything else, and only from a statement whose shape is the one
+/// captured: each line once with its amount in the sub column alone, and the
+/// `Cost of Sales :` heading present once, carrying an amount whenever the
+/// opening stock does (#692's rule 3: a heading with no amount is refused).
+/// Whether the figures are used is decided only after every check in
+/// [`derive_statements`] holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TallyClosingStock {
     amount: ExactDecimal,
+    /// `None` when Tally shows the `Opening Stock` line empty.
+    opening: Option<ExactDecimal>,
 }
 
 impl TallyClosingStock {
@@ -317,32 +325,58 @@ impl TallyClosingStock {
         if !amount.is_negative() {
             return Err(ClosingStockDeclined::NotADebit);
         }
-        let mut opening = statement
+        let mut opening_lines = statement
             .lines
             .iter()
             .filter(|line| line.name == OPENING_STOCK_LINE);
-        let shown_empty = matches!(
-            (opening.next(), opening.next()),
-            (Some(line), None)
-                if line.sub == NativeStatementAmount::Empty
-                    && line.main == NativeStatementAmount::Empty
-        );
-        if !shown_empty {
-            return Err(ClosingStockDeclined::OpeningStockNotShownEmpty);
-        }
-        // The heading the figure is checked against must be there to check.
-        if statement
+        let opening = match (opening_lines.next(), opening_lines.next()) {
+            (Some(line), None) => match (&line.sub, &line.main) {
+                (NativeStatementAmount::Empty, NativeStatementAmount::Empty) => None,
+                (NativeStatementAmount::Present(value), NativeStatementAmount::Empty)
+                    if value.is_negative() =>
+                {
+                    Some(value.clone())
+                }
+                _ => return Err(ClosingStockDeclined::OpeningStockNotAsSeen),
+            },
+            _ => return Err(ClosingStockDeclined::OpeningStockNotAsSeen),
+        };
+        // The heading the figures are checked against must be there to check.
+        let mut headings = statement
             .lines
             .iter()
-            .filter(|line| line.name == COST_OF_SALES_HEADING)
-            .count()
-            != 1
-        {
+            .filter(|line| line.name == COST_OF_SALES_HEADING);
+        let (Some(heading), None) = (headings.next(), headings.next()) else {
             return Err(ClosingStockDeclined::ShapeNotAsSeen);
+        };
+        // Rule 3: with opening stock, an empty heading could tie as zero over a
+        // window whose opening and closing stock are equal; it is refused.
+        if opening.is_some()
+            && heading.sub == NativeStatementAmount::Empty
+            && heading.main == NativeStatementAmount::Empty
+        {
+            return Err(ClosingStockDeclined::CostOfSalesHeadingWithoutAmount);
         }
         Ok(Some(Self {
             amount: amount.clone(),
+            opening,
         }))
+    }
+
+    /// Whether Tally showed an opening stock beside the closing stock.
+    pub fn offers_opening_stock(&self) -> bool {
+        self.opening.is_some()
+    }
+
+    /// What the stock moves a Profit and Loss figure by: opening less
+    /// closing, in Tally's sign, so a debit closing stock raises a profit and a
+    /// debit opening stock lowers it.
+    fn change(&self) -> Result<ExactDecimal, StatementsError> {
+        self.opening
+            .as_ref()
+            .unwrap_or(&ExactDecimal::zero())
+            .checked_subtract(&self.amount)
+            .map_err(|_| StatementsError::Arithmetic)
     }
 }
 
@@ -372,6 +406,26 @@ pub enum InventoryFlags {
     NotRead,
 }
 
+/// Tally's own Stock Summary over the statement's window, read only for a book
+/// whose Profit and Loss offers an opening stock, inventory shown integrated
+/// (#692's rule 2). Every variant but a report whose rows each carry a value
+/// declines the opening stock.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StockRows {
+    /// Not read: no opening stock was offered, or the flags declined it first.
+    NotRead,
+    /// The window is not 1 April to a month's last day in one financial year,
+    /// the shape the Stock Summary has been measured over; nothing was sent.
+    WindowNotMeasured,
+    /// The book's master mark is past what one Stock Summary read is admitted
+    /// for; nothing was sent.
+    BookTooLarge,
+    /// The read was made and failed, or its answer did not parse.
+    Unreadable,
+    /// The report as Tally answered it.
+    Report(NativeStockReport),
+}
+
 /// Why Tally's closing-stock figure was offered and not used. A refusal keeps
 /// the result it always had.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -381,8 +435,20 @@ pub enum ClosingStockDeclined {
     ShapeNotAsSeen,
     /// A credit: negative stock, not measured.
     NotADebit,
-    /// The `Opening Stock` line is missing, repeated or carries an amount.
-    OpeningStockNotShownEmpty,
+    /// The `Opening Stock` line is missing or repeated, or carries an amount
+    /// that is not a debit in its sub column alone.
+    OpeningStockNotAsSeen,
+    /// With opening stock, the `Cost of Sales :` heading carries no amount.
+    CostOfSalesHeadingWithoutAmount,
+    /// With opening stock, the window is not one the Stock Summary is read over.
+    StockSummaryWindowNotMeasured,
+    /// With opening stock, the book is too large for one Stock Summary read.
+    StockSummaryTooLarge,
+    /// With opening stock, the Stock Summary could not be read, or was empty.
+    StockSummaryNotRead,
+    /// With opening stock, a Stock Summary row carries no value (negative
+    /// stock is one way).
+    StockSummaryRowWithoutValue,
     /// The book's flags were read and do not show inventory on and integrated.
     BookNotShownIntegrated,
     /// The book's flags could not be read.
@@ -401,7 +467,12 @@ impl ClosingStockDeclined {
         match self {
             Self::ShapeNotAsSeen => "shape_not_as_seen",
             Self::NotADebit => "not_a_debit",
-            Self::OpeningStockNotShownEmpty => "opening_stock_not_shown_empty",
+            Self::OpeningStockNotAsSeen => "opening_stock_not_as_seen",
+            Self::CostOfSalesHeadingWithoutAmount => "cost_of_sales_heading_without_amount",
+            Self::StockSummaryWindowNotMeasured => "stock_summary_window_not_measured",
+            Self::StockSummaryTooLarge => "stock_summary_too_large",
+            Self::StockSummaryNotRead => "stock_summary_not_read",
+            Self::StockSummaryRowWithoutValue => "stock_summary_row_without_value",
             Self::BookNotShownIntegrated => "book_not_shown_integrated",
             Self::InventoryFlagsNotRead => "inventory_flags_not_read",
             Self::BalanceSheetDoesNotBalance => "balance_sheet_does_not_balance",
@@ -416,9 +487,14 @@ pub enum ClosingStockUse {
     /// Tally's Profit and Loss offered no closing stock, or the statement was
     /// refused for another reason first.
     NotApplicable,
-    /// Tally's own figure closed every gap at once and the results are
-    /// established with it, shown as a line of its own.
-    Applied { value: ExactDecimal },
+    /// Tally's own figures closed every gap at once and the results are
+    /// established with them, each shown as a line of its own.
+    Applied {
+        value: ExactDecimal,
+        /// Tally's own opening stock, where its Profit and Loss shows one.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        opening: Option<ExactDecimal>,
+    },
     /// Offered and not used; the results are those of a book without it.
     Declined {
         why: ClosingStockDeclined,
@@ -495,6 +571,7 @@ pub fn derive_statements(
     tally_balance_sheet: &NativeStatement,
     tally_profit_and_loss: Option<&NativeStatement>,
     inventory: InventoryFlags,
+    stock_rows: &StockRows,
 ) -> Result<DerivedStatements, StatementsError> {
     if tally_balance_sheet.kind != NativeStatementKind::BalanceSheet {
         return Err(StatementsError::GateNotABalanceSheet);
@@ -634,6 +711,9 @@ pub fn derive_statements(
     let gross = sum_of(&|name| TRADING_PRIMARY_GROUPS.contains(&name))?;
     let net = sum_of(&|_| true)?;
     let cost_of_sales = sum_of(&|name| COST_OF_SALES_GROUPS.contains(&name))?;
+    // Rule 1 of #692: the Profit & Loss A/c ledger enters with its own closing,
+    // which is its own opening (`TBALOPENING`) plus the window's movement
+    // (`check_row_identity`), never a result Bridge derived for an earlier year.
     let carried = match &profit_and_loss_ledger {
         None => Established::blocked(NotEstablishedReason::ProfitAndLossLedgerNotReturned),
         Some(ledger) => {
@@ -644,15 +724,16 @@ pub fn derive_statements(
     };
 
     // The gate compares the candidate figures before any is established. With
-    // Tally's own closing stock supplied, every figure it enters is moved by
-    // that one amount first (a debit is negative): Current Assets and the
-    // carried line, the trading result and the cost of sales.
+    // Tally's own stock supplied, Current Assets are moved by the closing stock,
+    // and the carried line, the trading result and the cost of sales by the
+    // opening stock less the closing stock (a debit is negative).
     let evaluate = |stock: Option<&TallyClosingStock>| -> Result<Evaluated, StatementsError> {
+        let change = stock.map(TallyClosingStock::change).transpose()?;
         let moved = |value: &ExactDecimal| -> Result<ExactDecimal, StatementsError> {
-            match stock {
+            match &change {
                 None => Ok(value.clone()),
-                Some(stock) => value
-                    .checked_subtract(&stock.amount)
+                Some(change) => value
+                    .checked_add(change)
                     .map_err(|_| StatementsError::Arithmetic),
             }
         };
@@ -684,10 +765,34 @@ pub fn derive_statements(
         let profit_and_loss_tie = tally_profit_and_loss
             .map(|tally| tie_lines(&profit_and_loss, None, tally, stock))
             .transpose()?;
-        let profit_and_loss_failures = profit_and_loss_tie
+        let mut profit_and_loss_failures = profit_and_loss_tie
             .as_ref()
             .map(|tie| profit_and_loss_gate_failures(tie, &cost_of_sales, stock.is_some()))
             .unwrap_or_default();
+        // Rule 4 of #692: with opening stock, the cost of sales holds the
+        // Direct Expenses group, which Tally showed in the heading's sub column;
+        // a Direct Expenses line with an amount in the main column is refused.
+        if let (
+            Some(tie),
+            Some(TallyClosingStock {
+                opening: Some(_), ..
+            }),
+        ) = (&profit_and_loss_tie, stock)
+        {
+            let direct_expenses = profit_and_loss
+                .iter()
+                .find(|group| group.reserved_name == DIRECT_EXPENSES_GROUP)
+                .map(|group| group.display_name.as_str());
+            profit_and_loss_failures.extend(
+                tie.lines
+                    .iter()
+                    .filter(|line| {
+                        Some(line.name.as_str()) == direct_expenses
+                            && line.tally_main != NativeStatementAmount::Empty
+                    })
+                    .map(|line| line.name.clone()),
+            );
+        }
         let movement_gated = |value: ExactDecimal| match gated(value) {
             Established::Established { .. } if !profit_and_loss_failures.is_empty() => {
                 Established::NotEstablished {
@@ -752,22 +857,33 @@ pub fn derive_statements(
                 lines: Vec::new(),
             },
         ),
+        Ok(Some(stock)) if stock.opening.is_some() && stock_rows_decline(stock_rows).is_some() => (
+            evaluate(None)?,
+            ClosingStockUse::Declined {
+                why: stock_rows_decline(stock_rows)
+                    .unwrap_or(ClosingStockDeclined::StockSummaryNotRead),
+                lines: Vec::new(),
+            },
+        ),
         Ok(Some(stock)) => {
             let with_stock = evaluate(Some(&stock))?;
-            // The figure moves Current Assets and the carried line by opposite
-            // amounts, so a book whose derived lines balanced before still does.
-            // A Trial Balance that does not balance leaves Tally's `Difference in
-            // opening balances` out of this book's Balance Sheet export, and the
-            // statement would not balance.
+            // The ledgers' closings sum to minus the opening stock (identity 3 of
+            // #692; zero without one): Tally's opening stock is the one balance
+            // the Trial Balance has no ledger for. A Trial Balance that does not
+            // balance otherwise leaves Tally's `Difference in opening balances` out
+            // of this book's Balance Sheet export, and the statement would not
+            // balance.
             let balanced = {
                 let mut total = StatementSum::new();
                 for line in &balance_sheet {
                     total.merge(&line.amount)?;
                 }
+                let opening = stock.opening.clone().unwrap_or_else(ExactDecimal::zero);
                 match &carried {
                     Established::Established { value } => total
                         .sum
                         .checked_add(value)
+                        .and_then(|sum| sum.checked_add(&opening))
                         .map_err(|_| StatementsError::Arithmetic)?
                         .is_zero(),
                     _ => false,
@@ -783,7 +899,8 @@ pub fn derive_statements(
                 )
             } else if with_stock.unmet.is_empty() {
                 let value = stock.amount.clone();
-                (with_stock, ClosingStockUse::Applied { value })
+                let opening = stock.opening.clone();
+                (with_stock, ClosingStockUse::Applied { value, opening })
             } else {
                 // A declined read is today's result, byte for byte.
                 (
@@ -813,6 +930,24 @@ pub fn derive_statements(
     })
 }
 
+/// Rule 2 of #692: opening stock is used only beside a Stock Summary for the
+/// window whose every row carries a value. `None` when it does.
+fn stock_rows_decline(rows: &StockRows) -> Option<ClosingStockDeclined> {
+    match rows {
+        StockRows::Report(NativeStockReport::Lines { empty: 0, .. }) => None,
+        StockRows::Report(NativeStockReport::Lines { .. }) => {
+            Some(ClosingStockDeclined::StockSummaryRowWithoutValue)
+        }
+        StockRows::WindowNotMeasured => Some(ClosingStockDeclined::StockSummaryWindowNotMeasured),
+        StockRows::BookTooLarge => Some(ClosingStockDeclined::StockSummaryTooLarge),
+        StockRows::NotRead
+        | StockRows::Unreadable
+        | StockRows::Report(NativeStockReport::Empty) => {
+            Some(ClosingStockDeclined::StockSummaryNotRead)
+        }
+    }
+}
+
 /// Every Balance Sheet line that does not tie: a Tally line that differs, or
 /// that carries an amount nothing derived was compared with, and a derived
 /// line with an amount that Tally does not show.
@@ -837,7 +972,8 @@ fn gate_failures(tie: &TieOut) -> Vec<String> {
 /// the derived Purchase Accounts and Direct Expenses: the cost of sales with
 /// no stock. Any other spelling is uncompared, and an amount there refuses.
 const COST_OF_SALES_HEADING: &str = "Cost of Sales :";
-const COST_OF_SALES_GROUPS: [&str; 2] = ["Purchase Accounts", "Direct Expenses"];
+const DIRECT_EXPENSES_GROUP: &str = "Direct Expenses";
+const COST_OF_SALES_GROUPS: [&str; 2] = ["Purchase Accounts", DIRECT_EXPENSES_GROUP];
 
 /// As [`gate_failures`], for Tally's own Profit and Loss, with the one
 /// heading allowed when its amount is the derived cost of sales. The heading
@@ -856,7 +992,8 @@ fn profit_and_loss_gate_failures(
         .iter()
         .filter(|line| match &line.status {
             TieStatus::NotCompared { reason }
-                if closing_stock_used && *reason == CLOSING_STOCK_USED =>
+                if closing_stock_used
+                    && (*reason == CLOSING_STOCK_USED || *reason == OPENING_STOCK_USED) =>
             {
                 false
             }
@@ -988,6 +1125,13 @@ fn tie_lines(
             TieStatus::NotCompared {
                 reason: CLOSING_STOCK_USED,
             }
+        } else if stock.is_some_and(|stock| stock.opening.is_some())
+            && is_profit_and_loss
+            && line.name == OPENING_STOCK_LINE
+        {
+            TieStatus::NotCompared {
+                reason: OPENING_STOCK_USED,
+            }
         } else if let Some(group) = lines.iter().find(|group| {
             group.display_name == line.name
                 || (stock.is_some()
@@ -1083,3 +1227,7 @@ fn compare(
 #[cfg(test)]
 #[path = "statements_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "statements_opening_stock_tests.rs"]
+mod opening_stock_tests;

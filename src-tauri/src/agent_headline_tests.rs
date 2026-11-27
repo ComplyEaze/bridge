@@ -55,7 +55,8 @@ fn a_gap_makes_the_read_partial_and_the_lead_says_so_and_counts_it() {
 
 /// A several-currency book with nothing set aside is still read for its
 /// base-currency ledgers only, and says so without claiming ledgers were left
-/// out or that the totals will differ.
+/// out or that the totals will differ, and without claiming that none was
+/// (#2481): what is set aside rests on Tally's marks in this answer.
 #[test]
 fn a_several_currency_book_with_nothing_set_aside_says_so() {
     let headline = basis(vec![Gap::BaseCurrencyLedgersOnly {
@@ -65,9 +66,43 @@ fn a_several_currency_book_with_nothing_set_aside_says_so() {
     .headline(&company(), page(0, 5, 5));
     assert_eq!(
         headline.lead,
-        "Partial trial balance for \u{201c}Synthetic Traders\u{201d}, 1 Apr 2026 to 2 Sep 2026: base-currency ledgers only, and no ledger was left out. The book has several currency masters, so only its base-currency ledgers were read."
+        "Partial trial balance for \u{201c}Synthetic Traders\u{201d}, 1 Apr 2026 to 2 Sep 2026: base-currency ledgers only, as Tally marked them in this answer. The book has several currency masters, so only its base-currency ledgers were read, and none was set aside. Which ledgers are base-currency rests on what Tally marked in this answer: a ledger is set aside only when the answer names another currency for it or shows one of its values in another currency, and one sent with base-currency figures alone is not checked against its vouchers."
     );
     assert!(!headline.lead.contains("0 ledgers"), "{}", headline.lead);
+}
+
+/// On the same request and book, Tally has marked six, two and no ledgers as
+/// holding another currency (#2481), so every several-currency lead says once
+/// that the set-aside rests on those marks, whatever the counts, and none says
+/// that no ledger was left out.
+#[test]
+fn every_several_currency_lead_says_once_that_the_set_aside_rests_on_marks() {
+    let leads = [(0, 0), (3, 1), (1, 0), (0, 5)]
+        .into_iter()
+        .map(|(foreign, mixed)| vec![Gap::BaseCurrencyLedgersOnly { foreign, mixed }])
+        .chain([vec![
+            Gap::BaseCurrencyLedgersOnly {
+                foreign: 0,
+                mixed: 0,
+            },
+            Gap::BaseCurrencyLedgersOnly {
+                foreign: 7,
+                mixed: 4,
+            },
+        ]])
+        .map(|gaps| {
+            basis(gaps)
+                .with_movements_differ(1)
+                .headline(&company(), page(0, 5, 5))
+                .lead
+        });
+    for lead in leads {
+        assert_eq!(lead.matches(MARKS_DECIDE_SCOPE).count(), 1, "{lead}");
+        assert!(!lead.contains("no ledger was left out"), "{lead}");
+        assert!(!lead.contains("nothing was left out"), "{lead}");
+    }
+    let whole = basis(vec![]).headline(&company(), page(0, 5, 5)).lead;
+    assert!(!whole.contains(MARKS_DECIDE_SCOPE), "{whole}");
 }
 
 /// Every gap is named, however many there are: none is dropped for another.

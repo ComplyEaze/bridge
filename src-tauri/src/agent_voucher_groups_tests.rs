@@ -6,6 +6,7 @@
 use super::*;
 use crate::tally::standard_ledger_catalog::parse_standard_ledger_catalog_response;
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
 use serde_json::Value;
 
@@ -99,7 +100,9 @@ fn the_captured_requests_are_what_the_read_code_renders() {
     // The captured bytes are the requests as sent: the same text the read code renders now.
     let catalogue = crate::agent::read_profiles::standard_ledger_catalog_read(COMPANY).unwrap();
     assert_eq!(utf16(CATALOGUE_REQUEST), catalogue.as_str());
-    let groups = crate::agent::read_profiles::native_group_snapshot_read(COMPANY);
+    let groups = crate::agent::read_profiles::native_group_snapshot_read(
+        &ValidatedCompanyName::new(COMPANY).unwrap(),
+    );
     assert_eq!(utf16(GROUPS_REQUEST), groups.as_str());
 }
 

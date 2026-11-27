@@ -1459,6 +1459,148 @@ fn a_counted_refusal_carries_the_counted_items_in_its_size() {
     assert_eq!(size.counted_items, Some((875, 874)));
 }
 
+/// The company the census slices were captured on (BRIDGE STOCK LAB).
+const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+
+/// A census slice captured on BRIDGE STOCK LAB, its company GUID (and so every row's GUID prefix)
+/// read as the test double's company, as `items()` does for the shape lab's items.
+fn stock_lab_census(name: &str) -> String {
+    let path = format!(
+        "{}/crates/bridge-tally-protocol/tests/fixtures/{name}.utf16le.xml",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let captured = decode(&std::fs::read(path).unwrap());
+    assert!(captured.contains(STOCK_LAB_GUID));
+    captured.replace(STOCK_LAB_GUID, GUID)
+}
+
+/// The captured census slice `name` with its `tag` rows replaced by `count` copies of its first
+/// row, each with a GUID and a name of its own. Synthetic mutation: no book this large has been
+/// captured. The census reads only each row's GUID and company GUID; the rows' GUIDs, names and
+/// the slice they answer differ from what Tally sent, and only their number is under test.
+fn census_of(name: &str, tag: &str, count: u64) -> String {
+    let captured = stock_lab_census(name);
+    let (open, close) = (format!("<{tag} "), format!("</{tag}>"));
+    let start = captured.find(&open).unwrap();
+    let first_end = start + captured[start..].find(&close).unwrap() + close.len();
+    let rows_end = captured.rfind(&close).unwrap() + close.len();
+    let row = &captured[start..first_end];
+    // The row's own GUID is the company's followed by a suffix; the company's GUID element is
+    // the company's alone.
+    let guid_at = row.find(&format!("{GUID}-")).unwrap();
+    let row_guid = &row[guid_at..guid_at + GUID.len() + 9];
+    let name_at = row.find("NAME=\"").unwrap() + "NAME=\"".len();
+    let row_name = &row[name_at..name_at + row[name_at..].find('"').unwrap()];
+    let rows: String = (1..=count)
+        .map(|n| {
+            row.replacen(row_guid, &format!("{GUID}-{n:08x}"), 1)
+                .replacen(
+                    &format!("NAME=\"{row_name}\""),
+                    &format!("NAME=\"{row_name} {n}\""),
+                    1,
+                )
+        })
+        .collect();
+    let mutated = format!("{}{rows}{}", &captured[..start], &captured[rows_end..]);
+    assert_eq!(
+        u64::try_from(mutated.matches(&open).count()).unwrap(),
+        count
+    );
+    mutated
+}
+
+/// One item more than one read holds (#692's oversized read, #1233): past the single-read mark,
+/// the stock-item census counts 875 items, so the call refuses with `stock_summary_too_large` and
+/// the counted items in its `size`, after the extent is read again and before any stock group,
+/// stock item or report request.
+#[tokio::test]
+async fn a_census_counting_more_items_than_one_read_holds_refuses_with_its_size() {
+    let limit = u64::try_from(16_000_000 / stock_item_worst_row_bytes()).unwrap();
+    assert_eq!(limit, 874);
+    // Every master holds its own AlterID at or under the mark, so the mark is at least the items;
+    // a higher mark keeps the two figures of `size` apart. (0, 900] is still one census slice.
+    let (items, mark) = (limit + 1, 900);
+    let mut plans = Book::captured().through_flags(14, mark);
+    plans.push(xml(census_of(
+        "stock_item_census_slice_stock_lab_200_300_live",
+        "STOCKITEM",
+        items,
+    )));
+    pair(&mut plans, xml(extents(14, mark)));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args(AS_OF, 0, 500, None)).await;
+    let refusal = error(&refused);
+    assert_eq!(refusal["code"], "stock_summary_too_large");
+    assert_eq!(
+        refusal["size"],
+        json!({
+            "master_alter_id": 900,
+            "estimated_bytes": 16_009_000,
+            "limit_bytes": 16_000_000,
+            "limit_master_alter_id": 874,
+            "counted_items": 875,
+            "limit_items": 874,
+        })
+    );
+    assert_eq!(
+        refusal["remediation"],
+        refusal_remediation("stock_summary_too_large").unwrap()
+    );
+    assert!(refused["structuredContent"]["result"]
+        .get("items")
+        .is_none());
+    // Identity, then the runtime read's mode probe, identity, opening extent, flags, the one
+    // census slice and the extent again.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 1 + 4);
+}
+
+/// An assumed worst-case line of Tally's Stock Summary report, in bytes, as
+/// `runtime_stock_summary_tests::the_report_is_sized_from_the_counted_items_and_groups` pins it.
+const REPORT_LINE_BYTES: u64 = 5_208;
+
+/// Items that one read holds, under more stock groups than one report holds lines for (#692's
+/// oversized read, #1233): the 55 items of the captured slice and 3,018 stock groups are 3,073
+/// report lines, and 3,072 is the most the budget admits. The call refuses with
+/// `stock_summary_report_too_large` after the extent is read again, before any stock item or
+/// report request.
+#[tokio::test]
+async fn a_census_counting_more_lines_than_one_report_holds_refuses_before_any_item_request() {
+    let lines = 16_000_000 / REPORT_LINE_BYTES + 1;
+    assert_eq!(lines, 3_073);
+    let items = 55;
+    // The items and groups together are at the mark, as every master's own AlterID is.
+    let mark = lines;
+    let mut plans = Book::captured().through_flags(14, mark);
+    let items_census = stock_lab_census("stock_item_census_slice_stock_lab_200_300_live");
+    assert_eq!(
+        u64::try_from(items_census.matches("<STOCKITEM ").count()).unwrap(),
+        items
+    );
+    plans.push(xml(items_census));
+    plans.push(xml(census_of(
+        "stock_group_census_slice_stock_lab_0_300_live",
+        "STOCKGROUP",
+        lines - items,
+    )));
+    pair(&mut plans, xml(extents(14, mark)));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args(AS_OF, 0, 500, None)).await;
+    let refusal = error(&refused);
+    assert_eq!(refusal["code"], "stock_summary_report_too_large");
+    // This refusal carries no master-mark `size`.
+    assert!(refusal.get("size").is_none());
+    assert_eq!(
+        refusal["remediation"],
+        refusal_remediation("stock_summary_report_too_large").unwrap()
+    );
+    assert!(refused["structuredContent"]["result"]
+        .get("items")
+        .is_none());
+    // Identity, then the runtime read's mode probe, identity, opening extent, flags, one slice
+    // of each census and the extent again.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 1 + 1 + 4);
+}
+
 #[tokio::test]
 async fn an_inventory_that_is_off_is_refused_after_the_flags() {
     let book = Book {

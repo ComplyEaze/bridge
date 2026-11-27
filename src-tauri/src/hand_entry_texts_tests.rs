@@ -7,8 +7,8 @@
 //! phrases fails here. Lowering a pin when texts are removed is the work of the issue's later
 //! slices; a pin that is higher than the count only leaves room, so lower it when you can.
 //!
-//! The scan reads string literals only. Comments are skipped, and so is everything from an inline
-//! `#[cfg(test)] mod name {` to the end of a file, so documentation and test text never count.
+//! The scan reads string literals only. Comments are skipped, and so is the body of every inline
+//! `#[cfg(test)] mod name { … }`, so documentation and test text never count.
 //! A sentence that forbids the thing ("Do not create the ledger in Tally by hand.") is not an
 //! instruction to do it, so a phrase in a sentence that carries a negation is not counted. It is
 //! a count per file, not a list of lines, so an edit that swaps one hand-entry text for another
@@ -34,20 +34,41 @@ const PINNED: &[(&str, usize)] = &[
 /// The text of every string literal in `source`, in order. Comments are skipped; a backslash at
 /// the end of a line joins the next line as Rust does; raw strings are read to their closing quote.
 fn string_literals(source: &str) -> Vec<String> {
+    lex(source).1
+}
+
+/// `source` split into its code, with every byte of a comment or literal blanked (a newline stays a
+/// newline, anything else becomes a space) so the code has the same byte offsets as `source`, and
+/// the text of its string literals, read as [`string_literals`] describes.
+pub(crate) fn lex(source: &str) -> (String, Vec<String>) {
+    let (code, spans) = lex_spans(source);
+    (code, spans.into_iter().map(|(_, _, text)| text).collect())
+}
+
+/// [`string_literals`] with where each literal sits: the byte index of its opening (the `r`, `br`
+/// or quote) and the byte index just past its closing quote.
+pub(crate) fn string_literal_spans(source: &str) -> Vec<(usize, usize, String)> {
+    lex_spans(source).1
+}
+
+/// [`lex`], with each literal's text paired with where it sits, as [`string_literal_spans`] gives it.
+fn lex_spans(source: &str) -> (String, Vec<(usize, usize, String)>) {
     let bytes = source.as_bytes();
+    let mut code = String::with_capacity(source.len());
     let mut literals = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
+        let start = i;
         let rest = &source[i..];
         if rest.starts_with("//") {
             i += rest.find('\n').unwrap_or(rest.len());
         } else if rest.starts_with("/*") {
             let mut depth = 0;
             while i < bytes.len() {
-                if source[i..].starts_with("/*") {
+                if bytes[i..].starts_with(b"/*") {
                     depth += 1;
                     i += 2;
-                } else if source[i..].starts_with("*/") {
+                } else if bytes[i..].starts_with(b"*/") {
                     depth -= 1;
                     i += 2;
                     if depth == 0 {
@@ -58,15 +79,18 @@ fn string_literals(source: &str) -> Vec<String> {
                 }
             }
         } else if let Some(raw) = raw_string_start(rest, i, bytes) {
+            // The prefix, hashes and quotes are part of the literal.
             let (opening_len, hashes) = raw;
             let body_start = i + opening_len;
             let closing = format!("\"{}", "#".repeat(hashes));
             let end = source[body_start..]
                 .find(&closing)
                 .map_or(bytes.len(), |at| body_start + at);
-            literals.push(source[body_start..end].to_string());
-            i = (end + closing.len()).min(bytes.len());
+            let close = (end + closing.len()).min(bytes.len());
+            literals.push((i, close, source[body_start..end].to_string()));
+            i = close;
         } else if bytes[i] == b'"' {
+            let open = i;
             let mut text = String::new();
             i += 1;
             while i < bytes.len() && bytes[i] != b'"' {
@@ -85,15 +109,24 @@ fn string_literals(source: &str) -> Vec<String> {
                 text.push(ch);
                 i += ch.len_utf8();
             }
-            literals.push(text);
-            i += 1;
-        } else if bytes[i] == b'\'' {
+            i = (i + 1).min(bytes.len());
+            literals.push((open, i, text));
+        } else if bytes[i] == b'\'' && char_literal_len(rest) > 1 {
             i += char_literal_len(rest);
         } else {
-            i += source[i..].chars().next().map_or(1, char::len_utf8);
+            // Code, a lifetime tick among it, is kept as it is.
+            let ch = source[i..].chars().next().unwrap_or('\u{fffd}');
+            code.push(ch);
+            i += ch.len_utf8();
+            continue;
         }
+        code.extend(
+            bytes[start..i]
+                .iter()
+                .map(|byte| if *byte == b'\n' { '\n' } else { ' ' }),
+        );
     }
-    literals
+    (code, literals)
 }
 
 /// `r"`, `r#"`, `br"` and so on at `at`: the length of the opening and the number of hashes. Not an
@@ -129,25 +162,90 @@ fn char_literal_len(rest: &str) -> usize {
     }
 }
 
-/// The part of `source` before an inline test module (`#[cfg(test)]`, then `mod name {`). A test
-/// module that is only declared (`mod tests;`, often with a `#[path]`) holds no text here.
-fn production_part(source: &str) -> &str {
-    let mut offset = 0;
-    let mut lines = source.lines().peekable();
-    while let Some(line) = lines.next() {
-        if line.starts_with("#[cfg(test)]") {
-            let mut ahead = lines.clone();
-            let module = ahead.find(|next| !next.trim_start().starts_with("#["));
-            if module.is_some_and(|next| {
-                let next = next.trim_start();
-                (next.starts_with("mod ") || next.starts_with("pub mod ")) && next.ends_with('{')
-            }) {
-                return &source[..offset];
+/// `source` without its inline test modules: each `#[cfg(test)]`, any further attributes, then
+/// `mod name {` (with or without a visibility) through its matching `}`, every one in the file.
+/// Braces are matched on the lexed code, so a brace in a comment or a literal does not count.
+/// Everything outside those modules is kept, code after a test module included. A test module that
+/// is only declared (`mod tests;`, often with a `#[path]`) holds no text here and is kept.
+pub(crate) fn production_part(source: &str) -> String {
+    const GATE: &str = "#[cfg(test)]";
+    let code = lex(source).0;
+    let mut kept = String::with_capacity(source.len());
+    let (mut from, mut search) = (0, 0);
+    while let Some(found) = code[search..].find(GATE) {
+        let start = search + found;
+        search = start + GATE.len();
+        if let Some(end) = inline_module_end(&code, search) {
+            kept.push_str(&source[from..start]);
+            kept.push('\n');
+            (from, search) = (end, end);
+        }
+    }
+    kept.push_str(&source[from..]);
+    kept
+}
+
+/// In lexed `code`, after a `#[cfg(test)]` that ends at `at`: the offset just past the closing
+/// brace of the inline module it gates, or `None` when it gates anything else, a declared module
+/// among them.
+fn inline_module_end(code: &str, mut at: usize) -> Option<usize> {
+    let bytes = code.as_bytes();
+    let skip_space = |at: usize| {
+        at + bytes[at..]
+            .iter()
+            .take_while(|byte| byte.is_ascii_whitespace())
+            .count()
+    };
+    at = skip_space(at);
+    while bytes[at..].starts_with(b"#[") {
+        at = skip_space(matching_close(bytes, at + 1)?);
+    }
+    if bytes[at..].starts_with(b"pub") {
+        at = skip_space(at + 3);
+        if bytes[at..].starts_with(b"(") {
+            at = skip_space(matching_close(bytes, at)?);
+        }
+    }
+    let after_mod = bytes[at..].strip_prefix(b"mod")?;
+    if !after_mod.first()?.is_ascii_whitespace() {
+        return None;
+    }
+    at = skip_space(at + 3);
+    at += bytes[at..]
+        .iter()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+        .count();
+    at = skip_space(at);
+    if !bytes[at..].starts_with(b"{") {
+        return None;
+    }
+    let end = matching_close(bytes, at);
+    assert!(
+        end.is_some(),
+        "an inline test module has no closing brace: the lexer misread this file"
+    );
+    end
+}
+
+/// Given the offset of a `(`, `[` or `{` in lexed `code`, the offset just past its matching close.
+fn matching_close(code: &[u8], open_at: usize) -> Option<usize> {
+    let (open, close) = match code[open_at] {
+        b'(' => (b'(', b')'),
+        b'[' => (b'[', b']'),
+        _ => (b'{', b'}'),
+    };
+    let mut depth = 0usize;
+    for (offset, byte) in code[open_at..].iter().enumerate() {
+        if *byte == open {
+            depth += 1;
+        } else if *byte == close {
+            depth -= 1;
+            if depth == 0 {
+                return Some(open_at + offset + 1);
             }
         }
-        offset += line.len() + 1;
     }
-    source
+    None
 }
 
 /// Words that make a clause a prohibition of the thing it names, or a statement that it is not done.
@@ -170,7 +268,7 @@ const CLAUSE_BREAKS: [char; 6] = ['.', '!', '?', ';', ':', ','];
 /// before it) holds a negation, so "Do not create it by hand." is not counted and "It does not get
 /// past this check: tell the user and enter it by hand." is.
 fn hand_entry_hits(source: &str) -> usize {
-    string_literals(production_part(source))
+    string_literals(&production_part(source))
         .iter()
         .map(|literal| {
             let text = literal
@@ -197,12 +295,9 @@ fn hand_entry_hits(source: &str) -> usize {
         .sum()
 }
 
-fn scan(
-    directory: &Path,
-    relative: &str,
-    found: &mut BTreeMap<String, usize>,
-    visited: &mut BTreeSet<String>,
-) {
+/// Adds every `.rs` file under `directory` to `sources`, by `relative` path, leaving out
+/// `*tests.rs` files and `tests` directories. A directory that does not exist adds nothing.
+pub(crate) fn scan(directory: &Path, relative: &str, sources: &mut BTreeMap<String, String>) {
     let Ok(entries) = fs::read_dir(directory) else {
         return;
     };
@@ -212,27 +307,22 @@ fn scan(
         let relative_path = format!("{relative}/{name}");
         if path.is_dir() {
             if name != "tests" {
-                scan(&path, &relative_path, found, visited);
+                scan(&path, &relative_path, sources);
             }
         } else if name.ends_with(".rs") && !name.ends_with("tests.rs") {
             let source = fs::read_to_string(&path).expect("a production source file is readable");
-            let relative_path = relative_path.trim_start_matches('/').to_string();
-            visited.insert(relative_path.clone());
-            let hits = hand_entry_hits(&source);
-            if hits > 0 {
-                found.insert(relative_path, hits);
-            }
+            sources.insert(relative_path.trim_start_matches('/').to_string(), source);
         }
     }
 }
 
-/// The hits per file, and every production file the walk read (so an unreadable or moved tree is
-/// told from a tree with no hand-entry texts).
-fn production_hits() -> (BTreeMap<String, usize>, BTreeSet<String>) {
+/// Every production source file under `src` and each `crates/*/src`, by path relative to the
+/// crate directory: `*tests.rs` files and `tests` directories are left out. A caller excludes the
+/// inline test modules with [`production_part`].
+pub(crate) fn production_sources() -> BTreeMap<String, String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut found = BTreeMap::new();
-    let mut visited = BTreeSet::new();
-    scan(&root.join("src"), "src", &mut found, &mut visited);
+    let mut sources = BTreeMap::new();
+    scan(&root.join("src"), "src", &mut sources);
     let mut crates: Vec<_> = fs::read_dir(root.join("crates"))
         .expect("the crates directory is readable")
         .flatten()
@@ -243,11 +333,22 @@ fn production_hits() -> (BTreeMap<String, usize>, BTreeSet<String>) {
         scan(
             &krate.path().join("src"),
             &format!("crates/{name}/src"),
-            &mut found,
-            &mut visited,
+            &mut sources,
         );
     }
-    (found, visited)
+    sources
+}
+
+/// The hits per file, and every production file the walk read (so an unreadable or moved tree is
+/// told from a tree with no hand-entry texts).
+fn production_hits() -> (BTreeMap<String, usize>, BTreeSet<String>) {
+    let sources = production_sources();
+    let found = sources
+        .iter()
+        .map(|(path, source)| (path.clone(), hand_entry_hits(source)))
+        .filter(|(_, hits)| *hits > 0)
+        .collect();
+    (found, sources.into_keys().collect())
 }
 
 #[test]
@@ -338,6 +439,52 @@ fn the_scan_reads_string_literals_and_nothing_else() {
         "a declared test module does not end the production text"
     );
     assert_eq!(hand_entry_hits("fn driver() { let _ = \"by hand\"; }"), 1);
+}
+
+#[test]
+fn the_test_module_cut_keeps_production_code_on_either_side() {
+    let source = concat!(
+        "const A: &str = \"a\";\n",
+        "#[cfg(test)]\n",
+        "mod tests {\n",
+        "    fn g() { let _ = \"}\"; let _ = '}'; } // }\n",
+        "    /* } */ const B: &str = \"b\";\n",
+        "}\n",
+        "const C: &str = \"c\";\n",
+        "mod outer {\n",
+        "    #[cfg(test)]\n",
+        "    #[allow(dead_code)]\n",
+        "    pub(crate) mod more {\n",
+        "        mod inner { const D: &str = \"d\"; }\n",
+        "    }\n",
+        "    const E: &str = \"e\";\n",
+        "}\n",
+        "#[cfg(test)]\n",
+        "fn helper() -> &'static str { \"f\" }\n",
+        "#[cfg(test)]\n",
+        "#[path = \"x_tests.rs\"]\n",
+        "mod declared;\n",
+        "const G: &str = \"g\";\n",
+    );
+    assert_eq!(
+        string_literals(&production_part(source)),
+        ["a", "c", "e", "f", "x_tests.rs", "g"],
+        "code after a test module is kept, every test module is removed with its whole body, and \
+         a gated item that is not an inline module is kept"
+    );
+    assert_eq!(
+        hand_entry_hits(
+            "#[cfg(test)]\nmod a { const X: &str = \"by hand\"; }\nconst Y: &str = \"by hand\";\n#[cfg(test)]\nmod b { const Z: &str = \"by hand\"; }"
+        ),
+        1,
+        "only the text between the two test modules counts"
+    );
+    let (code, _) = lex("let s = \"é}\"; // ü\nx");
+    assert_eq!(
+        code.len(),
+        "let s = \"é}\"; // ü\nx".len(),
+        "the lexed code keeps the source's byte offsets"
+    );
 }
 
 #[test]

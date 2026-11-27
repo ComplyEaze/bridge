@@ -36,3 +36,13 @@ private = { ignore = true }
 # openssl-src version, so a fallback in a regenerated report cannot be committed.
 [openssl-src]
 clarify = { license = "Apache-2.0", files = [{ path = "openssl/LICENSE.txt", checksum = "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a", license = "Apache-2.0" }] }
+
+# sqlcipher-src declares "MIT AND BSD-3-Clause AND blessing AND WTFPL" for everything it carries.
+# The build compiles only its SQLCipher amalgamation, sqlcipher/sqlcipher.c (libsqlite3-sys's
+# build.rs takes source_dir() and SOURCE_FILE alone; the crypto is OpenSSL on Windows and
+# CommonCrypto on macOS). That file is SQLCipher's code under BSD-3-Clause and SQLite's, which
+# is in the public domain (the "blessing") and carries no licence terms. The libtomcrypt files,
+# the WTFPL part, are not compiled. The report names the crate's own MIT licence and SQLCipher's
+# BSD-3-Clause, each with its file, pinned by checksum as for openssl-src above (#2432).
+[sqlcipher-src]
+clarify = { license = "MIT AND BSD-3-Clause", files = [{ path = "LICENSE", checksum = "413f82e0f4f8191a8624a7b7b2c9809466f7f3d930ad52a74ad29f2dd907881d", license = "MIT" }, { path = "sqlcipher/LICENSE-sqlcipher", checksum = "2a2826f6acf46fa650730cf42cbb22a642be33a7ef119c9c4f4bf6daf3bef48e", license = "BSD-3-Clause" }] }

@@ -2995,6 +2995,10 @@ async fn a_post_whose_response_cannot_be_journaled_still_reports_where_it_landed
         result["post_location"]["state"], "target_only",
         "{response}"
     );
+    // Sent: the busy refusal's step to post the same batch again is never
+    // offered after a send.
+    assert_eq!(result["attempt_recorded"], json!(true), "{response}");
+    assert!(result["error"].get("next_step").is_none(), "{response}");
 }
 
 /// The parsed `ENVELOPE/HEADER/TALLYREQUEST` of one request body, in either
@@ -3188,6 +3192,15 @@ async fn a_publication_unsettled_at_the_lock_is_refused_by_its_own_code() {
     })
     .await;
     assert_refused_at_the_lock(&run, "proof_publication_recovery_required");
+    // The marker still stands when the answer reads the journal back, so that
+    // read is refused too: no attempt is stated and no step is offered.
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(result["attempt_recorded"], Value::Null, "{}", run.response);
+    assert!(
+        result["error"].get("next_step").is_none(),
+        "{}",
+        run.response
+    );
 }
 
 /// A lock file that cannot be opened refuses the lock as unavailable, before
@@ -3202,6 +3215,15 @@ async fn a_lock_file_that_cannot_be_opened_at_the_lock_is_refused_as_unavailable
     })
     .await;
     assert_refused_at_the_lock(&run, "import_admission_lock_unavailable");
+    // The lock file still cannot be opened when the answer reads the journal
+    // back, so no attempt is stated and no step is offered.
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(result["attempt_recorded"], Value::Null, "{}", run.response);
+    assert!(
+        result["error"].get("next_step").is_none(),
+        "{}",
+        run.response
+    );
 }
 
 /// The intent's append itself keeps the catch-all (#711): the journal is made

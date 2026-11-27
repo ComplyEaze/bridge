@@ -4206,9 +4206,10 @@ fn validate_dispatched_import_endpoint(
 /// The import admission lock of `data_dir`, taken exclusively. Never park the
 /// async request loop behind another process's network work: the lock is tried
 /// once, and contention is an in-band refusal, not a deferred posting request.
-/// No refusal has written the import journal: the lock file is opened and
-/// tried, and unsettled publications checked (`persistence::settled`), and
-/// nothing else is done.
+/// No refusal has written the import journal: the lock file is opened (made
+/// if absent) and tried, and unsettled publications are checked
+/// (`persistence::settled`, which removes an empty publication marker folder
+/// and refuses on any other); nothing else is written.
 fn admit_exclusively(data_dir: &Path) -> Result<std::fs::File, AdmissionLockRefusal> {
     let path = data_dir.join("agent-import-admission.lock");
     let file = super::local_file::open_local_file(&path, true)

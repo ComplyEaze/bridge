@@ -18,7 +18,9 @@
 //! [`judge`] decides; the verdict is appended to the masters journal (the
 //! first terminal verdict of a batch is its last: the journal refuses a later
 //! one), and the answer reports the state, the GUID when found and each check.
-use super::super::master_ledger::{read_pre_image, MasterMark, MasterVerdict, MasterVerdictState};
+use super::super::master_ledger::{
+    read_pre_image, JournalBatchState, JournalRecord, MasterMark, MasterVerdict, MasterVerdictState,
+};
 use super::verdict::{
     judge, party_read_needed, Facts, Judgement, Moment, OrderCoverage, PartyRead, PartyView,
     ReadBack,
@@ -584,6 +586,19 @@ impl Server {
         unrecorded: Option<&MasterDispatchResponse>,
         answer_recorded: &mut bool,
     ) -> Result<bool, String> {
+        self.append_kind_under_lock(state, verdict, unrecorded, answer_recorded, read_journal)
+    }
+
+    /// [`Self::append_under_lock`] for the journal of any kind, which `read`
+    /// reads.
+    pub(super) fn append_kind_under_lock<B: JournalBatch>(
+        &self,
+        state: &JournalBatchState<B>,
+        verdict: MasterVerdict,
+        unrecorded: Option<&MasterDispatchResponse>,
+        answer_recorded: &mut bool,
+        read: KindReader<B>,
+    ) -> Result<bool, String> {
         let data_dir = &self.settings.data_dir;
         // An open verdict the journal already held, in the same words, stays
         // recorded when the lock cannot be taken or the journal cannot be read:
@@ -596,7 +611,7 @@ impl Server {
                 return Err("import_admission_busy".to_string());
             }
             let lock = ExclusiveAdmission::acquire(data_dir)?;
-            let journal = read_journal(data_dir).map_err(|error| error.code().to_string())?;
+            let journal = read(data_dir).map_err(|error| error.code().to_string())?;
             Ok((lock, journal))
         })();
         let (lock, journal) = match locked {
@@ -605,14 +620,14 @@ impl Server {
             Err(code) => return Err(code),
         };
         let held = journal
-            .state(&state.batch.batch_id)
+            .state(state.batch.batch_id())
             .ok_or_else(|| "master_batch_not_found".to_string())?;
         *answer_recorded = held.response.is_some();
         if let (Some(response), false) = (unrecorded, *answer_recorded) {
             append(
                 data_dir,
                 &lock,
-                MasterRecord::DispatchResponse(response.clone()),
+                JournalRecord::<B>::DispatchResponse(response.clone()),
             )
             .map_err(|error| error.code().to_string())?;
             *answer_recorded = true;
@@ -620,7 +635,7 @@ impl Server {
         if held.verdict.as_ref() == Some(&verdict) {
             return Ok(false);
         }
-        append(data_dir, &lock, MasterRecord::Verdict(verdict))
+        append(data_dir, &lock, JournalRecord::<B>::Verdict(verdict))
             .map_err(|error| error.code().to_string())?;
         Ok(true)
     }

@@ -849,10 +849,28 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
         batch_id: "first".to_string(),
         number: "INV/1".to_string(),
         date: "20260901".to_string(),
+        guid: None,
     };
     assert_eq!(
         control(vec![record(&first), sent(&first), found(&first)]),
         known
+    );
+    // Its post bound the voucher to a GUID: the control carries it, only so a
+    // miss can report whether the read returned that voucher elsewhere.
+    assert_eq!(
+        control(vec![
+            record(&first),
+            intent(&first, Some(1)),
+            answered(&first),
+            bound_as(&first),
+            found(&first)
+        ]),
+        NumberControl::Known {
+            batch_id: "first".to_string(),
+            number: "INV/1".to_string(),
+            date: "20260901".to_string(),
+            guid: Some("aaaa-00000064".to_string()),
+        }
     );
     // A later verification that no longer finds it demotes it.
     let demoted = record(
@@ -897,7 +915,8 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
         NumberControl::Known {
             batch_id: "later".to_string(),
             number: "INV/4".to_string(),
-            date: "20261015".to_string()
+            date: "20261015".to_string(),
+            guid: None,
         }
     );
     assert_eq!(
@@ -905,7 +924,8 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
         NumberControl::Known {
             batch_id: "next-year".to_string(),
             number: "INV/3".to_string(),
-            date: "20270410".to_string()
+            date: "20270410".to_string(),
+            guid: None,
         }
     );
 }
@@ -1230,6 +1250,7 @@ fn a_released_invoice_is_never_the_number_control() {
         batch_id: "first".to_string(),
         number: "INV/1".to_string(),
         date: "20260901".to_string(),
+        guid: None,
     };
     assert_eq!(
         control([release(ReleaseSeen::Found), vec![found(&first)]].concat()),
@@ -1295,6 +1316,7 @@ fn a_control_that_no_longer_verifies_stops_its_company_until_released() {
             batch_id: "gone".to_string(),
             number: "INV/2".to_string(),
             date: "20260901".to_string(),
+            guid: None,
         }
     );
     assert!(stops(verified.clone()).is_empty());
@@ -1303,6 +1325,7 @@ fn a_control_that_no_longer_verifies_stops_its_company_until_released() {
         batch_id: "older".to_string(),
         number: "INV/1".to_string(),
         date: "20260901".to_string(),
+        guid: None,
     };
     assert_eq!(control(&demoted), older_known);
     assert_eq!(stops(demoted.clone()), vec!["gone".to_string()]);

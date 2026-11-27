@@ -1,0 +1,4 @@
+# fixture: agent/stock-create-lab/stock-create-lab-marks.utf16le.xml
+# parser: parse_company_high_water(STOCK_CREATE_LAB)
+# source: captured
+Err("voucher_checkpoint_not_observed")

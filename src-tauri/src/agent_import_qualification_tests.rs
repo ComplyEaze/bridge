@@ -8,11 +8,11 @@ fn the_admitted_schema_offers_exactly_the_qualified_voucher_types() {
     assert_eq!(
         voucher_input_schema()["properties"]["vouchers"]["items"]["properties"]["voucher_type"]
             ["enum"],
-        json!(["Journal", "Payment", "Receipt", "Contra"])
+        json!(["Journal", "Payment", "Receipt", "Contra", "Sales"])
     );
     assert_eq!(
         serde_json::to_value(LIVE_QUALIFIED_VOUCHER_TYPES).unwrap(),
-        json!(["Journal", "Payment", "Receipt", "Contra"])
+        json!(["Journal", "Payment", "Receipt", "Contra", "Sales"])
     );
 }
 
@@ -57,7 +57,7 @@ fn the_published_rules_name_every_qualified_type_and_claim_no_other() {
 #[test]
 fn a_voucher_type_outside_the_qualified_list_is_refused() {
     // The gate exercised against a narrowed list, one type at a time. It is
-    // what refuses a type added ahead of its evidence (Sales today), and it
+    // what refuses a type added ahead of its evidence (Sales until #2162), and it
     // runs before the first live request of a build.
     let vouchers = admitted_payload().vouchers;
     assert_eq!(
@@ -261,14 +261,13 @@ fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
     }
 }
 
-/// Sales is declared and not qualified: one rehearsal posted two invoices built
-/// here and read them back, and what it left owed comes first (section 9.16).
-/// The one list refuses it on every surface: the
-/// build before its first request and with nothing written, the schema, and
-/// (in the post tests) a saved batch at post.
+/// A declared type off the list is refused on every surface: the build before
+/// its first request and with nothing written, the schema, and (in the post
+/// tests) a saved batch at post. Sales, against the list as it stood before
+/// Sales qualified.
 #[tokio::test]
-async fn a_sales_voucher_is_refused_before_any_request_and_nothing_is_written() {
-    assert!(!LIVE_QUALIFIED_VOUCHER_TYPES.contains(&VoucherType::Sales));
+async fn a_sales_voucher_off_the_list_is_refused_before_any_request_and_nothing_is_written() {
+    assert!(!PRE_SALES_QUALIFIED_VOUCHER_TYPES.contains(&VoucherType::Sales));
     let directory = tempfile::tempdir().unwrap();
     // Port 9 answers nothing: a build that sent a request would fail on the
     // connection, with evidence of the attempt, instead of this refusal.
@@ -302,8 +301,11 @@ async fn a_sales_voucher_is_refused_before_any_request_and_nothing_is_written() 
     // A well-formed invoice, and one with a defect of its own: both are refused
     // as an unqualified type, not for the defect a later check would find.
     for number in ["278", "INV 0042"] {
-        let failure = server
-            .build_import_xml(&invoice(number))
+        let failure = TEST_QUALIFIED_VOUCHER_TYPES
+            .scope(
+                PRE_SALES_QUALIFIED_VOUCHER_TYPES,
+                server.build_import_xml(&invoice(number)),
+            )
             .await
             .err()
             .unwrap();
@@ -315,8 +317,9 @@ async fn a_sales_voucher_is_refused_before_any_request_and_nothing_is_written() 
         !directory.path().join("agent-import-ledger.jsonl").exists(),
         "no journal line"
     );
-    // The schema does not offer the type.
-    let offered = &voucher_input_schema()["properties"]["vouchers"]["items"]["properties"];
+    // The schema for that list does not offer the type.
+    let schema = schema::voucher_input_schema_for(PRE_SALES_QUALIFIED_VOUCHER_TYPES);
+    let offered = &schema["properties"]["vouchers"]["items"]["properties"];
     assert_eq!(
         offered["voucher_type"]["enum"],
         json!(["Journal", "Payment", "Receipt", "Contra"])

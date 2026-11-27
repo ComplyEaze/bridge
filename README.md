@@ -16,6 +16,8 @@ registers, the stock summary, and the Profit and Loss and Balance Sheet (a book
 with stock items is read only when Tally's own closing stock closes every gap). It checks ledger
 names before you post, and prepares Journal, Payment, Receipt and Contra
 vouchers as an import file that you review and import into TallyPrime yourself.
+With posting on, it also prepares Sales invoices, and posts each one itself after
+you approve it.
 Posting is off by default in a new install, so as installed it never posts to
 TallyPrime: it reads from it and prepares files on your computer. If you turn
 posting on in the extension, it posts one voucher at a time, or a saved batch
@@ -73,7 +75,7 @@ with no figures, to a log on this computer.
 | --- | --- | --- |
 | `audit_test_run` | Off by default (setting **Allow tax-audit test runs**). One tax-audit test run on the company's own books for a date range, today only the cash share of receipts and payments against the s.44AB(a) limit: figure and finding ids with their values, confidence and clauses, and the count of any failed book check; no ledger name, no voucher, and refused while a redaction setting is on. You name the cash and bank groups; the period must lie in 2025-26. Books only, not a tax opinion | Nothing |
 | `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is read only when Tally’s own closing stock closes every gap) | Nothing |
-| `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch and writes an import file | An import file and a ledger record on this computer |
+| `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch, or with posting on one Sales invoice, and writes an import file | An import file and a ledger record on this computer |
 | `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |
 | `company_features` | Three settings the company’s record in Tally holds today (cost centres, GST and batch-wise stock; each yes, no or not reported) and the currency symbol; no ledger, voucher, amount or narration. Each of the three settings equalled Tally’s F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured | Nothing |
 | `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
@@ -99,7 +101,7 @@ with no figures, to a log on this computer.
 | `stock_by_batch` | Tally’s own Stock Query for up to 20 items: each item’s quantity per godown and batch, tied to its closing quantity in Tally’s stock item list; quantities only, and an empty answer is not read as zero | Nothing |
 | `stock_by_godown` | Closing stock by godown at a month's last day from Tally’s own Godown Summary, returned only when the godowns add up to Tally’s Stock Summary total; for an item directly under the root, its value in each godown at that godown’s own cost; an item inside a stock group gets no value per godown; measured on one lab book | Nothing |
 | `stock_summary` | The closing stock value of each item as of a month's last day, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own; an item inside a stock group returns its own quantity from Tally's stock item list, marked as not compared; small books only (a book with many masters of any kind is refused, and so is a date that is not a month's last day); month ends inside the year were checked on two lab books | Nothing |
-| `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
+| `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded. In source, not yet in a published build: the first status read of a session, once this build’s release date is more than 60 days before this computer’s date, also states both dates and where releases are listed, without asking the internet whether a newer release exists | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
 | `validate_masters` | Checks ledger names against the live book before you build an import file | Nothing |
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
@@ -425,9 +427,12 @@ exist.
 With writing on:
 
 - **Prepares vouchers as a local file** — Journal, Payment, Receipt and
-  Contra. Bridge writes the file; it does not send it.
-- **Posts one saved Journal, Payment, Receipt or Contra per approval, or a saved
-  batch of 2 to 50 after one approval of its summary**, and only after you
+  Contra, and with posting on a Sales invoice. ComplyEaze Bridge writes the
+  file; it does not send it. A Sales invoice must be posted only by approval,
+  never by importing its file.
+- **Posts one saved Journal, Payment, Receipt, Contra or Sales invoice per
+  approval, or a saved batch of 2 to 50 (no invoice) after one approval of its
+  summary**, and only after you
   approve that exact voucher (or that batch's summary) in a dialog on your own
   machine.
   The assistant cannot approve it. Bridge then reads the voucher back so you

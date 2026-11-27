@@ -33,6 +33,7 @@ fn detail() -> InvoiceDetail {
         voucher_type_name: "Sales".to_string(),
         place_of_supply: RAJ.to_string(),
         round_off_ledger: None,
+        e_invoice: None,
         observed: None,
     }
 }
@@ -90,7 +91,7 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
             applicable_from: Some("20250401".to_string()),
             taxability: Some("Taxable".to_string()),
             source: Some("Specify Details Here".to_string()),
-            unmeasured: false,
+            shape: wire::RowShape::Plain,
             empty: false,
             states: vec![wire::StateRates {
                 state: Some("Any".to_string()),
@@ -698,6 +699,17 @@ fn observed() -> InvoiceObserved {
     }
 }
 
+/// The e-invoice details row 2162-IRN9 imported and Tally stored as sent
+/// (`lab/2162-irn-import-answers` at 9cb3ebd0).
+fn irn9_e_invoice() -> EInvoiceDetails {
+    serde_json::from_value(serde_json::json!({
+        "irn": "c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+        "ack_no": "445566",
+        "ack_date": "2025-04-03"
+    }))
+    .unwrap()
+}
+
 /// The bytes the renderer writes, pinned. The rehearsal of 7 Oct 2026 posted
 /// two invoices the renderer wrote in this shape and Tally took both (section
 /// 9.16). Their import files are not committed, so the bytes pinned here are
@@ -725,6 +737,25 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     assert!(
         !xml.contains("ALLLEDGERENTRIES"),
         "an invoice view silently drops ALLLEDGERENTRIES"
+    );
+    // An invoice with e-invoice details carries the three elements right after `ISINVOICE`, as
+    // row 2162-IRN9 imported them and Tally stored them as sent; nothing else moves.
+    let mut with_details = v.clone();
+    with_details.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice());
+    let detailed = render_sales_invoice_xml(
+        &with_details,
+        id,
+        "20260310",
+        "<NARRATION>Invoice 278</NARRATION>",
+        VoucherAction::Create,
+    )
+    .unwrap();
+    assert_eq!(
+        detailed,
+        xml.replace(
+            "<ISINVOICE>Yes</ISINVOICE>",
+            "<ISINVOICE>Yes</ISINVOICE><IRN>c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0</IRN><IRNACKNO>445566</IRNACKNO><IRNACKDATE>20250403</IRNACKDATE>"
+        )
     );
     // A party that is not bill-wise gets no New Ref; and an unobserved voucher does not render.
     let mut not_bill_wise = v.clone();
@@ -901,7 +932,8 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// renderer, so what is written and what is compared cannot drift apart. Its
 /// four GSTR-1 status elements are the lab's, copied as Tally wrote them for an
 /// invoice it lists as included (`included_status_elements`), and so are the
-/// five HSN/SAC elements each sales line carries (`resolved_hsn_elements`).
+/// five HSN/SAC elements each sales line carries (`resolved_hsn_elements`). The
+/// registration is `with_registration`'s.
 fn readback_xml(v: &ImportVoucher) -> String {
     let id = sentinel_uuid(0x1a);
     let mut rendered = render_sales_invoice_xml(
@@ -928,7 +960,7 @@ fn readback_xml(v: &ImportVoucher) -> String {
         .replace("<DATE>", &format!("<ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><GUID>g-1</GUID><ALTERID> 77</ALTERID>{}<DATE>", included_status_elements()))
         // The export also gives every leg an empty allocation container.
         .replace("</ISDEEMEDPOSITIVE>", "</ISDEEMEDPOSITIVE><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>");
-    format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{voucher}</COLLECTION></DATA></ENVELOPE>")
+    with_registration(&format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{voucher}</COLLECTION></DATA></ENVELOPE>"))
 }
 
 /// #2062: an invoice's cancel candidate is its native request with only its
@@ -968,10 +1000,464 @@ fn observed_voucher() -> ImportVoucher {
     v
 }
 
+/// What the invoice read-back of a saved invoice with details returns when the e-invoice read
+/// is answered by `e_invoice` (given the captured day, its IRN changed): its differences, and
+/// for each request sent whether it named the three elements, beside where the script answers
+/// the e-invoice read. The script is not required to be answered to its end: a read-back that
+/// stops early sends fewer requests, and each test says how many it expects.
+async fn read_back_with_e_invoice_answer(
+    e_invoice: impl Fn(String) -> tally_protocol_simulator::ScenarioPlan,
+) -> (Vec<String>, Vec<bool>, Vec<bool>) {
+    use bridge_tally_transport::TallyEndpointConfig;
+    use tally_protocol_simulator::{
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+
+    let company_list = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"
+    ));
+    let guid = pilot_lab_guid();
+    let e_invoice_answer = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-readback/einvoice-day-read.utf16le.xml"
+    ))
+    .replace("eb2f5190-292e-4ed8-bfd3-eace839fe699", &guid)
+    .replace(
+        &format!("<GUID>{guid}-00000001</GUID>"),
+        &format!("<GUID>{guid}-0000000b</GUID>"),
+    )
+    .replace(
+        "<IRN TYPE=\"String\">a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8</IRN>",
+        "<IRN TYPE=\"String\">c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0</IRN>",
+    );
+    let answer = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body))
+            .with_encoding(WireEncoding::Utf16LeNoBom)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let order = concat!(
+        "eMsMseeRsRse",
+        "e1s1see2s2see3s3see4s4seeUsUsee6s6see7s7see8s8se",
+        "e9s9seexsxseeysyseezszse",
+        "eDsDse"
+    );
+    let months = crate::agent::agent_import::tests::lab_number_months();
+    let mut plans = order
+        .chars()
+        .map(|kind| match kind {
+            'e' => answer(company_list.clone()),
+            's' => ScenarioPlan::new(Fixture::ProductStatus(
+                tally_protocol_simulator::ProductStatus::TallyPrime,
+            ))
+            .with_framing(ResponseFraming::ContentLength),
+            'M' => answer(utf16le(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"
+            ))),
+            // Captured before the read-back fetched the registration, which `with_registration` adds.
+            'R' => answer(with_registration(&utf16le(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
+            )))),
+            'D' => e_invoice(e_invoice_answer.clone()),
+            month => {
+                let index = if month == 'U' {
+                    4
+                } else {
+                    "123456789xyz".find(month).expect("a month letter")
+                };
+                answer(utf16le(months[index].3))
+            }
+        })
+        .collect::<Vec<_>>();
+    plans.push(answer(company_list.clone()));
+    let simulator = SequenceSimulator::spawn(plans).expect("the scripted read-back starts");
+    let directory = tempfile::tempdir().expect("a temporary data directory");
+    let server = super::super::super::Server::new(super::super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::super::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let companies = bridge_tally_protocol::parse_companies_from_collection(&company_list)
+        .expect("the captured company list parses");
+    let company = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(guid.as_str()))
+        .expect("the pilot company")
+        .clone();
+    let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
+        company.name.clone(),
+        crate::tally::test_company_guid(&guid),
+        company.company_number.clone().unwrap(),
+        company.books_from.clone().unwrap(),
+        &companies,
+    )
+    .expect("the captured company identity verifies");
+    let saved: ImportVoucher = serde_json::from_value(json!({
+        "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":"BP/26-27/0010",
+        "invoice":{
+            "voucher_type_name":"BRIDGE Sales", "place_of_supply":"Rajasthan", "round_off_ledger":"BRIDGE Round Off",
+            "observed":{
+                "voucher_type_guid":format!("{guid}-000000ce"), "party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer", "party_bill_wise":false,
+                "company_state":"Rajasthan", "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]
+            },
+            "e_invoice":{
+                "irn":"a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8",
+                "ack_no":"112233", "ack_date":"2025-04-03"
+            }
+        },
+        "entries":[
+            {"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"},
+            {"ledger":"BRIDGE Svc 998313 5%","amount":"600.40","side":"Cr"},
+            {"ledger":"BRIDGE Svc 998314 5%","amount":"400.40","side":"Cr"},
+            {"ledger":"BRIDGE CGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE SGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE Round Off","amount":"0.16","side":"Cr"}
+        ]
+    }))
+    .expect("the saved invoice parses");
+
+    let (differences, ..) = server
+        .read_back_sales_invoice(&identity, &company, &saved)
+        .await
+        .expect("a read-back after a post is never an error");
+
+    simulator.cancel();
+    let requests = simulator
+        .finish()
+        .expect("the scripted read-back finishes")
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .collect::<Vec<_>>();
+    let names_the_details = requests
+        .iter()
+        .map(|request| {
+            let body = utf16le(&request.request_body);
+            body.contains(",IRN,IRNACKNO,IRNACKDATE</FETCH>")
+                && body.contains("<SVFROMDATE TYPE=\"Date\">20260801</SVFROMDATE>")
+                && body.contains("<SVTODATE TYPE=\"Date\">20260801</SVTODATE>")
+        })
+        .collect::<Vec<_>>();
+    let scripted = order.chars().map(|kind| kind == 'D').collect::<Vec<_>>();
+    (differences, names_the_details, scripted)
+}
+
+/// A captured answer, as the scripted read-backs frame it.
+fn scripted(body: String) -> tally_protocol_simulator::ScenarioPlan {
+    tally_protocol_simulator::ScenarioPlan::new(tally_protocol_simulator::Fixture::SyntheticXml(
+        body,
+    ))
+    .with_encoding(tally_protocol_simulator::WireEncoding::Utf16LeNoBom)
+    .with_framing(tally_protocol_simulator::ResponseFraming::ContentLength)
+}
+
+/// The invoice read-back sends the e-invoice read for a saved invoice with details, and an IRN
+/// that answer changes is a difference returned by the read-back itself.
+#[tokio::test]
+async fn an_irn_difference_from_the_extra_read_is_returned_by_the_invoice_read_back() {
+    let (differences, names_the_details, scripted_read) =
+        read_back_with_e_invoice_answer(scripted).await;
+    assert_eq!(differences, ["IRN"]);
+    // The e-invoice read is sent where the script answers it, over the invoice's one date, and
+    // no other request of the read-back names the three elements.
+    assert_eq!(names_the_details, scripted_read);
+}
+
+/// An e-invoice read that fails, here Tally answering HTTP 500, is the difference
+/// `e_invoice_readback_failed`, never a pass or an empty match (AGENTS.md P5).
+#[tokio::test]
+async fn a_failed_e_invoice_read_is_a_difference() {
+    let (differences, names_the_details, scripted_read) =
+        read_back_with_e_invoice_answer(|body| scripted(body).with_http_status(500)).await;
+    assert_eq!(differences, ["e_invoice_readback_failed"]);
+    // The read-back stops at the failed answer: the script up to and including the first
+    // e-invoice read is sent, and nothing after it.
+    let first = scripted_read
+        .iter()
+        .position(|&read| read)
+        .expect("the script answers an e-invoice read");
+    assert_eq!(names_the_details, scripted_read[..=first]);
+}
+
+/// An e-invoice read answered for another company does not parse for this one: it is the
+/// difference `e_invoice_readback_unreadable`, never `e_invoice_not_found` or a pass.
+#[tokio::test]
+async fn an_e_invoice_answer_that_does_not_parse_is_a_difference() {
+    let guid = pilot_lab_guid();
+    let other = "00000000-0000-0000-0000-000000000000";
+    let (differences, names_the_details, scripted_read) = read_back_with_e_invoice_answer(|body| {
+        assert!(body.contains(&guid), "the answer names the company");
+        scripted(body.replace(&guid, other))
+    })
+    .await;
+    assert_eq!(differences, ["e_invoice_readback_unreadable"]);
+    assert_eq!(names_the_details, scripted_read);
+}
+
 fn differences(v: &ImportVoucher, xml: &str) -> Vec<String> {
     match wire::parse_invoice_readback(xml).unwrap() {
         wire::Readback::One(read) => invoice_readback_differences(v, &read, "20260310"),
         other => panic!("one voucher expected, got {other:?}"),
+    }
+}
+
+/// #2464: the read-back reads the registration Tally filed the invoice under,
+/// by its name and its GSTIN, from the structure of the lab's answer for
+/// `BP/26-27/0010` (row 2464-GN, not committed since it holds a GSTIN): the
+/// name carries `TYPE="String"`. Either field not back, or back empty, is
+/// missing. A GSTIN that is not a valid GSTIN of the company's recorded state
+/// differs. Either way the invoice is divergent, never verified.
+#[test]
+fn the_registration_tally_filed_the_invoice_under_is_read_back() {
+    let v = observed_voucher();
+    let xml = readback_xml(&v);
+    assert_eq!(differences(&v, &xml), Vec::<String>::new());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    assert_eq!(
+        (xml.matches(unit).count(), xml.matches(&gstin).count()),
+        (1, 1)
+    );
+    // The name is read by its text, with the attribute or without it.
+    let bare = xml.replace(
+        unit,
+        "<GSTREGISTRATION>Rajasthan Registration</GSTREGISTRATION>",
+    );
+    assert_eq!(differences(&v, &bare), Vec::<String>::new());
+    for missing in [
+        xml.replace(unit, ""),
+        xml.replace(&gstin, ""),
+        xml.replace(unit, "").replace(&gstin, ""),
+        xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>"),
+        xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"> </GSTREGISTRATION>"),
+        xml.replace(&gstin, "<CMPGSTIN/>"),
+        xml.replace(unit, "<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>")
+            .replace(&gstin, "<CMPGSTIN/>"),
+    ] {
+        assert_eq!(
+            differences(&v, &missing),
+            vec!["invoice_registration_missing"]
+        );
+    }
+    for other in [GSTIN_MH, "08ZZZZZ0000Z1ZR", "08ZZZZZ0000Z1Z"] {
+        let differs = xml.replace(&gstin, &format!("<CMPGSTIN>{other}</CMPGSTIN>"));
+        assert_eq!(
+            differences(&v, &differs),
+            vec!["invoice_registration_differs"],
+            "{other}"
+        );
+    }
+    // The declared limit: a second registration in the company's recorded state
+    // is not told apart. A valid GSTIN of that state other than the company's
+    // own, under another unit name, reads with no difference.
+    let same_state = xml
+        .replace(&gstin, "<CMPGSTIN>08ZZZZZ0000Z2ZP</CMPGSTIN>")
+        .replace(
+            unit,
+            "<GSTREGISTRATION TYPE=\"String\">Second Unit</GSTREGISTRATION>",
+        );
+    assert_eq!(differences(&v, &same_state), Vec::<String>::new());
+    // Only the company's recorded state is the measure: the same answer for an
+    // invoice the build recorded under Maharashtra differs.
+    let mut maharashtra = v.clone();
+    maharashtra
+        .invoice
+        .as_mut()
+        .and_then(|detail| detail.observed.as_mut())
+        .unwrap()
+        .company_state = "Maharashtra".to_string();
+    assert!(differences(&maharashtra, &xml).contains(&"invoice_registration_differs".to_string()));
+    // A repeated field fails the whole read, as any repeated field does.
+    let twice = xml.replace(&gstin, &format!("{gstin}{gstin}"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_empty_gstin_before_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("<CMPGSTIN/>{gstin}"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_empty_gstin_after_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("{gstin}<CMPGSTIN/>"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_empty_registration_before_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("<GSTREGISTRATION TYPE=\"String\"/>{unit}"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_empty_registration_after_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("{unit}<GSTREGISTRATION TYPE=\"String\"/>"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_before_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(
+        &gstin,
+        &format!("<CMPGSTIN TYPE=\"String\"></CMPGSTIN>{gstin}"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_after_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(
+        &gstin,
+        &format!("{gstin}<CMPGSTIN TYPE=\"String\"></CMPGSTIN>"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_without_a_type_before_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("<CMPGSTIN></CMPGSTIN>{gstin}"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_without_a_type_after_a_repeated_gstin_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let twice = xml.replace(&gstin, &format!("{gstin}<CMPGSTIN></CMPGSTIN>"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_before_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(
+        unit,
+        &format!("<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>{unit}"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_after_a_repeated_registration_fails_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(
+        unit,
+        &format!("{unit}<GSTREGISTRATION TYPE=\"String\"></GSTREGISTRATION>"),
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_without_a_type_before_a_repeated_registration_fails_the_read(
+) {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("<GSTREGISTRATION></GSTREGISTRATION>{unit}"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn an_open_and_closed_empty_registration_without_a_type_after_a_repeated_registration_fails_the_read(
+) {
+    let xml = readback_xml(&observed_voucher());
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    let twice = xml.replace(unit, &format!("{unit}<GSTREGISTRATION></GSTREGISTRATION>"));
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+#[test]
+fn two_open_and_closed_empty_fields_fail_the_read() {
+    let xml = readback_xml(&observed_voucher());
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    let unit = "<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>";
+    for (empty, populated) in [
+        ("<CMPGSTIN></CMPGSTIN>", gstin),
+        ("<GSTREGISTRATION></GSTREGISTRATION>", unit.to_string()),
+    ] {
+        let twice = xml.replace(&populated, &format!("{empty}{empty}"));
+        assert_eq!(
+            wire::parse_invoice_readback(&twice),
+            Err("invoice_read_field_repeated")
+        );
+    }
+}
+
+#[test]
+fn an_open_and_closed_empty_gstin_reads_as_missing() {
+    let voucher = observed_voucher();
+    let xml = readback_xml(&voucher);
+    let gstin = format!("<CMPGSTIN>{GSTIN_RJ}</CMPGSTIN>");
+    for empty in [
+        "<CMPGSTIN TYPE=\"String\"></CMPGSTIN>",
+        "<CMPGSTIN></CMPGSTIN>",
+    ] {
+        assert_eq!(
+            differences(&voucher, &xml.replace(&gstin, empty)),
+            vec!["invoice_registration_missing"]
+        );
     }
 }
 
@@ -1257,7 +1743,28 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
         Box::new(|v| v.invoice.as_mut().unwrap().place_of_supply = "Haryana".into()),
         Box::new(|v| v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into())),
         Box::new(|v| v.invoice.as_mut().unwrap().observed = None),
+        Box::new(|v| v.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice())),
     ];
+    for (key, value) in [
+        (
+            "irn",
+            "d3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0c3d4e5f6a7b8c9d0",
+        ),
+        ("ack_no", "445567"),
+        ("ack_date", "2025-04-04"),
+    ] {
+        let with_details = {
+            let mut v = base.clone();
+            v.invoice.as_mut().unwrap().e_invoice = Some(irn9_e_invoice());
+            v
+        };
+        let mut changed = with_details.clone();
+        let mut details = serde_json::to_value(irn9_e_invoice()).unwrap();
+        details[key] = serde_json::json!(value);
+        changed.invoice.as_mut().unwrap().e_invoice =
+            Some(serde_json::from_value(details).unwrap());
+        assert_ne!(digest(&with_details), digest(&changed), "{key}");
+    }
     for field in 0..8 {
         changes.push(Box::new(move |v| {
             let seen = v.invoice.as_mut().unwrap().observed.as_mut().unwrap();
@@ -1355,6 +1862,7 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">900.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 </VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
     );
+    let xml = with_registration(&xml);
     let v = observed_voucher();
     assert_eq!(differences(&v, &xml), Vec::<String>::new());
     // An allocation whose amount did not come back is a difference, not an absence.
@@ -1371,15 +1879,10 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 
 /// The pilot lab's captured read-back of the invoice its book took (the
 /// `pilot-lab` set; its PROVENANCE table is beside the fixtures), decoded and
-/// compared with `expected` as a post compares them.
+/// compared with `expected` as a post compares them. Each was answered before
+/// the request fetched the registration, so `with_registration` adds it.
 fn pilot_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<String> {
-    let xml = String::from_utf16(
-        &bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect::<Vec<_>>(),
-    )
-    .unwrap();
+    let xml = with_registration(&utf16le(bytes));
     match wire::parse_invoice_readback(&xml).unwrap() {
         wire::Readback::One(read) => invoice_readback_differences(expected, &read, date),
         other => panic!("one voucher expected, got {other:?}"),
@@ -1417,10 +1920,12 @@ fn pilot_posted_to(number: &str, party: &str, bill_wise: bool) -> ImportVoucher 
 }
 
 /// The invoice the pilot lab's book took (9 Oct 2026), written as the build
-/// saved it, against Tally's answer to the read-back request the code sends
-/// now (the GSTR-1 status fields and each line's HSN/SAC, answered on 10 Oct
-/// 2026): no difference. The same answer against the invoice under another
-/// number differs in the number and the reference the number gives. The 9 Oct
+/// saved it, against the derived read-back `R` (Tally's answer of 3 Nov 2026
+/// to the request with the GSTR-1 status fields and each line's HSN/SAC): `R`'s
+/// registration name and GSTIN are inserted by `with_registration` and are not
+/// part of the capture; the comparison has no difference. The same answer
+/// against the invoice under another number differs in the number and the
+/// reference the number gives. The 9 Oct
 /// answer, whose request asked for no status field, reads as the build wrote it
 /// in everything else, and says so once: the GSTR-1 status not reported.
 #[test]
@@ -1436,6 +1941,52 @@ fn the_pilot_labs_posted_invoice_reads_back_as_planned_on_its_captured_answer() 
     assert_eq!(
         pilot_differences(&pilot_posted("BP/26-27/0010"), STATUS_NOT_ASKED, "20260801"),
         vec!["gst_status_not_reported"]
+    );
+}
+
+/// Tally's own answer to the request the build sends, for `BP/26-27/0105`: the
+/// invoice's `GSTREGISTRATION` named `Rajasthan Registration` and its `CMPGSTIN`
+/// empty (row 2464-RB; the pilot-lab PROVENANCE table). No registration is added
+/// to it: the pair is where and as Tally wrote it, after `VOUCHERTYPENAME`, the
+/// empty GSTIN a start and end pair with `TYPE="String"`.
+const REGISTRATION_EMPTY_GSTIN: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-registration-empty-gstin.utf16le.xml"
+);
+
+/// The empty `CMPGSTIN` of Tally's answer reads as a missing registration, with
+/// the other two codes that invoice reads: its sales lines' HSN/SAC unresolved
+/// and its GSTR-1 status uncertain at the time of the read (#2559).
+#[test]
+fn an_invoice_with_an_empty_gstin_as_tally_answered_it_reads_registration_missing() {
+    let xml = utf16le(REGISTRATION_EMPTY_GSTIN);
+    // The capture as Tally wrote it: one voucher, and its two fields with
+    // their attributes. The parse below counts them by structure.
+    assert_eq!(xml.matches("<VOUCHER ").count(), 1);
+    assert_eq!(
+        xml.matches("<GSTREGISTRATION TYPE=\"String\">Rajasthan Registration</GSTREGISTRATION>")
+            .count(),
+        1
+    );
+    assert_eq!(
+        xml.matches("<CMPGSTIN TYPE=\"String\"></CMPGSTIN>").count(),
+        1
+    );
+    let read = match wire::parse_invoice_readback(&xml).unwrap() {
+        wire::Readback::One(read) => read,
+        other => panic!("one voucher expected, got {other:?}"),
+    };
+    assert_eq!(read.fields["VOUCHERNUMBER"], "BP/26-27/0105");
+    assert_eq!(read.fields["GSTREGISTRATION"], "Rajasthan Registration");
+    // An empty field is left out of the read, so the GSTIN reads as absent.
+    assert!(!read.fields.contains_key("CMPGSTIN"), "{:?}", read.fields);
+    assert_eq!(read.legs.len(), 6, "the invoice's six legs");
+    assert_eq!(
+        invoice_readback_differences(&pilot_posted("BP/26-27/0105"), &read, "20260801"),
+        vec![
+            "invoice_registration_missing",
+            "invoice_line_hsn_unresolved",
+            "gst_status_uncertain"
+        ]
     );
 }
 
@@ -1579,6 +2130,73 @@ fn an_invoice_number_refusal_names_rule_46b_and_what_it_allows() {
         plain,
         json!({"code": "invoice_party_missing", "detail": ""})
     );
+}
+
+/// A control the read misses is refused naming its batch, and the refusal
+/// says what the answer held (#2162 item 13): the control's number and date as
+/// the journal stores them, the Sales rows of the answer, and whether its GUID
+/// was looked for and where it was seen. Its next step is the code's own.
+#[test]
+fn a_missing_control_refusal_says_what_the_answer_held() {
+    let refusal = |guid| {
+        InvoiceRefusal {
+            code: "invoice_number_control_missing",
+            detail: RefusalDetail::ControlMissing(Box::new(ControlMissing {
+                batch_id: "b1".to_string(),
+                number: "BP/26-27/0001".to_string(),
+                date: "20260801".to_string(),
+                miss: wire::ControlMiss {
+                    sales_rows: 3,
+                    guid,
+                },
+            })),
+        }
+        .to_json()
+    };
+    let not_recorded = refusal(None);
+    assert_eq!(not_recorded["code"], "invoice_number_control_missing");
+    assert_eq!(not_recorded["detail"], "b1");
+    assert_eq!(
+        not_recorded["control"],
+        json!({"voucher_number": "BP/26-27/0001", "date": "20260801",
+               "sales_rows_in_answer": 3, "guid_in_answer": "not_recorded"})
+    );
+    assert_eq!(
+        not_recorded["remediation"].as_str(),
+        crate::agent::refusal_remediation("invoice_number_control_missing")
+    );
+    assert!(not_recorded["remediation"].is_string());
+    assert_eq!(
+        refusal(Some(wire::GuidSeen::NotSeen))["control"]["guid_in_answer"],
+        "not_seen"
+    );
+    let seen = refusal(Some(wire::GuidSeen::Seen {
+        number: Some("BP/26-27/1".to_string()),
+        date: Some("20260801".to_string()),
+        voucher_type: Some("BRIDGE Sales".to_string()),
+    }));
+    assert_eq!(
+        seen["control"]["guid_in_answer"],
+        json!({"seen_as": {"voucher_number": "BP/26-27/1", "date": "20260801",
+                           "voucher_type": "BRIDGE Sales"}})
+    );
+}
+
+/// A date is placed in its month from the month's first day to its last, both
+/// included, for every month of a financial year; a date outside the year is
+/// in none. A control dated on a month's last day is looked for in that month.
+#[test]
+fn every_month_holds_its_first_and_last_day() {
+    let date = |text: &str| bridge_tally_core::TallyDate::parse(text).expect("a YYYYMMDD date");
+    let months = wire::calendar_months(&date("20260401"), &date("20270331")).expect("a year");
+    assert_eq!(months.len(), 12);
+    for (index, (first, last)) in months.iter().enumerate() {
+        assert_eq!(month_holding(&months, first.as_str()), Some(index));
+        assert_eq!(month_holding(&months, last.as_str()), Some(index));
+    }
+    assert_eq!(months[10].1.as_str(), "20270228");
+    assert_eq!(month_holding(&months, "20260331"), None);
+    assert_eq!(month_holding(&months, "20270401"), None);
 }
 
 #[test]
@@ -2038,6 +2656,13 @@ fn an_invoice_is_built_alone_and_never_amended() {
         refuse_mixed_shapes(&[voucher(), journal.clone()]),
         Err("voucher_type_shapes_mixed".to_string())
     );
+    // Each refusal tells the caller how to split the batch.
+    assert!(crate::agent::refusal_remediation("invoice_one_per_batch")
+        .is_some_and(|step| step.contains("batch of its own")));
+    assert!(
+        crate::agent::refusal_remediation("voucher_type_shapes_mixed")
+            .is_some_and(|step| step.contains("one Sales invoice alone"))
+    );
     assert_eq!(
         refuse_invoice_amendment(&[voucher()]),
         Err("invoice_amendment_not_supported".to_string())
@@ -2087,12 +2712,12 @@ fn an_invoice_is_filed_under_the_type_the_caller_named() {
 }
 
 /// A Sales line another build saved can sit in the journal of a build that
-/// does not qualify Sales. Its verification does not send the invoice
-/// read-back, and does not call the voucher verified.
+/// does not qualify Sales (the list before Sales qualified). Its verification
+/// does not send the invoice read-back, and does not call the voucher verified.
 #[test]
 fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verified() {
     use crate::agent::agent_import::verification::invoice_readback_due;
-    use crate::agent::agent_import::LIVE_QUALIFIED_VOUCHER_TYPES;
+    use crate::agent::agent_import::PRE_SALES_QUALIFIED_VOUCHER_TYPES;
     let saved = [observed_voucher()];
     let matched = || {
         json!({
@@ -2100,9 +2725,9 @@ fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verifi
             "counts":{"posted_verified":1,"posted_divergent":0}
         })
     };
-    // This build: Sales is not qualified.
+    // A build that does not qualify Sales.
     let mut result = matched();
-    assert!(invoice_readback_due(&mut result, &saved, LIVE_QUALIFIED_VOUCHER_TYPES).is_none());
+    assert!(invoice_readback_due(&mut result, &saved, PRE_SALES_QUALIFIED_VOUCHER_TYPES).is_none());
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
     assert_eq!(
         result["vouchers"][0]["diffs"][0]["invoice_fields"],
@@ -2115,8 +2740,12 @@ fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verifi
     // A build that qualifies the type: the read-back is due, and nothing is
     // marked before it runs.
     let mut result = matched();
-    let (voucher, row) =
-        invoice_readback_due(&mut result, &saved, &[VoucherType::Sales]).expect("due");
+    let (voucher, row) = invoice_readback_due(
+        &mut result,
+        &saved,
+        crate::agent::agent_import::LIVE_QUALIFIED_VOUCHER_TYPES,
+    )
+    .expect("due");
     assert_eq!(
         (voucher.bridge_txn_id.as_str(), &row["alter_id"]),
         ("t1", &json!(77))
@@ -2124,7 +2753,7 @@ fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verifi
     assert_eq!(result, matched());
     // A voucher the standard readback did not match has nothing due and is
     // left as it was, qualified or not.
-    for qualified in [LIVE_QUALIFIED_VOUCHER_TYPES, &[VoucherType::Sales][..]] {
+    for qualified in [PRE_SALES_QUALIFIED_VOUCHER_TYPES, &[VoucherType::Sales][..]] {
         let unmatched = json!({
             "vouchers":[{"bridge_txn_id":"t1","status":"not_found"}],
             "counts":{"posted_verified":0,"posted_divergent":0}
@@ -2303,7 +2932,7 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
     );
     // A row with an element or a slab list the lab's rows did not carry.
     assert_eq!(
-        with(&|r| r.gst_rows[0].unmeasured = true),
+        with(&|r| r.gst_rows[0].shape = wire::RowShape::Unmeasured),
         Err("invoice_sales_ledger_rate_shape_unmeasured")
     );
     assert_eq!(
@@ -2496,6 +3125,172 @@ fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
         check(&|r| r.rounding_limit = None),
         Some("invoice_tax_ledger_rounding_unsupported")
     );
+}
+
+/// The lab's two service sales ledgers give the same rate from the answer
+/// before lab row 2162-RW turned their rows zero per-unit and from the answer
+/// after (24 Nov 2026), on a day both rows are in force.
+#[test]
+fn the_service_ledgers_rate_is_the_same_plain_and_zero_per_unit() {
+    let read = |bytes: &[u8], name: &str| {
+        let mut rates = wire::parse_ledger_rates(
+            &utf16le(bytes),
+            "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+            &[name],
+        )
+        .unwrap();
+        rates.remove(name).unwrap()
+    };
+    let before = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc.utf16le.xml"
+    );
+    let after = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-svc-zero-per-unit.utf16le.xml"
+    );
+    for name in ["BRIDGE Svc 998313 5%", "BRIDGE Svc 998314 5%"] {
+        let (was, now) = (read(before, name), read(after, name));
+        assert_eq!(was.gst_rows[0].shape, wire::RowShape::Plain, "{name}");
+        assert_eq!(now.gst_rows[0].shape, wire::RowShape::ZeroPerUnit, "{name}");
+        assert_eq!(sales_rate_milli(&was, AS_OF_AUG), Ok(2_500), "{name}");
+        assert_eq!(sales_rate_milli(&now, AS_OF_AUG), Ok(2_500), "{name}");
+    }
+}
+
+/// A zero per-unit row must have one Cess head and one State Cess head, each
+/// reading the lab's valuation and the rate `0` as text; a cess head with no
+/// rate there, absent or repeated is a mix the lab did not see. A plain row's
+/// cess heads still carry no rate, `0` included.
+#[test]
+fn zero_per_unit_cess_heads_are_admitted_only_at_the_text_zero() {
+    const CESS: usize = 3;
+    const STATE_CESS: usize = 4;
+    let zero = |change: &dyn Fn(&mut Vec<wire::HeadRate>)| {
+        let mut row = sales_rates("2.5", "5");
+        row.gst_rows[0].shape = wire::RowShape::ZeroPerUnit;
+        let heads = &mut row.gst_rows[0].states[0].heads;
+        assert_eq!(
+            (heads[CESS].head.as_str(), heads[STATE_CESS].head.as_str()),
+            ("Cess", "State Cess")
+        );
+        heads[CESS].rate = Some("0".into());
+        heads[STATE_CESS].rate = Some("0".into());
+        change(heads);
+        sales_rate_milli(&row, AS_OF)
+    };
+    assert_eq!(zero(&|_| {}), Ok(2_500));
+    assert_eq!(
+        zero(&|h| h[CESS].rate = None),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+    assert_eq!(
+        zero(&|h| h[STATE_CESS].rate = None),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+    for rate in ["1", "0.00"] {
+        assert_eq!(
+            zero(&|h| h[CESS].rate = Some(rate.into())),
+            Err("invoice_cess_rate_not_supported"),
+            "Cess {rate}"
+        );
+        assert_eq!(
+            zero(&|h| h[STATE_CESS].rate = Some(rate.into())),
+            Err("invoice_cess_rate_not_supported"),
+            "State Cess {rate}"
+        );
+    }
+    assert_eq!(
+        zero(&|h| h[CESS].valuation = Some("Based on Value".into())),
+        Err("invoice_cess_rate_not_supported")
+    );
+    assert_eq!(
+        zero(&|h| h[STATE_CESS].valuation = Some("Not Applicable".into())),
+        Err("invoice_cess_rate_not_supported")
+    );
+    assert_eq!(
+        zero(&|h| h[CESS].valuation = None),
+        Err("invoice_cess_rate_not_supported")
+    );
+    // A missing rate is named before a wrong valuation.
+    assert_eq!(
+        zero(&|h| {
+            h[CESS].rate = None;
+            h[CESS].valuation = Some("Based on Value".into());
+        }),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+    // Each captured row has one head of each cess: a zero per-unit row with
+    // one absent, both absent or one repeated was not seen.
+    type Change<'a> = &'a dyn Fn(&mut Vec<wire::HeadRate>);
+    let unseen: [Change; 5] = [
+        &|h| drop(h.remove(CESS)),
+        &|h| drop(h.remove(STATE_CESS)),
+        &|h| h.truncate(CESS),
+        &|h| h.push(h[CESS].clone()),
+        &|h| h.push(h[STATE_CESS].clone()),
+    ];
+    for (case, change) in unseen.iter().enumerate() {
+        assert_eq!(
+            zero(change),
+            Err("invoice_sales_ledger_rate_shape_unmeasured"),
+            "case {case}"
+        );
+    }
+    // The state heads are read as in a plain row.
+    assert_eq!(
+        zero(&|h| h[0].rate = Some("0".into())),
+        Err("invoice_sales_ledger_rate_heads_unreadable")
+    );
+    assert_eq!(
+        zero(&|h| h[1].rate = Some("3".into())),
+        Err("invoice_sales_ledger_rate_heads_unequal")
+    );
+    // A plain row with a cess rate of `0`, as before.
+    let plain = |head: usize| {
+        let mut row = sales_rates("2.5", "5");
+        row.gst_rows[0].states[0].heads[head].rate = Some("0".into());
+        sales_rate_milli(&row, AS_OF)
+    };
+    assert_eq!(plain(CESS), Err("invoice_cess_rate_not_supported"));
+    assert_eq!(plain(STATE_CESS), Err("invoice_cess_rate_not_supported"));
+    // A plain row with a cess head absent or repeated is read as before.
+    let plain_heads = |change: &dyn Fn(&mut Vec<wire::HeadRate>)| {
+        let mut row = sales_rates("2.5", "5");
+        change(&mut row.gst_rows[0].states[0].heads);
+        sales_rate_milli(&row, AS_OF)
+    };
+    assert_eq!(plain_heads(&|h| h.truncate(CESS)), Ok(2_500));
+    assert_eq!(plain_heads(&|h| drop(h.remove(STATE_CESS))), Ok(2_500));
+    assert_eq!(plain_heads(&|h| h.push(h[CESS].clone())), Ok(2_500));
+    // An unmeasured row is refused before its heads are read.
+    let mut unmeasured = sales_rates("2.5", "5");
+    unmeasured.gst_rows[0].shape = wire::RowShape::Unmeasured;
+    assert_eq!(
+        sales_rate_milli(&unmeasured, AS_OF),
+        Err("invoice_sales_ledger_rate_shape_unmeasured")
+    );
+}
+
+/// No tax ledger with per-unit fields was captured: a tax ledger the check
+/// admits is refused once its GST row is zero per-unit, and once it is
+/// unmeasured.
+#[test]
+fn a_tax_ledger_with_a_zero_per_unit_row_is_refused() {
+    for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
+        let row = lab_row(name);
+        assert!(!row.gst_rows.is_empty(), "{name}");
+        assert_eq!(tax_ledger_refusal(&row, 2_500), None, "{name}");
+        for shape in [wire::RowShape::ZeroPerUnit, wire::RowShape::Unmeasured] {
+            let mut edited = row.clone();
+            for gst in &mut edited.gst_rows {
+                gst.shape = shape;
+            }
+            assert_eq!(
+                tax_ledger_refusal(&edited, 2_500),
+                Some("invoice_tax_ledger_gst_rate_unmeasured"),
+                "{name} {shape:?}"
+            );
+        }
+    }
 }
 
 /// Where a ledger's first GST row stands in the lab's listing.
@@ -2997,6 +3792,7 @@ fn pilot_invoice(
                 .iter()
                 .find(|(ledger, _)| *ledger == "BRIDGE Round Off")
                 .map(|(ledger, _)| ledger.to_string()),
+            e_invoice: None,
             observed: Some(InvoiceObserved {
                 voucher_type_guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce".to_string(),
                 party_gstin: None,
@@ -3051,9 +3847,12 @@ fn pilot_0021() -> ImportVoucher {
 
 /// The differences and the sales-line evidence of a read-back answer, as a
 /// post reads them.
+/// Each answer it judges was answered before the request fetched the
+/// registration, so `with_registration` adds it.
 fn hsn_outcome(v: &ImportVoucher, xml: &str) -> (Vec<String>, Vec<serde_json::Value>) {
     let date = v.date.as_str().to_string();
-    let (differences, _, _, lines) = readback_outcome(wire::parse_invoice_readback(xml), v, &date);
+    let xml = with_registration(xml);
+    let (differences, _, _, lines) = readback_outcome(wire::parse_invoice_readback(&xml), v, &date);
     (differences, lines)
 }
 
@@ -3231,6 +4030,348 @@ fn a_sales_line_missing_its_code_or_its_source_is_unresolved() {
     );
 }
 
+// ---- A stock item under a sales line (row 1379-IT, 10 Nov 2026, the pilot lab) ----
+
+/// Row 1379-IT's read-back answer, as Tally sent it
+/// (`pilot-lab-invoice-readback-item-line.utf16le.xml`, captured from
+/// `lab/1379-it-answers` at a5b9d603, `answers/a-s4r-R-0093.xml`).
+const ITEM_LINE_READBACK: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-item-line.utf16le.xml"
+);
+
+/// One stock item under a sales leg, with the structure of row 1379-IT's
+/// read-back answer for an amount-only item line (`ITEM_LINE_READBACK`): the
+/// item; the HSN/SAC Tally filled on the item line, from the ledger, and not
+/// on the leg; the line's side; an empty rate; the amount; empty quantities;
+/// and one batch allocation Tally added for the book's one godown. DERIVED,
+/// not Tally's bytes: only the elements the parse reads, in that answer's
+/// order, with this leg's ledger and amount, so that the off-form cases below
+/// can each change one of them on `BP/26-27/0010`'s answer.
+fn item_allocation(ledger: &str, amount: &str) -> String {
+    format!(
+        "<INVENTORYALLOCATIONS.LIST><STOCKITEMNAME>BRIDGE Item A</STOCKITEMNAME>\
+         <HSNSOURCETYPE>Ledger</HSNSOURCETYPE><HSNLEDGERSOURCE>{ledger}</HSNLEDGERSOURCE>\
+         <HSNGROUPSOURCE/><GSTHSNNAME>998313</GSTHSNNAME>\
+         <GSTHSNINFERAPPLICABILITY>As per Masters/Company</GSTHSNINFERAPPLICABILITY>\
+         <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><RATE/><AMOUNT>{amount}</AMOUNT>\
+         <ACTUALQTY/><BILLEDQTY/><BATCHALLOCATIONS.LIST><GODOWNNAME>Main Location</GODOWNNAME>\
+         <BATCHNAME>Primary Batch</BATCHNAME><AMOUNT>{amount}</AMOUNT><ACTUALQTY/><BILLEDQTY/>\
+         </BATCHALLOCATIONS.LIST></INVENTORYALLOCATIONS.LIST>"
+    )
+}
+
+/// The lab's read-back of `BP/26-27/0010` with its first sales line made an
+/// item line the way row 1379-IT's answer held one: the leg's own five
+/// HSN/SAC elements written empty, and `allocation` under the leg where that
+/// answer put it (after `INPUTCRALLOCS.LIST`).
+fn as_item_line(allocation: &str) -> String {
+    let xml = HSN_TAGS.iter().fold(utf16le(STATUS_INCLUDED), |xml, tag| {
+        let empty = format!("<{tag}/>");
+        if leg_element(leg_of(&xml, SVC_998313), tag) == empty {
+            return xml;
+        }
+        with_leg_element(&xml, SVC_998313, tag, &empty)
+    });
+    let leg = leg_of(&xml, SVC_998313);
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    xml.replacen(leg, &edited, 1)
+}
+
+/// On Tally's own bytes: row 1379-IT's read-back of `BP/26-27/0093`, whose one
+/// sales line holds one stock item, reads that item under its leg, with the
+/// HSN/SAC Tally filled on the item line and the batch Tally added, while the
+/// leg's own HSN/SAC is empty. No other leg holds an item.
+#[test]
+fn the_captured_item_line_reads_back_as_one_item_under_its_leg() {
+    let xml = utf16le(ITEM_LINE_READBACK);
+    let leg = read_leg(&xml, SVC_998313);
+    assert_eq!(leg.hsn.code, wire::EntryText::Empty);
+    let text = |value: &str| wire::EntryText::Text(value.into());
+    let empty = wire::EntryText::Empty;
+    assert_eq!(
+        leg.items,
+        wire::LegItems::One(Box::new(wire::ReadItem {
+            item: text("BRIDGE Item A"),
+            deemed_positive: text("No"),
+            amount: text("1000.80"),
+            rate: empty.clone(),
+            actual_qty: empty.clone(),
+            billed_qty: empty.clone(),
+            batches: vec![(
+                Some("Main Location".into()),
+                Some("Primary Batch".into()),
+                "1000.80".into()
+            )],
+            hsn: wire::LegHsn {
+                code: text("998313"),
+                source_type: text("Ledger"),
+                ledger_source: text(SVC_998313),
+                group_source: empty,
+                applicability: text("As per Masters/Company"),
+            },
+        }))
+    );
+    assert!(leg.line_hsn().resolved());
+    for other in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%", "BRIDGE Round Off"] {
+        assert_eq!(read_leg(&xml, other).items, wire::LegItems::None, "{other}");
+    }
+}
+
+/// The item line reads back under its leg, and its HSN/SAC is the one Tally
+/// filled on the item line: the leg's own elements are empty, as row 1379-IT
+/// found, so reading them alone would call the line unresolved. The build
+/// sends no item line yet, so the item is a difference of its own, and the
+/// only one.
+#[test]
+fn an_item_line_reads_back_under_its_leg_with_the_items_hsn() {
+    let xml = as_item_line(&item_allocation(SVC_998313, "600.40"));
+    let leg = read_leg(&xml, SVC_998313);
+    assert_eq!(leg.hsn.code, wire::EntryText::Empty);
+    let text = |value: &str| wire::EntryText::Text(value.into());
+    let empty = wire::EntryText::Empty;
+    assert_eq!(
+        leg.items,
+        wire::LegItems::One(Box::new(wire::ReadItem {
+            item: text("BRIDGE Item A"),
+            deemed_positive: text("No"),
+            amount: text("600.40"),
+            rate: empty.clone(),
+            actual_qty: empty.clone(),
+            billed_qty: empty.clone(),
+            batches: vec![(
+                Some("Main Location".into()),
+                Some("Primary Batch".into()),
+                "600.40".into()
+            )],
+            hsn: wire::LegHsn {
+                code: text("998313"),
+                source_type: text("Ledger"),
+                ledger_source: text(SVC_998313),
+                group_source: empty,
+                applicability: text("As per Masters/Company"),
+            },
+        }))
+    );
+    assert!(leg.line_hsn().resolved());
+    assert_eq!(
+        read_leg(&xml, SVC_998314).items,
+        wire::LegItems::None,
+        "the other sales line holds no item"
+    );
+    let (differences, lines) = hsn_outcome(&pilot_0010(), &xml);
+    assert_eq!(differences, ["invoice_line_item_not_sent"]);
+    assert_eq!(
+        lines,
+        [
+            line_evidence(SVC_998313, Some("998313")),
+            line_evidence(SVC_998314, Some("998314")),
+        ]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the committed clean read-back of
+/// `BP/26-27/0010`, with only this batch-only inventory list added under its
+/// first sales leg, whose own resolved ledger HSN/SAC is left in place.
+#[test]
+fn an_inventory_list_with_only_unmodelled_content_is_not_clean() {
+    let allocation = "<INVENTORYALLOCATIONS.LIST><BATCHALLOCATIONS.LIST>\
+         <GODOWNNAME>Main Location</GODOWNNAME><BATCHNAME>Primary Batch</BATCHNAME>\
+         <AMOUNT>600.40</AMOUNT></BATCHALLOCATIONS.LIST></INVENTORYALLOCATIONS.LIST>";
+    let xml = utf16le(STATUS_INCLUDED);
+    assert_eq!(hsn_outcome(&pilot_0010(), &xml).0, Vec::<String>::new());
+    let leg = leg_of(&xml, SVC_998313);
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    let xml = xml.replacen(leg, &edited, 1);
+    let differences = hsn_outcome(&pilot_0010(), &xml).0;
+    assert_eq!(differences, ["invoice_readback_unreadable"]);
+}
+
+/// DERIVED, each from the item line above edited in one place: a rate, an
+/// amount that is not the leg's, no batch allocation, a smaller, larger or
+/// unparsable batch amount, two items under one leg, and a whitespace-only
+/// list, which holds no item.
+#[test]
+fn an_item_line_off_the_measured_form_is_named() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let differences = |allocation: &str| hsn_outcome(&pilot_0010(), &as_item_line(allocation)).0;
+    let edit = |old: &str, new: &str| {
+        assert_eq!(measured.matches(old).count(), 1, "{old}");
+        measured.replacen(old, new, 1)
+    };
+    assert_eq!(
+        differences(&edit("<RATE/>", "<RATE>600.40</RATE>")),
+        ["invoice_line_item_not_sent", "invoice_line_item_differs"]
+    );
+    assert_eq!(
+        differences(&item_allocation(SVC_998313, "600.00")),
+        ["invoice_line_item_not_sent", "invoice_line_item_differs"]
+    );
+    let batch_start = measured.find("<BATCHALLOCATIONS.LIST>").unwrap();
+    let batch_end = measured.find("</INVENTORYALLOCATIONS.LIST>").unwrap();
+    assert_eq!(
+        differences(&edit(&measured[batch_start..batch_end], "")),
+        ["invoice_line_item_not_sent", "invoice_line_item_batch"]
+    );
+    let batch_amount = |amount: &str| {
+        edit(
+            "<AMOUNT>600.40</AMOUNT><ACTUALQTY/><BILLEDQTY/></BATCHALLOCATIONS.LIST>",
+            &format!("<AMOUNT>{amount}</AMOUNT><ACTUALQTY/><BILLEDQTY/></BATCHALLOCATIONS.LIST>"),
+        )
+    };
+    for amount in ["600.00", "600.80", "not-a-number"] {
+        assert_eq!(
+            differences(&batch_amount(amount)),
+            ["invoice_line_item_not_sent", "invoice_line_item_batch"],
+            "{amount}"
+        );
+    }
+    let two = as_item_line(&measured.repeat(2));
+    assert_eq!(read_leg(&two, SVC_998313).items, wire::LegItems::Several);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &two).0,
+        [
+            "invoice_line_hsn_unresolved",
+            "invoice_line_item_not_sent",
+            "invoice_line_items_several"
+        ]
+    );
+    let blank = as_item_line("<INVENTORYALLOCATIONS.LIST>      </INVENTORYALLOCATIONS.LIST>");
+    assert_eq!(read_leg(&blank, SVC_998313).items, wire::LegItems::None);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &blank).0,
+        ["invoice_line_hsn_unresolved"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place,
+/// with its side the opposite of its leg's.
+#[test]
+fn an_item_whose_side_is_not_its_legs_differs() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let edited = measured.replacen(
+        "<ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>",
+        "<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>",
+        1,
+    );
+    assert_ne!(edited, measured);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &as_item_line(&edited)).0,
+        ["invoice_line_item_not_sent", "invoice_line_item_differs"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place for
+/// each case, with an actual or billed quantity where the measured line's is
+/// empty.
+#[test]
+fn an_item_with_a_quantity_differs() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    for (tag, value) in [("ACTUALQTY", "1"), ("BILLEDQTY", "1")] {
+        let old = "<AMOUNT>600.40</AMOUNT><ACTUALQTY/><BILLEDQTY/><BATCHALLOCATIONS.LIST>";
+        assert_eq!(measured.matches(old).count(), 1);
+        let new = match tag {
+            "ACTUALQTY" => format!("<AMOUNT>600.40</AMOUNT><ACTUALQTY>{value}</ACTUALQTY><BILLEDQTY/><BATCHALLOCATIONS.LIST>"),
+            _ => format!("<AMOUNT>600.40</AMOUNT><ACTUALQTY/><BILLEDQTY>{value}</BILLEDQTY><BATCHALLOCATIONS.LIST>"),
+        };
+        let edited = measured.replacen(old, &new, 1);
+        assert_eq!(
+            hsn_outcome(&pilot_0010(), &as_item_line(&edited)).0,
+            ["invoice_line_item_not_sent", "invoice_line_item_differs"],
+            "{tag}"
+        );
+    }
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place for
+/// each case, with an empty godown name, an empty batch name, or a second
+/// batch allocation.
+#[test]
+fn an_item_batch_must_name_a_godown_and_a_batch_and_be_alone() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let edit = |old: &str, new: &str| {
+        assert_eq!(measured.matches(old).count(), 1, "{old}");
+        measured.replacen(old, new, 1)
+    };
+    for (old, new) in [
+        ("<GODOWNNAME>Main Location</GODOWNNAME>", "<GODOWNNAME/>"),
+        ("<BATCHNAME>Primary Batch</BATCHNAME>", "<BATCHNAME/>"),
+    ] {
+        assert_eq!(
+            hsn_outcome(&pilot_0010(), &as_item_line(&edit(old, new))).0,
+            ["invoice_line_item_not_sent", "invoice_line_item_batch"],
+            "{old}"
+        );
+    }
+    let batch_start = measured.find("<BATCHALLOCATIONS.LIST>").unwrap();
+    let batch_end = measured.find("</INVENTORYALLOCATIONS.LIST>").unwrap();
+    let batch = &measured[batch_start..batch_end];
+    let two = edit(batch, &format!("{batch}{batch}"));
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &as_item_line(&two)).0,
+        ["invoice_line_item_not_sent", "invoice_line_item_batch"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the measured item line edited in one place,
+/// with its own amount empty while its batch amount remains the leg's.
+#[test]
+fn an_item_without_its_own_amount_differs_and_has_no_matching_batch() {
+    let measured = item_allocation(SVC_998313, "600.40");
+    let old = "<RATE/><AMOUNT>600.40</AMOUNT><ACTUALQTY/>";
+    assert_eq!(measured.matches(old).count(), 1);
+    let edited = measured.replacen(old, "<RATE/><AMOUNT/><ACTUALQTY/>", 1);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &as_item_line(&edited)).0,
+        [
+            "invoice_line_item_not_sent",
+            "invoice_line_item_differs",
+            "invoice_line_item_batch"
+        ]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the committed clean read-back of
+/// `BP/26-27/0010`, with only the measured item line added under its CGST leg.
+#[test]
+fn an_item_under_a_non_sales_leg_is_not_sent() {
+    let xml = utf16le(STATUS_INCLUDED);
+    assert_eq!(hsn_outcome(&pilot_0010(), &xml).0, Vec::<String>::new());
+    let leg = leg_of(&xml, "BRIDGE CGST 2.5%");
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let allocation = item_allocation("BRIDGE CGST 2.5%", "25.02");
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    let xml = xml.replacen(leg, &edited, 1);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &xml).0,
+        ["invoice_line_item_not_sent"]
+    );
+}
+
+/// DERIVED, not Tally's bytes: the committed clean read-back of
+/// `BP/26-27/0010`, with only an inventory list whose only content is an empty
+/// godown element added under its first sales leg.
+#[test]
+fn an_inventory_list_with_only_an_empty_element_is_unreadable() {
+    let allocation = "<INVENTORYALLOCATIONS.LIST><BATCHALLOCATIONS.LIST>\
+         <GODOWNNAME/></BATCHALLOCATIONS.LIST></INVENTORYALLOCATIONS.LIST>";
+    let xml = utf16le(STATUS_INCLUDED);
+    assert_eq!(hsn_outcome(&pilot_0010(), &xml).0, Vec::<String>::new());
+    let leg = leg_of(&xml, SVC_998313);
+    let anchor = "<DUTYHEADDETAILS.LIST>";
+    assert_eq!(leg.matches(anchor).count(), 1);
+    let edited = leg.replacen(anchor, &format!("{allocation}{anchor}"), 1);
+    let xml = xml.replacen(leg, &edited, 1);
+    assert_eq!(
+        hsn_outcome(&pilot_0010(), &xml).0,
+        ["invoice_readback_unreadable"]
+    );
+}
+
 /// A batch saved before the build recorded its sales lines cannot say which
 /// legs to judge: its read-back is `invoice_not_observed`, never a pass.
 #[test]
@@ -3286,14 +4427,187 @@ fn a_resolved_code_is_warned_about_and_an_unresolved_one_refused() {
     assert_eq!(warnings.len(), 1);
 }
 
-/// The divergent invoice's next step must not promise that saving the invoice again repairs it:
-/// a save changes the voucher's AlterID, and what a verification reads after one is not
-/// established (voucher writes reference, section 9.16).
+/// The divergent invoice's next step must not promise that saving the invoice again repairs it.
+/// What it says of a re-saved invoice is row 2162-RS's, PARTIAL (one run, an invoice that had read
+/// back as built): an unchanged save kept the GUID and MASTERID and moved, of the fields read,
+/// only the AlterID and fields the read-back fetches and does not compare. It says that a save of
+/// an invoice that read back divergent was not tried (ADR 0004, the 2026-10-31 checklist, item 8;
+/// the re-save test below pins it on those bytes).
 #[test]
 fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
     let text = crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP;
     assert!(!text.contains("then open the invoice and save it again"));
-    assert!(text.contains("changes the invoice's AlterID"));
-    assert!(text.contains("has not been established"));
+    assert!(!text.contains("has not been established"));
+    assert!(text.contains(
+        "Saving an invoice that had read back as built again in Tally, unchanged, kept its \
+         identity on a test company (one run) and changed, of the fields read, only its AlterID \
+         and fields this check does not compare; a later verification judges an invoice on the \
+         fields it compares. That was not tried on an invoice that read back divergent."
+    ));
+    assert!(!text.contains("on the fields ComplyEaze Bridge wrote"));
     assert!(text.ends_with("Do not post it again."));
+}
+
+// ---- An invoice saved again, unchanged, on Tally's screen (9 Nov 2026, the pilot lab, row 2162-RS) ----
+
+/// The lab's read-back of `BP/26-27/0057`, created by the build's request, with no key pressed
+/// since the write: ALTERID 69.
+const RESAVE_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-before.utf16le.xml"
+);
+/// The same read once the voucher was opened from the Day Book and saved with no change.
+const RESAVE_AFTER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-after.utf16le.xml"
+);
+
+fn read_one(xml: &str) -> wire::ReadInvoice {
+    match wire::parse_invoice_readback(xml).unwrap() {
+        wire::Readback::One(read) => read,
+        other => panic!("one voucher expected, got {other:?}"),
+    }
+}
+
+/// The save moved the AlterID and filled two leg fields, which the read-back fetches and does not
+/// compare, so the invoice reads back as built on both reads. Its identity check compares the
+/// read-back with the voucher the same verification matched, which the save moved too, so it
+/// agrees. A field the read-back compares, changed, still reads divergent: a header field and a leg's
+/// amount. ADR 0004, the
+/// 2026-10-31 checklist, item 8: PARTIAL, one run.
+#[test]
+fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id() {
+    let (before_xml, after_xml) = (utf16le(RESAVE_BEFORE), utf16le(RESAVE_AFTER));
+    // What the save changed in the bytes: two leg fields the read-back fetches and does not compare.
+    assert!(!before_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
+    assert!(after_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
+    assert_eq!(before_xml.matches("<RATEOFINVOICETAX.LIST").count(), 0);
+    assert_eq!(after_xml.matches("<RATEOFINVOICETAX.LIST").count(), 2);
+    let (mut before, mut after) = (read_one(&before_xml), read_one(&after_xml));
+    let guid = after.fields["GUID"].clone();
+    assert_eq!(before.fields["GUID"], guid);
+    let alter_id = |read: &mut wire::ReadInvoice| {
+        read.fields
+            .remove("ALTERID")
+            .map(|id| id.trim().to_string())
+    };
+    assert_eq!(alter_id(&mut before).as_deref(), Some("69"));
+    assert_eq!(alter_id(&mut after).as_deref(), Some("70"));
+    assert_eq!(
+        before, after,
+        "the read-back's parse keeps nothing else the save changed"
+    );
+    // Both reads are the invoice as built.
+    let built = pilot_posted("BP/26-27/0057");
+    for bytes in [RESAVE_BEFORE, RESAVE_AFTER] {
+        assert_eq!(
+            pilot_differences(&built, bytes, "20260801"),
+            Vec::<String>::new()
+        );
+    }
+    // A later verification matches the voucher as it now is, AlterID 70, and its read-back reads
+    // 70: they agree. Only against the post's own AlterID would the save show.
+    let now = json!({"guid": guid, "alter_id": 70});
+    assert_eq!(
+        readback_identity_differences(Some(&guid), Some(" 70"), &now),
+        Vec::<String>::new()
+    );
+    let at_post = json!({"guid": guid, "alter_id": 69});
+    assert_eq!(
+        readback_identity_differences(Some(&guid), Some(" 70"), &at_post),
+        vec!["alter_id"]
+    );
+    // The control: a field the read-back compares, changed on the re-saved bytes, reads divergent.
+    // The capture predates the two registration fields (#2464), inserted here as `pilot_differences`
+    // inserts them.
+    let reference = "<REFERENCE TYPE=\"String\">BP/26-27/0057</REFERENCE>";
+    assert_eq!(after_xml.matches(reference).count(), 1);
+    let changed = after_xml.replacen(
+        reference,
+        "<REFERENCE TYPE=\"String\">BP/26-27/0058</REFERENCE>",
+        1,
+    );
+    assert_eq!(
+        invoice_readback_differences(&built, &read_one(&with_registration(&changed)), "20260801"),
+        vec!["REFERENCE"]
+    );
+    // And a leg: one sales leg's amount, changed by a paisa.
+    let amount = "<AMOUNT>600.40</AMOUNT>";
+    assert_eq!(after_xml.matches(amount).count(), 1);
+    let leg_changed = after_xml.replacen(amount, "<AMOUNT>600.41</AMOUNT>", 1);
+    assert_eq!(
+        invoice_readback_differences(
+            &built,
+            &read_one(&with_registration(&leg_changed)),
+            "20260801"
+        ),
+        vec!["legs"]
+    );
+}
+
+/// Row 2162-S9b's customer after `Regular - SEZ` was chosen on Tally's Ledger Alteration screen
+/// and saved: the build's compliance read answered on `BRIDGE PILOT LAB`, byte for byte as
+/// captured (`lab/2162-s9b-answers` at 6c80eb43). The
+/// ledger holds two dated entries, 20260401 `Regular` and 20260915 `Regular - SEZ`
+/// (voucher-writes reference §9.16).
+fn s9b_customer() -> bridge_tally_protocol::PartyLedgerMasterRecord {
+    let xml = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-s9b-customer-sez-compliance.utf16le.xml"
+    ));
+    let records = bridge_tally_protocol::parse_native_party_ledger_master_records_with_evidence(
+        &xml,
+        &pilot_lab_guid(),
+    )
+    .expect("the captured compliance read parses")
+    .records
+    .into_iter()
+    .map(|row| row.record)
+    .filter(|record| record.ledger.name == "BRIDGE Customer RJ")
+    .collect::<Vec<_>>();
+    let [customer] = <[_; 1]>::try_from(records).expect("one row for the customer");
+    customer
+}
+
+/// The entry in force on the invoice's date decides the type: before the first entry nothing is
+/// known, from it the customer is Regular, and from the day Tally dated the new entry it is not.
+#[test]
+fn a_customer_made_sez_on_screen_is_refused_from_the_date_of_its_new_entry() {
+    let customer = s9b_customer();
+    let on = |date: &str| {
+        gstin_evidence(
+            customer.ledger.party_gstin.returned_text(),
+            &customer.fields.gst_registrations,
+            date,
+        )
+    };
+    // The synthetic GSTIN the setup seed gave the customer, as the capture holds it.
+    const CUSTOMER: &str = "08ZZZZZ0000Z3ZO";
+    let in_force = |kind: &str| {
+        (
+            GstinEvidence::InForce(CUSTOMER.to_string()),
+            Some(kind.to_string()),
+        )
+    };
+    assert_eq!(on("20260331"), (GstinEvidence::NoEntryInForce, None));
+    assert_eq!(on("20260401"), in_force("Regular"));
+    assert_eq!(on("20260914"), in_force("Regular"));
+    assert_eq!(on("20260915"), in_force("Regular - SEZ"));
+
+    // Both GSTINs the answer holds pass the build's check digit: the customer's, and the
+    // company's own registration in the same answer.
+    assert!(gstin_valid(CUSTOMER));
+    assert!(gstin_valid("08ZZZZZ0000Z2ZP"));
+    // The judge is given the GSTIN and the entry's type exactly as the read gives them.
+    let judged = |date: &str| {
+        let (gstin, kind) = on(date);
+        let mut facts = good_facts();
+        let party = facts.get_mut("Customer A").unwrap();
+        party.gstin = gstin;
+        party.registration_type = kind;
+        classify_sales_invoice(&voucher(), &facts, RAJ, date)
+    };
+    assert_eq!(
+        codes(judged("20260331")),
+        vec!["invoice_party_registration_not_in_force"]
+    );
+    assert!(judged("20260914").is_ok());
+    assert_eq!(codes(judged("20260915")), vec!["invoice_party_not_regular"]);
 }

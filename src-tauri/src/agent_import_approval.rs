@@ -23,12 +23,16 @@
 //! totals only, as an ordinary ask of that text. Nothing is shown twice in one
 //! call, and no call chooses the form.
 use super::master_post::MasterPostRequest;
+use super::master_review::HeldStockItem;
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
 use crate::tally::approved_import::{
     Answered, ApprovedImport, PendingPostApproval, PostKind, UnderLockRefusal,
 };
 use crate::tally::ledger_create_item::LedgerCreateBatch;
+use crate::tally::stock_item_create::{
+    render_stock_item_create, PreparedStockItem, StockItemWrites,
+};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -145,6 +149,14 @@ enum BindingSubject {
         company: MasterCompanyTuple,
         batch: LedgerCreateBatch,
     },
+    /// One stock item `Create`: the verified company's tuple and every value
+    /// it writes, owned. A post of the masters kind, never equal to a ledger
+    /// binding, whose subject is the other variant. Boxed: the writes are
+    /// many times the size of the other subjects.
+    StockItem {
+        company: MasterCompanyTuple,
+        writes: Box<StockItemWrites>,
+    },
 }
 
 /// The verified company a master approval is for, as the person was shown it.
@@ -154,6 +166,17 @@ struct MasterCompanyTuple {
     guid: String,
     company_number: String,
     books_from: String,
+}
+
+impl MasterCompanyTuple {
+    fn of(company: &VerifiedCompanyIdentity) -> Self {
+        Self {
+            name: company.display_name().to_string(),
+            guid: company.company_guid().to_string(),
+            company_number: company.company_number().to_string(),
+            books_from: company.books_from_yyyymmdd().to_string(),
+        }
+    }
 }
 
 impl ApprovalBinding {
@@ -196,21 +219,44 @@ impl ApprovalBinding {
             endpoint_origin: Some(endpoint_origin.to_string()),
             preview_sha256: sha256_hex(preview.as_bytes()),
             subject: BindingSubject::Masters {
-                company: MasterCompanyTuple {
-                    name: company.display_name().to_string(),
-                    guid: company.company_guid().to_string(),
-                    company_number: company.company_number().to_string(),
-                    books_from: company.books_from_yyyymmdd().to_string(),
-                },
+                company: MasterCompanyTuple::of(company),
                 batch: batch.clone(),
             },
         }
     }
 
+    /// The binding of one stock item `Create`: the digest of the bytes its one
+    /// renderer gives, the endpoint, the verified company tuple the item was
+    /// prepared for, every value it writes, and the preview the person was
+    /// shown. The digest is the prepared value's own, so no caller supplies it.
+    pub(super) fn stock_item(
+        endpoint_origin: &str,
+        prepared: &PreparedStockItem,
+        preview: &str,
+    ) -> Self {
+        Self {
+            // One item has the one form: its box shows every copied field.
+            form: PreviewForm::Listed,
+            batch_sha256: sha256_hex(render_stock_item_create(prepared).as_bytes()),
+            endpoint_origin: Some(endpoint_origin.to_string()),
+            preview_sha256: sha256_hex(preview.as_bytes()),
+            subject: BindingSubject::StockItem {
+                company: MasterCompanyTuple::of(prepared.company()),
+                writes: Box::new(prepared.writes().clone()),
+            },
+        }
+    }
+
+    /// The digest this binding names, for tests that tie it to the bytes.
+    #[cfg(test)]
+    pub(super) fn digest_for_test(&self) -> &str {
+        &self.batch_sha256
+    }
+
     pub(super) fn kind(&self) -> PostKind {
         match self.subject {
             BindingSubject::Vouchers { .. } => PostKind::Vouchers,
-            BindingSubject::Masters { .. } => PostKind::Masters,
+            BindingSubject::Masters { .. } | BindingSubject::StockItem { .. } => PostKind::Masters,
         }
     }
 
@@ -218,7 +264,7 @@ impl ApprovalBinding {
     fn voucher_count(&self) -> Option<usize> {
         match self.subject {
             BindingSubject::Vouchers { voucher_count, .. } => Some(voucher_count),
-            BindingSubject::Masters { .. } => None,
+            BindingSubject::Masters { .. } | BindingSubject::StockItem { .. } => None,
         }
     }
 }
@@ -229,13 +275,18 @@ impl ApprovalBinding {
 pub(super) enum HeldRequest {
     Vouchers(NativePostRequest),
     Masters(MasterPostRequest),
+    /// One stock item `Create`, held as prepared: its bytes are rendered from
+    /// it by the one renderer whenever they are compared. Only
+    /// `ShownStockItem::ask` can make a [`HeldStockItem`], beside the binding
+    /// and the dialog of the same item, so no other code can hold one.
+    StockItem(HeldStockItem),
 }
 
 impl HeldRequest {
     pub(super) fn kind(&self) -> PostKind {
         match self {
             Self::Vouchers(_) => PostKind::Vouchers,
-            Self::Masters(_) => PostKind::Masters,
+            Self::Masters(_) | Self::StockItem(_) => PostKind::Masters,
         }
     }
 }
@@ -303,7 +354,37 @@ pub(super) enum Begin {
     /// Something else is held; refused with this code.
     Busy(&'static str),
     /// This batch's dialog ended in a refusal no call has read: returned now.
-    Refused(String),
+    Refused(KeptRefusalCode),
+}
+
+/// A kept refusal's code, as the one call that reads it receives it (#2516).
+/// Only [`PostApprovals::take_refusal`] makes one, so only a refusal that was
+/// kept between calls can carry the cause `approval_answered_earlier`; a No given to a
+/// call while it waits is a plain code, as before.
+pub(super) struct KeptRefusalCode(String);
+
+impl KeptRefusalCode {
+    /// The refusal's own code, unchanged, for tests that read it: the product
+    /// only converts it into the tool's failure.
+    #[cfg(test)]
+    pub(super) fn code(&self) -> &str {
+        &self.0
+    }
+
+    /// A kept refusal of `code`, for tests of a code no scripted dialog
+    /// gives, such as a timeout.
+    #[cfg(test)]
+    pub(in crate::agent) fn kept_for_test(code: &str) -> Self {
+        Self(code.to_owned())
+    }
+}
+
+impl From<KeptRefusalCode> for crate::agent::ToolFailure {
+    fn from(kept: KeptRefusalCode) -> Self {
+        let mut failure = Self::from(kept.0);
+        failure.cause = Some(crate::agent::APPROVAL_ANSWERED_EARLIER);
+        failure
+    }
 }
 
 /// What waiting on a joined dialog came to.
@@ -325,6 +406,17 @@ pub(super) struct Redemption<'a> {
 impl Redemption<'_> {
     pub(super) fn id(&self) -> Uuid {
         self.id
+    }
+
+    /// The batch this approval was taken for.
+    pub(super) fn batch_id(&self) -> &str {
+        &self.batch_id
+    }
+
+    /// Spend this approval, once: its own batch and id, through the holder
+    /// that gave it, so a call can spend only what it took.
+    pub(super) fn spend(&self) -> Result<(), UnderLockRefusal> {
+        self.approvals.spend(&self.batch_id, self.id)
     }
 }
 
@@ -553,10 +645,10 @@ impl PostApprovals {
     }
 
     /// `batch_id`'s kept refusal, removed: it is returned once.
-    fn take_refusal(&self, batch_id: &str) -> Option<String> {
+    fn take_refusal(&self, batch_id: &str) -> Option<KeptRefusalCode> {
         let mut refusals = self.refusals();
         let at = refusals.iter().position(|kept| kept.batch_id == batch_id)?;
-        refusals.remove(at).map(|kept| kept.code)
+        refusals.remove(at).map(|kept| KeptRefusalCode(kept.code))
     }
 
     fn expired(&self, answered: &Answered) -> bool {
@@ -1030,12 +1122,16 @@ impl Drop for PostApprovals {
 }
 
 /// A master approval is held with the request it was rendered for: the bytes
-/// the approval would send are the bytes held beside it. A voucher request has
-/// no such pair to compare.
+/// the approval would send are the bytes held beside it, for a stock item the
+/// bytes its one renderer gives the held item. A voucher request has no such
+/// pair to compare.
 fn held_matches_approved(held: &HeldRequest, approved: &ApprovedImport) -> bool {
     match held {
         HeldRequest::Vouchers(_) => true,
         HeldRequest::Masters(request) => approved.sends_exactly(request.xml()),
+        HeldRequest::StockItem(held) => {
+            approved.sends_exactly(&render_stock_item_create(held.prepared()))
+        }
     }
 }
 

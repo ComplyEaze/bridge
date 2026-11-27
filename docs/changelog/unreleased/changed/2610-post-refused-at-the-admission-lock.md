@@ -1,0 +1,1 @@
+- A post refused at the import admission lock, before anything was recorded or sent, now answers the lock's own code (`import_admission_busy`, `import_admission_lock_unavailable` or the publication-recovery code) instead of `import_dispatch_outcome_unknown`; when the journal shows no attempt, a busy refusal also says to post the same batch again (#2610).

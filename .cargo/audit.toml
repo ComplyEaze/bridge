@@ -21,22 +21,30 @@
 # date -- adding one would be an unknown field and cargo-audit would refuse to
 # parse the whole file. So every entry below carries that information as a
 # comment immediately above its id, not as structured TOML. A comment cannot
-# be checked by a machine; only a human reviewing this file (or the delta
-# script below, for *new* ids) enforces it. Say this plainly rather than
-# implying cargo-audit tracks review dates itself: it does not.
+# be checked by a machine, with one exception: scripts/audit-review-by.test.mjs
+# reads each `Review-by: YYYY-MM-DD` date and fails once one has passed. The
+# rest is enforced only by a human reviewing this file (or by
+# scripts/check-advisory-delta.mjs, which no workflow runs yet, for *new* ids).
+# Say this plainly rather than implying cargo-audit tracks review dates
+# itself: it does not.
 #
 # This file intentionally does NOT set `[output].deny`. The default already
 # treats every advisory kind (vulnerability, unmaintained, unsound, notice,
 # yanked) as at least a warning; `cargo audit`'s process exit code is already
 # non-zero only for an actual `error` (a real vulnerability, or an ignored-id
 # that turns out to still be unresolved) unless explicitly told to also fail
-# on warnings. The entries below are accepted WARNINGS, each with a reason;
-# nothing here silences an actual vulnerability (`error`), and the workflow's
-# real job -- catching a new one, like RUSTSEC-2026-0285 against `rustls` on
-# 2026-09-15 -- is untouched by this file. `--ignore` only removes an id from
-# the report entirely; that is deliberately not used here, because we want
-# these to keep showing up in `cargo audit`'s terminal output (as accepted
-# warnings) rather than vanish, even though they no longer fail the build.
+# on warnings. The entries below are accepted WARNINGS, each with a reason:
+# nothing here silences an actual vulnerability. An exception would carry a
+# dated review-by, a tracking issue and a reason no lockable fix exists; that
+# is a review convention, and only the date is checked. The workflow's real job --
+# catching a new one, like RUSTSEC-2026-0285 against `rustls` on 2026-09-15
+# -- is untouched by this file for every other id. An `ignore` entry removes
+# its id from `cargo audit`'s report entirely (checked with cargo-audit 0.22.2
+# on 2026-11-09: nothing is printed for it), so nothing reports it again: the
+# scheduled audit's tracking issue is built from the same filtered output and
+# will not list it. An ignore applies to the advisory id, whatever package or
+# version matches it. A passed Review-by date fails
+# scripts/audit-review-by.test.mjs, in the Node script tests that `pnpm test` runs.
 #
 # Reachability was checked with, e.g.:
 #   cargo tree --locked -p bridge -i <crate> --target aarch64-apple-darwin

@@ -31,6 +31,7 @@
 //! vouchers then pass the same admission as inline vouchers, so nothing here
 //! decides what is admitted.
 
+use super::failure_code::{BankStatementCode, ProposalsCode};
 use super::*;
 use crate::local_files::local_disk_path::LocalDiskPath;
 use bridge_bank_statement::bank::Bank;
@@ -105,13 +106,14 @@ pub(super) fn input_schema() -> Value {
             },
             "cash_answers":{
                 "type":"array", "maxItems":MAX_CASH_ANSWERS,
-                "description":"One answer per cash withdrawal or deposit listed in cash_questions, by its bridge_txn_id. Give the ledger the answer asks for; dont_know takes none and posts the line to suspense_ledger, tagged for the CA.",
+                "description":"One answer per cash withdrawal or deposit in cash_questions, by bridge_txn_id, with the ledger its answer asks for (dont_know takes none). cash_ledger (paid_to_someone only): the cash-in-hand ledger paid from.",
                 "items":{
                     "type":"object", "additionalProperties":false, "required":["bridge_txn_id","answer"],
                     "properties":{
                         "bridge_txn_id":{"type":"string","minLength":1,"maxLength":64,"pattern":r"\S"},
                         "answer":{"type":"string","enum":["business_cash","owner_use","paid_to_someone","own_cash_box","unbooked_cash_sales","customer_paid_in","owner_brought_in","dont_know"]},
-                        "ledger":{"type":"string","maxLength":agent_import::MAX_MASTER_NAME_CHARS}
+                        "ledger":{"type":"string","maxLength":agent_import::MAX_MASTER_NAME_CHARS},
+                        "cash_ledger":{"type":"string","maxLength":agent_import::MAX_MASTER_NAME_CHARS}
                     }
                 }
             }
@@ -119,7 +121,7 @@ pub(super) fn input_schema() -> Value {
     })
 }
 
-pub(super) const DESCRIPTION: &str = "Read a local SBI, HDFC, Union Bank of India or Bank of Baroda bank-statement PDF (password-protected; a statement that opens without a password needs password_file to be an empty file) and propose one Payment, Receipt or Contra per row (none for a cash line not yet answered), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label (a Bank of Baroda number is masked: see account_label), and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. A Union Bank statement, and a Bank of Baroda statement in the measured layout, print no opening or closing balance: take both balances from the books or the bank, since the statement cannot confirm them, and give an overdrawn (Dr) balance as a negative number (-16,141.16). With no printed totals (a Union Bank or Bank of Baroda statement), those two balances and a Page N of M footer on every page are the only checks on which rows were read, and missing rows whose amounts net to zero would not be seen. A Bank of Baroda statement is read only if page 1 prints an IFSC Code with the bank's prefix on the line that carries the words IFSC Code:, and otherwise is refused as statement_bank_not_recognised (the statements print the bank's name only in an image, so the code is the one thing in the text that names the bank). It prints its newest row first (a statement printed the other way round is refused when its dates show it) and cuts a narration at about 50 characters, so a party can end mid-word and two payers whose names agree up to the cut read as one party; rows are numbered oldest first, as the balance replay reads them. Text in render mode 3 (invisible), which a scanner app writes as its OCR layer under the page image, is not read. A PDF from which no figures can be read (a scan, a printed copy or an image has none), or whose text is mostly in that mode with no statement row in the rest, is refused as statement_no_readable_text: ask for the statement downloaded from net banking as a text PDF. A character that draws nothing (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the prepended concatenation marks) is not read from the PDF; a soft hyphen is read as a hyphen. The password is read from password_file, a local file, and is never returned. A password file that breaks password_file's ownership and permission rules is refused as statement_password_file_permissions, whose next step says how to make the file private. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; a voucher posted to a mapped ledger carries ` | Statement party: <name>`, the counterparty as the statement printed it, at the end of its narration text (a file imported by hand adds the `[BRIDGE:...]` tag after it; a party containing |, carrying the reserved [BRIDGE: marker or making the narration over 2000 characters is refused, party_not_admissible: skip it or map it to the suspense ledger; the parser's own labels such as BANK CHARGES and a cash movement are not written as a party); `skip` omits a transfer already carried by another account's Contra, and its mapping row must name the other account's ledger, so that Contra can be found; build_import_xml records a skipped row and lists it in a transfers section, by id and date, with its state and what to do, until the other account's Contra is built and verified through ComplyEaze Bridge or, for a skip a person withdrew, a batch holding the row is found posted; a skipped row that a batch found posted also posts, with no withdrawal named, stays listed as posted_against_skip, and a row with an equal amount going the other way the same day on its own statement is listed as reversed_same_day when no Contra with an equal network reference could carry it, because a reversal and a pair of real transfers look alike: it is paired only by an equal network reference, and the person checks in Tally which rows are transfers (a skip with no ledger is refused, skip_without_ledger, and so is one naming bank_ledger itself, skip_ledger_is_statement_bank, or suspense_ledger, skip_ledger_is_suspense). Only SBI 'ATM WDL' withdrawals and Union Bank and Bank of Baroda 'BY CASH' deposits are recognised as cash. Other cash text is not: where the parser names a party it is an ordinary party, and where it cannot (as for SBI deposits and HDFC cash text) it goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. You may ask the person once about all the open cash lines, listing each line's date and amount (cash_questions carries them, with the movement, a withdrawal or a deposit), then give each line its own answer and ask again about any line the person did not confirm: one answer is never applied to another line for them. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is counted (suspense_rows, and suspense_by_reason by why), and suspense parties are listed first in counterparties, within its bound, with their rows; a line's own date, amount and label stay in the local file. The result carries no amount except the figures the caller supplied, echoed in reconciled (closing_balance, and total_debits and total_credits where given), and an open cash line's amount (below). Arithmetic on the caller's own inputs can still give a row's amount, for example total_debits minus the open cash amounts when one other debit row remains, and when a direction has a single row the caller's own total is that row's amount and counterparties names its party; and a from/to window holding one row shows through rows_in_window that a row falls in it, and through counterparties that row's party and direction; no result can hide what follows from the caller's inputs. An open cash line is the one exception: its cash_questions entry carries its bridge_txn_id, date and amount, its party name (masked when BRIDGE_AGENT_REDACTION is mask_parties) and whether it is a withdrawal or a deposit, so the person can tell which line is asked about. No other value of any row is returned. A file parsed for the whole statement, or for whole calendar months (from the 1st to a month's last day) within its rows, can be checked with statement_tie_out, whose gaps together with the book's own figures give the statement's balance at those edges and its net over those months: totals per calendar month, never a part of a month except the part-months at the statement's own start and end, whose net a month edge's balance gives together with the opening and closing you supplied; though a month in which every other row's amount is already known (one row alone, or one row beside open cash lines) gives that row's amount. statement_tie_out compares no other narrowed window (window_not_whole_calendar_months). Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. build_import_xml builds the whole file, so from and to choose the batch. Import a statement in whole-day batches: cut a batch only between days, at most 50 vouchers (the most one batch post takes), because a same-day row with the same type, ledgers and amounts that an earlier batch posted refuses the whole later batch as import_preexisting_identity; from and to are days, so a window never cuts one, and a day with more than 50 rows does not fit one batch, an open limit: ask the user. With posting on, a saved batch of up to 50 posts after one approval, so same-day twins post together in one batch or through a hand import of the built file. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
+pub(super) const DESCRIPTION: &str = "Read a local SBI, HDFC, Union Bank of India or Bank of Baroda bank-statement PDF (password-protected; a statement that opens without a password needs password_file to be an empty file) and propose one Payment, Receipt or Contra per row (none for an unanswered cash line; for paid_to_someone, a Contra into cash_ledger and a same-day cash Payment to the payee, id ending -cash), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label (a Bank of Baroda number is masked: see account_label), and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. A Union Bank statement, and a Bank of Baroda statement in the measured layout, print no opening or closing balance: take both balances from the books or the bank, since the statement cannot confirm them, and give an overdrawn (Dr) balance as a negative number (-16,141.16). With no printed totals (a Union Bank or Bank of Baroda statement), those two balances and a Page N of M footer on every page are the only checks on which rows were read, and missing rows whose amounts net to zero would not be seen. A Bank of Baroda statement is read only if page 1 prints an IFSC Code with the bank's prefix on the line that carries the words IFSC Code:, and otherwise is refused as statement_bank_not_recognised (the statements print the bank's name only in an image, so the code is the one thing in the text that names the bank). It prints its newest row first (a statement printed the other way round is refused when its dates show it) and cuts a narration at about 50 characters, so a party can end mid-word and two payers whose names agree up to the cut read as one party; rows are numbered oldest first, as the balance replay reads them. Text in render mode 3 (invisible), which a scanner app writes as its OCR layer under the page image, is not read. A PDF from which no figures can be read (a scan, a printed copy or an image has none), or whose text is mostly in that mode with no statement row in the rest, is refused as statement_no_readable_text: ask for the statement downloaded from net banking as a text PDF. A character that draws nothing (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the prepended concatenation marks) is not read from the PDF; a soft hyphen is read as a hyphen. The password is read from password_file, a local file, and is never returned. A password file that breaks password_file's ownership and permission rules is refused as statement_password_file_permissions, whose next step says how to make the file private. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; a voucher posted to a mapped ledger carries ` | Statement party: <name>`, the counterparty as the statement printed it, at the end of its narration text (a file imported by hand adds the `[BRIDGE:...]` tag after it; a party containing |, carrying the reserved [BRIDGE: marker or making the narration over 2000 characters is refused, party_not_admissible: skip it or map it to the suspense ledger; the parser's own labels such as BANK CHARGES and a cash movement are not written as a party); `skip` omits a transfer already carried by another account's Contra, and its mapping row must name the other account's ledger, so that Contra can be found; build_import_xml records a skipped row and lists it in a transfers section, by id and date, with its state and what to do, until the other account's Contra is built and verified through ComplyEaze Bridge or, for a skip a person withdrew, a batch holding the row is found posted; a skipped row that a batch found posted also posts, with no withdrawal named, stays listed as posted_against_skip, and a row with an equal amount going the other way the same day on its own statement is listed as reversed_same_day when no Contra with an equal network reference could carry it, because a reversal and a pair of real transfers look alike: it is paired only by an equal network reference, and the person checks in Tally which rows are transfers (a skip with no ledger is refused, skip_without_ledger, and so is one naming bank_ledger itself, skip_ledger_is_statement_bank, or suspense_ledger, skip_ledger_is_suspense). Only SBI 'ATM WDL' withdrawals and Union Bank and Bank of Baroda 'BY CASH' deposits are recognised as cash; other cash text is an ordinary party where the parser names one, and otherwise (as for SBI deposits and HDFC cash text) goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. You may ask the person once about all the open cash lines, listing each line's date and amount, then give each line its own answer, never another line's, and ask again about any line the person did not confirm. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; cash this file pays one payee over 10000.00 in a day is tagged for the CA (s.40A(3)) and counted in cash_payments_over_limit; every line sent to suspense is counted (suspense_rows, and suspense_by_reason by why), and suspense parties are listed first in counterparties, within its bound, with their rows; a line's own date, amount and label stay in the local file. The result carries no amount except the figures the caller supplied, echoed in reconciled (closing_balance, and total_debits and total_credits where given), and an open cash line's amount (below). Arithmetic on the caller's own inputs can still give a row's amount, for example total_debits minus the open cash amounts when one other debit row remains, and when a direction has a single row the caller's own total is that row's amount and counterparties names its party; and a from/to window holding one row shows through rows_in_window that a row falls in it, and through counterparties that row's party and direction; no result can hide what follows from the caller's inputs. An open cash line is the one exception: its cash_questions entry carries its bridge_txn_id, date and amount, its party name (masked when BRIDGE_AGENT_REDACTION is mask_parties) and whether it is a withdrawal or a deposit, so the person can tell which line is asked about. No other value of any row is returned. A file parsed for the whole statement, or for whole calendar months (from the 1st to a month's last day) within its rows, can be checked with statement_tie_out, whose gaps together with the book's own figures give the statement's balance at those edges and its net over those months: totals per calendar month, never a part of a month except the part-months at the statement's own start and end, whose net a month edge's balance gives together with the opening and closing you supplied; though a month in which every other row's amount is already known (one row alone, or one row beside open cash lines) gives that row's amount. statement_tie_out compares no other narrowed window (window_not_whole_calendar_months). Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. build_import_xml builds the whole file, so from and to choose the batch. Import a statement in whole-day batches: cut a batch only between days, at most 50 vouchers (the most one batch post takes), because a same-day row with the same type, ledgers and amounts that an earlier batch posted refuses the whole later batch as import_preexisting_identity; from and to are days, so a window never cuts one, and a day with more than 50 vouchers does not fit one batch, an open limit: ask the user. With posting on, a saved batch of up to 50 posts after one approval, so same-day twins post together in one batch or through a hand import of the built file. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
 
 impl Server {
     pub(super) async fn parse_bank_statement(
@@ -131,7 +133,7 @@ impl Server {
         let max_bytes = self.settings.max_bytes;
         let result = tokio::task::spawn_blocking(move || run(&request, &data_dir, max_bytes))
             .await
-            .map_err(|_| "statement_task_failed".to_string())??;
+            .map_err(|_| ToolFailure::from(BankStatementCode::TaskFailed))??;
         Ok(self.parsed_outcome(b"parse_bank_statement", result))
     }
 
@@ -227,7 +229,7 @@ impl OwnedRequest {
         }
     }
 
-    fn from_args(args: &Value) -> Result<Self, String> {
+    fn from_args(args: &Value) -> Result<Self, ToolFailure> {
         StatementChoices::validate_lists(args)?;
         let bank = Bank::from_name(required_string(args, "bank")?)
             .ok_or_else(|| "argument_invalid:bank".to_string())?;
@@ -241,7 +243,7 @@ impl OwnedRequest {
         )
         .map_err(|refusal| refused(&refusal))?;
         if bank.prints_totals() && controls.debits.is_none() {
-            return Err("statement_control_totals_required".into());
+            return Err(BankStatementCode::ControlTotalsRequired.into());
         }
         let choices = StatementChoices::from_args(args)?;
         Ok(Self {
@@ -270,12 +272,12 @@ impl StatementChoices {
         Ok(())
     }
 
-    fn from_args(args: &Value) -> Result<Self, String> {
+    fn from_args(args: &Value) -> Result<Self, ToolFailure> {
         let date_from = window_date(args, "from")?;
         let date_to = window_date(args, "to")?;
         if let (Some(from), Some(to)) = (date_from, date_to) {
             if from > to {
-                return Err("statement_reversed_date_window".into());
+                return Err(BankStatementCode::ReversedDateWindow.into());
             }
         }
         let rows = args
@@ -307,6 +309,7 @@ impl StatementChoices {
                     .to_string(),
                 answer: row["answer"].as_str().unwrap_or_default().to_string(),
                 ledger: row["ledger"].as_str().map(str::to_string),
+                cash_ledger: row["cash_ledger"].as_str().map(str::to_string),
             });
         let cash_answers = CashAnswers::from_rows(answers).map_err(|refusal| refused(&refusal))?;
         Ok(Self {
@@ -342,34 +345,34 @@ impl StatementChoices {
 /// by this user and carry no group or other permission bits. On Windows its owner must be this user
 /// or Administrators, and its access list must let no one but this user, SYSTEM and Administrators
 /// read, change or re-grant it.
-fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, String> {
+fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, ToolFailure> {
     let file = local_file::open_local_file(path.as_path(), false)
-        .map_err(|_| "statement_password_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileUnreadable))?;
     let metadata = file
         .metadata()
-        .map_err(|_| "statement_password_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileUnreadable))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         if metadata.permissions().mode() & 0o077 != 0 {
-            return Err("statement_password_file_permissions".into());
+            return Err(BankStatementCode::PasswordFilePermissions.into());
         }
     }
     #[cfg(windows)]
     match crate::local_files::access::private_to_this_user(&file) {
         Ok(Ok(())) => {}
-        Ok(Err(_)) => return Err("statement_password_file_permissions".into()),
-        Err(_) => return Err("statement_password_file_unreadable".into()),
+        Ok(Err(_)) => return Err(BankStatementCode::PasswordFilePermissions.into()),
+        Err(_) => return Err(BankStatementCode::PasswordFileUnreadable.into()),
     }
     if metadata.len() > MAX_PASSWORD_FILE_BYTES {
-        return Err("statement_password_file_too_large".into());
+        return Err(BankStatementCode::PasswordFileTooLarge.into());
     }
     let mut bytes = Zeroizing::new(Vec::with_capacity(MAX_PASSWORD_FILE_BYTES as usize));
     file.take(MAX_PASSWORD_FILE_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "statement_password_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileUnreadable))?;
     if bytes.len() as u64 > MAX_PASSWORD_FILE_BYTES {
-        return Err("statement_password_file_too_large".into());
+        return Err(BankStatementCode::PasswordFileTooLarge.into());
     }
     for ending in [&b"\r\n"[..], &b"\n"[..]] {
         if bytes.ends_with(ending) {
@@ -378,21 +381,21 @@ fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, String> {
             break;
         }
     }
-    let text =
-        std::str::from_utf8(&bytes).map_err(|_| "statement_password_file_not_utf8".to_string())?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| ToolFailure::from(BankStatementCode::PasswordFileNotUtf8))?;
     Ok(Zeroizing::new(text.to_string()))
 }
 
-fn read_statement(path: &LocalDiskPath, limit: usize) -> Result<Vec<u8>, String> {
+fn read_statement(path: &LocalDiskPath, limit: usize) -> Result<Vec<u8>, ToolFailure> {
     let file = local_file::open_local_file(path.as_path(), false)
-        .map_err(|_| "statement_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::FileUnreadable))?;
     let limit = limit as u64;
     let mut bytes = Vec::new();
     file.take(limit + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "statement_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::FileUnreadable))?;
     if bytes.len() as u64 > limit {
-        return Err("statement_file_too_large".into());
+        return Err(BankStatementCode::FileTooLarge.into());
     }
     Ok(bytes)
 }
@@ -402,25 +405,25 @@ fn read_statement(path: &LocalDiskPath, limit: usize) -> Result<Vec<u8>, String>
 /// `BRIDGE_PDFIUM_LIBRARY`; any other build has no such lookup, which
 /// `scripts/check-no-test-seam.mjs` checks on the executables the Tauri
 /// bundle hook, CI's bundle job and the release workflow produce.
-fn pdfium_library() -> Result<PathBuf, String> {
+fn pdfium_library() -> Result<PathBuf, ToolFailure> {
     #[cfg(test)]
     if let Some(path) = env::var_os("BRIDGE_PDFIUM_LIBRARY") {
         let path = PathBuf::from(path);
         return if path.is_absolute() {
             Ok(path)
         } else {
-            Err("statement_pdf_engine_setting_invalid".into())
+            Err(BankStatementCode::PdfEngineSettingInvalid.into())
         };
     }
-    let executable =
-        env::current_exe().map_err(|_| "statement_pdf_engine_unavailable".to_string())?;
+    let executable = env::current_exe()
+        .map_err(|_| ToolFailure::from(BankStatementCode::PdfEngineUnavailable))?;
     let directory = executable
         .parent()
-        .ok_or_else(|| "statement_pdf_engine_unavailable".to_string())?;
+        .ok_or_else(|| ToolFailure::from(BankStatementCode::PdfEngineUnavailable))?;
     Ok(pdf::platform_library_path(directory))
 }
 
-fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Value, String> {
+fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Value, ToolFailure> {
     // Everything that can be refused without the PDF was refused already.
     let bytes = read_statement(&request.statement_path, MAX_PDF_BYTES)?;
     let text = {
@@ -443,7 +446,7 @@ fn written_and_summarised(
     parsed: &ParsedStatement,
     statement: &[u8],
     max_bytes: usize,
-) -> Result<Value, String> {
+) -> Result<Value, ToolFailure> {
     let statement_sha256 = sha256_hex(statement);
     let (proposals_id, file_sha256) = persist(data_dir, record, parsed, &statement_sha256)?;
     Ok(summary(
@@ -481,10 +484,10 @@ fn persist(
     request: &ParseRecord<'_>,
     parsed: &ParsedStatement,
     statement_sha256: &str,
-) -> Result<(String, String), String> {
+) -> Result<(String, String), ToolFailure> {
     let directory = data_dir.join(PROPOSALS_DIRECTORY);
     ensure_private_directory(&directory)
-        .map_err(|_| "statement_proposals_directory_unavailable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsDirectoryUnavailable))?;
     let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
     let mut document = json!({
         "schema": PROPOSALS_SCHEMA,
@@ -532,7 +535,7 @@ fn persist(
                 "basis": request.tie_out_basis,
             }),
             Some(Ok(Err(reason))) => json!({"state": "not_established", "reason": reason.code()}),
-            Some(Err(refusal)) => return Err(refused(&refusal)),
+            Some(Err(refusal)) => return Err(refused(&refusal).into()),
             None => Value::Null,
         };
         document["window"] = json!({
@@ -543,11 +546,11 @@ fn persist(
         });
     }
     let bytes = serde_json::to_vec_pretty(&document)
-        .map_err(|_| "statement_proposals_serialization_failed".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsSerializationFailed))?;
     let path = directory.join(format!("{proposals_id}.json"));
     let staged = directory.join(format!(".{proposals_id}.json.partial"));
     local_file::replace_private_file(&staged, &path, &bytes)
-        .map_err(|_| "statement_proposals_write_failed".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsWriteFailed))?;
     Ok((proposals_id, sha256_hex(&bytes)))
 }
 
@@ -643,7 +646,7 @@ fn summary(
     let next_step = if open == 0 {
         "Write mapping from counterparties and re-run until no row needs a ledger it should not reach (counterparties lists suspense parties first, most rows first: unmapped and unidentified parties, parties mapped to the suspense ledger, and dont_know cash lines. When counterparties_omitted is above zero, mapping some of those listed and re-running brings others into view, unless the listed ones are parties kept in suspense. Otherwise raise BRIDGE_AGENT_MAX_BYTES); check ledgers_to_validate with validate_masters. Then call build_import_xml with company_guid, proposals_id and proposals_sha256 set to this proposals_id and sha256. To correct a batch already built from an earlier run of this statement, also pass amends_batch_id; never rebuild it as a new batch."
     } else {
-        "Ask the person about the open cash_questions entries in their own words (once for all of them is fine, listing each line's date and amount), ask again about any line they do not confirm, and re-run with their answers in cash_answers (one per line, by bridge_txn_id, with the ledger the answer asks for). Never answer for them: dont_know is an answer they give, and it posts the line to suspense_ledger for the CA to move. build_import_xml refuses these proposals (cash_questions_open) while any question is open."
+        "Ask the person about the open cash_questions entries in their own words (once for all of them is fine, listing each line's date and amount), ask again about any line they do not confirm, and re-run with their answers in cash_answers (one per line, by bridge_txn_id, with the ledger the answer asks for, and for paid_to_someone the cash_ledger too). Never answer for them: dont_know is an answer they give, and it posts the line to suspense_ledger for the CA to move. build_import_xml refuses these proposals (cash_questions_open) while any question is open."
     };
     let mut result = json!({
         "proposals_id": proposals_id,
@@ -659,6 +662,10 @@ fn summary(
         "cash_questions_open": open,
         "cash_questions": cash_questions,
         "cash_questions_omitted": cash_questions_omitted,
+        "cash_payments_over_limit": records
+            .iter()
+            .filter(|record| record.paid_to.as_ref().is_some_and(|paid| paid.over_cash_limit))
+            .count(),
         // Only the caller's own figures are echoed. Totals the caller did not
         // give (a layout that prints none) are not returned.
         "reconciled": {
@@ -843,8 +850,8 @@ fn read_statement_facts(
     document: &Value,
     records: &[Value],
     posts_nothing: bool,
-) -> Result<ResolvedStatement, String> {
-    let invalid = || "proposals_file_invalid".to_string();
+) -> Result<ResolvedStatement, ToolFailure> {
+    let invalid = || ToolFailure::from(ProposalsCode::FileInvalid);
     let bank_ledger = document["bank_ledger"].as_str().ok_or_else(invalid)?;
     let date = |text: &str| normalized_date(text).map_err(|_| invalid());
     // `coverage` is always written, null when no day was read in full
@@ -899,16 +906,57 @@ pub(super) struct StatementLedgers {
     pub(super) suspense_ledger: String,
 }
 
-/// The voucher type and side an answer puts its named ledger on, for an
-/// answer that names one and is built.
-fn answered_entry(answer: CashAnswer) -> Option<(&'static str, &'static str)> {
+/// One leg an answer puts a ledger the person named on.
+struct AnsweredLeg {
+    /// The leg is on the cash Payment a `paid_to_someone` answer adds, whose
+    /// id is the row's and the suffix, not on the row's own voucher.
+    on_cash_payment: bool,
+    voucher_type: &'static str,
+    side: &'static str,
+    /// The leg's ledger is the payee a `paid_to_someone` record names, not
+    /// the record's own ledger.
+    payee: bool,
+    cash_in_hand: bool,
+}
+
+/// Every leg an answer that is built puts a named ledger on: none for an
+/// answer that names no ledger or is not built.
+fn answered_legs(answer: CashAnswer) -> &'static [AnsweredLeg] {
+    const fn leg(voucher_type: &'static str, side: &'static str, cash: bool) -> AnsweredLeg {
+        AnsweredLeg {
+            on_cash_payment: false,
+            voucher_type,
+            side,
+            payee: false,
+            cash_in_hand: cash,
+        }
+    }
+    const BUSINESS_CASH: &[AnsweredLeg] = &[leg("Contra", "Dr", true)];
+    // A deposit: the cash leaves the named ledger, so its leg is the credit.
+    const OWN_CASH_BOX: &[AnsweredLeg] = &[leg("Contra", "Cr", true)];
+    const OWNER_USE: &[AnsweredLeg] = &[leg("Payment", "Dr", false)];
+    const PAID_IN: &[AnsweredLeg] = &[leg("Receipt", "Cr", false)];
+    // The Contra fills the record's cash ledger; the cash Payment empties it
+    // to the payee.
+    const PAID_TO_SOMEONE: &[AnsweredLeg] = &[
+        leg("Contra", "Dr", true),
+        AnsweredLeg {
+            on_cash_payment: true,
+            ..leg("Payment", "Cr", true)
+        },
+        AnsweredLeg {
+            on_cash_payment: true,
+            payee: true,
+            ..leg("Payment", "Dr", false)
+        },
+    ];
     match answer {
-        CashAnswer::BusinessCash => Some(("Contra", "Dr")),
-        // A deposit: the cash leaves the named ledger, so its leg is the credit.
-        CashAnswer::OwnCashBox => Some(("Contra", "Cr")),
-        CashAnswer::OwnerUse => Some(("Payment", "Dr")),
-        CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => Some(("Receipt", "Cr")),
-        CashAnswer::PaidToSomeone | CashAnswer::UnbookedCashSales | CashAnswer::DontKnow => None,
+        CashAnswer::BusinessCash => BUSINESS_CASH,
+        CashAnswer::OwnCashBox => OWN_CASH_BOX,
+        CashAnswer::OwnerUse => OWNER_USE,
+        CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => PAID_IN,
+        CashAnswer::PaidToSomeone => PAID_TO_SOMEONE,
+        CashAnswer::UnbookedCashSales | CashAnswer::DontKnow => &[],
     }
 }
 
@@ -945,7 +993,7 @@ pub(super) fn load_proposals(
     data_dir: &Path,
     proposals_id: &Value,
     proposals_sha256: Option<&Value>,
-) -> Result<Value, String> {
+) -> Result<Value, ToolFailure> {
     let proposals_id = proposals_id
         .as_str()
         .filter(|id| {
@@ -954,7 +1002,7 @@ pub(super) fn load_proposals(
         })
         .ok_or_else(|| "argument_invalid:proposals_id".to_string())?;
     let expected_sha256 = proposals_sha256
-        .ok_or_else(|| "proposals_sha256_required".to_string())?
+        .ok_or_else(|| ToolFailure::from(BankStatementCode::ProposalsSha256Required))?
         .as_str()
         .filter(|digest| {
             digest.len() == 64
@@ -968,23 +1016,23 @@ pub(super) fn load_proposals(
         .join(format!("{proposals_id}.json"));
     let file = local_file::open_local_file(&path, false).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
-            "proposals_not_found".to_string()
+            ToolFailure::from(BankStatementCode::ProposalsNotFound)
         } else {
-            "proposals_file_unreadable".to_string()
+            ToolFailure::from(BankStatementCode::ProposalsFileUnreadable)
         }
     })?;
     let mut bytes = Vec::new();
     file.take(MAX_PROPOSALS_FILE_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "proposals_file_unreadable".to_string())?;
+        .map_err(|_| ToolFailure::from(BankStatementCode::ProposalsFileUnreadable))?;
     if bytes.len() as u64 > MAX_PROPOSALS_FILE_BYTES {
-        return Err("proposals_file_too_large".into());
+        return Err(BankStatementCode::ProposalsFileTooLarge.into());
     }
     if sha256_hex(&bytes) != expected_sha256 {
-        return Err("proposals_changed".into());
+        return Err(BankStatementCode::ProposalsChanged.into());
     }
-    let document: Value =
-        serde_json::from_slice(&bytes).map_err(|_| "proposals_file_invalid".to_string())?;
+    let document: Value = serde_json::from_slice(&bytes)
+        .map_err(|_| ToolFailure::from(ProposalsCode::FileInvalid))?;
     // a version 1 file is read too: what a caller may build from one is the
     // caller's to decide
     if !matches!(
@@ -992,7 +1040,7 @@ pub(super) fn load_proposals(
         Some(PROPOSALS_SCHEMA | PROPOSALS_SCHEMA_V1)
     ) || document["proposals_id"] != proposals_id
     {
-        return Err("proposals_file_invalid".into());
+        return Err(ProposalsCode::FileInvalid.into());
     }
     Ok(document)
 }
@@ -1005,16 +1053,16 @@ pub(super) fn load_proposals(
 pub(super) fn resolve_import_arguments(
     data_dir: &Path,
     args: &Value,
-) -> Result<ResolvedImport, String> {
+) -> Result<ResolvedImport, ToolFailure> {
     let Some(object) = args.as_object() else {
-        return Err("argument_schema_invalid".into());
+        return Err(BankStatementCode::ArgumentSchemaInvalid.into());
     };
     let Some(proposals_id) = object.get("proposals_id") else {
         if object.contains_key("proposals_sha256") {
-            return Err("proposals_id_required".into());
+            return Err(ProposalsCode::IdRequired.into());
         }
         if !object.contains_key("vouchers") {
-            return Err("vouchers_required".into());
+            return Err(ProposalsCode::VouchersRequired.into());
         }
         return Ok(ResolvedImport {
             args: args.clone(),
@@ -1024,14 +1072,14 @@ pub(super) fn resolve_import_arguments(
         });
     };
     if object.contains_key("vouchers") {
-        return Err("proposals_id_with_vouchers".into());
+        return Err(BankStatementCode::ProposalsIdWithVouchers.into());
     }
     let document = load_proposals(data_dir, proposals_id, object.get("proposals_sha256"))?;
     let legacy = document["schema"] == PROPOSALS_SCHEMA_V1;
     let vouchers = document
         .get("vouchers")
         .filter(|vouchers| vouchers.is_array())
-        .ok_or_else(|| "proposals_file_invalid".to_string())?;
+        .ok_or_else(|| ToolFailure::from(ProposalsCode::FileInvalid))?;
     // A cash line nobody answered has no voucher; building the rest would
     // leave it out of the books silently. A file written before cash lines
     // were asked holds them with no answer recorded, and one written by an
@@ -1039,7 +1087,7 @@ pub(super) fn resolve_import_arguments(
     // is refused the same way.
     let records = document["records"]
         .as_array()
-        .ok_or_else(|| "proposals_file_invalid".to_string())?;
+        .ok_or_else(|| ToolFailure::from(ProposalsCode::FileInvalid))?;
     if records.iter().any(|record| {
         record["disposition"] == "needs_answer"
             || (record["party"]
@@ -1051,7 +1099,7 @@ pub(super) fn resolve_import_arguments(
                     .and_then(CashAnswer::parse)
                     .is_none())
     }) {
-        return Err("cash_questions_open".into());
+        return Err(BankStatementCode::CashQuestionsOpen.into());
     }
     // A file written before facts existed cannot say which rows were skipped or
     // which Contras it holds. Built anyway, its Contras would be invisible to
@@ -1066,7 +1114,7 @@ pub(super) fn resolve_import_arguments(
                     .any(|voucher| voucher["voucher_type"] == "Contra")
             }))
     {
-        return Err("proposals_legacy".into());
+        return Err(BankStatementCode::ProposalsLegacy.into());
     }
     // Every ledger a person named in an answer, bound to the voucher actually
     // built: that bridge_txn_id's voucher has the type the answer makes, with
@@ -1076,33 +1124,56 @@ pub(super) fn resolve_import_arguments(
         let Some(answer) = record["cash_answer"].as_str().and_then(CashAnswer::parse) else {
             continue;
         };
-        let Some((voucher_type, side)) = answered_entry(answer) else {
-            continue;
-        };
-        let need = AnsweredCashLedger {
-            bridge_txn_id: record["bridge_txn_id"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-            ledger: record["ledger"].as_str().unwrap_or_default().to_string(),
-            cash_in_hand: answer.names_cash_in_hand(),
-            cash_out: answer == CashAnswer::OwnCashBox,
-        };
-        let built = vouchers.as_array().is_some_and(|vouchers| {
-            vouchers.iter().any(|voucher| {
-                voucher["bridge_txn_id"] == need.bridge_txn_id.as_str()
-                    && voucher["voucher_type"] == voucher_type
-                    && voucher["entries"].as_array().is_some_and(|entries| {
-                        entries.iter().any(|entry| {
-                            entry["side"] == side && entry["ledger"] == need.ledger.as_str()
+        let row_id = record["bridge_txn_id"].as_str().unwrap_or_default();
+        for leg in answered_legs(answer) {
+            // A paid_to_someone record names its cash Payment and payee; a
+            // record without them cannot be the parse's.
+            let (bridge_txn_id, ledger) = match (leg.on_cash_payment, leg.payee) {
+                (false, _) => (row_id, record["ledger"].as_str()),
+                // Its id is the row's and the suffix, as the parse names it,
+                // so a record cannot point at another row's Payment.
+                (true, payee) => (
+                    record["paid_to"]["bridge_txn_id"]
+                        .as_str()
+                        .filter(|id| {
+                            id.strip_suffix(
+                                bridge_bank_statement::proposals::CASH_PAYMENT_ID_SUFFIX,
+                            ) == Some(row_id)
                         })
-                    })
-            })
-        });
-        if !built {
-            return Err("proposals_file_invalid".into());
+                        .ok_or_else(|| {
+                            failure_code::ProposalsCode::FileInvalid
+                                .as_str()
+                                .to_string()
+                        })?,
+                    if payee {
+                        record["paid_to"]["ledger"].as_str()
+                    } else {
+                        record["ledger"].as_str()
+                    },
+                ),
+            };
+            let need = AnsweredCashLedger {
+                bridge_txn_id: bridge_txn_id.to_string(),
+                ledger: ledger.unwrap_or_default().to_string(),
+                cash_in_hand: leg.cash_in_hand,
+                cash_out: answer == CashAnswer::OwnCashBox,
+            };
+            let built = vouchers.as_array().is_some_and(|vouchers| {
+                vouchers.iter().any(|voucher| {
+                    voucher["bridge_txn_id"] == need.bridge_txn_id.as_str()
+                        && voucher["voucher_type"] == leg.voucher_type
+                        && voucher["entries"].as_array().is_some_and(|entries| {
+                            entries.iter().any(|entry| {
+                                entry["side"] == leg.side && entry["ledger"] == need.ledger.as_str()
+                            })
+                        })
+                })
+            });
+            if !built {
+                return Err(ProposalsCode::FileInvalid.into());
+            }
+            cash_ledgers.push(need);
         }
-        cash_ledgers.push(need);
     }
     // A file that names neither ledger is not held to a rule about them.
     let statement_ledgers = document["bank_ledger"]
@@ -1161,18 +1232,18 @@ impl ControlsSource {
     /// the file is read, so it takes no figures; every other source must give both. Only the
     /// file's own are not an independent control: a chain that starts and ends on them always
     /// agrees with itself, so a truncated export would pass.
-    fn figures(self, args: &Value) -> Result<Option<Controls>, String> {
+    fn figures(self, args: &Value) -> Result<Option<Controls>, ToolFailure> {
         let opening = optional_string(args, "opening_balance")?;
         let closing = optional_string(args, "closing_balance")?;
         match (self, opening.as_deref(), closing.as_deref()) {
             (Self::ThisFile, None, None) => Ok(None),
-            (Self::ThisFile, _, _) => Err("statement_control_figures_with_this_file".into()),
+            (Self::ThisFile, _, _) => Err(BankStatementCode::ControlFiguresWithThisFile.into()),
             (_, Some(opening), Some(closing)) => {
                 Controls::parse_optional(opening, closing, None, None)
                     .map(Some)
-                    .map_err(|refusal| refused(&refusal))
+                    .map_err(|refusal| ToolFailure::from(refused(&refusal)))
             }
-            _ => Err("statement_control_figures_required".into()),
+            _ => Err(BankStatementCode::ControlFiguresRequired.into()),
         }
     }
 }
@@ -1263,7 +1334,7 @@ struct CsvRequest {
 }
 
 impl CsvRequest {
-    fn from_args(args: &Value) -> Result<Self, String> {
+    fn from_args(args: &Value) -> Result<Self, ToolFailure> {
         StatementChoices::validate_lists(args)?;
         let controls_source = ControlsSource::parse(required_string(args, "controls_source")?)
             .ok_or_else(|| "argument_invalid:controls_source".to_string())?;
@@ -1288,7 +1359,7 @@ fn csv_failure(refusal: &Refusal) -> ToolFailure {
 /// The statement's bytes, read to the edge reader's own size bound and no
 /// further: one more byte is `statement_file_too_large`, as the reader's own
 /// bound would give.
-fn read_csv_file(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
+fn read_csv_file(path: &LocalDiskPath) -> Result<Vec<u8>, ToolFailure> {
     read_statement(path, csv_edge::MAX_FILE_BYTES)
 }
 
@@ -1314,7 +1385,7 @@ fn run_csv(request: &CsvRequest, data_dir: &Path, max_bytes: usize) -> Result<Va
         &request.choices.request(CsvLayout::BankA, controls),
     )
     .map_err(|refusal| refused(&refusal))?;
-    Ok(written_and_summarised(
+    written_and_summarised(
         data_dir,
         &ParseRecord {
             layout: CsvLayout::BankA.name(),
@@ -1326,7 +1397,7 @@ fn run_csv(request: &CsvRequest, data_dir: &Path, max_bytes: usize) -> Result<Va
         &parsed,
         &bytes,
         max_bytes,
-    )?)
+    )
 }
 
 impl Server {
@@ -1339,7 +1410,7 @@ impl Server {
         let max_bytes = self.settings.max_bytes;
         let result = tokio::task::spawn_blocking(move || run_csv(&request, &data_dir, max_bytes))
             .await
-            .map_err(|_| ToolFailure::from("statement_task_failed".to_string()))??;
+            .map_err(|_| ToolFailure::from(BankStatementCode::TaskFailed))??;
         Ok(self.parsed_outcome(b"parse_bank_statement_csv", result))
     }
 }

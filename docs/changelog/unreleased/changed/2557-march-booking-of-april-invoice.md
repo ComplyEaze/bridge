@@ -1,0 +1,1 @@
+- The supplier invoice identity check now also allows the following financial year for a booked copy with no invoice date and a voucher dated in March, so an April invoice booked as a year-end entry is found as possibly booked (#2557).

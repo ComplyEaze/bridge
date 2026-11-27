@@ -20,9 +20,26 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
         );
     }
     assert_eq!(
-        ValidatedCompanyName::new("x".repeat(256)),
+        ValidatedCompanyName::new("x".repeat(361)),
         Err(ReadProfileValidationError::CompanyInvalid)
     );
+    // The one copy of the company-name rule, and its typed reasons (#2433).
+    // The name is checked as given: never trimmed, so an edge control
+    // character is refused, and edge spaces are kept.
+    for (company, refusal) in [
+        ("", Some(CompanyNameRefusal::Blank)),
+        (" \t ", Some(CompanyNameRefusal::Blank)),
+        ("Lab\t", Some(CompanyNameRefusal::ControlCharacter)),
+        ("\nLab", Some(CompanyNameRefusal::ControlCharacter)),
+        ("Lab\u{85}", Some(CompanyNameRefusal::ControlCharacter)),
+        ("  Lab  ", None),
+    ] {
+        assert_eq!(
+            ValidatedCompanyName::refusal(company),
+            refusal,
+            "{company:?}"
+        );
+    }
     for (from, to, expected) in [
         (
             "2026-01-01",
@@ -761,5 +778,125 @@ fn the_v3_catalogue_request_renders_these_exact_bytes() {
     assert_eq!(
         ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render(),
         expected
+    );
+}
+
+/// The limit is 360 UTF-8 bytes for every script, rows #2433-N and #2433-N3.
+/// The figures are written out here rather than read from the constant, so a
+/// changed limit fails a test.
+#[test]
+fn the_company_name_limit_is_360_utf8_bytes_for_every_script() {
+    let not_established = Some(CompanyNameRefusal::LengthNotEstablished);
+    assert_eq!(MAX_COMPANY_NAME_BYTES, 360);
+    let at_limit = "x".repeat(360);
+    assert_eq!(ValidatedCompanyName::refusal(&at_limit), None);
+    assert_eq!(
+        ValidatedCompanyName::new(at_limit.clone())
+            .unwrap()
+            .as_str(),
+        at_limit
+    );
+    assert_eq!(
+        ValidatedCompanyName::refusal(&"x".repeat(361)),
+        not_established
+    );
+    // Row N3's name: 120 Devanagari letters, 360 bytes, admitted; one more letter is 363.
+    let devanagari = "\u{915}".repeat(120);
+    assert_eq!(devanagari.len(), 360);
+    assert_eq!(ValidatedCompanyName::refusal(&devanagari), None);
+    assert_eq!(
+        ValidatedCompanyName::refusal(&format!("{devanagari}\u{915}")),
+        not_established
+    );
+    // The limit counts bytes, not characters, and a character is counted whole:
+    // a three-byte letter ending at byte 360 is admitted, one crossing it is not.
+    let ending_at_limit = format!("{}\u{915}", "x".repeat(357));
+    assert_eq!(ending_at_limit.len(), 360);
+    assert_eq!(ValidatedCompanyName::refusal(&ending_at_limit), None);
+    let crossing_limit = format!("{}\u{915}", "x".repeat(358));
+    assert_eq!(
+        (crossing_limit.len(), crossing_limit.chars().count()),
+        (361, 359)
+    );
+    assert_eq!(
+        ValidatedCompanyName::refusal(&crossing_limit),
+        not_established
+    );
+}
+
+/// #2449: the one display rule for a company name, as the agent and the
+/// desktop client both show it. Each row is (name, shown text, refusal).
+#[test]
+fn a_company_name_is_shown_by_one_rule_and_marked_when_it_cannot_be_sent() {
+    let ascii_300 = "S".repeat(300);
+    let ascii_361 = "S".repeat(MAX_COMPANY_NAME_BYTES + 1);
+    let rows: Vec<(String, String, Option<CompanyNameRefusal>)> = vec![
+        // Edge spaces are part of the name: kept, shown and sendable.
+        (
+            "  Synthetic Traders  ".into(),
+            "  Synthetic Traders  ".into(),
+            None,
+        ),
+        // A zero-width space and a right-to-left override are shown as codes.
+        (
+            "Synthetic\u{200b}Tra\u{202e}ders".into(),
+            "Synthetic\\u{200b}Tra\\u{202e}ders".into(),
+            None,
+        ),
+        // A Devanagari name with a joiner is shown as is.
+        (
+            "\u{915}\u{94d}\u{200d}\u{937}".into(),
+            "\u{915}\u{94d}\u{200d}\u{937}".into(),
+            None,
+        ),
+        // Limit: a name of joiners alone is sendable and draws as nothing.
+        ("\u{200d}\u{200c}".into(), "\u{200d}\u{200c}".into(), None),
+        // Limit: a backslash is not escaped, so spelt-out text shows as is.
+        (
+            "Synthetic\\u{200b}".into(),
+            "Synthetic\\u{200b}".into(),
+            None,
+        ),
+        // Over 255 bytes and within the limit: sendable, shown whole.
+        (ascii_300.clone(), ascii_300, None),
+        // A control character marks the name, and every control and format
+        // character in it is shown as a code, the joiner included.
+        (
+            "Synthetic\u{7}Tra\u{200d}ders".into(),
+            "Synthetic\\u{0007}Tra\\u{200d}ders".into(),
+            Some(CompanyNameRefusal::ControlCharacter),
+        ),
+        // An edge control character marks the name too.
+        (
+            "Synthetic Traders\n".into(),
+            "Synthetic Traders\\u{000a}".into(),
+            Some(CompanyNameRefusal::ControlCharacter),
+        ),
+        // Over the limit: marked, never cut.
+        (
+            ascii_361.clone(),
+            ascii_361,
+            Some(CompanyNameRefusal::LengthNotEstablished),
+        ),
+        ("   ".into(), "   ".into(), Some(CompanyNameRefusal::Blank)),
+    ];
+    for (name, text, refusal) in rows {
+        let shown = ShownCompanyName::of(&name);
+        assert_eq!(shown.text(), text, "{name:?}");
+        assert_eq!(shown.refusal(), refusal, "{name:?}");
+        assert_eq!(
+            shown.refusal(),
+            ValidatedCompanyName::refusal(&name),
+            "{name:?}"
+        );
+    }
+    assert_eq!(CompanyNameRefusal::Blank.code(), "company_name_blank");
+    assert_eq!(
+        CompanyNameRefusal::ControlCharacter.code(),
+        "company_name_control_character"
+    );
+    assert_eq!(
+        CompanyNameRefusal::LengthNotEstablished.code(),
+        "company_name_length_not_established"
     );
 }

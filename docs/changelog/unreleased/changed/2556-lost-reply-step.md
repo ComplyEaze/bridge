@@ -1,0 +1,1 @@
+- Fixed the lost-reply next step to explain receipt matching without a batch id, allow receipts without request trails, and omit the step when it would exceed the verification byte budget (#2556).

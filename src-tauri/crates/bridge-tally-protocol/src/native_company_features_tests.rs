@@ -60,11 +60,17 @@ fn flag(name: &str, value: &str) -> String {
 #[test]
 fn the_request_is_byte_equal_to_each_committed_capture() {
     assert_eq!(
-        render_company_features_request("BRIDGE SHAPE LAB", &guid(SHAPE_GUID)),
+        render_company_features_request(
+            &ValidatedCompanyName::new("BRIDGE SHAPE LAB").unwrap(),
+            &guid(SHAPE_GUID),
+        ),
         decode_xml_bytes(SHAPE_REQUEST).unwrap()
     );
     assert_eq!(
-        render_company_features_request("BRIDGE CORPUS FOREX", &guid(FOREX_GUID)),
+        render_company_features_request(
+            &ValidatedCompanyName::new("BRIDGE CORPUS FOREX").unwrap(),
+            &guid(FOREX_GUID),
+        ),
         decode_xml_bytes(FOREX_REQUEST).unwrap()
     );
 }
@@ -80,7 +86,10 @@ fn a_guid_that_could_break_the_filter_cannot_be_built_and_a_name_is_escaped() {
     for bad in ["", "a\" or 1=1 or \"", "3a6bd6e1 b835", "x;y"] {
         assert!(CompanyGuid::parse(bad).is_err(), "{bad:?}");
     }
-    let request = render_company_features_request("A & B <C>", &guid(SHAPE_GUID));
+    let request = render_company_features_request(
+        &ValidatedCompanyName::new("A & B <C>").unwrap(),
+        &guid(SHAPE_GUID),
+    );
     assert!(request.contains("<SVCURRENTCOMPANY>A &amp; B &lt;C&gt;</SVCURRENTCOMPANY>"));
 }
 

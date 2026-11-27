@@ -383,7 +383,10 @@ fn controls_source_parse_admits_exactly_the_three_values_and_nothing_else() {
             CsvRequest::from_args(&json!({"statement_path": path, "controls_source": wrong}))
                 .err()
                 .expect("a value outside the three is refused");
-        assert_eq!(refused, "argument_invalid:controls_source", "{wrong:?}");
+        assert_eq!(
+            refused.code, "argument_invalid:controls_source",
+            "{wrong:?}"
+        );
     }
     for (text, source) in [
         ("prior_statement", ControlsSource::PriorStatement),
@@ -626,9 +629,14 @@ fn the_file_is_read_to_the_edge_readers_bound_and_no_further() {
         &vec![b'x'; bound + 1],
     ))
     .expect("an absolute local path");
-    assert_eq!(read_csv_file(&at_bound).map(|bytes| bytes.len()), Ok(bound));
     assert_eq!(
-        read_csv_file(&past_bound),
+        read_csv_file(&at_bound)
+            .map(|bytes| bytes.len())
+            .map_err(|failure| failure.code),
+        Ok(bound)
+    );
+    assert_eq!(
+        read_csv_file(&past_bound).map_err(|failure| failure.code),
         Err("statement_file_too_large".to_string())
     );
 }

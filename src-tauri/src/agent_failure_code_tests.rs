@@ -175,6 +175,91 @@ const TIE_OUT: &[(TieOutCode, &str)] = &[
     ),
 ];
 
+const BANK_STATEMENT: &[(BankStatementCode, &str)] = &[
+    (BankStatementCode::TaskFailed, "statement_task_failed"),
+    (
+        BankStatementCode::ControlTotalsRequired,
+        "statement_control_totals_required",
+    ),
+    (
+        BankStatementCode::ReversedDateWindow,
+        "statement_reversed_date_window",
+    ),
+    (
+        BankStatementCode::PasswordFileUnreadable,
+        "statement_password_file_unreadable",
+    ),
+    (
+        BankStatementCode::PasswordFilePermissions,
+        "statement_password_file_permissions",
+    ),
+    (
+        BankStatementCode::PasswordFileTooLarge,
+        "statement_password_file_too_large",
+    ),
+    (
+        BankStatementCode::PasswordFileNotUtf8,
+        "statement_password_file_not_utf8",
+    ),
+    (
+        BankStatementCode::FileUnreadable,
+        "statement_file_unreadable",
+    ),
+    (BankStatementCode::FileTooLarge, "statement_file_too_large"),
+    (
+        BankStatementCode::PdfEngineSettingInvalid,
+        "statement_pdf_engine_setting_invalid",
+    ),
+    (
+        BankStatementCode::PdfEngineUnavailable,
+        "statement_pdf_engine_unavailable",
+    ),
+    (
+        BankStatementCode::ProposalsDirectoryUnavailable,
+        "statement_proposals_directory_unavailable",
+    ),
+    (
+        BankStatementCode::ProposalsSerializationFailed,
+        "statement_proposals_serialization_failed",
+    ),
+    (
+        BankStatementCode::ProposalsWriteFailed,
+        "statement_proposals_write_failed",
+    ),
+    (
+        BankStatementCode::ProposalsSha256Required,
+        "proposals_sha256_required",
+    ),
+    (BankStatementCode::ProposalsNotFound, "proposals_not_found"),
+    (
+        BankStatementCode::ProposalsFileUnreadable,
+        "proposals_file_unreadable",
+    ),
+    (
+        BankStatementCode::ProposalsFileTooLarge,
+        "proposals_file_too_large",
+    ),
+    (BankStatementCode::ProposalsChanged, "proposals_changed"),
+    (
+        BankStatementCode::ArgumentSchemaInvalid,
+        "argument_schema_invalid",
+    ),
+    (
+        BankStatementCode::ProposalsIdWithVouchers,
+        "proposals_id_with_vouchers",
+    ),
+    (BankStatementCode::CashQuestionsOpen, "cash_questions_open"),
+    (BankStatementCode::ProposalsLegacy, "proposals_legacy"),
+    (
+        BankStatementCode::ControlFiguresWithThisFile,
+        "statement_control_figures_with_this_file",
+    ),
+    (
+        BankStatementCode::ControlFiguresRequired,
+        "statement_control_figures_required",
+    ),
+];
+
 const STOCK_ITEM_CREATE: &[(StockItemCreateCode, &str)] = &[
     (
         StockItemCreateCode::ReadUnreadable,
@@ -540,6 +625,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(COMPANY_READ),
         of(CENSUS_REUSE),
         of(E_INVOICE_READBACK),
+        of(BANK_STATEMENT),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -577,6 +663,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("CompanyReadCode", CompanyReadCode::ALL),
         of("CensusReuseCode", CensusReuseCode::ALL),
         of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
+        of("BankStatementCode", BankStatementCode::ALL),
     ];
     #[cfg(feature = "lab-writes")]
     let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
@@ -624,7 +711,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        19,
+        20,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -651,6 +738,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(MOVEMENT), MovementCode::ALL);
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
+    assert_eq!(variants(BANK_STATEMENT), BankStatementCode::ALL);
     assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
     assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
     #[cfg(feature = "lab-writes")]
@@ -693,6 +781,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(MOVEMENT, MovementCode::as_str);
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
+    check_pins(BANK_STATEMENT, BankStatementCode::as_str);
     check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
     check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);
     #[cfg(feature = "lab-writes")]
@@ -716,9 +805,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let codes = declared();
     // The three lab master codes are declared only in a build with `lab-writes`.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 77 + 4 + 2 + 1 + 1 + 4;
+    let expected = 77 + 4 + 2 + 1 + 1 + 4 + 25;
     #[cfg(feature = "lab-writes")]
-    let expected = 80 + 4 + 2 + 1 + 1 + 4;
+    let expected = 80 + 4 + 2 + 1 + 1 + 4 + 25;
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

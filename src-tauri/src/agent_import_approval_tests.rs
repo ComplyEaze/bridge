@@ -358,10 +358,11 @@ async fn another_batch_is_refused_while_one_waits_for_its_person() {
     assert_eq!(scripted.counts(), [1]);
 }
 
-/// Wait until a held dialog's answer has been stamped by its task. Bounded: a
-/// dialog that is no longer held is never stamped, which fails the test.
+/// Wait until a held dialog's answer has been stamped by its task. Bounded
+/// only so that a hang fails (#2551): a dialog that is no longer held is never
+/// stamped, which fails the test, and a slow runner only waits longer.
 async fn until_answered(server: &Server, batch_id: &str) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(HANG_GUARD, async {
         while !server.post_approvals.answered_for_test(batch_id) {
             tokio::time::sleep(Duration::from_millis(1)).await;
         }

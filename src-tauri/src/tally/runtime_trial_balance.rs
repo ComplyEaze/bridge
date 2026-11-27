@@ -625,7 +625,7 @@ impl TallyRuntime {
                             let inventory = if offered.is_some() {
                                 let flags_read: anyhow::Result<_> = async {
                                     let request = render_company_inventory_flags_request(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         identity.company_guid_value(),
                                     );
                                     let (xml, bytes, hash) = client

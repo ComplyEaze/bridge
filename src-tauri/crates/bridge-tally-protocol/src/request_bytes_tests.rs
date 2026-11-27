@@ -624,7 +624,7 @@ fn built_requests() -> Vec<(String, String)> {
 
     row(
         "render_company_inventory_flags_request".into(),
-        render_company_inventory_flags_request(COMPANY, &guid),
+        render_company_inventory_flags_request(&company, &guid),
     );
     row(
         "render_native_stock_summary_request".into(),
@@ -632,7 +632,7 @@ fn built_requests() -> Vec<(String, String)> {
     );
     row(
         "render_company_features_request".into(),
-        render_company_features_request(COMPANY, &guid),
+        render_company_features_request(&company, &guid),
     );
     row(
         "render_ledger_outstandings_request".into(),
@@ -642,17 +642,17 @@ fn built_requests() -> Vec<(String, String)> {
     let ledger_plan = LedgerCensusPlan::new(25, CENSUS_LIMITS).expect("a census plan");
     row(
         "render_ledger_census_slice_request/(10,20]".into(),
-        render_ledger_census_slice_request(COMPANY, &ledger_plan.slices()[1]),
+        render_ledger_census_slice_request(&company, &ledger_plan.slices()[1]),
     );
     let item_plan = CensusPlan::<StockItems>::new(25, CENSUS_LIMITS).expect("a census plan");
     row(
         "render_stock_item_census_slice_request/(10,20]".into(),
-        render_stock_item_census_slice_request(COMPANY, &item_plan.slices()[1]),
+        render_stock_item_census_slice_request(&company, &item_plan.slices()[1]),
     );
     let group_plan = CensusPlan::<StockGroups>::new(25, CENSUS_LIMITS).expect("a census plan");
     row(
         "render_stock_group_census_slice_request/(10,20]".into(),
-        render_stock_group_census_slice_request(COMPANY, &group_plan.slices()[1]),
+        render_stock_group_census_slice_request(&company, &group_plan.slices()[1]),
     );
 
     for kind in every!(NativeStatementKind: BalanceSheet, ProfitAndLoss) {

@@ -46,10 +46,11 @@ impl Server {
             .get(&CapabilityFeatureId::LoadedCompanies)
             .filter(|feature| feature.state == CapabilityState::Unknown)
             .map(|feature| {
-                feature
-                    .safe_reason_code
-                    .clone()
-                    .unwrap_or_else(|| "company_list_not_established".to_string())
+                feature.safe_reason_code.clone().unwrap_or_else(|| {
+                    super::failure_code::CompanyCode::ListNotEstablished
+                        .as_str()
+                        .to_string()
+                })
             });
         let mut evidence = evidence_from_runtime_read(wire_evidence);
         if refusal_reason.is_some() {
@@ -100,7 +101,10 @@ impl Server {
         guid: &str,
     ) -> Result<(TallyCompany, VerifiedCompanyIdentity, Evidence), ToolFailure> {
         if guid.trim().is_empty() {
-            return Err("company_guid_required".to_string().into());
+            return Err(super::failure_code::CompanyCode::GuidRequired
+                .as_str()
+                .to_string()
+                .into());
         }
         let (companies, evidence) = self.companies().await?;
         let result: Result<(TallyCompany, VerifiedCompanyIdentity, Evidence), ToolFailure> =
@@ -126,9 +130,13 @@ impl Server {
                 }
                 if matches.len() != 1 {
                     return Err(if matches.is_empty() {
-                        "company_identity_not_found".to_string()
+                        super::failure_code::CompanyCode::IdentityNotFound
+                            .as_str()
+                            .to_string()
                     } else {
-                        "company_identity_ambiguous".to_string()
+                        super::failure_code::CompanyCode::IdentityAmbiguous
+                            .as_str()
+                            .to_string()
                     }
                     .into());
                 }
@@ -171,10 +179,10 @@ impl Server {
                             "company_books_from_invalid"
                         }
                         crate::tally::VerifiedCompanyIdentityError::Missing => {
-                            "company_identity_not_found"
+                            super::failure_code::CompanyCode::IdentityNotFound.as_str()
                         }
                         crate::tally::VerifiedCompanyIdentityError::DuplicateTuple => {
-                            "company_identity_ambiguous"
+                            super::failure_code::CompanyCode::IdentityAmbiguous.as_str()
                         }
                         crate::tally::VerifiedCompanyIdentityError::DisplayScopeAmbiguous => {
                             "company_display_scope_ambiguous"
@@ -194,8 +202,11 @@ pub(super) fn parse_native_company_guid(
 ) -> Result<bridge_tally_core::company_guid::CompanyGuid, String> {
     // Native company GUIDs use hyphenated UUID spelling. Case is accepted and
     // normalised; no UUID alias that the native identity bracket rejects is.
-    bridge_tally_core::company_guid::CompanyGuid::parse(value)
-        .map_err(|_| "company_guid_invalid".to_string())
+    bridge_tally_core::company_guid::CompanyGuid::parse(value).map_err(|_| {
+        super::failure_code::CompanyCode::GuidInvalid
+            .as_str()
+            .to_string()
+    })
 }
 
 pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Value {

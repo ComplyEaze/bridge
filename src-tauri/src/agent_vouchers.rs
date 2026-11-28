@@ -1,4 +1,5 @@
 //! Vouchers for the local MCP adapter.
+use super::failure_code::{ListingSnapshotCode, VoucherListingCode};
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::TallyDate;
@@ -317,7 +318,11 @@ pub(super) const COST_CENTRE_BASIS: &str = "a `cost_centre` bucket is one cost c
 pub(super) fn summary_failure(code: String) -> ToolFailure {
     // An entry's own reason is the cause: the code travels with it as text, never data.
     if let Some(reason) = code.strip_prefix("summary_cost_centre_unreadable:") {
-        let mut failure = ToolFailure::from("summary_cost_centre_unreadable".to_string());
+        let mut failure = ToolFailure::from(
+            VoucherListingCode::SummaryCostCentreUnreadable
+                .as_str()
+                .to_string(),
+        );
         failure.cause = Some(
             CostCentreProblem::from_reason(reason).map_or("unknown", CostCentreProblem::reason),
         );
@@ -329,7 +334,11 @@ pub(super) fn summary_failure(code: String) -> ToolFailure {
                 Some((gap, ledger)) => (gap, Some(ledger)),
                 None => (rest, None),
             };
-            let mut failure = ToolFailure::from("summary_group_unresolved".to_string());
+            let mut failure = ToolFailure::from(
+                VoucherListingCode::SummaryGroupUnresolved
+                    .as_str()
+                    .to_string(),
+            );
             failure.cause = Some(voucher_groups::static_gap_code(gap));
             if let Some(ledger) = ledger {
                 failure
@@ -607,7 +616,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 type_guid,
                 identity.company_guid(),
             ) {
-                return Err(ToolFailure::from("voucher_type_guid_foreign".to_string()));
+                return Err(ToolFailure::from(VoucherListingCode::TypeGuidForeign.as_str().to_string()));
             }
         }
         let requested_ledger = optional_string(args, "ledger")?;
@@ -664,7 +673,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 .await?;
             accumulate_evidence(&mut accumulated, marks_evidence);
             if marks.masters() > GROUP_LEDGER_LIST_MARK_LIMIT {
-                let mut failure = ToolFailure::from("summary_group_book_too_large".to_string());
+                let mut failure = ToolFailure::from(VoucherListingCode::SummaryGroupBookTooLarge.as_str().to_string());
                 failure.read_size = Some(Box::new(ReadSize {
                     master_alter_id: marks.masters(),
                     estimated_bytes: marks.masters().saturating_mul(GROUP_LEDGER_LIST_BYTES_PER_LEDGER),
@@ -786,7 +795,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     return Err(super::failure_code::ReadCode::LedgerSnapshotDrifted.into());
                 }
                 if first != second {
-                    return Err("group_snapshot_drifted".to_string().into());
+                    return Err(VoucherListingCode::GroupSnapshotDrifted.as_str().to_string().into());
                 }
                 Some(Arc::new(first))
             }
@@ -850,7 +859,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     server.read_voucher_type_catalogue(&identity).await?;
                 accumulate_evidence(&mut accumulated, catalogue_evidence);
                 if let Some(nearest) = unknown_voucher_type(name, &book) {
-                    let mut failure = ToolFailure::from("unknown_voucher_type".to_string());
+                    let mut failure = ToolFailure::from(VoucherListingCode::UnknownVoucherType.as_str().to_string());
                     failure.candidates = Some(Box::new(Candidates {
                         requested: Some(name.clone()),
                         items: nearest.into_iter().map(BookVoucherType::json).collect(),
@@ -876,10 +885,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             // `items` then does not cover the window: say so in the state an
             // agent reads first, not only in a field it might skip.
             result_state = "partial";
-            corroboration_reason = Some("vouchers_withheld");
+            corroboration_reason = Some(VoucherListingCode::VouchersWithheld.as_str());
             if let Some(evidence) = accumulated.as_mut() {
                 evidence.state = "partial";
-                evidence.reason_code = Some("vouchers_withheld".to_string());
+                evidence.reason_code = Some(VoucherListingCode::VouchersWithheld.as_str().to_string());
             }
         }
         let rows = Arc::new(rows);
@@ -1001,7 +1010,7 @@ impl Server {
     fn drop_voucher_page(&self, key: &VoucherPageKey) -> Result<(), ToolFailure> {
         self.voucher_pages
             .lock()
-            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .map_err(|_| ListingSnapshotCode::StoreUnavailable.as_str().to_string())?
             .drop_key(key);
         Ok(())
     }
@@ -1016,7 +1025,7 @@ impl Server {
         let kept = self
             .voucher_pages
             .lock()
-            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .map_err(|_| ListingSnapshotCode::StoreUnavailable.as_str().to_string())?
             .hold(snapshot.clone());
         Ok(kept.then_some(snapshot))
     }
@@ -1044,7 +1053,7 @@ impl Server {
         let held = self
             .voucher_pages
             .lock()
-            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .map_err(|_| ListingSnapshotCode::StoreUnavailable.as_str().to_string())?
             .current(key);
         // Nothing held for this question: no marks are read for nothing.
         let Some(held) = held else {
@@ -1163,8 +1172,9 @@ impl Server {
         )
         .map_err(|error| {
             // The code names what failed and the cause why (bridge#676).
-            let mut failure = ToolFailure::from("voucher_type_export_invalid".to_string())
-                .with_prior_evidence(evidence.clone());
+            let mut failure =
+                ToolFailure::from(VoucherListingCode::TypeExportInvalid.as_str().to_string())
+                    .with_prior_evidence(evidence.clone());
             failure.cause = Some(error.safe_code());
             failure
         })?;

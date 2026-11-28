@@ -6,6 +6,7 @@ use bridge_tally_protocol::group_ancestry::{AncestryChain, AncestryGap, GroupInd
 use bridge_tally_protocol::gst_registration::GstRegistrationHistory;
 use bridge_tally_protocol::PartyLedgerMasterFields;
 
+use super::failure_code::{LedgerMastersCode, ListingSnapshotCode};
 use super::*;
 
 /// The `group` filter's match scope. `Immediate` is the tool's original,
@@ -350,7 +351,9 @@ fn requested_gstin_as_of(args: &Value) -> Result<Option<String>, String> {
     };
     let fields = optional_string(args, "fields")?.unwrap_or_else(|| "basic".to_string());
     if !ledger_master_fields(&fields)? {
-        return Err("ledger_masters_as_of_requires_compliance".to_string());
+        return Err(LedgerMastersCode::AsOfRequiresCompliance
+            .as_str()
+            .to_string());
     }
     normalized_date(&as_of).map(|date| Some(date.as_str().to_string()))
 }
@@ -366,7 +369,9 @@ fn requested_gst_details(args: &Value) -> Result<bool, String> {
     };
     let fields = optional_string(args, "fields")?.unwrap_or_else(|| "basic".to_string());
     if include && !ledger_master_fields(&fields)? {
-        return Err("ledger_masters_gst_details_requires_compliance".to_string());
+        return Err(LedgerMastersCode::GstDetailsRequiresCompliance
+            .as_str()
+            .to_string());
     }
     Ok(include)
 }
@@ -383,10 +388,14 @@ fn requested_mailing_details(args: &Value, gst_details: bool) -> Result<bool, St
     };
     let fields = optional_string(args, "fields")?.unwrap_or_else(|| "basic".to_string());
     if include && !ledger_master_fields(&fields)? {
-        return Err("ledger_masters_mailing_details_requires_compliance".to_string());
+        return Err(LedgerMastersCode::MailingDetailsRequiresCompliance
+            .as_str()
+            .to_string());
     }
     if include && gst_details {
-        return Err("ledger_masters_mailing_details_with_gst_details_not_captured".to_string());
+        return Err(LedgerMastersCode::MailingDetailsWithGstDetailsNotCaptured
+            .as_str()
+            .to_string());
     }
     Ok(include)
 }
@@ -669,7 +678,7 @@ impl ListingSnapshots {
 /// it: the book moved, or the snapshot is no longer held (expired, replaced
 /// by a newer first page, evicted, or never held).
 pub(super) fn snapshot_refusal(cause: &'static str) -> ToolFailure {
-    let mut failure = ToolFailure::from("listing_snapshot_changed".to_string());
+    let mut failure = ToolFailure::from(ListingSnapshotCode::Changed.as_str().to_string());
     failure.cause = Some(cause);
     failure
 }
@@ -716,7 +725,7 @@ impl Server {
             let mut ledgers = snapshot.rows.iter().collect::<Vec<_>>();
             let group_filter = match (group.as_deref(), snapshot.groups.as_ref().map(|groups| &groups.index)) {
                 (Some(group), Some(index)) => Some(apply_group_filter(&mut ledgers, scope, group, index)),
-                (Some(_), None) => return Err("listing_snapshot_groups_missing".to_string().into()),
+                (Some(_), None) => return Err(LedgerMastersCode::SnapshotGroupsMissing.as_str().to_string().into()),
                 (None, _) => None,
             };
             let total = ledgers.len();
@@ -780,7 +789,7 @@ impl Server {
         let held = self
             .listings
             .lock()
-            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .map_err(|_| ListingSnapshotCode::StoreUnavailable.as_str().to_string())?
             .current(identity.company_guid(), kind);
         match (held, snapshot_id) {
             (Some(held), Some(id)) if held.id == id => {
@@ -803,7 +812,7 @@ impl Server {
         let snapshot = Arc::new(snapshot);
         self.listings
             .lock()
-            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .map_err(|_| ListingSnapshotCode::StoreUnavailable.as_str().to_string())?
             .hold(snapshot.clone());
         Ok(snapshot)
     }
@@ -818,7 +827,7 @@ impl Server {
     ) -> Result<(), ToolFailure> {
         self.listings
             .lock()
-            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .map_err(|_| ListingSnapshotCode::StoreUnavailable.as_str().to_string())?
             .drop_kind(identity.company_guid(), kind);
         Ok(())
     }
@@ -952,7 +961,10 @@ impl Server {
             ListingKind::TrialBalance { .. }
             | ListingKind::Masters { .. }
             | ListingKind::StockSummary { .. } => {
-                return Err("listing_kind_not_a_ledger_listing".to_string().into());
+                return Err(LedgerMastersCode::KindNotALedgerListing
+                    .as_str()
+                    .to_string()
+                    .into());
             }
         };
         Ok(ListingSnapshot::new(

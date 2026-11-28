@@ -457,6 +457,228 @@ const IMPORT_POST: &[(ImportPostCode, &str)] = &[
     ),
 ];
 
+/// The import payload's own checks.
+const IMPORT_PAYLOAD: &[(ImportPayloadCode, &str)] = &[
+    (ImportPayloadCode::SchemaInvalid, "voucher_schema_invalid"),
+    (
+        ImportPayloadCode::VoucherTypeUnqualified,
+        "import_voucher_type_unqualified",
+    ),
+    (ImportPayloadCode::ShapesMixed, "voucher_type_shapes_mixed"),
+    (
+        ImportPayloadCode::InvoiceOnePerBatch,
+        "invoice_one_per_batch",
+    ),
+    (ImportPayloadCode::CountInvalid, "voucher_count_invalid"),
+    (
+        ImportPayloadCode::TxnIdInvalidOrDuplicate,
+        "bridge_txn_id_invalid_or_duplicate",
+    ),
+    (ImportPayloadCode::EntriesTooFew, "voucher_entries_too_few"),
+    (
+        ImportPayloadCode::NarrationReservedMarker,
+        "narration_reserved_marker",
+    ),
+    (ImportPayloadCode::TextInvalid, "voucher_text_invalid"),
+    (ImportPayloadCode::NumberInvalid, "voucher_number_invalid"),
+    (ImportPayloadCode::EntryInvalid, "voucher_entry_invalid"),
+    (
+        ImportPayloadCode::UniqueLedgerLimitExceeded,
+        "voucher_unique_ledger_limit_exceeded",
+    ),
+    (ImportPayloadCode::NotBalanced, "voucher_not_balanced"),
+    (
+        ImportPayloadCode::EntryPairRequired,
+        "voucher_entry_pair_required",
+    ),
+    (
+        ImportPayloadCode::EntryLedgerRepeated,
+        "voucher_entry_ledger_repeated",
+    ),
+    (
+        ImportPayloadCode::NumberUnqualifiedForType,
+        "voucher_number_unqualified_for_type",
+    ),
+    (
+        ImportPayloadCode::ReferenceUnqualifiedForType,
+        "voucher_reference_unqualified_for_type",
+    ),
+    (
+        ImportPayloadCode::DateOutsideCompanyExtent,
+        "voucher_date_outside_company_extent",
+    ),
+    (
+        ImportPayloadCode::EducationDateUnsupported,
+        "education_voucher_date_unsupported",
+    ),
+];
+
+/// The import build's refusals beyond its payload.
+const IMPORT_BUILD: &[(ImportBuildCode, &str)] = &[
+    (
+        ImportBuildCode::InvoiceCompanyStopped,
+        "invoice_company_stopped",
+    ),
+    (
+        ImportBuildCode::CatalogueChanged,
+        "import_catalogue_changed",
+    ),
+    (ImportBuildCode::GroupsChanged, "import_groups_changed"),
+    (
+        ImportBuildCode::ModeChangedDuringBuild,
+        "import_mode_changed_during_build",
+    ),
+    (
+        ImportBuildCode::SkipOnlyTakesNoApprovals,
+        "skip_only_statement_takes_no_approvals",
+    ),
+    (
+        ImportBuildCode::SkipOnlyCannotAmend,
+        "skip_only_statement_cannot_amend",
+    ),
+    (
+        ImportBuildCode::AmendBatchIdInvalid,
+        "import_amend_batch_id_invalid",
+    ),
+    (
+        ImportBuildCode::AmendBatchNotFound,
+        "import_amend_batch_not_found",
+    ),
+    (
+        ImportBuildCode::OnAccountApprovalInvalid,
+        "on_account_approval_invalid",
+    ),
+    (
+        ImportBuildCode::InvoiceReviewLayoutText,
+        "invoice_review_layout_text",
+    ),
+    (
+        ImportBuildCode::InvoiceReviewFormatText,
+        "invoice_review_format_text",
+    ),
+    (
+        ImportBuildCode::InvoiceReviewTooLarge,
+        "invoice_review_too_large",
+    ),
+    (
+        ImportBuildCode::MarkUnobserved,
+        "pre_import_mark_unobserved",
+    ),
+];
+
+/// The import tools' masters refusals.
+const IMPORT_MASTERS: &[(ImportMastersCode, &str)] = &[
+    (ImportMastersCode::LedgersRequired, "ledgers_required"),
+    (
+        ImportMastersCode::ReportIncomplete,
+        "master_report_incomplete",
+    ),
+    (
+        ImportMastersCode::LedgerExportInvalid,
+        "ledger_export_invalid",
+    ),
+    (
+        ImportMastersCode::GroupExportInvalid,
+        "group_export_invalid",
+    ),
+];
+
+/// The import verification's refusals.
+const IMPORT_VERIFY: &[(ImportVerifyCode, &str)] = &[
+    (
+        ImportVerifyCode::IdentityInvalid,
+        "import_verification_identity_invalid",
+    ),
+    (
+        ImportVerifyCode::TagAmbiguous,
+        "import_verification_tag_ambiguous",
+    ),
+    (
+        ImportVerifyCode::TagInvalid,
+        "import_verification_tag_invalid",
+    ),
+    (
+        ImportVerifyCode::PageRequiresProof,
+        "verification_page_requires_proof",
+    ),
+    (
+        ImportVerifyCode::ProofBatchMismatch,
+        "verification_proof_batch_mismatch",
+    ),
+    (ImportVerifyCode::ProofChanged, "verification_proof_changed"),
+    (
+        ImportVerifyCode::TooLargeToReport,
+        "verification_too_large_to_report",
+    ),
+    (
+        ImportVerifyCode::ModeChangedDuringRead,
+        "verification_mode_changed_during_read",
+    ),
+    (
+        ImportVerifyCode::ConflictRetry,
+        "import_verification_conflict_retry",
+    ),
+    (ImportVerifyCode::BindingNotRecorded, "binding_not_recorded"),
+    (ImportVerifyCode::ProofMissing, "verification_proof_missing"),
+    (
+        ImportVerifyCode::ProofTooLarge,
+        "verification_proof_too_large",
+    ),
+    (ImportVerifyCode::ProofAltered, "verification_proof_altered"),
+    (
+        ImportVerifyCode::ProofUnreadable,
+        "verification_proof_unreadable",
+    ),
+    (
+        ImportVerifyCode::BaselineUnreadable,
+        "verified_baseline_unreadable",
+    ),
+    (
+        ImportVerifyCode::BaselineSerializationFailed,
+        "verified_baseline_serialization_failed",
+    ),
+    (
+        ImportVerifyCode::BaselinePublishFailed,
+        "verified_baseline_publish_failed",
+    ),
+];
+
+/// The import's own local files.
+const IMPORT_FILE: &[(ImportFileCode, &str)] = &[
+    (
+        ImportFileCode::PersistedFileUnavailable,
+        "import_persisted_file_unavailable",
+    ),
+    (
+        ImportFileCode::PersistedFileTooLarge,
+        "import_persisted_file_too_large",
+    ),
+    (
+        ImportFileCode::ImportsDirUnavailable,
+        "imports_dir_unavailable",
+    ),
+    (
+        ImportFileCode::FilePermissionsFailed,
+        "import_file_permissions_failed",
+    ),
+    (
+        ImportFileCode::AdmissionLockUnavailable,
+        "import_admission_lock_unavailable",
+    ),
+    (
+        ImportFileCode::PostMastersRecordUnavailable,
+        "post_masters_record_unavailable",
+    ),
+    (
+        ImportFileCode::JournalRollbackFailed,
+        "import_ledger_rollback_failed",
+    ),
+    (
+        ImportFileCode::JournalWriteFailed,
+        "import_ledger_write_failed",
+    ),
+];
+
 const SEARCH: &[(SearchCode, &str)] = &[
     (SearchCode::CriterionEmpty, "search_criterion_empty"),
     (SearchCode::CriterionTooLong, "search_criterion_too_long"),
@@ -957,6 +1179,11 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(IMPORT_POST),
         of(BANK_STATEMENT),
         of(SEARCH),
+        of(IMPORT_PAYLOAD),
+        of(IMPORT_BUILD),
+        of(IMPORT_MASTERS),
+        of(IMPORT_VERIFY),
+        of(IMPORT_FILE),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -1007,6 +1234,11 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("ImportPostCode", ImportPostCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("SearchCode", SearchCode::ALL),
+        of("ImportPayloadCode", ImportPayloadCode::ALL),
+        of("ImportBuildCode", ImportBuildCode::ALL),
+        of("ImportMastersCode", ImportMastersCode::ALL),
+        of("ImportVerifyCode", ImportVerifyCode::ALL),
+        of("ImportFileCode", ImportFileCode::ALL),
     ];
     #[cfg(feature = "lab-writes")]
     let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
@@ -1054,7 +1286,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        32,
+        37,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1098,6 +1330,11 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(VOUCHER_READ), VoucherReadCode::ALL);
     assert_eq!(variants(TOOL_REQUEST), ToolRequestCode::ALL);
     assert_eq!(variants(IMPORT_POST), ImportPostCode::ALL);
+    assert_eq!(variants(IMPORT_PAYLOAD), ImportPayloadCode::ALL);
+    assert_eq!(variants(IMPORT_BUILD), ImportBuildCode::ALL);
+    assert_eq!(variants(IMPORT_MASTERS), ImportMastersCode::ALL);
+    assert_eq!(variants(IMPORT_VERIFY), ImportVerifyCode::ALL);
+    assert_eq!(variants(IMPORT_FILE), ImportFileCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -1153,6 +1390,11 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(VOUCHER_READ, VoucherReadCode::as_str);
     check_pins(TOOL_REQUEST, ToolRequestCode::as_str);
     check_pins(IMPORT_POST, ImportPostCode::as_str);
+    check_pins(IMPORT_PAYLOAD, ImportPayloadCode::as_str);
+    check_pins(IMPORT_BUILD, ImportBuildCode::as_str);
+    check_pins(IMPORT_MASTERS, ImportMastersCode::as_str);
+    check_pins(IMPORT_VERIFY, ImportVerifyCode::as_str);
+    check_pins(IMPORT_FILE, ImportFileCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -1174,13 +1416,13 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
-        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21,
+        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 19, 13, 4, 17, 8,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
-        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21,
+        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 19, 13, 4, 17, 8,
     ]
     .iter()
     .sum();

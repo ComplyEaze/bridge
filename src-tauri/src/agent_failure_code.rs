@@ -747,6 +747,188 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of an import payload's own checks (`agent_import.rs`), each made from the
+    /// vouchers the caller sent and the company's dates, before a file is written or a post sent.
+    pub(crate) enum ImportPayloadCode {
+        /// The tool arguments do not parse as an import payload.
+        SchemaInvalid = "voucher_schema_invalid",
+        /// A voucher's type is not one of the qualified voucher types.
+        VoucherTypeUnqualified = "import_voucher_type_unqualified",
+        /// The batch mixes an invoice with another voucher, or a bank-shaped voucher with one that
+        /// is not.
+        ShapesMixed = "voucher_type_shapes_mixed",
+        /// The batch holds more than one invoice.
+        InvoiceOnePerBatch = "invoice_one_per_batch",
+        /// The company GUID is blank, or the batch holds no voucher or more than a batch admits;
+        /// the build also gives it should its vouchers give no date window.
+        CountInvalid = "voucher_count_invalid",
+        /// A voucher's `bridge_txn_id` is not a valid id, or repeats one earlier in the batch.
+        TxnIdInvalidOrDuplicate = "bridge_txn_id_invalid_or_duplicate",
+        /// A voucher has fewer than two entries.
+        EntriesTooFew = "voucher_entries_too_few",
+        /// A voucher's narration or reference holds Bridge's reserved import marker.
+        NarrationReservedMarker = "narration_reserved_marker",
+        /// A narration, reference or voucher number is empty, too long or holds a control
+        /// character; a voucher number would read back as other text; or, checked before a build
+        /// or a post, a narration would read back as other text or holds a character that draws
+        /// nothing.
+        TextInvalid = "voucher_text_invalid",
+        /// A voucher number is longer than 32 characters, holds `$`, or has white space at either
+        /// end.
+        NumberInvalid = "voucher_number_invalid",
+        /// An entry's ledger is blank, too long, holds a control character other than one trailing
+        /// line break, or would read back as other text; or its amount is not admitted.
+        EntryInvalid = "voucher_entry_invalid",
+        /// The batch names more distinct ledgers than a batch admits.
+        UniqueLedgerLimitExceeded = "voucher_unique_ledger_limit_exceeded",
+        /// A voucher's debit total does not equal its credit total.
+        NotBalanced = "voucher_not_balanced",
+        /// A Payment, Receipt or Contra has no debit entry or no credit entry.
+        EntryPairRequired = "voucher_entry_pair_required",
+        /// A Payment, Receipt or Contra names one ledger on both sides.
+        EntryLedgerRepeated = "voucher_entry_ledger_repeated",
+        /// A Payment, Receipt or Contra carries a voucher number.
+        NumberUnqualifiedForType = "voucher_number_unqualified_for_type",
+        /// A Payment, Receipt or Contra carries a reference.
+        ReferenceUnqualifiedForType = "voucher_reference_unqualified_for_type",
+        /// A voucher's date is before the company's books-from date or after today.
+        DateOutsideCompanyExtent = "voucher_date_outside_company_extent",
+        /// A voucher's date is not one the observed licence mode's date boundaries accept.
+        EducationDateUnsupported = "education_voucher_date_unsupported",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `build_import_xml` (`agent_import.rs`) beyond the payload's own checks: a
+    /// book or mode that moved between its reads, a statement or amendment it cannot take, and an
+    /// invoice that `post_import` would refuse.
+    pub(crate) enum ImportBuildCode {
+        /// The batch holds an invoice, and its company is stopped by an earlier invoice's post, as
+        /// read again under the admission lock.
+        InvoiceCompanyStopped = "invoice_company_stopped",
+        /// The ledger catalogue read again before the file is written differs from the first read.
+        CatalogueChanged = "import_catalogue_changed",
+        /// The group tree read again before the file is written differs from the first read.
+        GroupsChanged = "import_groups_changed",
+        /// The product and licence mode observed after the build's reads is not the one observed
+        /// before them.
+        ModeChangedDuringBuild = "import_mode_changed_during_build",
+        /// A statement build that only records skipped rows was given On Account approvals.
+        SkipOnlyTakesNoApprovals = "skip_only_statement_takes_no_approvals",
+        /// A statement build that only records skipped rows names a batch to amend.
+        SkipOnlyCannotAmend = "skip_only_statement_cannot_amend",
+        /// The batch to amend is not named by a valid batch id.
+        AmendBatchIdInvalid = "import_amend_batch_id_invalid",
+        /// The import journal holds no batch with the id the amendment names.
+        AmendBatchNotFound = "import_amend_batch_not_found",
+        /// The `on_account_approvals` argument is not a list of approvals, each with a hex
+        /// digest.
+        OnAccountApprovalInvalid = "on_account_approval_invalid",
+        /// `post_import` would refuse the saved invoice's approval text for its layout.
+        InvoiceReviewLayoutText = "invoice_review_layout_text",
+        /// `post_import` would refuse the saved invoice's approval text for its format.
+        InvoiceReviewFormatText = "invoice_review_format_text",
+        /// `post_import` would refuse the saved invoice's approval text as too large.
+        InvoiceReviewTooLarge = "invoice_review_too_large",
+        /// The company's voucher mark could not be observed: the company read has no GUID, the
+        /// mark read did not parse for a reason other than a book with no voucher, or the build's
+        /// mark gave no master value. A verification's read of the mark refuses the same way.
+        MarkUnobserved = "pre_import_mark_unobserved",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the import tools' masters (`agent_import.rs`): `validate_masters`' request
+    /// and report, and the ledger catalogue and group tree reads a build, a post and a
+    /// verification make.
+    pub(crate) enum ImportMastersCode {
+        /// `validate_masters` was given no `ledgers` list, an empty one, or one holding a value
+        /// that is not a string.
+        LedgersRequired = "ledgers_required",
+        /// The masters report gave fewer rows than the ledger names it was asked about.
+        ReportIncomplete = "master_report_incomplete",
+        /// The ledger catalogue's request could not be admitted, or its answer could not be used.
+        LedgerExportInvalid = "ledger_export_invalid",
+        /// The group tree's answer did not parse.
+        GroupExportInvalid = "group_export_invalid",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `verify_import` (`agent_import.rs`): a read-back it cannot attribute, a
+    /// page it cannot serve from the persisted proof, a journal that moved while it read, and the
+    /// verified baseline it keeps beside the proof.
+    pub(crate) enum ImportVerifyCode {
+        /// A voucher read back has an empty or repeated GUID, a repeated master id, or neither.
+        IdentityInvalid = "import_verification_identity_invalid",
+        /// A voucher read back carries more than one import marker, or two carry the same
+        /// transaction id.
+        TagAmbiguous = "import_verification_tag_ambiguous",
+        /// A voucher read back carries an import marker whose transaction id is not valid.
+        TagInvalid = "import_verification_tag_invalid",
+        /// A page after the first was asked for without `proof_sha256`.
+        PageRequiresProof = "verification_page_requires_proof",
+        /// The persisted proof names another batch, or, for a later page, another company.
+        ProofBatchMismatch = "verification_proof_batch_mismatch",
+        /// The persisted proof is not the one the page's `proof_sha256` names: a newer
+        /// verification replaced it.
+        ProofChanged = "verification_proof_changed",
+        /// The parts of a page that are never cut exceed the response byte limit.
+        TooLargeToReport = "verification_too_large_to_report",
+        /// The product and licence mode observed after the verification's reads is not the one
+        /// observed before them.
+        ModeChangedDuringRead = "verification_mode_changed_during_read",
+        /// The batch's journal record moved since this verification read it, a rollback recorded
+        /// since covers the batch, or its post-span verdict is already recorded.
+        ConflictRetry = "import_verification_conflict_retry",
+        /// The post-span verdict appended to the journal did not read back as the one written; a
+        /// verification's report also names it when recording that verdict failed.
+        BindingNotRecorded = "binding_not_recorded",
+        /// The persisted proof could not be opened or read.
+        ProofMissing = "verification_proof_missing",
+        /// The persisted proof exceeds the size bound.
+        ProofTooLarge = "verification_proof_too_large",
+        /// The persisted proof does not hash to the digest its recorded name carries.
+        ProofAltered = "verification_proof_altered",
+        /// The persisted proof does not parse as JSON.
+        ProofUnreadable = "verification_proof_unreadable",
+        /// The batch's verified baseline files could not be read.
+        BaselineUnreadable = "verified_baseline_unreadable",
+        /// The verified baseline's addition could not be serialized.
+        BaselineSerializationFailed = "verified_baseline_serialization_failed",
+        /// The verified baseline's addition could not be written.
+        BaselinePublishFailed = "verified_baseline_publish_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the import's own local files (`agent_import.rs`): the imports directory,
+    /// the persisted XML, the admission lock, a post's check record and the journal's append.
+    pub(crate) enum ImportFileCode {
+        /// The XML file persisted for a batch could not be opened, its size read, or its bytes
+        /// read.
+        PersistedFileUnavailable = "import_persisted_file_unavailable",
+        /// The XML file persisted for a batch exceeds the size bound.
+        PersistedFileTooLarge = "import_persisted_file_too_large",
+        /// The private imports directory could not be prepared.
+        ImportsDirUnavailable = "imports_dir_unavailable",
+        /// The imports directory, or an import file, could not be made private to the user.
+        #[cfg_attr(not(unix), allow(dead_code))]
+        FilePermissionsFailed = "import_file_permissions_failed",
+        /// The import admission lock file could not be opened for a shared lock.
+        AdmissionLockUnavailable = "import_admission_lock_unavailable",
+        /// The imports directory for a post's pending check record could not be prepared, or the
+        /// record could not be written.
+        PostMastersRecordUnavailable = "post_masters_record_unavailable",
+        /// A failed journal append could not be cut back and synced.
+        JournalRollbackFailed = "import_ledger_rollback_failed",
+        /// A journal append failed; only a test seam gives this code now.
+        #[cfg_attr(not(test), allow(dead_code))]
+        JournalWriteFailed = "import_ledger_write_failed",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

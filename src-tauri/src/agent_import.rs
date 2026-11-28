@@ -113,7 +113,9 @@ pub(super) use transfers::{check_not_run_section, counts_only_section, trim_sect
 #[path = "agent_import_verification.rs"]
 mod verification;
 use super::failure_code::{
-    CompanyReadCode, ImportAckCode, ImportLedgerCode, ProposalsCode, ReadCode,
+    CompanyReadCode, ImportAckCode, ImportBuildCode, ImportFileCode, ImportLedgerCode,
+    ImportMastersCode, ImportPayloadCode, ImportPostCode, ImportVerifyCode, ProposalsCode,
+    ReadCode, ToolRequestCode,
 };
 use crate::local_files::visible_path::user_visible_path;
 use std::path::{Path, PathBuf};
@@ -184,7 +186,7 @@ fn pre_import_mark_refusal(parse_error: &str) -> &'static str {
     if parse_error == VOUCHER_CHECKPOINT_NOT_OBSERVED {
         "empty_book_first_import"
     } else {
-        "pre_import_mark_unobserved"
+        ImportBuildCode::MarkUnobserved.as_str()
     }
 }
 
@@ -1297,10 +1299,10 @@ impl ImportReadSource {
             )?;
             identities
                 .admit(row.guid.as_deref(), master_id)
-                .map_err(|_| "import_verification_identity_invalid".to_string())?;
+                .map_err(|_| ImportVerifyCode::IdentityInvalid.as_str().to_string())?;
             row.master_id = master_id.map(|id| id.to_string());
             if row.guid.is_none() && row.master_id.is_none() {
-                return Err("import_verification_identity_invalid".into());
+                return Err(ImportVerifyCode::IdentityInvalid.as_str().into());
             }
             let narration = row.narration.as_deref().unwrap_or_default();
             let mut markers = narration_markers(narration);
@@ -1309,13 +1311,13 @@ impl ImportReadSource {
                 // first would resolve that silently, which is what the
                 // presence contract refuses on the same evidence.
                 if markers.next().is_some() {
-                    return Err("import_verification_tag_ambiguous".into());
+                    return Err(ImportVerifyCode::TagAmbiguous.as_str().into());
                 }
                 let tag = first
                     .filter(|id| valid_txn_id(id))
-                    .ok_or_else(|| "import_verification_tag_invalid".to_string())?;
+                    .ok_or_else(|| ImportVerifyCode::TagInvalid.as_str().to_string())?;
                 if !transaction_tags.insert(tag.to_string()) {
-                    return Err("import_verification_tag_ambiguous".into());
+                    return Err(ImportVerifyCode::TagAmbiguous.as_str().into());
                 }
             }
         }
@@ -1352,12 +1354,12 @@ impl Server {
         let ledgers = args
             .get("ledgers")
             .and_then(Value::as_array)
-            .ok_or_else(|| "ledgers_required".to_string())?
+            .ok_or_else(|| ImportMastersCode::LedgersRequired.as_str().to_string())?
             .iter()
             .map(Value::as_str)
             .collect::<Option<Vec<_>>>()
             .filter(|names| !names.is_empty())
-            .ok_or_else(|| "ledgers_required".to_string())?;
+            .ok_or_else(|| ImportMastersCode::LedgersRequired.as_str().to_string())?;
         // Before either read. A name the core refuses is refused at any
         // catalogue, so verifying the company and reading its ledgers first
         // would spend two live round trips — and retain evidence of them — to
@@ -1661,7 +1663,7 @@ impl Server {
                     .import_invoice_stop_while_admitted(&payload.company_guid)?
                     .is_some()
             {
-                return Err(ToolFailure::from("invoice_company_stopped".to_string())
+                return Err(ToolFailure::from(ImportBuildCode::InvoiceCompanyStopped.as_str().to_string())
                     .with_prior_evidence(accumulated.clone()));
             }
             let lineage = match payload.amends_batch_id {
@@ -1680,14 +1682,14 @@ impl Server {
                 )? {
                     return Ok(ToolOutcome {
                         payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"error": {
-                            "code":"import_txn_already_posted",
+                            "code":ImportPostCode::TxnAlreadyPosted.as_str(),
                             "message":"No file was written: another batch of this company already sent, or was found to have posted, a row of this batch.",
                             "blocking_batch_id":blocking,
                             "next_step":BUILD_TXN_ALREADY_POSTED_NEXT_STEP
                         }}}),
                         evidence: Evidence {
                             state: "partial",
-                            reason_code: Some("import_txn_already_posted".to_string()),
+                            reason_code: Some(ImportPostCode::TxnAlreadyPosted.as_str().to_string()),
                             ..accumulated.clone()
                         },
                         company_guid: Some(payload.company_guid),
@@ -1703,7 +1705,7 @@ impl Server {
             let batch_id = format!("bridge-{}", Uuid::new_v4());
             let built_at = now();
             let origin = super::canonical_loopback_origin(&self.settings.endpoint)
-                .map_err(|_| "host_setting_invalid".to_string())?;
+                .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?;
             let amends_batch_id = lineage
                 .as_ref()
                 .map(|lineage| lineage.identity_batch_id.clone());
@@ -1783,7 +1785,7 @@ impl Server {
             // batch whose approval was asked.
             let digest_company = import_company_tuple(&company)?;
             let digest_endpoint = super::canonical_loopback_origin(&self.settings.endpoint)
-                .map_err(|_| "host_setting_invalid".to_string())?;
+                .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?;
             let bill_wise_context = bill_wise::DigestContext {
                 company: &digest_company,
                 endpoint_origin: &digest_endpoint,
@@ -1836,7 +1838,7 @@ impl Server {
             let vouchers = payload.vouchers.iter().map(ImportVoucher::numbering_at_build);
             let master_mark = mark
                 .master_value
-                .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+                .ok_or_else(|| ImportBuildCode::MarkUnobserved.as_str().to_string())?;
             match self
                 .admit_voucher_numbering(&identity, master_mark, vouchers, &mut accumulated)
                 .await
@@ -1926,7 +1928,7 @@ impl Server {
             // Compare the complete captured catalogue, including identities and parents.
             // This proves stability across these observations, not an atomic snapshot.
             if catalogue_evidence.response_sha256 != repeated_catalogue_evidence.response_sha256 {
-                return Err("import_catalogue_changed".to_string().into());
+                return Err(ImportBuildCode::CatalogueChanged.as_str().to_string().into());
             }
             // The classification that admitted these legs rests on the group
             // collection as much as on the catalogue, so hold it to the same
@@ -1936,7 +1938,7 @@ impl Server {
                     self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), repeated_group_evidence.clone());
                 if group_evidence.response_sha256 != repeated_group_evidence.response_sha256 {
-                    return Err("import_groups_changed".to_string().into());
+                    return Err(ImportBuildCode::GroupsChanged.as_str().to_string().into());
                 }
             }
             // The flags came in the catalogue rows, so the byte comparison above
@@ -1950,7 +1952,7 @@ impl Server {
                 None => date_window(payload.vouchers.iter().map(|voucher| &voucher.date)),
             }
             // `validate_payload` refuses an empty batch the same way.
-            .ok_or_else(|| "voucher_count_invalid".to_string())?;
+            .ok_or_else(|| ImportPayloadCode::CountInvalid.as_str().to_string())?;
             // Exercise the exact future readback projection before publishing a file.
             // This observes today's source, not a bound on later Tally mutations.
             // The high-water mark was read just above, so the pre-flight bound
@@ -2021,7 +2023,7 @@ impl Server {
             let closing_profile = self.qualified_import_profile().await?;
             accumulated = combine_evidence(accumulated.clone(), closing_profile.evidence);
             if closing_profile.admission_key != opening_profile.admission_key {
-                return Err("import_mode_changed_during_build".to_string().into());
+                return Err(ImportBuildCode::ModeChangedDuringBuild.as_str().to_string().into());
             }
             let xml = render_import_xml(
                 &company.name,
@@ -2034,7 +2036,7 @@ impl Server {
                 identity_scheme: Some(ImportIdentityScheme::BatchV1),
                 amends_batch_id,
                 company_guid: canonical_batch_guid(&payload.company_guid),
-                endpoint_origin: Some(super::canonical_loopback_origin(&self.settings.endpoint).map_err(|_| "host_setting_invalid".to_string())?),
+                endpoint_origin: Some(super::canonical_loopback_origin(&self.settings.endpoint).map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?),
                 company: Some(import_company_tuple(&company)?),
                 txn_ids: payload
                     .vouchers
@@ -2258,11 +2260,17 @@ impl Server {
             .map_err(approval_invalid)?
             .is_empty()
         {
-            return Err("skip_only_statement_takes_no_approvals".to_string().into());
+            return Err(ImportBuildCode::SkipOnlyTakesNoApprovals
+                .as_str()
+                .to_string()
+                .into());
         }
         let payload = parse_payload(&args)?;
         if payload.amends_batch_id.is_some() {
-            return Err("skip_only_statement_cannot_amend".to_string().into());
+            return Err(ImportBuildCode::SkipOnlyCannotAmend
+                .as_str()
+                .to_string()
+                .into());
         }
         let (company, identity, identity_evidence) =
             self.verified_company(&payload.company_guid).await?;
@@ -2293,7 +2301,7 @@ impl Server {
             record_id: format!("skips-{}", Uuid::new_v4().hyphenated()),
             company_guid: company_guid.clone(),
             endpoint_origin: super::canonical_loopback_origin(&self.settings.endpoint)
-                .map_err(|_| "host_setting_invalid".to_string())?,
+                .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?,
             built_at: now(),
             statement: StatementFacts::of_statement(statement, &binding),
         };
@@ -2373,7 +2381,10 @@ impl Server {
             return self.verify_import_page(args, &proof_sha256, offset);
         }
         if offset != 0 {
-            return Err("verification_page_requires_proof".to_string().into());
+            return Err(ImportVerifyCode::PageRequiresProof
+                .as_str()
+                .to_string()
+                .into());
         }
         let batch_id = required_string(args, "batch_id")?;
         let guid = required_string(args, "company_guid")?;
@@ -2390,10 +2401,10 @@ impl Server {
         let (proof, page) = served_verification_page(&persisted, 0)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         if proof["batch_id"] != batch_id {
-            return Err(
-                ToolFailure::from("verification_proof_batch_mismatch".to_string())
-                    .with_prior_evidence(evidence),
-            );
+            return Err(ToolFailure::from(
+                ImportVerifyCode::ProofBatchMismatch.as_str().to_string(),
+            )
+            .with_prior_evidence(evidence));
         }
         let essential = self
             .admit_verification_page(&page)
@@ -2421,7 +2432,7 @@ impl Server {
         let sha256 = sha256_hex(&persisted);
         // A newer verification replaced the proof this page belongs to.
         if sha256 != proof_sha256 {
-            return Err("verification_proof_changed".to_string().into());
+            return Err(ImportVerifyCode::ProofChanged.as_str().to_string().into());
         }
         let (proof, page) = served_verification_page(&persisted, offset)?;
         if proof["batch_id"] != batch_id
@@ -2429,7 +2440,10 @@ impl Server {
                 .as_str()
                 .is_some_and(|recorded| batch_guid_matches(recorded, guid))
         {
-            return Err("verification_proof_batch_mismatch".to_string().into());
+            return Err(ImportVerifyCode::ProofBatchMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         let _ = self.admit_verification_page(&page)?;
         // From the whole proof, so every page states the same outcome.
@@ -2461,7 +2475,10 @@ impl Server {
     fn admit_verification_page(&self, page: &Value) -> Result<usize, ToolFailure> {
         let size = verification_page_essential_bytes(page);
         if size > self.settings.max_bytes {
-            return Err("verification_too_large_to_report".to_string().into());
+            return Err(ImportVerifyCode::TooLargeToReport
+                .as_str()
+                .to_string()
+                .into());
         }
         Ok(size)
     }
@@ -2852,7 +2869,7 @@ impl Server {
                     return Err(refusal.verification_code().to_string().into());
                 }
                 if closing_mode.admission_key != opening_mode.admission_key {
-                    return Err("verification_mode_changed_during_read".to_string().into());
+                    return Err(ImportVerifyCode::ModeChangedDuringRead.as_str().to_string().into());
                 }
                 closing_mode_evidence = Some(closing_mode.evidence);
             }
@@ -3032,7 +3049,7 @@ impl Server {
         let _admission_lock = self.lock_import_admission()?;
         let current = self.import_snapshot_while_admitted(Some(&update.batch_id))?;
         if current.as_ref().map(|snapshot| snapshot.generation) != Some(expected_generation) {
-            return Err("import_verification_conflict_retry".into());
+            return Err(ImportVerifyCode::ConflictRetry.as_str().into());
         }
         // A rollback another verification recorded since this one read the
         // journal covers this batch: it is not verified, and the next
@@ -3045,7 +3062,7 @@ impl Server {
                     .covered_by
                     .is_some()
                 {
-                    return Err("import_verification_conflict_retry".into());
+                    return Err(ImportVerifyCode::ConflictRetry.as_str().into());
                 }
             }
         }
@@ -3164,7 +3181,7 @@ impl Server {
         let read = standard_ledger_catalog_read(company_name)
             .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
         admit_standard_ledger_catalog_request(read.as_str().to_string())
-            .map_err(|_| "ledger_export_invalid".to_string())?;
+            .map_err(|_| ImportMastersCode::LedgerExportInvalid.as_str().to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
         let catalogue =
             parse_standard_ledger_catalog_response(&xml, company_name, identity.company_guid())
@@ -3192,7 +3209,7 @@ impl Server {
         let read = import_ledger_catalogue_read(company_name)
             .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
         let request = admit_standard_ledger_catalog_request(read.as_str().to_string())
-            .map_err(|_| "ledger_export_invalid".to_string())?;
+            .map_err(|_| ImportMastersCode::LedgerExportInvalid.as_str().to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
         let catalogue =
             parse_import_ledger_catalog_response(&xml, company_name, identity.company_guid())
@@ -3221,8 +3238,9 @@ impl Server {
             .await?;
         let groups =
             parse_native_group_snapshot(&xml, identity.company_guid()).map_err(|error| {
-                let mut failure = ToolFailure::from("group_export_invalid".to_string())
-                    .with_prior_evidence(evidence.clone());
+                let mut failure =
+                    ToolFailure::from(ImportMastersCode::GroupExportInvalid.as_str().to_string())
+                        .with_prior_evidence(evidence.clone());
                 // The snapshot parser already names each refusal with a data-free
                 // code; keep it as the cause instead of dropping it (bridge#676).
                 failure.cause = crate::tally::approved_import::group_snapshot_cause(&error);
@@ -3401,7 +3419,7 @@ impl Server {
                 ..PostSpanDecision::reported(json!({"state":"refused","code":code}))
             },
             Err(_) => PostSpanDecision::reported(
-                json!({"state":"unsettled","code":"binding_not_recorded"}),
+                json!({"state":"unsettled","code":ImportVerifyCode::BindingNotRecorded.as_str()}),
             ),
         }
     }
@@ -3422,10 +3440,10 @@ impl Server {
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.batch.sha256 != line.sha256 || current.generation != expected {
-            return Err("import_verification_conflict_retry".into());
+            return Err(ImportVerifyCode::ConflictRetry.as_str().into());
         }
         if current.span_verdict.is_some() {
-            return Err("import_verification_conflict_retry".into());
+            return Err(ImportVerifyCode::ConflictRetry.as_str().into());
         }
         // Another batch may have bound one of these GUIDs since the check
         // before this lock: checked again here, where no other writer can.
@@ -3457,7 +3475,7 @@ impl Server {
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if recorded.span_verdict.as_ref() != Some(verdict) {
-            return Err("binding_not_recorded".into());
+            return Err(ImportVerifyCode::BindingNotRecorded.as_str().into());
         }
         Ok((verdict.clone(), recorded.generation))
     }
@@ -3491,7 +3509,7 @@ impl Server {
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.batch.sha256 != line.sha256 || current.generation != expected {
-            return Err("import_verification_conflict_retry".into());
+            return Err(ImportVerifyCode::ConflictRetry.as_str().into());
         }
         // Judged again where no other writer can: a record another check wrote
         // since may already cover what this one would.
@@ -3569,7 +3587,7 @@ impl Server {
             .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         #[cfg(test)]
         if TEST_ROLLBACK_AT_POST_APPEND_FAILS.try_with(|()| ()).is_ok() {
-            return Err("import_ledger_write_failed".into());
+            return Err(ImportFileCode::JournalWriteFailed.as_str().into());
         }
         self.append_import_record_while_admitted(&ledger::StatusRecord::rollback_seen(
             &snapshot.batch,
@@ -3606,7 +3624,7 @@ impl Server {
         let guid = company
             .guid
             .as_deref()
-            .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+            .ok_or_else(|| ImportBuildCode::MarkUnobserved.as_str().to_string())?;
         let (xml, evidence) = self
             .post_read(identity, company_high_water_read(&company.name))
             .await?;
@@ -3625,7 +3643,7 @@ impl Server {
         let guid = company
             .guid
             .as_deref()
-            .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+            .ok_or_else(|| ImportBuildCode::MarkUnobserved.as_str().to_string())?;
         let (xml, evidence) = self
             .post_read(identity, company_high_water_read(&company.name))
             .await?;
@@ -3650,19 +3668,19 @@ impl Server {
             ledger::CurrentProof::Legacy => format!("{recorded}.proof.json"),
         });
         let file = super::local_file::open_local_file(&path, false)
-            .map_err(|_| "verification_proof_missing".to_string())?;
+            .map_err(|_| ImportVerifyCode::ProofMissing.as_str().to_string())?;
         let mut bytes = Vec::new();
         std::io::Read::read_to_end(
             &mut std::io::Read::take(file, (MAX_PERSISTED_PROOF_BYTES + 1) as u64),
             &mut bytes,
         )
-        .map_err(|_| "verification_proof_missing".to_string())?;
+        .map_err(|_| ImportVerifyCode::ProofMissing.as_str().to_string())?;
         if bytes.len() > MAX_PERSISTED_PROOF_BYTES {
-            return Err("verification_proof_too_large".into());
+            return Err(ImportVerifyCode::ProofTooLarge.as_str().into());
         }
         if let ledger::CurrentProof::Saved(name) = &snapshot.current_proof {
             if sha256_hex(&bytes) != name.sha256() {
-                return Err("verification_proof_altered".into());
+                return Err(ImportVerifyCode::ProofAltered.as_str().into());
             }
         }
         Ok(bytes)
@@ -3715,23 +3733,34 @@ impl Server {
             .and_then(|value| uuid::Uuid::parse_str(value).ok())
             .ok_or_else(|| "import_batch_identifier_invalid".to_string())?;
         let path = self.imports_dir()?.join(format!("bridge-{uuid}.xml"));
-        let mut file = super::local_file::open_local_file(&path, false)
-            .map_err(|_| "import_persisted_file_unavailable".to_string())?;
+        let mut file = super::local_file::open_local_file(&path, false).map_err(|_| {
+            ImportFileCode::PersistedFileUnavailable
+                .as_str()
+                .to_string()
+        })?;
         let length = file
             .metadata()
-            .map_err(|_| "import_persisted_file_unavailable".to_string())?
+            .map_err(|_| {
+                ImportFileCode::PersistedFileUnavailable
+                    .as_str()
+                    .to_string()
+            })?
             .len();
         if length > MAX_PERSISTED_IMPORT_XML_BYTES as u64 {
-            return Err("import_persisted_file_too_large".into());
+            return Err(ImportFileCode::PersistedFileTooLarge.as_str().into());
         }
         let mut bytes = Vec::with_capacity(length as usize);
         std::io::Read::read_to_end(
             &mut std::io::Read::take(&mut file, (MAX_PERSISTED_IMPORT_XML_BYTES + 1) as u64),
             &mut bytes,
         )
-        .map_err(|_| "import_persisted_file_unavailable".to_string())?;
+        .map_err(|_| {
+            ImportFileCode::PersistedFileUnavailable
+                .as_str()
+                .to_string()
+        })?;
         if bytes.len() > MAX_PERSISTED_IMPORT_XML_BYTES {
-            return Err("import_persisted_file_too_large".into());
+            return Err(ImportFileCode::PersistedFileTooLarge.as_str().into());
         }
         Ok(bytes)
     }
@@ -3739,10 +3768,12 @@ impl Server {
     fn imports_dir(&self) -> Result<PathBuf, String> {
         let path = self.settings.data_dir.join("imports");
         super::ensure_private_directory(&path).map_err(|error| match error {
-            super::DirectoryAdmissionError::Unavailable => "imports_dir_unavailable".to_string(),
+            super::DirectoryAdmissionError::Unavailable => {
+                ImportFileCode::ImportsDirUnavailable.as_str().to_string()
+            }
             #[cfg(unix)]
             super::DirectoryAdmissionError::Permissions => {
-                "import_file_permissions_failed".to_string()
+                ImportFileCode::FilePermissionsFailed.as_str().to_string()
             }
         })?;
         Ok(path)
@@ -3754,8 +3785,11 @@ impl Server {
 
     fn lock_import_admission_shared(&self) -> Result<std::fs::File, String> {
         let path = self.settings.data_dir.join("agent-import-admission.lock");
-        let file = super::local_file::open_local_file(&path, true)
-            .map_err(|_| "import_admission_lock_unavailable".to_string())?;
+        let file = super::local_file::open_local_file(&path, true).map_err(|_| {
+            ImportFileCode::AdmissionLockUnavailable
+                .as_str()
+                .to_string()
+        })?;
         file.try_lock_shared()
             .map_err(import_admission_lock_error)?;
         persistence::require_settled(&self.settings.data_dir.join("imports"))?;
@@ -4039,16 +4073,16 @@ impl Server {
             .amends_batch_id
             .as_deref()
             .filter(|id| valid_batch_id(id))
-            .ok_or_else(|| "import_amend_batch_id_invalid".to_string())?;
+            .ok_or_else(|| ImportBuildCode::AmendBatchIdInvalid.as_str().to_string())?;
         let named = self
             .import_snapshot_while_admitted(Some(named_id))?
-            .ok_or_else(|| "import_amend_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportBuildCode::AmendBatchNotFound.as_str().to_string())?;
         let builds = match self.import_journal_while_admitted()? {
             Some(reader) => ledger::read_lineage(reader, named.batch.identity_batch_id())?,
             None => Vec::new(),
         };
         let origin = super::canonical_loopback_origin(&self.settings.endpoint)
-            .map_err(|_| "host_setting_invalid".to_string())?;
+            .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?;
         let lineage = amend::admit_lineage(&named, builds, &payload.company_guid, &origin)?;
         lineage.admit_proposal(&payload.vouchers)?;
         Ok(lineage)
@@ -4152,9 +4186,13 @@ const INVOICE_POST_NOT_ENABLED: &str = "invoice_post_not_enabled";
 /// here, with advice about an invoice.
 fn invoice_route_refusal(code: String) -> String {
     match code.as_str() {
-        "import_review_layout_text" => "invoice_review_layout_text".to_string(),
-        "import_review_format_text" => "invoice_review_format_text".to_string(),
-        "import_review_too_large" => "invoice_review_too_large".to_string(),
+        "import_review_layout_text" => ImportBuildCode::InvoiceReviewLayoutText
+            .as_str()
+            .to_string(),
+        "import_review_format_text" => ImportBuildCode::InvoiceReviewFormatText
+            .as_str()
+            .to_string(),
+        "import_review_too_large" => ImportBuildCode::InvoiceReviewTooLarge.as_str().to_string(),
         _ => code,
     }
 }
@@ -4224,9 +4262,9 @@ fn validate_dispatched_import_endpoint(
         return Ok(());
     }
     let origin = super::canonical_loopback_origin(endpoint)
-        .map_err(|_| "host_setting_invalid".to_string())?;
+        .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?;
     if line.endpoint_origin.as_deref() != Some(origin.as_str()) {
-        return Err("import_post_endpoint_mismatch".into());
+        return Err(ImportPostCode::EndpointMismatch.as_str().into());
     }
     Ok(())
 }
@@ -4352,7 +4390,7 @@ fn append_import_ledger_bytes(
         writer
             .truncate(original_length)
             .and_then(|_| writer.sync())
-            .map_err(|_| "import_ledger_rollback_failed".to_string())?;
+            .map_err(|_| ImportFileCode::JournalRollbackFailed.as_str().to_string())?;
         return Err(ImportLedgerCode::Unavailable.as_str().to_string());
     }
     Ok(())
@@ -4367,7 +4405,8 @@ fn batch_guid_matches(stored: &str, supplied: &str) -> bool {
 }
 
 fn parse_payload(args: &Value) -> Result<ImportPayload<String>, String> {
-    serde_json::from_value(args.clone()).map_err(|_| "voucher_schema_invalid".to_string())
+    serde_json::from_value(args.clone())
+        .map_err(|_| ImportPayloadCode::SchemaInvalid.as_str().to_string())
 }
 
 fn import_company_tuple(
@@ -4408,14 +4447,19 @@ fn catalogue_failure(
     error: bridge_tally_protocol::StandardLedgerCatalogError,
     evidence: &Evidence,
 ) -> ToolFailure {
-    let mut failure = ToolFailure::from("ledger_export_invalid".to_string())
-        .with_prior_evidence(evidence.clone());
+    let mut failure =
+        ToolFailure::from(ImportMastersCode::LedgerExportInvalid.as_str().to_string())
+            .with_prior_evidence(evidence.clone());
     failure.cause = Some(error.safe_code());
     failure
 }
 
 fn approval_invalid(error: bill_wise::ApprovalError) -> ToolFailure {
-    let mut failure = ToolFailure::from("on_account_approval_invalid".to_string());
+    let mut failure = ToolFailure::from(
+        ImportBuildCode::OnAccountApprovalInvalid
+            .as_str()
+            .to_string(),
+    );
     failure.cause = Some(error.cause());
     failure
 }
@@ -4652,7 +4696,11 @@ fn refuse_unqualified_types<D: PayloadDate>(
         .iter()
         .all(|voucher| qualified.contains(&voucher.voucher_type))
         .then_some(())
-        .ok_or_else(|| "import_voucher_type_unqualified".to_string())
+        .ok_or_else(|| {
+            ImportPayloadCode::VoucherTypeUnqualified
+                .as_str()
+                .to_string()
+        })
 }
 
 /// Whether this batch renders the bank shape at all.
@@ -4684,10 +4732,10 @@ fn refuse_mixed_shapes<D: PayloadDate>(vouchers: &[ImportVoucher<D>]) -> Result<
         .filter(|voucher| voucher.voucher_type.invoice_class().is_some())
         .count();
     if invoices > 0 && invoices != vouchers.len() {
-        return Err("voucher_type_shapes_mixed".to_string());
+        return Err(ImportPayloadCode::ShapesMixed.as_str().to_string());
     }
     if invoices > 1 {
-        return Err("invoice_one_per_batch".to_string());
+        return Err(ImportPayloadCode::InvoiceOnePerBatch.as_str().to_string());
     }
     let bank = vouchers
         .iter()
@@ -4695,7 +4743,7 @@ fn refuse_mixed_shapes<D: PayloadDate>(vouchers: &[ImportVoucher<D>]) -> Result<
         .count();
     (bank == 0 || bank == vouchers.len())
         .then_some(())
-        .ok_or_else(|| "voucher_type_shapes_mixed".to_string())
+        .ok_or_else(|| ImportPayloadCode::ShapesMixed.as_str().to_string())
 }
 
 /// Every check a batch must pass before Tally is read, and its vouchers with
@@ -4707,25 +4755,29 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
         || payload.vouchers.is_empty()
         || payload.vouchers.len() > MAX_VOUCHERS
     {
-        return Err("voucher_count_invalid".to_string());
+        return Err(ImportPayloadCode::CountInvalid.as_str().to_string());
     }
     let mut txn_ids = BTreeSet::new();
     let mut ledger_names = BTreeSet::new();
     let mut vouchers = Vec::with_capacity(payload.vouchers.len());
     for voucher in &payload.vouchers {
         if !valid_txn_id(&voucher.bridge_txn_id) || !txn_ids.insert(&voucher.bridge_txn_id) {
-            return Err("bridge_txn_id_invalid_or_duplicate".to_string());
+            return Err(ImportPayloadCode::TxnIdInvalidOrDuplicate
+                .as_str()
+                .to_string());
         }
         let date = voucher.date.tally_date()?;
         if voucher.entries.len() < 2 {
-            return Err("voucher_entries_too_few".to_string());
+            return Err(ImportPayloadCode::EntriesTooFew.as_str().to_string());
         }
         for text in [voucher.narration.as_deref(), voucher.reference.as_deref()]
             .into_iter()
             .flatten()
         {
             if contains_reserved_marker(text) {
-                return Err("narration_reserved_marker".to_string());
+                return Err(ImportPayloadCode::NarrationReservedMarker
+                    .as_str()
+                    .to_string());
             }
         }
         for text in [voucher.narration.as_deref(), voucher.reference.as_deref()]
@@ -4737,7 +4789,7 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
                 || text.chars().count() > MAX_TEXT_CHARS
                 || text.chars().any(char::is_control)
             {
-                return Err("voucher_text_invalid".to_string());
+                return Err(ImportPayloadCode::TextInvalid.as_str().to_string());
             }
         }
         if let Some(number) = voucher.voucher_number.as_deref() {
@@ -4751,7 +4803,7 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
                 || number.chars().any(char::is_control)
                 || reads_back_as_other_text(number)
             {
-                return Err("voucher_text_invalid".to_string());
+                return Err(ImportPayloadCode::TextInvalid.as_str().to_string());
             }
         }
         if voucher.voucher_number.as_deref().is_some_and(|number| {
@@ -4760,7 +4812,7 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
             // posted; white space at the start is refused too, unmeasured.
             number.chars().count() > 32 || number.contains('$') || number.trim() != number
         }) {
-            return Err("voucher_number_invalid".to_string());
+            return Err(ImportPayloadCode::NumberInvalid.as_str().to_string());
         }
         // The amount is parsed here, where its text used to be checked, so a batch with
         // several defects is refused for the same one as before (#1872).
@@ -4776,11 +4828,13 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
                     || reads_back_as_other_text(&entry.ledger),
                 amount,
             ) else {
-                return Err("voucher_entry_invalid".to_string());
+                return Err(ImportPayloadCode::EntryInvalid.as_str().to_string());
             };
             ledger_names.insert(entry.ledger.as_str());
             if ledger_names.len() > MAX_MASTER_NAMES {
-                return Err("voucher_unique_ledger_limit_exceeded".to_string());
+                return Err(ImportPayloadCode::UniqueLedgerLimitExceeded
+                    .as_str()
+                    .to_string());
             }
             entries.push(ImportEntry {
                 ledger: entry.ledger.clone(),
@@ -4791,7 +4845,7 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
         let admitted = voucher.admitted(date, entries);
         let (debit, credit) = totals(std::slice::from_ref(&admitted))?;
         if !debit.numeric_eq(&credit) {
-            return Err("voucher_not_balanced".to_string());
+            return Err(ImportPayloadCode::NotBalanced.as_str().to_string());
         }
         if admitted.voucher_type.bank_shape().is_some() {
             validate_bank_voucher_shape(&admitted)?;
@@ -4837,13 +4891,13 @@ fn validate_bank_voucher_shape<D: PayloadDate>(voucher: &ImportVoucher<D>) -> Re
     // balance checks run first; kept so this function stays correct on its own
     // if that order changes.
     if debits.is_empty() || credits.is_empty() {
-        return Err("voucher_entry_pair_required".to_string());
+        return Err(ImportPayloadCode::EntryPairRequired.as_str().to_string());
     }
     if debits
         .iter()
         .any(|debit| credits.iter().any(|credit| credit.ledger == debit.ledger))
     {
-        return Err("voucher_entry_ledger_repeated".to_string());
+        return Err(ImportPayloadCode::EntryLedgerRepeated.as_str().to_string());
     }
     // A supplied VOUCHERNUMBER's fate is decided by the *voucher type's*
     // numbering method (§9.8), which is per-type configuration this build has
@@ -4856,7 +4910,9 @@ fn validate_bank_voucher_shape<D: PayloadDate>(voucher: &ImportVoucher<D>) -> Re
     // number for exactly this reason. The bank's own reference belongs in the
     // narration, which survives either way.
     if voucher.voucher_number.is_some() {
-        return Err("voucher_number_unqualified_for_type".to_string());
+        return Err(ImportPayloadCode::NumberUnqualifiedForType
+            .as_str()
+            .to_string());
     }
     // §9.13's measured shape carries no REFERENCE element. Tally may well
     // accept one here, but no file carrying it has been imported and read
@@ -4865,7 +4921,9 @@ fn validate_bank_voucher_shape<D: PayloadDate>(voucher: &ImportVoucher<D>) -> Re
     // were dropped or rewritten. Refuse it rather than write an unmeasured
     // variant while claiming the qualified shape.
     if voucher.reference.is_some() {
-        return Err("voucher_reference_unqualified_for_type".to_string());
+        return Err(ImportPayloadCode::ReferenceUnqualifiedForType
+            .as_str()
+            .to_string());
     }
     Ok(())
 }
@@ -5160,7 +5218,7 @@ fn refuse_rewritten_narration(vouchers: &[ImportVoucher]) -> Result<(), String> 
             reads_back_as_other_text(narration) || narration.chars().any(draws_nothing)
         })
     }) {
-        return Err("voucher_text_invalid".to_string());
+        return Err(ImportPayloadCode::TextInvalid.as_str().to_string());
     }
     Ok(())
 }
@@ -5192,7 +5250,9 @@ fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(
     for voucher in &payload.vouchers {
         let date = &voucher.date;
         if *date < from || date.as_str() > today.as_str() {
-            return Err("voucher_date_outside_company_extent".to_string());
+            return Err(ImportPayloadCode::DateOutsideCompanyExtent
+                .as_str()
+                .to_string());
         }
     }
     Ok(())
@@ -5217,7 +5277,9 @@ fn validate_import_dates_for_profile(
     let boundary_profile = boundary_profile_for(profile);
     for voucher in &payload.vouchers {
         if !boundary_profile.accepts_boundary(&voucher.date) {
-            return Err("education_voucher_date_unsupported".to_string());
+            return Err(ImportPayloadCode::EducationDateUnsupported
+                .as_str()
+                .to_string());
         }
     }
     Ok(())
@@ -5288,12 +5350,12 @@ fn totals(vouchers: &[ImportVoucher]) -> Result<(ExactDecimal, ExactDecimal), St
             EntrySide::Dr => {
                 debit = debit
                     .checked_add(amount)
-                    .map_err(|_| "voucher_amount_overflow".to_string())?
+                    .map_err(|_| ImportPostCode::VoucherAmountOverflow.as_str().to_string())?
             }
             EntrySide::Cr => {
                 credit = credit
                     .checked_add(amount)
-                    .map_err(|_| "voucher_amount_overflow".to_string())?
+                    .map_err(|_| ImportPostCode::VoucherAmountOverflow.as_str().to_string())?
             }
         }
     }
@@ -5385,7 +5447,7 @@ fn bind_ledgers(
     Ok(ledger_masters
         .catalog()
         .bind_selected(names)
-        .map_err(|_| "import_masters_changed".to_string())?
+        .map_err(|_| ImportPostCode::MastersChanged.as_str().to_string())?
         .pairs()
         .map(|(name, guid)| BoundLedger {
             name: name.to_string(),
@@ -5497,7 +5559,7 @@ fn requested_master_report(
         .map(|master| match master {
             RequestedMaster::Named(_) => named_report
                 .next()
-                .ok_or_else(|| "master_report_incomplete".to_string()),
+                .ok_or_else(|| ImportMastersCode::ReportIncomplete.as_str().to_string()),
             RequestedMaster::ExactOnly(name) => Ok(if catalogue.contains(name) {
                 json!({
                     "requested": party_name(name.clone()),
@@ -6197,7 +6259,11 @@ impl Server {
         batch_id: &str,
         batch: bool,
     ) -> Result<(), String> {
-        let unavailable = |_| "post_masters_record_unavailable".to_string();
+        let unavailable = |_| {
+            ImportFileCode::PostMastersRecordUnavailable
+                .as_str()
+                .to_string()
+        };
         let imports = self.imports_dir().map_err(unavailable)?;
         let mut pending = json!({"state": MASTERS_CHECK_PENDING});
         if batch {
@@ -6373,7 +6439,7 @@ fn record_verified_baseline(imports: &Path, batch_id: &str, proof: &Value) -> Re
     // An unreadable baseline is never added to: nothing proves which values
     // were first, so amendments of this build stay refused.
     let (recorded, next) = read_baseline_files(imports, batch_id)
-        .map_err(|()| "verified_baseline_unreadable".to_string())?;
+        .map_err(|()| ImportVerifyCode::BaselineUnreadable.as_str().to_string())?;
     let recorded = recorded.unwrap_or_default();
     let mut baseline = recorded.clone();
     if !amend::record_first_verified(&mut baseline, proof) {
@@ -6382,8 +6448,11 @@ fn record_verified_baseline(imports: &Path, batch_id: &str, proof: &Value) -> Re
     baseline
         .vouchers
         .retain(|txn_id, _| !recorded.vouchers.contains_key(txn_id));
-    let bytes = serde_json::to_vec_pretty(&baseline)
-        .map_err(|_| "verified_baseline_serialization_failed".to_string())?;
+    let bytes = serde_json::to_vec_pretty(&baseline).map_err(|_| {
+        ImportVerifyCode::BaselineSerializationFailed
+            .as_str()
+            .to_string()
+    })?;
     // Placed whole or not at all, so a failed write leaves the earlier files
     // as they were rather than a truncated one that would refuse every
     // amendment.
@@ -6391,7 +6460,7 @@ fn record_verified_baseline(imports: &Path, batch_id: &str, proof: &Value) -> Re
         &verified_baseline_addition_path(imports, batch_id, next),
         &bytes,
     )
-    .map_err(|_| "verified_baseline_publish_failed".to_string())
+    .map_err(|_| ImportVerifyCode::BaselinePublishFailed.as_str().to_string())
 }
 
 fn verified_baselines(imports: &Path, lineage: &amend::Lineage) -> amend::VerifiedBaselines {
@@ -6420,7 +6489,7 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
     {
         use std::os::unix::fs::PermissionsExt;
         file.set_permissions(fs::Permissions::from_mode(0o600))
-            .map_err(|_| "import_file_permissions_failed".to_string())?;
+            .map_err(|_| ImportFileCode::FilePermissionsFailed.as_str().to_string())?;
     }
     #[cfg(not(unix))]
     let _ = file;
@@ -6455,7 +6524,7 @@ fn verification_page_essential_bytes(page: &Value) -> usize {
 /// through this, so they cannot differ in what they mark.
 fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, Value), String> {
     let mut proof: Value = serde_json::from_slice(persisted)
-        .map_err(|_| "verification_proof_unreadable".to_string())?;
+        .map_err(|_| ImportVerifyCode::ProofUnreadable.as_str().to_string())?;
     mark_verification_names(&mut proof);
     let page = verification_response_page(&proof, &sha256_hex(persisted), offset);
     Ok((proof, page))

@@ -1231,6 +1231,59 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the import's publication of a built file and of a verification's proof pair
+    /// (`agent_import_persistence.rs`).
+    pub(crate) enum ImportPublicationCode {
+        /// The build's publication folder could not be made, a build whose journal append failed
+        /// could not be undone, or a leftover build folder or marker still blocks the next
+        /// admission.
+        BuildRecoveryRequired = "import_publication_recovery_required",
+        /// The proof's publication folder could not be made, could not be cleared after a step
+        /// inside it failed, or a leftover proof folder or marker still blocks the next admission.
+        ProofRecoveryRequired = "proof_publication_recovery_required",
+        /// The proof's journal append failed and could not be cut back.
+        ProofRollbackFailed = "proof_publication_rollback_failed",
+        /// A file already holds the proof's name, and its bytes are not the proof's or could not be
+        /// read.
+        ProofFailed = "proof_publication_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusal of an invoice's post whose masters moved since its build
+    /// (`agent_import_invoice.rs`).
+    pub(crate) enum InvoiceMastersCode {
+        /// What the re-read observed of the invoice's masters differs from what the build recorded,
+        /// or one of the two observed nothing.
+        Changed = "import_invoice_masters_changed",
+    }
+}
+
+failure_codes! {
+    /// The differences an invoice's read-back names that are not one field of the voucher
+    /// (`agent_import_invoice.rs`).
+    pub(crate) enum InvoiceReadbackCode {
+        /// The voucher carries no invoice detail with an observation of its masters, or, for the
+        /// read-back's comparison, one naming no sales ledger.
+        NotObserved = "invoice_not_observed",
+        /// A leg read back has an amount or a side that could not be read.
+        LegsUnreadable = "legs_unreadable",
+        /// A sales line read back does not name both an HSN/SAC and the kind of master it came
+        /// from.
+        LineHsnUnresolved = "invoice_line_hsn_unresolved",
+    }
+}
+
+failure_codes! {
+    /// The refusal of a ledger name that reads as a masked one (`agent_ledger_candidates.rs`).
+    pub(crate) enum LedgerNameCode {
+        /// The name is not a ledger's exact spelling, and carries the mask mark or, under masking,
+        /// reads like another ledger's masked form.
+        Masked = "ledger_name_masked",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

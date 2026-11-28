@@ -283,6 +283,17 @@ const MASTER_LEDGER: &[(MasterLedgerCode, &str)] = &[
     (MasterLedgerCode::IntentMissing, "master_intent_missing"),
 ];
 
+const EGRESS: &[(EgressCode, &str)] = &[
+    (EgressCode::RecordTooLarge, "egress_record_too_large"),
+    (EgressCode::RecordWriteFailed, "egress_record_write_failed"),
+    (
+        EgressCode::RecordRollbackFailed,
+        "egress_record_rollback_failed",
+    ),
+    (EgressCode::LogUnreadable, "egress_log_unreadable"),
+    (EgressCode::LogIncomplete, "egress_log_incomplete"),
+];
+
 const TOOL_REQUEST: &[(ToolRequestCode, &str)] = &[
     (ToolRequestCode::RequestCancelled, "request_cancelled"),
     (ToolRequestCode::HostSettingInvalid, "host_setting_invalid"),
@@ -850,6 +861,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(STOP_ACK),
         of(IMPORT_APPROVAL),
         of(MASTER_LEDGER),
+        of(EGRESS),
         of(TOOL_REQUEST),
         of(IMPORT_POST),
         of(BANK_STATEMENT),
@@ -897,6 +909,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("StopAckCode", StopAckCode::ALL),
         of("ImportApprovalCode", ImportApprovalCode::ALL),
         of("MasterLedgerCode", MasterLedgerCode::ALL),
+        of("EgressCode", EgressCode::ALL),
         of("ToolRequestCode", ToolRequestCode::ALL),
         of("ImportPostCode", ImportPostCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
@@ -948,7 +961,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        29,
+        30,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -987,6 +1000,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(STOP_ACK), StopAckCode::ALL);
     assert_eq!(variants(IMPORT_APPROVAL), ImportApprovalCode::ALL);
     assert_eq!(variants(MASTER_LEDGER), MasterLedgerCode::ALL);
+    assert_eq!(variants(EGRESS), EgressCode::ALL);
     assert_eq!(variants(TOOL_REQUEST), ToolRequestCode::ALL);
     assert_eq!(variants(IMPORT_POST), ImportPostCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -1039,6 +1053,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(STOP_ACK, StopAckCode::as_str);
     check_pins(IMPORT_APPROVAL, ImportApprovalCode::as_str);
     check_pins(MASTER_LEDGER, MasterLedgerCode::as_str);
+    check_pins(EGRESS, EgressCode::as_str);
     check_pins(TOOL_REQUEST, ToolRequestCode::as_str);
     check_pins(IMPORT_POST, ImportPostCode::as_str);
 }
@@ -1061,11 +1076,11 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 2, 21]
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 2, 21]
         .iter()
         .sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 2, 21]
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 2, 21]
         .iter()
         .sum();
     assert_eq!(codes.len(), expected, "the declared codes");

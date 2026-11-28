@@ -18,6 +18,7 @@
 //! [`judge`] decides; the verdict is appended to the masters journal (the
 //! first terminal verdict of a batch is its last: the journal refuses a later
 //! one), and the answer reports the state, the GUID when found and each check.
+use super::super::super::failure_code::MasterLedgerCode;
 use super::super::master_ledger::{read_pre_image, MasterMark, MasterVerdict, MasterVerdictState};
 use super::verdict::{
     judge, party_read_needed, Facts, Judgement, Moment, OrderCoverage, PartyRead, PartyView,
@@ -475,7 +476,7 @@ impl Server {
         let intent = state
             .intent
             .as_ref()
-            .ok_or_else(|| "master_intent_missing".to_string())?;
+            .ok_or_else(|| MasterLedgerCode::IntentMissing.as_str().to_string())?;
         let counters = answer.counters;
         let pre_image = read_pre_image(
             &self.settings.data_dir,
@@ -606,7 +607,7 @@ impl Server {
         };
         let held = journal
             .state(&state.batch.batch_id)
-            .ok_or_else(|| "master_batch_not_found".to_string())?;
+            .ok_or_else(|| MasterLedgerCode::BatchNotFound.as_str().to_string())?;
         *answer_recorded = held.response.is_some();
         if let (Some(response), false) = (unrecorded, *answer_recorded) {
             append(

@@ -499,7 +499,7 @@ pub(crate) async fn selected_voucher_operation(
     let from = normalized_date(required_string(args, "from")?)?;
     let to = normalized_date(required_string(args, "to")?)?;
     if from > to {
-        return Err("invalid_date_range".to_string().into());
+        return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     let (company, identity, accumulated) = server.verified_company(guid).await?;
     selected_voucher_operation_for_verified(

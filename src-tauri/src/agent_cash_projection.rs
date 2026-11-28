@@ -401,7 +401,7 @@ impl Server {
         to: &TallyDate,
     ) -> Result<(TrialBalanceRead, CompanyBookExtent), ToolFailure> {
         let period = TrialBalancePeriod::new(from.clone(), to.clone())
-            .map_err(|_| "invalid_date_range".to_string())?;
+            .map_err(|_| super::super::failure_code::ReadCode::InvalidDateRange)?;
         self.runtime
             .fetch_trial_balance_with_extent(
                 self.tally_config(),

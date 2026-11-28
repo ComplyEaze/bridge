@@ -22,7 +22,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         if from > to {
-            return Err("invalid_date_range".to_string().into());
+            return Err(super::failure_code::ReadCode::InvalidDateRange.into());
         }
         let (company, identity, prior) = self.verified_company(guid).await?;
         let read = self

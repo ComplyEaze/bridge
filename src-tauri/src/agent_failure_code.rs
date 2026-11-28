@@ -601,6 +601,46 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of an import's invoice checks in `agent_import_invoice.rs` that look only at
+    /// the vouchers, before Tally is asked about them: the caller's payload, or for the invoice
+    /// date, a saved batch's line.
+    pub(crate) enum InvoiceInputCode {
+        /// The caller's payload carries what Tally returned for an invoice, which only the build
+        /// records.
+        ObservedNotInput = "invoice_observed_not_input",
+        /// An amendment names an invoice voucher; an invoice is never amended.
+        AmendmentNotSupported = "invoice_amendment_not_supported",
+        /// A voucher that is not an invoice carries invoice detail.
+        DetailOnNonInvoice = "invoice_detail_on_non_invoice",
+        /// An invoice voucher has no invoice detail.
+        DetailRequired = "invoice_detail_required",
+        /// The invoice's voucher type name is empty, too long, padded, holds a control character,
+        /// or would read back as other text.
+        VoucherTypeNameInvalid = "invoice_voucher_type_name_invalid",
+        /// The invoice's place of supply is not a state name Bridge knows.
+        PlaceOfSupplyUnknown = "invoice_place_of_supply_unknown",
+        /// The invoice has no voucher number.
+        NumberRequired = "invoice_number_required",
+        /// The invoice's voucher number is empty, longer than 16 characters, or holds a character
+        /// other than an ASCII letter, a digit, `/` or `-`.
+        NumberInvalid = "invoice_number_invalid",
+        /// A Sales invoice carries a supplier reference.
+        ReferenceNotForSales = "invoice_reference_not_for_sales",
+        /// The round-off ledger is not a plain name, or no entry of the invoice uses it.
+        RoundOffLedgerInvalid = "invoice_round_off_ledger_invalid",
+        /// Two entries of the invoice name the same ledger.
+        LedgerRepeated = "invoice_ledger_repeated",
+        /// Leaving out the round-off ledger, the invoice does not have exactly one debit and at
+        /// least three credits.
+        EntryShapeInvalid = "invoice_entry_shape_invalid",
+        /// The invoice has more entries than its approval window can show.
+        TooManyEntries = "invoice_too_many_entries",
+        /// The invoice's date does not give the financial year its number is checked in.
+        DateInvalid = "invoice_date_invalid",
+    }
+}
+
+failure_codes! {
     /// The refusals a request to any tool can end in, whatever the tool: the person cancelled it,
     /// or the configured Tally endpoint is not a loopback origin.
     pub(crate) enum ToolRequestCode {

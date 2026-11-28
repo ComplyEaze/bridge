@@ -276,6 +276,7 @@ test("a 5xx, 403 or 429 answer, on a download or on the index, is still retried:
 });
 
 test("the real coreutils timeout cuts a stalled attempt off at the bound, and the retry passes", { skip: noRealTimeout }, () => {
+  // The bound covers every attempt; one second let a loaded machine cut the passing attempt off before it started (#2638).
   const r = run([{ hang: true }, OK], { realTimeout: true, bound: "5" });
   assert.equal(r.status, 0, r.output);
   assert.equal(r.calls.length, 2, "both attempts started cargo; the first never finished");

@@ -84,7 +84,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         if from > to {
-            return Err("invalid_date_range".to_string().into());
+            return Err(super::failure_code::ReadCode::InvalidDateRange.into());
         }
         if from.as_str() < RULES_YEAR_FROM || to.as_str() > RULES_YEAR_TO {
             return Err(PERIOD_OUTSIDE_RULES.to_string().into());

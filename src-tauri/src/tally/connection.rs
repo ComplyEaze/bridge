@@ -2772,7 +2772,7 @@ impl TallyClient {
         evidence: &mut RuntimeReadEvidence,
         count_evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<CountCrossCheck> {
-        let request = render_company_ledger_count_request(identity.display_name());
+        let request = render_company_ledger_count_request(identity.company_name());
         let (body, bytes, sha256) = self
             .post_xml_with_encoded_bytes(request.clone())
             .await

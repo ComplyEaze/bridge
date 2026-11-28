@@ -117,7 +117,7 @@ impl Server {
                 self.drop_listing(&identity, &listing)
                     .map_err(|failure| failure.with_prior_evidence(prior.clone()))?;
                 let today = TallyDate::parse(tally_host_today())
-                    .map_err(|_| "current_date_invalid".to_string())?;
+                    .map_err(|_| super::failure_code::ReadCode::CurrentDateInvalid)?;
                 let (read, extent) = self
                     .runtime
                     .fetch_stock_summary_with_extent(self.tally_config(), &identity, as_of, today)

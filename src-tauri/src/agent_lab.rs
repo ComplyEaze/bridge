@@ -930,7 +930,7 @@ pub(super) async fn lab_read_inventory(
     };
     let (from, to) = (date("from")?, date("to")?);
     if from > to {
-        return Err("invalid_date_range".to_string().into());
+        return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     // Always-on lab preconditions (feature+env; §3.1). This is a read, so it
     // reads whichever company_guid the caller asks for -- it does not require
@@ -970,7 +970,7 @@ pub(super) async fn lab_read_inventory(
         let rows = parse_lab_inventory_vouchers(&voucher_xml)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         if !window_honoured(&rows, from.as_str(), to.as_str()) {
-            return Err(ToolFailure::from("window_not_honoured".to_string())
+            return Err(ToolFailure::from(super::failure_code::ReadCode::WindowNotHonoured)
                 .with_prior_evidence(evidence.clone()));
         }
         let offset = arg_usize(args, "offset", 0)?;
@@ -1119,7 +1119,7 @@ pub(super) async fn lab_read_purchase_identity(
     };
     let (from, to) = (date("from")?, date("to")?);
     if from > to {
-        return Err("invalid_date_range".to_string().into());
+        return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     if !identity_window_fits(&from, &to) {
         return Err("lab_identity_window_too_wide".to_string().into());
@@ -1146,7 +1146,7 @@ pub(super) async fn lab_read_purchase_identity(
             let parsed = parse_agent_rows(&xml, identity.company_guid());
             if let Ok(rows) = &parsed {
                 if !window_honoured(rows, from.as_str(), to.as_str()) {
-                    return Err(ToolFailure::from("window_not_honoured".to_string())
+                    return Err(ToolFailure::from(super::failure_code::ReadCode::WindowNotHonoured)
                         .with_prior_evidence(evidence.clone()));
                 }
             }

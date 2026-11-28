@@ -29,12 +29,12 @@ fn candidate_request_matches_the_captured_bytes() {
 #[test]
 fn candidate_request_changes_only_the_fetch_list() {
     for name in ["BRIDGE STOCK CREATE LAB", "BRIDGE ESCAPE & <LAB> \"Q\" 'A'"] {
-        let shipped = render_native_masters_request(NativeMasterKind::StockItems, name);
+        let company = ValidatedCompanyName::new(name).expect("an admitted name");
+        let shipped = render_native_masters_request(NativeMasterKind::StockItems, &company);
         assert_eq!(shipped.matches(SHIPPED_FETCH).count(), 1);
         let changed = shipped.replacen(SHIPPED_FETCH, CANDIDATE_FETCH, 1);
         assert_ne!(changed, shipped);
 
-        let company = ValidatedCompanyName::new(name).expect("an admitted name");
         assert_eq!(render_candidate_stock_items_request(&company), changed);
     }
 }

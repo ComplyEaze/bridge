@@ -8,6 +8,7 @@ use bridge_tally_protocol::{
     outstandings_shared::{
         parse_company_ledger_count, render_company_ledger_count_request, OutstandingsError,
     },
+    xml_read_profiles::ValidatedCompanyName,
     ExpectedTallyTextEncoding,
 };
 use sha2::{Digest, Sha256};
@@ -55,7 +56,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[test]
 fn the_request_is_the_request_that_was_sent_live() {
     let sent = bridge_tally_protocol::encode_tally_xml_request_utf16le(
-        &render_company_ledger_count_request(SIZE_BOOK),
+        &render_company_ledger_count_request(&ValidatedCompanyName::new(SIZE_BOOK).unwrap()),
     );
     assert_eq!(sent.len(), 992);
     assert_eq!(
@@ -66,13 +67,15 @@ fn the_request_is_the_request_that_was_sent_live() {
 
 #[test]
 fn the_request_asks_the_company_collection_for_name_guid_and_ledger_count_only() {
-    let request = render_company_ledger_count_request(SIZE_BOOK);
+    let request =
+        render_company_ledger_count_request(&ValidatedCompanyName::new(SIZE_BOOK).unwrap());
     assert!(request.contains("<ID>BridgeCompanyLedgerCountV1</ID>"));
     assert!(request.contains("<TYPE>Company</TYPE>"));
     assert!(request.contains("<FETCH>Name, GUID, NUMLEDGERS</FETCH>"));
     assert!(!request.contains("ALTMSTID") && !request.contains("ALTVCHID"));
     assert_eq!(request.matches("$$").count(), 1, "only the export format");
-    let escaped = render_company_ledger_count_request("A & B <LAB>");
+    let escaped =
+        render_company_ledger_count_request(&ValidatedCompanyName::new("A & B <LAB>").unwrap());
     assert!(escaped.contains("<SVCURRENTCOMPANY>A &amp; B &lt;LAB&gt;</SVCURRENTCOMPANY>"));
 }
 

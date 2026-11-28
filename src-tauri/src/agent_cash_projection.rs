@@ -401,7 +401,7 @@ impl Server {
         to: &TallyDate,
     ) -> Result<(TrialBalanceRead, CompanyBookExtent), ToolFailure> {
         let period = TrialBalancePeriod::new(from.clone(), to.clone())
-            .map_err(|_| "invalid_date_range".to_string())?;
+            .map_err(|_| super::super::failure_code::ReadCode::InvalidDateRange)?;
         self.runtime
             .fetch_trial_balance_with_extent(
                 self.tally_config(),
@@ -470,7 +470,9 @@ impl Server {
     ) -> Result<(EstablishedCashProjection, Evidence), CashProjectionFailure> {
         let dates = outflows.iter().map(|outflow| &outflow.date);
         let (Some(from), Some(last)) = (dates.clone().min(), dates.max()) else {
-            return Err(ToolFailure::from("proposals_file_invalid".to_string()).into());
+            return Err(
+                ToolFailure::from(super::super::failure_code::ProposalsCode::FileInvalid).into(),
+            );
         };
         let from = from.clone();
         let first_to = year_end(last).map_err(ToolFailure::from)?;

@@ -15,7 +15,7 @@
 //! Every estimate here is a planning figure, not a bound (§12a.8). The transport
 //! cap stays the final safeguard; this only stops Bridge from *asking* for a
 //! response it already expects to be too large.
-use super::failure_code::CensusReuseCode;
+use super::failure_code::{CensusReuseCode, ReadCode};
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::{DateSpan, TallyDate};
@@ -251,7 +251,7 @@ impl AlterIdSpan {
 /// caller, the bill trail's window start (`agent_bill_trail.rs`), and carried as
 /// a [`TallyDate`] into every request rendered from it (#861).
 pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
-    TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
+    TallyDate::parse(value).map_err(|_| ToolFailure::from(ReadCode::InvalidDateRange))
 }
 
 /// One request of a divided window: a date range, and for a part of one day, the
@@ -930,7 +930,7 @@ impl WindowCensus {
     ) -> Result<bool, ToolFailure> {
         let (from, to) = (day_of(from)?, day_of(to)?);
         if from > to {
-            return Err(ToolFailure::from("invalid_date_range".to_string()));
+            return Err(ToolFailure::from(ReadCode::InvalidDateRange));
         }
         Ok(self.days.range(from..=to).next().is_some())
     }
@@ -1824,7 +1824,7 @@ const TALLY_DATE_OVERFLOW: &str = "tally_date_overflow";
 /// the typed refusal rather than a panic should that ever change.
 fn day_of(date: &TallyDate) -> Result<NaiveDate, ToolFailure> {
     NaiveDate::parse_from_str(date.as_str(), "%Y%m%d")
-        .map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
+        .map_err(|_| ToolFailure::from(ReadCode::InvalidDateRange))
 }
 
 /// A planning day as the date a request carries. `NaiveDate` reaches far
@@ -2429,7 +2429,7 @@ where
     let first = day_of(from)?;
     let last = day_of(to)?;
     if first > last {
-        return Err("invalid_date_range".to_string().into());
+        return Err(ReadCode::InvalidDateRange.into());
     }
     let mut preflight = None;
     let mut opening: Option<CompanyMarks> = None;
@@ -2452,10 +2452,10 @@ where
         WindowPlanSource::Replay { parts, witness } => {
             for part in &parts {
                 if part.from > part.to {
-                    return Err("invalid_date_range".to_string().into());
+                    return Err(ReadCode::InvalidDateRange.into());
                 }
                 if part.from < *from || part.to > *to {
-                    return Err("window_not_honoured".to_string().into());
+                    return Err(ReadCode::WindowNotHonoured.into());
                 }
             }
             match witness {
@@ -2481,7 +2481,7 @@ where
                 #[cfg(test)]
                 WindowPlanSource::Counted(counted) => {
                     if !counted.within(first, last) {
-                        return Err("window_not_honoured".to_string().into());
+                        return Err(ReadCode::WindowNotHonoured.into());
                     }
                     whole_or_counted(counted, None, limits)
                 }
@@ -2863,7 +2863,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     }
     let days = (day_of(from)?, day_of(to)?);
     if days.0 > days.1 {
-        return Err("invalid_date_range".to_string().into());
+        return Err(ReadCode::InvalidDateRange.into());
     }
     let mut preflight = None;
     let mut opening = None;

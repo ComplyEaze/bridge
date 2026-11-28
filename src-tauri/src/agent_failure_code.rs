@@ -554,8 +554,9 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of an import's invoice checks in `agent_import_invoice.rs`, made from the
-    /// caller's payload alone, before Tally is asked about it.
+    /// The refusals of an import's invoice checks in `agent_import_invoice.rs` that look only at
+    /// the vouchers, before Tally is asked about them: the caller's payload, or for the invoice
+    /// date, a saved batch's line.
     pub(crate) enum InvoiceInputCode {
         /// The caller's payload carries what Tally returned for an invoice, which only the build
         /// records.

@@ -744,7 +744,10 @@ impl Server {
                 return Err("import_batch_changed".to_string().into());
             }
             if !batch_guid_matches(&snapshot.batch.company_guid, guid) {
-                return Err("import_batch_company_mismatch".to_string().into());
+                return Err(ImportAckCode::BatchCompanyMismatch
+                    .as_str()
+                    .to_string()
+                    .into());
             }
             Ok(snapshot)
         })();
@@ -1847,7 +1850,10 @@ impl Server {
     ) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
         if !batch_guid_matches(&snapshot.batch.company_guid, guid) {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         // Retain batch and endpoint integrity without applying approval-only
         // display restrictions or constructing an approval request.

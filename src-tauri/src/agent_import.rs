@@ -2541,7 +2541,10 @@ impl Server {
             .latest_import_snapshot(batch_id)?
             .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if !batch_guid_matches(&line.company_guid, guid) {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         // A batch that was never sent is refused as the build and the post
         // refuse it, before any request. A batch that was sent is still read:

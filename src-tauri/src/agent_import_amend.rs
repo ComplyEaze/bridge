@@ -58,7 +58,7 @@ pub(super) fn admit_lineage(
             return Err("import_amend_identity_scheme_unsupported".into());
         }
         if !batch_guid_matches(&batch.company_guid, company_guid) {
-            return Err("import_batch_company_mismatch".into());
+            return Err(ImportAckCode::BatchCompanyMismatch.as_str().into());
         }
         if batch.endpoint_origin.as_deref() != Some(endpoint_origin) {
             return Err("import_amend_endpoint_mismatch".into());

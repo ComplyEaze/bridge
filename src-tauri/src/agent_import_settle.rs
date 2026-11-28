@@ -215,7 +215,10 @@ impl Server {
             .company_guid
             .eq_ignore_ascii_case(required_string(args, "company_guid")?)
         {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         let step_matched = || {
             self.imports_dir()

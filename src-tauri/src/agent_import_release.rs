@@ -156,7 +156,10 @@ impl Server {
             .company_guid
             .eq_ignore_ascii_case(required_string(args, "company_guid")?)
         {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         // Only a native post that recorded its pre-POST mark can be covered.
         if snapshot.pre_post_voucher_mark.is_none() {

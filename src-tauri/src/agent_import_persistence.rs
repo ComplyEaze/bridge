@@ -3,7 +3,9 @@
 //! append whose outcome is unknown, keeps its transaction folder and blocks
 //! admission until its state is reconciled. An empty folder records no unknown
 //! outcome: admission clears it (`require_settled`, #2269).
-use super::super::failure_code::{ImportAckCode, ImportLedgerCode, ImportPublicationCode};
+use super::super::failure_code::{
+    ImportAckCode, ImportFileCode, ImportLedgerCode, ImportPublicationCode,
+};
 use super::*;
 
 const TRANSACTION: &str = ".proof-publication";
@@ -151,7 +153,9 @@ fn persist_build_with_stage(
     let recovery =
         || Persisted::Incomplete(ImportPublicationCode::BuildRecoveryRequired.as_str().into());
     match append_status() {
-        Err(error) if error == "import_ledger_rollback_failed" => Ok(Persisted::Incomplete(error)),
+        Err(error) if error == ImportFileCode::JournalRollbackFailed.as_str() => {
+            Ok(Persisted::Incomplete(error))
+        }
         Err(error) => {
             if fs::remove_file(&path).is_err() {
                 return Ok(recovery());
@@ -249,7 +253,7 @@ fn publish_proofs_syncing(
     match appended {
         // The journal may hold part of the record: keep the marker, which
         // blocks every later append until a person has looked.
-        Err(error) if error == "import_ledger_rollback_failed" => {
+        Err(error) if error == ImportFileCode::JournalRollbackFailed.as_str() => {
             Err(ImportPublicationCode::ProofRollbackFailed.as_str().into())
         }
         Err(error) => {

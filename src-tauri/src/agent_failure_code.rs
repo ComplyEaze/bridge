@@ -1285,8 +1285,8 @@ failure_codes! {
 
 failure_codes! {
     /// The refusals of an `outstandings` party detail before its bill report is read: a request
-    /// that does not pair a party with a detail, or a party name the `open_bills` detail does not
-    /// send (`agent_party_bills.rs`).
+    /// whose party, detail and reference do not go together, or a party name the `open_bills`
+    /// detail does not send (`agent_party_bills.rs`).
     pub(crate) enum OutstandingsDetailCode {
         /// The party's ledger name is not one the detail sends; the cause says why.
         PartyNameNotAdmitted = "party_name_not_admitted",

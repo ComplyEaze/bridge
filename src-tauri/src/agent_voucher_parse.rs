@@ -1,5 +1,5 @@
 //! Voucher parse for the local MCP adapter.
-use super::failure_code::ReadCode;
+use super::failure_code::{ReadCode, VoucherReadCode};
 use super::*;
 
 #[path = "agent_voucher_bank_allocations.rs"]
@@ -565,7 +565,7 @@ impl DeliveryNoteCollector {
                 entry.insert(tag.to_string(), String::new());
                 Ok(())
             }
-            _ => Err("voucher_delivery_note_invalid".to_string()),
+            _ => Err(VoucherReadCode::DeliveryNoteInvalid.as_str().to_string()),
         }
     }
 
@@ -1134,12 +1134,12 @@ fn parse_voucher_rows(
                             let amount = allocation_row
                                 .get("AMOUNT")
                                 .filter(|value| !value.trim().is_empty())
-                                .ok_or_else(|| "bill_allocation_field_missing".to_string())?;
+                                .ok_or_else(|| VoucherReadCode::BillAllocationFieldMissing.as_str().to_string())?;
                             if bridge_tally_core::ExactDecimal::parse(amount.clone()).is_err() {
                                 if composites.withholds(amount) {
                                     withheld = true;
                                 } else {
-                                    return Err("bill_allocation_amount_invalid".to_string());
+                                    return Err(VoucherReadCode::BillAllocationAmountInvalid.as_str().to_string());
                                 }
                             }
                             let name = allocation_row
@@ -1156,12 +1156,12 @@ fn parse_voucher_rows(
                                 // -- is trying to tell us about. Refuse it as
                                 // `bill_reference_forbidden`.
                                 if name.is_some() {
-                                    return Err("bill_reference_forbidden".to_string());
+                                    return Err(VoucherReadCode::BillReferenceForbidden.as_str().to_string());
                                 }
                                 json!({"kind": "on_account"})
                             } else {
                                 let name = name.ok_or_else(|| {
-                                    "bill_allocation_field_missing".to_string()
+                                    VoucherReadCode::BillAllocationFieldMissing.as_str().to_string()
                                 })?;
                                 json!({"kind": "named", "name": name})
                             };
@@ -1182,7 +1182,7 @@ fn parse_voucher_rows(
                                 .filter(|value| !value.is_empty())
                             {
                                 bridge_tally_core::TallyDate::parse(bill_date.to_string())
-                                    .map_err(|_| "bill_allocation_date_invalid".to_string())?;
+                                    .map_err(|_| VoucherReadCode::BillAllocationDateInvalid.as_str().to_string())?;
                                 parsed_allocation["bill_date"] = json!(bill_date);
                             }
                             if let Some(period) = allocation_row
@@ -1198,7 +1198,7 @@ fn parse_voucher_rows(
                         ) {
                             // A named bill with no type is partially populated, not a
                             // placeholder. Guessing the type would invent an allocation.
-                            return Err("bill_allocation_field_missing".to_string());
+                            return Err(VoucherReadCode::BillAllocationFieldMissing.as_str().to_string());
                         }
                     }
                 } else if scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST") {
@@ -1333,10 +1333,12 @@ fn parse_voucher_rows(
                                 company_guid,
                             )
                         }) {
-                            return Err("voucher_company_identity_invalid".to_string());
+                            return Err(VoucherReadCode::CompanyIdentityInvalid
+                                .as_str()
+                                .to_string());
                         }
                         bridge_tally_core::TallyDate::parse(row["DATE"].clone())
-                            .map_err(|_| "voucher_date_invalid".to_string())?;
+                            .map_err(|_| VoucherReadCode::DateInvalid.as_str().to_string())?;
                         let master_id = parse_optional_tally_u64(
                             row.get("MASTERID").map(String::as_str),
                             "voucher_master_id_invalid",
@@ -1393,7 +1395,9 @@ fn parse_voucher_rows(
                                 .filter(|value| !value.is_empty())
                             {
                                 bridge_tally_core::TallyDate::parse(effective.to_string())
-                                    .map_err(|_| "voucher_effective_date_invalid".to_string())?;
+                                    .map_err(|_| {
+                                        VoucherReadCode::EffectiveDateInvalid.as_str().to_string()
+                                    })?;
                                 parsed["effective_date"] = json!(effective);
                             }
                         }
@@ -1420,7 +1424,11 @@ fn parse_voucher_rows(
                             parsed["post_dated"] = Value::Bool(match post_dated {
                                 "Yes" => true,
                                 "No" => false,
-                                _ => return Err("voucher_post_dated_invalid".to_string()),
+                                _ => {
+                                    return Err(VoucherReadCode::PostDatedInvalid
+                                        .as_str()
+                                        .to_string())
+                                }
                             });
                         }
                         // REFERENCE is TYPE="String", the same shape NARRATION uses, but
@@ -1449,7 +1457,9 @@ fn parse_voucher_rows(
                             .filter(|value| !value.is_empty())
                         {
                             bridge_tally_core::TallyDate::parse(reference_date.to_string())
-                                .map_err(|_| "voucher_reference_date_invalid".to_string())?;
+                                .map_err(|_| {
+                                    VoucherReadCode::ReferenceDateInvalid.as_str().to_string()
+                                })?;
                             parsed["reference_date"] = json!(reference_date);
                         }
                         // ISINVOICE follows ISPOSTDATED's optional-boolean idiom exactly:
@@ -1470,7 +1480,11 @@ fn parse_voucher_rows(
                             parsed["is_invoice"] = Value::Bool(match is_invoice {
                                 "Yes" => true,
                                 "No" => false,
-                                _ => return Err("voucher_is_invoice_invalid".to_string()),
+                                _ => {
+                                    return Err(VoucherReadCode::IsInvoiceInvalid
+                                        .as_str()
+                                        .to_string())
+                                }
                             });
                         }
                         // PARTYGSTIN is TYPE="String", handled like REFERENCE above: an
@@ -1598,7 +1612,7 @@ fn start_delivery_note_element(
     notes: &mut DeliveryNoteCollector,
 ) -> Result<(), String> {
     if scope.delivery_note_field() {
-        Err("voucher_delivery_note_invalid".to_string())
+        Err(VoucherReadCode::DeliveryNoteInvalid.as_str().to_string())
     } else if scope.row("VOUCHER") && tag == DELIVERY_NOTE_LIST {
         notes.start_entry();
         Ok(())
@@ -1663,7 +1677,9 @@ pub(super) fn required_tally_bool(value: Option<&String>) -> Result<bool, String
     match value.map(String::as_str).map(str::trim) {
         Some("Yes") => Ok(true),
         Some("No") => Ok(false),
-        _ => Err("voucher_accounting_state_not_observed".to_string()),
+        _ => Err(VoucherReadCode::AccountingStateNotObserved
+            .as_str()
+            .to_string()),
     }
 }
 

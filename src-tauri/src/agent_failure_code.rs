@@ -572,8 +572,8 @@ failure_codes! {
         BillAllocationDateInvalid = "bill_allocation_date_invalid",
         /// A voucher's GUID is absent or does not belong to the company read.
         CompanyIdentityInvalid = "voucher_company_identity_invalid",
-        /// A voucher's date is not a date, or, in the summary, does not start with a year and a
-        /// month.
+        /// A voucher's date is not a date, or, in the summary, is shorter than six characters or
+        /// holds a character that is not a digit.
         DateInvalid = "voucher_date_invalid",
         /// A voucher's effective date is present and is not a date.
         EffectiveDateInvalid = "voucher_effective_date_invalid",
@@ -583,9 +583,9 @@ failure_codes! {
         ReferenceDateInvalid = "voucher_reference_date_invalid",
         /// A voucher's invoice flag is present and is neither Yes nor No.
         IsInvoiceInvalid = "voucher_is_invoice_invalid",
-        /// A Yes or No the read requires (a voucher's cancelled or optional flag, an entry's or
-        /// movement's deemed-positive flag) is absent or is neither; or a voucher's cancelled and
-        /// optional flags were not both observed.
+        /// A voucher's cancelled or optional flag is absent or is neither Yes nor No, or an entry's
+        /// or a movement's deemed-positive flag is neither; or, in the read-back, a voucher's
+        /// cancelled and optional flags were not both observed.
         AccountingStateNotObserved = "voucher_accounting_state_not_observed",
     }
 }

@@ -1,0 +1,6 @@
+src-tauri/src/agent.rs
+src-tauri/src/agent_read_profiles.rs
+src-tauri/src/agent_read_validation.rs
+src-tauri/src/agent_voucher_scalars.rs
+src-tauri/src/agent_voucher_window.rs
+reviewer: lamemustafa

@@ -4170,7 +4170,9 @@ fn validate_then_filter_voucher_rows(
     selected_ledger: Option<&str>,
 ) -> Result<Vec<Value>, String> {
     if !window_honoured(&rows, from, to) {
-        return Err("window_not_honoured".to_string());
+        return Err(failure_code::ReadCode::WindowNotHonoured
+            .as_str()
+            .to_string());
     }
     match selected_ledger {
         Some(ledger) => Ok(filter_voucher_rows_for_ledger(rows, ledger)),
@@ -4230,7 +4232,7 @@ fn widened_window(
         match stepped {
             Ok(date) => Ok(date),
             Err(bridge_tally_core::TallyError::InvalidData { code }) => Err(code),
-            Err(_) => Err("invalid_date".to_string()),
+            Err(_) => Err(failure_code::ReadCode::InvalidDate.as_str().to_string()),
         }
     };
     Ok((step(from.previous_day())?, step(to.next_day())?))
@@ -4343,17 +4345,27 @@ fn arg_positive_usize(args: &Value, key: &str, default: usize) -> Result<usize, 
 /// the rest must be a valid `YYYYMMDD` date.
 fn normalized_date(value: &str) -> Result<bridge_tally_core::TallyDate, String> {
     bridge_tally_core::TallyDate::parse(value.replace('-', ""))
-        .map_err(|_| "invalid_date".to_string())
+        .map_err(|_| failure_code::ReadCode::InvalidDate.as_str().to_string())
 }
 
 fn add_decimal(left: &str, right: &str) -> Result<String, String> {
-    let left = bridge_tally_core::ExactDecimal::parse(left.to_string())
-        .map_err(|_| "voucher_amount_invalid".to_string())?;
-    let right = bridge_tally_core::ExactDecimal::parse(right.to_string())
-        .map_err(|_| "voucher_amount_invalid".to_string())?;
+    let left = bridge_tally_core::ExactDecimal::parse(left.to_string()).map_err(|_| {
+        failure_code::ReadCode::VoucherAmountInvalid
+            .as_str()
+            .to_string()
+    })?;
+    let right = bridge_tally_core::ExactDecimal::parse(right.to_string()).map_err(|_| {
+        failure_code::ReadCode::VoucherAmountInvalid
+            .as_str()
+            .to_string()
+    })?;
     left.checked_add(&right)
         .map(|value| value.as_str().to_string())
-        .map_err(|_| "voucher_amount_invalid".to_string())
+        .map_err(|_| {
+            failure_code::ReadCode::VoucherAmountInvalid
+                .as_str()
+                .to_string()
+        })
 }
 
 /// A refusal's `candidates`: the longest prefix whose serialised size fits

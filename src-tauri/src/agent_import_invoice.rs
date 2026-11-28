@@ -12,6 +12,7 @@
 //! (never from a ledger's name: duty heads, reserved groups), the arithmetic,
 //! and the rendering. The reads that fill `LedgerFacts` belong to the build.
 
+use super::super::failure_code::InvoiceInputCode;
 use super::super::failure_code::InvoiceItemLineCode;
 use super::super::failure_code::InvoiceRegistrationCode;
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
@@ -684,7 +685,7 @@ pub(super) fn refuse_supplied_observed<D: super::PayloadDate>(
             .as_ref()
             .is_some_and(|detail| detail.observed.is_some())
     }) {
-        return Err("invoice_observed_not_input".to_string());
+        return Err(InvoiceInputCode::ObservedNotInput.as_str().to_string());
     }
     Ok(())
 }
@@ -697,7 +698,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
         .iter()
         .any(|voucher| voucher.voucher_type.invoice_class().is_some())
     {
-        return Err("invoice_amendment_not_supported".to_string());
+        return Err(InvoiceInputCode::AmendmentNotSupported.as_str().to_string());
     }
     Ok(())
 }
@@ -709,11 +710,11 @@ pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), St
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
             None => Ok(()),
-            Some(_) => Err("invoice_detail_on_non_invoice".to_string()),
+            Some(_) => Err(InvoiceInputCode::DetailOnNonInvoice.as_str().to_string()),
         };
     }
     let Some(detail) = voucher.invoice.as_ref() else {
-        return Err("invoice_detail_required".to_string());
+        return Err(InvoiceInputCode::DetailRequired.as_str().to_string());
     };
     let plain = |text: &str, max: usize| {
         !text.trim().is_empty()
@@ -724,31 +725,33 @@ pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), St
     if !plain(&detail.voucher_type_name, super::MAX_MASTER_NAME_CHARS)
         || super::reads_back_as_other_text(&detail.voucher_type_name)
     {
-        return Err("invoice_voucher_type_name_invalid".to_string());
+        return Err(InvoiceInputCode::VoucherTypeNameInvalid
+            .as_str()
+            .to_string());
     }
     if !is_state_name(&detail.place_of_supply) {
-        return Err("invoice_place_of_supply_unknown".to_string());
+        return Err(InvoiceInputCode::PlaceOfSupplyUnknown.as_str().to_string());
     }
     // The invoice number is the document number GSTR-1 reports, in the
     // alphabet GST rule 46(b) allows and no other (a space is refused). It
     // goes into a TDL string literal for the duplicate check, so a closed
     // alphabet, not a deny-list.
     let Some(number) = voucher.voucher_number.as_deref() else {
-        return Err("invoice_number_required".to_string());
+        return Err(InvoiceInputCode::NumberRequired.as_str().to_string());
     };
     if InvoiceNumber::parse(number).is_none() {
-        return Err("invoice_number_invalid".to_string());
+        return Err(InvoiceInputCode::NumberInvalid.as_str().to_string());
     }
     // The supplier reference is a purchase notion; a Sales invoice has none.
     if voucher.reference.is_some() {
-        return Err("invoice_reference_not_for_sales".to_string());
+        return Err(InvoiceInputCode::ReferenceNotForSales.as_str().to_string());
     }
     let round_off = detail.round_off_ledger.as_deref();
     if let Some(name) = round_off {
         if !plain(name, super::MAX_MASTER_NAME_CHARS)
             || !voucher.entries.iter().any(|entry| entry.ledger == name)
         {
-            return Err("invoice_round_off_ledger_invalid".to_string());
+            return Err(InvoiceInputCode::RoundOffLedgerInvalid.as_str().to_string());
         }
     }
     let mut seen = std::collections::BTreeSet::new();
@@ -757,7 +760,7 @@ pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), St
         .iter()
         .all(|entry| seen.insert(entry.ledger.as_str()))
     {
-        return Err("invoice_ledger_repeated".to_string());
+        return Err(InvoiceInputCode::LedgerRepeated.as_str().to_string());
     }
     let counted = voucher
         .entries
@@ -767,12 +770,12 @@ pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), St
     let credits = counted.filter(|e| e.side == EntrySide::Cr).count();
     // One party debit; the sales legs and one tax leg per head are credits.
     if debits != 1 || credits < 3 {
-        return Err("invoice_entry_shape_invalid".to_string());
+        return Err(InvoiceInputCode::EntryShapeInvalid.as_str().to_string());
     }
     // The approval window holds this many legs and no more (24 lines, 1,600
     // characters); an invoice that would not fit is refused here, before any read.
     if voucher.entries.len() > MAX_INVOICE_ENTRIES {
-        return Err("invoice_too_many_entries".to_string());
+        return Err(InvoiceInputCode::TooManyEntries.as_str().to_string());
     }
     Ok(())
 }
@@ -1213,7 +1216,7 @@ impl super::super::Server {
             return Ok(None);
         };
         let year = financial_year_window(voucher.date.as_str())
-            .ok_or_else(|| "invoice_date_invalid".to_string())?;
+            .ok_or_else(|| InvoiceInputCode::DateInvalid.as_str().to_string())?;
         self.import_invoice_number_control(&line.company_guid, (year.0.as_str(), year.1.as_str()))
             .map(Some)
     }

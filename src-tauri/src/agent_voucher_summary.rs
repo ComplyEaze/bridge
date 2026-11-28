@@ -4,7 +4,7 @@
 //! the arithmetic over the rows that survive, with no I/O. Every bucket is a plain sum of the
 //! entries of the vouchers in it, so its total can be rebuilt from the vouchers `vouchers`
 //! lists for the same arguments, and the result says which vouchers it left out and why.
-use super::failure_code::ReadCode;
+use super::failure_code::{ReadCode, VoucherReadCode};
 use super::movement::movement_entry_effect;
 use super::voucher_groups::{Placement, Placements, Primary};
 use super::*;
@@ -406,7 +406,7 @@ fn month_of(date: &str) -> Result<String, String> {
     {
         Ok(format!("{}-{}", &date[..4], &date[4..6]))
     } else {
-        Err("voucher_date_invalid".to_string())
+        Err(VoucherReadCode::DateInvalid.as_str().to_string())
     }
 }
 

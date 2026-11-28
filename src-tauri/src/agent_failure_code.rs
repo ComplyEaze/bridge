@@ -537,8 +537,9 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of the ledger-create master tool (`agent_master_tools.rs`): an item the caller
-    /// sent that is not an admitted ledger, and a stored batch that cannot be found or read back.
+    /// The refusals of the ledger-create master tool and its read-back (`agent_master_tools.rs`,
+    /// `agent_master_verify.rs`): an item the caller sent that is not an admitted ledger, and a
+    /// stored batch that is missing, no longer parses, or has no recorded intent.
     pub(crate) enum MasterLedgerCode {
         /// The item's `kind` is not `party`, `suspense` or `gst_duty`.
         KindNotAdmitted = "master_kind_not_admitted",

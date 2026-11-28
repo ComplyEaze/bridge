@@ -890,6 +890,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
     check_pins(BANK_STATEMENT, BankStatementCode::as_str);
+    check_pins(SEARCH, SearchCode::as_str);
     check_pins(IMPORT_LEDGER, ImportLedgerCode::as_str);
     check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
     check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);

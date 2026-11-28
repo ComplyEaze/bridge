@@ -151,9 +151,10 @@ failure_codes! {
         NarrationTooShort = "search_narration_too_short",
         /// `suspense_tagged` is given as anything but `true`.
         SuspenseTaggedInvalid = "search_suspense_tagged_invalid",
-        /// `suspense_tagged` is given without a `ledger`.
+        /// `suspense_tagged` is given without a `ledger`, or with a blank one.
         SuspenseTaggedNeedsLedger = "search_suspense_tagged_needs_ledger",
-        /// The `amount` criterion is not a plain unsigned decimal.
+        /// The `amount` criterion is not a plain unsigned decimal above zero, or does not read as
+        /// one exactly.
         AmountInvalid = "search_amount_invalid",
     }
 }

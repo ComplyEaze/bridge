@@ -58,6 +58,13 @@ pub enum AuditError {
         code: &'static str,
         detail: String,
     },
+    /// A test was given a document whose comparison this crate has not ported, so it refuses
+    /// rather than give the part of its result it can: `gst_ledgers_3b` with a GSTR-3B.
+    #[error("{test}: a {document} was supplied, and the comparison with it is not ported here")]
+    DocumentNotPorted {
+        test: &'static str,
+        document: &'static str,
+    },
     #[error("{path}: {source}")]
     Io {
         path: String,

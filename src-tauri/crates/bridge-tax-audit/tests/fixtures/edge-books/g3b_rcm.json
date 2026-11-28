@@ -1,0 +1,508 @@
+{
+ "comment": "gst_ledgers_3b, no GSTR-3B: RCM tax ledgers set (two journals in one month, a voucher whose RCM lines net to nil and is not cited, a payment) and goods-carriage ledgers set: listed are a bare payment and a journal with a debit and a credit on the ledger (its debit counted); not listed are one with a configured tax line, a nil line on an unconfigured Duties & Taxes ledger, an RCM line, only a credit, only a nil line, and a cancelled one; and, on ledgers outside Duties & Taxes, one with a configured tax line and one with a configured RCM line.",
+ "period": [
+  "2025-04-01",
+  "2025-05-31"
+ ],
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Export Sales": "Sales Accounts",
+  "Direct Incomes": null,
+  "Indirect Incomes": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-g3b_rcm-000"
+  },
+  {
+   "name": "CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-001"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-g3b_rcm-002"
+  },
+  {
+   "name": "Freight Outward",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-g3b_rcm-003"
+  },
+  {
+   "name": "GST Clearing",
+   "chain": [
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-004"
+  },
+  {
+   "name": "GST Paid",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-005"
+  },
+  {
+   "name": "Legal Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-g3b_rcm-006"
+  },
+  {
+   "name": "RCM CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-007"
+  },
+  {
+   "name": "RCM Liability",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-008"
+  },
+  {
+   "name": "RCM Payable",
+   "chain": [
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-009"
+  },
+  {
+   "name": "RCM SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-010"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-g3b_rcm-011"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_rcm-012"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5265,
+   "closing": -5265
+  },
+  {
+   "ledger": "CGST",
+   "opening": 0,
+   "debit": 270,
+   "credit": 0,
+   "closing": 270
+  },
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Freight Outward",
+   "opening": 0,
+   "debit": 6150,
+   "credit": 500,
+   "closing": 5650
+  },
+  {
+   "ledger": "GST Clearing",
+   "opening": 0,
+   "debit": 45,
+   "credit": 0,
+   "closing": 45
+  },
+  {
+   "ledger": "GST Paid",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Legal Fees",
+   "opening": 0,
+   "debit": 10000,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "RCM CGST",
+   "opening": 0,
+   "debit": 1504,
+   "credit": 0,
+   "closing": 1504
+  },
+  {
+   "ledger": "RCM Liability",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2304,
+   "closing": -2304
+  },
+  {
+   "ledger": "RCM Payable",
+   "opening": 0,
+   "debit": 27,
+   "credit": 0,
+   "closing": 27
+  },
+  {
+   "ledger": "RCM SGST",
+   "opening": 0,
+   "debit": 1200,
+   "credit": 100,
+   "closing": 1100
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 100,
+   "credit": 0,
+   "closing": 100
+  },
+  {
+   "ledger": "Supplier B",
+   "opening": 0,
+   "debit": 300,
+   "credit": 11427,
+   "closing": -11127
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-10",
+   "base_type": "Journal",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Legal Fees",
+     10000
+    ],
+    [
+     "RCM CGST",
+     900
+    ],
+    [
+     "RCM SGST",
+     900
+    ],
+    [
+     "Supplier B",
+     -10000
+    ],
+    [
+     "RCM Liability",
+     -1800
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-04-18",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "RCM CGST",
+     450
+    ],
+    [
+     "RCM Liability",
+     -450
+    ]
+   ]
+  },
+  {
+   "guid": "r03",
+   "date": "2025-05-02",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "RCM CGST",
+     100
+    ],
+    [
+     "RCM SGST",
+     -100
+    ]
+   ]
+  },
+  {
+   "guid": "r04",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "RCM SGST",
+     300
+    ],
+    [
+     "Bank",
+     -300
+    ]
+   ]
+  },
+  {
+   "guid": "g01",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     2000
+    ],
+    [
+     "Bank",
+     -2000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     1500
+    ],
+    [
+     "CGST",
+     270
+    ],
+    [
+     "Bank",
+     -1770
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-04-07",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     800
+    ],
+    [
+     "GST Paid",
+     0
+    ],
+    [
+     "Bank",
+     -800
+    ]
+   ]
+  },
+  {
+   "guid": "g04",
+   "date": "2025-04-09",
+   "base_type": "Journal",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Freight Outward",
+     600
+    ],
+    [
+     "RCM CGST",
+     54
+    ],
+    [
+     "RCM Liability",
+     -54
+    ],
+    [
+     "Supplier B",
+     -600
+    ]
+   ]
+  },
+  {
+   "guid": "g05",
+   "date": "2025-05-09",
+   "base_type": "Journal",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Freight Outward",
+     -300
+    ],
+    [
+     "Supplier B",
+     300
+    ]
+   ]
+  },
+  {
+   "guid": "g06",
+   "date": "2025-05-12",
+   "base_type": "Journal",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Freight Outward",
+     700
+    ],
+    [
+     "Freight Outward",
+     -200
+    ],
+    [
+     "Supplier B",
+     -500
+    ]
+   ]
+  },
+  {
+   "guid": "g07",
+   "date": "2025-05-20",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     0
+    ],
+    [
+     "Rent",
+     100
+    ],
+    [
+     "Bank",
+     -100
+    ]
+   ]
+  },
+  {
+   "guid": "g08",
+   "date": "2025-05-21",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     900
+    ],
+    [
+     "Bank",
+     -900
+    ]
+   ],
+   "status": "cancelled"
+  },
+  {
+   "guid": "g09",
+   "date": "2025-05-25",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "Freight Outward",
+     250
+    ],
+    [
+     "GST Clearing",
+     45
+    ],
+    [
+     "Bank",
+     -295
+    ]
+   ]
+  },
+  {
+   "guid": "g10",
+   "date": "2025-05-26",
+   "base_type": "Journal",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Freight Outward",
+     300
+    ],
+    [
+     "RCM Payable",
+     27
+    ],
+    [
+     "Supplier B",
+     -327
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "gst_ledgers_3b"
+ ],
+ "gst_ledgers_3b": {
+  "tax_ledgers": {
+   "cgst": [
+    "CGST",
+    "GST Clearing"
+   ]
+  },
+  "rcm_tax_ledgers": [
+   "RCM CGST",
+   "RCM Payable",
+   "RCM SGST"
+  ],
+  "round_off_ledgers": [],
+  "goods_carriage_ledgers": [
+   "Freight Outward"
+  ]
+ }
+}

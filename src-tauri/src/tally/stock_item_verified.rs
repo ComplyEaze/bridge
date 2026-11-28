@@ -31,7 +31,7 @@
 //! `bridge-tally-protocol/tests/fixtures/agent/stock-create-lab/`; see their
 //! `PROVENANCE.md` (PARTIAL: one book, one release, one sitting).
 
-// Nothing outside the tests calls this until the stock-item tools exist.
+// Parts of this are reached only by the tests.
 #![cfg_attr(not(test), allow(dead_code))]
 
 use super::master_name::MasterName;

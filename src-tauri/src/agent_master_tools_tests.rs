@@ -532,7 +532,7 @@ fn the_master_tools_are_listed_only_when_master_writes_are_in_force() {
         // Master writes need posting: with it off the setting lists nothing.
         assert_eq!(
             master(&on),
-            if writes { 2 } else { 0 },
+            if writes { 4 } else { 0 },
             "import={import} writes={writes}"
         );
     }
@@ -545,13 +545,18 @@ fn the_master_tools_are_listed_only_when_master_writes_are_in_force() {
     );
 }
 
-const MASTER_WRITE_TOOLS_FOR_TEST: [&str; 2] = ["post_ledger_creates", "prepare_ledger_creates"];
+const MASTER_WRITE_TOOLS_FOR_TEST: [&str; 4] = [
+    "post_ledger_creates",
+    "post_stock_item",
+    "prepare_ledger_creates",
+    "prepare_stock_item",
+];
 
 #[tokio::test]
 async fn tools_list_serves_the_master_tools_only_when_the_setting_is_effective() {
     use crate::agent::agent_protocol::serve_stdio;
     use tokio::io::BufReader;
-    for (master, expected) in [(false, 0), (true, 2)] {
+    for (master, expected) in [(false, 0), (true, 4)] {
         let directory = tempfile::tempdir().unwrap();
         let server = server_with("127.0.0.1:9".parse().unwrap(), directory.path(), master);
         let input = format!(
@@ -590,8 +595,14 @@ async fn with_the_setting_off_both_tools_are_refused_master_writes_disabled_befo
     for (tool, args) in [
         ("prepare_ledger_creates", prepare_args(LEDGER)),
         ("post_ledger_creates", json!({"batch_id": "bridge-x"})),
+        (
+            "prepare_stock_item",
+            json!({"company_guid": GUID, "name": "A", "sibling": "B"}),
+        ),
+        ("post_stock_item", json!({"batch_id": "bridge-x"})),
         // Even arguments that would otherwise be refused first.
         ("prepare_ledger_creates", json!({"nonsense": 1})),
+        ("prepare_stock_item", json!({"nonsense": 1})),
     ] {
         let response = server.call_tool(tool, args).await;
         assert_eq!(

@@ -55,7 +55,7 @@
 //! `& < > " '`. The rate's magnitude and the unit's value are not checked.
 //! Bridge does not know how Tally treats values other than the measured ones.
 
-// Nothing outside the tests calls this until the stock-item tools exist.
+// Parts of this are reached only by the tests.
 #![cfg_attr(not(test), allow(dead_code))]
 
 use super::master_name::{MasterName, MasterNameError};

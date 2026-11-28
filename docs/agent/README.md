@@ -3269,8 +3269,9 @@ measured on TallyPrime 7.1 Silver, on one synthetic book; other releases and
 editions are not measured.
 
 `BRIDGE_AGENT_ENABLE_MASTER_WRITES=true`, together with
-`BRIDGE_AGENT_ENABLE_WRITES=true`, lists two more tools, which are not among the
-ordinary default tools above: `prepare_ledger_creates` and `post_ledger_creates`.
+`BRIDGE_AGENT_ENABLE_WRITES=true`, lists four more tools, which are not among the
+ordinary default tools above: `prepare_ledger_creates` and `post_ledger_creates`,
+described here, and `prepare_stock_item` and `post_stock_item`, described after them.
 Together they create ONE new ledger (a party under Sundry Debtors or Sundry
 Creditors, a Suspense ledger, or a GST duty ledger whose head has been measured)
 from typed fields: ComplyEaze Bridge builds the request itself, accepts no XML,
@@ -3519,6 +3520,41 @@ address or phone number is put in an answer or a record; a GSTIN the caller
 supplied, which contains the party's PAN, is in the preview and in the batch's
 local record. The setting is a command-line setting only and is not in the MCPB
 extension.
+
+`prepare_stock_item` and `post_stock_item` are in the source and in no release yet
+(#1381). Together they create ONE new stock item, a copy of an existing one
+(`sibling`) under a new `name`: ComplyEaze Bridge builds the request itself from
+those two names and the company's own reads, accepts no XML, and gives no opening
+balance. The sibling must be the one stock item that holds that name exactly, as
+its name or an alias: Goods, taxable, with GST applicable, one dated GST entry and
+one HSN entry. The new item takes its parent group, base unit, GST details and HSN
+code and description as read. `prepare_stock_item` reads the company's stock
+items, stock groups and units once, refuses a name that a stock item already holds
+as its name or an alias, or that differs from one only in case, spaces or symbols
+(`master_name_taken`), and a sibling it cannot copy (a `stock_item_sibling_` code),
+saves the request in the local stock journal and returns a `batch_id` with the
+preview the person will be shown (under `mask_parties` the item's name, the
+sibling's name, the parent and the HSN description are masked in it; the dialog
+shows them whole); it writes nothing to Tally. `post_stock_item` takes that
+`batch_id`, reads the company's stock items, groups and units again and refuses
+unless they make the same item, asks the local user in a native dialog, and sends
+the create once; its approval, pending and approved answers behave as
+`post_import`'s do. A name that an unsettled stock item create holds, in any
+company of this data folder, is refused before the ask. After the send it reads the
+book back and answers with one of three states: `posted_verified` (only in the call
+that sent the create: Tally's answer clean, exactly one new stock item of the name
+with the parent, unit, GST details and HSN details as sent, no stock item that
+existed before changed, the company's master mark moved by exactly one and no other
+loaded company's mark moved), `masters_after_post_unconfirmed` (the book could not
+be read back; call again, which only reads) or `reconciliation_required` (with
+reasons). A later call never sends and never verifies: it reads the book back and
+judges it the same way, so a batch not verified in the call that sent it stays open
+and keeps holding its name. A call cancelled once its send is recorded is not
+withdrawn: it runs to its answer and keeps the approval. Never create the stock
+item in Tally by hand meanwhile. The create's request shape was measured once, sent
+by a lab script and not by these tools, on one synthetic book on TallyPrime 7.2
+single-user edition (partial); these tools have not been run against a real
+TallyPrime, and no other release or edition is measured.
 
 All three switches accept `true`/`false` or `1`/`0`; any other value stops startup, except that an empty `BRIDGE_AGENT_ENABLE_WRITES`, or the extension's unresolved placeholder for it, reads as off. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**

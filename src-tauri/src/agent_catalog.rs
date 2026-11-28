@@ -1,8 +1,8 @@
 //! Public tool catalog and argument admission before any Tally read.
 use super::*;
 
-/// The longest ledger name `prepare_ledger_creates` publishes, the master-name
-/// bound `MasterName` enforces.
+/// The longest ledger or stock item name `prepare_ledger_creates` and
+/// `prepare_stock_item` publish, the master-name bound `MasterName` enforces.
 const MAX_LEDGER_NAME_CHARS: usize = bridge_tally_core::master_binding::MAX_NAME_CHARS;
 const NONBLANK_PATTERN: &str = r"\S";
 const DATE_WIRE_PATTERN: &str = "^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$";
@@ -295,7 +295,12 @@ fn proposed_voucher_schema() -> Value {
 /// force (`BRIDGE_AGENT_ENABLE_MASTER_WRITES` together with posting). They stay
 /// registered either way, so a call to one with the setting off is answered
 /// `master_writes_disabled` and never `tool_not_found`.
-pub(super) const MASTER_WRITE_TOOLS: [&str; 2] = ["post_ledger_creates", "prepare_ledger_creates"];
+pub(super) const MASTER_WRITE_TOOLS: [&str; 4] = [
+    "post_ledger_creates",
+    "post_stock_item",
+    "prepare_ledger_creates",
+    "prepare_stock_item",
+];
 
 /// The tools `tools/list` serves with master writes off.
 #[cfg(test)]
@@ -355,6 +360,7 @@ const PARSE_STATEMENT_CSV_SENTENCE: &str = "Reads the CSV bank statement you nam
 const PARSE_STATEMENT_SENTENCE: &str = "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally.";
 const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally.";
 const PREPARE_LEDGER_SENTENCE: &str = "Reads the company's ledger and group names from Tally once, then writes one record of the prepared ledger to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally.";
+const PREPARE_STOCK_SENTENCE: &str = "Reads the company's stock items, stock groups and units from Tally once, then writes one record of the prepared stock item to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally.";
 const ACKNOWLEDGE_SENTENCE: &str = "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also adds proof files and status records there, replacing and deleting nothing; writes nothing to Tally.";
 
 /// What a shipped (non-lab) tool does beyond answering, which decides its MCP
@@ -406,7 +412,9 @@ impl ToolEffect {
             "parse_bank_statement_csv" => Self::LocalWrite(PARSE_STATEMENT_CSV_SENTENCE),
             "post_import" => Self::TallyPost,
             "post_ledger_creates" => Self::TallyPost,
+            "post_stock_item" => Self::TallyPost,
             "prepare_ledger_creates" => Self::LocalWrite(PREPARE_LEDGER_SENTENCE),
+            "prepare_stock_item" => Self::LocalWrite(PREPARE_STOCK_SENTENCE),
             "profit_and_loss" => Self::Read,
             "purchase_register" => Self::Read,
             "read_evidence" => Self::Read,
@@ -469,7 +477,9 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "parse_bank_statement_csv",
     "post_import",
     "post_ledger_creates",
+    "post_stock_item",
     "prepare_ledger_creates",
+    "prepare_stock_item",
     "profit_and_loss",
     "purchase_register",
     "read_evidence",
@@ -507,6 +517,9 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         ("post_ledger_creates", "batch_id") => "The batch_id prepare_ledger_creates returned for the prepared ledger.",
         ("prepare_ledger_creates", "ledgers") => "2 to 10 ledgers as in ledger, one kind and side, sent together; a box too tall for the screen is refused. Not with ledger.",
         ("prepare_ledger_creates", "ledger") => "The one ledger to create. name: ASCII only, no leading, trailing or repeated spaces. kind: party, suspense or gst_duty. For a party: side (sundry_debtors or sundry_creditors, required), gstin (optional, its check character is verified) and bill_wise (optional, default false). For gst_duty: duty_head in Tally's spelling (only SGST/UTGST is admitted today). The parent group follows from the kind, and no opening balance can be given.",
+        ("post_stock_item", "batch_id") => "The batch_id prepare_stock_item returned for the prepared stock item.",
+        ("prepare_stock_item", "name") => "The new stock item's name: ASCII only, no leading, trailing or repeated spaces.",
+        ("prepare_stock_item", "sibling") => "The exact name or alias of an existing stock item of the company to copy: Goods, taxable, with GST applicable, one dated GST entry and one HSN entry. The new item takes its parent group, base unit, GST rates and HSN code and description as read, and nothing else; no opening balance is given.",
         (_, "batch_id") => "The batch_id build_import_xml returned for the saved batch.",
         ("parse_bank_statement" | "parse_bank_statement_csv", "from") => "Optional: only statement rows dated on or after this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no start.",
         ("parse_bank_statement" | "parse_bank_statement_csv", "to") => "Optional: only statement rows dated on or before this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no end.",
@@ -636,7 +649,9 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         "post_import"
                             | "acknowledge_post_review"
                             | "post_ledger_creates"
+                            | "post_stock_item"
                             | "prepare_ledger_creates"
+                            | "prepare_stock_item"
                     )
             })
             // LAB-ONLY: registered only when the `lab-writes` feature is
@@ -756,9 +771,17 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         "Ask the local user to approve creating the ledgers prepared by prepare_ledger_creates, in a native dialog, then send the create to Tally once and read the book back. Requires opt-in (BRIDGE_AGENT_ENABLE_MASTER_WRITES together with BRIDGE_AGENT_ENABLE_WRITES). Takes the batch_id prepare_ledger_creates returned. The approval works as post_import's: the call waits about 40 seconds; approval.state pending means nothing was created and the same dialog stays open (call again with the same batch_id, which waits on it); approved means call again at once. A batch already sent is never sent again: calling again reads the book back, unless another dispatch is using the Tally endpoint or the batch's company cannot be matched, or reports what ComplyEaze Bridge recorded for a batch already settled. States: posted_verified (each ledger new, as sent; one create counted per ledger, nothing altered; this company's master mark moved by one per ledger and no other loaded company's did); posted_into_existing_master and master_write_located_elsewhere lead with an alert: tell the person to check Tally, and never retry; confirmed_absent (only from a later call, on licensed TallyPrime 7.2; make sure Tally is idle and answering before a new batch is prepared), and confirmed_absent_after_change, the same after a master change moved the mark, with no master new since the send; posted_unattributed (only from a later call with no answer from Tally on file: the ledger as sent, its ALTERID the first master change after the last read before the send; settled but not verified, so tell the person to check the ledger in Tally); masters_after_post_unconfirmed, posted_unverified and reconciliation_required (never send the batch again: calling again with the same batch_id only reads). A name that an unsettled create holds, in any company of this data folder, is refused as master_ledger_open_dispatch_overlaps; error.hold, blocking_batch_ids and blocking_batches_other_companies say which batches to call first. Every answer's next_step says what to do next; never create the ledger in Tally by hand meanwhile, and never rebuild or resend a sent batch. The ComplyEaze Bridge agent guide, for the person, describes every state, reason and field.",
                         json!({"type":"object", "additionalProperties":false, "required":["batch_id"], "properties":{"batch_id":{"type":"string","minLength":43,"maxLength":43,"pattern":BRIDGE_BATCH_ID_PATTERN}}}),
                     ),
+                    "post_stock_item" => (
+                        "Ask the local user to approve creating the stock item prepared by prepare_stock_item, in a native dialog, then send the create to Tally once and read the book back. Requires opt-in (BRIDGE_AGENT_ENABLE_MASTER_WRITES together with BRIDGE_AGENT_ENABLE_WRITES). Takes the batch_id prepare_stock_item returned. Before the ask it reads the company's stock items, groups and units again and refuses unless they make the item prepared (import_batch_changed). The approval works as post_import's: the call waits about 40 seconds; approval.state pending means nothing was created and the same dialog stays open (call again with the same batch_id, which waits on it); approved means call again at once. A batch already sent is never sent again: calling again reads the book back and sends nothing, or reports what ComplyEaze Bridge recorded for a batch already settled. A name that an unsettled stock item create holds, in any company of this data folder, is refused before the ask. Every answer's next_step says what to do next; never create the stock item in Tally by hand meanwhile, and never rebuild or resend a sent batch.",
+                        json!({"type":"object", "additionalProperties":false, "required":["batch_id"], "properties":{"batch_id":{"type":"string","minLength":43,"maxLength":43,"pattern":BRIDGE_BATCH_ID_PATTERN}}}),
+                    ),
                     "prepare_ledger_creates" => (
                         "Prepare one new ledger, or with ledgers up to 10 of one kind and side, for ComplyEaze Bridge to create in a company in Tally. Nothing is written to Tally. Requires opt-in (BRIDGE_AGENT_ENABLE_MASTER_WRITES together with BRIDGE_AGENT_ENABLE_WRITES). ComplyEaze Bridge builds the request itself from the typed fields; no XML is accepted. It reads the company's ledger and group names from Tally once and refuses a name that already exists as a ledger, a group or an alias, or differs from one only in case, spaces or symbols (master_name_taken; measured on TallyPrime 7.1 Silver, one synthetic book), saves the request in its local folder, and returns a batch_id with the exact preview the person will be shown (with BRIDGE_AGENT_REDACTION=mask_parties, the ledger's name in the returned preview is masked; the dialog shows it whole). If the ledger names Tally returns cannot be read, this call refuses master_ledger_index_unavailable and prepares nothing. Create the ledger by calling post_ledger_creates with the batch_id.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string"},"ledger":{"type":"object","additionalProperties":false,"required":["name","kind"],"properties":{"name":{"type":"string","minLength":1,"maxLength":MAX_LEDGER_NAME_CHARS},"kind":{"type":"string","minLength":1,"maxLength":32},"side":{"type":"string","minLength":1,"maxLength":32},"gstin":{"type":"string","minLength":1,"maxLength":32},"bill_wise":{"type":"boolean"},"duty_head":{"type":"string","minLength":1,"maxLength":32}}},"ledgers":{"type":"array","minItems":2,"maxItems":crate::tally::ledger_create_item::MAX_LEDGERS_PER_BATCH,"items":{"type":"object"}}}}),
+                    ),
+                    "prepare_stock_item" => (
+                        "Prepare one new stock item, a copy of an existing one (sibling) under a new name, for ComplyEaze Bridge to create in a company in Tally. Nothing is written to Tally. Requires opt-in (BRIDGE_AGENT_ENABLE_MASTER_WRITES together with BRIDGE_AGENT_ENABLE_WRITES). ComplyEaze Bridge builds the request itself from the typed fields; no XML is accepted. It refuses a name that a stock item of the company already holds as its name or an alias, or that differs from one only in case, spaces or symbols, and a sibling it cannot copy, saves the request in its local folder, and returns a batch_id with the exact preview the person will be shown (with BRIDGE_AGENT_REDACTION=mask_parties, the item's name, the sibling's name, the parent and the HSN description are masked in the returned preview; the dialog shows them whole). Create the stock item by calling post_stock_item with the batch_id.",
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid","name","sibling"],"properties":{"company_guid":{"type":"string"},"name":{"type":"string","minLength":1,"maxLength":MAX_LEDGER_NAME_CHARS},"sibling":{"type":"string","minLength":1,"maxLength":MAX_LEDGER_NAME_CHARS}}}),
                     ),
                     "purchase_register" | "sales_register" => (
                         "", // the text comes from `RegisterKind::description`

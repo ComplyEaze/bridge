@@ -47,6 +47,7 @@ use super::master_post::{
 use super::master_review::{masked_review_text, master_review_text};
 use super::post::{refusal_cause, refusal_code, ApprovalTarget, Entry, Pass, Step};
 use super::*;
+use crate::agent::agent_protocol::PostTool;
 use crate::agent::evidence_from_runtime_read;
 use crate::agent::read_profiles::{ledger_name_index_read, native_group_snapshot_read};
 use crate::agent::shown_cause;
@@ -106,6 +107,30 @@ const CANCELLED_SEND_RECORDED_MESSAGE: &str = "The request was cancelled after a
 /// The journal could not be read, or does not hold the batch, so whether a send
 /// was recorded is not known.
 const CANCELLED_SEND_NOT_KNOWN_MESSAGE: &str = "The request was cancelled, and whether a send of this batch was recorded is not known: the journal could not be read just now, or holds no such batch. Check the company's ledgers in Tally.";
+
+/// The code of a tool name the catalogue does not hold.
+fn tool_not_found() -> String {
+    "tool_not_found".to_string()
+}
+
+/// The texts of a cancelled master post's three cases, by kind: the message
+/// for nothing sent, a send recorded and not known, and the step for the last
+/// two.
+struct CancelledTexts {
+    not_sent: &'static str,
+    sent: &'static str,
+    not_known: &'static str,
+    sent_step: &'static str,
+    not_known_step: &'static str,
+}
+
+const LEDGER_CANCELLED: CancelledTexts = CancelledTexts {
+    not_sent: CANCELLED_NOT_SENT_MESSAGE,
+    sent: CANCELLED_SEND_RECORDED_MESSAGE,
+    not_known: CANCELLED_SEND_NOT_KNOWN_MESSAGE,
+    sent_step: NEXT_UNCONFIRMED,
+    not_known_step: NEXT_SEND_NOT_KNOWN,
+};
 
 /// The refusal code of a [`MasterNameError`].
 fn master_name_code(error: MasterNameError) -> &'static str {
@@ -341,7 +366,7 @@ fn enforce_published_schema(args: &Value) -> Result<(), String> {
                 .find(|tool| tool["name"] == "prepare_ledger_creates")
         })
         .map(|tool| tool["inputSchema"].clone())
-        .ok_or_else(|| "tool_not_found".to_string())?;
+        .ok_or_else(tool_not_found)?;
     for key in ["ledger", "ledgers"] {
         if let Some(value) = args.get(key) {
             super::super::catalog::validate_against_schema(value, &schema["properties"][key], key)?;
@@ -493,43 +518,61 @@ impl Server {
         tool: &str,
         args: &Value,
     ) -> Result<Option<bool>, ToolFailure> {
-        if tool == "post_ledger_creates" {
-            self.recorded_master_attempt(args)
-        } else {
-            self.recorded_import_attempt(args)
+        match PostTool::of(tool) {
+            Some(PostTool::Vouchers) => self.recorded_import_attempt(args),
+            Some(PostTool::Ledger) => self.recorded_master_attempt(args),
+            Some(PostTool::Stock) => self.recorded_stock_attempt(args),
+            // Not known, so the post drains: never the voucher journal's answer.
+            None => {
+                debug_assert!(false, "{tool} is not a post tool");
+                Ok(None)
+            }
         }
     }
 
-    /// The answer to a post withdrawn before its intent, by tool.
+    /// The answer to a post withdrawn before its intent, by tool. Both master
+    /// kinds answer it here, each from its own journal and with its own texts.
     pub(in crate::agent) fn cancelled_post_for_response(
         &self,
         tool: &str,
         args: &Value,
     ) -> Result<ToolOutcome, ToolFailure> {
-        if tool != "post_ledger_creates" {
-            return self.cancelled_import_for_response(args);
-        }
+        let (attempted, company_guid, texts) = match PostTool::of(tool) {
+            Some(PostTool::Vouchers) => return self.cancelled_import_for_response(args),
+            Some(PostTool::Ledger) => {
+                let batch_id = required_string(args, "batch_id")?;
+                let attempted = self.recorded_master_attempt(args)?;
+                let company_guid = self.read_master_journal().ok().and_then(|journal| {
+                    journal
+                        .state(batch_id)
+                        .map(|state| state.batch.company.guid.clone())
+                });
+                (attempted, company_guid, &LEDGER_CANCELLED)
+            }
+            Some(PostTool::Stock) => {
+                let (attempted, company_guid) = self.cancelled_stock_facts(args)?;
+                (attempted, company_guid, &stock_tools::STOCK_CANCELLED)
+            }
+            None => {
+                debug_assert!(false, "{tool} is not a post tool");
+                return Err(tool_not_found().into());
+            }
+        };
         let batch_id = required_string(args, "batch_id")?;
-        let attempted = self.recorded_master_attempt(args)?;
-        let company_guid = self.read_master_journal().ok().and_then(|journal| {
-            journal
-                .state(batch_id)
-                .map(|state| state.batch.company.guid.clone())
-        });
         let mut evidence = empty_evidence();
         evidence.state = "partial";
         evidence.reason_code = Some("request_cancelled".into());
         // The three cases a failure answer has: nothing sent, a send recorded,
         // and a journal that could not be read, which does not know.
         let mut error = json!({"code": "request_cancelled", "message": match attempted {
-            Some(false) => CANCELLED_NOT_SENT_MESSAGE,
-            Some(true) => CANCELLED_SEND_RECORDED_MESSAGE,
-            None => CANCELLED_SEND_NOT_KNOWN_MESSAGE,
+            Some(false) => texts.not_sent,
+            Some(true) => texts.sent,
+            None => texts.not_known,
         }});
         match attempted {
             Some(false) => {}
-            Some(true) => error["next_step"] = json!(NEXT_UNCONFIRMED),
-            None => error["next_step"] = json!(NEXT_SEND_NOT_KNOWN),
+            Some(true) => error["next_step"] = json!(texts.sent_step),
+            None => error["next_step"] = json!(texts.not_known_step),
         }
         Ok(ToolOutcome {
             payload: json!({"result":{

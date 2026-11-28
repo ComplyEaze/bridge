@@ -579,15 +579,14 @@ struct PostRequest<'a> {
 /// (#778 would stop it between requests). Input is read meanwhile.
 fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
     request.cancellation.cancel();
-    if let Some(batch_id) = request.args.get("batch_id").and_then(Value::as_str) {
-        let kind = if request.tool == "post_ledger_creates" {
-            crate::tally::approved_import::PostKind::Masters
-        } else {
-            crate::tally::approved_import::PostKind::Vouchers
-        };
+    let tool = PostTool::of(request.tool);
+    debug_assert!(tool.is_some(), "a post tool");
+    if let (Some(batch_id), Some(tool)) =
+        (request.args.get("batch_id").and_then(Value::as_str), tool)
+    {
         server
             .post_approvals
-            .revoke_of(kind, batch_id, "request_cancelled");
+            .revoke_of(tool.kind(), batch_id, "request_cancelled");
     }
 }
 
@@ -605,7 +604,37 @@ pub(in crate::agent) enum ToolCallEnd {
 /// The tools that post to Tally behind a native approval, and so run through
 /// [`run_named_post`] rather than as an ordinary call.
 fn is_post_tool(name: &str) -> bool {
-    matches!(name, "post_import" | "post_ledger_creates")
+    PostTool::of(name).is_some()
+}
+
+/// A post tool, by the journal that records its sends: the one list of them,
+/// which a cancellation reads to classify the post and revoke its approval.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::agent) enum PostTool {
+    Vouchers,
+    Ledger,
+    Stock,
+}
+
+impl PostTool {
+    /// The post tool `name` names; `None` for any other tool.
+    pub(in crate::agent) fn of(name: &str) -> Option<Self> {
+        match name {
+            "post_import" => Some(Self::Vouchers),
+            "post_ledger_creates" => Some(Self::Ledger),
+            "post_stock_item" => Some(Self::Stock),
+            _ => None,
+        }
+    }
+
+    /// The approval kind its post takes: a stock item is a master.
+    fn kind(self) -> crate::tally::approved_import::PostKind {
+        use crate::tally::approved_import::PostKind;
+        match self {
+            Self::Vouchers => PostKind::Vouchers,
+            Self::Ledger | Self::Stock => PostKind::Masters,
+        }
+    }
 }
 
 /// Run one `post_import` call to its end while servicing input: the one path

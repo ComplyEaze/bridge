@@ -2,12 +2,13 @@
 //! file of its own (`agent-master-stock-item.jsonl`), and
 //! [`StockItemReadBackBasis`], the one value a stock-item read-back takes.
 //!
-//! No shipped path writes this file yet: [`record_stock_item_intent`], its
-//! intent writer, has no shipped caller. The intent, the pre-image sidecar and
-//! the record tags are the master journal's own, generic over the batch kind;
-//! neither the intent nor the sidecar records a kind, because the file is the
-//! kind. A stock verdict is built only by [`MasterVerdict::stock`], from the
-//! judgement of [`verdict`], whose module documentation holds its table.
+//! The stock post writes this file's intents through
+//! [`record_stock_item_intent`], its intent writer. The intent, the pre-image
+//! sidecar and the record tags are the master journal's own, generic over the
+//! batch kind; neither the intent nor the sidecar records a kind, because the
+//! file is the kind. A stock verdict is built only by
+//! [`MasterVerdict::stock`], from the judgement of [`verdict`], whose module
+//! documentation holds its table.
 //!
 //! A stock item and a ledger of the same name do not block each other: each
 //! journal's open-dispatch overlap check sees only its own file. That rests on
@@ -366,8 +367,7 @@ pub(in crate::agent::agent_import) enum StockIntentRefusal {
 /// exclusive lock and in its order: the batch undispatched and unchanged, the
 /// token and the approval of that batch, the token of that digest, the
 /// journal's admission, then the spend of `redemption`, the sidecar and the
-/// intent. Its only caller is the stock post, which nothing registers.
-#[cfg_attr(not(test), allow(dead_code))]
+/// intent. Its only caller is the stock post.
 pub(in crate::agent::agent_import) fn record_stock_item_intent(
     data_dir: &Path,
     lock: &ExclusiveAdmission,

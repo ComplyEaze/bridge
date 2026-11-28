@@ -1,5 +1,6 @@
 //! `prepare_stock_item` (#1381): the stock twin of `prepare_ledger_creates`.
-//! No tool is registered for it yet, so nothing shipped calls it.
+//! Like the ledger pair, both stock tools are listed only while master writes
+//! are in force, and refuse `master_writes_disabled` otherwise.
 //!
 //! It verifies the company, reads the company's stock reads once in one queued
 //! execution, builds the stock-item draft from those reads, builds the preview
@@ -19,10 +20,9 @@
 //! The answer's evidence is the company-list read of the identity check only:
 //! the stock reads keep none, and no declared reason code says so.
 //!
-//! `post_stock_item` is the stock twin of the ledger post's pass, and nothing
-//! registers it either. It reads the batch from the stock journal, verifies the
-//! company, shows the item again from the book as it stands through the same
-//! read as above, refuses unless the batch that item makes is the stored one,
+//! `post_stock_item` is the stock twin of the ledger post's pass. It reads the
+//! batch from the stock journal, verifies the company, shows the item again
+//! from the book as it stands through the same read as above, refuses unless the batch that item makes is the stored one,
 //! and refuses a name an open stock dispatch holds. Then it asks and holds the
 //! person's approval as the ledger post does, takes it, and sends the one
 //! Create through the shared queue with the stock recheck and the stock intent
@@ -60,9 +60,8 @@ use crate::tally::stock_item_create::{
 };
 use crate::tally::stock_item_verified::StockItemImportOutcome;
 
-/// What a caller is told after a stock item is prepared. It names no tool: none
-/// posts a stock item yet.
-const PREPARED_STOCK_NEXT_STEP: &str = "Nothing was written to Tally. This stock item is recorded for approval; the local user must approve it in a native dialog before it is created.";
+/// What a caller is told after a stock item is prepared.
+const PREPARED_STOCK_NEXT_STEP: &str = "Nothing was written to Tally. To create this stock item, call post_stock_item with this batch_id: the local user must approve it in a native dialog first.";
 
 /// What a caller is told after the one stock-item Create was answered and the
 /// book could not be read back at all.
@@ -99,10 +98,20 @@ const STOCK_HOLD_NEXT_STEP: &str = "When the stock item creates that hold the na
 /// The step after a hold check that could not read the journal.
 const STOCK_UNREAD_NEXT_STEP: &str = "Post this batch again later: the journal is read again then. Do not create the stock item in Tally by hand meanwhile.";
 
+/// What a stock post withdrawn by its caller is told, by what the stock
+/// journal showed of its batch, in the ledger post's three cases.
+pub(super) const STOCK_CANCELLED: CancelledTexts = CancelledTexts {
+    not_sent: "The request was cancelled. No send is recorded for this prepared stock item.",
+    sent: "The request was cancelled after a send of this batch was recorded. The stock item create may have been sent to Tally: never send this batch again.",
+    not_known: "The request was cancelled, and whether a send of this batch was recorded is not known: the journal could not be read just now, or holds no such batch. Check the company's stock items in Tally.",
+    sent_step: "The stock item has not been read back. Call post_stock_item with this batch_id again once Tally is idle to read it back (it sends nothing), or look at the company's stock items in Tally. Do not create the stock item in Tally by hand meanwhile: the create may still be waiting in Tally. Never post this batch again.",
+    // Not known: a later call is the right one either way.
+    not_known_step: "Call post_stock_item with this batch_id again. If a send of this batch was recorded, that call sends nothing: it reads the book back, or reports the outcome already recorded; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the stock item in Tally by hand meanwhile: a create that has not run yet may still be waiting in Tally.",
+};
+
 impl Server {
     /// Prepare ONE stock item, a copy of the sibling stock item `sibling` under
     /// `name`, in the company `company_guid`. Nothing is written to Tally.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(in crate::agent) async fn prepare_stock_item(
         &self,
         company_guid: &str,
@@ -174,7 +183,6 @@ impl Server {
     /// Ask the person and, once approved, send the one stock-item Create of
     /// `batch_id`, in at most two passes as the ledger post does. See the
     /// module documentation.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(in crate::agent) async fn post_stock_item(
         &self,
         batch_id: &str,
@@ -369,6 +377,36 @@ impl Server {
 }
 
 impl Server {
+    /// Whether the stock journal records a send of the batch `args` names:
+    /// `Some(false)` is known not sent. Only a busy journal is an error, which
+    /// a cancellation waits out; anything else not known is `None`, and the
+    /// post then drains rather than be taken as unsent.
+    pub(super) fn recorded_stock_attempt(&self, args: &Value) -> Result<Option<bool>, ToolFailure> {
+        let Some(batch_id) = args.get("batch_id").and_then(Value::as_str) else {
+            return Ok(None);
+        };
+        match self.read_kind_journal_shared(read_stock_item_journal) {
+            Ok(journal) => Ok(journal.state(batch_id).map(|state| state.intent.is_some())),
+            Err(error) if error == "import_admission_busy" => Err(error.into()),
+            Err(_) => Ok(None),
+        }
+    }
+
+    /// What the stock journal shows of the batch a cancelled stock post
+    /// names: whether a send of it is recorded, and its company's GUID.
+    pub(super) fn cancelled_stock_facts(
+        &self,
+        args: &Value,
+    ) -> Result<(Option<bool>, Option<String>), ToolFailure> {
+        let batch_id = required_string(args, "batch_id")?;
+        let attempted = self.recorded_stock_attempt(args)?;
+        let company_guid =
+            (self.read_kind_journal_shared(read_stock_item_journal).ok()).and_then(|journal| {
+                (journal.state(batch_id)).map(|state| state.batch.company().guid.clone())
+            });
+        Ok((attempted, company_guid))
+    }
+
     /// After the one Create was answered: the answer recorded once, then the
     /// book read back and judged with it in hand. Else NOT verified.
     async fn answer_stock_send(

@@ -936,7 +936,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // the batch id, the caller's own proposed ledger name inside the preview
     // (masked there under `mask_parties`), the company's own name and Bridge's
     // own states, and no name read from the book (a name that exists is
-    // refused by code); `audit_test_run` returns only figure and finding ids,
+    // refused by code); the two stock item tools return the batch id, the
+    // preview, which names the item, its sibling, the parent and the HSN
+    // description read from the book (their own tests show those masked under
+    // `mask_parties`), and Bridge's own states; `audit_test_run` returns only figure and finding ids,
     // numbers, the admitted test's fixed wording and the codes and counts of
     // failed book checks (its own test replays a book and looks for every
     // group, ledger and company name in the result).
@@ -950,7 +953,9 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "local_data_report",
         "month_register",
         "post_ledger_creates",
+        "post_stock_item",
         "prepare_ledger_creates",
+        "prepare_stock_item",
         "statement_tie_out",
         "voucher_read_cost",
     ];

@@ -700,8 +700,9 @@ failure_codes! {
 
 failure_codes! {
     /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs` and
-    /// `agent_voucher_scalars.rs`), the voucher summary and the import's read-back: a voucher, bill allocation or Delivery Note element Tally sent
-    /// that the read cannot admit. One of them is also the cause a voucher is withheld with.
+    /// `agent_voucher_scalars.rs`), the voucher summary and the import's read-back: a voucher,
+    /// bill allocation or Delivery Note element Tally sent that the read cannot admit. One of them
+    /// is also the cause a voucher is withheld with.
     pub(crate) enum VoucherReadCode {
         /// A Delivery Note entry holds an element that is not one of its measured fields, a field
         /// twice, or an element inside a field.

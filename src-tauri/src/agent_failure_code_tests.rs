@@ -134,6 +134,59 @@ const LAB_MASTERS: &[(LabMastersCode, &str)] = &[
     ),
 ];
 
+/// The lab tools' shared refusals: their guards, evidence store, master period and read arguments.
+#[cfg(feature = "lab-writes")]
+const LAB_TOOL: &[(LabToolCode, &str)] = &[
+    (LabToolCode::WritesDisabled, "lab_writes_disabled"),
+    (LabToolCode::TargetGuidRequired, "lab_target_guid_required"),
+    (LabToolCode::TargetGuidInvalid, "lab_target_guid_invalid"),
+    (LabToolCode::DenyGuidsInvalid, "lab_deny_guids_invalid"),
+    (LabToolCode::PortNot9001, "lab_port_not_9001"),
+    (LabToolCode::DenyGuidsRequired, "lab_deny_guids_required"),
+    (
+        LabToolCode::SourceCompanyLoaded,
+        "lab_source_company_loaded",
+    ),
+    (LabToolCode::TargetNotLoaded, "lab_target_not_loaded"),
+    (LabToolCode::AuditReadNotTarget, "lab_audit_read_not_target"),
+    (
+        LabToolCode::ProbeCompanyNotTarget,
+        "lab_probe_company_not_target",
+    ),
+    (LabToolCode::DirUnavailable, "lab_dir_unavailable"),
+    (
+        LabToolCode::DirPermissionsFailed,
+        "lab_dir_permissions_failed",
+    ),
+    (
+        LabToolCode::EvidenceWriteFailed,
+        "lab_evidence_write_failed",
+    ),
+    (LabToolCode::AuditReadExists, "lab_audit_read_exists"),
+    (
+        LabToolCode::MasterPeriodBoundaryChanged,
+        "lab_master_period_boundary_changed",
+    ),
+    (
+        LabToolCode::MasterPeriodUnobserved,
+        "lab_master_period_unobserved",
+    ),
+    (
+        LabToolCode::MasterPeriodInvalid,
+        "lab_master_period_invalid",
+    ),
+    (
+        LabToolCode::MasterPeriodUnsupported,
+        "lab_master_period_unsupported",
+    ),
+    (
+        LabToolCode::IdentityWindowTooWide,
+        "lab_identity_window_too_wide",
+    ),
+    (LabToolCode::ProbeTermInvalid, "lab_probe_term_invalid"),
+    (LabToolCode::ProbeKeyInvalid, "lab_probe_key_invalid"),
+];
+
 const MOVEMENT: &[(MovementCode, &str)] = &[
     (
         MovementCode::VoucherSnapshotDrifted,
@@ -1023,7 +1076,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
-    let pins = [pins, of(LAB_MASTERS)].concat();
+    let pins = [pins, of(LAB_MASTERS), of(LAB_TOOL)].concat();
     pins
 }
 
@@ -1074,7 +1127,14 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("SearchCode", SearchCode::ALL),
     ];
     #[cfg(feature = "lab-writes")]
-    let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
+    let enums = [
+        enums,
+        vec![
+            of("LabMastersCode", LabMastersCode::ALL),
+            of("LabToolCode", LabToolCode::ALL),
+        ],
+    ]
+    .concat();
     enums
 }
 
@@ -1115,11 +1175,13 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     // Declared in a build without `lab-writes` too, as source text.
     #[cfg(not(feature = "lab-writes"))]
     walked.push("LabMastersCode".to_string());
+    #[cfg(not(feature = "lab-writes"))]
+    walked.push("LabToolCode".to_string());
     found.sort();
     walked.sort();
     assert_eq!(
         found.len(),
-        34,
+        35,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1154,6 +1216,8 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
+    #[cfg(feature = "lab-writes")]
+    assert_eq!(variants(LAB_TOOL), LabToolCode::ALL);
     assert_eq!(variants(IMPORT_ACK), ImportAckCode::ALL);
     assert_eq!(variants(STOP_ACK), StopAckCode::ALL);
     assert_eq!(variants(IMPORT_APPROVAL), ImportApprovalCode::ALL);
@@ -1211,6 +1275,8 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
+    #[cfg(feature = "lab-writes")]
+    check_pins(LAB_TOOL, LabToolCode::as_str);
     check_pins(IMPORT_ACK, ImportAckCode::as_str);
     check_pins(STOP_ACK, StopAckCode::as_str);
     check_pins(IMPORT_APPROVAL, ImportApprovalCode::as_str);
@@ -1239,8 +1305,9 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    // The three lab master codes are declared only in a build with `lab-writes`. The counts are
-    // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
+    // The three lab master codes and the twenty-one lab tool codes are declared only in a build
+    // with `lab-writes`. The counts are a list, not a sum, so the merge gate's phone-number scan
+    // does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
         77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 8, 11,
@@ -1249,7 +1316,7 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
-        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 8, 11,
+        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 8, 11, 21,
     ]
     .iter()
     .sum();

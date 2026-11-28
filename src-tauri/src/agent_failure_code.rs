@@ -41,7 +41,7 @@ macro_rules! failure_codes {
             #[cfg(test)]
             pub(crate) const ALL: &'static [$name] = &[$($name::$variant,)+];
 
-            pub(crate) fn as_str(self) -> &'static str {
+            pub(crate) const fn as_str(self) -> &'static str {
                 match self {
                     $($name::$variant => $code,)+
                 }
@@ -643,7 +643,7 @@ failure_codes! {
 failure_codes! {
     /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs`), the voucher summary
     /// and the import's read-back: a voucher, bill allocation or Delivery Note element Tally sent
-    /// that the read cannot admit.
+    /// that the read cannot admit. One of them is also the cause a voucher is withheld with.
     pub(crate) enum VoucherReadCode {
         /// A Delivery Note entry holds an element that is not one of its measured fields, a field
         /// twice, or an element inside a field.
@@ -674,6 +674,26 @@ failure_codes! {
         /// or a movement's deemed-positive flag is neither; or, in the read-back, a voucher's
         /// cancelled and optional flags were not both observed.
         AccountingStateNotObserved = "voucher_accounting_state_not_observed",
+        /// A voucher's e-invoice acknowledgement date, read when e-invoice details are asked, is
+        /// present and is not a date.
+        IrnAckDateInvalid = "voucher_irn_ack_date_invalid",
+        /// A voucher's date of the party's own note, read when GST details are asked, is present
+        /// and is not a date.
+        PartyNoteDateInvalid = "voucher_party_note_date_invalid",
+        /// A voucher's bill of lading date is present and is not a date.
+        LadingDateInvalid = "voucher_lading_date_invalid",
+        /// A Delivery Note entry's date is present and is not a date.
+        DeliveryNoteDateInvalid = "voucher_delivery_note_date_invalid",
+        /// A voucher read for its change identity has no date or no voucher type name, or a blank
+        /// one.
+        ChangeRowCoreFieldInvalid = "change_row_core_field_invalid",
+        /// A voucher's master ID is present and is blank, holds a character that is not a digit, or
+        /// is too large to read.
+        MasterIdInvalid = "voucher_master_id_invalid",
+        /// A voucher's amount is a foreign-currency composite the read did not resolve against the
+        /// company's currency: the cause a withheld voucher carries, and the refusal of a presence
+        /// check that meets one.
+        ForeignCurrencyAmountUnparsed = "foreign_currency_amount_unparsed",
     }
 }
 

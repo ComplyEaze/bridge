@@ -359,7 +359,7 @@ impl EInvoiceFields {
         let irn = detail(row, "IRN");
         let ack_no = detail(row, "IRNACKNO");
         let ack_date = detail(row, "IRNACKDATE");
-        ack_date.require_date("voucher_irn_ack_date_invalid")?;
+        ack_date.require_date(VoucherReadCode::IrnAckDateInvalid.as_str())?;
         if !row_says_details(row, &[&irn, &ack_no, &ack_date]) {
             return Ok(None);
         }
@@ -461,7 +461,7 @@ impl VoucherGstFields {
         let note_reason = VoucherDetail::of(row, "GSTNATUREOFRETURN");
         let party_note_number = VoucherDetail::of(row, "VATPARTYTRANSRETURNNUMBER");
         let party_note_date = VoucherDetail::of(row, "VATPARTYTRANSRETURNDATE");
-        party_note_date.require_date("voucher_party_note_date_invalid")?;
+        party_note_date.require_date(VoucherReadCode::PartyNoteDateInvalid.as_str())?;
         let details = [
             &place_of_supply,
             &party_state,
@@ -501,7 +501,7 @@ impl VoucherGstFields {
         let lading_no = VoucherDetail::of(row, "BILLOFLADINGNO");
         let lading_date = VoucherDetail::of(row, "BILLOFLADINGDATE");
         let vehicle_no = VoucherDetail::of(row, "BASICSHIPVESSELNO");
-        lading_date.require_date("voucher_lading_date_invalid")?;
+        lading_date.require_date(VoucherReadCode::LadingDateInvalid.as_str())?;
         let details = [
             &doc_no,
             &dispatched_through,
@@ -583,7 +583,7 @@ impl DeliveryNoteCollector {
         }
         let number = VoucherDetail::of(&entry, DELIVERY_NOTE_FIELDS[0]);
         let date = VoucherDetail::of(&entry, DELIVERY_NOTE_FIELDS[1]);
-        date.require_date("voucher_delivery_note_date_invalid")?;
+        date.require_date(VoucherReadCode::DeliveryNoteDateInvalid.as_str())?;
         self.notes
             .get_or_insert_with(Vec::new)
             .push(json!({"number": number.to_json(), "date": date.to_json()}));
@@ -776,7 +776,8 @@ impl std::fmt::Debug for WithheldVoucher {
 }
 
 /// Why a voucher is withheld; the only cause so far.
-pub(super) const WITHHELD_FOREIGN_CURRENCY: &str = "foreign_currency_amount_unparsed";
+pub(super) const WITHHELD_FOREIGN_CURRENCY: &str =
+    VoucherReadCode::ForeignCurrencyAmountUnparsed.as_str();
 
 /// Marks a row in [`WithheldVoucher::filter_view`]; the parser never emits it.
 pub(super) const WITHHELD_MARKER: &str = "withheld_cause";
@@ -1321,7 +1322,7 @@ fn parse_voucher_rows(
                             row.get(*field).is_none_or(|value| value.trim().is_empty())
                         }) {
                             return Err(if require_change_identity {
-                                "change_row_core_field_invalid"
+                                VoucherReadCode::ChangeRowCoreFieldInvalid.as_str()
                             } else {
                                 ReadCode::ReadProtocolInvalid.as_str()
                             }
@@ -1341,7 +1342,7 @@ fn parse_voucher_rows(
                             .map_err(|_| VoucherReadCode::DateInvalid.as_str().to_string())?;
                         let master_id = parse_optional_tally_u64(
                             row.get("MASTERID").map(String::as_str),
-                            "voucher_master_id_invalid",
+                            VoucherReadCode::MasterIdInvalid.as_str(),
                         )?;
                         identities.admit(row.get("GUID").map(String::as_str), master_id)?;
                         // Emitted as the parsed number's text, never Tally's

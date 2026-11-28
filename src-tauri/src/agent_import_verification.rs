@@ -5,6 +5,7 @@
 //! classifies every expected voucher, finds duplicates, and renders the proof.
 //! Moved out of `agent_import.rs` with only visibility and `super::` paths changed;
 //! nothing here dispatches to Tally.
+use super::super::failure_code::ReadCode;
 use super::*;
 
 pub(super) fn parse_import_vouchers(
@@ -74,7 +75,7 @@ pub(super) fn verification_window_identities(
         let date = voucher.date.as_str();
         date < from || date > to
     }) {
-        return Err("window_not_honoured".to_string());
+        return Err(ReadCode::WindowNotHonoured.as_str().to_string());
     }
     observed
         .rows

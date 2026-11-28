@@ -5,12 +5,13 @@
 mod common;
 
 use bridge_tax_audit::{
-    cash_book_integrity_canonical, rules_for, trial_balance_canonical, Engagement,
+    cash_book_integrity_canonical, rules_for, trial_balance_canonical, DirectoryEngagement,
+    Engagement,
 };
 use serde_json::Value;
 
 /// The synthetic engagement with one `[roles]` line added.
-fn engagement_with(terms_line: &str) -> Engagement {
+fn engagement_with(terms_line: &str) -> DirectoryEngagement {
     let text = std::fs::read_to_string(common::fixtures().join("synthetic-engagement.toml"))
         .unwrap()
         .replacen(

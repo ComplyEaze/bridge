@@ -112,6 +112,9 @@ use statement_facts::{SkipOnlyRecord, StatementFacts};
 pub(super) use transfers::{check_not_run_section, counts_only_section, trim_section};
 #[path = "agent_import_verification.rs"]
 mod verification;
+use super::failure_code::{
+    CompanyReadCode, ImportAckCode, ImportLedgerCode, ProposalsCode, ReadCode,
+};
 use crate::local_files::visible_path::user_visible_path;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -2536,9 +2539,12 @@ impl Server {
             ..
         } = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if !batch_guid_matches(&line.company_guid, guid) {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         // A batch that was never sent is refused as the build and the post
         // refuse it, before any request. A batch that was sent is still read:
@@ -3051,7 +3057,7 @@ impl Server {
         // copy says, so the proof and the ledger status cannot disagree.
         local_proof["verification_status"] = json!(update.status);
         let json = serde_json::to_vec_pretty(&local_proof)
-            .map_err(|_| "proof_serialization_failed".to_string())?;
+            .map_err(|_| ImportAckCode::ProofSerializationFailed.as_str().to_string())?;
         let markdown = render_proof_markdown(&local_proof);
         persistence::publish_proofs(
             &imports,
@@ -3156,7 +3162,7 @@ impl Server {
         company_name: &str,
     ) -> Result<(bridge_tally_protocol::StandardLedgerCatalog, Evidence), ToolFailure> {
         let read = standard_ledger_catalog_read(company_name)
-            .map_err(|_| "company_name_invalid".to_string())?;
+            .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
         admit_standard_ledger_catalog_request(read.as_str().to_string())
             .map_err(|_| "ledger_export_invalid".to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
@@ -3184,7 +3190,7 @@ impl Server {
         ToolFailure,
     > {
         let read = import_ledger_catalogue_read(company_name)
-            .map_err(|_| "company_name_invalid".to_string())?;
+            .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
         let request = admit_standard_ledger_catalog_request(read.as_str().to_string())
             .map_err(|_| "ledger_export_invalid".to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
@@ -3414,7 +3420,7 @@ impl Server {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.batch.sha256 != line.sha256 || current.generation != expected {
             return Err("import_verification_conflict_retry".into());
         }
@@ -3449,7 +3455,7 @@ impl Server {
         ))?;
         let recorded = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if recorded.span_verdict.as_ref() != Some(verdict) {
             return Err("binding_not_recorded".into());
         }
@@ -3462,7 +3468,7 @@ impl Server {
         let _lock = self.lock_import_admission_shared()?;
         match self.import_journal_while_admitted()? {
             Some(reader) => ledger::rollback_cover(reader, batch_id),
-            None => Err("import_batch_not_found".into()),
+            None => Err(ImportAckCode::ImportBatchNotFound.as_str().into()),
         }
     }
 
@@ -3483,7 +3489,7 @@ impl Server {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.batch.sha256 != line.sha256 || current.generation != expected {
             return Err("import_verification_conflict_retry".into());
         }
@@ -3505,7 +3511,7 @@ impl Server {
         ))?;
         let recorded = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         let others = match self.import_journal_while_admitted()? {
             Some(reader) => ledger::covered_by_last_record(reader)?
                 .into_iter()
@@ -3560,7 +3566,7 @@ impl Server {
         };
         let snapshot = self
             .import_snapshot_while_admitted(Some(&named))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         #[cfg(test)]
         if TEST_ROLLBACK_AT_POST_APPEND_FAILS.try_with(|()| ()).is_ok() {
             return Err("import_ledger_write_failed".into());
@@ -3637,7 +3643,7 @@ impl Server {
         const MAX_PERSISTED_PROOF_BYTES: usize = 32 * 1024 * 1024;
         let snapshot = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         let recorded = &snapshot.batch.batch_id;
         let path = self.imports_dir()?.join(match &snapshot.current_proof {
             ledger::CurrentProof::Saved(name) => name.json_file(recorded),
@@ -3773,7 +3779,7 @@ impl Server {
         let file = match super::local_file::open_local_file(&path, false) {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(_) => return Err("import_ledger_unavailable".to_string()),
+            Err(_) => return Err(ImportLedgerCode::Unavailable.as_str().to_string()),
         };
         Ok(Some(std::io::BufReader::new(file)))
     }
@@ -3952,17 +3958,17 @@ impl Server {
         // A statement file's vouchers carry the caller's date text, as a build
         // receives them; each is parsed the way a build parses it.
         let vouchers: Vec<ImportVoucher<String>> = serde_json::from_value(vouchers.clone())
-            .map_err(|_| "proposals_file_invalid".to_string())?;
+            .map_err(|_| ProposalsCode::FileInvalid.as_str().to_string())?;
         let vouchers = vouchers
             .into_iter()
             .map(|voucher| {
                 let date = normalized_date(&voucher.date)
-                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                    .map_err(|_| ProposalsCode::FileInvalid.as_str().to_string())?;
                 // An amount that is not an import amount is refused here as the date is: the
                 // build would refuse it later (#1872).
                 let entries = voucher
                     .parsed_entries()
-                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                    .map_err(|_| ProposalsCode::FileInvalid.as_str().to_string())?;
                 Ok(voucher.admitted(date, entries))
             })
             .collect::<Result<Vec<ImportVoucher>, String>>()?;
@@ -4013,10 +4019,10 @@ impl Server {
     ) -> Result<(), String> {
         let path = self.settings.data_dir.join(file_name);
         let encoded = serde_json::to_string(line)
-            .map_err(|_| "import_ledger_serialization_failed".to_string())?;
+            .map_err(|_| ImportLedgerCode::SerializationFailed.as_str().to_string())?;
         let encoded = format!("{encoded}\n");
         if encoded.len() > ledger::MAX_RECORD_BYTES {
-            return Err("import_ledger_record_too_large".into());
+            return Err(ImportLedgerCode::RecordTooLarge.as_str().into());
         }
         append_private_import_ledger(&path, encoded.as_bytes(), set_private_file)
     }
@@ -4267,10 +4273,10 @@ fn append_private_import_ledger_syncing(
 ) -> Result<(), String> {
     // Admission serializes writers; read/write access also permits Windows rollback.
     let mut file = super::local_file::open_local_file(path, true)
-        .map_err(|_| "import_ledger_unavailable".to_string())?;
+        .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
     prepare_permissions(&file)?;
     file.seek(SeekFrom::End(0))
-        .map_err(|_| "import_ledger_unavailable".to_string())?;
+        .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
     let mut journal = JournalFile {
         file,
         directory: path.parent().unwrap_or(path).to_path_buf(),
@@ -4328,7 +4334,7 @@ fn append_import_ledger_bytes(
 ) -> Result<(), String> {
     let original_length = writer
         .length()
-        .map_err(|_| "import_ledger_unavailable".to_string())?;
+        .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
     // The length is read afresh for every append: a journal that is empty here
     // (just created, or left empty by an append that stopped) may lack a durable
     // directory entry, so the write is not complete until that is synced.
@@ -4347,7 +4353,7 @@ fn append_import_ledger_bytes(
             .truncate(original_length)
             .and_then(|_| writer.sync())
             .map_err(|_| "import_ledger_rollback_failed".to_string())?;
-        return Err("import_ledger_unavailable".to_string());
+        return Err(ImportLedgerCode::Unavailable.as_str().to_string());
     }
     Ok(())
 }
@@ -4373,19 +4379,19 @@ fn import_company_tuple(
             company
                 .guid
                 .as_deref()
-                .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
         )?,
         company_number: nonempty_company_field(
             company
                 .company_number
                 .as_deref()
-                .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
         )?,
         books_from: normalized_date(
             company
                 .books_from
                 .as_deref()
-                .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
         )?,
     })
 }
@@ -4393,7 +4399,7 @@ fn import_company_tuple(
 fn nonempty_company_field(value: &str) -> Result<String, String> {
     (!value.trim().is_empty())
         .then(|| value.to_string())
-        .ok_or_else(|| "company_identity_incomplete".to_string())
+        .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())
 }
 
 /// A catalogue answer that cannot be used: `code` keeps naming what failed; the
@@ -5179,8 +5185,9 @@ fn date_window<'a>(
 }
 
 fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(), String> {
-    let from =
-        normalized_date(books_from.ok_or_else(|| "company_identity_incomplete".to_string())?)?;
+    let from = normalized_date(
+        books_from.ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
+    )?;
     let today = super::tally_host_today();
     for voucher in &payload.vouchers {
         let date = &voucher.date;
@@ -6167,10 +6174,10 @@ fn read_capped_record(file: &mut fs::File) -> Option<Vec<u8>> {
 /// writers need no lock and never collide.
 fn write_masters_record(path: &Path, record: &Value) -> Result<(), String> {
     let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
-    let bytes =
-        serde_json::to_vec_pretty(record).map_err(|_| "proof_serialization_failed".to_string())?;
+    let bytes = serde_json::to_vec_pretty(record)
+        .map_err(|_| ImportAckCode::ProofSerializationFailed.as_str().to_string())?;
     super::local_file::replace_private_file(&staged, path, &bytes)
-        .map_err(|_| "import_file_write_failed".to_string())
+        .map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string())
 }
 
 impl Server {
@@ -6406,7 +6413,7 @@ fn verified_baselines(imports: &Path, lineage: &amend::Lineage) -> amend::Verifi
 
 fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     super::local_file::write_private_file(path, bytes)
-        .map_err(|_| "import_file_write_failed".to_string())
+        .map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string())
 }
 fn set_private_file(file: &std::fs::File) -> Result<(), String> {
     #[cfg(unix)]

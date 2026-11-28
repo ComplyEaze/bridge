@@ -1,4 +1,5 @@
 //! Shared scalar admission for native voucher readers.
+use super::super::failure_code::ReadCode;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(in crate::agent) fn is_voucher_scalar(field: &str) -> bool {
@@ -56,7 +57,7 @@ pub(in crate::agent) fn claim_agent_scalar(
     field: &str,
 ) -> Result<(), String> {
     if row.insert(field.into(), String::new()).is_some() {
-        return Err("agent_read_protocol_invalid".into());
+        return Err(ReadCode::ReadProtocolInvalid.as_str().into());
     }
     Ok(())
 }

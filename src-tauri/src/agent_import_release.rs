@@ -25,6 +25,7 @@
 //! cannot all be listed is never released. Only a batch of Journal, Payment
 //! and Receipt vouchers is released: a Sales invoice or a Contra is also held
 //! by readers a release does not reach.
+use super::super::failure_code::ImportAckCode;
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount};
 
@@ -145,17 +146,20 @@ impl Server {
         let batch_id = required_string(args, "batch_id")?;
         let snapshot = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         let line = snapshot.batch.clone();
         // Refused before any read or dialog: nothing was sent.
         if !snapshot.dispatched || line.vouchers.is_empty() {
-            return Err("ack_batch_not_posted".to_string().into());
+            return Err(ImportAckCode::BatchNotPosted.as_str().to_string().into());
         }
         if !line
             .company_guid
             .eq_ignore_ascii_case(required_string(args, "company_guid")?)
         {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         // Only a native post that recorded its pre-POST mark can be covered.
         if snapshot.pre_post_voucher_mark.is_none() {
@@ -172,7 +176,7 @@ impl Server {
             return Err(VOUCHERS_NOT_LISTED.to_string().into());
         };
         if self.import_row_release(&line.batch_id)? {
-            return Err("ack_already_recorded".to_string().into());
+            return Err(ImportAckCode::AlreadyRecorded.as_str().to_string().into());
         }
 
         // The read the dialog shows. It must show the book rolled back, and a

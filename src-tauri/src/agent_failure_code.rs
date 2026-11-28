@@ -514,18 +514,38 @@ failure_codes! {
         RecordedReviewStale = "ack_recorded_review_stale",
         /// A review is already recorded.
         AlreadyRecorded = "ack_already_recorded",
-        /// The acknowledgement record could not be written.
+        /// An import file could not be written: the acknowledgement record, a proof or
+        /// another of the import's own records.
         ImportFileWriteFailed = "import_file_write_failed",
         /// The import journal has no such batch.
         ImportBatchNotFound = "import_batch_not_found",
+        /// The batch belongs to another company than the one the caller names.
+        BatchCompanyMismatch = "import_batch_company_mismatch",
         /// The batch was not dispatched or has no vouchers.
         BatchNotPosted = "ack_batch_not_posted",
         /// The requested doubt name is invalid.
         DoubtInvalid = "ack_doubt_invalid",
         /// The observed review state changed while the dialog was open.
         ChangedWhileReviewing = "ack_changed_while_reviewing",
-        /// The acknowledgement record could not be serialized.
+        /// An import record or proof, the acknowledgement record among them, could not be
+        /// serialized.
         ProofSerializationFailed = "proof_serialization_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a person's release of an invoice stop.
+    pub(crate) enum StopAckCode {
+        /// Nothing of the batch was sent, or it holds no invoice, so it stops nothing (also the
+        /// fallback should a count of one fail to build).
+        BatchNotSent = "ack_stop_batch_not_sent",
+        /// The batch or its stop changed while the dialog was open, so it is not the stop the
+        /// person was shown.
+        ChangedWhileReviewing = "ack_stop_changed_while_reviewing",
+        /// The release record was written, yet the batch still stops its company.
+        NotRecorded = "ack_stop_not_recorded",
+        /// The batch does not stop its company now.
+        NotHeld = "ack_stop_not_held",
     }
 }
 

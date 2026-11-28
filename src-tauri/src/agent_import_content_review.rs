@@ -21,6 +21,7 @@
 //! yet settled, or a batch that reads `posted_verified`. A later
 //! `posted_verified` of the batch, a later answer with an outcome, or any
 //! rollback cover voids it (`ledger::content_review`).
+use super::super::failure_code::ImportAckCode;
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount};
 
@@ -188,23 +189,26 @@ impl Server {
         let batch_id = required_string(args, "batch_id")?;
         let snapshot = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         let line = snapshot.batch.clone();
         // Refused before any read or dialog: nothing was sent.
         if !snapshot.dispatched || line.vouchers.is_empty() {
-            return Err("ack_batch_not_posted".to_string().into());
+            return Err(ImportAckCode::BatchNotPosted.as_str().to_string().into());
         }
         if !line
             .company_guid
             .eq_ignore_ascii_case(required_string(args, "company_guid")?)
         {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         let Some(reviewed) = journaled_state(&snapshot) else {
             return Err(NOT_CONTENT_ONLY.to_string().into());
         };
         if self.import_content_review(&line.batch_id)?.is_some() {
-            return Err("ack_already_recorded".to_string().into());
+            return Err(ImportAckCode::AlreadyRecorded.as_str().to_string().into());
         }
 
         // The read the dialog shows. It must show the same content-only state:

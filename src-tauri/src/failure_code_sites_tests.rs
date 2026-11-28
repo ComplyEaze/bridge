@@ -19,7 +19,7 @@ use std::path::Path;
 /// Sites per production file under `src`, relative to the crate directory: upper bounds, which
 /// may only be lowered.
 const PINNED: &[(&str, usize)] = &[
-    ("src/agent.rs", 33),
+    ("src/agent.rs", 7),
     ("src/agent_audit_run.rs", 1),
     ("src/agent_bank_statement.rs", 4),
     ("src/agent_bill_trail.rs", 2),

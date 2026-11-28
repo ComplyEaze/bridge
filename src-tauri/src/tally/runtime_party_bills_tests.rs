@@ -172,8 +172,9 @@ fn pilot_identity() -> VerifiedCompanyIdentity {
 }
 
 fn outstandings_request() -> String {
+    let identity = pilot_identity();
     render_ledger_outstandings_request(
-        "BRIDGE PILOT LAB",
+        identity.company_name(),
         &LedgerOutstandingsParty::new("BRIDGE Supplier RJ").unwrap(),
         &TallyDate::parse("20260731").unwrap(),
     )
@@ -222,7 +223,10 @@ async fn an_ordinary_report_read_of_the_empty_answer_fails_as_before() {
     let to = TallyDate::parse("20260331").unwrap();
     let Err(error) = client
         .fetch_native_report_paired(render_ledger_outstandings_request(
-            "BRIDGE BILLTRAIL LAB",
+            &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+                "BRIDGE BILLTRAIL LAB",
+            )
+            .unwrap(),
             &party,
             &to,
         ))

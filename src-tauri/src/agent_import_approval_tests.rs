@@ -668,7 +668,7 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     let response = tokio::time::timeout(HANG_GUARD, post)
         .await
         .expect("the withdrawn call stops");
-    let observed = sent(simulator);
+    let observed = sent_after(simulator, &response);
     assert_eq!(
         result(&response)["error"]["code"],
         "request_cancelled",
@@ -1312,6 +1312,31 @@ fn described(outcome: &ToolCallEnd) -> String {
     }
 }
 
+/// The last three requests the simulator served, for a failed assertion: what
+/// each was and how its answer went, so that a response cut short, a request
+/// that was not the client's and a client that gave up are told apart (#2551).
+fn last_served(observed: &[tally_protocol_simulator::ObservedRequest]) -> String {
+    let from = observed.len().saturating_sub(3);
+    observed[from..]
+        .iter()
+        .zip(from..)
+        .map(|(request, index)| {
+            format!(
+                "[{index}: {} {}, body {} bytes sha256 {}, processed {}, cancelled {}, \
+                 client stopped reading {}]",
+                request.method,
+                request.path,
+                request.request_body_bytes,
+                request.request_body_sha256.get(..12).unwrap_or_default(),
+                request.request_processed,
+                request.cancelled,
+                request.client_stopped_reading_response,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// A post that ends before the request the cancel waits for is answered, not
 /// waited on until its bound (#2093): here the cancel is to follow a request
 /// the post never makes, and the post runs to its end.
@@ -1377,9 +1402,17 @@ async fn a_post_that_has_not_ended_within_its_bound_says_where_it_stood() {
 /// The order is set by events (#2542): the held read's response is not sent
 /// until the simulator has received that request, the cancel has been sent
 /// and the post has been withdrawn. The post is measured at no cost, so the
-/// approval is posted in the call that answered it however long the reads
-/// before it took; with the measured cost, a runner whose reads ran past about
-/// 24 seconds kept the approval for a later call, and no lease was started.
+/// approval is posted in the call that answered it unless the reads before it
+/// took more than the call's 45-second ceiling; with the measured cost, a runner
+/// whose reads ran past about 24 seconds kept the approval for a later call,
+/// and no lease was started.
+///
+/// A post that ends before the held request sends no cancel, so it fails as
+/// that, with the requests the simulator served, and not as a cancellation
+/// that did not take: on one Windows runner a read about twenty requests
+/// before the approval appears to have failed (the answer's request and
+/// response digests match a fault injected there), and the test said only
+/// that the post was not withdrawn (#2551).
 #[test]
 fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;
@@ -1411,8 +1444,20 @@ fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
             bound,
         )
         .await;
-        let observed = sent(simulator);
+        let observed = sent_after(simulator, &described(&outcome));
         if let Some(held_at) = held_at {
+            // A post that ended before the held request was never cancelled:
+            // that is a failed read, not a cancellation that did not take,
+            // and the failure says which (#2551).
+            let held = lease_start + held_at;
+            assert!(
+                observed.len() > held,
+                "{held_at}: the post ended before it sent the held request {held}, so no cancel \
+                 was sent; the simulator served {} requests, the last {}; the post {}",
+                observed.len(),
+                last_served(&observed),
+                described(&outcome)
+            );
             assert!(
                 matches!(outcome, ToolCallEnd::Withdrawn { .. }),
                 "{held_at}: answered as cancelled, but {}",
@@ -4117,7 +4162,7 @@ async fn a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_
     held.answer(true);
     until_answered(&server, &line.batch_id).await;
     let posted = server.call_tool("post_import", args).await;
-    let observed = sent(simulator);
+    let observed = sent_after(simulator, &posted);
     assert_eq!(result(&posted)["attempt_recorded"], true, "{posted}");
     assert_eq!(
         dispatch_intent(directory.path())["batch_id"],

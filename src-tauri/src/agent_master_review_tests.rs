@@ -780,7 +780,7 @@ fn shown_read_back(shown: &StockItemDraft<'_>, fresh: &StockItemCatalogue) -> Re
     let guids = before
         .items()
         .iter()
-        .map(|item| item.guid.clone())
+        .map(|item| item.guid().to_owned())
         .collect();
     ReadBackVerdict::of(before.company(), shown.writes(), &guids, fresh)
 }

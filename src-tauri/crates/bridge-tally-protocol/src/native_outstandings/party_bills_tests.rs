@@ -56,7 +56,11 @@ fn total(bills: &[PartyBill]) -> ExactDecimal {
 fn the_request_is_the_lab_request_without_its_indentation() {
     let party = LedgerOutstandingsParty::new("Lab Party P1").expect("admitted");
     assert_eq!(
-        render_ledger_outstandings_request("BRIDGE BILLTRAIL LAB", &party, &date("20260331")),
+        render_ledger_outstandings_request(
+            &ValidatedCompanyName::new("BRIDGE BILLTRAIL LAB").unwrap(),
+            &party,
+            &date("20260331"),
+        ),
         concat!(
             "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>",
             "<TYPE>Data</TYPE><ID>Ledger Outstandings</ID></HEADER><BODY><DESC><STATICVARIABLES>",

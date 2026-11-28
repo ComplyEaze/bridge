@@ -536,7 +536,7 @@ fn built_requests() -> Vec<(String, String)> {
     ) {
         row(
             format!("render_native_masters_request/{kind:?}"),
-            render_native_masters_request(kind, COMPANY),
+            render_native_masters_request(kind, &company),
         );
     }
     // #1381's candidate read, not yet sent by any release.
@@ -547,11 +547,11 @@ fn built_requests() -> Vec<(String, String)> {
     // The same request as the `ReadOnlyProfile::CompanyBookExtentV2` row.
     row(
         "render_company_book_extent_v2".into(),
-        render_company_book_extent_v2(COMPANY),
+        render_company_book_extent_v2(&company),
     );
     row(
         "render_company_ledger_count_request".into(),
-        render_company_ledger_count_request(COMPANY),
+        render_company_ledger_count_request(&company),
     );
 
     let profile_ids = every!(ReadOnlyProfileId:
@@ -635,7 +635,7 @@ fn built_requests() -> Vec<(String, String)> {
     );
     row(
         "render_ledger_outstandings_request".into(),
-        render_ledger_outstandings_request(COMPANY, &party, &to),
+        render_ledger_outstandings_request(&company, &party, &to),
     );
 
     let ledger_plan = LedgerCensusPlan::new(25, CENSUS_LIMITS).expect("a census plan");

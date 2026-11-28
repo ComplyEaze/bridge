@@ -523,9 +523,11 @@ failure_codes! {
 failure_codes! {
     /// The refusals of a person's release of an invoice stop.
     pub(crate) enum StopAckCode {
-        /// Nothing of the batch was sent, or it holds no invoice, so it stops nothing.
+        /// Nothing of the batch was sent, or it holds no invoice, so it stops nothing (also the
+        /// fallback should a count of one fail to build).
         BatchNotSent = "ack_stop_batch_not_sent",
-        /// The batch changed while the dialog was open, so it is not the stop the person was shown.
+        /// The batch or its stop changed while the dialog was open, so it is not the stop the
+        /// person was shown.
         ChangedWhileReviewing = "ack_stop_changed_while_reviewing",
         /// The release record was written, yet the batch still stops its company.
         NotRecorded = "ack_stop_not_recorded",

@@ -1,0 +1,4 @@
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/tdl_engine.rs
+reviewer: lamemustafa

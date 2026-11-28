@@ -688,7 +688,7 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     .await
     .unwrap_or_else(|_| {
         panic!(
-            "the post dialog was not closed within {HANG_GUARD:?} of the call's answer: {response}"
+            "the post dialog did not open, or was not closed, within {HANG_GUARD:?} of the call's answer: {response}"
         )
     });
     assert!(!scripted.is_waiting(), "the dialog was closed");

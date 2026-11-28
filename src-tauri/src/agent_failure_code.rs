@@ -710,9 +710,10 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs`), the voucher summary
-    /// and the import's read-back: a voucher, bill allocation or Delivery Note element Tally sent
-    /// that the read cannot admit. One of them is also the cause a voucher is withheld with.
+    /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs` and
+    /// `agent_voucher_scalars.rs`), the voucher summary and the import's read-back: a voucher,
+    /// bill allocation or Delivery Note element Tally sent that the read cannot admit. One of them
+    /// is also the cause a voucher is withheld with.
     pub(crate) enum VoucherReadCode {
         /// A Delivery Note entry holds an element that is not one of its measured fields, a field
         /// twice, or an element inside a field.
@@ -765,6 +766,12 @@ failure_codes! {
         /// company's currency: the cause a withheld voucher carries, and the refusal of a presence
         /// check that meets one.
         ForeignCurrencyAmountUnparsed = "foreign_currency_amount_unparsed",
+        /// A voucher's GUID is blank or repeats, or its master ID repeats, in one collection
+        /// (`agent_voucher_scalars.rs`).
+        SourceIdentityInvalid = "voucher_source_identity_invalid",
+        /// A voucher's alter ID is present and is blank, holds a character that is not a digit, or
+        /// is too large to read (`agent_voucher_scalars.rs`).
+        AlterIdInvalid = "voucher_alter_id_invalid",
     }
 }
 
@@ -1361,7 +1368,31 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of an `outstandings` party detail before its bill report is read: a request
+    /// whose party, detail and reference do not go together, or a party name the `open_bills`
+    /// detail does not send (`agent_party_bills.rs`).
+    pub(crate) enum OutstandingsDetailCode {
+        /// The party's ledger name is not one the detail sends; the cause says why.
+        PartyNameNotAdmitted = "party_name_not_admitted",
+        /// A detail was asked for without a party.
+        DetailRequiresParty = "detail_requires_party",
+        /// A bill reference was given without the `bill_trail` detail.
+        ReferenceRequiresBillTrail = "reference_requires_bill_trail",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a stock read's `as_of` before any request: a date that is not the last day
+    /// of a month. Only `stock_by_godown`'s refusal is declared here so far.
+    pub(crate) enum StockAsOfCode {
+        /// `stock_by_godown`'s `as_of` is not the last day of a month.
+        GodownNotMeasured = "stock_by_godown_as_of_not_measured",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
+    /// `build_import_xml` also refuses a malformed `withdraw_skips` with `ArgumentSchemaInvalid`.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.
         TaskFailed = "statement_task_failed",
@@ -1402,7 +1433,8 @@ failure_codes! {
         ProposalsFileTooLarge = "proposals_file_too_large",
         /// The proposals file's hash differs from the digest the parse returned.
         ProposalsChanged = "proposals_changed",
-        /// The tool arguments are not an object.
+        /// The tool arguments are not an object, or a build's `withdraw_skips` is not a list of
+        /// distinct statement row ids no longer than a build can hold.
         ArgumentSchemaInvalid = "argument_schema_invalid",
         /// Both a proposals id and inline vouchers were given.
         ProposalsIdWithVouchers = "proposals_id_with_vouchers",

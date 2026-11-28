@@ -462,6 +462,11 @@ const VOUCHER_READ: &[(VoucherReadCode, &str)] = &[
         VoucherReadCode::ForeignCurrencyAmountUnparsed,
         "foreign_currency_amount_unparsed",
     ),
+    (
+        VoucherReadCode::SourceIdentityInvalid,
+        "voucher_source_identity_invalid",
+    ),
+    (VoucherReadCode::AlterIdInvalid, "voucher_alter_id_invalid"),
 ];
 
 const TOOL_REQUEST: &[(ToolRequestCode, &str)] = &[
@@ -1121,6 +1126,28 @@ const LAB_IMPORT: &[(LabImportCode, &str)] = &[
     ),
 ];
 
+/// An `outstandings` party detail's request and the party name it sends.
+const OUTSTANDINGS_DETAIL: &[(OutstandingsDetailCode, &str)] = &[
+    (
+        OutstandingsDetailCode::PartyNameNotAdmitted,
+        "party_name_not_admitted",
+    ),
+    (
+        OutstandingsDetailCode::DetailRequiresParty,
+        "detail_requires_party",
+    ),
+    (
+        OutstandingsDetailCode::ReferenceRequiresBillTrail,
+        "reference_requires_bill_trail",
+    ),
+];
+
+/// A stock read's `as_of` that is not the last day of a month.
+const STOCK_AS_OF: &[(StockAsOfCode, &str)] = &[(
+    StockAsOfCode::GodownNotMeasured,
+    "stock_by_godown_as_of_not_measured",
+)];
+
 const SEARCH: &[(SearchCode, &str)] = &[
     (SearchCode::CriterionEmpty, "search_criterion_empty"),
     (SearchCode::CriterionTooLong, "search_criterion_too_long"),
@@ -1641,6 +1668,8 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(COMPANY),
         of(COMPANY_CHECKPOINT),
         of(AGENT_RESPONSE),
+        of(OUTSTANDINGS_DETAIL),
+        of(STOCK_AS_OF),
         of(BANK_STATEMENT),
         of(MASTER_POST),
         of(SEARCH),
@@ -1714,6 +1743,8 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("CompanyCode", CompanyCode::ALL),
         of("CompanyCheckpointCode", CompanyCheckpointCode::ALL),
         of("AgentResponseCode", AgentResponseCode::ALL),
+        of("OutstandingsDetailCode", OutstandingsDetailCode::ALL),
+        of("StockAsOfCode", StockAsOfCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("MasterPostCode", MasterPostCode::ALL),
         of("SearchCode", SearchCode::ALL),
@@ -1776,7 +1807,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        57,
+        59,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1847,6 +1878,8 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(AGENT_RESPONSE), AgentResponseCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_IMPORT), LabImportCode::ALL);
+    assert_eq!(variants(OUTSTANDINGS_DETAIL), OutstandingsDetailCode::ALL);
+    assert_eq!(variants(STOCK_AS_OF), StockAsOfCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -1929,6 +1962,8 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(AGENT_RESPONSE, AgentResponseCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_IMPORT, LabImportCode::as_str);
+    check_pins(OUTSTANDINGS_DETAIL, OutstandingsDetailCode::as_str);
+    check_pins(STOCK_AS_OF, StockAsOfCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -1951,15 +1986,15 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
-        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 19, 13, 4, 17, 8,
-        6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1,
+        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 21, 2, 21, 8, 11, 19, 13, 4, 17, 8,
+        6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1, 3, 1,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
-        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 21, 19, 13, 4,
-        17, 8, 6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1, 9,
+        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10, 5, 14, 21, 2, 21, 8, 11, 21, 19, 13, 4,
+        17, 8, 6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1, 9, 3, 1,
     ]
     .iter()
     .sum();

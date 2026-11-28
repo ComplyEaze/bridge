@@ -20,6 +20,7 @@
 //!   eight classes, and no other reserved type answers `Yes` to any of them.
 //!
 //! See protocol reference §8.2e.
+use super::failure_code::VoucherTypeClassCode;
 use super::*;
 use std::collections::{BTreeMap as Map, BTreeSet};
 
@@ -156,23 +157,25 @@ pub(super) fn resolve_row_voucher_type(
         return Ok(None);
     }
     if present != voucher_type_class_tags().count() {
-        return Err("voucher_type_class_missing".to_string());
+        return Err(VoucherTypeClassCode::ClassMissing.as_str().to_string());
     }
     let guid = row[VOUCHER_TYPE_GUID_TAG].trim();
     if guid.is_empty() || !bridge_tally_protocol::master_guid_belongs_to_company(guid, company_guid)
     {
-        return Err("voucher_type_unresolved".to_string());
+        return Err(VoucherTypeClassCode::Unresolved.as_str().to_string());
     }
     let mut classes = Vec::new();
     for class in ReservedVoucherClass::ALL {
         match row[class.tag()].trim() {
             "Yes" => classes.push(class),
             "No" => {}
-            _ => return Err("voucher_type_class_invalid".to_string()),
+            _ => return Err(VoucherTypeClassCode::ClassInvalid.as_str().to_string()),
         }
     }
     if classes.len() > 1 {
-        return Err("voucher_type_class_contradictory".to_string());
+        return Err(VoucherTypeClassCode::ClassContradictory
+            .as_str()
+            .to_string());
     }
     let class = classes.first().copied();
     let reserved_name = row[VOUCHER_TYPE_RESERVED_NAME_TAG].trim();
@@ -182,10 +185,14 @@ pub(super) fn resolve_row_voucher_type(
     // unmeasured, so it is refused rather than counted in that class.
     match ReservedVoucherClass::parse(reserved_name) {
         Some(direct) if class != Some(direct) => {
-            return Err("voucher_type_class_contradictory".to_string())
+            return Err(VoucherTypeClassCode::ClassContradictory
+                .as_str()
+                .to_string())
         }
         None if !reserved_name.is_empty() && class.is_some() => {
-            return Err("voucher_type_class_contradictory".to_string())
+            return Err(VoucherTypeClassCode::ClassContradictory
+                .as_str()
+                .to_string())
         }
         _ => {}
     }
@@ -217,12 +224,16 @@ impl VoucherTypeSelector {
             (None, None, None) => Ok(None),
             (Some(class), None, None) => ReservedVoucherClass::parse(&class)
                 .map(|class| Some(Self::Class(class)))
-                .ok_or_else(|| ToolFailure::from("voucher_class_unsupported".to_string())),
+                .ok_or_else(|| {
+                    ToolFailure::from(VoucherTypeClassCode::ClassUnsupported.as_str().to_string())
+                }),
             (None, Some(guid), None) => Ok(Some(Self::Guid(guid))),
             (None, None, Some(name)) if !name.is_empty() => Ok(Some(Self::Name(name))),
-            (None, None, Some(_)) => Err(ToolFailure::from("voucher_type_invalid".to_string())),
+            (None, None, Some(_)) => Err(ToolFailure::from(
+                VoucherTypeClassCode::TypeInvalid.as_str().to_string(),
+            )),
             _ => Err(ToolFailure::from(
-                "voucher_type_selectors_conflict".to_string(),
+                VoucherTypeClassCode::SelectorsConflict.as_str().to_string(),
             )),
         }
     }
@@ -286,14 +297,15 @@ fn row_type(row: &Value) -> Result<RowType, &'static str> {
         row[key]
             .as_str()
             .map(str::to_string)
-            .ok_or("voucher_type_class_missing")
+            .ok_or(VoucherTypeClassCode::ClassMissing.as_str())
     };
     let class = match &row["voucher_class"] {
         Value::Null => None,
-        Value::String(class) => {
-            Some(ReservedVoucherClass::parse(class).ok_or("voucher_type_class_invalid")?)
-        }
-        _ => return Err("voucher_type_class_invalid"),
+        Value::String(class) => Some(
+            ReservedVoucherClass::parse(class)
+                .ok_or(VoucherTypeClassCode::ClassInvalid.as_str())?,
+        ),
+        _ => return Err(VoucherTypeClassCode::ClassInvalid.as_str()),
     };
     Ok(RowType {
         guid: text("voucher_type_guid")?,
@@ -338,7 +350,7 @@ pub(super) fn select_voucher_rows(
         // One GUID is one type: a second name or class for it is not one state.
         if seen.name != name || seen.reserved_name != reserved_name || seen.class != class {
             return Err(VoucherTypeRefusal::bare(
-                "voucher_type_snapshot_inconsistent",
+                VoucherTypeClassCode::SnapshotInconsistent.as_str(),
             ));
         }
         seen.rows += 1;
@@ -375,7 +387,7 @@ pub(super) fn select_voucher_rows(
             }
             if let Some(rival) = rivals.into_iter().find(|rival| *rival != named) {
                 return Err(VoucherTypeRefusal {
-                    code: "voucher_type_ambiguous",
+                    code: VoucherTypeClassCode::Ambiguous.as_str(),
                     candidates: window_types
                         .iter()
                         .filter(|kind| named.contains(&kind.guid) || rival.contains(&kind.guid))

@@ -1,4 +1,5 @@
 //! Desktop Journal review capability, native selection, and thin operation orchestration.
+use super::super::failure_code::DesktopJournalCode;
 use super::desktop_journal::{DesktopJournalOperation, DesktopJournalService};
 use super::*;
 use crate::tally::{TallyConfig, TallyRuntime};
@@ -157,27 +158,42 @@ pub(crate) async fn pick_for_review(
         else {
             return Ok(None);
         };
-        let mut file = super::super::local_file::open_local_file(&path, false)
-            .map_err(|_| "import_selected_file_unavailable".to_string())?;
+        let mut file = super::super::local_file::open_local_file(&path, false).map_err(|_| {
+            DesktopJournalCode::SelectedFileUnavailable
+                .as_str()
+                .to_string()
+        })?;
         let length = file
             .metadata()
-            .map_err(|_| "import_selected_file_unavailable".to_string())?
+            .map_err(|_| {
+                DesktopJournalCode::SelectedFileUnavailable
+                    .as_str()
+                    .to_string()
+            })?
             .len();
         if length > MAX_SELECTED_JOURNAL_BYTES as u64 {
-            return Err("import_selected_file_too_large".to_string());
+            return Err(DesktopJournalCode::SelectedFileTooLarge
+                .as_str()
+                .to_string());
         }
         let mut bytes = Vec::with_capacity(length as usize);
         std::io::Read::by_ref(&mut file)
             .take((MAX_SELECTED_JOURNAL_BYTES + 1) as u64)
             .read_to_end(&mut bytes)
-            .map_err(|_| "import_selected_file_unavailable".to_string())?;
+            .map_err(|_| {
+                DesktopJournalCode::SelectedFileUnavailable
+                    .as_str()
+                    .to_string()
+            })?;
         if bytes.len() > MAX_SELECTED_JOURNAL_BYTES {
-            return Err("import_selected_file_too_large".to_string());
+            return Err(DesktopJournalCode::SelectedFileTooLarge
+                .as_str()
+                .to_string());
         }
         Ok(Some(bytes))
     })
     .await
-    .map_err(|_| DesktopJournalError::refused("file_picker_failed"))?
+    .map_err(|_| DesktopJournalError::refused(DesktopJournalCode::FilePickerFailed.as_str()))?
     .map_err(DesktopJournalError::refused)?;
     let Some(selected) = selected else {
         return Ok(None);

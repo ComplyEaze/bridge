@@ -25,6 +25,7 @@
 //! verification read does not fetch. An edit to any of them made after Bridge
 //! first verified the build is caught instead by the voucher's ALTERID (#239;
 //! see `compare_and_swap`); one made before that verification is not.
+use super::super::failure_code::ImportAmendCode;
 use super::*;
 
 /// Every build that shares one wire identity, in journal order.
@@ -47,27 +48,27 @@ pub(super) fn admit_lineage(
     if !builds.iter().any(|build| {
         build.batch.batch_id == identity_batch_id && build.batch.amends_batch_id.is_none()
     }) {
-        return Err("import_amend_lineage_invalid".into());
+        return Err(ImportAmendCode::LineageInvalid.as_str().into());
     }
     for build in &builds {
         let batch = &build.batch;
         if batch.identity_batch_id() != identity_batch_id {
-            return Err("import_amend_lineage_invalid".into());
+            return Err(ImportAmendCode::LineageInvalid.as_str().into());
         }
         if batch.identity_scheme != Some(ImportIdentityScheme::BatchV1) {
-            return Err("import_amend_identity_scheme_unsupported".into());
+            return Err(ImportAmendCode::IdentitySchemeUnsupported.as_str().into());
         }
         if !batch_guid_matches(&batch.company_guid, company_guid) {
             return Err(ImportAckCode::BatchCompanyMismatch.as_str().into());
         }
         if batch.endpoint_origin.as_deref() != Some(endpoint_origin) {
-            return Err("import_amend_endpoint_mismatch".into());
+            return Err(ImportAmendCode::EndpointMismatch.as_str().into());
         }
         // A native post was sent under a fresh private REMOTEID, not the batch
         // identity, and since #864 without the narration marker. Re-importing
         // under the batch identity would create, not alter.
         if build.dispatched {
-            return Err("import_amend_natively_posted".into());
+            return Err(ImportAmendCode::NativelyPosted.as_str().into());
         }
     }
     Ok(Lineage {
@@ -112,17 +113,17 @@ impl Lineage {
         for voucher in vouchers {
             let mut versions = self.versions(&voucher.bridge_txn_id).peekable();
             if versions.peek().is_none() {
-                return Err("import_amend_txn_not_in_batch".into());
+                return Err(ImportAmendCode::TxnNotInBatch.as_str().into());
             }
             for (_, recorded) in versions {
                 if recorded.voucher_type != voucher.voucher_type {
-                    return Err("import_amend_voucher_type_changed".into());
+                    return Err(ImportAmendCode::VoucherTypeChanged.as_str().into());
                 }
                 if recorded.voucher_number != voucher.voucher_number {
-                    return Err("import_amend_voucher_number_changed".into());
+                    return Err(ImportAmendCode::VoucherNumberChanged.as_str().into());
                 }
                 if recorded.reference != voucher.reference {
-                    return Err("import_amend_voucher_reference_changed".into());
+                    return Err(ImportAmendCode::VoucherReferenceChanged.as_str().into());
                 }
             }
         }

@@ -7,6 +7,7 @@ use super::*;
 /// tests name `RegisterKind::Sales` and call `super::classify_register` directly.
 fn classify_register(index: &MasterIndex, rows: &[Value]) -> Result<RegisterPage, String> {
     super::classify_register(RegisterKind::Purchase, index, rows)
+        .map_err(|code| code.as_str().to_string())
 }
 
 /// The disposable GST lab book the captures below were read from.
@@ -358,8 +359,8 @@ fn a_repeated_ledger_name_refuses_as_drift() {
     let mut masters = captured_masters();
     masters.push(masters[0].clone());
     assert_eq!(
-        MasterIndex::build(masters.iter(), &captured_groups()),
-        Err("ledger_snapshot_drifted".to_string())
+        MasterIndex::build(masters.iter(), &captured_groups()).map_err(FailureCode::as_str),
+        Err("ledger_snapshot_drifted")
     );
 }
 
@@ -570,6 +571,7 @@ fn result_for(
         (0, 500),
         redaction,
     )
+    .map_err(|failure| failure.code)
 }
 
 #[test]
@@ -1191,8 +1193,9 @@ fn a_sales_voucher_naming_ledgers_the_masters_do_not_list_refuses_instead_of_bei
                 &captured_index(),
                 &sales_day_rows(name)
             )
-            .map(|_| ()),
-            Err("ledger_snapshot_drifted".to_string())
+            .map(|_| ())
+            .map_err(FailureCode::as_str),
+            Err("ledger_snapshot_drifted")
         );
     }
 }
@@ -1561,7 +1564,8 @@ fn a_withheld_voucher_dated_outside_the_window_refuses_as_window_not_honoured() 
                 (0, 500),
                 Redaction::None,
             )
-            .map(|_| ()),
+            .map(|_| ())
+            .map_err(|failure| failure.code),
             Err("window_not_honoured".to_string())
         );
     }

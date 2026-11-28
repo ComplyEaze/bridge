@@ -1,5 +1,6 @@
 use super::*;
 use crate::tally::ledger_create_item::LedgerCreateItem;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 
 // The production constructor of the masters kind is `confirm_masters`, which
 // asks the person first. This module also builds one without a dialog, from the
@@ -198,7 +199,7 @@ fn masters_identity() -> VerifiedCompanyIdentity {
 
 fn masters_item(name: &str) -> LedgerCreateItem {
     LedgerCreateItem::new(
-        super::super::ledger_create_item::MasterName::new(name).unwrap(),
+        super::super::master_name::MasterName::new(name).unwrap(),
         super::super::ledger_create_item::AdmittedLedgerKind::Suspense,
     )
 }
@@ -218,9 +219,12 @@ fn approved_masters(name: &str) -> ApprovedImport {
     )
 }
 
-fn masters_of(approved: &ApprovedImport) -> &MasterAdmission {
+fn masters_of(approved: &ApprovedImport) -> &LedgerAdmission {
     match &approved.kind {
-        ApprovedKind::Masters(masters) => masters,
+        ApprovedKind::Masters(masters) => match masters.writes() {
+            AdmittedWrites::Ledgers(ledgers) => ledgers,
+            AdmittedWrites::StockItem { .. } => panic!("expected a ledger admission"),
+        },
         ApprovedKind::Vouchers(_) => panic!("expected the masters kind"),
     }
 }
@@ -260,7 +264,7 @@ fn a_master_posts_index_reads_are_the_ledger_catalogue_and_group_snapshot_for_it
     assert_eq!(
         masters.group_index_request().into_xml(),
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
-            MASTERS_LAB
+            &ValidatedCompanyName::new(MASTERS_LAB).unwrap()
         )
     );
     assert_ne!(
@@ -527,5 +531,142 @@ fn the_ledger_dialog_is_worded_by_its_count() {
     assert_eq!(
         answer_effect(Shown::Masters, VoucherCount::new(1).unwrap()).0,
         "create this ledger in Tally"
+    );
+}
+
+// The stock-item child's own answer.
+
+#[test]
+fn an_approved_stock_item_dialog_writes_exactly_its_own_token() {
+    let (approved, output) = answer_as(
+        STOCK_ITEM_TOKEN_PREFIX,
+        |_, _| true,
+        &format!("{NONCE}\n1\nCreate one stock item"),
+    );
+    assert!(approved);
+    assert_eq!(
+        output,
+        format!("bridge-create-stock-item:{NONCE}\n").into_bytes()
+    );
+    for other in [POST_TOKEN_PREFIX, REVIEW_TOKEN_PREFIX, MASTERS_TOKEN_PREFIX] {
+        assert_ne!(STOCK_ITEM_TOKEN_PREFIX, other);
+        assert!(!STOCK_ITEM_TOKEN_PREFIX.starts_with(other));
+        assert!(!other.starts_with(STOCK_ITEM_TOKEN_PREFIX));
+    }
+}
+
+#[test]
+fn a_declined_stock_item_dialog_writes_no_token() {
+    static SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let (approved, output) = answer_as(
+        STOCK_ITEM_TOKEN_PREFIX,
+        |_, _| {
+            SHOWN.store(true, std::sync::atomic::Ordering::SeqCst);
+            false
+        },
+        &format!("{NONCE}\n1\nCreate one stock item"),
+    );
+    assert!(SHOWN.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(!approved);
+    assert!(output.is_empty(), "{output:?}");
+}
+
+#[test]
+fn the_stock_item_dialog_is_not_shown_for_more_than_one_item() {
+    // Count one is never called here: it would open a real box.
+    for count in [2, MAX_LEDGERS_PER_BATCH, 200] {
+        assert!(!show_create_stock_item(
+            VoucherCount::new(count).unwrap(),
+            "Create"
+        ));
+    }
+}
+
+#[test]
+fn the_stock_item_dialog_words_name_what_the_button_does() {
+    assert_eq!(
+        STOCK_ITEM_TITLE,
+        "ComplyEaze Bridge — create one stock item?"
+    );
+    assert_eq!(
+        stock_item_words(ONE_STOCK_ITEM),
+        Some((
+            "ComplyEaze Bridge — create one stock item?".to_string(),
+            "Create stock item".to_string(),
+        ))
+    );
+    let (_, button) = stock_item_words(ONE_STOCK_ITEM).unwrap();
+    assert_ne!(button, "Cancel");
+    assert_eq!(stock_item_words(VoucherCount::new(2).unwrap()), None);
+    assert_eq!(
+        answer_effect(Shown::StockItem, ONE_STOCK_ITEM),
+        (
+            "create this stock item in Tally".to_string(),
+            "Nothing is created until you answer.",
+        )
+    );
+}
+
+#[tokio::test]
+async fn the_scripted_stock_item_dialog_records_apart() {
+    let scripted = test_seam::ScriptedApproval::approving();
+    let recording = scripted.clone();
+    test_seam::SCRIPTED_APPROVAL
+        .scope(scripted, async {
+            assert_eq!(super::approve_stock_item("Create stock").await, Ok(()));
+        })
+        .await;
+    assert_eq!(recording.stock_items(), ["Create stock"]);
+    assert!(recording.previews().is_empty());
+    assert!(recording.reviews().is_empty());
+    assert!(recording.masters().is_empty());
+    assert_eq!(
+        super::approve_stock_item("x").await,
+        Err(StockItemDialogRefusal::Declined)
+    );
+}
+
+#[test]
+fn the_stock_item_dialog_writes_its_own_first_lines() {
+    let shown = displayed_text(Shown::StockItem, ONE_STOCK_ITEM, "Details");
+    assert_eq!(
+        shown,
+        format!(
+            "{}\n\nDetails",
+            answer_text(Shown::StockItem, ONE_STOCK_ITEM)
+        )
+    );
+    assert!(shown.contains("create this stock item in Tally"));
+    assert!(!shown.contains("ledger"));
+    assert!(!shown.contains("voucher"));
+    assert_eq!(stock_item_dialog_text("Details"), shown);
+}
+
+#[cfg(not(windows))]
+#[test]
+fn the_mac_stock_item_answer_text_names_its_button() {
+    let answer = answer_text(Shown::StockItem, ONE_STOCK_ITEM);
+    assert_eq!(
+        answer,
+        "Click \"Create stock item\" to create this stock item in Tally. Click Cancel to cancel. Nothing is created until you answer."
+    );
+    assert_eq!(answer.chars().count(), 122);
+    assert_eq!(answer.lines().count(), 1);
+}
+
+#[cfg(windows)]
+#[test]
+fn the_windows_stock_item_answer_text_is_wrapped() {
+    let answer = answer_text(Shown::StockItem, ONE_STOCK_ITEM);
+    assert_eq!(
+        answer,
+        "Press Y (or click Yes) to create this stock item in Tally. Press N (or click No) to cancel. Nothing\nis created until you answer."
+    );
+    assert_eq!(
+        answer
+            .lines()
+            .map(|line| line.chars().count())
+            .collect::<Vec<_>>(),
+        [99, 28]
     );
 }

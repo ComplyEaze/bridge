@@ -205,7 +205,7 @@ impl TallyRuntime {
                         stock_summary_period(profile, &as_of, extent.books_from(), &today)?;
 
                     let request = render_company_inventory_flags_request(
-                        identity.display_name(),
+                        identity.company_name(),
                         identity.company_guid_value(),
                     );
                     let (xml, bytes, hash) = client
@@ -262,7 +262,7 @@ impl TallyRuntime {
                             continue;
                         }
                         let request =
-                            render_stock_query_request(identity.display_name(), &name, &period);
+                            render_stock_query_request(identity.company_name(), &name, &period);
                         match client
                             .fetch_stock_query(request.clone(), STOCK_QUERY_ANSWER_MAX_BYTES)
                             .await

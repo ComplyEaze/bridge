@@ -1,0 +1,1135 @@
+{
+  "file": "src-tauri/src/agent_import_post_location.rs",
+  "base_commit": "812d39bb",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the file and its test module byte for byte as there (or as this change leaves the test module, for survivors_again). A tool mutant that survived was run again in the whole_set and survivors_again runs as the same edit written as text, under the id named in its run's command.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 2248,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_post_location.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv|location/)'",
+      "time": "2026-11-10T23:37:18Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 710,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/post::location|post::e2e_tests|post::tests|ack/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 5044,
+      "command": "as the hand run with every bridge test (-E 'all()'), after the unmutated tree passed all 5044, for the tool's one missed mutant (T1 is 69:31, the guard replaced with true) and the thirteen hand-written ones the filtered run missed; P07, P11 and P12 were caught there, by tests outside the hand run's filter",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_run": 5048,
+      "command": "as the whole_set run, for the eleven still missed there",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 54,
+      "missed": 1,
+      "unviable": 1
+    },
+    "hand": {
+      "caught": 59,
+      "missed": 1
+    },
+    "survived_at_base": {
+      "tool": 1,
+      "hand": 13
+    },
+    "equivalent": {
+      "tool": 1,
+      "hand": 1
+    }
+  },
+  "tool_results": {
+    "24:5 replace same_name -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_binding_snapshot_without_the_target_is_refused_as_unconfirmed",
+      "killer_at": "base"
+    },
+    "24:5 replace same_name -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "33:5 replace possibly_same_name -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "33:5 replace possibly_same_name -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "39:16 replace == with != in possibly_same_name": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_attempted_while_approval_is_pending_is_refused_by_name",
+      "killer_at": "base"
+    },
+    "43:5 replace is_target -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "43:5 replace is_target -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "43:41 replace && with || in is_target": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_binding_snapshot_without_the_target_is_refused_as_unconfirmed",
+      "killer_at": "base"
+    },
+    "53:5 replace target_voucher_mark -> Option<u64> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "53:5 replace target_voucher_mark -> Option<u64> with Some(0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt",
+      "killer_at": "base"
+    },
+    "53:5 replace target_voucher_mark -> Option<u64> with Some(1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "55:9 delete match arm (Some(row), None) in target_voucher_mark": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt",
+      "killer_at": "base"
+    },
+    "66:5 replace aimed_voucher_mark -> Option<u64> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt",
+      "killer_at": "base"
+    },
+    "66:5 replace aimed_voucher_mark -> Option<u64> with Some(0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_rejected_whole_whose_mark_moved_is_not_labelled",
+      "killer_at": "base"
+    },
+    "66:5 replace aimed_voucher_mark -> Option<u64> with Some(1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_rejected_whole_whose_mark_moved_is_not_labelled",
+      "killer_at": "base"
+    },
+    "69:31 replace match guard observed == mark with true in aimed_voucher_mark": {
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "69:31 replace match guard observed == mark with false in aimed_voucher_mark": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "69:40 replace == with != in aimed_voucher_mark": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "78:5 replace omits_voucher_mark -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "78:5 replace omits_voucher_mark -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::an_omitted_voucher_mark_after_the_post_is_an_unavailable_snapshot_not_zero",
+      "killer_at": "base"
+    },
+    "89:5 replace admit_post_target -> Result<(), &'static str> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_renamed_to_the_target_refuses_before_the_post",
+      "killer_at": "base"
+    },
+    "97:21 replace && with || in admit_post_target": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_renamed_to_the_target_refuses_before_the_post",
+      "killer_at": "base"
+    },
+    "97:16 replace == with != in admit_post_target": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "97:34 replace == with != in admit_post_target": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "116:5 replace target_masters_unchanged -> Option<bool> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "116:5 replace target_masters_unchanged -> Option<bool> with Some(true)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_master_mark_that_moved_between_binding_and_aim_is_refused",
+      "killer_at": "base"
+    },
+    "116:5 replace target_masters_unchanged -> Option<bool> with Some(false)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "116:54 replace == with != in target_masters_unchanged": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "126:5 replace target_master_mark -> Option<u64> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "126:5 replace target_master_mark -> Option<u64> with Some(0)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_master_mark_that_moved_between_binding_and_aim_is_refused",
+      "killer_at": "base"
+    },
+    "126:5 replace target_master_mark -> Option<u64> with Some(1)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_master_mark_that_moved_between_binding_and_aim_is_refused",
+      "killer_at": "base"
+    },
+    "128:9 delete match arm (Some(row), None) in target_master_mark": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_free_name_is_admitted_and_returns_the_pre_image",
+      "killer_at": "base"
+    },
+    "155:5 replace target_voucher_step -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "158:13 delete match arm (Some(row), None) in target_voucher_step": {
+      "verdict": "unviable",
+      "reason": "does not compile: type annotations needed"
+    },
+    "177:5 replace key -> (String, String) with (String::new(), String::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "177:5 replace key -> (String, String) with (String::new(), \"xyzzy\".into())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "177:5 replace key -> (String, String) with (\"xyzzy\".into(), String::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "177:5 replace key -> (String, String) with (\"xyzzy\".into(), \"xyzzy\".into())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "184:5 replace described -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "203:5 replace classify_post_location -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "208:44 replace || with && in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::two_rows_with_one_identity_are_ambiguous_not_merged",
+      "killer_at": "base"
+    },
+    "208:28 replace != with == in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "208:66 replace != with == in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "215:23 delete ! in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "220:23 delete ! in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "227:32 replace != with == in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "235:31 delete ! in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "240:35 replace || with && in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "240:20 delete ! in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "240:38 delete ! in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "244:33 replace || with && in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "244:15 delete ! in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "244:36 delete ! in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "250:28 replace && with || in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::concurrent_writers_are_reported_and_never_read_as_not_posted",
+      "killer_at": "base"
+    },
+    "254:32 replace == with != in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_moving_instead_is_named_in_the_result",
+      "killer_at": "base"
+    },
+    "256:28 replace == with != in classify_post_location": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_moving_instead_is_named_in_the_result",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "P01": {
+      "what": "same_name: names are not trimmed",
+      "edits": [
+        {
+          "from": "left.trim().eq_ignore_ascii_case(right.trim())",
+          "to": "left.eq_ignore_ascii_case(right)"
+        }
+      ],
+      "mutation": "832a9354c9462d93cbc88f32f99647c1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_masters_comparison_without_exactly_one_target_row_says_nothing",
+      "killer_at": "base"
+    },
+    "P02": {
+      "what": "same_name: names are compared with case",
+      "edits": [
+        {
+          "from": "left.trim().eq_ignore_ascii_case(right.trim())",
+          "to": "left.trim() == right.trim()"
+        }
+      ],
+      "mutation": "3bf7165bb93295f5e95ce389e110e9a0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_masters_comparison_without_exactly_one_target_row_says_nothing",
+      "killer_at": "base"
+    },
+    "P03": {
+      "what": "possibly_same_name: runs of whitespace are not collapsed",
+      "edits": [
+        {
+          "from": "name.split_whitespace()\n            .collect::<Vec<_>>()\n            .join(\" \")\n            .to_lowercase()",
+          "to": "name.trim().to_lowercase()"
+        }
+      ],
+      "mutation": "4577e6c7fa8633532a7d18ae12ee4786",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_namesake_beyond_ascii_case_or_inner_spacing_still_refuses",
+      "killer_at": "base"
+    },
+    "P04": {
+      "what": "possibly_same_name: names are not lower-cased",
+      "edits": [
+        {
+          "from": ".join(\" \")\n            .to_lowercase()",
+          "to": ".join(\" \")\n            .to_string()"
+        }
+      ],
+      "mutation": "4869c20783aae53ac6ecf82a38951c3b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_renamed_to_the_target_refuses_before_the_post",
+      "killer_at": "base"
+    },
+    "P05": {
+      "what": "is_target: the GUID is compared with case",
+      "edits": [
+        {
+          "from": "row.guid.eq_ignore_ascii_case(guid) && same_name(&row.name, name)",
+          "to": "row.guid == guid && same_name(&row.name, name)"
+        }
+      ],
+      "mutation": "8febdf1897dfc42a480be2c6fc445579",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_company_keeps_its_identity_across_guid_case_and_name_spacing_and_case",
+      "killer_at": "this_commit"
+    },
+    "P06": {
+      "what": "is_target: the name is not compared",
+      "edits": [
+        {
+          "from": "row.guid.eq_ignore_ascii_case(guid) && same_name(&row.name, name)",
+          "to": "row.guid.eq_ignore_ascii_case(guid)"
+        }
+      ],
+      "mutation": "f60a00060a5a8f3e5068c03b8a514085",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_binding_snapshot_without_the_target_is_refused_as_unconfirmed",
+      "killer_at": "base"
+    },
+    "P07": {
+      "what": "target_voucher_mark: the first of two target rows is taken",
+      "edits": [
+        {
+          "from": "    match (targets.next(), targets.next()) {\n        (Some(row), None) => Some(row.vouchers),",
+          "to": "    match (targets.next(), targets.next()) {\n        (Some(row), _) => Some(row.vouchers),"
+        }
+      ],
+      "mutation": "8187cfb9a862799faf68b34f7da19c19",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::compact_ledger_tests::the_aim_mark_is_read_only_from_exactly_one_target_row",
+      "killer_at": "base"
+    },
+    "P08": {
+      "what": "target_master_mark: the first of two target rows is taken",
+      "edits": [
+        {
+          "from": "(Some(row), None) => Some(row.masters),",
+          "to": "(Some(row), _) => Some(row.masters),"
+        }
+      ],
+      "mutation": "85f08469e6728c4f141237537c4abdf5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_masters_comparison_without_exactly_one_target_row_says_nothing",
+      "killer_at": "base"
+    },
+    "P09": {
+      "what": "target_voucher_step: the first of two target rows is taken",
+      "edits": [
+        {
+          "from": "            (Some(row), None) => Some(row.vouchers),",
+          "to": "            (Some(row), _) => Some(row.vouchers),"
+        }
+      ],
+      "mutation": "037a82a226d086813353c4ff63098d27",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::no_step_is_reported_unless_each_snapshot_holds_exactly_one_target",
+      "killer_at": "base"
+    },
+    "P10": {
+      "what": "aimed_voucher_mark: the observed mark is not compared with the target row's",
+      "edits": [
+        {
+          "from": "Ok(Some(observed)) if observed == mark => Some(mark),",
+          "to": "Ok(Some(_)) => Some(mark),"
+        }
+      ],
+      "mutation": "103c5e5345d61892b29b0d0b39d498b2",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "P11": {
+      "what": "aimed_voucher_mark: the target row's mark is taken without reading the observed one",
+      "edits": [
+        {
+          "from": "    match company_voucher_mark(marks, guid) {\n        Ok(Some(observed)) if observed == mark => Some(mark),\n        _ => None,\n    }",
+          "to": "    Some(mark)"
+        }
+      ],
+      "mutation": "f554e42e444335d6a86177cbd4eccb7e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::compact_ledger_tests::an_omitted_voucher_mark_in_the_aim_snapshot_is_no_mark_not_zero",
+      "killer_at": "base"
+    },
+    "P12": {
+      "what": "aimed_voucher_mark: an omitted mark is taken as the target row's",
+      "edits": [
+        {
+          "from": "        _ => None,\n    }\n}\n\n/// Whether the target's row",
+          "to": "        Ok(None) => Some(mark),\n        _ => None,\n    }\n}\n\n/// Whether the target's row"
+        }
+      ],
+      "mutation": "2bad051893539fcc02f32d6e89c6b15d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::compact_ledger_tests::an_omitted_voucher_mark_in_the_aim_snapshot_is_no_mark_not_zero",
+      "killer_at": "base"
+    },
+    "P13": {
+      "what": "omits_voucher_mark: a snapshot that does not read also counts as omitting the mark",
+      "edits": [
+        {
+          "from": "matches!(company_voucher_mark(marks, guid), Ok(None))",
+          "to": "matches!(company_voucher_mark(marks, guid), Ok(None) | Err(_))"
+        }
+      ],
+      "mutation": "a716f5b0b5e1f0a625214ed449adea0c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::an_unreadable_snapshot_does_not_count_as_omitting_the_voucher_mark",
+      "killer_at": "this_commit"
+    },
+    "P14": {
+      "what": "admit_post_target: namesakes are counted by the narrow match",
+      "edits": [
+        {
+          "from": ".filter(|row| possibly_same_name(&row.name, name))",
+          "to": ".filter(|row| same_name(&row.name, name))"
+        }
+      ],
+      "mutation": "1e2657ad6206aa02341465ef3260d21a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_namesake_beyond_ascii_case_or_inner_spacing_still_refuses",
+      "killer_at": "base"
+    },
+    "P15": {
+      "what": "admit_post_target: namesakes are not counted",
+      "edits": [
+        {
+          "from": "if targets == 1 && namesakes == 1 {",
+          "to": "if targets == 1 {"
+        }
+      ],
+      "mutation": "6392f4d466f3ac3fd7ba6dff87db6702",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_renamed_to_the_target_refuses_before_the_post",
+      "killer_at": "base"
+    },
+    "P16": {
+      "what": "admit_post_target: the refusal takes another code",
+      "edits": [
+        {
+          "from": "Err(\"post_company_scope_changed\")",
+          "to": "Err(\"company_scope_changed\")"
+        }
+      ],
+      "mutation": "3a796413782df59cc3d83f4fae75c895",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_namesake_beyond_ascii_case_or_inner_spacing_still_refuses",
+      "killer_at": "base"
+    },
+    "P17": {
+      "what": "target_masters_unchanged: the binding snapshot is compared with itself",
+      "edits": [
+        {
+          "from": "target_master_mark(at_aim, guid, name)?",
+          "to": "target_master_mark(at_binding, guid, name)?"
+        }
+      ],
+      "mutation": "ca6de9da85b29f9a0e01d299c46a9aa5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::master_post::tests::a_master_mark_that_moved_between_binding_and_aim_is_refused",
+      "killer_at": "base"
+    },
+    "P18": {
+      "what": "target_masters_unchanged: a snapshot without one target row reads as unchanged when the other has none either",
+      "edits": [
+        {
+          "from": "Some(target_master_mark(at_binding, guid, name)? == target_master_mark(at_aim, guid, name)?)",
+          "to": "Some(target_master_mark(at_binding, guid, name) == target_master_mark(at_aim, guid, name))"
+        }
+      ],
+      "mutation": "70da1f235d9de50411dfca8c2a5cfb6d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_binding_snapshot_without_the_target_is_refused_as_unconfirmed",
+      "killer_at": "base"
+    },
+    "P19": {
+      "what": "target_voucher_step: a mark that went backwards wraps into a step",
+      "edits": [
+        {
+          "from": "let step = to.checked_sub(from);",
+          "to": "let step = Some(to.wrapping_sub(from));"
+        }
+      ],
+      "mutation": "9c3af145e6e683afde9cb910a7e824f5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::the_target_step_is_reported_against_what_tally_reported_creating",
+      "killer_at": "base"
+    },
+    "P20": {
+      "what": "target_voucher_step: before and after are swapped",
+      "edits": [
+        {
+          "from": "\"before\": from,\n        \"after\": to,",
+          "to": "\"before\": to,\n        \"after\": from,"
+        }
+      ],
+      "mutation": "53bca30939e3a3c45c736e1e21a5b1bd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_native_posts_alter_id_delta_is_measured_from_the_mark_before_its_post",
+      "killer_at": "base"
+    },
+    "P21": {
+      "what": "target_voucher_step: the reported count is left out",
+      "edits": [
+        {
+          "from": "\"reported_created\": reported_created,",
+          "to": "\"reported_created\": Value::Null,"
+        }
+      ],
+      "mutation": "78054f3b2d0e5bd8379a01fc46a3040e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "P22": {
+      "what": "target_voucher_step: with no reported count the match reads false, not null",
+      "edits": [
+        {
+          "from": "reported_created.map(|created| step == Some(created))",
+          "to": "Some(reported_created.is_some_and(|created| step == Some(created)))"
+        }
+      ],
+      "mutation": "0c620c54738cdaa6b92197d8e9a5b7a5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::the_target_step_is_reported_against_what_tally_reported_creating",
+      "killer_at": "base"
+    },
+    "P23": {
+      "what": "key: the GUID keeps its case",
+      "edits": [
+        {
+          "from": "row.guid.to_ascii_lowercase(),",
+          "to": "row.guid.clone(),"
+        }
+      ],
+      "mutation": "a2adfa9982f34557363892810607d6b1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_company_keeps_its_identity_across_guid_case_and_name_spacing_and_case",
+      "killer_at": "this_commit"
+    },
+    "P24": {
+      "what": "key: the name is not trimmed",
+      "edits": [
+        {
+          "from": "row.name.trim().to_ascii_lowercase(),",
+          "to": "row.name.to_ascii_lowercase(),"
+        }
+      ],
+      "mutation": "e8efe5bd27bdd67c0a91ea51cf44ad91",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_company_keeps_its_identity_across_guid_case_and_name_spacing_and_case",
+      "killer_at": "this_commit"
+    },
+    "P25": {
+      "what": "key: the name keeps its case",
+      "edits": [
+        {
+          "from": "row.name.trim().to_ascii_lowercase(),",
+          "to": "row.name.trim().to_string(),"
+        }
+      ],
+      "mutation": "71f59952af96d2b6b2cd1e8790f71c70",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_company_keeps_its_identity_across_guid_case_and_name_spacing_and_case",
+      "killer_at": "this_commit"
+    },
+    "P26": {
+      "what": "described: the GUID is left out",
+      "edits": [
+        {
+          "from": "json!({\"name\": row.name, \"guid\": row.guid})",
+          "to": "json!({\"name\": row.name})"
+        }
+      ],
+      "mutation": "638f26aa0b655aaf007661cbd5713491",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P27": {
+      "what": "classify_post_location: an unreadable after snapshot takes another state",
+      "edits": [
+        {
+          "from": "\"after_snapshot_unavailable\"",
+          "to": "\"after_snapshot_missing\""
+        }
+      ],
+      "mutation": "02aa3d521224c4598fa234753ad4106f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt",
+      "killer_at": "base"
+    },
+    "P28": {
+      "what": "classify_post_location: duplicate rows are looked for only before the post",
+      "edits": [
+        {
+          "from": "before_by_key.len() != before.len() || after_by_key.len() != after.len()",
+          "to": "before_by_key.len() != before.len()"
+        }
+      ],
+      "mutation": "e5de156741aab80ed73f8be1a6107fbe",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::two_rows_with_one_identity_are_ambiguous_not_merged",
+      "killer_at": "base"
+    },
+    "P29": {
+      "what": "classify_post_location: duplicate rows are looked for only after the post",
+      "edits": [
+        {
+          "from": "before_by_key.len() != before.len() || after_by_key.len() != after.len()",
+          "to": "after_by_key.len() != after.len()"
+        }
+      ],
+      "mutation": "05a769e64a5a36d9cfd9d840416d52a8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::two_rows_with_one_identity_are_ambiguous_not_merged",
+      "killer_at": "base"
+    },
+    "P30": {
+      "what": "classify_post_location: duplicate rows take another state",
+      "edits": [
+        {
+          "from": "\"location_ambiguous_duplicate_rows\"",
+          "to": "\"location_ambiguous\""
+        }
+      ],
+      "mutation": "b5efa31b953010bac767f70853b914a3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::two_rows_with_one_identity_are_ambiguous_not_merged",
+      "killer_at": "base"
+    },
+    "P31": {
+      "what": "classify_post_location: every company after the post counts as added",
+      "edits": [
+        {
+          "from": "        .filter(|row| !before_by_key.contains_key(&key(row)))\n",
+          "to": ""
+        }
+      ],
+      "mutation": "1847288656e0614bf7aba8554afd53e1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "P32": {
+      "what": "classify_post_location: every company before the post counts as removed",
+      "edits": [
+        {
+          "from": "        .filter(|row| !after_by_key.contains_key(&key(row)))\n",
+          "to": ""
+        }
+      ],
+      "mutation": "2cc678a8127a0a963b5675cf09225736",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "P33": {
+      "what": "classify_post_location: a company moved by its master mark, not its voucher mark",
+      "edits": [
+        {
+          "from": "(previous.vouchers != row.vouchers).then_some",
+          "to": "(previous.masters != row.masters).then_some"
+        }
+      ],
+      "mutation": "71d9a3e480ccd31eab8f03eadf507508",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "P34": {
+      "what": "classify_post_location: a moved company's marks are swapped",
+      "edits": [
+        {
+          "from": ".then_some((row, previous.vouchers, row.vouchers))",
+          "to": ".then_some((row, row.vouchers, previous.vouchers))"
+        }
+      ],
+      "mutation": "e9fbefb53606d1bc901a113e108f9f87",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::another_company_moving_instead_of_the_target_is_named",
+      "killer_at": "base"
+    },
+    "P35": {
+      "what": "classify_post_location: the target before the post is found by GUID alone",
+      "edits": [
+        {
+          "from": "let target_before = before.iter().any(|row| is_target(row, guid, name));",
+          "to": "let target_before = before.iter().any(|row| row.guid.eq_ignore_ascii_case(guid));"
+        }
+      ],
+      "mutation": "70667b14bc1034b25e596891ad2a180f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_target_absent_or_named_otherwise_before_the_post_is_a_scope_change",
+      "killer_at": "this_commit"
+    },
+    "P36": {
+      "what": "classify_post_location: the target after the post is found by GUID alone",
+      "edits": [
+        {
+          "from": "let target_after = after.iter().any(|row| is_target(row, guid, name));",
+          "to": "let target_after = after.iter().any(|row| row.guid.eq_ignore_ascii_case(guid));"
+        }
+      ],
+      "mutation": "01348cb11ec0037c8c284a8b7abaf4ed",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P37": {
+      "what": "classify_post_location: the target is taken as moved by GUID alone",
+      "edits": [
+        {
+          "from": "let target_moved = moved.iter().any(|(row, _, _)| is_target(row, guid, name));",
+          "to": "let target_moved = moved.iter().any(|(row, _, _)| row.guid.eq_ignore_ascii_case(guid));"
+        }
+      ],
+      "mutation": "bf81605035badb8d81db989cdd7ff1d4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_company_sharing_the_targets_guid_under_another_name_is_not_the_target",
+      "killer_at": "this_commit"
+    },
+    "P38": {
+      "what": "classify_post_location: the target is listed among the other companies moved",
+      "edits": [
+        {
+          "from": "        .filter(|(row, _, _)| !is_target(row, guid, name))\n",
+          "to": ""
+        }
+      ],
+      "mutation": "eeb7623cf9d32d924fd2a7fae93abc99",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "P39": {
+      "what": "classify_post_location: another company's marks before and after are swapped",
+      "edits": [
+        {
+          "from": "\"voucher_mark_before\": from, \"voucher_mark_after\": to",
+          "to": "\"voucher_mark_before\": to, \"voucher_mark_after\": from"
+        }
+      ],
+      "mutation": "134a9fa255e1890fa5d43bc4ce5e1f51",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::another_company_moving_instead_of_the_target_is_named",
+      "killer_at": "base"
+    },
+    "P40": {
+      "what": "classify_post_location: another company moved is named without its GUID",
+      "edits": [
+        {
+          "from": "json!({\"name\": row.name, \"guid\": row.guid, \"voucher_mark_before\"",
+          "to": "json!({\"name\": row.name, \"voucher_mark_before\""
+        }
+      ],
+      "mutation": "239fc070fe1e1026369935ea28449648",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::another_company_moving_instead_of_the_target_is_named",
+      "killer_at": "base"
+    },
+    "P41": {
+      "what": "classify_post_location: a target missing before the post is not a scope change",
+      "edits": [
+        {
+          "from": "if !target_before || !target_after {",
+          "to": "if !target_after {"
+        }
+      ],
+      "mutation": "f09a39bd7bc98c87816169f4e52d956d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_target_absent_or_named_otherwise_before_the_post_is_a_scope_change",
+      "killer_at": "this_commit"
+    },
+    "P42": {
+      "what": "classify_post_location: a target missing after the post is not a scope change",
+      "edits": [
+        {
+          "from": "if !target_before || !target_after {",
+          "to": "if !target_before {"
+        }
+      ],
+      "mutation": "485f4faa93fb0c582ef26818bcfd5b6e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P43": {
+      "what": "classify_post_location: a target renamed or unloaded reads as ambiguous",
+      "edits": [
+        {
+          "from": "\"target_scope_changed\"",
+          "to": "\"location_ambiguous_scope_changed\""
+        }
+      ],
+      "mutation": "de460749a481ce15d79dd6981ecbbc5e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P44": {
+      "what": "classify_post_location: a target that moved while the companies changed reads as ambiguous",
+      "edits": [
+        {
+          "from": "            \"target_moved_scope_changed\"",
+          "to": "            \"location_ambiguous_scope_changed\""
+        }
+      ],
+      "mutation": "525334b1f83a1ac248c03d67182e1b5f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P45": {
+      "what": "classify_post_location: an ambiguous scope change reads as the target's",
+      "edits": [
+        {
+          "from": "            \"location_ambiguous_scope_changed\"",
+          "to": "            \"target_scope_changed\""
+        }
+      ],
+      "mutation": "914d759706afcb54e6b3f9e1d19c2588",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P46": {
+      "what": "classify_post_location: the target alone moving reads as others moving too",
+      "edits": [
+        {
+          "from": "\"target_only\"",
+          "to": "\"target_and_others_moved\""
+        }
+      ],
+      "mutation": "dc9731a15996090f1a68bba3e30e914e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_mark_step_other_than_the_create_is_reported_and_never_verified",
+      "killer_at": "base"
+    },
+    "P47": {
+      "what": "classify_post_location: the target and others moving reads as the target alone",
+      "edits": [
+        {
+          "from": "\"target_and_others_moved\"",
+          "to": "\"target_only\""
+        }
+      ],
+      "mutation": "a2f590dc32cce36aee02968caf8c4eb5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::concurrent_writers_are_reported_and_never_read_as_not_posted",
+      "killer_at": "base"
+    },
+    "P48": {
+      "what": "classify_post_location: no creation reported reads as not observed",
+      "edits": [
+        {
+          "from": "\"no_creation_reported\"",
+          "to": "\"not_observed\""
+        }
+      ],
+      "mutation": "8fce3b89fa653c78779707ca0db084fe",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_moving_while_tally_created_nothing_is_not_blamed",
+      "killer_at": "base"
+    },
+    "P49": {
+      "what": "classify_post_location: one other company moving reads as concurrent changes",
+      "edits": [
+        {
+          "from": "\"suspected_other_company\"",
+          "to": "\"ambiguous_concurrent_changes\""
+        }
+      ],
+      "mutation": "62e736f8843ffc12994d2a50427ed00c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_moving_instead_is_named_in_the_result",
+      "killer_at": "base"
+    },
+    "P50": {
+      "what": "classify_post_location: nothing observed reads as no creation reported",
+      "edits": [
+        {
+          "from": "        \"not_observed\"",
+          "to": "        \"no_creation_reported\""
+        }
+      ],
+      "mutation": "1399fb3b437e135af9784fa175927461",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::concurrent_writers_are_reported_and_never_read_as_not_posted",
+      "killer_at": "base"
+    },
+    "P51": {
+      "what": "classify_post_location: several other companies moving reads as one suspected",
+      "edits": [
+        {
+          "from": "\"ambiguous_concurrent_changes\"",
+          "to": "\"suspected_other_company\""
+        }
+      ],
+      "mutation": "df9a1531876c3d91aef08a1cbbdb84e7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::concurrent_writers_are_reported_and_never_read_as_not_posted",
+      "killer_at": "base"
+    },
+    "P52": {
+      "what": "classify_post_location: a response that did not parse reads as no creation reported",
+      "edits": [
+        {
+          "from": "} else if reported_created == Some(0) {",
+          "to": "} else if reported_created.unwrap_or(0) == 0 {"
+        }
+      ],
+      "mutation": "06a547d483009b5e21b24a40284a99fc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_move_elsewhere_while_tally_created_nothing_is_not_called_a_misdirected_post",
+      "killer_at": "base"
+    },
+    "P53": {
+      "what": "classify_post_location: a company removed is not a scope change",
+      "edits": [
+        {
+          "from": "} else if !added.is_empty() || !removed.is_empty() {",
+          "to": "} else if !added.is_empty() {"
+        }
+      ],
+      "mutation": "35cd0ecc85b2506a39dda9076accf49e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P54": {
+      "what": "classify_post_location: a company added is not a scope change",
+      "edits": [
+        {
+          "from": "} else if !added.is_empty() || !removed.is_empty() {",
+          "to": "} else if !removed.is_empty() {"
+        }
+      ],
+      "mutation": "1a3ba654d54bc62720280fe94a6c56e7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P55": {
+      "what": "classify_post_location: the answer says the target did not move",
+      "edits": [
+        {
+          "from": "\"target_moved\": target_moved,",
+          "to": "\"target_moved\": false,"
+        }
+      ],
+      "mutation": "28377284fe8eb104e3725aa2c642826f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::only_the_target_moving_is_the_expected_landing",
+      "killer_at": "base"
+    },
+    "P56": {
+      "what": "classify_post_location: no company is listed as added",
+      "edits": [
+        {
+          "from": "\"companies_added\": added,",
+          "to": "\"companies_added\": Vec::<Value>::new(),"
+        }
+      ],
+      "mutation": "505f60722d9d5bc5892d3afd185b3a75",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::location::tests::a_target_absent_or_named_otherwise_before_the_post_is_a_scope_change",
+      "killer_at": "this_commit"
+    },
+    "P57": {
+      "what": "classify_post_location: no company is listed as removed",
+      "edits": [
+        {
+          "from": "\"companies_removed\": removed,",
+          "to": "\"companies_removed\": Vec::<Value>::new(),"
+        }
+      ],
+      "mutation": "a832eab1e4f4e47473ee44ab2ff1e887",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::location::tests::a_changed_company_set_is_never_a_clean_landing",
+      "killer_at": "base"
+    },
+    "P58": {
+      "what": "classify_post_location: no other company is listed as moved",
+      "edits": [
+        {
+          "from": "\"other_companies_moved\": others,",
+          "to": "\"other_companies_moved\": Vec::<Value>::new(),"
+        }
+      ],
+      "mutation": "5ef5ac715f2beb9de1a424db35b83d40",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::another_company_moving_instead_is_named_in_the_result",
+      "killer_at": "base"
+    },
+    "P59": {
+      "what": "classify_post_location: the step is given no reported count",
+      "edits": [
+        {
+          "from": "target_voucher_step(before, after, guid, name, reported_created)",
+          "to": "target_voucher_step(before, after, guid, name, None)"
+        }
+      ],
+      "mutation": "31d2303b7e7d6ab6f07d74ca4c61dd0e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    },
+    "P60": {
+      "what": "classify_post_location: the step is taken from after to before",
+      "edits": [
+        {
+          "from": "target_voucher_step(before, after, guid, name, reported_created)",
+          "to": "target_voucher_step(after, before, guid, name, reported_created)"
+        }
+      ],
+      "mutation": "416e81910f20a9a6e1ecc6aad8ab0820",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_post_records_its_step_verdict_before_the_readback",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "69:31 replace match guard observed == mark with true in aimed_voucher_mark": {
+      "reason": "equivalent: company_voucher_mark answers a mark only when exactly one row of the answer carries the GUID (company_high_water_row), and aimed_voucher_mark has already found exactly one row with that GUID and the name, so it is that row. Both read the row through company_high_water_rows and its ALTVCHID through observed_checkpoint, so the observed mark always equals the mark of the target row and the comparison never refuses"
+    },
+    "P10": {
+      "mutation": "103c5e5345d61892b29b0d0b39d498b2",
+      "reason": "equivalent: company_voucher_mark answers a mark only when exactly one row of the answer carries the GUID (company_high_water_row), and aimed_voucher_mark has already found exactly one row with that GUID and the name, so it is that row. Both read the row through company_high_water_rows and its ALTVCHID through observed_checkpoint, so the observed mark always equals the mark of the target row and the comparison never refuses"
+    }
+  }
+}

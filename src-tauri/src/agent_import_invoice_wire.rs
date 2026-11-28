@@ -18,9 +18,12 @@
 //! GST registration, each GUID the company's GUID with a suffix, the
 //! registration's dated rows under `GSTREGISTRATIONDETAILS.LIST`.
 
+use super::super::super::voucher_type_class::ReservedVoucherClass;
+use super::super::verification::folded_number;
+use super::super::InvoiceClass;
 use super::InvoiceNumber;
 use bridge_tally_core::TallyDate;
-use bridge_tally_protocol::xml_text::escape_text as xml_escape;
+use bridge_tally_protocol::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use quick_xml::events::Event;
 use std::collections::BTreeMap;
 
@@ -34,17 +37,20 @@ pub(super) struct Row {
     /// Each direct child whose tag ends in `.LIST`, as its own row (its fields
     /// are relative to it): the ledger entries of a voucher.
     pub(super) lists: Vec<(String, Row)>,
-    /// In a list's row, the path of each element that came back with no text
-    /// (`<GSTHSNNAME/>`): present, unlike an element that did not come back.
+    /// The path of each element that came back with no text (`<GSTHSNNAME/>`):
+    /// present, unlike an element that did not come back.
     pub(super) empties: Vec<String>,
 }
 
 impl Row {
-    /// The one value at `path`, `Ok(None)` when absent, an error when repeated.
+    /// The one value at `path`, `Ok(None)` when absent or empty, an error when repeated.
     pub(super) fn one(&self, path: &str) -> Result<Option<&str>, &'static str> {
         let mut found = self.fields.iter().filter(|(key, _)| key == path);
         let first = found.next().map(|(_, value)| value.as_str());
-        if found.next().is_some() {
+        let occurrences = usize::from(first.is_some())
+            + found.count()
+            + self.empties.iter().filter(|key| *key == path).count();
+        if occurrences > 1 {
             return Err("invoice_read_field_repeated");
         }
         Ok(first)
@@ -193,6 +199,8 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                         let value = text.trim();
                         if !value.is_empty() {
                             current.fields.push((relative, value.to_string()));
+                        } else if leaf && list_depth.is_none() {
+                            current.empties.push(relative);
                         }
                     }
                 }
@@ -205,6 +213,15 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                 if let (Some(_), Some(list)) = (row_depth, list_depth) {
                     sub.empties.push(
                         path[list + 1..]
+                            .iter()
+                            .cloned()
+                            .chain(std::iter::once(empty.name().as_ref().to_string()))
+                            .collect::<Vec<_>>()
+                            .join("/"),
+                    );
+                } else if let Some(depth) = row_depth {
+                    current.empties.push(
+                        path[depth + 1..]
                             .iter()
                             .cloned()
                             .chain(std::iter::once(empty.name().as_ref().to_string()))
@@ -265,9 +282,13 @@ pub(super) struct ResolvedVoucherType {
 }
 
 pub(in crate::agent) fn render_voucher_types_request(company: &str) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        "",
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Voucher Types</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Voucher Types\" ISMODIFY=\"No\"><TYPE>VoucherType</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company)
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Voucher Types</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Voucher Types\" ISMODIFY=\"No\"><TYPE>VoucherType</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -329,7 +350,7 @@ pub(super) fn parse_voucher_types(xml: &str) -> Result<Vec<VoucherTypeRow>, &'st
 pub(super) fn resolve_voucher_type(
     types: &[VoucherTypeRow],
     name: &str,
-    class: &str,
+    class: ReservedVoucherClass,
 ) -> Result<ResolvedVoucherType, &'static str> {
     let named = types
         .iter()
@@ -361,7 +382,7 @@ pub(super) fn resolve_voucher_type(
             _ => return Err("invoice_voucher_type_parent_ambiguous"),
         };
     };
-    if reached != class {
+    if reached != class.name() {
         return Err("invoice_voucher_type_wrong_class");
     }
     // The GUID goes into the read-back's formula: checked here, at the build,
@@ -376,10 +397,12 @@ pub(super) fn resolve_voucher_type(
     // series).
     // Its "prevent duplicates" flag is the guard the number read's control
     // relies on when no invoice of the company stands as sent (its first, or
-    // every one after a person's release). The protocol reference (§9.8)
-    // measured that flag on Journal and Payment vouchers only (PARTIAL); on a
-    // Sales voucher it is not measured, which ADR 0004 lists as a blocker for
-    // switching Sales on.
+    // every one after a person's release). On two Sales types with one Manual
+    // series, in two sittings on one book, it declined a number already in the
+    // book in the import's answer, with no dialog (PARTIAL: row S4, §9.16, the
+    // bullet on two invoices that differ only by their number; row 2162-KD,
+    // ADR 0004's amendment of 2026-11-09, item 12); §9.8 measured it on Journal
+    // and Payment vouchers before.
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {
@@ -426,29 +449,108 @@ impl VoucherTypeGuid {
 /// say whether a voucher holding the number carries an IRN: with them the lab's
 /// answers were the answers without them plus the three elements on each row
 /// (#2162 item 8, `lab/2162-irn-read-answers` R1, protocol reference §8.2j).
+// Retired from the build by the month reads below (#2162 item 11); kept for
+// the tests that pin the request the one-number captures answered.
+#[cfg(test)]
 pub(in crate::agent) fn render_invoice_number_request(
     company: &str,
     number: &InvoiceNumber,
     (from, to): (&TallyDate, &TallyDate),
 ) -> String {
     let (number, from, to) = (number.as_str(), from.as_str(), to.as_str());
+    // The one-number captures this request is pinned to were Sales.
+    let compute = class_compute(InvoiceClass::Sales);
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        company = xml_escape(company),
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH>{compute}<FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
-/// The element the Sales class compute answers in (the name the voucher reads
-/// already use).
-const SALES_CLASS_TAG: &str = "BRIDGEVCHISSALES";
+/// Every voucher of one window, whatever its type and number, with the same
+/// fetch list and class compute as the number read: the number read less its
+/// number term. Tally cannot be asked whether two numbers match after case and
+/// leading zeros are ignored (row 2162-S4: its own filter and duplicate guard
+/// ignore case but not a dropped zero), so the program compares the window's
+/// numbers itself. One read of the year does not fit the transport on a dense
+/// book (row 2162-S6: 83.7 MB, 44 s), so the year is read a calendar month at
+/// a time (row 2162-S7: every dense month under 15 s and 24 MiB, the months'
+/// rows equal to the year's). The lab sent this request for each month of a
+/// year and for a whole year (`lab/2162-s7-sheet` at b63accd9).
+pub(in crate::agent) fn render_invoice_window_numbers_request(
+    company: &str,
+    class: InvoiceClass,
+    (from, to): (&TallyDate, &TallyDate),
+) -> String {
+    let (from, to) = (from.as_str(), to.as_str());
+    let compute = class_compute(class);
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
+    format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH>{compute}<FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+    )
+}
 
-/// The returned vouchers that are Sales-class. A row whose class element is
+/// The calendar months from `from` to `to`, each as its first and last day,
+/// or `None` unless `from` is a first of the month and `to` the last day of a
+/// month on or after it. The financial year's window is such a span.
+pub(in crate::agent) fn calendar_months(
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Option<Vec<(TallyDate, TallyDate)>> {
+    if from > to || !from.as_str().ends_with("01") || to.next_day().ok()?.as_str().get(6..)? != "01"
+    {
+        return None;
+    }
+    let mut months = Vec::new();
+    let mut first = from.clone();
+    while first <= *to {
+        let (year, month): (u32, u32) = (
+            first.as_str().get(..4)?.parse().ok()?,
+            first.as_str().get(4..6)?.parse().ok()?,
+        );
+        let next = if month == 12 {
+            format!("{:04}0101", year + 1)
+        } else {
+            format!("{year:04}{:02}01", month + 1)
+        };
+        let next = TallyDate::parse(next).ok()?;
+        months.push((first, next.previous_day().ok()?));
+        first = next;
+    }
+    Some(months)
+}
+
+/// The number reads' per-row class compute: the class's `$$Is<Class>` of the
+/// row's voucher type, answered in the element the voucher reads already use
+/// for that class (bridge#625, §8.2e). For Sales it is
+/// `BRIDGEVCHISSALES:$$IsSales:$VoucherTypeName`.
+fn class_compute(class: InvoiceClass) -> String {
+    let class = class.reserved();
+    format!(
+        "<COMPUTE>{}:{}:$VoucherTypeName</COMPUTE>",
+        class.tag(),
+        class.function()
+    )
+}
+
+/// The returned vouchers of the invoice's class. A row whose class element is
 /// missing or is neither Yes nor No is an error: an unknown function omits its
 /// element, so a gap is never a No.
-fn sales_rows(xml: &str) -> Result<Vec<Row>, &'static str> {
+fn class_rows(xml: &str, class: InvoiceClass) -> Result<Vec<Row>, &'static str> {
     let mut sales = Vec::new();
     for row in rows(xml, "VOUCHER")? {
-        match row.one(SALES_CLASS_TAG)? {
+        match row.one(class.reserved().tag())? {
             Some("Yes") => sales.push(row),
             Some("No") => {}
             _ => return Err("invoice_number_class_unread"),
@@ -457,38 +559,175 @@ fn sales_rows(xml: &str) -> Result<Vec<Row>, &'static str> {
     Ok(sales)
 }
 
-/// How many of the returned vouchers are Sales-class.
-pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
-    sales_rows(xml).map(|sales| sales.len())
+/// What a window answer that did not show the control holds instead (#2162
+/// item 13): its Sales-class row count, and the row of either class carrying
+/// the control's voucher GUID, if one does, as that row reads. `None` for the
+/// GUID when the journal recorded none for the control. The window read's
+/// answer carries each voucher's `GUID` though its fetch list does not name it
+/// (the captured `pilot-lab-number-*` answers), so a GUID seen under another
+/// number, date or type tells a miss of one voucher from a read missing rows.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ControlMiss {
+    pub(super) sales_rows: usize,
+    pub(super) guid: Option<GuidSeen>,
 }
 
-/// Whether a Sales-class voucher holding the number carries an IRN: an `IRN`
-/// with text. One that came back empty or did not come back says nothing (the
-/// row reader keeps no empty field, so the two are not told apart), and never
-/// makes this true.
-pub(super) fn sales_holder_has_irn(xml: &str) -> Result<bool, &'static str> {
-    for row in sales_rows(xml)? {
-        if row.one("IRN")?.is_some() {
-            return Ok(true);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum GuidSeen {
+    NotSeen,
+    Seen {
+        number: Option<String>,
+        date: Option<String>,
+        voucher_type: Option<String>,
+    },
+}
+
+pub(super) fn control_miss(
+    xml: &str,
+    class: InvoiceClass,
+    guid: Option<&str>,
+) -> Result<ControlMiss, &'static str> {
+    let sales_rows = class_rows(xml, class)?.len();
+    let guid = match guid {
+        None => None,
+        Some(guid) => {
+            let mut seen = GuidSeen::NotSeen;
+            for row in rows(xml, "VOUCHER")? {
+                if row
+                    .one("GUID")?
+                    .is_some_and(|held| held.eq_ignore_ascii_case(guid))
+                {
+                    seen = GuidSeen::Seen {
+                        number: row.one("VOUCHERNUMBER")?.map(str::to_string),
+                        date: row.one("DATE")?.map(str::to_string),
+                        voucher_type: row.one("VOUCHERTYPENAME")?.map(str::to_string),
+                    };
+                }
+            }
+            Some(seen)
+        }
+    };
+    Ok(ControlMiss { sales_rows, guid })
+}
+
+/// A window read's verdict on one invoice number: whether a row of the invoice's
+/// class in the window holds a number that folds to it (case and the leading zeros of
+/// each digit run ignored, `folded_number`), and if so whether one such holder
+/// carries an IRN. The window read returns every voucher of its window, so the
+/// program, not Tally's filter, makes the comparison (row 2162-S4: Tally's
+/// filter misses a dropped zero). A row of either class with no number holds
+/// none. A row whose class cannot be read is an error, as for the number read.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum NumberHolding {
+    Unheld,
+    Held { with_irn: bool },
+}
+
+pub(super) fn number_holding(
+    xml: &str,
+    class: InvoiceClass,
+    number: &str,
+) -> Result<NumberHolding, &'static str> {
+    let wanted = folded_number(number);
+    let mut holding = NumberHolding::Unheld;
+    for row in class_rows(xml, class)? {
+        let held = row.one("VOUCHERNUMBER")?.and_then(folded_number);
+        if wanted.is_some() && held == wanted {
+            let with_irn = row.one("IRN")?.is_some();
+            holding = match holding {
+                NumberHolding::Held { with_irn: true } => holding,
+                _ => NumberHolding::Held { with_irn },
+            };
         }
     }
-    Ok(false)
+    Ok(holding)
+}
+
+/// The number's month reads sent again after a post (#2162): the posted
+/// invoice, found by the read-back in `posted_type`, must be the only
+/// voucher of the invoice's class in its financial year whose number folds to its own,
+/// compared as the build compares it (`number_holding`). The read-back filters
+/// on the posted type's GUID, so a Sales voucher of another type holding the
+/// number is seen only here. `months` are the answers of every month of the
+/// year, which the caller sends only when each came back. The difference names
+/// each other type that holds the number, as Tally answered it; there is none
+/// when exactly one such row came back in the whole year, in the posted type.
+/// A month or row that cannot be read is a difference, never a pass (P3).
+pub(super) fn number_after_post_difference(
+    months: &[String],
+    class: InvoiceClass,
+    number: &str,
+    posted_type: Option<&str>,
+) -> Option<String> {
+    use crate::agent::failure_code::InvoiceNumberAfterPostCode as Code;
+    let code = |code: Code| Some(code.as_str().to_owned());
+    let wanted = folded_number(number);
+    let mut holders = Vec::new();
+    for xml in months {
+        let sales = match class_rows(xml, class) {
+            Ok(sales) => sales,
+            Err(unread) => return Some(unread.to_owned()),
+        };
+        for row in sales {
+            match row.one("VOUCHERNUMBER") {
+                Ok(held) if wanted.is_some() && held.and_then(folded_number) == wanted => {
+                    holders.push(row);
+                }
+                Ok(_) => {}
+                Err(unread) => return Some(unread.to_owned()),
+            }
+        }
+    }
+    let Some(posted_type) = posted_type else {
+        return code(Code::TypeUnread);
+    };
+    let mut types = Vec::with_capacity(holders.len());
+    for row in &holders {
+        match row.one("VOUCHERTYPENAME") {
+            Ok(Some(name)) => types.push(name),
+            Ok(None) => return code(Code::TypeUnread),
+            Err(unread) => return Some(unread.to_owned()),
+        }
+    }
+    let others: std::collections::BTreeSet<&str> = types
+        .iter()
+        .copied()
+        .filter(|name| *name != posted_type)
+        .collect();
+    if !others.is_empty() {
+        let named: Vec<&str> = others.into_iter().collect();
+        return Some(format!(
+            "{}: {}",
+            Code::InAnotherType.as_str(),
+            named.join(", ")
+        ));
+    }
+    match types.len() {
+        1 => None,
+        0 => code(Code::ReadMissedInvoice),
+        _ => code(Code::NotUnique),
+    }
 }
 
 /// Whether the number read for a known invoice (the control) found it: a row
-/// carrying exactly that number and that date, read as Sales class. Any other
+/// carrying exactly that number and that date, read as the invoice's class. Any other
 /// row is not the control, and a row whose class cannot be read is an error,
 /// as for the read it controls.
-pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<bool, &'static str> {
+pub(super) fn control_row_found(
+    xml: &str,
+    class: InvoiceClass,
+    number: &str,
+    date: &str,
+) -> Result<bool, &'static str> {
     let mut found = false;
     for row in rows(xml, "VOUCHER")? {
-        let class = match row.one(SALES_CLASS_TAG)? {
+        let in_class = match row.one(class.reserved().tag())? {
             Some("Yes") => true,
             Some("No") => false,
             _ => return Err("invoice_number_class_unread"),
         };
         found |=
-            class && row.one("VOUCHERNUMBER")? == Some(number) && row.one("DATE")? == Some(date);
+            in_class && row.one("VOUCHERNUMBER")? == Some(number) && row.one("DATE")? == Some(date);
     }
     Ok(found)
 }
@@ -501,7 +740,13 @@ pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<b
 /// (7 Oct 2026, §9.16): every field below came back. The four GSTR-1 status
 /// fields were added on 10 Oct 2026 and `ISPOSTDATED` after them on 3 Nov 2026,
 /// each time when the lab answered this request byte for byte (§9.16; the
-/// `pilot-lab-invoice-readback-post-dated` fixtures).
+/// `pilot-lab-invoice-readback-post-dated` fixtures). `GSTREGISTRATION` and
+/// `CMPGSTIN` came last, on 10 Nov 2026, when the lab answered this request for
+/// `BP/26-27/0010` with the two names Tally's own read of that voucher holds,
+/// and nothing else in the answer moved (§9.16, "The company registration in the
+/// read-back"; that answer holds a GSTIN, so it is not committed). The fetched
+/// `GSTREGISTRATION` carries `TYPE="String"`, which `rows` does not keep, as
+/// it keeps no attribute of any fetched field.
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
     type_guid: &VoucherTypeGuid,
@@ -510,9 +755,15 @@ pub(in crate::agent) fn render_invoice_readback_request(
 ) -> String {
     let (type_guid, number) = (type_guid.as_str(), number.as_str());
     let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN, ISPOSTDATED</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        company = xml_escape(company),
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN, ISPOSTDATED, GSTREGISTRATION, CMPGSTIN</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -524,6 +775,111 @@ pub(super) struct ReadLeg {
     /// Bill allocations of the leg: name, type, amount.
     pub(super) allocations: Vec<(Option<String>, Option<String>, String)>,
     pub(super) hsn: LegHsn,
+    /// The stock items Tally holds under the leg.
+    pub(super) items: LegItems,
+}
+
+impl ReadLeg {
+    /// The HSN/SAC Tally used for the line: on an item line it is the one Tally
+    /// filled on the item's allocation (from the ledger, on the measured book),
+    /// and the leg's own elements are empty (§9.16, entry "A stock item under a
+    /// ledger entry in the read-back", row 1379-IT, 10 Nov 2026).
+    pub(super) fn line_hsn(&self) -> &LegHsn {
+        match &self.items {
+            LegItems::One(item) => &item.hsn,
+            LegItems::None | LegItems::Several => &self.hsn,
+        }
+    }
+}
+
+/// The stock items under one ledger entry. §9.16, entry "A stock item under a
+/// ledger entry in the read-back" (row 1379-IT, TallyPrime 7.2,
+/// 10 Nov 2026, one amount-only item line on a book with one godown and no
+/// batches) found the line read back as its ledger's entry, with the item in
+/// one `INVENTORYALLOCATIONS.LIST` under it and no inventory list on the
+/// voucher. How Tally answers with two items under one entry is not measured
+/// (unverified): this parse groups an item's elements by their list, and it
+/// does not rely on that grouping for more than one, so several are only
+/// counted, and refused. The test of several is built from the one measured
+/// item, repeated.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum LegItems {
+    None,
+    One(Box<ReadItem>),
+    Several,
+}
+
+/// One stock item under a ledger entry, as §9.16's entry "A stock item under a
+/// ledger entry in the read-back" records row 1379-IT reading it back.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ReadItem {
+    pub(super) item: EntryText,
+    pub(super) deemed_positive: EntryText,
+    pub(super) amount: EntryText,
+    pub(super) rate: EntryText,
+    pub(super) actual_qty: EntryText,
+    pub(super) billed_qty: EntryText,
+    /// Batch allocations: godown, batch, amount. Tally wrote one, naming the
+    /// book's one godown and `Primary Batch`, where the request named neither.
+    pub(super) batches: Vec<(Option<String>, Option<String>, String)>,
+    /// The line's HSN/SAC, which Tally keeps here on an item line.
+    pub(super) hsn: LegHsn,
+}
+
+const ITEM: &str = "INVENTORYALLOCATIONS.LIST/";
+
+impl LegItems {
+    fn read(entry: &Row) -> Result<Self, &'static str> {
+        let path = |tag: &str| format!("{ITEM}{tag}");
+        // An item is counted by any of the three elements every line carries,
+        // present with text or empty. Content with none of them is unmodelled;
+        // a whitespace-only list alone holds no item.
+        let count = ["STOCKITEMNAME", "ISDEEMEDPOSITIVE", "AMOUNT"]
+            .iter()
+            .map(|tag| {
+                let path = path(tag);
+                entry.all(&path).count() + entry.empties.iter().filter(|key| **key == path).count()
+            })
+            .max()
+            .unwrap_or_default();
+        if count > 1 {
+            return Ok(Self::Several);
+        }
+        if count == 0 {
+            let has_content = entry.fields.iter().any(|(path, _)| path.starts_with(ITEM))
+                || entry.empties.iter().any(|path| path.starts_with(ITEM));
+            if has_content {
+                return Err("invoice_read_malformed");
+            }
+            return Ok(Self::None);
+        }
+        let batch = |tag: &str| {
+            entry
+                .all(&path(&format!("BATCHALLOCATIONS.LIST/{tag}")))
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        let (godowns, names, amounts) = (batch("GODOWNNAME"), batch("BATCHNAME"), batch("AMOUNT"));
+        let batches = (0..godowns.len().max(names.len()).max(amounts.len()))
+            .map(|index| {
+                (
+                    godowns.get(index).cloned(),
+                    names.get(index).cloned(),
+                    amounts.get(index).cloned().unwrap_or_default(),
+                )
+            })
+            .collect();
+        Ok(Self::One(Box::new(ReadItem {
+            item: entry.entry_text(&path("STOCKITEMNAME"))?,
+            deemed_positive: entry.entry_text(&path("ISDEEMEDPOSITIVE"))?,
+            amount: entry.entry_text(&path("AMOUNT"))?,
+            rate: entry.entry_text(&path("RATE"))?,
+            actual_qty: entry.entry_text(&path("ACTUALQTY"))?,
+            billed_qty: entry.entry_text(&path("BILLEDQTY"))?,
+            batches,
+            hsn: LegHsn::read(entry, ITEM)?,
+        })))
+    }
 }
 
 /// One element of a ledger entry as Tally answered it. Tally writes an element
@@ -555,13 +911,16 @@ pub(super) struct LegHsn {
 }
 
 impl LegHsn {
-    fn read(entry: &Row) -> Result<Self, &'static str> {
+    /// The five elements at `prefix` below the entry: the entry's own (`""`),
+    /// or its stock item's.
+    fn read(entry: &Row, prefix: &str) -> Result<Self, &'static str> {
+        let at = |tag: &str| entry.entry_text(&format!("{prefix}{tag}"));
         Ok(Self {
-            code: entry.entry_text("GSTHSNNAME")?,
-            source_type: entry.entry_text("HSNSOURCETYPE")?,
-            ledger_source: entry.entry_text("HSNLEDGERSOURCE")?,
-            group_source: entry.entry_text("HSNGROUPSOURCE")?,
-            applicability: entry.entry_text("GSTHSNINFERAPPLICABILITY")?,
+            code: at("GSTHSNNAME")?,
+            source_type: at("HSNSOURCETYPE")?,
+            ledger_source: at("HSNLEDGERSOURCE")?,
+            group_source: at("HSNGROUPSOURCE")?,
+            applicability: at("GSTHSNINFERAPPLICABILITY")?,
         })
     }
 
@@ -640,7 +999,8 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Readback, &'static str
                 .to_string(),
             deemed_positive: entry.one("ISDEEMEDPOSITIVE")?.map(str::to_string),
             allocations,
-            hsn: LegHsn::read(entry)?,
+            hsn: LegHsn::read(entry, "")?,
+            items: LegItems::read(entry)?,
         });
     }
     Ok(Readback::One(ReadInvoice { fields, legs }))
@@ -671,6 +1031,8 @@ pub(super) fn readback_fields(voucher: &Row) -> Result<BTreeMap<String, String>,
         "VCHGSTSTATUSISEXCLUDED",
         "ISGSTOVERRIDDEN",
         "ISPOSTDATED",
+        "GSTREGISTRATION",
+        "CMPGSTIN",
     ] {
         if let Some(value) = voucher.one(key)? {
             fields.insert(key.to_string(), value.to_string());
@@ -692,9 +1054,13 @@ pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
 /// whether it is inactive), and once from the same collection typed by hand
 /// and sent as UTF-8; the pilot-lab fixtures hold the first answer.
 pub(in crate::agent) fn render_company_registration_request(company: &str) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        "",
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company)
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -878,17 +1244,24 @@ fn render_ledger_rates(
     window: (&TallyDate, &TallyDate),
     (formula, filters): (String, String),
 ) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>",
+            from = window.0.as_str(),
+            to = window.1.as_str(),
+        ),
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        company = xml_escape(company),
-        from = window.0.as_str(),
-        to = window.1.as_str(),
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
 /// One element of an answer with its attributes, text and children, kept
 /// whole so a field that is present but empty stays different from one that is
-/// absent (`rows` drops empty leaves; the rate rows depend on the difference).
+/// absent (`rows` keeps empty leaves on their containing row; the rate rows
+/// depend on the difference).
 #[derive(Debug, Default)]
 struct Node {
     name: String,
@@ -1061,14 +1434,34 @@ pub(super) struct GstRow {
     pub(super) taxability: Option<String>,
     pub(super) source: Option<String>,
     pub(super) states: Vec<StateRates>,
-    /// The row carries an element or a value the lab's rows did not (a child
-    /// of the row, of a state-wise block or of a head's rate that is not in
-    /// the measured set, or a slab-rate list that is not empty).
-    pub(super) unmeasured: bool,
+    /// Which of the measured shapes the row has, decided here once.
+    pub(super) shape: RowShape,
     /// The row holds no attribute, no element and no text, as the lab's
     /// round-off ledger's row read (`BRIDGE Round Off`, the `pilot-lab` rate
     /// listing).
     pub(super) empty: bool,
+}
+
+/// The shape of a dated GST row, as the lab's rows read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RowShape {
+    /// Nothing but the elements the lab's rows carried (10 Oct 2026, fourteen
+    /// ledgers) and an empty slab-rate list.
+    Plain,
+    /// A plain row but for one `GSTRATEPERUNIT` reading `0` (after cleaning)
+    /// in every rate row of every state-wise block, and at least one rate row.
+    /// The lab measured it on 24 Nov 2026 (row 2162-RW, two service sales
+    /// ledgers): after the voucher lists of their two HSN/SAC codes were
+    /// opened from GSTR-1's HSN summary, Tally answered so for both ledgers
+    /// until the company was shut and loaded again, and their Cess and State
+    /// Cess rows then carried a rate of `0`. No other field changed (protocol
+    /// reference §12a.31).
+    ZeroPerUnit,
+    /// Anything else: a child of the row, of a state-wise block or of a rate
+    /// row outside the measured set, a slab-rate list that is not empty, or a
+    /// `GSTRATEPERUNIT` that is missing from some rate rows, repeated, holds
+    /// an element or reads anything but `0`.
+    Unmeasured,
 }
 
 /// What the rate listing says of one ledger. Each field is the text Tally
@@ -1100,6 +1493,8 @@ const GST_ROW_CHILDREN: &[&str] = &[
 ];
 const STATE_BLOCK_CHILDREN: &[&str] = &["GSTSLABRATES.LIST", "RATEDETAILS.LIST", "STATENAME"];
 const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALUATIONTYPE"];
+/// The rate row's per-unit field, admitted only as [`RowShape::ZeroPerUnit`].
+const PER_UNIT: &str = "GSTRATEPERUNIT";
 
 /// The rate listing by ledger name, for the ledgers an invoice names. Every
 /// row of the answer must carry the verified company's GUID (the
@@ -1185,6 +1580,8 @@ pub(super) fn parse_ledger_rates_and_rows(
                 .children
                 .iter()
                 .any(|child| !GST_ROW_CHILDREN.contains(&child.name.as_str()));
+            // Rate rows, and those of them with one zero per-unit field.
+            let (mut rate_rows, mut zero_per_unit_rows) = (0_usize, 0_usize);
             let mut states = Vec::new();
             for state in details.all("STATEWISEDETAILS.LIST") {
                 unmeasured |= state
@@ -1196,10 +1593,17 @@ pub(super) fn parse_ledger_rates_and_rows(
                     .any(|slabs| !slabs.children.is_empty() || !clean(&slabs.text).is_empty());
                 let mut heads = Vec::new();
                 for detail in state.all("RATEDETAILS.LIST") {
-                    unmeasured |= detail
-                        .children
-                        .iter()
-                        .any(|child| !HEAD_RATE_CHILDREN.contains(&child.name.as_str()));
+                    unmeasured |= detail.children.iter().any(|child| {
+                        child.name != PER_UNIT && !HEAD_RATE_CHILDREN.contains(&child.name.as_str())
+                    });
+                    rate_rows += 1;
+                    match detail.all(PER_UNIT).collect::<Vec<_>>().as_slice() {
+                        [] => {}
+                        [one] if one.children.is_empty() && clean(&one.text) == "0" => {
+                            zero_per_unit_rows += 1;
+                        }
+                        _ => unmeasured = true,
+                    }
                     heads.push(HeadRate {
                         head: detail
                             .text_of("GSTRATEDUTYHEAD")?
@@ -1218,7 +1622,15 @@ pub(super) fn parse_ledger_rates_and_rows(
                 taxability: details.text_of("TAXABILITY")?,
                 source: details.text_of("SRCOFGSTDETAILS")?,
                 states,
-                unmeasured,
+                shape: if unmeasured {
+                    RowShape::Unmeasured
+                } else if zero_per_unit_rows == 0 {
+                    RowShape::Plain
+                } else if zero_per_unit_rows == rate_rows {
+                    RowShape::ZeroPerUnit
+                } else {
+                    RowShape::Unmeasured
+                },
                 empty: details.attributes.is_empty()
                     && details.children.is_empty()
                     && clean(&details.text).is_empty(),
@@ -1247,8 +1659,8 @@ pub(in crate::agent::agent_import) use hsn::HsnWarning;
 #[cfg(test)]
 pub(super) use hsn::HsnWarningCode;
 pub(super) use hsn::{
-    hsn_warnings, parse_company_hsn, parse_group_hsn, resolve_hsn, HsnLevel, HsnRows, HsnStep,
-    SupplyType, NOT_MEASURED as HSN_NOT_MEASURED,
+    hsn_warnings, parse_company_hsn, parse_group_hsn, resolve_hsn, CompanyGst, HsnLevel, HsnRows,
+    HsnStep, SupplyType, NOT_MEASURED as HSN_NOT_MEASURED,
 };
 
 /// The group listing the build's compliance read already sends (the
@@ -1258,9 +1670,13 @@ pub(super) use hsn::{
 /// `pilot-lab-groups-hsn` fixture: one `HSNDETAILS.LIST` per group, empty on a
 /// group with no code).
 pub(in crate::agent) fn render_group_hsn_request(company: &str) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        "",
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Groups</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"List of Groups\" ISMODIFY=\"Yes\"><FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME, HSNDETAILS.LIST</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        company = xml_escape(company),
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Groups</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"List of Groups\" ISMODIFY=\"Yes\"><FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME, HSNDETAILS.LIST</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 

@@ -3,6 +3,7 @@
 //! one edit; none has a hand-written response.
 use super::*;
 use crate::native_outstandings::render_native_voucher_type_export_request;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use crate::{is_tally_reserved_root, TALLY_SANITIZED_ROOT_MARKER};
 
 const COMPANY: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
@@ -151,7 +152,7 @@ fn bound_element(company: &str) -> String {
 fn every_request_is_byte_equal_to_its_committed_fixture() {
     for kind in NativeMasterKind::ALL {
         assert_eq!(
-            render_native_masters_request(kind, LAB),
+            render_native_masters_request(kind, &ValidatedCompanyName::new(LAB).unwrap()),
             request_fixture(kind),
             "{kind:?}"
         );
@@ -160,14 +161,18 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
 
 #[test]
 fn the_voucher_type_request_is_the_existing_builder_with_the_masters_fields() {
-    let existing = render_native_voucher_type_export_request(LAB);
+    let existing =
+        render_native_voucher_type_export_request(&ValidatedCompanyName::new(LAB).unwrap());
     let derived = existing.replace(
         "ALTERID</FETCH>",
         "ALTERID, ISACTIVE, ISOPTIONAL, NUMBERINGMETHOD</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>",
     );
     assert_ne!(derived, existing, "the derivation must change something");
     assert_eq!(
-        render_native_masters_request(NativeMasterKind::VoucherTypes, LAB),
+        render_native_masters_request(
+            NativeMasterKind::VoucherTypes,
+            &ValidatedCompanyName::new(LAB).unwrap(),
+        ),
         derived
     );
 }

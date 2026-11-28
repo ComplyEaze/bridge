@@ -12,7 +12,7 @@ use super::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
     },
     tdl_engine,
-    validators::{normalize_company_guid, normalize_company_name},
+    validators::{normalize_company_guid, validate_company_name},
     xml_parser::{self, TallyCompany},
     VerifiedCompanyIdentity,
 };
@@ -196,8 +196,9 @@ pub(crate) enum MailingReadDecision {
     /// reference §8.4, lab row 2214).
     ContinueOnceDrained,
     /// The read ran out of time, or past the cap without Tally declaring it, so
-    /// Tally may still be working on it, and no such cut of a mailing read has
-    /// been seen live: the export fails, and nothing is sent again.
+    /// Tally may still be working on it: the export fails, and nothing is sent
+    /// again. A mailing read cut at the time limit has been seen live, owing
+    /// the drain (protocol reference §8.4).
     Refuse,
 }
 
@@ -245,6 +246,7 @@ impl MailingReadFailure {
             TallyTransportError::ResponseReadFailed => Self::ReadFailed,
             TallyTransportError::RequestFailed => Self::NoAnswer,
             TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer
             | TallyTransportError::UnsupportedContentEncoding => Self::Undecodable,
             TallyTransportError::HttpStatus { .. } => Self::HttpStatus,
             TallyTransportError::EndpointInvalid { .. }
@@ -1425,6 +1427,49 @@ impl PairedNativeReportResponseFailure {
     }
 }
 
+/// What one send of a paired read may answer: a report read admits only a body.
+pub(crate) trait PairedAnswer: PartialEq + Sized {
+    fn admit(
+        sent: anyhow::Result<(String, usize, String)>,
+    ) -> anyhow::Result<(Self, usize, String)>;
+}
+
+impl PairedAnswer for String {
+    fn admit(
+        sent: anyhow::Result<(String, usize, String)>,
+    ) -> anyhow::Result<(Self, usize, String)> {
+        sent
+    }
+}
+
+/// One send of the party-bills report: a body, or the empty answer Tally gives a party it reports
+/// nothing for (protocol reference §12a.27). The empty answer is recorded at 0 bytes, with the
+/// SHA-256 of no input.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum PartyBillsAnswerBody {
+    Rows(String),
+    Empty,
+}
+
+impl PairedAnswer for PartyBillsAnswerBody {
+    fn admit(
+        sent: anyhow::Result<(String, usize, String)>,
+    ) -> anyhow::Result<(Self, usize, String)> {
+        match sent {
+            Ok((text, bytes, sha256)) => Ok((Self::Rows(text), bytes, sha256)),
+            Err(error)
+                if error.chain().any(|cause| {
+                    cause.downcast_ref::<TallyTransportError>()
+                        == Some(&TallyTransportError::EmptyAnswer)
+                }) =>
+            {
+                Ok((Self::Empty, 0, sha256_hex(&[])))
+            }
+            Err(error) => Err(error),
+        }
+    }
+}
+
 /// Outcome of a paired native-report read. `Drifted` means the two reads
 /// disagreed, so the book moved between them and no total may be reported.
 pub(crate) enum NativePairedRead {
@@ -2128,7 +2173,7 @@ impl TallyClient {
         &self,
         candidate_name: &str,
     ) -> anyhow::Result<TallyCompany> {
-        let candidate_name = normalize_company_name(candidate_name)
+        validate_company_name(candidate_name)
             .map_err(|_| anyhow::anyhow!("Tally direct company candidate was invalid"))?;
         let discovered = self.fetch_companies().await?;
         let candidates = discovered
@@ -2356,16 +2401,16 @@ impl TallyClient {
                 Some(counted) => asked.resolved_for_count(counted, master_mark),
                 None => read,
             };
-            let group_request = render_native_group_snapshot_request(identity.display_name());
+            let group_request = render_native_group_snapshot_request(identity.company_name());
             let part_requests = |read: ComplianceRead| match (&partition, ledgers) {
                 (_, Some(part)) => vec![(
                     render_party_ledger_master_request_for_ledgers(
-                        identity.display_name(),
+                        identity.company_name(),
                         &master_period,
                         part,
                     ),
                     render_native_ledger_snapshot_request_for_ledgers(
-                        identity.display_name(),
+                        identity.company_name(),
                         &balance_period,
                         part,
                     ),
@@ -2374,25 +2419,25 @@ impl TallyClient {
                     match read {
                         ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                             render_party_ledger_master_request(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                         ComplianceRead::WithMailingDetails
                         | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                             render_party_ledger_master_request_with_mailing_details(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                         ComplianceRead::WithGstDetails => {
                             render_party_ledger_master_request_with_gst_details(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &master_period,
                             )
                         }
                     },
-                    render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
+                    render_native_ledger_snapshot_request(identity.company_name(), &balance_period),
                 )],
                 (Some(partition), None) => partition
                     .parts()
@@ -2402,7 +2447,7 @@ impl TallyClient {
                             match read {
                                 ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                                     render_party_ledger_master_request_for_parents(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
@@ -2410,21 +2455,21 @@ impl TallyClient {
                                 ComplianceRead::WithMailingDetails
                                 | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                                     render_party_ledger_master_request_for_parents_with_mailing_details(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
                                 }
                                 ComplianceRead::WithGstDetails => {
                                     render_party_ledger_master_request_for_parents_with_gst_details(
-                                        identity.display_name(),
+                                        identity.company_name(),
                                         &master_period,
                                         part,
                                     )
                                 }
                             },
                             render_native_ledger_snapshot_request_for_parents(
-                                identity.display_name(),
+                                identity.company_name(),
                                 &balance_period,
                                 part,
                             ),
@@ -2663,7 +2708,7 @@ impl TallyClient {
             .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
         let mut census = LedgerCensus::new(plan);
         while let Some(slice) = census.next_slice() {
-            let request = render_ledger_census_slice_request(identity.display_name(), &slice);
+            let request = render_ledger_census_slice_request(identity.company_name(), &slice);
             let (body, bytes, sha256) = self
                 .post_xml_with_encoded_bytes(request.clone())
                 .await
@@ -2727,7 +2772,7 @@ impl TallyClient {
         evidence: &mut RuntimeReadEvidence,
         count_evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<CountCrossCheck> {
-        let request = render_company_ledger_count_request(identity.display_name());
+        let request = render_company_ledger_count_request(identity.company_name());
         let (body, bytes, sha256) = self
             .post_xml_with_encoded_bytes(request.clone())
             .await
@@ -3172,10 +3217,44 @@ impl TallyClient {
         &self,
         request_xml: String,
     ) -> anyhow::Result<(String, usize, String)> {
-        let (first, first_bytes, first_sha256) = self
-            .post_xml_with_encoded_bytes(request_xml.clone())
+        self.paired_with_evidence::<String>(request_xml).await
+    }
+
+    /// The party-bills report read twice as [`Self::fetch_native_report_paired`] reads a report,
+    /// with the empty answer (protocol reference §12a.27) admitted as a value of its own. Empty
+    /// twice is [`PartyBillsAnswerBody::Empty`]; empty once, beside a body, is the pair's drift,
+    /// `party_bills_drifted`. Every other failure is the report read's.
+    pub(crate) async fn fetch_party_bills_paired(
+        &self,
+        request_xml: String,
+    ) -> anyhow::Result<(PartyBillsAnswerBody, usize, String)> {
+        match self
+            .paired_with_evidence::<PartyBillsAnswerBody>(request_xml)
             .await
-            .map_err(|error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error)))?;
+        {
+            Err(error)
+                if error
+                    .chain()
+                    .any(|cause| cause.is::<NativeReportPairDrift>()) =>
+            {
+                let failure = error.downcast::<super::runtime::RuntimeReadFailure>()?;
+                Err(super::runtime::with_read_evidence(
+                    PairedReadValidationError::PartyBills.into(),
+                    failure.evidence,
+                ))
+            }
+            read => read,
+        }
+    }
+
+    async fn paired_with_evidence<A: PairedAnswer>(
+        &self,
+        request_xml: String,
+    ) -> anyhow::Result<(A, usize, String)> {
+        let (first, first_bytes, first_sha256) = A::admit(
+            self.post_xml_with_encoded_bytes(request_xml.clone()).await,
+        )
+        .map_err(|error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error)))?;
         let mut evidence =
             RuntimeReadEvidence::single(&request_xml, first_sha256.clone(), first_bytes);
         let result = async {
@@ -3183,12 +3262,10 @@ impl TallyClient {
                 .get_status_decoded()
                 .await
                 .context("Tally health check between paired native report reads failed")?;
-            let (second, second_bytes, second_sha256) = self
-                .post_xml_with_encoded_bytes(request_xml.clone())
-                .await
-                .map_err(|error| {
-                    anyhow::Error::new(PairedNativeReportResponseFailure::new(error))
-                })?;
+            let (second, second_bytes, second_sha256) = A::admit(
+                self.post_xml_with_encoded_bytes(request_xml.clone()).await,
+            )
+            .map_err(|error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error)))?;
             if first_bytes == second_bytes && first_sha256 == second_sha256 {
                 evidence.bytes = evidence.bytes.saturating_add(second_bytes);
             } else {
@@ -3353,11 +3430,14 @@ fn party_ledger_master_closing_period(
     NativeLedgerSnapshotPeriod::new(boundary_profile, books_from, closing_boundary)
 }
 
+/// The name is kept exactly as Tally reported it and is not checked here: a
+/// company whose name a request cannot carry still lists, and its reads
+/// refuse through `validate_company_name` (#2433).
 fn normalize_discovered_companies(companies: Vec<TallyCompany>) -> Result<Vec<TallyCompany>, ()> {
     companies
         .into_iter()
         .map(|company| {
-            let name = normalize_company_name(&company.name).map_err(|_| ())?;
+            let name = company.name;
             let guid = company
                 .guid
                 .as_deref()

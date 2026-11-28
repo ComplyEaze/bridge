@@ -386,11 +386,8 @@ pub(super) async fn read_audit_book(
     let (parts, marks) = collect_parts(runtime, config, identity, period, limits).await?;
     let (store, read_id, manifest_sha256) = memory_read(identity, period, marks, &parts)?;
     let admitted = Read::open_from(&store, &read_id, &manifest_sha256)?;
-    admitted.check(
-        &engagement.period,
-        engagement.allow_unbracketed_read,
-        engagement.company_pin.as_ref(),
-    )?;
+    // An engagement for a held book has no [snapshot], so no unbracketed-read opt-in.
+    admitted.check(&engagement.period, false, engagement.company_pin.as_ref())?;
     let book = bridge_tax_audit::book::load_book(&admitted, identity.display_name())?;
     Ok(AuditBook {
         engagement,
@@ -463,8 +460,7 @@ async fn collect_parts(
         opening,
     ));
 
-    let company_object =
-        AgentReadRequest::company_object(identity).map_err(|error| refused(&error.to_string()))?;
+    let company_object = AgentReadRequest::company_object(identity);
     let company_part = fetch(runtime, config, identity, company_object).await?;
     bridge_tally_protocol::audit_company_part::admit_audit_company_part(
         &company_part.body,
@@ -485,7 +481,7 @@ async fn collect_parts(
         runtime,
         config,
         identity,
-        native_group_snapshot_read(name).into_xml(),
+        native_group_snapshot_read(&company).into_xml(),
     )
     .await?;
     parts.push(single("groups", "groups", "groups.xml", None, groups));
@@ -502,7 +498,7 @@ async fn collect_parts(
         .map_err(|_| refused("audit_part_window_unsupported_in_education"))?;
     let trial_balance =
         bridge_tally_protocol::native_trial_balance::render_native_trial_balance_request(
-            name, &snapshot,
+            &company, &snapshot,
         );
     let trial_balance = fetch_xml(runtime, config, identity, trial_balance).await?;
     let window = Some((period.0.clone(), period.1.clone()));
@@ -518,7 +514,7 @@ async fn collect_parts(
         runtime,
         config,
         identity,
-        voucher_type_catalogue_read(name).into_xml(),
+        voucher_type_catalogue_read(&company).into_xml(),
     )
     .await?;
     parts.push(single(

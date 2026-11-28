@@ -1,0 +1,1 @@
+- `tally_status` now adds one line, `build_notice`, once per session, when the release the program belongs to is more than 60 days before the computer's date. It states the two dates and where releases are listed, and makes no request; installs already out are not changed (#2391).

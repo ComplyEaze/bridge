@@ -3132,8 +3132,8 @@
   "by": "author (Lane E2)",
   "what": "TDS on a voucher that also posts to another loan is counted",
   "file": "src/loans_interest.rs",
-  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
-  "to": "                        .any(|l| l.ledger.is_empty())"
+  "from": "                    .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0);",
+  "to": "                    .any(|l| l.ledger.is_empty());"
  },
  {
   "id": "LR-07",
@@ -3380,8 +3380,8 @@
   "by": "author (Lane E2)",
   "what": "coverage allows no rupee of rounding per deduction",
   "file": "src/loans_interest.rs",
-  "from": "                if tds_on_loan > 0 && covering >= expected - tolerance {",
-  "to": "                if tds_on_loan > 0 && covering >= expected {"
+  "from": "                } else if tds_on_loan > 0 && covering >= expected - tolerance {",
+  "to": "                } else if tds_on_loan > 0 && covering >= expected {"
  },
  {
   "id": "LR-38",
@@ -3452,7 +3452,7 @@
   "by": "author",
   "what": "coverage is open with no TDS seen on the loan (a certain default lost)",
   "file": "src/loans_interest.rs",
-  "from": "        let coverage_open = !listed_194a.is_empty() && tds_on_loan != 0;",
+  "from": "        let coverage_open = !listed_194a.is_empty() && !tds_by_voucher.is_empty();",
   "to": "        let coverage_open = !listed_194a.is_empty();"
  },
  {
@@ -5236,8 +5236,8 @@
   "by": "reviewer-opus",
   "what": "the proven-under title names cash whatever the row's mode",
   "file": "src/high_value_register.rs",
-  "from": "                            capitalize(mode_name)\n                        );\n                    }\n                    if unnamed {",
-  "to": "                            capitalize(\"cash\")\n                        );\n                    }\n                    if unnamed {"
+  "from": "            (false, Direction::Payment) => (\"Paid from the bank\", \"to\"),",
+  "to": "            (false, Direction::Payment) => (\"Cash paid\", \"to\"),"
  },
  {
   "id": "E3A-01",
@@ -5338,10 +5338,10 @@
  {
   "id": "E3A-13",
   "by": "author",
-  "what": "the period credit is added to the books closing",
-  "file": "src/stock.rs",
-  "from": "let mv = sub(add(t.opening_paise, t.debit_paise)?, t.credit_paise)?;",
-  "to": "let mv = add(add(t.opening_paise, t.debit_paise)?, t.credit_paise)?;"
+  "what": "the period credit is added to the books closing (TbRow::closing_by_movements_paise)",
+  "file": "src/book.rs",
+  "from": ".checked_sub(self.credit_paise)",
+  "to": ".checked_add(self.credit_paise)"
  },
  {
   "id": "E3A-14",
@@ -7432,28 +7432,12 @@
   "to": "        if false\n            && roles\n                .get(\"trade_creditors_source\")"
  },
  {
-  "id": "S1-03",
-  "by": "author",
-  "what": "a held-book engagement can be loaded as a directory",
-  "file": "src/lib.rs",
-  "from": "    if engagement.in_memory {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\",",
-  "to": "    if false {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\","
- },
- {
-  "id": "S1-04",
-  "by": "author",
-  "what": "a directory engagement is marked as held",
-  "file": "src/lib.rs",
-  "from": "            in_memory,\n",
-  "to": "            in_memory: true,\n"
- },
- {
   "id": "S1-05",
   "by": "author",
-  "what": "a held-book engagement keeps a directory path",
+  "what": "a directory engagement's read is not under its config directory",
   "file": "src/lib.rs",
-  "from": "            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),",
-  "to": "            read_dir: PathBuf::from(\"x\"),"
+  "from": "        let read_dir = base_dir.map_or_else(PathBuf::new, |b| b.join(path));\n",
+  "to": "        let read_dir = PathBuf::from(path);\n"
  },
  {
   "id": "S1-06",
@@ -7474,18 +7458,18 @@
  {
   "id": "S1-08",
   "by": "author",
-  "what": "a held book reads a legacy creditor file when the source is set after parsing",
+  "what": "a legacy source set after parsing is taken as the one read at parse",
   "file": "src/lib.rs",
-  "from": "        if self.in_memory && legacy {",
-  "to": "        if false && legacy {"
+  "from": "            Some(read) if Some(&read.source) == source => {\n",
+  "to": "            Some(read) => {\n"
  },
  {
   "id": "S1-09",
   "by": "author",
   "what": "a legacy source is taken for any other kind, and the reverse",
   "file": "src/lib.rs",
-  "from": "            == Some(\"legacy_json\");\n        if self.in_memory && legacy {",
-  "to": "            != Some(\"legacy_json\");\n        if self.in_memory && legacy {"
+  "from": "        .and_then(toml::Value::as_str)\n        == Some(\"legacy_json\")\n}\n",
+  "to": "        .and_then(toml::Value::as_str)\n        != Some(\"legacy_json\")\n}\n"
  },
  {
   "id": "CQ-01",
@@ -7916,7 +7900,7 @@
   "by": "author",
   "what": "a limb (b) row cites the unlabelled bucket, not the printed names",
   "file": "src/high_value_register.rs",
-  "from": "            evidence.push(party_ref(ledger, data));\n            r.findings.push(Finding {\n                id: format!(\"{TEST_ID}/single_transaction/{rid}\"),",
+  "from": "            evidence.push(party_ref(ledger, data, UNIDENTIFIED_PARTY));\n            r.findings.push(Finding {\n                id: format!(\"{TEST_ID}/single_transaction/{rid}\"),",
   "to": "            evidence.push(EvidenceRef::with_label(\"row\", UNIDENTIFIED_PARTY_ROW, UNIDENTIFIED_PARTY));\n            r.findings.push(Finding {\n                id: format!(\"{TEST_ID}/single_transaction/{rid}\"),"
  },
  {
@@ -7924,7 +7908,7 @@
   "by": "author",
   "what": "the day row cites the unlabelled bucket, not the printed names",
   "file": "src/high_value_register.rs",
-  "from": "                    evidence.push(party_ref(ledger, data));\n                    let mut facts",
+  "from": "                    evidence.push(party_ref(ledger, data, bucket));\n                    let mut facts",
   "to": "                    evidence.push(EvidenceRef::with_label(\"row\", UNIDENTIFIED_PARTY_ROW, UNIDENTIFIED_PARTY));\n                    let mut facts"
  },
  {
@@ -7972,8 +7956,8 @@
   "by": "author",
   "what": "an unnamed payment row is worded as received",
   "file": "src/high_value_register.rs",
-  "from": "                        let did = if direction == Direction::Receipt {\n                            \"received\"",
-  "to": "                        let did = if direction != Direction::Receipt {\n                            \"received\""
+  "from": "            (true, Direction::Payment) => (\"Cash paid\", \"to\"),",
+  "to": "            (true, Direction::Payment) => (\"Cash received\", \"to\"),"
  },
  {
   "id": "HV-20",
@@ -8012,24 +7996,24 @@
   "by": "author",
   "what": "an unnamed row keeps the one-party ask",
   "file": "src/high_value_register.rs",
-  "from": "ask.retain(|a| {",
-  "to": "ask.retain(|a| {\n                            true ||"
+  "from": "ask.retain(|a| a != ASK_RECEIPT_ONE_PARTY",
+  "to": "ask.retain(|a| true || a != ASK_RECEIPT_ONE_PARTY"
  },
  {
   "id": "HV-25",
   "by": "author",
   "what": "an unnamed row keeps the old-ask for a payment (only the receipt ask is dropped)",
   "file": "src/high_value_register.rs",
-  "from": "                            a != \"Confirm whether this receipt is genuinely from one party.\"\n                                && a != \"Confirm whether this payment is genuinely to one party.\"",
-  "to": "                            a != \"Confirm whether this receipt is genuinely from one party.\""
+  "from": "a != ASK_RECEIPT_ONE_PARTY && a != ASK_PAYMENT_ONE_PARTY);",
+  "to": "a != ASK_RECEIPT_ONE_PARTY);"
  },
  {
   "id": "HV-26",
   "by": "author",
-  "what": "an unnamed row's ask names the limit as the vouching threshold regardless of mode",
+  "what": "an unnamed row's ask asks whether one person reached the limit whatever the row's mode (#772: re-pointed, as only the cash ask now names a limit)",
   "file": "src/high_value_register.rs",
-  "from": "                            \"Who {act} on each of these vouchers, and did any one person reach the \\\n                             {over_what} this day?",
-  "to": "                            \"Who {act} on each of these vouchers, and did any one person reach the \\\n                             s.269ST(a) limit this day?"
+  "from": "ask.push(if is_cash {",
+  "to": "ask.push(if true {"
  },
  {
   "id": "HV-27",
@@ -11373,7 +11357,7 @@
   "what": "loans_interest: the loan rows read a ledger on a nil line as another ledger of the voucher",
   "file": "src/loans_interest.rs",
   "from": "        let others = posted_others_than(v, loan_ledger);",
-  "to": "        let others = others_than(v, loan_ledger);"
+  "to": "        let others = v.lines.iter().filter(|l| &l.ledger != loan_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>();"
  },
  {
   "id": "L1259-02",
@@ -11397,7 +11381,7 @@
   "what": "loans_interest: LOAN-3 re-derives a paired loan's interest journals with a nil line's ledger among the rest",
   "file": "src/loans_interest.rs",
   "from": "                        let rest: Vec<&str> = posted_others_than(v, loan)",
-  "to": "                        let rest: Vec<&str> = others_than(v, loan)"
+  "to": "                        let rest: Vec<&str> = v.lines.iter().filter(|l| &l.ledger != loan).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>()"
  },
  {
   "id": "L1259-05",
@@ -11568,14 +11552,6 @@
   "to": "tds_read.iter().cloned().collect();"
  },
  {
-  "id": "L1259-26",
-  "by": "reviewer-opus",
-  "what": "loans_interest: charge_shaped leaves out the ledgers on nil lines (the reference reads them)",
-  "file": "src/loans_interest.rs",
-  "from": "            let counter: Vec<&str> = others_than(v, loan_ledger)\n",
-  "to": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)\n"
- },
- {
   "id": "L1259-27",
   "by": "reviewer-opus",
   "what": "loans_interest: tds_in_principal is published only where the principal vouchers' TDS does not net to nil",
@@ -11597,7 +11573,7 @@
   "what": "loans_interest: the TDS-journal test reads the ledgers on nil lines (the reference's reads those on lines with an amount)",
   "file": "src/loans_interest.rs",
   "from": "            && others\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n",
-  "to": "            && others_than(v, loan_ledger)\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n"
+  "to": "            && v.lines.iter().filter(|l| &l.ledger != loan_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>()\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n"
  },
  {
   "id": "L1259-30",
@@ -11614,6 +11590,174 @@
   "file": "src/loans_interest.rs",
   "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)",
   "to": "                            .filter(|l| l.ledger == **name)\n                            .map(|l| i128::from(l.amount_paise))\n                            .sum::<i128>()\n                            != 0"
+ },
+ {
+  "id": "L1875-TDS-01",
+  "by": "author",
+  "what": "loans_interest: a voucher of loans on one side and TDS alone counts its TDS on neither loan (#1875 rule 3)",
+  "file": "src/loans_interest.rs",
+  "from": "                } else if tds_split_across_loans(v, is_loan, &tds_here) {",
+  "to": "                } else if false {"
+ },
+ {
+  "id": "L1875-TDS-02",
+  "by": "author",
+  "what": "loans_interest: each loan of a shape (a) voucher takes the voucher's whole TDS, not its own line",
+  "file": "src/loans_interest.rs",
+  "from": "                    Some((at, net(v, loan_ledger)))",
+  "to": "                    Some((at, -net_on(v, &tds_here)))"
+ },
+ {
+  "id": "L1875-TDS-03",
+  "by": "author",
+  "what": "loans_interest: shape (a) admits loans on opposite sides",
+  "file": "src/loans_interest.rs",
+  "from": "        && (on_loans().all(|l| l.amount_paise > 0) || on_loans().all(|l| l.amount_paise < 0))",
+  "to": "        && true"
+ },
+ {
+  "id": "L1875-TDS-04",
+  "by": "author",
+  "what": "loans_interest: shape (a) admits a voucher with another posted line",
+  "file": "src/loans_interest.rs",
+  "from": "    posted().all(|l| is_loan(&l.ledger) || tds.contains(&l.ledger))\n",
+  "to": "    true\n"
+ },
+ {
+  "id": "L1875-TDS-05",
+  "by": "author",
+  "what": "loans_interest: shape (a) admits TDS that does not net to the loans' sum",
+  "file": "src/loans_interest.rs",
+  "from": "\n        && on_loans().map(|l| i128::from(l.amount_paise)).sum::<i128>() + net_on(v, tds) == 0",
+  "to": ""
+ },
+ {
+  "id": "L1875-TDS-06",
+  "by": "author",
+  "what": "loans_interest: a nil line is a posting when shape (a) is read",
+  "file": "src/loans_interest.rs",
+  "from": "    let posted = || v.lines.iter().filter(|l| l.amount_paise != 0);",
+  "to": "    let posted = || v.lines.iter();"
+ },
+ {
+  "id": "L1875-TDS-07",
+  "by": "author",
+  "what": "loans_interest: a TDS debit is netted into the TDS deducted again (#1875 rule 4)",
+  "file": "src/loans_interest.rs",
+  "from": "            tds_by_voucher.iter().copied().partition(|&(_, x)| x > 0);",
+  "to": "            tds_by_voucher.iter().copied().partition(|&(_, x)| x != 0);"
+ },
+ {
+  "id": "L1875-TDS-08",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 leaves the TDS debits out of its tie",
+  "file": "src/loans_interest.rs",
+  "from": "        let tds_on_loan = value(format!(\"{prefix}tds_on_loan_{h}\"))\n            - value(format!(\"{prefix}tds_debited_on_loan_{h}\"));",
+  "to": "        let tds_on_loan = value(format!(\"{prefix}tds_on_loan_{h}\"));"
+ },
+ {
+  "id": "L1875-TDS-09",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 adds the TDS debits with their sign turned",
+  "file": "src/loans_interest.rs",
+  "from": "            - value(format!(\"{prefix}tds_debited_on_loan_{h}\"));",
+  "to": "            + value(format!(\"{prefix}tds_debited_on_loan_{h}\"));"
+ },
+ {
+  "id": "L1875-TDS-10",
+  "by": "author",
+  "what": "loans_interest: the TDS debited figure is not published",
+  "file": "src/loans_interest.rs",
+  "from": "        if !debited.is_empty() {\n            r.fig(",
+  "to": "        if false {\n            r.fig("
+ },
+ {
+  "id": "L1875-TDS-11",
+  "by": "author",
+  "what": "loans_interest: the TDS deducted figure's text does not name the vouchers left out",
+  "file": "src/loans_interest.rs",
+  "from": "        let left_out = if debited.is_empty() {",
+  "to": "        let left_out = if true {"
+ },
+ {
+  "id": "L1875-TDS-12",
+  "by": "author",
+  "what": "loans_interest: the TDS deducted figure cites the vouchers left out of it",
+  "file": "src/loans_interest.rs",
+  "from": "            voucher_refs(deducted.iter().map(|&(at, _)| pop[at])),",
+  "to": "            ev_tds.clone(),"
+ },
+ {
+  "id": "L1875-TDS-13",
+  "by": "author",
+  "what": "loans_interest: the TDS in principal says it is inside the TDS deducted where a debit among it is not",
+  "file": "src/loans_interest.rs",
+  "from": "            let definition = if principal_tds.iter().any(|&(_, x)| x < 0) {",
+  "to": "            let definition = if false {"
+ },
+ {
+  "id": "L1875-TDS-14",
+  "by": "author",
+  "what": "loans_interest: a deduction beside a TDS debit can read as covering the interest (#1875 rule 4)",
+  "file": "src/loans_interest.rs",
+  "from": "                if !split_deducted.is_empty() || debit_beside_deduction {",
+  "to": "                if !split_deducted.is_empty() {"
+ },
+ {
+  "id": "L1875-TDS-15",
+  "by": "author",
+  "what": "loans_interest: a TDS debit alone reads not checked, with nothing deducted",
+  "file": "src/loans_interest.rs",
+  "from": "        let debit_beside_deduction = tds_on_loan > 0 && !debited.is_empty();",
+  "to": "        let debit_beside_deduction = !debited.is_empty();"
+ },
+ {
+  "id": "L1875-TDS-16",
+  "by": "author",
+  "what": "loans_interest: the coverage is open on the TDS deducted alone, so a TDS debit alone leaves it closed",
+  "file": "src/loans_interest.rs",
+  "from": "        let coverage_open = !listed_194a.is_empty() && !tds_by_voucher.is_empty();",
+  "to": "        let coverage_open = !listed_194a.is_empty() && tds_on_loan != 0;"
+ },
+ {
+  "id": "L1875-TDS-17",
+  "by": "author",
+  "what": "loans_interest: the not-checked finding does not name the TDS debit",
+  "file": "src/loans_interest.rs",
+  "from": "                if debit_beside_deduction {\n                    limits.push(format!(",
+  "to": "                if false {\n                    limits.push(format!("
+ },
+ {
+  "id": "L1875-TDS-18",
+  "by": "author",
+  "what": "loans_interest: the not-checked finding does not name the split voucher",
+  "file": "src/loans_interest.rs",
+  "from": "                if !split_deducted.is_empty() {\n                    limits.push(format!(",
+  "to": "                if false {\n                    limits.push(format!("
+ },
+ {
+  "id": "L1875-TDS-19",
+  "by": "author",
+  "what": "loans_interest: the coverage text does not list not checked beside a TDS debit",
+  "file": "src/loans_interest.rs",
+  "from": "        let unchecked_debit = if debit_beside_deduction {",
+  "to": "        let unchecked_debit = if false {"
+ },
+ {
+  "id": "L1875-TDS-20",
+  "by": "author",
+  "what": "loans_interest: the not-computed finding does not say where a listed voucher's TDS debit is",
+  "file": "src/loans_interest.rs",
+  "from": "            let listed_tds = if debited.iter().any(|&(at, _)| rows.listed.contains(&at)) {",
+  "to": "            let listed_tds = if false {"
+ },
+ {
+  "id": "L1875-TDS-21",
+  "by": "author",
+  "what": "loans_interest: a split voucher counted as a TDS debit is read as a split deduction",
+  "file": "src/loans_interest.rs",
+  "from": "                x > 0\n                    && pop[at]\n",
+  "to": "                x != 0\n                    && pop[at]\n"
  },
  {
   "id": "P1243-DEP-01",
@@ -13516,8 +13660,8 @@
   "by": "author",
   "what": "book.rs: an item with no opening value counted as one paisa",
   "file": "src/book.rs",
-  "from": "                .map(|m| m.opening_value_paise.unwrap_or(0))",
-  "to": "                .map(|m| m.opening_value_paise.unwrap_or(1))"
+  "from": "                total.checked_add(m.opening_value_paise.unwrap_or(0))",
+  "to": "                total.checked_add(m.opening_value_paise.unwrap_or(1))"
  },
  {
   "id": "OS-6",
@@ -14382,6 +14526,54 @@
   "file": "src/cash_payments_40a3.rs",
   "from": "} else if proven_under {\n                format!(\n                    \"Paid to one party",
   "to": "} else if false {\n                format!(\n                    \"Paid to one party"
+ },
+ {
+  "id": "L772-5",
+  "by": "author",
+  "what": "#772: a named s.40A(3) row's amount is defined as cash paid again",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                \"Debits to one payee ledger (tag {h}) on {}, on population vouchers with a cash \\\npayment, summed: the debits, not the cash paid.\",",
+  "to": "                \"Cash paid to one payee ledger (tag {h}) on {}, summed across every \\\npopulation voucher that day.\","
+ },
+ {
+  "id": "L772-6",
+  "by": "author",
+  "what": "#772: a named s.40A(3) row's title calls its debits cash paid to one payee again",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                    \"Debits to one payee ledger on vouchers with a cash payment total over the \\\ns.40A(3) daily limit on {}: the cash paid is not shown\",",
+  "to": "                    \"Cash paid to one payee over the s.40A(3) daily limit on {}\","
+ },
+ {
+  "id": "L772-7",
+  "by": "author",
+  "what": "#772: a bank receipt row's title says the bank received the money again",
+  "file": "src/high_value_register.rs",
+  "from": "            (false, Direction::Receipt) => (\"Received into the bank\", \"from\"),",
+  "to": "            (false, Direction::Receipt) => (\"Bank received\", \"from\"),"
+ },
+ {
+  "id": "L772-8",
+  "by": "author",
+  "what": "#772: a bank row with no party ledger says whether one person reached the vouching threshold is not known",
+  "file": "src/high_value_register.rs",
+  "from": "} else if is_cash {\n                            format!(\n                                \"{opening}the total",
+  "to": "} else if true {\n                            format!(\n                                \"{opening}the total"
+ },
+ {
+  "id": "L772-9",
+  "by": "author",
+  "what": "#772: a bank row with no party ledger is labelled with the cash leg's wording",
+  "file": "src/high_value_register.rs",
+  "from": "let bucket = if is_cash {",
+  "to": "let bucket = if true {"
+ },
+ {
+  "id": "L772-10",
+  "by": "author",
+  "what": "#772: a limb (b) row with no party ledger defines its amount as one party ledger's",
+  "file": "src/high_value_register.rs",
+  "from": "let definition = if ledger.as_str() == UNIDENTIFIED_PARTY {",
+  "to": "let definition = if false {"
  },
  {
   "id": "C16-01",
@@ -15454,6 +15646,406 @@
   "file": "src/partners_40b_194t.rs",
   "from": "                    tranches: s194t_tranches(&credits, tds_limit_paise)?,",
   "to": "                    tranches: Vec::new(),"
+ },
+ {
+  "id": "L1875-1",
+  "by": "author",
+  "what": "loans_interest: charge_shaped reads the ledgers on nil lines again (#1875 item 1)",
+  "file": "src/loans_interest.rs",
+  "from": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)",
+  "to": "            let counter: Vec<&str> = v.lines.iter().filter(|l| &l.ledger != loan_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>()"
+ },
+ {
+  "id": "L1875-2",
+  "by": "author",
+  "what": "loans_interest: interest_tds_ledgers lists a TDS ledger only on a nil line again (#1875 item 2)",
+  "file": "src/loans_interest.rs",
+  "from": "            .filter(|l| tds_here.contains(&l.ledger) && l.amount_paise != 0)",
+  "to": "            .filter(|l| tds_here.contains(&l.ledger))"
+ },
+ {
+  "id": "L1875-3",
+  "by": "author",
+  "what": "loans_interest: the misposted finding's tags name a foreign interest ledger only on a nil line again (#1875 item 2)",
+  "file": "src/loans_interest.rs",
+  "from": "                    .filter(|l| foreign_interest.contains(&l.ledger) && l.amount_paise != 0)",
+  "to": "                    .filter(|l| foreign_interest.contains(&l.ledger))"
+ },
+ {
+  "id": "L1875-4",
+  "by": "author",
+  "what": "loans_interest: a nil line on a paired loan takes a voucher out of LOAN-3's undeclared-shared check again (#1875 item 5)",
+  "file": "src/loans_interest.rs",
+  "from": "                    .any(|l| paired.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "                    .any(|l| paired.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "L2242-1",
+  "by": "author",
+  "what": "loans_interest: the shared-interest pairing on the figure side reads the ledgers on nil lines again (#2242 site 1)",
+  "file": "src/loans_interest.rs",
+  "from": "            let others = posted_others_than(v, il);",
+  "to": "            let others = v.lines.iter().filter(|l| &l.ledger != il).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>();"
+ },
+ {
+  "id": "L2242-2",
+  "by": "author",
+  "what": "loans_interest: LOAN-3's re-derivation of the shared-interest pairing reads the ledgers on nil lines again (#2242 site 2)",
+  "file": "src/loans_interest.rs",
+  "from": "                            posted_others_than(v, interest_ledger),",
+  "to": "                            v.lines.iter().filter(|l| &l.ledger != interest_ledger).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>(),"
+ },
+ {
+  "id": "L2242-3",
+  "by": "author",
+  "what": "loans_interest: LOAN-2 (A) reads the ledgers on nil lines again when it asks about an entry on a loan (#2242 site 3)",
+  "file": "src/loans_interest.rs",
+  "from": "            let others = posted_others_than(v, loan);",
+  "to": "            let others = v.lines.iter().filter(|l| &l.ledger != *loan).map(|l| l.ledger.as_str()).collect::<BTreeSet<&str>>();"
+ },
+ {
+  "id": "TBM-01",
+  "by": "author",
+  "what": "book: the movements add the debit column as a credit",
+  "file": "src/book.rs",
+  "from": ".checked_add(self.debit_paise)?",
+  "to": ".checked_sub(self.debit_paise)?"
+ },
+ {
+  "id": "TBM-02",
+  "by": "author",
+  "what": "book: an overflow in the movements reads as zero, not as unknown",
+  "file": "src/book.rs",
+  "from": ".checked_add(self.debit_paise)?",
+  "to": ".checked_add(self.debit_paise).unwrap_or(0)"
+ },
+ {
+  "id": "TBM-03",
+  "by": "author",
+  "what": "book: the gap is the movements less the closing",
+  "file": "src/book.rs",
+  "from": ".checked_sub(self.closing_by_movements_paise()?)?",
+  "to": ".checked_add(self.closing_by_movements_paise()?)?"
+ },
+ {
+  "id": "TBM-04",
+  "by": "author",
+  "what": "book: a row ties when its closing is not the movements",
+  "file": "src/book.rs",
+  "from": "if by_paise == 0 {",
+  "to": "if by_paise != 0 {"
+ },
+ {
+  "id": "TBM-05",
+  "by": "author",
+  "what": "book: the gap is dropped from a row that does not tie",
+  "file": "src/book.rs",
+  "from": "TbMovements::Differ { by_paise }",
+  "to": "TbMovements::Differ { by_paise: 0 }"
+ },
+ {
+  "id": "TBM-06",
+  "by": "author",
+  "what": "stock: the books closing is taken from the Trial Balance field",
+  "file": "src/stock.rs",
+  "from": "t.closing_by_movements_paise().ok_or_else(overflow)?;",
+  "to": "t.closing_paise;"
+ },
+ {
+  "id": "TBM-07",
+  "by": "author",
+  "what": "tb: the gap figure has the wrong sign",
+  "file": "src/trial_balance.rs",
+  "from": "Value::Int(by_paise),",
+  "to": "Value::Int(-by_paise),"
+ },
+ {
+  "id": "TBM-08",
+  "by": "author",
+  "what": "tb: no gap figure is stated",
+  "file": "src/trial_balance.rs",
+  "from": "if let TbMovements::Differ { by_paise } = t.movements().ok_or_else(overflow)? {",
+  "to": "if let TbMovements::Differ { by_paise } = TbMovements::Tie {"
+ },
+ {
+  "id": "TB3-01",
+  "by": "author",
+  "what": "TB-3: a row that ties is expected to carry the figure",
+  "file": "src/trial_balance.rs",
+  "from": "TbMovements::Tie => None,",
+  "to": "TbMovements::Tie => gap,"
+ },
+ {
+  "id": "TB3-03",
+  "by": "author",
+  "what": "TB-3: a figure that is not the gap is not reported",
+  "file": "src/trial_balance.rs",
+  "from": "if gap != want {",
+  "to": "if gap == want {"
+ },
+ {
+  "id": "TB3-04",
+  "by": "author",
+  "what": "TB-3: only a row with no listed closing is checked",
+  "file": "src/trial_balance.rs",
+  "from": "if closing.is_some() {",
+  "to": "if closing.is_none() {"
+ },
+ {
+  "id": "TB3-05",
+  "by": "author",
+  "what": "TB-3: the expected gap has the wrong sign",
+  "file": "src/trial_balance.rs",
+  "from": "TbMovements::Differ { by_paise } => Some(by_paise),",
+  "to": "TbMovements::Differ { by_paise } => Some(-by_paise),"
+ },
+ {
+  "id": "RY-1",
+  "by": "author",
+  "what": "the rules' year label never compared",
+  "file": "src/lib.rs",
+  "from": "    if engagement.assessment_year != rules.assessment_year {\n",
+  "to": "    if false {\n"
+ },
+ {
+  "id": "RY-2",
+  "by": "author",
+  "what": "a period starting before the rules' year is judged",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.to > *end {\n"
+ },
+ {
+  "id": "RY-3",
+  "by": "author",
+  "what": "a period ending after the rules' year is judged",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.from < *start {\n"
+ },
+ {
+  "id": "RY-4",
+  "by": "author",
+  "what": "the year's first day refused",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.from <= *start || engagement.period.to > *end {\n"
+ },
+ {
+  "id": "RY-5",
+  "by": "author",
+  "what": "the year's last day refused",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.from < *start || engagement.period.to >= *end {\n"
+ },
+ {
+  "id": "RY-6",
+  "by": "author",
+  "what": "the year's start read from its end",
+  "file": "src/rules.rs",
+  "from": "                meta_date(\"previous_year_start\")?,\n",
+  "to": "                meta_date(\"previous_year_end\")?,\n"
+ },
+ {
+  "id": "S1602-1",
+  "by": "author",
+  "what": "#1602: the opening total wraps instead of being refused",
+  "file": "src/book.rs",
+  "from": "                total.checked_add(m.opening_value_paise.unwrap_or(0))\n",
+  "to": "                Some(total.wrapping_add(m.opening_value_paise.unwrap_or(0)))\n"
+ },
+ {
+  "id": "S1602-2",
+  "by": "author",
+  "what": "#1602: an opening total too large to hold reads as a known zero",
+  "file": "src/book.rs",
+  "from": "            .map_or(\n                OpeningStock::Unknown(OpeningStockUnknown::TooLarge),\n",
+  "to": "            .map_or(\n                OpeningStock::Valued(0),\n"
+ },
+ {
+  "id": "S1602-3",
+  "by": "author",
+  "what": "#1602: the too-large reason loses its words",
+  "file": "src/book.rs",
+  "from": "                \"not taken: the stock items' opening values add up to more than can be held\"\n",
+  "to": "                \"not taken\"\n"
+ },
+ {
+  "id": "S1602-4",
+  "by": "author",
+  "what": "#1602: a stock-items part that lists no item reads as a known zero opening",
+  "file": "src/book.rs",
+  "from": "        Ok(masters) if masters.is_empty() => {\n            OpeningStock::Unknown(OpeningStockUnknown::NoStockItems)\n",
+  "to": "        Ok(masters) if masters.is_empty() => {\n            OpeningStock::Valued(0)\n"
+ },
+ {
+  "id": "S1602-5",
+  "by": "author",
+  "what": "#1602: items none of which carries an opening value read as a known zero opening",
+  "file": "src/book.rs",
+  "from": "            OpeningStock::Unknown(OpeningStockUnknown::NoOpeningValues)\n        }\n",
+  "to": "            OpeningStock::Valued(0)\n        }\n"
+ },
+ {
+  "id": "S1602-6",
+  "by": "author",
+  "what": "#1602: one item without an opening value makes the whole opening unknown",
+  "file": "src/book.rs",
+  "from": "        Ok(masters) if masters.values().all(|m| m.opening_value_paise.is_none()) => {\n",
+  "to": "        Ok(masters) if masters.values().any(|m| m.opening_value_paise.is_none()) => {\n"
+ },
+ {
+  "id": "S1602-7",
+  "by": "author",
+  "what": "#1602: the no-item reason loses its words",
+  "file": "src/book.rs",
+  "from": "            Self::NoStockItems => \"not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil\",\n",
+  "to": "            Self::NoStockItems => \"not taken\",\n"
+ },
+ {
+  "id": "S1602-8",
+  "by": "author",
+  "what": "#1602: the no-value reason loses its words",
+  "file": "src/book.rs",
+  "from": "            Self::NoOpeningValues => \"not taken: no stock item carries an opening value\",\n",
+  "to": "            Self::NoOpeningValues => \"not taken\",\n"
+ },
+ {
+  "id": "BA-01",
+  "by": "author",
+  "what": "bills: an untyped row with an amount passed over as a placeholder",
+  "file": "src/book.rs",
+  "from": "\"\" if amount.is_empty()\n                        && bill_allocation_without_type_is_placeholder",
+  "to": "\"\" if bill_allocation_without_type_is_placeholder"
+ },
+ {
+  "id": "BA-02",
+  "by": "author",
+  "what": "bills: an untyped row with a name passed over as a placeholder",
+  "file": "src/book.rs",
+  "from": "\n                        && bill_allocation_without_type_is_placeholder(Some(name)) =>",
+  "to": "\n                        =>"
+ },
+ {
+  "id": "BA-03",
+  "by": "author",
+  "what": "bills: read when any vouchers part asked",
+  "file": "src/book.rs",
+  "from": ".all(|vp| vp.bill_allocations)",
+  "to": ".any(|vp| vp.bill_allocations)"
+ },
+ {
+  "id": "BA-04",
+  "by": "author",
+  "what": "bills: amount kept credit positive",
+  "file": "src/book.rs",
+  "from": "let amount_paise = flip(amount, part)",
+  "to": "let amount_paise = paise(amount, part)"
+ },
+ {
+  "id": "BA-05",
+  "by": "author",
+  "what": "bills: an On Account row that names a bill read",
+  "file": "src/book.rs",
+  "from": "\"On Account\" if name.is_empty() => Bill::OnAccount,",
+  "to": "\"On Account\" if true => Bill::OnAccount,"
+ },
+ {
+  "id": "BA-06",
+  "by": "author",
+  "what": "bills: a bill with no name read",
+  "file": "src/book.rs",
+  "from": "(!name.is_empty())\n",
+  "to": "(!name.is_empty() || true)\n"
+ },
+ {
+  "id": "BA-07",
+  "by": "author",
+  "what": "bills: an unknown bill type read as New Ref",
+  "file": "src/book.rs",
+  "from": "_ => return Err(refuse(BillRowFault::UnknownType)),",
+  "to": "_ => named(Bill::NewRef)?,"
+ },
+ {
+  "id": "BA-08",
+  "by": "author",
+  "what": "bills: a voucher with none listed",
+  "file": "src/book.rs",
+  "from": "        if !rows.is_empty() {\n            found.insert",
+  "to": "        if true {\n            found.insert"
+ },
+ {
+  "id": "BA-09",
+  "by": "author",
+  "what": "bills: a row that does not read leaves them not read",
+  "file": "src/book.rs",
+  "from": "(true, Err(refusal)) => BillAllocations::Unreadable(refusal),",
+  "to": "(true, Err(_)) => BillAllocations::NotRead,"
+ },
+ {
+  "id": "BA-10",
+  "by": "author",
+  "what": "bills: no part's rows read when asked",
+  "file": "src/book.rs",
+  "from": "        if bills_asked {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "BA-11",
+  "by": "author",
+  "what": "bills: an absent amount read as zero",
+  "file": "src/book.rs",
+  "from": ".ok_or_else(|| refuse(BillRowFault::NoAmount))?;",
+  "to": ".unwrap_or(0);"
+ },
+ {
+  "id": "BA-12",
+  "by": "author",
+  "what": "bills: an amount that is not a decimal read as absent",
+  "file": "src/book.rs",
+  "from": ".map_err(|_| refuse(BillRowFault::AmountUnreadable))?",
+  "to": ".unwrap_or(None)"
+ },
+ {
+  "id": "BA-13",
+  "by": "author",
+  "what": "read: bill_allocations honoured on any part",
+  "file": "src/read.rs",
+  "from": "Some(Value::Bool(asked)) if kind == \"vouchers\" => *asked,",
+  "to": "Some(Value::Bool(asked)) => *asked,"
+ },
+ {
+  "id": "BA-14",
+  "by": "author",
+  "what": "read: a null bill_allocations taken as false",
+  "file": "src/read.rs",
+  "from": "        None => false,\n        Some(Value::Bool(asked))",
+  "to": "        None | Some(Value::Null) => false,\n        Some(Value::Bool(asked))"
+ },
+ {
+  "id": "S1-10",
+  "by": "author",
+  "what": "a legacy source's file read as naming no ledger",
+  "file": "src/lib.rs",
+  "from": "                names: read_legacy_names(source, b),\n",
+  "to": "                names: Ok(Vec::new()),\n"
+ },
+ {
+  "id": "S1-11",
+  "by": "author",
+  "what": "a legacy source no engagement read taken as no source",
+  "file": "src/lib.rs",
+  "from": "            _ => Err(AuditError::refused(\n                \"CFG-no-directory\",\n                \"a legacy_json trade-creditor source names a file this engagement did not read: only its own [roles], parsed with a directory, is read\",\n            )),\n",
+  "to": "            _ => Ok(None),\n"
+ },
+ {
+  "id": "S1-12",
+  "by": "author",
+  "what": "a legacy source's stored read error taken as no names",
+  "file": "src/lib.rs",
+  "from": "                read.names.clone().map(Some).map_err(AuditError::Config)\n",
+  "to": "                read.names.clone().map(Some).or(Ok(None))\n"
  },
  {
   "id": "G3B-01",

@@ -1,4 +1,5 @@
 //! Movement for the local MCP adapter.
+use super::failure_code::{CompanyReadCode, FailureCode, MovementCode, ReadCode};
 use super::voucher_window::{WindowScope, LEDGER_SCOPE_NEEDS_DAY_SPLIT};
 use super::*;
 use bridge_tally_core::TallyDate;
@@ -144,7 +145,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         if from > to {
-            return Err("invalid_date_range".to_string().into());
+            return Err(ReadCode::InvalidDateRange.into());
         }
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
@@ -152,12 +153,17 @@ impl Server {
                 company
                     .books_from
                     .as_deref()
-                    .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                    .ok_or(ReadCode::CompanyIdentityIncomplete)?,
             )?;
             ensure_movement_window_within_books(&from, &books_from)?;
             let opening_date = from.clone();
-            let (ledgers, ledger_evidence) = self
-                .read_movement_ledgers(&identity, opening_date.clone())
+            let MovementOpening {
+                ledgers,
+                extent: opening_extent,
+                several_currency,
+                evidence: ledger_evidence,
+            } = self
+                .read_movement_opening(&identity, opening_date.clone())
                 .await?;
             evidence = combine_evidence(evidence.clone(), ledger_evidence);
             // The named ledger is resolved against the first catalogue, before
@@ -187,6 +193,48 @@ impl Server {
                 }
                 None => None,
             };
+            // A book with several Currency masters reaches here only at its first day (#683,
+            // §8.2n). The Trial Balance sets ledgers aside before any voucher is read, checked
+            // against the composite openings, and a named ledger that is set aside refuses before
+            // the window is read.
+            let set_aside = match several_currency.as_ref() {
+                Some(first_day) => {
+                    let period = crate::tally::runtime::TrialBalancePeriod::new(from.clone(), to.clone())
+                        .map_err(|_| ToolFailure::from(ReadCode::InvalidDateRange))?;
+                    let (trial_balance, extent) = self
+                        .runtime
+                        .fetch_trial_balance_with_extent(
+                            self.tally_config(),
+                            &identity,
+                            period,
+                            crate::tally::runtime::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
+                        )
+                        .await
+                        .map_err(|error| ToolFailure::from_runtime("ledger_movement_read_failed", error))?;
+                    evidence = combine_evidence(
+                        evidence.clone(),
+                        evidence_from_runtime_read(trial_balance.evidence.clone()),
+                    );
+                    if extent != opening_extent {
+                        return Err(ReadCode::LedgerSnapshotDrifted.into());
+                    }
+                    let set_aside =
+                        currency::CurrencySetAside::before_window(
+                            first_day,
+                            &trial_balance.ledger_scope,
+                            &trial_balance.report,
+                            &ledgers,
+                        )?;
+                    set_aside.refuse_named(selected.as_ref().map(|found| found.name()))?;
+                    Some(set_aside)
+                }
+                None => None,
+            };
+            let composites = if set_aside.is_some() {
+                MovementComposites::NameLedger
+            } else {
+                MovementComposites::Refuse
+            };
             let scoped_first = scope_name.as_ref().map_or(WindowScope::Book, WindowScope::Ledger);
             let opening = self
                 .read_movement_vouchers(
@@ -196,6 +244,7 @@ impl Server {
                     (from.clone(), to.clone()),
                     WindowPlanSource::Estimate { known_marks: None },
                     None,
+                    composites,
                 )
                 .await;
             let (opening_read, scope) = match opening {
@@ -216,6 +265,7 @@ impl Server {
                             (from.clone(), to.clone()),
                             WindowPlanSource::Estimate { known_marks: None },
                             None,
+                            composites,
                         )
                         .await
                         .map_err(|failure| tag_window_refusal(failure, whole_book))?;
@@ -238,9 +288,15 @@ impl Server {
             if let Some(closing) = opening_read.closing {
                 evidence = combine_evidence(evidence.clone(), closing);
             }
-            let (corroborating_ledgers, corroboration_evidence) =
-                self.read_movement_ledgers(&identity, opening_date).await?;
-            evidence = combine_evidence(evidence.clone(), corroboration_evidence);
+            let corroborating = self.read_movement_opening(&identity, opening_date).await?;
+            evidence = combine_evidence(evidence.clone(), corroborating.evidence);
+            // The two catalogues are compared ledger by ledger below, openings included, so a
+            // rule-3 set that moved between them refuses as drifted; so does a book whose
+            // Currency admission changed.
+            if corroborating.several_currency.is_some() != set_aside.is_some() {
+                return Err(ReadCode::LedgerSnapshotDrifted.into());
+            }
+            let corroborating_ledgers = corroborating.ledgers;
             // An in-window posting need not change the period opening. Repeat
             // the voucher source across the final ledger read as well; an
             // AlterID high-water alone cannot establish deletion stability.
@@ -259,12 +315,13 @@ impl Server {
                     (from, to),
                     WindowPlanSource::replay_of(opening_read.reads, opening_read.witness),
                     marks,
+                    composites,
                 )
                 .await
                 .map_err(|failure| match WholeBookReason::of_failure(&failure) {
                     // The same parts, read again, now answer differently: the book moved.
                     Some(_) => {
-                        let mut drifted = ToolFailure::from("voucher_snapshot_drifted".to_string());
+                        let mut drifted = ToolFailure::from(MovementCode::VoucherSnapshotDrifted);
                         drifted.evidence = failure.evidence;
                         tag_window_refusal(drifted, whole_book)
                     }
@@ -277,12 +334,25 @@ impl Server {
                 evidence = combine_evidence(evidence.clone(), closing);
             }
             if voucher_snapshot != closing_snapshot {
-                return Err("voucher_snapshot_drifted".to_string().into());
+                return Err(MovementCode::VoucherSnapshotDrifted.into());
             }
             validate_movement_snapshot(&ledgers, &corroborating_ledgers, &vouchers)?;
+            // The window both reads agreed on checks the Trial Balance: a composite entry on a
+            // ledger it reads as plain refuses the read.
+            if let Some(set_aside) = set_aside.as_ref() {
+                set_aside.check_composite_entries(&vouchers)?;
+            }
             let mut movement =
                 BTreeMap::<String, (Option<String>, Option<String>, String, String, usize)>::new();
             for ledger in ledgers {
+                // A set-aside ledger is left out before summing, so its entries are skipped
+                // below as an unselected ledger's are, and no figure of it is returned.
+                if set_aside
+                    .as_ref()
+                    .is_some_and(|set_aside| set_aside.rule_of(&ledger.name).is_some())
+                {
+                    continue;
+                }
                 if selected
                     .as_ref()
                     .is_none_or(|found| found.name() == ledger.name)
@@ -307,8 +377,11 @@ impl Server {
                         // this entry belongs to a known, unselected ledger.
                         continue;
                     };
-                    let amount = bridge_tally_core::ExactDecimal::parse(entry.amount.clone())
-                        .map_err(|_| "voucher_amount_invalid".to_string())?;
+                    // No input reaches this refusal: `parse_scoped_movement_rows` parsed every
+                    // amount of these vouchers with the same call and refused the read first, and
+                    // its test holds that site (#2558). A composite entry (#683) has no amount to
+                    // parse; one on a kept ledger was refused by `check_composite_entries` above.
+                    let amount = entry.plain_amount()?;
                     let (is_debit, magnitude) =
                         movement_entry_effect(&amount, entry.is_deemed_positive);
                     if is_debit {
@@ -350,9 +423,18 @@ impl Server {
                         (rows, any_partial || partial)
                     },
                 );
-            if opening_unobserved {
+            // On this path the result is always partial, as its rules are measured on one book
+            // (§8.2n); an unobserved opening names the reason when both hold.
+            let partial_reason = if opening_unobserved {
+                Some(MovementCode::OpeningBalanceNotObserved.as_str())
+            } else if set_aside.is_some() {
+                Some("base_currency_ledgers_only")
+            } else {
+                None
+            };
+            if let Some(reason) = partial_reason {
                 evidence.state = "partial";
-                evidence.reason_code = Some("opening_balance_not_observed".to_string());
+                evidence.reason_code = Some(reason.to_string());
             }
             let offset = arg_usize(args, "offset", 0)?;
             let limit =
@@ -372,7 +454,12 @@ impl Server {
                     json!({"basis": "whole_book", "reason": reason.code(), "note": reason.note()})
                 }
             };
-            let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "window_scope": window_scope, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}});
+            let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if partial_reason.is_some() {"partial"} else {"complete"}, "partial_reason": partial_reason, "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "window_scope": window_scope, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}});
+            if let (Some(set_aside), Some(result)) =
+                (set_aside.as_ref(), payload["result"].as_object_mut())
+            {
+                set_aside.frame(result, self.settings.redaction);
+            }
             // What the two window reads cost, when it is worth saying, goes in the
             // result beside the ledgers (#1239); the replay is the second read.
             let mut cost = json!({});
@@ -412,25 +499,28 @@ impl Server {
             .runtime
             .fetch_ledger_opening_at_with_evidence(self.tally_config(), identity, from)
             .await
-            .map_err(|error| {
-                // A catalogue that outlived its deadline or the response cap says
-                // which, beside the operation's own code (`code` keeps naming
-                // what failed). Its own causes, not the transport's window ones:
-                // the catalogue lists every ledger in the book and does not shrink
-                // with the voucher window, so an agent told the window was too
-                // large would narrow the dates and send the same read again.
-                let cause = window_too_large_code(&error).and_then(|code| match code {
-                    "request_deadline_exceeded" => Some(MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED),
-                    "response_size_limit_exceeded" => Some(MOVEMENT_CATALOGUE_TOO_LARGE),
-                    _ => None,
-                });
-                let mut failure = ToolFailure::from_runtime("ledger_movement_read_failed", error);
-                if failure.cause.is_none() {
-                    failure.cause = cause;
-                }
-                failure
-            })?;
+            .map_err(movement_catalogue_failure)?;
         Ok((ledgers, evidence_from_runtime_read(evidence)))
+    }
+
+    /// `ledger_movement`'s own catalogue read: as [`Self::read_movement_ledgers`], except that a
+    /// book with several Currency masters is admitted at its first day (#683).
+    async fn read_movement_opening(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        from: bridge_tally_core::TallyDate,
+    ) -> Result<MovementOpening, ToolFailure> {
+        let read = self
+            .runtime
+            .fetch_movement_ledger_opening_at(self.tally_config(), identity, from)
+            .await
+            .map_err(movement_catalogue_failure)?;
+        Ok(MovementOpening {
+            ledgers: read.ledgers,
+            extent: read.extent,
+            several_currency: read.several_currency,
+            evidence: evidence_from_runtime_read(read.evidence),
+        })
     }
 
     /// Each day's net movement on `ledger` over a window, a debit positive, read
@@ -450,7 +540,15 @@ impl Server {
             .map_or(WindowScope::Book, WindowScope::Ledger);
         let mut attempt = None;
         let read = match self
-            .read_movement_vouchers(identity, company, scope, window.clone(), plan(), None)
+            .read_movement_vouchers(
+                identity,
+                company,
+                scope,
+                window.clone(),
+                plan(),
+                None,
+                MovementComposites::Refuse,
+            )
             .await
         {
             Err(failure)
@@ -465,6 +563,7 @@ impl Server {
                     window,
                     plan(),
                     None,
+                    MovementComposites::Refuse,
                 )
                 .await?
             }
@@ -484,6 +583,7 @@ impl Server {
     /// what the two snapshot reads compare — and the pre-flight comes back
     /// beside it, with the ranges read so the closing read can replay them and
     /// be comparable part for part.
+    #[allow(clippy::too_many_arguments)]
     async fn read_movement_vouchers(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -492,11 +592,12 @@ impl Server {
         (from, to): (TallyDate, TallyDate),
         source: WindowPlanSource,
         known_marks: Option<CompanyMarks>,
+        composites: MovementComposites,
     ) -> Result<MovementWindowRead, ToolFailure> {
         let company = ValidatedCompanyName::new(company.to_string())
-            .map_err(|_| "company_name_invalid".to_string())?;
+            .map_err(|_| CompanyReadCode::NameInvalid)?;
         let range = ValidatedDateRange::new(from.as_str(), to.as_str())
-            .map_err(|_| "invalid_date_range".to_string())?;
+            .map_err(|_| ReadCode::InvalidDateRange)?;
         let shape = VoucherReadShape::Movement;
         let read = self
             .read_scoped_voucher_window(
@@ -508,7 +609,17 @@ impl Server {
                 shape,
                 source,
                 WindowReadLimits::for_shape(shape),
-                |xml| parse_agent_changed_rows(xml, identity.company_guid()),
+                |xml| match composites {
+                    MovementComposites::Refuse => {
+                        parse_agent_changed_rows(xml, identity.company_guid())
+                    }
+                    MovementComposites::NameLedger => {
+                        parse_agent_changed_rows_naming_composite_ledgers(
+                            xml,
+                            identity.company_guid(),
+                        )
+                    }
+                },
             )
             .await?;
         let preflight = read.preflight_evidence;
@@ -566,6 +677,42 @@ impl Server {
             )),
         }
     }
+}
+
+/// A catalogue that outlived its deadline or the response cap says which, beside the operation's
+/// own code (`code` keeps naming what failed). Its own causes, not the transport's window ones: the
+/// catalogue lists every ledger in the book and does not shrink with the voucher window, so an
+/// agent told the window was too large would narrow the dates and send the same read again.
+fn movement_catalogue_failure(error: anyhow::Error) -> ToolFailure {
+    let cause = window_too_large_code(&error).and_then(|code| match code {
+        "request_deadline_exceeded" => Some(MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED),
+        "response_size_limit_exceeded" => Some(MOVEMENT_CATALOGUE_TOO_LARGE),
+        _ => None,
+    });
+    let mut failure = ToolFailure::from_runtime("ledger_movement_read_failed", error);
+    if failure.cause.is_none() {
+        failure.cause = cause;
+    }
+    failure
+}
+
+/// `ledger_movement`'s catalogue at `from`, with what the runtime admitted it under.
+struct MovementOpening {
+    ledgers: Vec<TallyLedger>,
+    extent: bridge_tally_protocol::outstandings_shared::CompanyBookExtent,
+    several_currency: Option<crate::tally::runtime::SeveralCurrencyFirstDay>,
+    evidence: Evidence,
+}
+
+/// What a movement window read does with a currency composite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MovementComposites {
+    /// Fails the window (`voucher_amount_invalid`, `bill_allocation_amount_invalid`): every
+    /// caller but one.
+    Refuse,
+    /// Keeps a composite entry with no figure, to set its ledger aside: `ledger_movement` on a
+    /// several-currency book at its first day only (#683).
+    NameLedger,
 }
 
 /// One bounded movement window read. See `read_movement_vouchers`.
@@ -629,7 +776,7 @@ fn validate_movement_snapshot(
     opening: &[TallyLedger],
     corroboration: &[TallyLedger],
     vouchers: &[MovementVoucher],
-) -> Result<(), String> {
+) -> Result<(), FailureCode> {
     let initial = opening
         .iter()
         .map(|ledger| (ledger.name.as_str(), ledger))
@@ -646,7 +793,7 @@ fn validate_movement_snapshot(
             .flat_map(|voucher| &voucher.ledger_entries)
             .any(|entry| !initial.contains_key(entry.ledger_name.as_str()))
     {
-        return Err("ledger_snapshot_drifted".to_string());
+        return Err(ReadCode::LedgerSnapshotDrifted.into());
     }
     Ok(())
 }
@@ -663,12 +810,57 @@ pub(super) struct MovementVoucher {
 }
 
 #[derive(serde::Deserialize)]
+#[serde(from = "ParsedMovementEntry")]
 pub(super) struct MovementEntry {
+    ledger_name: String,
+    amount: MovementAmount,
+    is_deemed_positive: bool,
+}
+
+/// An entry's amount. A currency composite carries no figure, so no code can sum it: it only
+/// names its ledger, to be set aside (#683).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum MovementAmount {
+    Plain(String),
+    Composite,
+}
+
+impl MovementEntry {
+    /// The entry's figure; a composite has none (`voucher_amount_invalid`).
+    fn plain_amount(&self) -> Result<bridge_tally_core::ExactDecimal, ReadCode> {
+        match &self.amount {
+            MovementAmount::Plain(amount) => bridge_tally_core::ExactDecimal::parse(amount.clone())
+                .map_err(|_| ReadCode::VoucherAmountInvalid),
+            MovementAmount::Composite => Err(ReadCode::VoucherAmountInvalid),
+        }
+    }
+}
+
+/// An entry as the voucher parse emits it. `currency_composite` is present only under the
+/// movement's own composite policy, and only on a composite entry.
+#[derive(serde::Deserialize)]
+struct ParsedMovementEntry {
     #[serde(rename = "ledger")]
     ledger_name: String,
     amount: String,
     #[serde(deserialize_with = "parse_movement_polarity")]
     is_deemed_positive: bool,
+    #[serde(default)]
+    currency_composite: bool,
+}
+
+impl From<ParsedMovementEntry> for MovementEntry {
+    fn from(entry: ParsedMovementEntry) -> Self {
+        Self {
+            ledger_name: entry.ledger_name,
+            amount: if entry.currency_composite {
+                MovementAmount::Composite
+            } else {
+                MovementAmount::Plain(entry.amount)
+            },
+            is_deemed_positive: entry.is_deemed_positive,
+        }
+    }
 }
 
 fn parse_movement_polarity<'de, D: serde::Deserializer<'de>>(
@@ -682,8 +874,8 @@ fn parse_movement_polarity<'de, D: serde::Deserializer<'de>>(
 pub(super) fn day_moves_of(
     vouchers: &[MovementVoucher],
     ledger: &str,
-) -> Result<BTreeMap<String, bridge_tally_core::ExactDecimal>, String> {
-    let invalid = |_| "voucher_amount_invalid".to_string();
+) -> Result<BTreeMap<String, bridge_tally_core::ExactDecimal>, FailureCode> {
+    let invalid = |_| ReadCode::VoucherAmountInvalid;
     let mut moves = BTreeMap::<String, bridge_tally_core::ExactDecimal>::new();
     for voucher in vouchers {
         for entry in voucher
@@ -691,8 +883,7 @@ pub(super) fn day_moves_of(
             .iter()
             .filter(|entry| entry.ledger_name == ledger)
         {
-            let amount =
-                bridge_tally_core::ExactDecimal::parse(entry.amount.clone()).map_err(invalid)?;
+            let amount = entry.plain_amount()?;
             let (is_debit, magnitude) = movement_entry_effect(&amount, entry.is_deemed_positive);
             let magnitude = bridge_tally_core::ExactDecimal::parse(magnitude).map_err(invalid)?;
             let day = moves
@@ -715,7 +906,7 @@ pub(super) fn parse_movement_vouchers(
     from: &str,
     to: &str,
     company_guid: &str,
-) -> Result<Vec<MovementVoucher>, String> {
+) -> Result<Vec<MovementVoucher>, ToolFailure> {
     Ok(parse_movement_rows(parse_agent_changed_rows(xml, company_guid)?, from, to)?.rows)
 }
 
@@ -725,7 +916,11 @@ struct MovementPage {
 }
 
 #[cfg(test)]
-fn parse_movement_rows(rows: Vec<Value>, from: &str, to: &str) -> Result<MovementPage, String> {
+fn parse_movement_rows(
+    rows: Vec<Value>,
+    from: &str,
+    to: &str,
+) -> Result<MovementPage, ToolFailure> {
     parse_scoped_movement_rows(rows, WindowScope::Book, from, to)
 }
 
@@ -734,13 +929,12 @@ fn parse_scoped_movement_rows(
     scope: WindowScope<'_>,
     from: &str,
     to: &str,
-) -> Result<MovementPage, String> {
+) -> Result<MovementPage, ToolFailure> {
     let observed_rows = rows.len();
     let vouchers = rows
         .into_iter()
         .map(|row| {
-            serde_json::from_value::<MovementVoucher>(row)
-                .map_err(|_| "ledger_movement_read_failed".to_string())
+            serde_json::from_value::<MovementVoucher>(row).map_err(|_| MovementCode::ReadFailed)
         })
         .collect::<Result<Vec<_>, _>>()?;
     // A ledger-scoped read promised the vouchers with a line on that ledger: a row without one
@@ -752,7 +946,7 @@ fn parse_scoped_movement_rows(
                 .iter()
                 .any(|entry| entry.ledger_name == ledger.as_str())
         }) {
-            return Err(LEDGER_SCOPE_ROW_WITHOUT_LINE.to_string());
+            return Err(LEDGER_SCOPE_ROW_WITHOUT_LINE.to_string().into());
         }
     }
     // Check the whole window before excluding cancelled/optional records.
@@ -760,7 +954,7 @@ fn parse_scoped_movement_rows(
         .iter()
         .any(|voucher| voucher.date.as_str() < from || voucher.date.as_str() > to)
     {
-        return Err("window_not_honoured".to_string());
+        return Err(ReadCode::WindowNotHonoured.into());
     }
     // A voucher with no accounting entries cannot move a ledger balance, so it
     // is excluded the way a cancelled or optional one is rather than refusing
@@ -774,19 +968,31 @@ fn parse_scoped_movement_rows(
     // what a truncated response or a request-shape regression looks like, and
     // that refusal stays loud. So by this point "no entries" can only mean
     // Tally sent none, never that we failed to read them.
+    //
+    // A voucher holding a currency composite (#683) carries no figure for that entry, so it
+    // cannot be checked here; its composite entries' ledgers are set aside, and only its plain
+    // entries on kept ledgers are summed.
     for voucher in vouchers.iter().filter(|voucher| {
-        !voucher.cancelled && !voucher.optional && !voucher.ledger_entries.is_empty()
+        !voucher.cancelled
+            && !voucher.optional
+            && !voucher.ledger_entries.is_empty()
+            && voucher
+                .ledger_entries
+                .iter()
+                .all(|entry| entry.amount != MovementAmount::Composite)
     }) {
         let total = voucher.ledger_entries.iter().try_fold(
             bridge_tally_core::ExactDecimal::zero(),
             |total, entry| {
-                bridge_tally_core::ExactDecimal::parse(entry.amount.clone())
-                    .and_then(|amount| total.checked_add(&amount))
-                    .map_err(|_| "voucher_amount_invalid".to_string())
+                entry.plain_amount().and_then(|amount| {
+                    total
+                        .checked_add(&amount)
+                        .map_err(|_| ReadCode::VoucherAmountInvalid)
+                })
             },
         )?;
         if !total.is_zero() {
-            return Err("voucher_entries_unbalanced".to_string());
+            return Err(ReadCode::VoucherEntriesUnbalanced.into());
         }
     }
     Ok(MovementPage {
@@ -799,6 +1005,9 @@ fn parse_scoped_movement_rows(
         observed_rows,
     })
 }
+
+#[path = "agent_movement_currency.rs"]
+mod currency;
 
 #[cfg(test)]
 #[path = "agent_movement_tests.rs"]

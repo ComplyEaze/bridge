@@ -9,7 +9,7 @@
 //! a vendored rules excerpt ([`rules`]), and serialise the result canonically ([`canonical`]) so
 //! [`compare`] can diff it against the reference engine's dump under the same rules the
 //! reference's own comparer applies. A module with its own invariant (`depreciation`'s DEP-1/DEP-2,
-//! `financial_statements`' FS-1/FS-2, `trial_balance`'s TB-1/TB-2, `stale_balances_41_1`'s STL-1,
+//! `financial_statements`' FS-1/FS-2, `trial_balance`'s TB-1/TB-2/TB-3, `stale_balances_41_1`'s STL-1,
 //! `ledger_scrutiny`'s LSC-1, `cash_book_integrity`'s CBI-1/CBI-2) threads it through
 //! [`canonical::canonical_test_result`]'s `module_check` parameter.
 //!
@@ -106,11 +106,6 @@ pub struct Engagement {
     pub label: String,
     pub assessment_year: String,
     pub period: Window,
-    /// The directory of the read. Empty for an engagement built for a book the caller holds
-    /// ([`Engagement::from_toml_for_read`]); never give that to `Read::open`. [`load_book`] refuses
-    /// such an engagement, and the field stays `pub` until the engagement is split into two types.
-    pub read_dir: PathBuf,
-    pub allow_unbracketed_read: bool,
     /// `[client.tally]` `company_guid` + `books_from`: the company every read must come from
     /// (C5-client), or `None` when the config does not pin one.
     pub company_pin: Option<CompanyPin>,
@@ -244,12 +239,51 @@ pub struct Engagement {
     /// struct's public contract: a field a caller should read directly (`cash_groups` and the
     /// rest above) is exposed as its own field instead.
     raw_cfg: toml::Table,
-    /// The directory `[snapshot].path` and a legacy trade-creditor source are relative to.
-    base_dir: PathBuf,
-    /// Built by [`Engagement::from_toml_for_read`]: no `[snapshot]`, no directory. [`load_book`]
-    /// refuses such an engagement, so it cannot reach a directory by any path; its book comes from
-    /// the caller, and the tests run on it through [`registry`].
-    in_memory: bool,
+    /// What a `legacy_json` trade-creditor source in this config's own `[roles]` read, when the
+    /// engagement was parsed with a directory ([`Engagement::from_toml`]); `None` otherwise. An
+    /// engagement holds no path, so this is the only file it can ever have read.
+    legacy_read: Option<LegacyRead>,
+}
+
+/// A `legacy_json` trade-creditor source and what reading it gave: the ledger names, or the
+/// message of the `AuditError::Config` the read refused with (an error is not `Clone`, and binding
+/// runs once per test).
+#[derive(Debug, Clone)]
+struct LegacyRead {
+    source: toml::Value,
+    names: std::result::Result<Vec<String>, String>,
+}
+
+/// An engagement whose book is read from a directory ([`Engagement::from_toml`]): the
+/// configuration both kinds share (an [`Engagement`], through `Deref` and `DerefMut`), and the
+/// read's directory. Changing or replacing the shared configuration cannot give it a path: an
+/// `Engagement` holds none. Only this type can be given to
+/// [`load_book`] and [`registry::run_canonical`]; an engagement for a book the caller holds
+/// ([`Engagement::from_toml_for_read`]) is a plain [`Engagement`] and has no directory to give.
+///
+/// ```compile_fail
+/// let held = bridge_tax_audit::Engagement::from_toml_for_read("").unwrap();
+/// let _ = bridge_tax_audit::load_book(&held);
+/// ```
+#[derive(Debug, Clone)]
+pub struct DirectoryEngagement {
+    engagement: Engagement,
+    /// The directory of the read: `[snapshot].path` under the config's directory.
+    pub read_dir: PathBuf,
+    pub allow_unbracketed_read: bool,
+}
+
+impl std::ops::Deref for DirectoryEngagement {
+    type Target = Engagement;
+    fn deref(&self) -> &Engagement {
+        &self.engagement
+    }
+}
+
+impl std::ops::DerefMut for DirectoryEngagement {
+    fn deref_mut(&mut self) -> &mut Engagement {
+        &mut self.engagement
+    }
 }
 
 /// `[loans]` from the client config, bound. Empty when the config has no `[loans]` table: the
@@ -521,8 +555,8 @@ pub struct DepreciationConfig {
     pub opening_wdv_paise: BTreeMap<String, i64>,
     pub dep_expense_ledgers: BTreeSet<String>,
     /// `[depreciation.put_to_use_by_voucher]`, guid -> date; optional, empty when absent (no
-    /// client TOML configures this key today -- the reference engine's own `pack.py` never
-    /// passes it either -- but `depreciation.py`'s `run()` signature carries it, so this port
+    /// client TOML configures this key today -- the reference engine's own pack never
+    /// passes it either -- but the depreciation test's `run()` signature carries it, so this port
     /// does too).
     pub put_to_use_by_voucher: BTreeMap<String, TallyDate>,
 }
@@ -594,20 +628,30 @@ const LEGACY_SNAPSHOT_KEYS: [&str; 10] = [
 ];
 
 impl Engagement {
-    /// Parse a client config; `[snapshot].path` is relative to `base_dir`.
-    pub fn from_toml(text: &str, base_dir: &Path) -> Result<Self> {
-        Self::parse(text, Some(base_dir))
+    /// Parse a client config; `[snapshot].path`, and the file a `legacy_json` trade-creditor
+    /// source names, are relative to `base_dir`. That file is read here, and what it gave is
+    /// returned by [`Engagement::bind`] at the point the reference reads it.
+    pub fn from_toml(text: &str, base_dir: &Path) -> Result<DirectoryEngagement> {
+        let (engagement, read_dir, allow_unbracketed_read) = Self::parse(text, Some(base_dir))?;
+        Ok(DirectoryEngagement {
+            engagement,
+            read_dir,
+            allow_unbracketed_read,
+        })
     }
 
     /// Parse a client config for a book the caller already holds (a read Bridge made itself): no
     /// `[snapshot]` table is allowed, there is no directory, and the result can never be given to
-    /// [`load_book`]. Everything else is read and refused exactly as [`Engagement::from_toml`] does,
-    /// except a `legacy_json` trade-creditor source, which names a file and so is refused here.
+    /// [`load_book`] (it is not a [`DirectoryEngagement`]). Everything else is read and refused
+    /// exactly as [`Engagement::from_toml`] does, except a `legacy_json` trade-creditor source,
+    /// which names a file and so is refused here.
     pub fn from_toml_for_read(text: &str) -> Result<Self> {
-        Self::parse(text, None)
+        Self::parse(text, None).map(|(engagement, _, _)| engagement)
     }
 
-    fn parse(text: &str, base_dir: Option<&Path>) -> Result<Self> {
+    /// The shared configuration, the read's directory and whether an unbracketed read is allowed
+    /// (an empty directory and `false` with no `base_dir`).
+    fn parse(text: &str, base_dir: Option<&Path>) -> Result<(Self, PathBuf, bool)> {
         let cfg: toml::Table = toml::from_str(text)
             .map_err(|e| AuditError::Config(format!("engagement TOML: {e}")))?;
         let table = |name: &str| {
@@ -979,18 +1023,25 @@ not YYYY-MM-DD"
                 }
             }
         }
-        Ok(Self {
+        let read_dir = base_dir.map_or_else(PathBuf::new, |b| b.join(path));
+        let allow_unbracketed_read = snapshot
+            .get("allow_unbracketed_read")
+            .and_then(toml::Value::as_bool)
+            .unwrap_or(false);
+        let legacy_read = base_dir.and_then(|b| {
+            let source = roles.get("trade_creditors_source")?;
+            is_legacy(Some(source)).then(|| LegacyRead {
+                source: source.clone(),
+                names: read_legacy_names(source, b),
+            })
+        });
+        let engagement = Self {
             label: string(client, "label")?,
             assessment_year: string(client, "assessment_year")?,
             period: Window {
                 from: date(period, "start")?,
                 to: date(period, "end")?,
             },
-            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),
-            allow_unbracketed_read: snapshot
-                .get("allow_unbracketed_read")
-                .and_then(toml::Value::as_bool)
-                .unwrap_or(false),
             company_pin,
             cash_groups: strings(roles, "cash_groups")?,
             bank_groups: strings(roles, "bank_groups")?,
@@ -1051,10 +1102,10 @@ not YYYY-MM-DD"
             clause21a: cfg.get("clause21a").cloned(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
-            base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
-            in_memory,
+            legacy_read,
             raw_cfg: cfg,
-        })
+        };
+        Ok((engagement, read_dir, allow_unbracketed_read))
     }
 
     /// Bind this engagement's ledger and group names to `book` by Tally identity, or refuse.
@@ -1066,26 +1117,36 @@ not YYYY-MM-DD"
     }
 
     /// The ledger names a `legacy_json` trade-creditor source reads, or `None` for any other
-    /// source. This is the one place an engagement reads such a file, and a held-book engagement
-    /// refuses to: its source can be set after parsing (the field is public), and the parse-time
-    /// refusal (`CFG-legacy-for-read`) cannot see that.
+    /// source: what the read made at parse time gave, for the source this config's own `[roles]`
+    /// named. Any other `legacy_json` source (the field is public, so one can be set after parsing,
+    /// and a held-book engagement read none) is refused: the engagement holds no path to read it
+    /// from.
     pub(crate) fn legacy_creditor_names(
         &self,
         source: Option<&toml::Value>,
     ) -> Result<Option<Vec<String>>> {
-        let legacy = source
-            .and_then(toml::Value::as_table)
-            .and_then(|t| t.get("kind"))
-            .and_then(toml::Value::as_str)
-            == Some("legacy_json");
-        if self.in_memory && legacy {
-            return Err(AuditError::refused(
-                "CFG-no-directory",
-                "a legacy_json trade-creditor source names a file, and this engagement has no directory",
-            ));
+        if !is_legacy(source) {
+            return Ok(None);
         }
-        legacy_trade_creditor_names(source, &self.base_dir)
+        match &self.legacy_read {
+            Some(read) if Some(&read.source) == source => {
+                read.names.clone().map(Some).map_err(AuditError::Config)
+            }
+            _ => Err(AuditError::refused(
+                "CFG-no-directory",
+                "a legacy_json trade-creditor source names a file this engagement did not read: only its own [roles], parsed with a directory, is read",
+            )),
+        }
     }
+}
+
+/// Whether a trade-creditor source is a `legacy_json` one.
+fn is_legacy(source: Option<&toml::Value>) -> bool {
+    source
+        .and_then(toml::Value::as_table)
+        .and_then(|t| t.get("kind"))
+        .and_then(toml::Value::as_str)
+        == Some("legacy_json")
 }
 
 /// The ledger names a `legacy_json` trade-creditor source reads (`derived.fs.trade_creditors[]
@@ -1095,13 +1156,24 @@ pub fn legacy_trade_creditor_names(
     source: Option<&toml::Value>,
     base_dir: &Path,
 ) -> Result<Option<Vec<String>>> {
-    let Some(src) = source.and_then(toml::Value::as_table) else {
-        return Ok(None);
-    };
-    if src.get("kind").and_then(toml::Value::as_str) != Some("legacy_json") {
-        return Ok(None);
+    match source {
+        Some(src) if is_legacy(source) => read_legacy_names(src, base_dir)
+            .map(Some)
+            .map_err(AuditError::Config),
+        _ => Ok(None),
     }
-    let bad = |what: String| AuditError::Config(format!("legacy trade-creditor source: {what}"));
+}
+
+/// Read a `legacy_json` source's file: its ledger names, or the message of the config error that
+/// refuses it.
+fn read_legacy_names(
+    source: &toml::Value,
+    base_dir: &Path,
+) -> std::result::Result<Vec<String>, String> {
+    let src = source
+        .as_table()
+        .ok_or("legacy trade-creditor source: not a table")?;
+    let bad = |what: String| format!("legacy trade-creditor source: {what}");
     let path = src
         .get("path")
         .and_then(toml::Value::as_str)
@@ -1120,8 +1192,7 @@ pub fn legacy_trade_creditor_names(
                 .map(str::to_string)
                 .ok_or_else(|| bad(format!("{path}: a row has no ledger name")))
         })
-        .collect::<Result<Vec<_>>>()
-        .map(Some)
+        .collect()
 }
 
 /// The trade creditors `creditor_ageing_43bh` ages: the reference's `trade_creditors`, on a bound
@@ -1169,25 +1240,39 @@ pub fn trade_creditors(engagement: &Engagement, book: &book::Book) -> Result<BTr
     }
 }
 
-/// The vendored rules, for the one assessment year this slice carries.
+/// The vendored rules, for the one assessment year this slice carries. The year and the
+/// financial year they judge are the rules' own `[meta]`: an engagement for another year is
+/// refused (`CFG-rules-year`), and so is a period that is not inside that financial year
+/// (`CFG-period-outside-rules`), which would otherwise be judged by this year's thresholds.
 pub fn rules_for(engagement: &Engagement) -> Result<Rules> {
-    if engagement.assessment_year != "2026-27" {
-        return Err(AuditError::Config(format!(
-            "no vendored rules for AY {}",
-            engagement.assessment_year
-        )));
+    let rules = Rules::vendored()?;
+    if engagement.assessment_year != rules.assessment_year {
+        return Err(AuditError::refused(
+            "CFG-rules-year",
+            format!(
+                "no rules for assessment year {}; the rules held are for {}",
+                engagement.assessment_year, rules.assessment_year
+            ),
+        ));
     }
-    Rules::vendored()
+    let (start, end) = &rules.previous_year;
+    if engagement.period.from < *start || engagement.period.to > *end {
+        return Err(AuditError::refused(
+            "CFG-period-outside-rules",
+            format!(
+                "the period {} to {} is not inside {} to {}, the year the rules are for",
+                engagement.period.from.as_str(),
+                engagement.period.to.as_str(),
+                start.as_str(),
+                end.as_str()
+            ),
+        ));
+    }
+    Ok(rules)
 }
 
 /// Read and verify the engagement's read, and build its book (C1-C10).
-pub fn load_book(engagement: &Engagement) -> Result<book::Book> {
-    if engagement.in_memory {
-        return Err(AuditError::refused(
-            "CFG-no-directory",
-            "this engagement was built for a book the caller holds and names no read directory",
-        ));
-    }
+pub fn load_book(engagement: &DirectoryEngagement) -> Result<book::Book> {
     let read = Read::open(&engagement.read_dir)?;
     read.check(
         &engagement.period,
@@ -1211,7 +1296,10 @@ pub fn cash_44ab_on(
 }
 
 /// Read, verify, build the book, run `cash_44ab` and return its canonical parity dump.
-pub fn cash_44ab_canonical(engagement: &Engagement, rules: &Rules) -> Result<serde_json::Value> {
+pub fn cash_44ab_canonical(
+    engagement: &DirectoryEngagement,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
     cash_44ab_on(engagement, &load_book(engagement)?, rules)
 }
 
@@ -1260,7 +1348,7 @@ pub fn counter_cheques_40a3_on(
 
 /// Read, verify, build the book, run `counter_cheques_40a3` and return its canonical parity dump.
 pub fn counter_cheques_40a3_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
 ) -> Result<serde_json::Value> {
     counter_cheques_40a3_on(engagement, &load_book(engagement)?, rules)
@@ -1268,7 +1356,7 @@ pub fn counter_cheques_40a3_canonical(
 
 /// Read, verify, build the book, run `cash_payments_40a3` and return its canonical parity dump.
 pub fn cash_payments_40a3_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
 ) -> Result<serde_json::Value> {
     cash_payments_40a3_on(engagement, &load_book(engagement)?, rules)
@@ -1362,7 +1450,10 @@ pub fn loans_interest_on(
 }
 
 /// Read, verify, build the book, run `depreciation` and return its canonical parity dump.
-pub fn depreciation_canonical(engagement: &Engagement, rules: &Rules) -> Result<serde_json::Value> {
+pub fn depreciation_canonical(
+    engagement: &DirectoryEngagement,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
     depreciation_on(engagement, &load_book(engagement)?, rules)
 }
 
@@ -1442,7 +1533,7 @@ pub fn statutory_dues_43b_on(
 }
 
 /// Run `trial_balance` on a book and return its canonical parity dump, with the module's own
-/// TB-1/TB-2 check. Reads no engagement configuration beyond binding.
+/// TB-1/TB-2/TB-3 check. Reads no engagement configuration beyond binding.
 pub fn trial_balance_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -1725,7 +1816,7 @@ pub fn read_scope_on(book: &book::Book, rules: &Rules) -> Result<serde_json::Val
 
 /// Read, verify, build the book, run `cash_book_integrity` and return its canonical parity dump.
 pub fn cash_book_integrity_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
 ) -> Result<serde_json::Value> {
     cash_book_integrity_on(engagement, &load_book(engagement)?, rules)
@@ -1748,7 +1839,7 @@ pub fn ledger_scrutiny_on(
 
 /// Read, verify, build the book, run `ledger_scrutiny` and return its canonical parity dump.
 pub fn ledger_scrutiny_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
 ) -> Result<serde_json::Value> {
     ledger_scrutiny_on(engagement, &load_book(engagement)?, rules)
@@ -1789,7 +1880,7 @@ pub fn book_keeping_quality_on(
 
 /// Read, verify, build the book, run `stale_balances_41_1` and return its canonical parity dump.
 pub fn stale_balances_41_1_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
 ) -> Result<serde_json::Value> {
     stale_balances_41_1_on(engagement, &load_book(engagement)?, rules)
@@ -1797,7 +1888,7 @@ pub fn stale_balances_41_1_canonical(
 
 /// Read, verify, build the book, run `trial_balance` and return its canonical parity dump.
 pub fn trial_balance_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
 ) -> Result<serde_json::Value> {
     trial_balance_on(engagement, &load_book(engagement)?, rules)
@@ -1824,7 +1915,7 @@ pub fn financial_statements_on(
 
 /// Read, verify, build the book, run `financial_statements` and return its canonical parity dump.
 pub fn financial_statements_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
     report_totals: Option<&financial_statements::ReportTotals>,
 ) -> Result<serde_json::Value> {
@@ -2259,13 +2350,16 @@ pub fn tds_interest_201_on(
 }
 
 /// Read, verify, build the book, run `tds_payees` and return its canonical parity dump.
-pub fn tds_payees_canonical(engagement: &Engagement, rules: &Rules) -> Result<serde_json::Value> {
+pub fn tds_payees_canonical(
+    engagement: &DirectoryEngagement,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
     tds_payees_on(engagement, &load_book(engagement)?, rules)
 }
 
 /// Read, verify, build the book, run `applicability_44ab` and return its canonical parity dump.
 pub fn applicability_44ab_canonical(
-    engagement: &Engagement,
+    engagement: &DirectoryEngagement,
     rules: &Rules,
     comparisons: &applicability_44ab::TurnoverInputs,
 ) -> Result<serde_json::Value> {
@@ -2390,6 +2484,59 @@ mod py_int_tests {
             py_int_value(&Value::Float(f64::INFINITY)),
             Err(PyIntError::Invalid)
         );
+    }
+}
+
+#[cfg(test)]
+mod rules_for_tests {
+    use super::*;
+
+    fn engagement(year: &str, start: &str, end: &str) -> Engagement {
+        Engagement::from_toml_for_read(&format!(
+            "[client]\nlabel = \"T\"\nassessment_year = \"{year}\"\n\n[period]\n\
+             start = \"{start}\"\nend = \"{end}\"\n\n[roles]\ncash_groups = []\n\
+             bank_groups = []\n"
+        ))
+        .unwrap()
+    }
+
+    fn refusal(e: &Engagement) -> &'static str {
+        match rules_for(e).unwrap_err() {
+            AuditError::Refused { code, .. } => code,
+            other => panic!("not a refusal: {other}"),
+        }
+    }
+
+    /// The year and the financial year come from the rules' own `[meta]`.
+    #[test]
+    fn the_rules_name_their_year_and_the_financial_year_they_judge() {
+        let rules = Rules::vendored().unwrap();
+        assert_eq!(rules.assessment_year, "2026-27");
+        assert_eq!(rules.previous_year.0.as_str(), "20250401");
+        assert_eq!(rules.previous_year.1.as_str(), "20260331");
+    }
+
+    /// The whole year and a part of it are judged; another year's label, a period that starts
+    /// before the year or ends after it is refused by code, never judged by these thresholds.
+    #[test]
+    fn a_period_outside_the_rules_year_is_refused() {
+        assert!(rules_for(&engagement("2026-27", "2025-04-01", "2026-03-31")).is_ok());
+        assert!(rules_for(&engagement("2026-27", "2025-10-01", "2025-12-31")).is_ok());
+        assert_eq!(
+            refusal(&engagement("2027-28", "2025-04-01", "2026-03-31")),
+            "CFG-rules-year"
+        );
+        for (start, end) in [
+            ("2025-03-31", "2026-03-31"),
+            ("2025-04-01", "2026-04-01"),
+            ("2026-04-01", "2027-03-31"),
+        ] {
+            assert_eq!(
+                refusal(&engagement("2026-27", start, end)),
+                "CFG-period-outside-rules",
+                "{start} to {end}"
+            );
+        }
     }
 }
 

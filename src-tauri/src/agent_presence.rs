@@ -5,6 +5,7 @@
 //! `docs/adr/0017-voucher-presence-authority.md`. This file owns only the two
 //! qualified reads that produce the evidence, the typed parse of the caller's
 //! proposals, and the response shape.
+use super::failure_code::{PresenceCode, ProposalsCode, ReadCode};
 use super::vouchers::VoucherComposites;
 use super::*;
 use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
@@ -69,7 +70,7 @@ impl Server {
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
         if from > to {
-            return Err("invalid_date_range".to_string().into());
+            return Err(ReadCode::InvalidDateRange.into());
         }
         // Parse the caller's own input before any Tally read: a malformed
         // proposal set should never cost a read.
@@ -171,7 +172,7 @@ impl Server {
                     .chain(entry_ledgers.filter(|name| !name.trim().is_empty()))
                 {
                     if catalog.exact(ledger).is_none() {
-                        return Err("ledger_catalogue_incomplete".to_string().into());
+                        return Err(PresenceCode::LedgerCatalogueIncomplete.into());
                     }
                 }
             }
@@ -227,7 +228,7 @@ impl Server {
                 || after.len() != corroboration.len()
                 || before != after
             {
-                return Err("ledger_snapshot_drifted".to_string().into());
+                return Err(ReadCode::LedgerSnapshotDrifted.into());
             }
 
             // The qualified `vouchers` profile does not FETCH REMOTEID, so an
@@ -343,8 +344,7 @@ impl Server {
             rows.push(row);
         }
         if !refused.is_empty() {
-            let mut failure =
-                ToolFailure::from("presence_numbering_method_differs_from_book".to_string());
+            let mut failure = ToolFailure::from(PresenceCode::NumberingMethodDiffers);
             failure.candidates = Some(Box::new(Candidates {
                 requested: None,
                 items: refused,
@@ -693,11 +693,11 @@ fn present_text(value: &Value) -> Option<&str> {
     value.as_str().filter(|text| !text.trim().is_empty())
 }
 
-fn parse_numbering(args: &Value) -> Result<NumberingDeclaration, String> {
+fn parse_numbering(args: &Value) -> Result<NumberingDeclaration, ToolFailure> {
     let declared = args
         .get("numbering")
         .and_then(Value::as_array)
-        .ok_or_else(|| "numbering_required".to_string())?;
+        .ok_or(PresenceCode::NumberingRequired)?;
     let entries = declared
         .iter()
         .map(|entry| {
@@ -715,16 +715,17 @@ fn parse_numbering(args: &Value) -> Result<NumberingDeclaration, String> {
             Ok((voucher_type, method))
         })
         .collect::<Result<Vec<_>, String>>()?;
-    NumberingDeclaration::new(entries).map_err(|error| error.safe_reason_code().to_string())
+    NumberingDeclaration::new(entries)
+        .map_err(|error| ToolFailure::from(error.safe_reason_code().to_string()))
 }
 
 fn parse_proposals(
     args: &Value,
-) -> Result<bridge_tally_core::book_presence::ProposedBatch, String> {
+) -> Result<bridge_tally_core::book_presence::ProposedBatch, ToolFailure> {
     let proposed = args
         .get("vouchers")
         .and_then(Value::as_array)
-        .ok_or_else(|| "vouchers_required".to_string())?;
+        .ok_or(ProposalsCode::VouchersRequired)?;
     let invalid = || "argument_invalid:vouchers".to_string();
     struct RawProposal {
         date: bridge_tally_core::TallyDate,
@@ -754,7 +755,7 @@ fn parse_proposals(
                 // cannot have produced a marker, and hashing it anyway derives
                 // an identity no book can hold and calls the result `absent`.
                 if !agent_import::valid_txn_id(txn_id) {
-                    return Err("argument_invalid:bridge_txn_id".to_string());
+                    return Err("argument_invalid:bridge_txn_id".to_string().into());
                 }
                 // Same rule, other half of the pair. A mistyped batch id is
                 // not a harmless miss: under automatic numbering, with nothing
@@ -763,12 +764,12 @@ fn parse_proposals(
                 // invites the duplicate import this contract exists to stop.
                 // Bad input should say it is bad input.
                 if !agent_import::valid_batch_id(batch_id) {
-                    return Err("argument_invalid:batch_id".to_string());
+                    return Err("argument_invalid:batch_id".to_string().into());
                 }
                 Some(agent_import::import_identity(batch_id, txn_id).to_string())
             }
             (None, None) => None,
-            _ => return Err("presence_import_identity_incomplete".to_string()),
+            _ => return Err(PresenceCode::ImportIdentityIncomplete.into()),
         };
         let rows = voucher["entries"].as_array().ok_or_else(invalid)?;
         // Admit the complete borrowed shape before date/decimal parsing or
@@ -838,7 +839,8 @@ fn parse_proposals(
             party: voucher.party.as_deref(),
             entries: &descriptors[position],
         });
-    ProposedVoucher::from_inputs(inputs).map_err(|error| error.safe_reason_code().to_string())
+    ProposedVoucher::from_inputs(inputs)
+        .map_err(|error| ToolFailure::from(error.safe_reason_code().to_string()))
 }
 
 /// Bounds the fixed observations, so a diagnostic can never cost the answer.

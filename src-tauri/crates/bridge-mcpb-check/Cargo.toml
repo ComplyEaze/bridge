@@ -1,0 +1,19 @@
+[package]
+name = "bridge-mcpb-check"
+version = "0.1.0"
+description = "Home of the MCPB bundle checker example, kept out of the bridge package so building it never compiles bridge"
+license = "Apache-2.0"
+repository = "https://github.com/ComplyEaze/bridge"
+publish = false
+edition = "2021"
+rust-version = "1.96"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+tempfile = "3"
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }

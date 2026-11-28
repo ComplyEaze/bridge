@@ -1,0 +1,173 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# cargo-audit configuration for `cargo audit --file src-tauri/Cargo.lock`. Each entry's
+# reachability note was checked against src-tauri/Cargo.lock.
+#
+# cargo-audit resolves this file at `./.cargo/audit.toml`, relative to the
+# process's CURRENT WORKING DIRECTORY -- not relative to `--file`'s lockfile,
+# and not relative to a Cargo manifest. `.github/workflows/dependency-security.yml`
+# runs `cargo audit` from the repository root with no `working-directory`
+# override, so this file MUST live at the repository root's `.cargo/`, not
+# under `src-tauri/.cargo/`. Moving it there silently stops it from being read
+# and every ignore below starts failing CI again with no config-loading error
+# of any kind -- cargo-audit just falls back to `~/.cargo/audit.toml` (usually
+# absent) or no config at all.
+#
+# WHAT THIS FILE CAN AND CANNOT EXPRESS
+# --------------------------------------------------------------------------
+# `[advisories].ignore` is a flat list of RUSTSEC ids (`AuditConfig` in
+# cargo-audit 0.22.2's own source, `#[serde(deny_unknown_fields)]`). There is
+# no per-entry field for a reason, a "who does this reach" note, or a review
+# date -- adding one would be an unknown field and cargo-audit would refuse to
+# parse the whole file. So every entry below carries that information as a
+# comment immediately above its id, not as structured TOML. A comment cannot
+# be checked by a machine, with one exception: scripts/audit-review-by.test.mjs
+# reads each `Review-by: YYYY-MM-DD` date and fails once one has passed. The
+# rest is enforced only by a human reviewing this file (or by
+# scripts/check-advisory-delta.mjs, which no workflow runs yet, for *new* ids).
+# Say this plainly rather than implying cargo-audit tracks review dates
+# itself: it does not.
+#
+# This file intentionally does NOT set `[output].deny`. The default already
+# treats every advisory kind (vulnerability, unmaintained, unsound, notice,
+# yanked) as at least a warning; `cargo audit`'s process exit code is already
+# non-zero only for an actual `error` (a real vulnerability, or an ignored-id
+# that turns out to still be unresolved) unless explicitly told to also fail
+# on warnings. The entries below are accepted WARNINGS, each with a reason,
+# except RUSTSEC-2026-0459 (its entry is found by that id below), which IS a
+# vulnerability (`error`) and is accepted for a stated time (see its entry).
+# The rule was "nothing here silences an actual vulnerability"; that entry is
+# the one exception. A second one should carry the same: a dated review-by, a
+# tracking issue, a reason no lockable fix exists, and a maintainer's approval
+# recorded in that issue. Nothing enforces this; it is a review convention.
+# A test checks only that no review-by date has passed; whether the rest is
+# present, and who approved, is for a person reviewing the change to see.
+# The workflow's real job --
+# catching a new one, like RUSTSEC-2026-0285 against `rustls` on 2026-09-15
+# -- is untouched by this file for every other id. An `ignore` entry removes
+# its id from `cargo audit`'s report entirely (checked with cargo-audit 0.22.2
+# on 2026-11-09: nothing is printed for it), so `cargo audit` never reports it
+# again. The scheduled audit's tracking issue lists it instead: every ignored
+# id, with the Review-by date and the first issue number in the comment above
+# it, in its own section, every day the audit runs
+# (scripts/audit-tracking-issue.mjs, which fails the run if this list and the
+# ids cargo-audit applied differ). An ignore applies to the advisory id,
+# whatever package or version matches it. A passed Review-by date fails
+# scripts/audit-review-by.test.mjs, in the Node script tests that `pnpm test` runs.
+#
+# Reachability was checked with, e.g.:
+#   cargo tree --locked -p bridge -i <crate> --target aarch64-apple-darwin
+#   cargo tree --locked -p bridge -i <crate> --target x86_64-pc-windows-msvc
+#   cargo tree --locked -i <crate> --target all
+# against src-tauri/Cargo.lock on 2026-09-15. Re-run these before renewing an
+# entry past its review-by date; a dependency bump can change the path
+# (or remove it) between reviews.
+[advisories]
+ignore = [
+
+  # --- RUSTSEC-2024-0429 -- glib 0.18.5, unsound (VariantStrIter) ----------
+  # Transitive only through Tauri's Linux webview backend:
+  #   glib <- atk <- gtk <- {muda, tao, webkit2gtk, tauri-runtime-wry} <- tauri
+  # This project ships only macOS and Windows builds (docs/release-process.md,
+  # "Hosts: current GitHub-hosted Windows and macOS runners"); confirmed with
+  # `cargo tree --locked -p bridge -i glib --target aarch64-apple-darwin` and
+  # `--target x86_64-pc-windows-msvc`, both of which print nothing (the
+  # dependency is not part of the resolved graph for either shipped target),
+  # versus `--target all`, which shows the gtk/webkit2gtk chain above. The
+  # vulnerable code is not compiled into anything we build or distribute.
+  # Review-by: 2027-03-15 (6 months) -- re-run the target check above if a
+  # Linux build target is ever added to this project.
+  "RUSTSEC-2024-0429",
+
+  # --- RUSTSEC-2024-0370 -- proc-macro-error 1.0.4, unmaintained -----------
+  # Same Linux-only chain as glib above, one hop further: proc-macro-error is
+  # a build-time dependency of glib-macros, which glib depends on. Not
+  # reachable on the macOS/Windows targets we ship (`cargo tree --locked -i
+  # proc-macro-error --target all` shows only the glib-macros -> glib -> gtk
+  # -> tauri chain; darwin/windows targets print nothing). Not a known
+  # vulnerability, only "no longer maintained".
+  # Review-by: 2027-03-15 (6 months) -- same trigger as RUSTSEC-2024-0429.
+  "RUSTSEC-2024-0370",
+
+  # --- unic-* crates, all unmaintained (RUSTSEC-2025-0075/0080/0081/0098/0100) --
+  # unic-char-range, unic-common, unic-char-property, unic-ucd-version and
+  # unic-ucd-ident form one dependency chain:
+  #   unic-ucd-ident <- urlpattern <- tauri-utils <- tauri
+  # Unlike glib, this one IS reachable on every shipped target -- confirmed
+  # with `cargo tree --locked -i unic-ucd-ident --target aarch64-apple-darwin`
+  # and `--target x86_64-pc-windows-msvc`, both showing the tauri-utils path.
+  # `tauri-utils` uses `urlpattern` for its own IPC/navigation URL-pattern
+  # matching; we do not call any `unic-*` API directly and have no
+  # `unic-*` dependency of our own. All five advisories are "unmaintained",
+  # not a known vulnerability -- this is an upstream Tauri dependency-freshness
+  # problem, not something patchable from this repository short of vendoring
+  # or pinning an alternate `urlpattern`/`tauri-utils`, either of which is a
+  # bigger change than accepting the warning.
+  # Review-by: 2026-12-15 (90 days) -- shorter than the Linux-only entries
+  # above because this chain IS in the shipped binaries; re-check whether a
+  # `tauri`/`tauri-utils` upgrade has replaced `urlpattern`'s `unic-ucd-ident`
+  # dependency (its changelog is the fastest way to check) before renewing.
+  "RUSTSEC-2025-0075",
+  "RUSTSEC-2025-0080",
+  "RUSTSEC-2025-0081",
+  "RUSTSEC-2025-0098",
+  "RUSTSEC-2025-0100",
+
+  # --- zbus family, all unmaintained (RUSTSEC-2026-0370 zvariant 5.14.0, ---
+  # --- RUSTSEC-2026-0371 zbus_names 4.3.4, RUSTSEC-2026-0372 zvariant_derive 5.14.0) ---
+  # Published 2026-10-16: the standalone crates were merged into `zbus` 6.0.0,
+  # and the advisories list no patched version. Transitive only through the
+  # Linux Secret Service credential store:
+  #   {zvariant, zvariant_derive, zbus_names} <- zbus 5.19.0 <- secret-service
+  #   <- zbus-secret-service-keyring-store <- keyring 4.2.0 <- bridge
+  # (`cargo tree --locked -i zvariant --target all`; the same chain for the
+  # other two). Confirmed not reachable on the shipped targets: for each of the
+  # three crates, `cargo tree --locked -p bridge -i <crate> --target
+  # aarch64-apple-darwin` and `--target x86_64-pc-windows-msvc` print nothing
+  # ("nothing to print"), checked against src-tauri/Cargo.lock (the only
+  # lockfile) on 2026-10-18. This project ships only macOS and
+  # Windows builds (docs/release-process.md), which use the Apple and Windows
+  # credential stores. There is no in-range fix: `cargo update --dry-run -p
+  # zbus` and `-p keyring` lock nothing new, because the move to `zbus` 6 is
+  # the Secret Service crates' own change, not ours. Not a known vulnerability,
+  # only "no longer maintained".
+  # Review-by: 2027-04-18 (6 months) -- re-run the target check above and look
+  # for a `keyring` / `secret-service` release on `zbus` 6 (which drops all
+  # three); renew only if a Linux build target is still not shipped.
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0372",
+
+  # --- RUSTSEC-2026-0459 -- libsqlite3-sys 0.37.0, a VULNERABILITY, accepted --
+  # Added 2026-11-09 because it failed Dependency security on every merge-queue
+  # group and on master. Affected: libsqlite3-sys 0.6.0 to 0.38.2; patched:
+  # >= 0.39.0. No lockable fix exists: the newest sqlx-sqlite release, 0.9.0,
+  # requires libsqlite3-sys >=0.30.1, <0.38.0, so 0.39 cannot be locked beside
+  # it, and the sqlx release that raises the bound is not published. Not
+  # taken: a git dependency on unreleased sqlx, a [patch] or a fork (each a
+  # new source, P8) and any bump whose only effect is a passing audit.
+  # A bump does not move the bundled SQLite; see #2432, which holds the
+  # decision. cargo-audit prints nothing for an ignored id; the scheduled
+  # tracker lists it with its review-by date every day it runs, and the date
+  # below is what fails a test once it has passed
+  # (scripts/audit-review-by.test.mjs). The id is ignored for any
+  # libsqlite3-sys version it matches.
+  # Review-by: 2026-12-09 (30 days; shorter than the others because this one is
+  # an error, not a warning). Remove this entry when a patched libsqlite3-sys
+  # can be locked and the tracking issue confirms it clears the shipped build;
+  # renew only with a new finding written in that issue.
+  "RUSTSEC-2026-0459",
+]
+# A yanked crate (no RUSTSEC id -- cargo-audit reports yanked crates
+# separately from `ignore`-able advisory ids) can't be listed here:
+# `--ignore` takes an advisory id and a yanked-crate warning has none. The
+# fix is a lockfile update to an unyanked release, not an accepted-risk
+# entry. `chacha20 0.10.1` was one: `cargo tree --locked -i chacha20
+# --target all` printed nothing against src-tauri's workspace members, so it
+# was an unreachable lockfile entry, and bridge#445 moved both lockfiles to
+# the unyanked 0.10.2.
+
+[yanked]
+# Keep yanked-crate checking on (the tool default) -- it is what caught
+# chacha20 (see the note above).
+enabled = true

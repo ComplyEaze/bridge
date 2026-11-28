@@ -392,6 +392,7 @@ async fn a_statement_read_refuses_a_several_currency_book_after_its_currency_rea
                 )
                 .unwrap(),
                 kind,
+                TallyDate::parse("20261109").unwrap(),
             )
             .await
             .unwrap_err();

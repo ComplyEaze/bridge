@@ -1,0 +1,5 @@
+.github/workflows/ci.yml
+scripts/check-ci-workflow-consistency.mjs
+src-tauri/Cargo.lock
+src-tauri/Cargo.toml
+reviewer: lamemustafa

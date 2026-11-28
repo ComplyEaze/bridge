@@ -116,6 +116,7 @@ pub fn run_journal_confirmation_child_from_args(
         Some("--confirm-release") => agent::run_release_confirmation,
         Some("--confirm-settle") => agent::run_settle_confirmation,
         Some("--confirm-row-release") => agent::run_release_rows_confirmation,
+        Some("--confirm-stock-item") => agent::run_stock_item_confirmation,
         _ => return None,
     };
     if args.next().is_some() {
@@ -536,3 +537,9 @@ mod client_preference_mount_tests;
 
 #[cfg(test)]
 mod hand_entry_texts_tests;
+
+#[cfg(test)]
+mod company_variable_writer_tests;
+
+#[cfg(test)]
+mod failure_code_sites_tests;

@@ -1,0 +1,2 @@
+- A divergent invoice's next step now names each e-invoice difference (`IRN`, `IRNACKNO`, `IRNACKDATE`, `e_invoice_not_found`, `e_invoice_not_unique`, `e_invoice_readback_failed`, `e_invoice_readback_unreadable`) and says to check the details on the voucher's Statutory Details screen in Tally (#2574).
+  When an invoice's e-invoice details are what take its approval text over the window's limit, `build_import_xml` now refuses it as `invoice_review_too_large_with_e_invoice`, whose next step is to build it again without the details and enter them in Tally.

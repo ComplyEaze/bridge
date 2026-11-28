@@ -48,7 +48,13 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 
 #[path = "runtime_masters.rs"]
 mod masters;
-pub(crate) use masters::{MastersKind, MastersReadError, MastersRows, VoucherNumberingRead};
+#[cfg(test)]
+pub(crate) use masters::StockItemCountMismatch;
+pub(crate) use masters::{
+    target_binding_mark, AdmittedCandidateRead, AdmittedStockGroups, AdmittedStockUnits,
+    CompanyMarksParser, CompanyMasterMark, MastersKind, MastersReadError, MastersRows,
+    StockItemReadKind, StockItemRecheckReads, VoucherNumberingRead,
+};
 
 #[cfg(test)]
 #[path = "runtime_masters_tests.rs"]
@@ -71,7 +77,7 @@ mod negative_ledgers;
 pub(crate) use negative_ledgers::NegativeLedgersReadError;
 #[path = "runtime_party_bills.rs"]
 mod party_bills;
-pub(crate) use party_bills::PartyBillsReadError;
+pub(crate) use party_bills::{OpenBillsParty, PartyBillsReadError};
 
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;
@@ -190,7 +196,7 @@ impl ObservedTally {
 
 /// What the endpoint queue read to admit a post, before the aim: the reads of
 /// the request's own kind.
-enum QueuedReads {
+enum QueuedReads<'a> {
     Vouchers {
         catalogue: String,
         groups: Option<String>,
@@ -199,10 +205,22 @@ enum QueuedReads {
         invoice_answers: Option<Box<super::approved_import::InvoiceAnswers>>,
     },
     Masters {
+        /// The ledger admission the index reads were made for.
+        admission: &'a super::approved_import::LedgerAdmission,
         ledgers_first: String,
         ledgers_second: String,
         groups_first: String,
         groups_second: String,
+    },
+    /// The candidate, stock-group and unit reads, each sized at the target's
+    /// binding mark. Boxed: they carry the company three times.
+    StockItem {
+        admission: &'a super::approved_import::StockItemAdmission,
+        reads: Box<(
+            AdmittedCandidateRead,
+            AdmittedStockGroups,
+            AdmittedStockUnits,
+        )>,
     },
 }
 
@@ -488,6 +506,7 @@ fn classify_audit_part_failure(error: &anyhow::Error) -> AuditPartFailure {
             | TallyTransportError::ResponseTruncated => AuditPartFailureKind::ConnectionDropped,
             TallyTransportError::HttpStatus { .. }
             | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer
             | TallyTransportError::UnsupportedContentEncoding => {
                 AuditPartFailureKind::HeadRejected(transport.safe_code())
             }
@@ -981,7 +1000,7 @@ pub(crate) async fn read_classified_currency(
         ))
     };
     let (body, read) = paired_read(
-        render_company_currency_request(identity.display_name()),
+        render_company_currency_request(identity.company_name()),
         PairedReadValidationError::CurrencyMaster,
     )
     .await?;
@@ -1015,7 +1034,7 @@ pub(crate) async fn identify_base_among_several(
     };
     let (with_original_names, company_currency_name) = {
         let (body, read) = paired_read(
-            render_company_currency_request_with_originalname(identity.display_name()),
+            render_company_currency_request_with_originalname(identity.company_name()),
             PairedReadValidationError::CurrencyMaster,
         )
         .await?;
@@ -1029,7 +1048,7 @@ pub(crate) async fn identify_base_among_several(
             ));
         }
         let (body, read) = paired_read(
-            render_company_base_currency_request(identity.display_name()),
+            render_company_base_currency_request(identity.company_name()),
             PairedReadValidationError::CompanyCurrencyName,
         )
         .await?;
@@ -1316,6 +1335,81 @@ impl ClassifiedCompanyCurrencyRead {
 #[error("{0}")]
 pub(crate) struct CurrencyAdmissionRefusal(pub(crate) &'static str);
 
+/// Whether an opening read admits a book with several Currency masters (#683).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SeveralCurrencyOpening {
+    /// Refused as `company_several_currency_masters`: every reader but one.
+    Refused,
+    /// Admitted at the book's first day only, for `ledger_movement`.
+    AtFirstDay,
+}
+
+/// Proof that an opening read of a book with several Currency masters was
+/// pinned at the book's first day, through the INR base Tally identifies.
+///
+/// Only from that day does a composite mark every foreign balance; from a later
+/// day a foreign party balance reads as a plain rupee figure that no composite
+/// test sees (TALLY_PROTOCOL_REFERENCE §8.2n). So [`Self::at`] builds none for a
+/// later date, and nothing that sets ledgers aside by currency is reachable
+/// without one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SeveralCurrencyFirstDay {
+    /// The ledgers whose opening at that day is a currency composite (rule 3).
+    composite_openings: std::collections::BTreeSet<String>,
+}
+
+impl SeveralCurrencyFirstDay {
+    /// Built only after Tally identified an INR base among the masters, and
+    /// only when `from` is the book's first day.
+    fn at(
+        books_from: &TallyDate,
+        from: &TallyDate,
+        _base: &IdentifiedBaseCurrency,
+    ) -> Option<Self> {
+        (books_from == from).then(|| Self {
+            composite_openings: std::collections::BTreeSet::new(),
+        })
+    }
+
+    /// A first-day admission with the given rule-3 set, for the movement's
+    /// tests, which classify captured answers without a runtime read.
+    #[cfg(test)]
+    pub(crate) fn for_tests(composite_openings: std::collections::BTreeSet<String>) -> Self {
+        Self { composite_openings }
+    }
+
+    /// The ledgers whose opening export gave a composite at the first day.
+    pub(crate) fn composite_openings(&self) -> &std::collections::BTreeSet<String> {
+        &self.composite_openings
+    }
+}
+
+/// Rule 3 (#683): the ledgers whose opening is a currency composite, judged by
+/// the classifier `trial_balance` uses.
+fn composite_opening_names(ledgers: &[TallyLedger]) -> std::collections::BTreeSet<String> {
+    ledgers
+        .iter()
+        .filter(|ledger| {
+            ledger
+                .opening_balance
+                .as_deref()
+                .is_some_and(bridge_tally_protocol::currency_composite::is_balance_composite)
+        })
+        .map(|ledger| ledger.name.clone())
+        .collect()
+}
+
+/// `ledger_movement`'s opening read: the ledgers, the extent they were read
+/// under, and, for a book with several Currency masters, its first-day
+/// admission (#683).
+#[derive(Debug)]
+pub(crate) struct MovementLedgerOpening {
+    pub(crate) ledgers: Vec<TallyLedger>,
+    pub(crate) extent: CompanyBookExtent,
+    pub(crate) several_currency: Option<SeveralCurrencyFirstDay>,
+    pub(crate) evidence: RuntimeReadEvidence,
+}
+
 /// One BOOKSFROM-pinned ledger export and the book extent it was read under:
 /// the opening and closing extents were equal, or the read refused.
 #[derive(Debug)]
@@ -1332,6 +1426,7 @@ pub(crate) struct LedgerListing {
 struct LedgerOpeningRead {
     listing: LedgerListing,
     groups: Option<Vec<bridge_tally_protocol::TallyNamedMaster>>,
+    several_currency: Option<SeveralCurrencyFirstDay>,
 }
 
 /// The compliance ledger records, the group collection read with them, the
@@ -1905,7 +2000,11 @@ async fn read_invoice_plan(
     answers.rates = Some(paired(client, identity, &plan.rates, &mut evidence).await?);
     answers.voucher_types =
         Some(paired(client, identity, &plan.voucher_types, &mut evidence).await?);
-    answers.number = Some(paired(client, identity, &plan.number, &mut evidence).await?);
+    for month in &plan.number {
+        answers
+            .number
+            .push(paired(client, identity, month, &mut evidence).await?);
+    }
     if let Some(request) = &plan.number_control {
         answers.number_control = Some(paired(client, identity, request, &mut evidence).await?);
     }
@@ -2103,11 +2202,32 @@ pub(crate) enum NativeLedgerIdentityAdmissionError {
     InvalidMasterId,
 }
 
+#[cfg(test)]
 fn admit_native_ledger_opening_rows(
     xml: &str,
     company_guid: &str,
 ) -> anyhow::Result<Vec<TallyLedger>> {
-    let parsed = parse_native_ledger_source_records_with_evidence(xml, company_guid)?;
+    admit_native_ledger_opening_rows_as(xml, company_guid, SeveralCurrencyOpening::Refused)
+}
+
+fn admit_native_ledger_opening_rows_as(
+    xml: &str,
+    company_guid: &str,
+    several_currency: SeveralCurrencyOpening,
+) -> anyhow::Result<Vec<TallyLedger>> {
+    let parsed = match several_currency {
+        SeveralCurrencyOpening::Refused => {
+            parse_native_ledger_source_records_with_evidence(xml, company_guid)?
+        }
+        // A composite opening is kept as text, to set its ledger aside by name
+        // (§8.2n); any other value that is not a decimal still refuses.
+        SeveralCurrencyOpening::AtFirstDay => {
+            bridge_tally_protocol::parse_native_ledger_source_records_keeping_composite_openings(
+                xml,
+                company_guid,
+            )?
+        }
+    };
     if !parsed.evidence.duplicate_identities.is_empty() {
         return Err(NativeLedgerIdentityAdmissionError::Duplicate.into());
     }
@@ -3041,6 +3161,7 @@ impl TallyRuntime {
             identity,
             None,
             false,
+            SeveralCurrencyOpening::Refused,
             // Sent once, as the movement catalogue is: a catalogue that outlived
             // its deadline is abandoned, and sending it again queues more work
             // behind a gateway still building the response (#485, #937).
@@ -3066,6 +3187,7 @@ impl TallyRuntime {
                 identity,
                 None,
                 true,
+                SeveralCurrencyOpening::Refused,
                 // Sent once, as above (#485, #937).
                 ReadRetryPolicy::SINGLE_ATTEMPT,
             )
@@ -3096,6 +3218,7 @@ impl TallyRuntime {
             identity,
             Some(from),
             false,
+            SeveralCurrencyOpening::Refused,
             // Sent once. A catalogue that outlived its deadline is abandoned, and
             // sending it again queues more work behind a gateway still building
             // the response: agent voucher reads take the same rule (#485, #937).
@@ -3105,12 +3228,43 @@ impl TallyRuntime {
         .map(|read| (read.listing.ledgers, read.listing.evidence))
     }
 
+    /// `ledger_movement`'s opening read at `from`. As
+    /// [`Self::fetch_ledger_opening_at_with_evidence`], except that a book with
+    /// several Currency masters is admitted when `from` is the book's first
+    /// day and Tally identifies an INR base among them (#683, §8.2n). A later
+    /// `from` still refuses as `company_several_currency_masters`, before any
+    /// ledger request.
+    pub(crate) async fn fetch_movement_ledger_opening_at(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        from: TallyDate,
+    ) -> anyhow::Result<MovementLedgerOpening> {
+        self.fetch_ledger_opening_with_evidence(
+            config,
+            identity,
+            Some(from),
+            false,
+            SeveralCurrencyOpening::AtFirstDay,
+            // Sent once, as above (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
+        )
+        .await
+        .map(|read| MovementLedgerOpening {
+            ledgers: read.listing.ledgers,
+            extent: read.listing.extent,
+            several_currency: read.several_currency,
+            evidence: read.listing.evidence,
+        })
+    }
+
     async fn fetch_ledger_opening_with_evidence(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         opening_date: Option<TallyDate>,
         read_groups: bool,
+        several_currency: SeveralCurrencyOpening,
         retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -3137,7 +3291,7 @@ impl TallyRuntime {
                         // before any ledger request (bridge#714). A foreign
                         // ledger's non-zero bare opening is UNOBSERVED; the
                         // captured book's dollar openings are 0.00.
-                        let request = render_company_currency_request(identity.display_name());
+                        let request = render_company_currency_request(identity.company_name());
                         let (body, encoded_bytes, encoded_sha256) = client
                             .fetch_native_report_paired(request.clone())
                             .await?
@@ -3156,11 +3310,49 @@ impl TallyRuntime {
                             (1, true) => None,
                             (0, _) => Some("company_currency_probe_failed"),
                             (1, false) => Some("company_base_currency_not_inr"),
+                            // Several masters: admitted for the movement read at
+                            // the book's first day only (#683, §8.2n), checked
+                            // before anything more is sent.
+                            _ if several_currency == SeveralCurrencyOpening::AtFirstDay
+                                && opening_date.as_ref() == Some(opening_extent.books_from()) =>
+                            {
+                                None
+                            }
                             _ => Some("company_several_currency_masters"),
                         };
                         if let Some(code) = refusal {
                             return Err(anyhow::Error::new(CurrencyAdmissionRefusal(code)));
                         }
+                        let mut first_day = if currency.currency_count > 1 {
+                            let masters = parse_currency_master_list(&body)?;
+                            let identified = identify_base_among_several(
+                                &client,
+                                &identity,
+                                &mut evidence,
+                                masters,
+                            )
+                            .await?
+                            .ok_or(CurrencyAdmissionRefusal(
+                                "company_base_currency_undetermined",
+                            ))?;
+                            if !identified.is_inr() {
+                                return Err(anyhow::Error::new(CurrencyAdmissionRefusal(
+                                    "company_base_currency_not_inr",
+                                )));
+                            }
+                            let first_day = opening_date.as_ref().and_then(|from| {
+                                SeveralCurrencyFirstDay::at(
+                                    opening_extent.books_from(),
+                                    from,
+                                    &identified,
+                                )
+                            });
+                            Some(first_day.ok_or(CurrencyAdmissionRefusal(
+                                "company_several_currency_masters",
+                            ))?)
+                        } else {
+                            None
+                        };
                         let period = ledger_opening_period(
                             boundary_profile,
                             opening_extent.books_from(),
@@ -3169,7 +3361,7 @@ impl TallyRuntime {
                         )
                         .map_err(OpeningBoundaryObservationError::Period)?;
                         let request =
-                            render_native_ledger_export_request(identity.display_name(), &period);
+                            render_native_ledger_export_request(identity.company_name(), &period);
                         let paired = client.fetch_native_report_paired(request.clone()).await?;
                         let (body, encoded_bytes, encoded_sha256) = paired
                             .require_stable(PairedReadValidationError::NativeLedgerCollection)?;
@@ -3178,11 +3370,23 @@ impl TallyRuntime {
                             encoded_sha256,
                             encoded_bytes,
                         ));
-                        let ledgers =
-                            admit_native_ledger_opening_rows(&body, identity.company_guid())?;
+                        let ledgers = admit_native_ledger_opening_rows_as(
+                            &body,
+                            identity.company_guid(),
+                            if first_day.is_some() {
+                                SeveralCurrencyOpening::AtFirstDay
+                            } else {
+                                SeveralCurrencyOpening::Refused
+                            },
+                        )?;
+                        // Rule 3 (#683): a composite opening sets its ledger
+                        // aside; the parse kept no other non-decimal.
+                        if let Some(first_day) = first_day.as_mut() {
+                            first_day.composite_openings = composite_opening_names(&ledgers);
+                        }
                         let groups = if read_groups {
                             let request =
-                                render_native_group_snapshot_request(identity.display_name());
+                                render_native_group_snapshot_request(identity.company_name());
                             let paired = client.fetch_native_report_paired(request.clone()).await?;
                             let (body, encoded_bytes, encoded_sha256) = paired
                                 .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
@@ -3213,6 +3417,7 @@ impl TallyRuntime {
                                 evidence: evidence.clone(),
                             },
                             groups,
+                            several_currency: first_day,
                         })
                     }
                     .await;
@@ -3499,7 +3704,10 @@ impl TallyRuntime {
     /// One approved mutation through the shared endpoint queue. The durable
     /// intent is committed after identity admission and before any import bytes.
     /// Unlike paired reads, an import must never be repeated automatically.
-    pub(crate) async fn post_approved_import<A, F, L>(
+    /// What the admission recheck returns is handed to `before_dispatch` by
+    /// value, so the intent records what the recheck saw; a value never spent
+    /// is dropped in the same execution.
+    pub(crate) async fn post_approved_import<A, F, R, L>(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
@@ -3508,8 +3716,8 @@ impl TallyRuntime {
         before_dispatch: F,
     ) -> anyhow::Result<ApprovedImportDispatch>
     where
-        A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<()>,
-        F: Fn() -> Result<L, super::approved_import::BeforeDispatchError>,
+        A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<R>,
+        F: Fn(R) -> Result<L, super::approved_import::BeforeDispatchError>,
         L: super::approved_import::DispatchLicense,
     {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -3539,12 +3747,20 @@ impl TallyRuntime {
                     // marked as refused before the intent; nothing that records
                     // the intent or sends may move into it
                     // (`tests/approval_seam_gate.rs` holds it to that).
-                    let (admission_evidence, before_marks) = async {
+                    let (admission_evidence, before_marks, rechecked) = async {
                         // A master post is for the company it was rendered for: the
                         // request names it, and the identity brackets check this one.
                         // A mismatch is a wiring fault, refused before any request.
                         if let super::approved_import::ApprovedKind::Masters(masters) = &request.kind {
-                            if masters.company() != &identity {
+                            let consistent = match masters.writes() {
+                                super::approved_import::AdmittedWrites::Ledgers(ledgers) => {
+                                    ledgers.company() == &identity
+                                }
+                                super::approved_import::AdmittedWrites::StockItem(stock) => {
+                                    stock.company() == &identity
+                                }
+                            };
+                            if !consistent {
                                 return Err(anyhow::Error::from(
                                     super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent,
                                 ));
@@ -3675,11 +3891,38 @@ impl TallyRuntime {
                                     admission_evidence,
                                 )
                             }
-                            super::approved_import::ApprovedKind::Masters(masters) => {
+                            super::approved_import::ApprovedKind::Masters(masters) => 'masters: {
+                                let admission = match masters.writes() {
+                                    super::approved_import::AdmittedWrites::Ledgers(ledgers) => ledgers,
+                                    // A stock item's reads, sized at the target's mark in the
+                                    // binding marks above, as the standalone recheck sizes them.
+                                    super::approved_import::AdmittedWrites::StockItem(admission) => {
+                                        let mut evidence = admission_evidence.clone();
+                                        // Boxed, as the invoice reads are: this future would
+                                        // otherwise sit inside the post's.
+                                        let read = Box::pin(masters::read_stock_item_admission(
+                                            &reads,
+                                            &identity,
+                                            &binding_marks.text,
+                                            admission.parse_marks(),
+                                            &mut evidence,
+                                        ))
+                                        .await;
+                                        let stock_reads =
+                                            read.map_err(|error| with_read_evidence(error, evidence.clone()))?;
+                                        break 'masters (
+                                            QueuedReads::StockItem {
+                                                admission,
+                                                reads: Box::new(stock_reads),
+                                            },
+                                            evidence,
+                                        );
+                                    }
+                                };
                                 let (ledgers_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledger_index_request(),
+                                    admission.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3687,7 +3930,7 @@ impl TallyRuntime {
                                 let (ledgers_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.ledger_index_request(),
+                                    admission.ledger_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3695,7 +3938,7 @@ impl TallyRuntime {
                                 let (groups_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.group_index_request(),
+                                    admission.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3703,13 +3946,14 @@ impl TallyRuntime {
                                 let (groups_second, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    masters.group_index_request(),
+                                    admission.group_index_request(),
                                 )
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                                 let admission_evidence = admission_evidence.combine(evidence);
                                 (
                                     QueuedReads::Masters {
+                                        admission,
                                         ledgers_first: ledgers_first.body,
                                         ledgers_second: ledgers_second.body,
                                         groups_first: groups_first.body,
@@ -3818,8 +4062,9 @@ impl TallyRuntime {
                                 ),
                             },
                             (
-                                super::approved_import::ApprovedKind::Masters(masters),
+                                super::approved_import::ApprovedKind::Masters(_),
                                 QueuedReads::Masters {
+                                    admission,
                                     ledgers_first,
                                     ledgers_second,
                                     groups_first,
@@ -3827,8 +4072,8 @@ impl TallyRuntime {
                                 },
                                 None,
                             ) => super::approved_import::QueuedAdmission::Masters {
-                                batch: masters.batch(),
-                                company: masters.company(),
+                                batch: admission.batch(),
+                                company: admission.company(),
                                 ledgers_first,
                                 ledgers_second,
                                 groups_first,
@@ -3836,6 +4081,23 @@ impl TallyRuntime {
                                 company_marks_at_binding: &binding_marks.text,
                                 company_marks: &before_marks.text,
                             },
+                            (
+                                super::approved_import::ApprovedKind::Masters(_),
+                                QueuedReads::StockItem {
+                                    admission,
+                                    reads: stock,
+                                },
+                                None,
+                            ) => super::approved_import::QueuedAdmission::StockItem(
+                                super::approved_import::QueuedStockItem::new(
+                                    admission,
+                                    &stock.0,
+                                    &stock.1,
+                                    &stock.2,
+                                    &binding_marks.text,
+                                    &before_marks.text,
+                                ),
+                            ),
                             _ => {
                                 return Err(with_read_evidence(
                                     super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent
@@ -3844,9 +4106,9 @@ impl TallyRuntime {
                                 ))
                             }
                         };
-                        recheck_admission(queued)
+                        let rechecked = recheck_admission(queued)
                             .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
-                        Ok::<_, anyhow::Error>((admission_evidence, before_marks))
+                        Ok::<_, anyhow::Error>((admission_evidence, before_marks, rechecked))
                     }
                     .await
                     .map_err(|source| {
@@ -3879,7 +4141,7 @@ impl TallyRuntime {
                             admission_evidence.clone(),
                         )
                     })?;
-                    let license = before_dispatch().map_err(|error| {
+                    let license = before_dispatch(rechecked).map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
                                 anyhow::Error::from(refusal)
@@ -4141,8 +4403,14 @@ impl TallyRuntime {
                         }
                     };
                     let mut total_bytes = 0usize;
-                    let read =
-                        |kind| render_native_bills_request(kind, company, &books_from, &as_of);
+                    let read = |kind| {
+                        render_native_bills_request(
+                            kind,
+                            identity.company_name(),
+                            &books_from,
+                            &as_of,
+                        )
+                    };
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
                         .fetch_native_report_paired(receivable_request.clone())
@@ -4173,7 +4441,8 @@ impl TallyRuntime {
                     // subgroup. The native group snapshot resolves it all the
                     // way to Sundry Debtors/Creditors without importing the
                     // legacy custom-TDL profile.
-                    let group_request = render_native_group_snapshot_request(company);
+                    let group_request =
+                        render_native_group_snapshot_request(identity.company_name());
                     let groups = client
                         .fetch_native_report_paired(group_request.clone())
                         .await?;
@@ -4224,8 +4493,10 @@ impl TallyRuntime {
                         encoded_bytes,
                     ));
 
-                    let ledger_request =
-                        render_native_ledger_snapshot_request(company, &snapshot_period);
+                    let ledger_request = render_native_ledger_snapshot_request(
+                        identity.company_name(),
+                        &snapshot_period,
+                    );
                     let ledgers = client
                         .fetch_native_report_paired(ledger_request.clone())
                         .await?;
@@ -4470,7 +4741,7 @@ impl TallyRuntime {
                     // Pin identity first: a currency read against the wrong
                     // company is worse than none.
                     let extent = client.fetch_company_book_extent(&identity).await?;
-                    let request = render_company_currency_request(identity.display_name());
+                    let request = render_company_currency_request(identity.company_name());
                     let body = client.fetch_native_report_paired(request.clone()).await?;
                     let (body, encoded_bytes, encoded_sha256) =
                         body.require_stable(PairedReadValidationError::CurrencyMaster)?;
@@ -4753,7 +5024,8 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
         ) => ReadFailureClass::SizeLimit,
         Some(
             TallyTransportError::UnsupportedContentEncoding
-            | TallyTransportError::InvalidEncoding { .. },
+            | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::EmptyAnswer,
         ) => ReadFailureClass::Decode,
         Some(
             TallyTransportError::EndpointInvalid { .. }

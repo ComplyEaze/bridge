@@ -1,7 +1,9 @@
 //! Read profiles for the local MCP adapter.
+use super::failure_code::CompanyReadCode;
 use super::*;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+use bridge_tally_protocol::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 
 /// The FETCH list for reads that RETURN bill allocations.
 ///
@@ -186,7 +188,7 @@ pub(super) fn render_agent_named_vouchers_in_span(
     classes: bool,
 ) -> Result<String, String> {
     let mut fetch = AGENT_VOUCHER_FETCH.to_string();
-    if fields.e_invoice == EInvoiceFields::Asked {
+    if fields.e_invoice.asked() {
         fetch.push_str(AGENT_VOUCHER_E_INVOICE_WORDS);
     }
     if fields.gst == VoucherGstFields::Asked {
@@ -299,14 +301,19 @@ fn render_voucher_census(
     let (collection, type_element) =
         scope.collection("Bridge Agent Voucher Census", "Bridge Agent Ledger Census");
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     let span_filter = span.filter();
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company.as_str())
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     ))
 }
 
@@ -388,13 +395,18 @@ fn render_scoped_vouchers(
     let (collection, type_element) =
         scope.collection("Bridge Agent Vouchers", "Bridge Agent Ledger Vouchers");
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company.as_str())
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     ))
 }
 
@@ -543,12 +555,17 @@ fn render_status_window(
 ) -> Result<String, String> {
     let fetch_tail = fetch.tail();
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
+    let static_variables = company.xml_static_variables(
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN{fetch_tail}</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company.as_str()),
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN{fetch_tail}</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(type_name.as_str())
     ))
 }
@@ -572,9 +589,13 @@ pub(super) fn gst_status_read(
 }
 
 pub(super) fn render_agent_company_high_water(company: &str) -> String {
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        "",
+    );
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Company High Water</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Agent Company High Water\" ISMODIFY=\"No\"><TYPE>Company</TYPE><FETCH>GUID,ALTVCHID,ALTMSTID</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company)
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Company High Water</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Agent Company High Water\" ISMODIFY=\"No\"><TYPE>Company</TYPE><FETCH>GUID,ALTVCHID,ALTMSTID</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
 }
 
@@ -607,7 +628,7 @@ impl ReadRequest {
 
 /// The book's voucher-type masters, as the sync connector reads them: names
 /// and GUIDs only, no period (bridge#664).
-pub(super) fn voucher_type_catalogue_read(company: &str) -> ReadRequest {
+pub(super) fn voucher_type_catalogue_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_voucher_type_export_request(
             company,
@@ -652,7 +673,7 @@ pub(super) fn ledger_name_index_read(company: &str) -> anyhow::Result<ReadReques
 /// sensitive master values; the one caller projects each row onto the few
 /// fields it reads (`agent_master_verdict::PartyView`).
 pub(super) fn party_ledger_master_for_parent_read(
-    company: &str,
+    company: &ValidatedCompanyName,
     period: &bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod,
     part: &bridge_tally_protocol::parent_partition::ParentPart,
 ) -> ReadRequest {
@@ -663,7 +684,7 @@ pub(super) fn party_ledger_master_for_parent_read(
     )
 }
 
-pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
+pub(super) fn native_group_snapshot_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(company),
     )
@@ -675,16 +696,17 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_voucher_types_request(company))
 }
 
-/// The vouchers carrying one invoice number in one financial year, with the
-/// measured per-row Sales-class compute, for the duplicate-number check.
-pub(super) fn invoice_number_read(
+/// Every voucher of one window (a calendar month of an invoice's financial
+/// year), with the measured per-row compute of the invoice's class, for the
+/// duplicate-number check: the program compares the numbers (#2162 item 11).
+pub(super) fn invoice_window_numbers_read(
     company: &str,
-    number: &agent_import::invoice::InvoiceNumber,
+    class: agent_import::InvoiceClass,
     window: (&TallyDate, &TallyDate),
 ) -> ReadRequest {
-    ReadRequest(agent_import::invoice::render_invoice_number_request(
-        company, number, window,
-    ))
+    ReadRequest(
+        agent_import::invoice::render_invoice_window_numbers_request(company, class, window),
+    )
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.
@@ -697,6 +719,25 @@ pub(super) fn invoice_readback_read(
     ReadRequest(agent_import::invoice::render_invoice_readback_request(
         company, type_guid, number, window,
     ))
+}
+
+/// A posted invoice's e-invoice details, read over its one date by the window read with the
+/// e-invoice words: byte for byte the request a `vouchers` call with `include_e_invoice` sends for
+/// a window it reads whole (§8.2j, measured on `BRIDGE EINVOICE LAB`), so no new request shape is
+/// sent. Only an invoice that carries details sends it (#2162 item 9).
+pub(super) fn invoice_e_invoice_read(
+    company: &str,
+    date: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_named_vouchers_in_span(
+        company,
+        date,
+        date,
+        None,
+        NamedVoucherFields::E_INVOICE_ONLY,
+        false,
+    )
+    .map(ReadRequest)
 }
 
 /// The ledger listing with each ledger's GST rate and rounding, for the tax
@@ -730,7 +771,7 @@ pub(super) fn invoice_company_registration_read(company: &str) -> ReadRequest {
 /// The company's Currency masters: the request the outstandings paths send,
 /// verbatim. Its response carries no company GUID, so it is bound only by the
 /// identity brackets it is read inside.
-pub(super) fn company_currency_read(company: &str) -> ReadRequest {
+pub(super) fn company_currency_read(company: &ValidatedCompanyName) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_company_currency_request(company),
     )
@@ -873,7 +914,7 @@ mod sealed_read_tests {
         let mut reads = vec![
             company_high_water_read(company),
             standard_ledger_catalog_read(company).unwrap(),
-            native_group_snapshot_read(company),
+            native_group_snapshot_read(&ValidatedCompanyName::new(company).unwrap()),
             voucher_census_read(company, &from, &to, span).unwrap(),
             gst_status_read(
                 company,

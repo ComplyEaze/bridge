@@ -499,7 +499,7 @@ pub(crate) async fn selected_voucher_operation(
     let from = normalized_date(required_string(args, "from")?)?;
     let to = normalized_date(required_string(args, "to")?)?;
     if from > to {
-        return Err("invalid_date_range".to_string().into());
+        return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     let (company, identity, accumulated) = server.verified_company(guid).await?;
     selected_voucher_operation_for_verified(
@@ -731,7 +731,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             gst: VoucherGstFields::following(shown.2),
         });
         let read = server
-            .read_entry_window_rows(
+            .read_entry_window_rows_reusing_census(
                 &identity,
                 &company.name,
                 &from,
@@ -783,7 +783,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     .read_group_placements(&identity, &company.name, &mut accumulated, None)
                     .await?;
                 if !first.same_ledgers(&second) {
-                    return Err("ledger_snapshot_drifted".to_string().into());
+                    return Err(super::failure_code::ReadCode::LedgerSnapshotDrifted.into());
                 }
                 if first != second {
                     return Err("group_snapshot_drifted".to_string().into());
@@ -819,7 +819,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 || rows.iter().flat_map(|row| row["amounts"].as_array().into_iter().flatten())
                     .any(|entry| !initial.contains(entry["ledger"].as_str().unwrap_or_default()))
             {
-                return Err("ledger_snapshot_drifted".to_string().into());
+                return Err(super::failure_code::ReadCode::LedgerSnapshotDrifted.into());
             }
             rows = filter_voucher_rows_for_ledger(rows, &row_spelling);
             ledger_match = Some(ledger_match_json(
@@ -847,7 +847,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             // confident zero from an unknown name (bridge#664).
             if let (VoucherTypeSelector::Name(name), true) = (selector, selection.rows.is_empty()) {
                 let (book, catalogue_evidence) =
-                    server.read_voucher_type_catalogue(&identity, &company.name).await?;
+                    server.read_voucher_type_catalogue(&identity).await?;
                 accumulate_evidence(&mut accumulated, catalogue_evidence);
                 if let Some(nearest) = unknown_voucher_type(name, &book) {
                     let mut failure = ToolFailure::from("unknown_voucher_type".to_string());
@@ -992,6 +992,10 @@ impl Server {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .drop_company(company_guid);
+        self.held_censuses
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .drop_company(company_guid);
     }
 
     fn drop_voucher_page(&self, key: &VoucherPageKey) -> Result<(), ToolFailure> {
@@ -1131,7 +1135,7 @@ impl Server {
                 parents
             }
         };
-        let (groups, group_evidence) = self.read_group_collection(identity, company).await?;
+        let (groups, group_evidence) = self.read_group_collection(identity).await?;
         accumulate_evidence(accumulated, group_evidence);
         Ok(Placements::build(
             parents
@@ -1146,10 +1150,12 @@ impl Server {
     async fn read_voucher_type_catalogue(
         &self,
         identity: &VerifiedCompanyIdentity,
-        company: &str,
     ) -> Result<(Vec<BookVoucherType>, Evidence), ToolFailure> {
         let (xml, evidence) = self
-            .post_read(identity, voucher_type_catalogue_read(company))
+            .post_read(
+                identity,
+                voucher_type_catalogue_read(identity.company_name()),
+            )
             .await?;
         let parsed = bridge_tally_protocol::parse_native_voucher_type_source_records_with_evidence(
             &xml,
@@ -1333,6 +1339,36 @@ impl Server {
             shape,
             composites,
             gst,
+            WindowPlanSource::Estimate { known_marks: None },
+        )
+        .await
+    }
+
+    /// [`Self::read_entry_window_rows`] for the `vouchers` tool's first page: the
+    /// census may be taken from an earlier call while the company's marks, read
+    /// afresh here, are unchanged (#2399). No other window reader is given the store; the
+    /// desktop screen builds a server per call, so what it leaves is dropped with it.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn read_entry_window_rows_reusing_census(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        from: &TallyDate,
+        to: &TallyDate,
+        shape: VoucherReadShape,
+        composites: VoucherComposites,
+        gst: GstDetailsShown,
+    ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
+        read_entry_window_rows_reading_gst(
+            &AgentReader(self),
+            identity,
+            company,
+            from,
+            to,
+            shape,
+            composites,
+            gst,
+            WindowPlanSource::EstimateReusing(Arc::clone(&self.held_censuses)),
         )
         .await
     }
@@ -1442,6 +1478,7 @@ pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
         shape,
         composites,
         GstDetailsShown::Withheld,
+        WindowPlanSource::Estimate { known_marks: None },
     )
     .await
 }
@@ -1458,6 +1495,7 @@ async fn read_entry_window_rows_reading_gst<R: WindowReader>(
     shape: VoucherReadShape,
     composites: VoucherComposites,
     gst: GstDetailsShown,
+    source: WindowPlanSource,
 ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
     read_voucher_window_with(
         reader,
@@ -1466,7 +1504,7 @@ async fn read_entry_window_rows_reading_gst<R: WindowReader>(
         from,
         to,
         shape,
-        WindowPlanSource::Estimate { known_marks: None },
+        source,
         WindowReadLimits::for_shape(shape).counting_small_books(),
         |xml| match composites {
             VoucherComposites::Withhold => parse_agent_rows_withholding_reading_gst(

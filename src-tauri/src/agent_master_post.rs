@@ -1,6 +1,8 @@
-//! The recheck a master post makes inside the endpoint queue, after approval
-//! and before the intent: the one place that decides whether a ledger name is
-//! already taken.
+//! The rechecks a master post makes after approval and before the intent: the
+//! ledger path decides whether a ledger or group name is already taken, and the
+//! stock twin rebuilds an approved stock draft from fresh admitted stock reads,
+//! which [`recheck_shown_stock_item`] has the runtime's stock coordinator make
+//! in one queued execution. Nothing shipped calls the stock twin yet.
 //!
 //! A master post reads the company's ledger index and group index twice each,
 //! between the all-company mark read as the binding reads begin and the aim
@@ -18,12 +20,21 @@
 //! [`recheck_master_admission`] is the closure body a masters caller passes to
 //! the queue. It reads nothing and sends nothing; [`admit_master_create`]
 //! below it is pure over parsed indexes, so it is tested on constructed ones.
-use super::master_ledger::MasterMark;
+use super::master_ledger::{MasterMark, PreImage, PreImageError};
 use super::post::admit_queued_aim;
-use crate::agent::change_parse::parse_all_company_marks;
+use crate::agent::change_parse::{parse_all_company_marks, LoadedCompanyMarks};
 use crate::tally::approved_import::{ApprovedImportAdmissionError, QueuedAdmission};
 use crate::tally::ledger_create_item::{LedgerCreateBatch, LedgerCreateItem, RenderedLedgerCreate};
-use crate::tally::VerifiedCompanyIdentity;
+use crate::tally::runtime::{
+    target_binding_mark, AdmittedStockGroups, AdmittedStockUnits, CompanyMasterMark,
+    StockItemReadKind, StockItemRecheckReads, TallyRuntime,
+};
+use crate::tally::stock_item_create::{
+    CompleteStockItemCatalogue, CreateRenderRefusal, DraftRefusal, GoodsSibling, ItemNameNotAbsent,
+    NotGoodsSibling, PreparedStockItem, SiblingGst, SiblingRefusal, StockItemCatalogueError,
+    StockItemDraft,
+};
+use crate::tally::{TallyConfig, VerifiedCompanyIdentity};
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError,
 };
@@ -32,7 +43,234 @@ use bridge_tally_protocol::native_outstandings::{
 };
 use bridge_tally_protocol::{parse_ledger_name_index, StandardLedgerCatalogError};
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+
+/// The fresh stock reads and marks for one approved stock-item Create.
+struct StockItemRecheckInput<'a> {
+    prepared: &'a PreparedStockItem,
+    candidate: &'a CompleteStockItemCatalogue,
+    groups: &'a AdmittedStockGroups,
+    units: &'a AdmittedStockUnits,
+    company_marks_at_binding: &'a str,
+    company_marks: &'a str,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) enum StockItemRecheckError {
+    #[error("stock reads are for another company")]
+    OtherCompany,
+    #[error("stock item name is not absent")]
+    NameNotAbsent(ItemNameNotAbsent),
+    #[error("stock item sibling is refused")]
+    Sibling(SiblingRefusal),
+    #[error("stock item sibling is not the measured goods case")]
+    NotGoods(NotGoodsSibling),
+    #[error("stock item draft is refused")]
+    Draft(DraftRefusal),
+    #[error("stock item catalogue is refused")]
+    Catalogue(StockItemCatalogueError),
+    #[error("stock item draft changed")]
+    DraftChanged,
+    #[error("stock item read was sized at another master mark")]
+    SizedAtAnotherMark {
+        read: StockItemReadKind,
+        sized: u64,
+        binding: u64,
+    },
+    #[error("stock item create does not render")]
+    NotRendered(CreateRenderRefusal),
+    /// The prepared writes digest to other bytes than the POST would send.
+    #[error("stock item create digest is not the sent bytes'")]
+    DigestMismatch,
+    /// The candidate read gives no pre-image: an empty one is a failed read.
+    #[error("stock item pre-image is not recordable")]
+    PreImage(PreImageError),
+}
+
+/// Proof that the queue's stock recheck passed, spent by the stock intent writer
+/// in the same queued execution as the POST. Only
+/// [`recheck_stock_item_for_dispatch`] makes one, from a queued stock item; it
+/// is not `Clone`, and [`Self::into_intent_parts`] consumes it.
+#[must_use]
+#[derive(Debug)]
+pub(super) struct StockItemRecheckPassed {
+    /// The digest of the bytes the POST sends, which the prepared writes give.
+    create_sha256: String,
+    /// Every candidate item's GUID with its ALTERID, from the queue's read.
+    pre_image: PreImage,
+    /// Every loaded company's master mark in the queue's aim snapshot.
+    marks: Vec<MasterMark>,
+    /// The batch the approval was bound to at birth.
+    batch_id: String,
+}
+
+impl StockItemRecheckPassed {
+    /// The digest, the pre-image, the aim marks and the batch id, consumed.
+    pub(super) fn into_intent_parts(self) -> (String, PreImage, Vec<MasterMark>, String) {
+        (
+            self.create_sha256,
+            self.pre_image,
+            self.marks,
+            self.batch_id,
+        )
+    }
+}
+
+/// Reads the stock reads for `prepared` in one queued execution
+/// ([`TallyRuntime::read_and_recheck_stock_item`]) and rechecks it on them
+/// ([`recheck_stock_item_admission`]). This module supplies only the parse of
+/// the marks answer; the runtime chooses the target's own binding mark among
+/// the rows ([`target_binding_mark`]) and sizes the reads at it. It returns no approval or dispatch
+/// value, sends no import, and nothing shipped calls it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) async fn recheck_shown_stock_item(
+    runtime: &TallyRuntime,
+    config: TallyConfig,
+    prepared: &PreparedStockItem,
+) -> anyhow::Result<()> {
+    let company = prepared.company();
+    let marks = crate::tally::agent_read_request::AgentReadRequest::parse(
+        crate::agent::read_profiles::render_agent_company_high_water(company.display_name()),
+    )?;
+    let recheck = |reads: StockItemRecheckReads| {
+        let (candidate, groups, units, at_binding, at_aim) = reads.into_parts();
+        let candidate = CompleteStockItemCatalogue::from_admitted(&candidate)
+            .map_err(StockItemRecheckError::Catalogue)?;
+        recheck_stock_item_admission(StockItemRecheckInput {
+            prepared,
+            candidate: &candidate,
+            groups: &groups,
+            units: &units,
+            company_marks_at_binding: &at_binding,
+            company_marks: &at_aim,
+        })
+    };
+    runtime
+        .read_and_recheck_stock_item(config, company, marks, stock_company_marks, recheck)
+        .await
+}
+
+/// The queue's recheck of a stock item `Create`: the reads the queue made
+/// under its lock rebuild the approved draft ([`recheck_stock_item_admission`]),
+/// the prepared writes digest to the bytes the POST sends, and the candidate
+/// read and the aim give the pre-image and marks the intent records. Anything
+/// but a queued stock item is `AdmissionInconsistent`. No shipped caller passes
+/// it to the queue yet.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn recheck_stock_item_for_dispatch(
+    queued: QueuedAdmission<'_>,
+) -> anyhow::Result<StockItemRecheckPassed> {
+    let QueuedAdmission::StockItem(stock) = queued else {
+        return Err(ApprovedImportAdmissionError::AdmissionInconsistent.into());
+    };
+    let candidate = CompleteStockItemCatalogue::from_admitted(stock.candidate())
+        .map_err(StockItemRecheckError::Catalogue)?;
+    recheck_stock_item_admission(StockItemRecheckInput {
+        prepared: stock.prepared(),
+        candidate: &candidate,
+        groups: stock.groups(),
+        units: stock.units(),
+        company_marks_at_binding: stock.company_marks_at_binding(),
+        company_marks: stock.company_marks(),
+    })?;
+    let create_sha256 = sent_digest(stock.prepared(), stock.xml_sha256())?;
+    let items = candidate.catalogue().items().iter();
+    let pre_image = PreImage::new(items.map(|item| (item.guid().to_owned(), item.alter_id())))
+        .map_err(StockItemRecheckError::PreImage)?;
+    let marks = aim_master_marks(stock.company_marks())?;
+    Ok(StockItemRecheckPassed {
+        create_sha256,
+        pre_image,
+        marks,
+        batch_id: stock.batch_id().to_owned(),
+    })
+}
+
+/// The digest of `prepared`'s writes, refused unless it is `sent`, the digest
+/// of the bytes the POST sends: the intent records the one value both give.
+fn sent_digest(prepared: &PreparedStockItem, sent: &str) -> Result<String, StockItemRecheckError> {
+    let digest = (prepared.writes().create_sha256(prepared.company()))
+        .map_err(StockItemRecheckError::NotRendered)?;
+    if digest != sent {
+        return Err(StockItemRecheckError::DigestMismatch);
+    }
+    Ok(digest)
+}
+
+/// The parse of the all-company marks answer a stock item's reads are sized by,
+/// for the standalone recheck and for the stock approval the queue reads with:
+/// an answer that does not parse is `MastersUnconfirmed`.
+pub(super) fn stock_company_marks(text: &str) -> anyhow::Result<Vec<CompanyMasterMark>> {
+    let rows = parse_all_company_marks(text)
+        .map_err(|_| ApprovedImportAdmissionError::MastersUnconfirmed)?;
+    Ok(master_marks(&rows))
+}
+
+/// The rows [`target_binding_mark`] chooses among, from the agent's parse.
+fn master_marks(rows: &[LoadedCompanyMarks]) -> Vec<CompanyMasterMark> {
+    rows.iter()
+        .map(|row| CompanyMasterMark {
+            name: row.name.clone(),
+            guid: row.guid.clone(),
+            masters: row.masters,
+        })
+        .collect()
+}
+
+/// Applies the ledger path's unchanged aim check, then rebuilds the approved
+/// stock draft from fresh admitted stock reads sized at the target's own binding
+/// mark. Step 1 compares the full
+/// `VerifiedCompanyIdentity` values the reads carry, which the coordinator
+/// attached; the parsers bind rows by GUID only.
+fn recheck_stock_item_admission(input: StockItemRecheckInput<'_>) -> anyhow::Result<()> {
+    let writes = input.prepared.writes();
+    let company = input.prepared.company();
+    if input.candidate.catalogue().company() != company
+        || input.groups.company() != company
+        || input.units.company() != company
+    {
+        return Err(StockItemRecheckError::OtherCompany.into());
+    }
+
+    // The ledger path's aim check first: it admits exactly one target in each
+    // snapshot and an unmoved master mark, so the binding mark below is the
+    // target's own and not a namesake's or a same-GUID sibling's.
+    let binding_rows = admit_queued_aim(
+        input.company_marks_at_binding,
+        input.company_marks,
+        company.company_guid(),
+        company.display_name(),
+    )?;
+    let binding = target_binding_mark(&master_marks(&binding_rows), company)?;
+    for (read, sized) in [
+        (StockItemReadKind::Candidate, input.candidate.sized_mark()),
+        (StockItemReadKind::StockGroups, input.groups.sized_mark()),
+        (StockItemReadKind::Units, input.units.sized_mark()),
+    ] {
+        if sized != binding {
+            return Err(StockItemRecheckError::SizedAtAnotherMark {
+                read,
+                sized,
+                binding,
+            }
+            .into());
+        }
+    }
+
+    let name = input
+        .candidate
+        .name_absent(writes.name())
+        .map_err(StockItemRecheckError::NameNotAbsent)?;
+    let sibling = SiblingGst::named(input.candidate.catalogue(), writes.sibling_source_name())
+        .map_err(StockItemRecheckError::Sibling)?;
+    let sibling = GoodsSibling::from_sibling(sibling).map_err(StockItemRecheckError::NotGoods)?;
+    let fresh = StockItemDraft::new_admitted(name, sibling, input.groups, input.units)
+        .map_err(StockItemRecheckError::Draft)?;
+    if fresh.writes() != writes {
+        return Err(StockItemRecheckError::DraftChanged.into());
+    }
+    Ok(())
+}
 
 /// The request a master approval is held with: the batch and the request
 /// rendered from it, once. It is the masters twin of `NativePostRequest` in the
@@ -248,24 +486,19 @@ pub(super) struct MasterAim {
 }
 
 /// The recheck closure body of a master post: [`recheck_master_admission`], then
-/// the aim it left, set into `aim` for the intent. The queue's recheck returns
-/// `()` and its signature stays that way; this is the side channel, as the
-/// voucher path's `aimed_mark` is. `aim` is written only when the recheck
-/// admitted the post, and a recheck that refuses leaves it as it was.
+/// the aim it saw, returned for the queue to hand to the intent by value. A
+/// recheck that refuses returns no aim, and a queued stock item is refused as
+/// `AdmissionInconsistent`: this recheck admits ledgers only.
 pub(super) fn recheck_master_for_dispatch(
     queued: QueuedAdmission<'_>,
-    aim: &Mutex<Option<MasterAim>>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<MasterAim> {
     let QueuedAdmission::Masters { company_marks, .. } = &queued else {
         return Err(ApprovedImportAdmissionError::AdmissionInconsistent.into());
     };
     let marks_text = (*company_marks).to_string();
     let pre_image = recheck_master_admission(queued)?;
     let marks = aim_master_marks(&marks_text)?;
-    *aim.lock()
-        .map_err(|_| ApprovedImportAdmissionError::AdmissionInconsistent)? =
-        Some(MasterAim { pre_image, marks });
-    Ok(())
+    Ok(MasterAim { pre_image, marks })
 }
 
 /// Every loaded company's master mark in the aim snapshot. A snapshot that does
@@ -304,8 +537,8 @@ pub(super) fn admit_master_create(
         company.display_name(),
     )?;
     // The pre-image is returned, not kept: [`recheck_master_for_dispatch`]
-    // carries it from the queue's recheck closure to `before_dispatch`, which
-    // writes it as the sidecar its intent names.
+    // returns it from the queue's recheck, and the queue hands it to
+    // `before_dispatch`, which writes it as the sidecar its intent names.
     Ok(index.pre_image())
 }
 
@@ -354,4 +587,4 @@ fn admit_free_name(index: &MasterNameIndex, item: &LedgerCreateItem) -> anyhow::
 
 #[cfg(test)]
 #[path = "agent_master_post_tests.rs"]
-mod tests;
+pub(super) mod tests;

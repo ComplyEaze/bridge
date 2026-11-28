@@ -3,6 +3,7 @@
 //! append whose outcome is unknown, keeps its transaction folder and blocks
 //! admission until its state is reconciled. An empty folder records no unknown
 //! outcome: admission clears it (`require_settled`, #2269).
+use super::super::failure_code::{ImportAckCode, ImportLedgerCode};
 use super::*;
 
 const TRANSACTION: &str = ".proof-publication";
@@ -27,6 +28,11 @@ fn create_transaction(path: &Path) -> std::io::Result<()> {
 /// and before it exists nothing is published. `remove_dir` removes only an empty
 /// folder, so a marker still holding anything keeps refusing (#2269).
 pub(super) fn require_settled(imports: &Path) -> Result<(), String> {
+    settled(imports).map_err(String::from)
+}
+
+/// [`require_settled`], refusing with the code itself.
+pub(super) fn settled(imports: &Path) -> Result<(), &'static str> {
     for (name, error_code) in [
         (TRANSACTION, "proof_publication_recovery_required"),
         (BUILD_TRANSACTION, "import_publication_recovery_required"),
@@ -42,10 +48,10 @@ pub(super) fn require_settled(imports: &Path) -> Result<(), String> {
                     if error.kind() != std::io::ErrorKind::DirectoryNotEmpty {
                         eprintln!("{name} not cleared: {}", os_cause(&error));
                     }
-                    return Err(error_code.into());
+                    return Err(error_code);
                 }
             },
-            _ => return Err(error_code.into()),
+            _ => return Err(error_code),
         }
     }
     Ok(())
@@ -125,13 +131,14 @@ fn persist_build_with_stage(
         write_private(
             &transaction.join("update.json"),
             &serde_json::to_vec_pretty(line)
-                .map_err(|_| "import_ledger_serialization_failed".to_string())?,
+                .map_err(|_| ImportLedgerCode::SerializationFailed.as_str().to_string())?,
         )?;
         // Every partial write and process interruption now leaves an admission
         // marker. Expose the importable name only after the staged XML is synced.
         let staged_xml = transaction.join("batch.xml");
         stage_xml(&staged_xml, xml)?;
-        fs::rename(&staged_xml, &path).map_err(|_| "import_file_write_failed".to_string())
+        fs::rename(&staged_xml, &path)
+            .map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string())
     })();
     if let Err(error) = publication {
         // Once our marker exists, the caller must return this batch's recovery
@@ -216,7 +223,7 @@ fn publish_proofs_syncing(
     )?;
     // The status record appended next names this pair: it must not be durable
     // before the pair is. A failure refuses, leaving files no record names.
-    sync(imports).map_err(|_| "import_file_write_failed".to_string())?;
+    sync(imports).map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string())?;
     let record = ledger::StatusRecord::verified(update, name.clone());
     before(PublicationStep::MarkAppend)?;
     let transaction = imports.join(TRANSACTION);
@@ -227,7 +234,7 @@ fn publish_proofs_syncing(
         write_private(
             &transaction.join("update.json"),
             &serde_json::to_vec_pretty(&record)
-                .map_err(|_| "proof_serialization_failed".to_string())?,
+                .map_err(|_| ImportAckCode::ProofSerializationFailed.as_str().to_string())?,
         )?;
         before(PublicationStep::AppendStatus)?;
         append_status(&record)
@@ -259,12 +266,12 @@ fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
         Ok(mut file) => file
             .write_all(bytes)
             .and_then(|()| file.sync_data())
-            .map_err(|_| "import_file_write_failed".to_string()),
+            .map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string()),
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => match fs::read(path) {
             Ok(existing) if existing == bytes => Ok(()),
             _ => Err("proof_publication_failed".into()),
         },
-        Err(_) => Err("import_file_write_failed".into()),
+        Err(_) => Err(ImportAckCode::ImportFileWriteFailed.as_str().into()),
     }
 }
 

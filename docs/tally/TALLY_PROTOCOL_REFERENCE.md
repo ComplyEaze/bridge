@@ -178,6 +178,10 @@ base revision.
 
 [8.2m An item Purchase keyed through a voucher class — **PARTIAL 2026-11-04; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82m-an-item-purchase-keyed-through-a-voucher-class--partial-2026-11-04-tallyprime-72-one-synthetic-book)
 
+<a id="82n-a-dollar-party-balance-is-a-composite-from-the-books-first-day-and-a-plain-rupee-figure-from-the-day-after-its-only-voucher-day--partial-2026-11-10-tallyprime-72-one-synthetic-book"></a>
+
+[8.2n A dollar party balance is a composite from the book's first day, and a plain rupee figure from the day after its only voucher day — **PARTIAL 2026-11-10; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82n-a-dollar-party-balance-is-a-composite-from-the-books-first-day-and-a-plain-rupee-figure-from-the-day-after-its-only-voucher-day--partial-2026-11-10-tallyprime-72-one-synthetic-book)
+
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
@@ -499,6 +503,30 @@ base revision.
 <a id="12a26-a-cash-ledgers-day-end-balance-partial"></a>
 
 [12a.26 A cash ledger's day-end balance (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a26-a-cash-ledgers-day-end-balance-partial)
+<a id="12a27-ledger-outstandings-answers-a-bill-wise-party-with-no-entry-by-its-date-as-it-answers-a-name-no-ledger-carries-http-200-a-zero-length-no-type-no-body-partial"></a>
+
+[12a.27 Ledger Outstandings answers a bill-wise party with no entry by its date as it answers a name no ledger carries: HTTP 200, a zero length, no type, no body (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a27-ledger-outstandings-answers-a-bill-wise-party-with-no-entry-by-its-date-as-it-answers-a-name-no-ledger-carries-http-200-a-zero-length-no-type-no-body-partial)
+<a id="12a28-a-bank-cash-withdrawal-answered-as-paid-to-someone-posts-as-a-contra-into-cash-and-a-cash-payment-and-reads-back-as-built-partial"></a>
+
+[12a.28 A bank cash withdrawal answered as paid to someone posts as a Contra into cash and a cash Payment, and reads back as built (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a28-a-bank-cash-withdrawal-answered-as-paid-to-someone-posts-as-a-contra-into-cash-and-a-cash-payment-and-reads-back-as-built-partial)
+<a id="12a29-a-skipped-transfer-row-pairs-with-a-contra-posted-from-the-other-accounts-statement-and-a-repeat-post-after-a-kept-no-opens-a-new-approval-box-partial"></a>
+
+[12a.29 A skipped transfer row pairs with a Contra posted from the other account's statement, and a repeat post after a kept No opens a new approval box (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a29-a-skipped-transfer-row-pairs-with-a-contra-posted-from-the-other-accounts-statement-and-a-repeat-post-after-a-kept-no-opens-a-new-approval-box-partial)
+<a id="12a30-sales-invoices-through-the-build-a-post-dated-invoice-in-gst-status-an-inactive-or-a-second-registration-refused-and-a-two-ledger-invoice-posted-and-read-back-as-sent-partial"></a>
+
+[12a.30 Sales invoices through the build: a post-dated invoice in GST status, an inactive or a second registration refused, and a two-ledger invoice posted and read back as sent (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a30-sales-invoices-through-the-build-a-post-dated-invoice-in-gst-status-an-inactive-or-a-second-registration-refused-and-a-two-ledger-invoice-posted-and-read-back-as-sent-partial)
+<a id="12a31-after-two-service-codes-voucher-lists-were-opened-from-gstr-1s-hsn-summary-tallys-rate-answer-carried-zero-per-unit-fields-on-their-two-sales-ledgers-and-the-build-refused-both-and-shut-company-with-a-reload-cleared-it-partial"></a>
+
+[12a.31 After two service codes' voucher lists were opened from GSTR-1's HSN summary, Tally's rate answer carried zero per-unit fields on their two sales ledgers and the build refused both, and Shut Company with a reload cleared it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a31-after-two-service-codes-voucher-lists-were-opened-from-gstr-1s-hsn-summary-tallys-rate-answer-carried-zero-per-unit-fields-on-their-two-sales-ledgers-and-the-build-refused-both-and-shut-company-with-a-reload-cleared-it-partial)
+<a id="12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-two-ledger-vouchers-displays-of-another-period-grew-nothing-partial"></a>
+
+[12a.32 Either service code's voucher list alone grew both service ledgers' rate answer, and two Ledger Vouchers displays of another period grew nothing (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a32-either-service-codes-voucher-list-alone-grew-both-service-ledgers-rate-answer-and-two-ledger-vouchers-displays-of-another-period-grew-nothing-partial)
+<a id="12a33-in-one-grown-state-of-tallys-rate-answer-the-build-without-the-rate-row-change-refused-the-test-invoice-and-the-build-with-it-admitted-it-partial"></a>
+
+[12a.33 In one grown state of Tally's rate answer, the build without the rate-row change refused the test invoice and the build with it admitted it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a33-in-one-grown-state-of-tallys-rate-answer-the-build-without-the-rate-row-change-refused-the-test-invoice-and-the-build-with-it-admitted-it-partial)
+<a id="12a34-ledger-outstandings-reads-a-ledgername-holding-measured-marks-as-that-ledger-when-no-other-ledger-shares-its-letters-and-digits-partial"></a>
+
+[12a.34 Ledger Outstandings reads a LedgerName holding measured marks as that ledger when no other ledger shares its letters and digits (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a34-ledger-outstandings-reads-a-ledgername-holding-measured-marks-as-that-ledger-when-no-other-ledger-shares-its-letters-and-digits-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

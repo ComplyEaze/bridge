@@ -1,9 +1,10 @@
 //! Shared export admission before any collection can become accounting evidence.
+use super::failure_code::ReadCode;
 use bridge_tally_protocol::{export_status, TallyExportStatus};
 use quick_xml::events::Event;
 
 pub(super) fn validate_agent_envelope(xml: &str) -> Result<(), String> {
-    let invalid = || "agent_read_protocol_invalid".to_string();
+    let invalid = || ReadCode::ReadProtocolInvalid.as_str().to_string();
     if !matches!(export_status(xml), Ok(TallyExportStatus::Success)) {
         return Err(invalid());
     }

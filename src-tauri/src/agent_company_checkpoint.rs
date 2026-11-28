@@ -1,4 +1,5 @@
 //! Admit one company checkpoint without losing fragmented scalar content.
+use super::super::failure_code::ReadCode;
 use super::*;
 use quick_xml::events::Event;
 
@@ -87,7 +88,7 @@ fn company_high_water_rows(xml: &str) -> Result<Vec<BTreeMap<String, String>>, S
     let marked = mark_agent_xml(xml);
     let xml = marked.as_ref();
     validate_agent_envelope(xml)?;
-    let invalid = || "agent_read_protocol_invalid".to_string();
+    let invalid = || ReadCode::ReadProtocolInvalid.as_str().to_string();
     let mut reader = quick_xml::Reader::from_str(xml);
     reader.config_mut().trim_text(false);
     let mut current: Option<BTreeMap<String, String>> = None;

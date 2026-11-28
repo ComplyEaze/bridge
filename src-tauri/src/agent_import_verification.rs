@@ -5,6 +5,7 @@
 //! classifies every expected voucher, finds duplicates, and renders the proof.
 //! Moved out of `agent_import.rs` with only visibility and `super::` paths changed;
 //! nothing here dispatches to Tally.
+use super::super::failure_code::ReadCode;
 use super::*;
 
 pub(super) fn parse_import_vouchers(
@@ -74,7 +75,7 @@ pub(super) fn verification_window_identities(
         let date = voucher.date.as_str();
         date < from || date > to
     }) {
-        return Err("window_not_honoured".to_string());
+        return Err(ReadCode::WindowNotHonoured.as_str().to_string());
     }
     observed
         .rows
@@ -176,11 +177,39 @@ pub(super) struct InvoiceKey<'a> {
 }
 
 /// A voucher number as two numbers are compared for absence: trimmed, ASCII
-/// case ignored. `None` for a number that is absent, empty or blank. Looser
-/// than the comparison after a post (`voucher_diffs`), so it refuses more.
-fn folded_number(number: &str) -> Option<String> {
+/// case ignored, and the leading zeros of each run of digits dropped (a run of
+/// zeros alone keeps one), so `bp/0051` and `BP/51` fold alike. Tally's own
+/// duplicate guard and its number filter ignore case but not a dropped zero
+/// (row 2162-S4), so a person reading the two as one invoice is what this
+/// guards; the rule was decided for #2162 on 4 Nov 2026. Each run is folded
+/// on its own, so `1.05` and `1.5` fold alike too, which only refuses more.
+/// Spaces inside a
+/// number are kept: what Tally does with them is not measured. `None` for a
+/// number that is absent, empty or blank. Looser than the comparison after a
+/// post (`voucher_diffs`), so it refuses more.
+pub(super) fn folded_number(number: &str) -> Option<String> {
     let number = number.trim();
-    (!number.is_empty()).then(|| number.to_ascii_uppercase())
+    if number.is_empty() {
+        return None;
+    }
+    let mut folded = String::with_capacity(number.len());
+    let mut run = String::new();
+    // Each character, then one `None` that ends the last run of digits.
+    for character in number.chars().map(Some).chain(std::iter::once(None)) {
+        if let Some(digit) = character.filter(char::is_ascii_digit) {
+            run.push(digit);
+            continue;
+        }
+        if !run.is_empty() {
+            let kept = run.trim_start_matches('0');
+            folded.push_str(if kept.is_empty() { "0" } else { kept });
+            run.clear();
+        }
+        if let Some(character) = character {
+            folded.push(character.to_ascii_uppercase());
+        }
+    }
+    Some(folded)
 }
 
 /// The number an invoice is matched by; `None` for every other voucher and for
@@ -188,7 +217,8 @@ fn folded_number(number: &str) -> Option<String> {
 fn invoice_number(voucher: &ImportVoucher) -> Option<String> {
     voucher
         .voucher_type
-        .is_invoice()
+        .invoice_class()
+        .is_some()
         .then(|| voucher.voucher_number.as_deref().and_then(folded_number))
         .flatten()
 }
@@ -682,6 +712,48 @@ pub(super) fn verify_batch_as(
     )
 }
 
+/// What a confirmed Sales invoice row of a native post says about e-invoicing.
+/// It states only what was sent: nothing here reads whether e-invoicing applies
+/// to the company or the customer, or whether the voucher holds an IRN in Tally
+/// (#2162).
+pub(super) const NO_E_INVOICE_DETAILS_NOTE: &str = "ComplyEaze Bridge sent this invoice without e-invoice details, so it carries no IRN from this post. Where e-invoicing applies to this company and customer, generating the IRN is the CA's act; ComplyEaze Bridge does not generate one.";
+
+/// Which e-invoice details the saved invoice detail records as sent. Only an
+/// invoice sent without them gets a value (`None`); one that carried them gets
+/// no note here, because the note would be false for it.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum EInvoiceDetailsSent {
+    None,
+}
+
+impl EInvoiceDetailsSent {
+    fn result(self) -> Value {
+        match self {
+            Self::None => json!({"details":self,"note":NO_E_INVOICE_DETAILS_NOTE}),
+        }
+    }
+}
+
+fn e_invoice_details_sent(expected: &ImportVoucher) -> Option<EInvoiceDetailsSent> {
+    if expected.voucher_type != VoucherType::Sales {
+        return None;
+    }
+    let detail = expected.invoice.as_ref()?;
+    // A new field must be looked at here, because it may be e-invoice details.
+    let invoice::InvoiceDetail {
+        voucher_type_name: _,
+        place_of_supply: _,
+        round_off_ledger: _,
+        observed: _,
+        e_invoice,
+    } = detail;
+    if e_invoice.is_some() {
+        return None;
+    }
+    Some(EInvoiceDetailsSent::None)
+}
+
 /// The status of a voucher attributed to `matched` by an identity (its
 /// narration tag, or the GUID its own POST was bound to), counted in `counts`.
 fn attributed_status(
@@ -712,7 +784,11 @@ fn attributed_status(
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true, narration),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
     } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
         count("posted_verified");
-        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+        let mut row = json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id});
+        if let Some(sent) = e_invoice_details_sent(expected) {
+            row["e_invoice_sent"] = sent.result();
+        }
+        row
     } else if diffs.is_empty() {
         count("posted_not_effective");
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_optional","voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
@@ -736,10 +812,34 @@ pub(super) fn mark_book_rolled_back(result: &mut Value) {
 /// journal of another computer, would not hold a post made elsewhere or since.
 pub(super) const NOT_SENT_BY_BRIDGE_SUMMARY: &str = "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status.";
 
+fn dispatch_state_is_sent(state: Option<&str>) -> bool {
+    matches!(
+        state,
+        Some("posted_verified")
+            | Some("reconciliation_required")
+            | Some("previous_attempt_reconciled")
+    )
+}
+
+fn remove_e_invoice_sent_without_native_dispatch(result: &mut Value) {
+    if dispatch_state_is_sent(result["dispatch"]["state"].as_str()) {
+        return;
+    }
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if let Some(fields) = voucher.as_object_mut() {
+                fields.remove("e_invoice_sent");
+            }
+        }
+    }
+}
+
 /// Beside the verdict, never instead of it, for a verified batch whose journal
 /// records no dispatch (the same record `local_data_report` counts as sent).
-/// A partly found batch is not marked.
+/// A partly found batch is not marked. No row says what Bridge sent when the
+/// batch has no native dispatch.
 pub(super) fn mark_found_not_sent(result: &mut Value) {
+    remove_e_invoice_sent_without_native_dispatch(result);
     result["dispatch_record"] =
         json!({"state":"none_on_record","summary":NOT_SENT_BY_BRIDGE_SUMMARY});
 }
@@ -883,8 +983,9 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
 }
 
 /// What a person does about an invoice that is in the book and did not read
-/// back as built.
-pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number; or the voucher found under that number is not the one this post created (`guid`, `alter_id`); or Tally's GSTR-1 does not list it as included (`gst_status_uncertain`, `gst_status_excluded`, `gst_status_not_in_return`; `gst_status_post_dated` when Tally marks it post-dated; `gst_status_not_reported` or `gst_status_unreadable` when its status did not come back or does not read), or a person accepted it there as it stands (`gst_status_overridden`); or Tally did not fill in the HSN/SAC of a sales line (`invoice_line_hsn_unresolved`: `invoice_lines` shows, for every sales line, the code Tally used and the ledger or group it took it from). Open the invoice in Tally and check it against the source document before relying on it. For `invoice_line_hsn_unresolved`, that line's ledger, its group or the company has no HSN/SAC for the invoice date: set it in Tally. Correcting the master alone did not change an invoice already saved; saving the invoice again did change it on a test company, but that changes the invoice's AlterID, and what ComplyEaze Bridge's verification reads after a person saves a posted invoice again has not been established, so the invoice may stay not confirmed here. For a GSTR-1 status, open GSTR-1 for the invoice's month in Tally and read the reason there: none comes back with the status. Correcting a ledger or another master does not by itself change the status of an invoice already saved: on a test company an invoice stayed uncertain after its sales ledger's HSN/SAC was set, until the invoice itself was saved again. Accepting it as it stands in GSTR-1 leaves it not confirmed here until a person releases it in ComplyEaze Bridge's own dialog. These statuses were seen only on invoices to an unregistered buyer. Do not post it again.";
+/// back as built. Tally keeps the e-invoice details on the voucher's Statutory
+/// Details screen (TALLY_PROTOCOL_REFERENCE section 8.2j).
+pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number, or a Sales voucher of another type does (`invoice_number_in_another_type` names that type); or the voucher found under that number is not the one this post created (`guid`, `alter_id`); or Tally's GSTR-1 does not list it as included (`gst_status_uncertain`, `gst_status_excluded`, `gst_status_not_in_return`; `gst_status_post_dated` when Tally marks it post-dated; `gst_status_not_reported` or `gst_status_unreadable` when its status did not come back or does not read), or a person accepted it there as it stands (`gst_status_overridden`); or Tally did not fill in the HSN/SAC of a sales line (`invoice_line_hsn_unresolved`: `invoice_lines` shows, for every sales line, the code Tally used and the ledger or group it took it from). Or the e-invoice details sent with it are not confirmed: `IRN`, `IRNACKNO` or `IRNACKDATE` when Tally does not hold the IRN, ack number or ack date sent; `e_invoice_not_found` when the read-back of the invoice returned no GUID, or the read of its date found no voucher with it; `e_invoice_not_unique` when that read found more than one; `e_invoice_readback_failed` or `e_invoice_readback_unreadable` when that read failed or did not parse, so the details were not checked. For these, check the IRN, ack number and ack date on the voucher's Statutory Details screen in Tally. Open the invoice in Tally and check it against the source document before relying on it. For `invoice_line_hsn_unresolved`, that line's ledger, its group or the company has no HSN/SAC for the invoice date: set it in Tally. Correcting the master alone did not change an invoice already saved; saving the invoice again did change it on a test company. Saving an invoice that had read back as built again in Tally, unchanged, kept its identity on a test company (one run) and changed, of the fields read, only its AlterID and fields this check does not compare; a later verification judges an invoice on the fields it compares. That was not tried on an invoice that read back divergent. For a GSTR-1 status, open GSTR-1 for the invoice's month in Tally and read the reason there: none comes back with the status. Correcting a ledger or another master does not by itself change the status of an invoice already saved: on a test company an invoice stayed uncertain after its sales ledger's HSN/SAC was set, until the invoice itself was saved again. Accepting it as it stands in GSTR-1 leaves it not confirmed here until a person releases it in ComplyEaze Bridge's own dialog. These statuses were seen only on invoices to an unregistered buyer. Do not post it again.";
 
 /// An invoice the standard readback matched, whose own fields did not read back
 /// as built (party, GST header, reference, allocation, or the voucher could not
@@ -907,6 +1008,9 @@ pub(super) fn mark_invoice_readback(
                 voucher["invoice_lines"] = json!(lines);
             }
             if !differences.is_empty() {
+                if let Some(fields) = voucher.as_object_mut() {
+                    fields.remove("e_invoice_sent");
+                }
                 voucher["status"] = json!("posted_divergent");
                 voucher["diffs"] = json!([{ "invoice_fields": differences }]);
                 voucher["next_step"] = json!(INVOICE_DIVERGENT_NEXT_STEP);
@@ -937,7 +1041,7 @@ pub(super) fn invoice_readback_due<'a>(
 ) -> Option<(&'a ImportVoucher, Value)> {
     let voucher = vouchers
         .iter()
-        .find(|voucher| voucher.voucher_type.is_invoice())?;
+        .find(|voucher| voucher.voucher_type.invoice_class().is_some())?;
     let matched = result["vouchers"]
         .as_array()?
         .iter()
@@ -981,6 +1085,64 @@ pub(super) fn mark_sent_not_attributed_after_unclean_answer(result: &mut Value) 
         "sent_not_attributed",
         Some(SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP),
     );
+}
+
+/// How many of the `sent` vouchers of a post Tally's own answer reported as not
+/// created, when the answer has the captured shape of a post that landed in
+/// part: every counter reported, `CREATED` and `EXCEPTIONS` each at least 1,
+/// their sum equal to `sent`, every other counter zero, and the company's
+/// voucher mark confirmed to have moved by what Tally reported creating
+/// (`step_confirms`, given `CREATED`). That is a count of what Tally reported,
+/// not a fact about any voucher: it does not say which vouchers they were
+/// (bridge#1108; protocol reference §9.2). `None` for every other answer,
+/// including one Tally rejected whole, which [`unmatched_cause`] reads.
+pub(super) fn reported_not_created_count(
+    counters: &bridge_tally_protocol::TallyImportResult,
+    sent: usize,
+    step_confirms: impl FnOnce(u64) -> bool,
+) -> Option<u64> {
+    let sent = u64::try_from(sent).ok()?;
+    let landed_in_part = counters.counter_presence.all_reported()
+        && counters.created >= 1
+        && counters.exceptions >= 1
+        && counters.altered == 0
+        && counters.deleted == 0
+        && counters.ignored == 0
+        && counters.errors == 0
+        && counters.cancelled == 0
+        && counters.created.checked_add(counters.exceptions) == Some(sent);
+    (landed_in_part && step_confirms(counters.created)).then_some(counters.exceptions)
+}
+
+/// What Tally's answer reported of a post that landed in part, said after the
+/// next step of a voucher the post's readback cannot find. It names no voucher
+/// and never says one was not posted: only how many of the `sent` vouchers
+/// Tally reported as not created, and that which ones is not known.
+pub(super) fn partly_created_sentence(not_created: u64, sent: usize) -> String {
+    let which = if not_created == 1 {
+        "was that one"
+    } else {
+        "were those"
+    };
+    format!(
+        "Tally's answer to this post reported {not_created} of the {sent} vouchers as not created; ComplyEaze Bridge cannot say which of the vouchers it sent {which}."
+    )
+}
+
+/// Rewrites a verification of an unbound post whose answer reported that it
+/// landed in part: as [`mark_sent_not_attributed_after_unclean_answer`], with
+/// [`partly_created_sentence`] after the next step. The status is the same
+/// `sent_not_attributed`; no voucher is named or read as not created.
+pub(super) fn mark_sent_not_attributed_after_partly_created_answer(
+    result: &mut Value,
+    not_created: u64,
+    sent: usize,
+) {
+    let next_step = format!(
+        "{SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP} {}",
+        partly_created_sentence(not_created, sent)
+    );
+    mark_not_found_with(result, "sent_not_attributed", Some(&next_step));
 }
 
 /// Rewrites a later verification of a post whose saved answer reported its
@@ -1060,8 +1222,11 @@ pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 8] = [
 /// the response's configured redaction applies to it. Names already marked are
 /// left as they are; a proof saved with plain names is marked the same way.
 /// A posted_under_changed_masters message is given its current text, which
-/// names no ledger.
+/// names no ledger. A result without a native dispatch carries no statement
+/// about the e-invoice details Bridge sent, including on a partly found batch
+/// that does not pass through `mark_found_not_sent`.
 pub(super) fn mark_verification_names(result: &mut Value) {
+    remove_e_invoice_sent_without_native_dispatch(result);
     fn mark_at(value: &mut Value, path: &[&str]) {
         match path.split_first() {
             None => {

@@ -6,6 +6,7 @@ use super::{
     VOUCHER_CHECKPOINT_NOT_OBSERVED,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
+use crate::tally::approved_import::AdmissionLockRefusal;
 use crate::tally::standard_ledger_catalog::{
     admit_standard_ledger_catalog_request, parse_import_ledger_catalog_response,
     parse_standard_ledger_catalog_response,
@@ -19,6 +20,7 @@ use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
@@ -110,6 +112,9 @@ use statement_facts::{SkipOnlyRecord, StatementFacts};
 pub(super) use transfers::{check_not_run_section, counts_only_section, trim_section};
 #[path = "agent_import_verification.rs"]
 mod verification;
+use super::failure_code::{
+    CompanyReadCode, ImportAckCode, ImportLedgerCode, ProposalsCode, ReadCode,
+};
 use crate::local_files::visible_path::user_visible_path;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -241,7 +246,9 @@ impl<D: PayloadDate> ImportVoucher<D> {
     /// What a read-back must find, and what a render writes.
     fn filed_type_name(&self) -> &str {
         match &self.invoice {
-            Some(detail) if self.voucher_type.is_invoice() => &detail.voucher_type_name,
+            Some(detail) if self.voucher_type.invoice_class().is_some() => {
+                &detail.voucher_type_name
+            }
             _ => self.voucher_type.as_str(),
         }
     }
@@ -263,7 +270,7 @@ impl<D: PayloadDate> ImportVoucher<D> {
     /// type the build held to Manual with duplicates prevented.
     fn numbering_at_post(&self) -> (&str, post::numbering::OwnNumber) {
         match self.numbering_at_build() {
-            invoice if self.voucher_type.is_invoice() => invoice,
+            invoice if self.voucher_type.invoice_class().is_some() => invoice,
             (filed, _) => (filed, post::numbering::OwnNumber::Absent),
         }
     }
@@ -346,11 +353,34 @@ impl VoucherType {
         }
     }
 
-    /// A GST invoice: a party leg, a sales or purchase leg and tax legs, with
-    /// an invoice view. It shares nothing of the bank shape and is refused
-    /// beside any other shape.
-    fn is_invoice(&self) -> bool {
-        matches!(self, Self::Sales)
+    /// The invoice class of a GST invoice: a party leg, a sales or purchase
+    /// leg and tax legs, with an invoice view. It shares nothing of the bank
+    /// shape and is refused beside any other shape. `None` for every other
+    /// type. The match names each type, so a type added later is placed here
+    /// by the compiler, not by a default (#2346).
+    fn invoice_class(&self) -> Option<InvoiceClass> {
+        match self {
+            Self::Sales => Some(InvoiceClass::Sales),
+            Self::Payment | Self::Receipt | Self::Journal | Self::Contra => None,
+        }
+    }
+}
+
+/// The reserved class an invoice is built in, carried as a value from the
+/// voucher type to the type resolver and the number's month reads (#2346).
+/// Sales is the one class built today.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum InvoiceClass {
+    Sales,
+}
+
+impl InvoiceClass {
+    /// The reserved voucher class whose name the type resolver walks to and
+    /// whose `$$Is<Class>` compute the number reads carry (§8.2e).
+    pub(super) const fn reserved(self) -> super::voucher_type_class::ReservedVoucherClass {
+        match self {
+            Self::Sales => super::voucher_type_class::ReservedVoucherClass::Sales,
+        }
     }
 }
 
@@ -406,19 +436,26 @@ impl VoucherType {
 // Every variant here carries live import/readback evidence for the exact file
 // shape this module renders for it: Journal in
 // docs/agent/ASSESSMENT-2026-09-06.md, and Payment/Receipt/Contra in
-// docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.13. Adding a `VoucherType` variant
-// does not qualify it; the build refuses any type absent from this list before
-// its first request, and a post refuses a saved one, so evidence has to arrive
-// before the file can.
+// docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.13. Sales carries PARTIAL evidence
+// only (§9.16); ADR 0004's amendment of 2026-11-09 lists what it still owes.
+// Adding a `VoucherType` variant does not qualify it; the build refuses any
+// type absent from this list before its first request, and a post refuses a
+// saved one, so evidence has to arrive before the file can.
 //
-// Sales is NOT here. One lab rehearsal (7 Oct 2026, §9.16) showed the
-// duplicate-number read finding a known invoice, Tally taking two of the
-// element sets, every read-back field coming back, and the company's
-// STATENAME equal to the GST registration state of a keyed invoice. It joins
-// this list when what that rehearsal left owed is done (ADR 0004). The check
-// before a post now recognises an invoice by its number; that has not run
-// against Tally.
+// Once a Sales batch is saved, a release older than `mcp-v0.7.0` refuses this
+// computer's import journal; the release notes name the recovery.
 const LIVE_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
+    VoucherType::Journal,
+    VoucherType::Payment,
+    VoucherType::Receipt,
+    VoucherType::Contra,
+    VoucherType::Sales,
+];
+
+/// Test-only: the list as it stood before Sales qualified. The tests that hold
+/// the gate on a declared type missing from the list run against it.
+#[cfg(test)]
+const PRE_SALES_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
     VoucherType::Journal,
     VoucherType::Payment,
     VoucherType::Receipt,
@@ -1292,8 +1329,9 @@ impl Server {
         Ok(ToolOutcome {
             payload: json!({"result": {"schema": schema, "rules": [
                 "bridge_txn_id is client-supplied, unique within this batch, 1-64 ASCII characters from [A-Za-z0-9_-]",
-                "new files accept Journal, Payment, Receipt and Contra, the voucher types with recorded live import/readback evidence",
+                "new files accept Journal, Payment, Receipt and Contra, the voucher types with recorded live import/readback evidence, and Sales, whose live evidence is PARTIAL (synthetic books, one TallyPrime release)",
                 "a Journal takes any balanced set of entries and may carry a voucher_number",
+                "a Sales voucher is a GST invoice: it carries invoice and voucher_number, is built only while posting is on (invoice_post_not_enabled), is the only voucher of its batch (invoice_one_per_batch beside another invoice, voucher_type_shapes_mixed beside another type), and must be posted only through post_import, never by importing its file in Tally",
                 "Payment, Receipt and Contra take two or more entries with at least one debit and one credit, no ledger on both sides (for more than two entries, one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified; no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), and neither voucher_number nor reference: neither element's fate on these types has been observed, and the bank's own reference belongs in the narration, which survives",
                 "a Payment credits, and a Receipt debits, a ledger whose live group ancestry reaches Bank Accounts or Cash-in-Hand; both Contra legs must name one, and a leg that cannot be established is refused",
                 "the other leg of a Payment or Receipt must be established as holding no money: a ledger under any money group is refused there, because money on both sides is a Contra whatever the type says, and so is one whose group ancestry cannot be resolved at all",
@@ -1302,7 +1340,7 @@ impl Server {
                 "dates must be within the selected company's BOOKSFROM through today",
                 "ledger names must exactly match the live catalogue; validate_masters before build_import_xml",
                 "a batch may contain at most 100 distinct ledger names of at most 1024 characters each"
-            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt and Contra are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import, and so is a batch of 2 to 50 such vouchers: an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post."}}}),
+            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt, Contra and Sales are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that Sales rests on PARTIAL evidence, invoices built by ComplyEaze Bridge, imported over the gateway and read back on synthetic lab books on one release, and that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import, and so is a batch of 2 to 50 such vouchers: an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post. A Sales invoice is posted one per batch."}}}),
             evidence: local_evidence("voucher_schema"),
             company_guid: None,
             truncated: false,
@@ -1457,7 +1495,7 @@ impl Server {
         if payload
             .vouchers
             .iter()
-            .any(|voucher| voucher.voucher_type.is_invoice())
+            .any(|voucher| voucher.voucher_type.invoice_class().is_some())
             && !self.settings.posting.enabled()
         {
             return Err(INVOICE_POST_NOT_ENABLED.to_string().into());
@@ -1505,7 +1543,7 @@ impl Server {
             // the named voucher type, the party's bill-wise flag, the company's
             // state), classifies every leg from them and records what it saw on
             // the voucher. A journal-only or bank batch never takes this path.
-            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice()) {
+            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.invoice_class().is_some()) {
                 match self
                     .admit_sales_invoice(&identity, &company, &mut payload.vouchers[0], &ledger_masters)
                     .await
@@ -1537,7 +1575,7 @@ impl Server {
             let mut group_evidence = None;
             let mut statement_warnings: Vec<Value> = Vec::new();
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
-                let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
+                let (groups, evidence) = self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
                 let observed = ObservedMasters::new(ledger_masters.catalog().parents(), groups);
                 let refusals =
@@ -1618,7 +1656,7 @@ impl Server {
             })?;
             // The admission above read the stop before this lock; a post may
             // have gone out since. No file is written for a stopped company.
-            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())
+            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.invoice_class().is_some())
                 && self
                     .import_invoice_stop_while_admitted(&payload.company_guid)?
                     .is_some()
@@ -1895,7 +1933,7 @@ impl Server {
             // stability requirement rather than trusting a single observation.
             if let Some(group_evidence) = group_evidence {
                 let (_, repeated_group_evidence) =
-                    self.read_group_collection(&identity, &company.name).await?;
+                    self.read_group_collection(&identity).await?;
                 accumulated = combine_evidence(accumulated.clone(), repeated_group_evidence.clone());
                 if group_evidence.response_sha256 != repeated_group_evidence.response_sha256 {
                     return Err("import_groups_changed".to_string().into());
@@ -2038,6 +2076,15 @@ impl Server {
                     post::PostScope::Vouchers,
                     self.post_voucher_limit(post::PostScope::Vouchers),
                 ) {
+                    // The details' own lines can be what takes it over (#2574).
+                    if code == "import_review_too_large"
+                        && post::e_invoice_details_pushed_review_over(&line, &self.settings.endpoint)
+                    {
+                        return Err(
+                            crate::agent::failure_code::InvoiceBuildCode::ReviewTooLargeWithEInvoice
+                                .into(),
+                        );
+                    }
                     return Err(invoice_route_refusal(code).into());
                 }
             }
@@ -2412,10 +2459,7 @@ impl Server {
     /// text is not essential: the cap drops it first, so it is not counted.
     /// The size of those parts, for what may be added to the page.
     fn admit_verification_page(&self, page: &Value) -> Result<usize, ToolFailure> {
-        let mut essential = page.clone();
-        essential["items"] = json!([]);
-        super::drop_tally_line_error_text(&mut essential);
-        let size = essential.to_string().len();
+        let size = verification_page_essential_bytes(page);
         if size > self.settings.max_bytes {
             return Err("verification_too_large_to_report".to_string().into());
         }
@@ -2495,7 +2539,7 @@ impl Server {
             ..
         } = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if !batch_guid_matches(&line.company_guid, guid) {
             return Err("import_batch_company_mismatch".to_string().into());
         }
@@ -2718,18 +2762,21 @@ impl Server {
                     .as_ref()
                     .and_then(|response| response.outcome.as_ref())
                     .map(|outcome| outcome.counters());
+                let measured_step =
+                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
+                let mut step_matched = false;
                 let cause = if current_dispatch {
                     verification::unmatched_cause(
                         answer,
                         line.vouchers.len(),
                         verification::unmatched_count(&result),
-                        verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark),
+                        measured_step,
                     )
                 } else {
                     // The post's own verdict on its voucher step, for a batch.
                     // Read only where it decides, and never a way for this
                     // check to fail: no record reads as not matched.
-                    let step_matched = answer.is_some()
+                    step_matched = answer.is_some()
                         && line.vouchers.len() > 1
                         && self
                             .imports_dir()
@@ -2751,14 +2798,37 @@ impl Server {
                         // it) makes an edit in Tally no likelier than a
                         // voucher Tally did not create, so its line drops the
                         // edit example (bridge#1108). With no answer on
-                        // record, or a clean one, the line is unchanged.
+                        // record, or a clean one, the line is unchanged. When
+                        // the answer is the captured shape of a post that
+                        // landed in part, the line also says how many
+                        // vouchers Tally reported as not created and that
+                        // which ones is not known: no row is named.
                         let unclean = dispatch_response.as_ref().is_some_and(|response| {
                             !post::import_outcome_is_clean(
                                 response.outcome.as_ref(),
                                 line.vouchers.len(),
                             )
                         });
-                        if unclean {
+                        let not_created = answer.and_then(|counters| {
+                            verification::reported_not_created_count(
+                                counters,
+                                line.vouchers.len(),
+                                |created| {
+                                    if current_dispatch {
+                                        measured_step == Some(created)
+                                    } else {
+                                        step_matched
+                                    }
+                                },
+                            )
+                        });
+                        if let (true, Some(not_created)) = (unclean, not_created) {
+                            verification::mark_sent_not_attributed_after_partly_created_answer(
+                                &mut result,
+                                not_created,
+                                line.vouchers.len(),
+                            )
+                        } else if unclean {
                             verification::mark_sent_not_attributed_after_unclean_answer(&mut result)
                         } else {
                             verification::mark_sent_not_attributed(&mut result)
@@ -2931,6 +3001,7 @@ impl Server {
             }
             // Marked before it is saved, so the proof holds the marks too.
             mark_verification_names(&mut payload["result"]);
+            post::attach_response_missing_next_step(&mut payload, self.settings.max_bytes);
             self.persist_import_verification(&payload["result"], &line, status, generation)?;
             Ok(ToolOutcome {
                 payload,
@@ -2983,7 +3054,7 @@ impl Server {
         // copy says, so the proof and the ledger status cannot disagree.
         local_proof["verification_status"] = json!(update.status);
         let json = serde_json::to_vec_pretty(&local_proof)
-            .map_err(|_| "proof_serialization_failed".to_string())?;
+            .map_err(|_| ImportAckCode::ProofSerializationFailed.as_str().to_string())?;
         let markdown = render_proof_markdown(&local_proof);
         persistence::publish_proofs(
             &imports,
@@ -3027,6 +3098,28 @@ impl Server {
         Ok((resolvable_ledgers(&catalogue), evidence))
     }
 
+    /// The same catalogue read, with every name each ledger answers to (row spelling, stored
+    /// name and aliases), one list per ledger, for the `open_bills` key check (#2480).
+    pub(super) async fn read_resolvable_ledgers_with_names(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<
+        (
+            Vec<super::ledger_candidates::CatalogueLedger>,
+            Vec<Vec<String>>,
+            Evidence,
+        ),
+        ToolFailure,
+    > {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        let names = catalogue
+            .names_by_ledger()
+            .map(|names| names.into_iter().map(str::to_string).collect())
+            .collect();
+        Ok((resolvable_ledgers(&catalogue), names, evidence))
+    }
+
     /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
     /// (`None` when it returned none), for the group summaries of `vouchers` (#1230).
     pub(super) async fn read_ledger_parents(
@@ -3066,7 +3159,7 @@ impl Server {
         company_name: &str,
     ) -> Result<(bridge_tally_protocol::StandardLedgerCatalog, Evidence), ToolFailure> {
         let read = standard_ledger_catalog_read(company_name)
-            .map_err(|_| "company_name_invalid".to_string())?;
+            .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
         admit_standard_ledger_catalog_request(read.as_str().to_string())
             .map_err(|_| "ledger_export_invalid".to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
@@ -3094,7 +3187,7 @@ impl Server {
         ToolFailure,
     > {
         let read = import_ledger_catalogue_read(company_name)
-            .map_err(|_| "company_name_invalid".to_string())?;
+            .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
         let request = admit_standard_ledger_catalog_request(read.as_str().to_string())
             .map_err(|_| "ledger_export_invalid".to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
@@ -3116,10 +3209,12 @@ impl Server {
     pub(super) async fn read_group_collection(
         &self,
         identity: &super::VerifiedCompanyIdentity,
-        company_name: &str,
     ) -> Result<(Vec<bridge_tally_protocol::TallyNamedMaster>, Evidence), ToolFailure> {
         let (xml, evidence) = self
-            .post_read(identity, native_group_snapshot_read(company_name))
+            .post_read(
+                identity,
+                native_group_snapshot_read(identity.company_name()),
+            )
             .await?;
         let groups =
             parse_native_group_snapshot(&xml, identity.company_guid()).map_err(|error| {
@@ -3322,7 +3417,7 @@ impl Server {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.batch.sha256 != line.sha256 || current.generation != expected {
             return Err("import_verification_conflict_retry".into());
         }
@@ -3357,7 +3452,7 @@ impl Server {
         ))?;
         let recorded = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if recorded.span_verdict.as_ref() != Some(verdict) {
             return Err("binding_not_recorded".into());
         }
@@ -3370,7 +3465,7 @@ impl Server {
         let _lock = self.lock_import_admission_shared()?;
         match self.import_journal_while_admitted()? {
             Some(reader) => ledger::rollback_cover(reader, batch_id),
-            None => Err("import_batch_not_found".into()),
+            None => Err(ImportAckCode::ImportBatchNotFound.as_str().into()),
         }
     }
 
@@ -3391,7 +3486,7 @@ impl Server {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.batch.sha256 != line.sha256 || current.generation != expected {
             return Err("import_verification_conflict_retry".into());
         }
@@ -3413,7 +3508,7 @@ impl Server {
         ))?;
         let recorded = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         let others = match self.import_journal_while_admitted()? {
             Some(reader) => ledger::covered_by_last_record(reader)?
                 .into_iter()
@@ -3468,7 +3563,7 @@ impl Server {
         };
         let snapshot = self
             .import_snapshot_while_admitted(Some(&named))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         #[cfg(test)]
         if TEST_ROLLBACK_AT_POST_APPEND_FAILS.try_with(|()| ()).is_ok() {
             return Err("import_ledger_write_failed".into());
@@ -3545,7 +3640,7 @@ impl Server {
         const MAX_PERSISTED_PROOF_BYTES: usize = 32 * 1024 * 1024;
         let snapshot = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         let recorded = &snapshot.batch.batch_id;
         let path = self.imports_dir()?.join(match &snapshot.current_proof {
             ledger::CurrentProof::Saved(name) => name.json_file(recorded),
@@ -3651,14 +3746,7 @@ impl Server {
     }
 
     pub(super) fn lock_import_admission(&self) -> Result<std::fs::File, String> {
-        let path = self.settings.data_dir.join("agent-import-admission.lock");
-        let file = super::local_file::open_local_file(&path, true)
-            .map_err(|_| "import_admission_lock_unavailable".to_string())?;
-        // Never park the async request loop behind another process's network
-        // work. Contention is an in-band refusal, not a deferred posting request.
-        file.try_lock().map_err(import_admission_lock_error)?;
-        persistence::require_settled(&self.settings.data_dir.join("imports"))?;
-        Ok(file)
+        admit_exclusively(&self.settings.data_dir).map_err(|refusal| refusal.code().to_string())
     }
 
     fn lock_import_admission_shared(&self) -> Result<std::fs::File, String> {
@@ -3688,7 +3776,7 @@ impl Server {
         let file = match super::local_file::open_local_file(&path, false) {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(_) => return Err("import_ledger_unavailable".to_string()),
+            Err(_) => return Err(ImportLedgerCode::Unavailable.as_str().to_string()),
         };
         Ok(Some(std::io::BufReader::new(file)))
     }
@@ -3867,17 +3955,17 @@ impl Server {
         // A statement file's vouchers carry the caller's date text, as a build
         // receives them; each is parsed the way a build parses it.
         let vouchers: Vec<ImportVoucher<String>> = serde_json::from_value(vouchers.clone())
-            .map_err(|_| "proposals_file_invalid".to_string())?;
+            .map_err(|_| ProposalsCode::FileInvalid.as_str().to_string())?;
         let vouchers = vouchers
             .into_iter()
             .map(|voucher| {
                 let date = normalized_date(&voucher.date)
-                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                    .map_err(|_| ProposalsCode::FileInvalid.as_str().to_string())?;
                 // An amount that is not an import amount is refused here as the date is: the
                 // build would refuse it later (#1872).
                 let entries = voucher
                     .parsed_entries()
-                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                    .map_err(|_| ProposalsCode::FileInvalid.as_str().to_string())?;
                 Ok(voucher.admitted(date, entries))
             })
             .collect::<Result<Vec<ImportVoucher>, String>>()?;
@@ -3928,10 +4016,10 @@ impl Server {
     ) -> Result<(), String> {
         let path = self.settings.data_dir.join(file_name);
         let encoded = serde_json::to_string(line)
-            .map_err(|_| "import_ledger_serialization_failed".to_string())?;
+            .map_err(|_| ImportLedgerCode::SerializationFailed.as_str().to_string())?;
         let encoded = format!("{encoded}\n");
         if encoded.len() > ledger::MAX_RECORD_BYTES {
-            return Err("import_ledger_record_too_large".into());
+            return Err(ImportLedgerCode::RecordTooLarge.as_str().into());
         }
         append_private_import_ledger(&path, encoded.as_bytes(), set_private_file)
     }
@@ -4043,7 +4131,7 @@ const ROWS_IN_BOOK_NEXT_STEP: &str = "Do not post or import this batch yet: the 
 fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
     line.vouchers
         .iter()
-        .any(|voucher| voucher.voucher_type.is_invoice())
+        .any(|voucher| voucher.voucher_type.invoice_class().is_some())
 }
 
 /// Why no file was written for a row another batch already sent (#876), and what
@@ -4140,6 +4228,25 @@ fn validate_dispatched_import_endpoint(
     Ok(())
 }
 
+/// The import admission lock of `data_dir`, taken exclusively. Never park the
+/// async request loop behind another process's network work: the lock is tried
+/// once, and contention is an in-band refusal, not a deferred posting request.
+/// No refusal has written the import journal: the lock file is opened (made
+/// if absent) and tried, and unsettled publications are checked
+/// (`persistence::settled`, which removes an empty publication marker folder
+/// and refuses on any other); nothing else is written.
+fn admit_exclusively(data_dir: &Path) -> Result<std::fs::File, AdmissionLockRefusal> {
+    let path = data_dir.join("agent-import-admission.lock");
+    let file = super::local_file::open_local_file(&path, true)
+        .map_err(|_| AdmissionLockRefusal::Unavailable)?;
+    file.try_lock().map_err(|error| match error {
+        std::fs::TryLockError::WouldBlock => AdmissionLockRefusal::Busy,
+        std::fs::TryLockError::Error(_) => AdmissionLockRefusal::Unavailable,
+    })?;
+    persistence::settled(&data_dir.join("imports")).map_err(AdmissionLockRefusal::Unsettled)?;
+    Ok(file)
+}
+
 fn append_private_import_ledger(
     path: &Path,
     bytes: &[u8],
@@ -4163,10 +4270,10 @@ fn append_private_import_ledger_syncing(
 ) -> Result<(), String> {
     // Admission serializes writers; read/write access also permits Windows rollback.
     let mut file = super::local_file::open_local_file(path, true)
-        .map_err(|_| "import_ledger_unavailable".to_string())?;
+        .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
     prepare_permissions(&file)?;
     file.seek(SeekFrom::End(0))
-        .map_err(|_| "import_ledger_unavailable".to_string())?;
+        .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
     let mut journal = JournalFile {
         file,
         directory: path.parent().unwrap_or(path).to_path_buf(),
@@ -4224,7 +4331,7 @@ fn append_import_ledger_bytes(
 ) -> Result<(), String> {
     let original_length = writer
         .length()
-        .map_err(|_| "import_ledger_unavailable".to_string())?;
+        .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
     // The length is read afresh for every append: a journal that is empty here
     // (just created, or left empty by an append that stopped) may lack a durable
     // directory entry, so the write is not complete until that is synced.
@@ -4243,7 +4350,7 @@ fn append_import_ledger_bytes(
             .truncate(original_length)
             .and_then(|_| writer.sync())
             .map_err(|_| "import_ledger_rollback_failed".to_string())?;
-        return Err("import_ledger_unavailable".to_string());
+        return Err(ImportLedgerCode::Unavailable.as_str().to_string());
     }
     Ok(())
 }
@@ -4269,19 +4376,19 @@ fn import_company_tuple(
             company
                 .guid
                 .as_deref()
-                .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
         )?,
         company_number: nonempty_company_field(
             company
                 .company_number
                 .as_deref()
-                .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
         )?,
         books_from: normalized_date(
             company
                 .books_from
                 .as_deref()
-                .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
         )?,
     })
 }
@@ -4289,7 +4396,7 @@ fn import_company_tuple(
 fn nonempty_company_field(value: &str) -> Result<String, String> {
     (!value.trim().is_empty())
         .then(|| value.to_string())
-        .ok_or_else(|| "company_identity_incomplete".to_string())
+        .ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())
 }
 
 /// A catalogue answer that cannot be used: `code` keeps naming what failed; the
@@ -4326,7 +4433,7 @@ fn native_post_refusal_reason(code: &str) -> String {
     let voucher_limit = ledger::MAX_BATCH_POST_VOUCHERS;
     match code {
         "import_post_requires_one_voucher" => format!(
-            "native posting takes 1 to {voucher_limit} vouchers, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
+            "native posting takes one Sales invoice, or 1 to {voucher_limit} vouchers, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
         ),
         "import_post_batch_too_large" => format!(
             "this batch has more vouchers than native posting takes at once ({voucher_limit})"
@@ -4492,7 +4599,7 @@ fn live_evidence(vouchers: &[ImportVoucher]) -> Vec<Value> {
     let mut sources = BTreeMap::<(&str, &str), BTreeSet<&str>>::new();
     for voucher in vouchers {
         let source = match voucher.voucher_type.bank_shape() {
-            None if voucher.voucher_type.is_invoice() => (
+            None if voucher.voucher_type.invoice_class().is_some() => (
                 "hand_keyed_reads_and_hand_imports_not_bridge_posted",
                 "docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md",
             ),
@@ -4571,7 +4678,7 @@ fn refuse_mixed_shapes<D: PayloadDate>(vouchers: &[ImportVoucher<D>]) -> Result<
     // numbering and its party are read for that one voucher.
     let invoices = vouchers
         .iter()
-        .filter(|voucher| voucher.voucher_type.is_invoice())
+        .filter(|voucher| voucher.voucher_type.invoice_class().is_some())
         .count();
     if invoices > 0 && invoices != vouchers.len() {
         return Err("voucher_type_shapes_mixed".to_string());
@@ -5075,8 +5182,9 @@ fn date_window<'a>(
 }
 
 fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(), String> {
-    let from =
-        normalized_date(books_from.ok_or_else(|| "company_identity_incomplete".to_string())?)?;
+    let from = normalized_date(
+        books_from.ok_or_else(|| ReadCode::CompanyIdentityIncomplete.as_str().to_string())?,
+    )?;
     let today = super::tally_host_today();
     for voucher in &payload.vouchers {
         let date = &voucher.date;
@@ -5820,7 +5928,7 @@ fn render_voucher_xml(
         .as_deref()
         .map(|value| format!("<VOUCHERNUMBER>{}</VOUCHERNUMBER>", xml_escape(value)))
         .unwrap_or_default();
-    if voucher.voucher_type.is_invoice() {
+    if voucher.voucher_type.invoice_class().is_some() {
         let date = voucher.date.as_str().to_string();
         // An invoice reaches here only after the build recorded what it
         // observed (`admit_saved_voucher_integrity` refuses one that has not).
@@ -5928,7 +6036,14 @@ pub(super) fn render_import_verification_in_span(
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
-    format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>", xml_escape(company))
+    let static_variables = static_variables_for_unvalidated_company(
+        company,
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
+        &format!(
+            "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
+        ),
+    );
+    format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
 }
 
 pub(super) fn local_evidence(label: &str) -> Evidence {
@@ -6056,10 +6171,10 @@ fn read_capped_record(file: &mut fs::File) -> Option<Vec<u8>> {
 /// writers need no lock and never collide.
 fn write_masters_record(path: &Path, record: &Value) -> Result<(), String> {
     let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
-    let bytes =
-        serde_json::to_vec_pretty(record).map_err(|_| "proof_serialization_failed".to_string())?;
+    let bytes = serde_json::to_vec_pretty(record)
+        .map_err(|_| ImportAckCode::ProofSerializationFailed.as_str().to_string())?;
     super::local_file::replace_private_file(&staged, path, &bytes)
-        .map_err(|_| "import_file_write_failed".to_string())
+        .map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string())
 }
 
 impl Server {
@@ -6295,7 +6410,7 @@ fn verified_baselines(imports: &Path, lineage: &amend::Lineage) -> amend::Verifi
 
 fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     super::local_file::write_private_file(path, bytes)
-        .map_err(|_| "import_file_write_failed".to_string())
+        .map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string())
 }
 fn set_private_file(file: &std::fs::File) -> Result<(), String> {
     #[cfg(unix)]
@@ -6308,6 +6423,11 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
     let _ = file;
     Ok(())
 }
+
+/// The request bytes of every app builder, pinned by hash (#2397).
+#[cfg(test)]
+#[path = "agent_import_request_bytes_tests.rs"]
+mod request_bytes_tests;
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;
@@ -6315,6 +6435,16 @@ mod tests;
 #[cfg(test)]
 #[path = "agent_import_numbering_fixtures.rs"]
 pub(in crate::agent) mod numbering_fixtures;
+
+/// The bytes of a verification page's parts that are never cut: the page with
+/// no verified rows and without Tally's LINEERROR text, which the cap drops
+/// first (see `Server::admit_verification_page`).
+fn verification_page_essential_bytes(page: &Value) -> usize {
+    let mut essential = page.clone();
+    essential["items"] = json!([]);
+    super::drop_tally_line_error_text(&mut essential);
+    essential.to_string().len()
+}
 
 /// A verification page as it is served, from the saved proof's bytes: the
 /// proof, with every ledger name marked so the response's redaction applies,

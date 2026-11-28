@@ -14,6 +14,8 @@
 
 use super::super::failure_code::InvoiceInputCode;
 use super::super::failure_code::InvoiceItemLineCode;
+use super::super::failure_code::InvoiceMastersCode;
+use super::super::failure_code::InvoiceReadbackCode;
 use super::super::failure_code::InvoiceRegistrationCode;
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
 use crate::tally::approved_import::{
@@ -1360,7 +1362,8 @@ pub(super) fn admit_queued_invoice(
 /// The refusal for an invoice whose masters moved, naming the first field that
 /// differs as its typed cause.
 fn masters_changed(field: &'static str) -> super::super::ToolFailure {
-    let mut failure = super::super::ToolFailure::from("import_invoice_masters_changed".to_string());
+    let mut failure =
+        super::super::ToolFailure::from(InvoiceMastersCode::Changed.as_str().to_string());
     failure.cause = Some(field);
     failure
 }
@@ -1520,7 +1523,7 @@ fn invoice_readback_differences(
             .and_then(|detail| detail.observed.as_ref())
             .filter(|observed| !observed.sales_ledgers.is_empty()),
     ) else {
-        return vec!["invoice_not_observed".to_string()];
+        return vec![InvoiceReadbackCode::NotObserved.as_str().to_string()];
     };
     let number = expected.voucher_number.as_deref().unwrap_or_default();
     let party = party_entry(expected)
@@ -1580,7 +1583,7 @@ fn invoice_readback_differences(
             (Some(amount), Some("Yes")) => read_legs.push(key(&leg.ledger, amount, true)),
             (Some(amount), Some("No")) => read_legs.push(key(&leg.ledger, amount, false)),
             _ => {
-                diffs.push("legs_unreadable".to_string());
+                diffs.push(InvoiceReadbackCode::LegsUnreadable.as_str().to_string());
                 read_legs.clear();
                 break;
             }
@@ -1588,7 +1591,11 @@ fn invoice_readback_differences(
     }
     expected_legs.sort();
     read_legs.sort();
-    if !diffs.iter().any(|d| d == "legs_unreadable") && expected_legs != read_legs {
+    if !diffs
+        .iter()
+        .any(|d| d == InvoiceReadbackCode::LegsUnreadable.as_str())
+        && expected_legs != read_legs
+    {
         diffs.push("legs".to_string());
     }
     // Bill allocation: exactly one New Ref named by the number on the party leg
@@ -1616,7 +1623,7 @@ fn invoice_readback_differences(
     // Each sales line names the HSN/SAC Tally used and the kind of master it
     // took it from (§9.16); the code itself is not judged here.
     if sales_legs(observed, read).any(|leg| !leg.line_hsn().resolved()) {
-        diffs.push("invoice_line_hsn_unresolved".to_string());
+        diffs.push(InvoiceReadbackCode::LineHsnUnresolved.as_str().to_string());
     }
     diffs.extend(
         item_line_differences(read)
@@ -1950,7 +1957,7 @@ impl super::super::Server {
             .and_then(|detail| detail.observed.as_ref())
         else {
             return Ok((
-                vec!["invoice_not_observed".to_string()],
+                vec![InvoiceReadbackCode::NotObserved.as_str().to_string()],
                 None,
                 None,
                 Vec::new(),

@@ -3,7 +3,7 @@
 //! append whose outcome is unknown, keeps its transaction folder and blocks
 //! admission until its state is reconciled. An empty folder records no unknown
 //! outcome: admission clears it (`require_settled`, #2269).
-use super::super::failure_code::{ImportAckCode, ImportLedgerCode};
+use super::super::failure_code::{ImportAckCode, ImportLedgerCode, ImportPublicationCode};
 use super::*;
 
 const TRANSACTION: &str = ".proof-publication";
@@ -125,8 +125,11 @@ fn persist_build_with_stage(
 ) -> Result<Persisted, String> {
     let path = imports.join(format!("{}.xml", line.batch_id));
     let transaction = imports.join(BUILD_TRANSACTION);
-    create_transaction(&transaction)
-        .map_err(|_| "import_publication_recovery_required".to_string())?;
+    create_transaction(&transaction).map_err(|_| {
+        ImportPublicationCode::BuildRecoveryRequired
+            .as_str()
+            .to_string()
+    })?;
     let publication = (|| {
         write_private(
             &transaction.join("update.json"),
@@ -145,7 +148,8 @@ fn persist_build_with_stage(
         // ID even if no complete XML or journal record could be published.
         return Ok(Persisted::Incomplete(error));
     }
-    let recovery = || Persisted::Incomplete("import_publication_recovery_required".into());
+    let recovery =
+        || Persisted::Incomplete(ImportPublicationCode::BuildRecoveryRequired.as_str().into());
     match append_status() {
         Err(error) if error == "import_ledger_rollback_failed" => Ok(Persisted::Incomplete(error)),
         Err(error) => {
@@ -227,8 +231,11 @@ fn publish_proofs_syncing(
     let record = ledger::StatusRecord::verified(update, name.clone());
     before(PublicationStep::MarkAppend)?;
     let transaction = imports.join(TRANSACTION);
-    create_transaction(&transaction)
-        .map_err(|_| "proof_publication_recovery_required".to_string())?;
+    create_transaction(&transaction).map_err(|_| {
+        ImportPublicationCode::ProofRecoveryRequired
+            .as_str()
+            .to_string()
+    })?;
     let appended = (|| {
         // Enough context for a person to reconcile after process death.
         write_private(
@@ -243,10 +250,14 @@ fn publish_proofs_syncing(
         // The journal may hold part of the record: keep the marker, which
         // blocks every later append until a person has looked.
         Err(error) if error == "import_ledger_rollback_failed" => {
-            Err("proof_publication_rollback_failed".into())
+            Err(ImportPublicationCode::ProofRollbackFailed.as_str().into())
         }
         Err(error) => {
-            clear(&transaction).map_err(|_| "proof_publication_recovery_required".to_string())?;
+            clear(&transaction).map_err(|_| {
+                ImportPublicationCode::ProofRecoveryRequired
+                    .as_str()
+                    .to_string()
+            })?;
             Err(error)
         }
         // The record is whole and names this pair: a folder that stays does
@@ -269,7 +280,7 @@ fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
             .map_err(|_| ImportAckCode::ImportFileWriteFailed.as_str().to_string()),
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => match fs::read(path) {
             Ok(existing) if existing == bytes => Ok(()),
-            _ => Err("proof_publication_failed".into()),
+            _ => Err(ImportPublicationCode::ProofFailed.as_str().into()),
         },
         Err(_) => Err(ImportAckCode::ImportFileWriteFailed.as_str().into()),
     }

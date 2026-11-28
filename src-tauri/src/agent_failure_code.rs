@@ -741,7 +741,8 @@ failure_codes! {
         /// The review text, or a narration in it, is longer or has more or longer lines than one
         /// review shows.
         ReviewTooLarge = "import_review_too_large",
-        /// A voucher's amounts overflow when they are added up for its review text.
+        /// A voucher's amounts overflow when they are added up, for its balance check or its review
+        /// text.
         VoucherAmountOverflow = "voucher_amount_overflow",
     }
 }

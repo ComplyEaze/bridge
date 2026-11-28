@@ -299,7 +299,7 @@ mod post {
     };
     use super::super::super::super::master_post::tests::coordinator::{
         approved_stock, import_answer, imports, minted, rebound_after, rebound_before,
-        rebound_shown_from, stock_answers, QUEUE_READS,
+        rebound_shown_from, stock_answers, stock_answers_at, QUEUE_READS,
     };
     use super::super::super::super::master_review::tests::{
         approved_shown_for, approved_stock_item_for, stock_approvals, taken_stock_approval,
@@ -307,7 +307,7 @@ mod post {
     use super::*;
     use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
     use std::time::Duration;
-    use tally_protocol_simulator::{Delivery, ObservedRequest};
+    use tally_protocol_simulator::{Delivery, DeliveryGate, ObservedRequest};
 
     const A: u16 = 0xa1;
     const B: u16 = 0xb2;
@@ -424,6 +424,40 @@ mod post {
         plans
     }
 
+    /// The read-back after the Create, in the standalone read's order: the R1
+    /// read after the marked create, rebound (three rows, so the count is 3, a
+    /// hand edit), and marks 290 in both answers: one above the queue's 289, a
+    /// constructed edit, since the marks after a create were not captured
+    /// (stock-create-lab `PROVENANCE.md`).
+    fn read_back() -> Vec<ScenarioPlan> {
+        standalone(stock_answers_at(
+            rebound_after(),
+            3,
+            marks_at(290),
+            marks_at(290),
+        ))
+    }
+
+    /// [`dispatch`], then the [`read_back`].
+    fn dispatch_and_read_back() -> Vec<ScenarioPlan> {
+        let mut plans = dispatch();
+        plans.extend(read_back());
+        plans
+    }
+
+    /// The records of a batch sent, answered and judged.
+    const RECORDED: [&str; 4] = [
+        "master_batch",
+        "master_dispatch_intent",
+        "master_dispatch_response",
+        "master_verdict",
+    ];
+
+    /// The verified item's GUID: the rebound R1 row of the marked create.
+    fn created_guid() -> String {
+        format!("{SHAPE_GUID}-000000d2")
+    }
+
     fn refused_code(outcome: &Result<ToolOutcome, ToolFailure>) -> &str {
         match outcome {
             Ok(outcome) => panic!("the post answered: {}", outcome.payload),
@@ -437,17 +471,19 @@ mod post {
     }
 
     /// Prepare, then post: one dialog, the stored bytes sent once, one intent,
-    /// the approval used and gone, and an answer that says NOT verified. Under
-    /// `mask_parties` the answer's preview is masked as the prepare masks it,
-    /// and the dialog shows the whole names.
+    /// the approval used and gone, Tally's answer recorded, the book read back
+    /// and the item verified, with the verdict recorded. Under `mask_parties`
+    /// the answer's preview is masked as the prepare masks it, and the dialog
+    /// shows the whole names. Posted again, the settled batch is answered from
+    /// the journal alone.
     #[tokio::test]
-    async fn a_prepared_stock_item_is_asked_once_and_its_stored_bytes_are_sent_once_unverified() {
+    async fn a_prepared_stock_item_is_asked_once_sent_once_and_verified_by_its_read_back() {
         for redaction in [Redaction::None, Redaction::MaskParties] {
             let mut plans = passing_run();
             let prepared_at = plans.len();
             plans.extend(post_reads());
             let posted_at = plans.len() + passing_answers().len();
-            plans.extend(dispatch());
+            plans.extend(dispatch_and_read_back());
             let run = posting(plans, redaction);
             let prepared = run
                 .server
@@ -463,11 +499,17 @@ mod post {
                 .await
                 .expect("the post answers");
             let result = &outcome.payload["result"];
-            assert_eq!(result["state"], "posted_unverified", "{result}");
-            assert_eq!(result["verification"]["attempted"], false);
+            assert_eq!(result["state"], "posted_verified", "{result}");
+            assert_eq!(result["answer_recorded"], true);
+            let verification = &result["verification"];
+            assert_eq!(verification["moment"], "after_post");
+            assert_eq!(verification["settled"], true);
+            assert_eq!(verification["guid"], json!(created_guid()));
+            assert_eq!(verification["reasons"], json!([]));
+            assert_eq!(verification["read_back"]["state"], "read");
+            assert_eq!(verification["verdict_written"], true);
             assert_eq!(result["dispatch"]["state"], "dispatched");
             assert_eq!(result["counters"]["created"], 1);
-            assert!(result["note"].as_str().unwrap().contains("NOT verified"));
             let step = result["next_step"].as_str().unwrap();
             assert!(
                 !step.contains("post_") && !step.contains("prepare_"),
@@ -486,30 +528,28 @@ mod post {
             } else {
                 assert_eq!(preview, shown.preview());
             }
-            assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+            assert_eq!(run.records(), RECORDED);
             assert!(
                 !run.server.post_approvals.holds(&batch_id),
                 "nothing is held"
             );
             let stored = journal_lines(&std::fs::read(run.dir().join(STOCK_JOURNAL)).unwrap());
-            // Posted again: the recorded intent answers, nothing is asked or sent.
+            assert_eq!(stored[3]["state"], "posted_verified");
+            assert_eq!(stored[3]["items"][0]["guid"], json!(created_guid()));
+            assert_eq!(stored[3]["items"][0]["reason"], Value::Null);
+            // Posted again: the settled batch answers from the journal, and
+            // nothing is asked, read or sent.
             let again = run.post(&scripted, &batch_id).await.expect("an answer");
             let again = &again.payload["result"];
-            assert_eq!(
-                again["error"]["code"],
-                UnderLockRefusal::AlreadyAttempted.code()
-            );
+            assert_eq!(again["state"], "posted_verified", "{again}");
+            assert_eq!(again["journal"]["verdict"], "posted_verified");
             assert_eq!(again["attempt_recorded"], true);
-            assert!(again["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("NOT verified"));
             assert_eq!(scripted.stock_items().len(), 1);
             let observed = run.finish();
             assert_eq!(
-                observed.len(),
-                posted_at + 1,
-                "nothing after the one import"
+                sent(&observed[posted_at + 1..]),
+                EVERY_READ,
+                "after the one import, the read-back alone"
             );
             assert_eq!(sent(&observed[..prepared_at]), every_request());
             assert_eq!(
@@ -777,24 +817,67 @@ mod post {
     }
 
     /// A batch whose send is recorded, with an approval held for it: the
-    /// answer says sent and not verified, nothing is sent, and the approval
-    /// is withdrawn.
+    /// approval is withdrawn, and the batch is reconciled: the company
+    /// checked, the book read back and judged, never verified, and nothing
+    /// imported.
     #[tokio::test]
     async fn an_approval_held_for_a_sent_batch_is_withdrawn() {
-        let run = posting(vec![health()], Redaction::None);
+        let mut plans = identity_answers(false);
+        plans.extend(read_back());
+        let run = posting(plans, Redaction::None);
         let a = shape_batch(A, &run.origin);
         record(run.dir(), &a);
         dispatch_open(run.dir(), &a).await;
         hold_for(&run, id(A)).await;
         let outcome = run.post(&ScriptedApproval::approving(), id(A)).await;
         let result = outcome.expect("the answer").payload["result"].clone();
-        assert_eq!(
-            result["error"]["code"],
-            UnderLockRefusal::AlreadyAttempted.code()
+        assert_eq!(result["state"], "reconciliation_required", "{result}");
+        assert_eq!(result["verification"]["moment"], "reconcile");
+        assert_eq!(result["verification"]["read_back"]["state"], "read");
+        let reasons = &result["verification"]["reasons"];
+        assert!(
+            reasons
+                .as_array()
+                .unwrap()
+                .contains(&json!("later_call_does_not_verify")),
+            "{reasons}"
         );
         assert_eq!(result["attempt_recorded"], true);
         assert!(!run.server.post_approvals.holds(id(A)));
-        assert!(run.cancelled().is_empty(), "no request is sent");
+        assert_eq!(
+            sent(&run.finish()),
+            every_request(),
+            "the read-back, no import"
+        );
+    }
+
+    /// A later call whose company check fails (the company list answered
+    /// unpaired, its second copy in Education: a constructed edit): it answers
+    /// as a recorded send with the check's code, reads nothing back and records
+    /// nothing.
+    #[tokio::test]
+    async fn a_reconcile_whose_company_check_fails_reads_nothing_back() {
+        let mut plans = identity_answers(false);
+        plans[2] = identity_answers(true).remove(2);
+        let run = posting(plans, Redaction::None);
+        let a = shape_batch(A, &run.origin);
+        record(run.dir(), &a);
+        dispatch_open(run.dir(), &a).await;
+        let outcome = run.post(&ScriptedApproval::approving(), id(A)).await;
+        let result = outcome.expect("the answer").payload["result"].clone();
+        assert_eq!(
+            result["dispatch"]["state"], "reconciliation_required",
+            "{result}"
+        );
+        assert_eq!(result["verification"]["attempted"], false);
+        assert_eq!(result["attempt_recorded"], true);
+        assert_eq!(result["error"]["code"], "company_collection_invalid");
+        assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+        assert_eq!(
+            sent(&run.finish()),
+            IDENTITY_READ,
+            "the identity read alone"
+        );
     }
 
     /// The name appears in the book between the ask and the dispatch: the
@@ -862,6 +945,290 @@ mod post {
         assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
         assert!(!run.server.post_approvals.holds(id(A)));
         assert_eq!(imports(&run.finish()), [create_bytes()], "sent once");
+    }
+
+    /// The create is lost after the intent: the post answers as today and
+    /// reads nothing (its next answers are the later call's, which would not
+    /// line up otherwise). A later call reconciles it: the company checked, the
+    /// book read back with the item found, and the verdict open, never
+    /// verified nor attributed, with no answer from Tally on file.
+    #[tokio::test]
+    async fn a_lost_answer_is_reconciled_by_a_later_call_with_a_read_and_never_verified() {
+        let mut plans = post_reads();
+        plans.extend(passing_answers());
+        let posted_at = plans.len();
+        plans.push(
+            import_answer().with_delivery(Delivery::ResetAfterRequestProcessed {
+                delay: Duration::from_millis(0),
+            }),
+        );
+        plans.extend(identity_answers(false));
+        plans.extend(read_back());
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let scripted = ScriptedApproval::approving();
+        let lost = run.post(&scripted, id(A)).await.expect("the answer");
+        let lost = &lost.payload["result"];
+        assert_eq!(lost["error"]["code"], "import_dispatch_outcome_unknown");
+        assert_eq!(lost["verification"]["attempted"], false, "{lost}");
+        assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+        let later = run.post(&scripted, id(A)).await.expect("the answer");
+        let later = &later.payload["result"];
+        assert_eq!(later["state"], "reconciliation_required", "{later}");
+        assert_eq!(later["answer_recorded"], false);
+        let verification = &later["verification"];
+        assert_eq!(verification["moment"], "reconcile");
+        assert_eq!(verification["read_back"]["state"], "read");
+        assert_eq!(verification["guid"], Value::Null);
+        assert_eq!(
+            verification["reasons"],
+            json!(["later_call_does_not_verify"])
+        );
+        assert_eq!(
+            run.records(),
+            ["master_batch", "master_dispatch_intent", "master_verdict"]
+        );
+        let stored = journal_lines(&std::fs::read(run.dir().join(STOCK_JOURNAL)).unwrap());
+        assert_eq!(stored[2]["state"], "reconciliation_required");
+        assert_eq!(
+            stored[2]["items"][0]["reason"],
+            "later_call_does_not_verify"
+        );
+        assert_eq!(scripted.stock_items().len(), 1, "asked once");
+        let observed = run.finish();
+        assert_eq!(imports(&observed), [create_bytes()], "sent once");
+        assert_eq!(sent(&observed[posted_at + 1..]), every_request());
+    }
+
+    /// The read-back at post time fails in transport (its binding marks
+    /// request reset, a constructed delivery): the verdict is unconfirmed and recorded, with
+    /// Tally's answer. A later call reads back cleanly (the marks one above the
+    /// aim read, the item found) and still cannot verify it.
+    #[tokio::test]
+    async fn a_read_back_failed_at_post_time_is_unconfirmed_and_a_reconcile_cannot_verify_it() {
+        let mut plans = post_reads();
+        plans.extend(dispatch());
+        let reset = Delivery::ResetAfterRequestProcessed {
+            delay: Duration::from_millis(0),
+        };
+        let read_at = plans.len();
+        let mut failing = read_back();
+        failing.truncate(4);
+        let binding = failing.pop().unwrap();
+        failing.push(binding.with_delivery(reset));
+        plans.extend(failing);
+        plans.extend(identity_answers(false));
+        plans.extend(read_back());
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let scripted = ScriptedApproval::approving();
+        let posted = run.post(&scripted, id(A)).await.expect("the answer");
+        let posted = &posted.payload["result"];
+        assert_eq!(
+            posted["state"], "masters_after_post_unconfirmed",
+            "{posted}"
+        );
+        assert_eq!(posted["verification"]["read_back"]["state"], "failed");
+        assert_eq!(
+            posted["verification"]["reasons"],
+            json!(["masters_unconfirmed"])
+        );
+        assert_eq!(posted["answer_recorded"], true);
+        assert_eq!(posted["counters"]["created"], 1);
+        let note = posted["note"].as_str().unwrap();
+        let step = posted["next_step"].as_str().unwrap();
+        assert!(note.contains("NOT verified"), "{note}");
+        for text in [note, step] {
+            assert!(
+                !text.contains("post_") && !text.contains("prepare_"),
+                "{text}"
+            );
+            assert!(!text.contains("ledger"), "{text}");
+        }
+        assert_eq!(run.records(), RECORDED);
+        let later = run.post(&scripted, id(A)).await.expect("the answer");
+        let later = &later.payload["result"];
+        assert_eq!(later["state"], "reconciliation_required", "{later}");
+        assert_eq!(later["verification"]["read_back"]["state"], "read");
+        assert_eq!(
+            later["verification"]["reasons"],
+            json!(["later_call_does_not_verify"])
+        );
+        assert_eq!(later["counters"]["created"], 1, "the answer on file");
+        let mut records = RECORDED.to_vec();
+        records.push("master_verdict");
+        assert_eq!(run.records(), records);
+        let observed = run.finish();
+        assert_eq!(imports(&observed), [create_bytes()], "sent once");
+        let failed = [Sent::Health, Sent::Companies, Sent::Companies, Sent::Marks];
+        assert_eq!(sent(&observed[read_at..read_at + 4]), failed);
+        assert_eq!(sent(&observed[read_at + 4..]), every_request());
+    }
+
+    /// The read-back at post time is answered in full, but its aim marks
+    /// answer does not parse (the ALTMSTID of 290 made `x`, a constructed edit
+    /// of the captured marks): the verdict is unconfirmed, not open.
+    #[tokio::test]
+    async fn a_read_back_whose_marks_do_not_parse_is_unconfirmed() {
+        let mark = "<ALTMSTID TYPE=\"Number\"> 290</ALTMSTID>";
+        let unparsed = marks_at(290).replacen(mark, "<ALTMSTID TYPE=\"Number\">x</ALTMSTID>", 1);
+        assert_ne!(unparsed, marks_at(290));
+        let mut plans = post_reads();
+        plans.extend(dispatch());
+        let answers = stock_answers_at(rebound_after(), 3, marks_at(290), unparsed);
+        plans.extend(standalone(answers));
+        let run = posting(plans, Redaction::None);
+        record(run.dir(), &shape_batch(A, &run.origin));
+        let posted = run.post(&ScriptedApproval::approving(), id(A)).await;
+        let result = posted.expect("the answer").payload["result"].clone();
+        assert_eq!(
+            result["state"], "masters_after_post_unconfirmed",
+            "{result}"
+        );
+        assert_eq!(result["verification"]["read_back"]["state"], "unparsed");
+        assert_eq!(
+            result["verification"]["reasons"],
+            json!(["masters_unconfirmed"])
+        );
+        assert_eq!(run.records(), RECORDED);
+        let observed = run.finish();
+        assert_eq!(imports(&observed), [create_bytes()], "sent once");
+    }
+
+    /// Tally's answer cannot be recorded, after the send and again under the
+    /// verdict's lock: a clean read-back is NOT verified (the journal admits no
+    /// verified verdict without the answer), and the answer says so. Refused
+    /// only once, the retry records it and the item is verified.
+    #[tokio::test]
+    async fn an_answer_that_cannot_be_recorded_leaves_the_item_unverified() {
+        for (faults, verified) in [
+            (
+                vec!["master_dispatch_response", "master_dispatch_response"],
+                false,
+            ),
+            (vec!["master_dispatch_response"], true),
+        ] {
+            let mut plans = post_reads();
+            plans.extend(dispatch_and_read_back());
+            let run = posting(plans, Redaction::None);
+            record(run.dir(), &shape_batch(A, &run.origin));
+            let outcome = TEST_FAULTS
+                .scope(
+                    std::cell::RefCell::new(faults),
+                    run.post(&ScriptedApproval::approving(), id(A)),
+                )
+                .await;
+            let result = outcome.expect("the answer").payload["result"].clone();
+            assert_eq!(result["verification"]["read_back"]["state"], "read");
+            assert_eq!(result["counters"]["created"], 1);
+            if verified {
+                assert_eq!(result["state"], "posted_verified", "{result}");
+                assert_eq!(result["answer_recorded"], true);
+                assert_eq!(run.records(), RECORDED);
+            } else {
+                assert_eq!(result["state"], "posted_unverified", "{result}");
+                assert_eq!(result["answer_recorded"], false);
+                assert_eq!(result["verification"]["settled"], false);
+                assert_eq!(result["verification"]["verdict_recorded"], false);
+                assert_eq!(result["note"], UNRECORDED_NOTE);
+                let step = result["next_step"].as_str().unwrap();
+                assert!(step.contains(STOCK_VERDICT_UNRECORDED), "{step}");
+                assert!(step.contains(STOCK_ANSWER_UNRECORDED), "{step}");
+                assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+            }
+            assert_eq!(imports(&run.finish()), [create_bytes()], "sent once");
+        }
+    }
+
+    /// Another action holds the admission lock shared from after the Create is
+    /// sent (its request read in full, Tally's answer held) until the post
+    /// returns: a real held lock, no injected fault. The answer's append after
+    /// the send finds the lock busy, and so does the retry under the verdict's
+    /// lock, so nothing past the intent is recorded. A clean read-back is then
+    /// NOT verified, and the answer is a recorded send, never "nothing sent".
+    /// Released while the read-back's first answer is held, after the first
+    /// append failed, the retry records Tally's answer and the verdict, and the
+    /// item is verified.
+    #[tokio::test]
+    async fn an_answer_append_under_an_admission_lock_held_after_the_send_is_a_recorded_send() {
+        for released_before_retry in [false, true] {
+            let (sent_gate, read_gate) = (DeliveryGate::new(), DeliveryGate::new());
+            let mut plans = post_reads();
+            plans.extend(passing_answers());
+            let posted_at = plans.len();
+            plans.push(import_answer().with_delivery(Delivery::Held(sent_gate.clone())));
+            let mut reads = read_back();
+            if released_before_retry {
+                reads[0] = reads[0]
+                    .clone()
+                    .with_delivery(Delivery::Held(read_gate.clone()));
+            } else {
+                read_gate.open();
+            }
+            plans.extend(reads);
+            let run = posting(plans, Redaction::None);
+            record(run.dir(), &shape_batch(A, &run.origin));
+            let simulator = &run.simulator;
+            let until_received = move |count: usize| async move {
+                tokio::time::timeout(Duration::from_secs(20), async {
+                    while simulator.received() < count {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                })
+                .await
+                .expect("the request was read");
+            };
+            let other_action = async {
+                until_received(posted_at + 1).await;
+                assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+                let held = (run.server.lock_import_admission_shared())
+                    .expect("the post holds no lock while Tally's answer is held");
+                sent_gate.open();
+                if released_before_retry {
+                    until_received(posted_at + 2).await;
+                    drop(held);
+                    read_gate.open();
+                    None
+                } else {
+                    Some(held)
+                }
+            };
+            let scripted = ScriptedApproval::approving();
+            let (outcome, held) = tokio::join!(run.post(&scripted, id(A)), other_action);
+            drop(held);
+            let result = outcome.expect("not a refusal").payload["result"].clone();
+            assert_eq!(result["attempt_recorded"], true, "{result}");
+            assert_eq!(result["dispatch"]["state"], "dispatched");
+            assert_eq!(result["verification"]["read_back"]["state"], "read");
+            assert_eq!(result["counters"]["created"], 1);
+            let text = result.to_string();
+            for not_sent in ["Nothing was sent", "sent nothing", "Nothing was written"] {
+                assert!(!text.contains(not_sent), "{not_sent}: {result}");
+            }
+            if released_before_retry {
+                assert_eq!(result["state"], "posted_verified", "{result}");
+                assert_eq!(result["answer_recorded"], true);
+                assert_eq!(run.records(), RECORDED, "recorded on the retry");
+            } else {
+                assert_eq!(result["state"], "posted_unverified", "{result}");
+                assert_eq!(result["answer_recorded"], false);
+                assert_eq!(result["verification"]["verdict_recorded"], false);
+                assert_eq!(
+                    result["verification"]["verdict_record_error"],
+                    "import_admission_busy"
+                );
+                assert_eq!(result["note"], UNRECORDED_NOTE);
+                let step = result["next_step"].as_str().unwrap();
+                assert!(step.contains("never post this batch again"), "{step}");
+                assert!(step.contains(STOCK_ANSWER_UNRECORDED), "{step}");
+                assert_eq!(
+                    run.records(),
+                    ["master_batch", "master_dispatch_intent"],
+                    "not recorded on the retry either"
+                );
+            }
+            assert_eq!(imports(&run.finish()), [create_bytes()], "sent once");
+        }
     }
 
     /// The writer's refusals through the tool, by the journal faults the
@@ -991,7 +1358,7 @@ mod post {
         let mut plans = post_reads();
         let first = plans.len();
         plans.extend(post_reads());
-        plans.extend(dispatch());
+        plans.extend(dispatch_and_read_back());
         let run = posting(plans, Redaction::None);
         record(run.dir(), &shape_batch(A, &run.origin));
         let scripted = ScriptedApproval::held();
@@ -1001,9 +1368,9 @@ mod post {
         scripted.answer(true);
         until_answered(&run.server, id(A)).await;
         let posted = run.post(&scripted, id(A)).await.expect("posted");
-        assert_eq!(posted.payload["result"]["state"], "posted_unverified");
+        assert_eq!(posted.payload["result"]["state"], "posted_verified");
         assert_eq!(scripted.stock_items().len(), 1, "one dialog, asked once");
-        assert_eq!(run.records(), ["master_batch", "master_dispatch_intent"]);
+        assert_eq!(run.records(), RECORDED);
         let observed = run.finish();
         assert_eq!(sent(&observed[..first]), every_request());
         assert_eq!(imports(&observed), [create_bytes()]);

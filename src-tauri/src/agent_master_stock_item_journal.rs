@@ -6,7 +6,8 @@
 //! intent writer, has no shipped caller. The intent, the pre-image sidecar and
 //! the record tags are the master journal's own, generic over the batch kind;
 //! neither the intent nor the sidecar records a kind, because the file is the
-//! kind.
+//! kind. A stock verdict is built only by [`MasterVerdict::stock`], from the
+//! judgement of [`verdict`], whose module documentation holds its table.
 //!
 //! A stock item and a ledger of the same name do not block each other: each
 //! journal's open-dispatch overlap check sees only its own file. That rests on
@@ -18,8 +19,8 @@ use super::super::master_tools::journal_refusal;
 use super::{
     append_kind_intent, check_company, check_ids, read_kind_journal, read_pre_image,
     remove_pre_image, write_pre_image, ExclusiveAdmission, Invalid, Journal, JournalBatch,
-    MasterCompany, MasterDispatchIntent, MasterLedgerError, PreImage, PreImageError,
-    RecordedIntent,
+    MasterCompany, MasterDispatchIntent, MasterLedgerError, MasterVerdict, MasterVerdictState,
+    PreImage, PreImageError, RecordedIntent, VerdictItem,
 };
 use crate::tally::approved_import::UnderLockRefusal;
 use crate::tally::stock_item_create::{
@@ -31,8 +32,12 @@ use crate::tally::stock_item_verified::{
 };
 use crate::tally::VerifiedCompanyIdentity;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+
+#[path = "agent_master_stock_verdict.rs"]
+mod verdict;
+pub(in crate::agent::agent_import) use verdict::{Answer, StockJudgement, StockReadBack};
 
 /// The one class of stock-item batch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -226,14 +231,16 @@ fn of_company(guid: &str, company_guid: &str) -> bool {
         .is_some_and(|rest| rest.starts_with('-'))
 }
 
-/// The company, the writes and the before GUIDs of one stock-item read-back,
-/// all taken from one admitted batch, its intent and its sidecar, so no
-/// read-back can pair one batch's writes with another's company or before set.
+/// The company, the writes, the before GUIDs and the whole pre-image of one
+/// stock-item read-back, all taken from one admitted batch, its intent and its
+/// sidecar, so no read-back can pair one batch's writes with another's company
+/// or before set.
 #[derive(Debug)]
 pub(super) struct StockItemReadBackBasis {
     company: VerifiedCompanyIdentity,
     writes: StockItemWrites,
     before: BeforeGuids,
+    pre_image: PreImage,
 }
 
 impl StockItemReadBackBasis {
@@ -290,7 +297,14 @@ impl StockItemReadBackBasis {
             company: identity.clone(),
             writes,
             before: BeforeGuids::of(&pre_image),
+            pre_image,
         })
+    }
+
+    /// Every item of the read before the Create, by lower-case GUID, with its
+    /// ALTERID.
+    pub(super) fn pre_image(&self) -> &BTreeMap<String, u64> {
+        self.pre_image.entries()
     }
 
     pub(super) fn read_back(&self, fresh: &StockItemCatalogue) -> ReadBackVerdict {
@@ -303,6 +317,29 @@ impl StockItemReadBackBasis {
         fresh: &StockItemCatalogue,
     ) -> Result<VerifiedItem, NotVerified> {
         VerifiedItem::new(outcome, &self.company, &self.writes, &self.before.0, fresh)
+    }
+}
+
+impl MasterVerdict {
+    /// The verdict `judgement` gives on the stock batch `batch`: its one item
+    /// with the judgement's GUID, and its reasons unless it is verified.
+    pub(in crate::agent::agent_import) fn stock(
+        batch: &StockItemBatch,
+        judgement: &StockJudgement,
+    ) -> Self {
+        let state = judgement.state();
+        Self {
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.batch_sha256.clone(),
+            state,
+            items: vec![VerdictItem {
+                name: batch.item.name.clone(),
+                guid: judgement.guid().map(str::to_string),
+                reason: (state != MasterVerdictState::PostedVerified)
+                    .then(|| judgement.reasons().join(",")),
+            }],
+            sealed: (),
+        }
     }
 }
 

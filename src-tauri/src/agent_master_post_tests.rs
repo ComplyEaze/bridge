@@ -1225,11 +1225,12 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
             "recheck_stock_item_admission",
             &[("agent_master_post.rs", 5)],
         ),
+        // The stock post's read-back parses its fresh read too.
         (
             "CompleteStockItemCatalogue",
             &[
                 ("agent_master_post.rs", 4),
-                ("agent_master_stock_tools.rs", 2),
+                ("agent_master_stock_tools.rs", 3),
                 ("tally/stock_item_create.rs", 2),
             ],
         ),
@@ -1241,11 +1242,12 @@ fn stock_read_and_recheck_have_no_shipped_caller_or_registered_tool() {
                 ("tally/stock_item_create.rs", 1),
             ],
         ),
+        // The stock show, and the stock post's read-back after its send.
         (
             "read_and_recheck_stock_item",
             &[
                 ("agent_master_post.rs", 2),
-                ("agent_master_stock_tools.rs", 1),
+                ("agent_master_stock_tools.rs", 2),
                 ("tally/runtime_masters.rs", 3),
             ],
         ),
@@ -2344,6 +2346,16 @@ pub(crate) mod coordinator {
     /// of 11 items made `items` (a hand edit), the R1 group and unit reads
     /// rebound to the shape lab's GUID (hand edits), and aim marks at `aim`.
     pub(crate) fn stock_answers(candidate: String, items: usize, aim: String) -> Vec<ScenarioPlan> {
+        stock_answers_at(candidate, items, marks_at(289), aim)
+    }
+
+    /// [`stock_answers`] with the binding marks answer `binding`.
+    pub(crate) fn stock_answers_at(
+        candidate: String,
+        items: usize,
+        binding: String,
+        aim: String,
+    ) -> Vec<ScenarioPlan> {
         let r1 = |bytes| stock_capture(bytes).replace(STOCK_GUID, SHAPE_GUID);
         let count = stock_capture(SHAPE_COUNT);
         let reported = "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>";
@@ -2352,7 +2364,7 @@ pub(crate) mod coordinator {
             reported,
             &format!("<NUMSTOCKITEMS TYPE=\"Number\"> {items}</NUMSTOCKITEMS>"),
         );
-        let mut plans = through_binding(marks_at(289));
+        let mut plans = through_binding(binding);
         for read in [candidate, count, r1(STOCK_GROUPS), r1(STOCK_UNITS)] {
             plans.extend(pair(read.clone(), read));
         }

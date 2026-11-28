@@ -445,11 +445,16 @@ impl Server {
     /// on a torn last line. Nothing here may fail the call: the caller answers
     /// from what it cannot read.
     fn read_master_journal_after_answer(&self) -> Result<MasterJournal, String> {
+        self.read_kind_journal_after_answer(read_journal)
+    }
+
+    /// [`Self::read_master_journal_after_answer`] for the journal `read` reads.
+    fn read_kind_journal_after_answer<B>(&self, read: KindReader<B>) -> Result<Journal<B>, String> {
         #[cfg(test)]
         if super::master_ledger::test_fault_fires("answer_read_failed") {
             return Err("master_journal_unavailable".to_string());
         }
-        let shared = self.read_master_journal();
+        let shared = self.read_kind_journal_shared(read);
         #[cfg(test)]
         let shared = if super::master_ledger::test_fault_fires("answer_read_busy") {
             Err("import_admission_busy".to_string())
@@ -459,9 +464,7 @@ impl Server {
             shared
         };
         match shared {
-            Err(_) => {
-                read_journal(&self.settings.data_dir).map_err(|error| error.code().to_string())
-            }
+            Err(_) => read(&self.settings.data_dir).map_err(|error| error.code().to_string()),
             other => other,
         }
     }

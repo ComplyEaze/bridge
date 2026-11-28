@@ -36,8 +36,14 @@ pub(super) fn require_settled(imports: &Path) -> Result<(), String> {
 /// [`require_settled`], refusing with the code itself.
 pub(super) fn settled(imports: &Path) -> Result<(), &'static str> {
     for (name, error_code) in [
-        (TRANSACTION, "proof_publication_recovery_required"),
-        (BUILD_TRANSACTION, "import_publication_recovery_required"),
+        (
+            TRANSACTION,
+            ImportPublicationCode::ProofRecoveryRequired.as_str(),
+        ),
+        (
+            BUILD_TRANSACTION,
+            ImportPublicationCode::BuildRecoveryRequired.as_str(),
+        ),
     ] {
         let path = imports.join(name);
         match fs::symlink_metadata(&path) {

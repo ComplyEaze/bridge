@@ -1070,11 +1070,12 @@ failure_codes! {
     /// The refusals of the import's publication of a built file and of a verification's proof pair
     /// (`agent_import_persistence.rs`).
     pub(crate) enum ImportPublicationCode {
-        /// The build's publication folder could not be made, or a build whose journal append failed
-        /// could not be undone.
+        /// The build's publication folder could not be made, a build whose journal append failed
+        /// could not be undone, or a leftover build folder or marker still blocks the next
+        /// admission.
         BuildRecoveryRequired = "import_publication_recovery_required",
-        /// The proof's publication folder could not be made, or could not be cleared after a step
-        /// inside it failed.
+        /// The proof's publication folder could not be made, could not be cleared after a step
+        /// inside it failed, or a leftover proof folder or marker still blocks the next admission.
         ProofRecoveryRequired = "proof_publication_recovery_required",
         /// The proof's journal append failed and could not be cut back.
         ProofRollbackFailed = "proof_publication_rollback_failed",

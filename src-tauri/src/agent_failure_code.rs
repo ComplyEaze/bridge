@@ -804,6 +804,108 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of `ledger_masters` itself (`agent_ledgers.rs`): an argument that needs
+    /// fields=compliance, a pair of arguments not captured together, and a listing that cannot be
+    /// read or filtered as asked.
+    pub(crate) enum LedgerMastersCode {
+        /// `as_of` was given without fields=compliance.
+        AsOfRequiresCompliance = "ledger_masters_as_of_requires_compliance",
+        /// `include_gst_details` was asked without fields=compliance.
+        GstDetailsRequiresCompliance = "ledger_masters_gst_details_requires_compliance",
+        /// `include_mailing_details` was asked without fields=compliance.
+        MailingDetailsRequiresCompliance = "ledger_masters_mailing_details_requires_compliance",
+        /// `include_mailing_details` and `include_gst_details` were asked together, a request not
+        /// captured live.
+        MailingDetailsWithGstDetailsNotCaptured =
+            "ledger_masters_mailing_details_with_gst_details_not_captured",
+        /// A group filter was asked of a listing that holds no group index.
+        SnapshotGroupsMissing = "listing_snapshot_groups_missing",
+        /// The ledger listing read was asked for a listing kind that is not a ledger listing.
+        KindNotALedgerListing = "listing_kind_not_a_ledger_listing",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the held listings that later pages are served from (`agent_ledgers.rs` and
+    /// `agent_vouchers.rs`).
+    pub(crate) enum ListingSnapshotCode {
+        /// A later page that named its snapshot cannot be served from it: the book moved since the
+        /// first page, or the snapshot is no longer held (its cause says which).
+        Changed = "listing_snapshot_changed",
+        /// The lock of the held listings or of the held voucher windows is poisoned, so a held
+        /// listing cannot be read, held or dropped.
+        StoreUnavailable = "listing_snapshot_store_unavailable",
+    }
+}
+
+failure_codes! {
+    /// The refusals of `vouchers` itself (`agent_vouchers.rs`), and the reason its window is
+    /// partial when it withholds a voucher.
+    pub(crate) enum VoucherListingCode {
+        /// A cost-centre summary met an entry whose allocations could not be read.
+        SummaryCostCentreUnreadable = "summary_cost_centre_unreadable",
+        /// A group summary met a ledger whose group chain could not be walked or that the ledger
+        /// list does not hold.
+        SummaryGroupUnresolved = "summary_group_unresolved",
+        /// `voucher_type_guid` is not a GUID of this company.
+        TypeGuidForeign = "voucher_type_guid_foreign",
+        /// A group summary was asked of a book whose master mark is above the ledger-list bound.
+        SummaryGroupBookTooLarge = "summary_group_book_too_large",
+        /// The ledgers' group placements read after the window differ from those read before it.
+        GroupSnapshotDrifted = "group_snapshot_drifted",
+        /// A `voucher_type` name that selected nothing is carried by no voucher type in the book.
+        UnknownVoucherType = "unknown_voucher_type",
+        /// Not a refusal: the window withholds a voucher, so it is partial.
+        VouchersWithheld = "vouchers_withheld",
+        /// The book's voucher types read did not parse.
+        TypeExportInvalid = "voucher_type_export_invalid",
+    }
+}
+
+failure_codes! {
+    /// The refusals of an amendment's lineage and proposal, before any voucher is read
+    /// (`agent_import_amend.rs`).
+    pub(crate) enum ImportAmendCode {
+        /// No build of the lineage is its unamended original, or a build carries another identity.
+        LineageInvalid = "import_amend_lineage_invalid",
+        /// A build of the lineage was not made under the batch identity scheme.
+        IdentitySchemeUnsupported = "import_amend_identity_scheme_unsupported",
+        /// A build of the lineage was made for another Tally endpoint.
+        EndpointMismatch = "import_amend_endpoint_mismatch",
+        /// A build of the lineage was posted natively.
+        NativelyPosted = "import_amend_natively_posted",
+        /// A proposed transaction is in no build of the lineage.
+        TxnNotInBatch = "import_amend_txn_not_in_batch",
+        /// A proposed voucher's type differs from a recorded version's.
+        VoucherTypeChanged = "import_amend_voucher_type_changed",
+        /// A proposed voucher's number differs from a recorded version's.
+        VoucherNumberChanged = "import_amend_voucher_number_changed",
+        /// A proposed voucher's reference differs from a recorded version's.
+        VoucherReferenceChanged = "import_amend_voucher_reference_changed",
+    }
+}
+
+failure_codes! {
+    /// The refusals of an import's verification read (`agent_import_verification.rs`), and the
+    /// difference its read-back names for an invoice of a type the build does not qualify.
+    pub(crate) enum ImportVerificationCode {
+        /// The verification answer did not parse, and its envelope is not one the read admits.
+        ProtocolInvalid = "import_verification_protocol_invalid",
+        /// The verification answer did not parse within an admitted envelope, a row's core field,
+        /// date, effective or reference date or accounting state was not admitted, or a row did not
+        /// deserialise.
+        ExportInvalid = "import_verification_export_invalid",
+        /// A verification row's amount, or an amount the import's checks put in canonical form, is
+        /// not a decimal.
+        AmountInvalid = "import_verification_amount_invalid",
+        /// A verification row's master ID was not admitted.
+        MasterIdInvalid = "import_verification_master_id_invalid",
+        /// An invoice of a type this build does not qualify is marked not confirmed, not read back.
+        InvoiceTypeUnqualified = "invoice_type_unqualified",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

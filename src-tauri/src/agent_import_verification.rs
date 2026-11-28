@@ -5,7 +5,7 @@
 //! classifies every expected voucher, finds duplicates, and renders the proof.
 //! Moved out of `agent_import.rs` with only visibility and `super::` paths changed;
 //! nothing here dispatches to Tally.
-use super::super::failure_code::{ReadCode, VoucherReadCode};
+use super::super::failure_code::{ImportVerificationCode, ReadCode, VoucherReadCode};
 use super::*;
 
 pub(super) fn parse_import_vouchers(
@@ -33,19 +33,21 @@ pub(super) fn parse_import_voucher_rows(
                 "agent_read_protocol_invalid"
                     if super::super::validate_agent_envelope(xml).is_err() =>
                 {
-                    "import_verification_protocol_invalid"
+                    ImportVerificationCode::ProtocolInvalid.as_str()
                 }
                 "agent_read_protocol_invalid"
                 | "change_row_core_field_invalid"
                 | "voucher_date_invalid"
                 | "voucher_effective_date_invalid"
                 | "voucher_reference_date_invalid"
-                | "voucher_accounting_state_not_observed" => "import_verification_export_invalid",
+                | "voucher_accounting_state_not_observed" => {
+                    ImportVerificationCode::ExportInvalid.as_str()
+                }
                 "change_row_identity_invalid"
                 | "voucher_source_identity_invalid"
                 | "voucher_company_identity_invalid" => "import_verification_identity_invalid",
-                "voucher_amount_invalid" => "import_verification_amount_invalid",
-                "voucher_master_id_invalid" => "import_verification_master_id_invalid",
+                "voucher_amount_invalid" => ImportVerificationCode::AmountInvalid.as_str(),
+                "voucher_master_id_invalid" => ImportVerificationCode::MasterIdInvalid.as_str(),
                 _ => return code,
             }
             .to_string()
@@ -54,7 +56,7 @@ pub(super) fn parse_import_voucher_rows(
         .into_iter()
         .map(|row| {
             serde_json::from_value(row)
-                .map_err(|_| "import_verification_export_invalid".to_string())
+                .map_err(|_| ImportVerificationCode::ExportInvalid.as_str().to_string())
         })
         .collect::<Result<_, _>>()?;
     // The shared parser has validated these lexemes; comparisons use canonical
@@ -115,7 +117,7 @@ pub(super) fn canonical_verification_amount(value: &str) -> Result<String, Strin
     ExactDecimal::parse(value.to_string())
         .and_then(|amount| amount.checked_add(&ExactDecimal::zero()))
         .map(|amount| amount.as_str().to_string())
-        .map_err(|_| "import_verification_amount_invalid".to_string())
+        .map_err(|_| ImportVerificationCode::AmountInvalid.as_str().to_string())
 }
 
 /// What a batch voucher and a book row are matched by. Every voucher but a
@@ -1054,7 +1056,9 @@ pub(super) fn invoice_readback_due<'a>(
         mark_invoice_readback(
             result,
             &voucher.bridge_txn_id,
-            &["invoice_type_unqualified".to_string()],
+            &[ImportVerificationCode::InvoiceTypeUnqualified
+                .as_str()
+                .to_string()],
             &[],
         );
         return None;

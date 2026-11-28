@@ -15,7 +15,7 @@
 //! Every estimate here is a planning figure, not a bound (§12a.8). The transport
 //! cap stays the final safeguard; this only stops Bridge from *asking* for a
 //! response it already expects to be too large.
-use super::failure_code::{CensusReuseCode, ReadCode};
+use super::failure_code::{CensusReuseCode, ReadCode, VoucherReadCode};
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::{DateSpan, TallyDate};
@@ -1529,7 +1529,7 @@ pub(super) fn master_id_of(value: Option<&str>) -> Result<Option<u64>, String> {
             value
                 .trim()
                 .parse::<u64>()
-                .map_err(|_| "voucher_master_id_invalid".to_string())
+                .map_err(|_| VoucherReadCode::MasterIdInvalid.as_str().to_string())
         })
         .transpose()
 }

@@ -644,7 +644,7 @@ failure_codes! {
     /// The refusals of the agent's own settings and data directory, read when the server starts
     /// or a tool first needs them (`agent.rs`).
     pub(crate) enum AgentSettingCode {
-        /// The redaction setting is not one of the values it admits.
+        /// The redaction setting is not Unicode, or not one of the values it admits.
         RedactionSettingInvalid = "redaction_setting_invalid",
         /// The Tally port setting is not Unicode, or not a port number from 1 to 65535.
         PortSettingInvalid = "port_setting_invalid",
@@ -654,7 +654,8 @@ failure_codes! {
         EndpointInvalid = "endpoint_invalid",
         /// The agent's data directory path is not valid Unicode.
         DataDirEncodingInvalid = "agent_data_dir_encoding_invalid",
-        /// The agent's data directory cannot be made, or is not a directory, or is a link.
+        /// The agent's data directory cannot be made or read, is not a directory, or is a link or
+        /// another reparse point.
         DataDirUnavailable = "agent_data_dir_unavailable",
         /// The agent's data directory is not owned by this user, or its mode is not 0700 (Unix).
         DataDirPermissionsFailed = "agent_data_dir_permissions_failed",
@@ -666,7 +667,7 @@ failure_codes! {
 failure_codes! {
     /// The refusals of the agent's tool dispatch and its shared argument and window checks
     /// (`agent.rs`): a tool that is off, unknown or unsupported, an argument out of range, or a
-    /// window an empty read cannot be trusted for.
+    /// window that starts too early or whose empty read cannot be trusted.
     pub(crate) enum AgentToolCode {
         /// The posting setting is off, so the post and its review acknowledgement are refused.
         ImportPostingDisabled = "import_posting_disabled",
@@ -686,9 +687,11 @@ failure_codes! {
         PaginationInvalid = "pagination_invalid",
         /// The window starts before the company's books begin.
         WindowPrecedesBooksFrom = "window_precedes_books_from",
-        /// A read found nothing in the window, but the census found vouchers on its days.
+        /// A read found nothing in the window, but the census or the widened read's rows put a
+        /// voucher on its days.
         WindowContradicted = "window_contradicted",
-        /// No company voucher checkpoint was read, so an empty window cannot be corroborated.
+        /// The company's voucher checkpoint is not a whole number, or, in a case the callers
+        /// rule out, no checkpoint is held to corroborate an empty window.
         VoucherCheckpointInvalid = "voucher_checkpoint_invalid",
     }
 }

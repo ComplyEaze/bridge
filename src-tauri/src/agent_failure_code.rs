@@ -537,6 +537,23 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the one held post approval: a person's answer to a post dialog, kept for
+    /// the call that redeems it.
+    pub(crate) enum ImportApprovalCode {
+        /// The approval ran out of time before a call redeemed it.
+        Expired = "import_approval_expired",
+        /// Another call is redeeming this batch's approval now.
+        InUse = "import_approval_in_use",
+        /// No approval for this batch is held: it was revoked, or another batch's is held.
+        Revoked = "import_approval_revoked",
+        /// What is to be posted is no longer what the person approved.
+        BindingChanged = "import_approval_binding_changed",
+        /// Another post approval already holds the one place there is for one.
+        Busy = "post_approval_busy",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

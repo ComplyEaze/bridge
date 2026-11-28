@@ -83,7 +83,10 @@ fn shown<'c>(before: &'c StockItemCatalogue, new_name: &str) -> StockItemDraft<'
 
 /// The GUIDs of a read, as the set taken before a Create.
 fn guids(read: &StockItemCatalogue) -> BTreeSet<String> {
-    read.items().iter().map(|item| item.guid.clone()).collect()
+    read.items()
+        .iter()
+        .map(|item| item.guid().to_owned())
+        .collect()
 }
 
 /// `ReadBackVerdict::of` for `shown`'s writes, with the company and GUIDs of

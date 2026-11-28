@@ -844,10 +844,9 @@ async fn voucher_types_send_the_masters_request_then_the_numbering_request_betwe
     let (result, observed) = run_observed(voucher_types_plans(), VOUCHER_TYPES_KIND).await;
     result.unwrap();
 
-    let name = identity().display_name().to_string();
     let masters = request_hash(&render_native_masters_request(
         NativeMasterKind::VoucherTypes,
-        &name,
+        identity().company_name(),
     ));
     let numbering = request_hash(&render_voucher_type_numbering_request(
         identity().company_name(),
@@ -871,7 +870,6 @@ async fn voucher_types_send_the_masters_request_then_the_numbering_request_betwe
 
 #[tokio::test]
 async fn every_other_kind_sends_no_numbering_request() {
-    let name = identity().display_name().to_string();
     let numbering = request_hash(&render_voucher_type_numbering_request(
         identity().company_name(),
     ));
@@ -892,7 +890,10 @@ async fn every_other_kind_sends_no_numbering_request() {
         result.unwrap();
         // The sequence of one collection pair, as before the numbering read.
         assert_eq!(observed.len(), 18, "{kind:?}");
-        let masters = request_hash(&render_native_masters_request(kind, &name));
+        let masters = request_hash(&render_native_masters_request(
+            kind,
+            identity().company_name(),
+        ));
         assert_eq!(observed[7].request_body_sha256, masters, "{kind:?}");
         assert_eq!(observed[9].request_body_sha256, masters, "{kind:?}");
         assert!(
@@ -1112,7 +1113,7 @@ fn joined(left: &str, right: &str) -> String {
 fn voucher_types_request_hash() -> String {
     request_hash(&render_native_masters_request(
         NativeMasterKind::VoucherTypes,
-        identity().display_name(),
+        identity().company_name(),
     ))
 }
 
@@ -1733,10 +1734,9 @@ async fn the_numbering_read_sends_the_masters_pair_then_the_numbering_pair_and_n
     .await;
     let read = result.unwrap();
     assert_eq!(observed.len(), NUMBERING_READ_SEQUENCE);
-    let name = identity().display_name().to_string();
     let masters = request_hash(&render_native_masters_request(
         NativeMasterKind::VoucherTypes,
-        &name,
+        identity().company_name(),
     ));
     let numbering = request_hash(&render_voucher_type_numbering_request(
         identity().company_name(),

@@ -820,6 +820,131 @@ const IMPORT_FILE: &[(ImportFileCode, &str)] = &[
     ),
 ];
 
+const LEDGER_MASTERS: &[(LedgerMastersCode, &str)] = &[
+    (
+        LedgerMastersCode::AsOfRequiresCompliance,
+        "ledger_masters_as_of_requires_compliance",
+    ),
+    (
+        LedgerMastersCode::GstDetailsRequiresCompliance,
+        "ledger_masters_gst_details_requires_compliance",
+    ),
+    (
+        LedgerMastersCode::MailingDetailsRequiresCompliance,
+        "ledger_masters_mailing_details_requires_compliance",
+    ),
+    (
+        LedgerMastersCode::MailingDetailsWithGstDetailsNotCaptured,
+        "ledger_masters_mailing_details_with_gst_details_not_captured",
+    ),
+    (
+        LedgerMastersCode::SnapshotGroupsMissing,
+        "listing_snapshot_groups_missing",
+    ),
+    (
+        LedgerMastersCode::KindNotALedgerListing,
+        "listing_kind_not_a_ledger_listing",
+    ),
+];
+
+const LISTING_SNAPSHOT: &[(ListingSnapshotCode, &str)] = &[
+    (ListingSnapshotCode::Changed, "listing_snapshot_changed"),
+    (
+        ListingSnapshotCode::StoreUnavailable,
+        "listing_snapshot_store_unavailable",
+    ),
+];
+
+const VOUCHER_LISTING: &[(VoucherListingCode, &str)] = &[
+    (
+        VoucherListingCode::SummaryCostCentreUnreadable,
+        "summary_cost_centre_unreadable",
+    ),
+    (
+        VoucherListingCode::SummaryGroupUnresolved,
+        "summary_group_unresolved",
+    ),
+    (
+        VoucherListingCode::TypeGuidForeign,
+        "voucher_type_guid_foreign",
+    ),
+    (
+        VoucherListingCode::SummaryGroupBookTooLarge,
+        "summary_group_book_too_large",
+    ),
+    (
+        VoucherListingCode::GroupSnapshotDrifted,
+        "group_snapshot_drifted",
+    ),
+    (
+        VoucherListingCode::UnknownVoucherType,
+        "unknown_voucher_type",
+    ),
+    (VoucherListingCode::VouchersWithheld, "vouchers_withheld"),
+    (
+        VoucherListingCode::TypeExportInvalid,
+        "voucher_type_export_invalid",
+    ),
+];
+
+const IMPORT_AMEND: &[(ImportAmendCode, &str)] = &[
+    (
+        ImportAmendCode::LineageInvalid,
+        "import_amend_lineage_invalid",
+    ),
+    (
+        ImportAmendCode::IdentitySchemeUnsupported,
+        "import_amend_identity_scheme_unsupported",
+    ),
+    (
+        ImportAmendCode::EndpointMismatch,
+        "import_amend_endpoint_mismatch",
+    ),
+    (
+        ImportAmendCode::NativelyPosted,
+        "import_amend_natively_posted",
+    ),
+    (
+        ImportAmendCode::TxnNotInBatch,
+        "import_amend_txn_not_in_batch",
+    ),
+    (
+        ImportAmendCode::VoucherTypeChanged,
+        "import_amend_voucher_type_changed",
+    ),
+    (
+        ImportAmendCode::VoucherNumberChanged,
+        "import_amend_voucher_number_changed",
+    ),
+    (
+        ImportAmendCode::VoucherReferenceChanged,
+        "import_amend_voucher_reference_changed",
+    ),
+];
+
+const IMPORT_VERIFICATION: &[(ImportVerificationCode, &str)] = &[
+    (
+        ImportVerificationCode::ProtocolInvalid,
+        "import_verification_protocol_invalid",
+    ),
+    (
+        ImportVerificationCode::ExportInvalid,
+        "import_verification_export_invalid",
+    ),
+    (
+        ImportVerificationCode::AmountInvalid,
+        "import_verification_amount_invalid",
+    ),
+    (
+        ImportVerificationCode::MasterIdInvalid,
+        "import_verification_master_id_invalid",
+    ),
+    (
+        ImportVerificationCode::InvoiceTypeUnqualified,
+        "invoice_type_unqualified",
+    ),
+];
+
 const VOUCHER_TYPE_CLASS: &[(VoucherTypeClassCode, &str)] = &[
     (
         VoucherTypeClassCode::ClassMissing,
@@ -1392,6 +1517,11 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(IMPORT_MASTERS),
         of(IMPORT_VERIFY),
         of(IMPORT_FILE),
+        of(LEDGER_MASTERS),
+        of(LISTING_SNAPSHOT),
+        of(VOUCHER_LISTING),
+        of(IMPORT_AMEND),
+        of(IMPORT_VERIFICATION),
         of(VOUCHER_TYPE_CLASS),
         of(VOUCHER_SUMMARY),
         of(DESKTOP_JOURNAL),
@@ -1452,6 +1582,11 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("ImportMastersCode", ImportMastersCode::ALL),
         of("ImportVerifyCode", ImportVerifyCode::ALL),
         of("ImportFileCode", ImportFileCode::ALL),
+        of("LedgerMastersCode", LedgerMastersCode::ALL),
+        of("ListingSnapshotCode", ListingSnapshotCode::ALL),
+        of("VoucherListingCode", VoucherListingCode::ALL),
+        of("ImportAmendCode", ImportAmendCode::ALL),
+        of("ImportVerificationCode", ImportVerificationCode::ALL),
         of("VoucherTypeClassCode", VoucherTypeClassCode::ALL),
         of("VoucherSummaryCode", VoucherSummaryCode::ALL),
         of("DesktopJournalCode", DesktopJournalCode::ALL),
@@ -1513,7 +1648,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        43,
+        48,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1566,6 +1701,11 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(IMPORT_MASTERS), ImportMastersCode::ALL);
     assert_eq!(variants(IMPORT_VERIFY), ImportVerifyCode::ALL);
     assert_eq!(variants(IMPORT_FILE), ImportFileCode::ALL);
+    assert_eq!(variants(LEDGER_MASTERS), LedgerMastersCode::ALL);
+    assert_eq!(variants(LISTING_SNAPSHOT), ListingSnapshotCode::ALL);
+    assert_eq!(variants(VOUCHER_LISTING), VoucherListingCode::ALL);
+    assert_eq!(variants(IMPORT_AMEND), ImportAmendCode::ALL);
+    assert_eq!(variants(IMPORT_VERIFICATION), ImportVerificationCode::ALL);
     assert_eq!(variants(VOUCHER_TYPE_CLASS), VoucherTypeClassCode::ALL);
     assert_eq!(variants(VOUCHER_SUMMARY), VoucherSummaryCode::ALL);
     assert_eq!(variants(DESKTOP_JOURNAL), DesktopJournalCode::ALL);
@@ -1633,6 +1773,11 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(IMPORT_MASTERS, ImportMastersCode::as_str);
     check_pins(IMPORT_VERIFY, ImportVerifyCode::as_str);
     check_pins(IMPORT_FILE, ImportFileCode::as_str);
+    check_pins(LEDGER_MASTERS, LedgerMastersCode::as_str);
+    check_pins(LISTING_SNAPSHOT, ListingSnapshotCode::as_str);
+    check_pins(VOUCHER_LISTING, VoucherListingCode::as_str);
+    check_pins(IMPORT_AMEND, ImportAmendCode::as_str);
+    check_pins(IMPORT_VERIFICATION, ImportVerificationCode::as_str);
     check_pins(VOUCHER_TYPE_CLASS, VoucherTypeClassCode::as_str);
     check_pins(VOUCHER_SUMMARY, VoucherSummaryCode::as_str);
     check_pins(DESKTOP_JOURNAL, DesktopJournalCode::as_str);
@@ -1658,15 +1803,15 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
-        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 19, 13, 4, 17, 8, 9,
-        3, 5,
+        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 19, 13, 4, 17, 8, 6,
+        2, 8, 8, 5, 9, 3, 5,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
         80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 21, 19, 13, 4, 17,
-        8, 9, 3, 5,
+        8, 6, 2, 8, 8, 5, 9, 3, 5,
     ]
     .iter()
     .sum();

@@ -38,14 +38,16 @@ const SEAM_CEILING: usize = 11;
 /// and the company-list template, which names no company.
 const WRITER_LITERALS: usize = 2;
 
-/// The request-byte tables. Every builder that calls the writer has a row in one of them, unless
-/// it is in [`NOT_PINNED`].
+/// The request-byte tables. Every builder whose request reaches the writer is meant to have a row
+/// in one of them, or to be listed in [`NOT_PINNED`]; review keeps that, not a test.
 const TABLES: [&str; 2] = [
     "crates/bridge-tally-protocol/src/request_bytes_tests.rs",
     "src/agent_import_request_bytes_tests.rs",
 ];
 
-/// Builders that call the writer and have no row in [`TABLES`], with their file and why.
+/// Builders whose request reaches the writer, directly or through a shared envelope, and that
+/// have no row in [`TABLES`], with their file and why. The test checks only that each one is
+/// defined where listed and has no row.
 const NOT_PINNED: &[(&str, &str, &str)] = &[(
     "render_voucher_batch_xml",
     "src/agent_lab_import.rs",
@@ -165,7 +167,9 @@ fn seam_uses(code: &str, aliases: &BTreeSet<String>) -> (usize, usize) {
 }
 
 /// Calls of the writer in blanked `code`: the seam's [`seam_uses`], each `xml_static_variables`
-/// not after `fn`, and each `static_variables` followed by `(` and not after `fn`.
+/// not after `fn`, and each `static_variables` followed by `(` and not after `fn`. A local of
+/// that name is not a call; the private writer passed as a function value is not counted
+/// either, and only its own file could do that.
 fn writer_calls(code: &str, aliases: &BTreeSet<String>) -> usize {
     let mut words: Vec<(&str, usize)> = Vec::new();
     let mut start = None;

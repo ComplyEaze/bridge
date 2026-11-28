@@ -4,7 +4,7 @@
 //! the arithmetic over the rows that survive, with no I/O. Every bucket is a plain sum of the
 //! entries of the vouchers in it, so its total can be rebuilt from the vouchers `vouchers`
 //! lists for the same arguments, and the result says which vouchers it left out and why.
-use super::failure_code::{ReadCode, VoucherReadCode};
+use super::failure_code::{ReadCode, VoucherReadCode, VoucherSummaryCode};
 use super::movement::movement_entry_effect;
 use super::voucher_groups::{Placement, Placements, Primary};
 use super::*;
@@ -54,7 +54,9 @@ impl SummaryGroup {
             Some("group") => Ok(Some(Self::Group)),
             Some("primary_group") => Ok(Some(Self::PrimaryGroup)),
             Some("cost_centre") => Ok(Some(Self::CostCentre)),
-            Some(_) => Err(ToolFailure::from("summarise_by_invalid".to_string())),
+            Some(_) => Err(ToolFailure::from(
+                VoucherSummaryCode::SummariseByInvalid.as_str().to_string(),
+            )),
         }
     }
 
@@ -388,7 +390,9 @@ fn allocations_of(entry: &Value) -> Result<Option<Vec<Allocation<'_>>>, String> 
     for sum in by_category.into_values() {
         let sum = bridge_tally_core::ExactDecimal::parse(sum).map_err(|_| invalid())?;
         if !sum.numeric_eq(&entry_amount) {
-            return Err("summary_cost_centre_allocation_mismatch".to_string());
+            return Err(VoucherSummaryCode::CostCentreAllocationMismatch
+                .as_str()
+                .to_string());
         }
     }
     Ok(Some(allocations))
@@ -504,7 +508,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             SummaryGroup::VoucherType => Some(
                 row["voucher_type"]
                     .as_str()
-                    .ok_or_else(|| "voucher_type_missing".to_string())?
+                    .ok_or_else(|| VoucherSummaryCode::VoucherTypeMissing.as_str().to_string())?
                     .to_string(),
             ),
         };

@@ -862,6 +862,66 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of a `vouchers` type filter (`agent_voucher_type_class.rs`): a row whose type
+    /// or class cannot be read as one state of the book, a selector that cannot be read one way,
+    /// or a name that does not pick out exactly the types it names.
+    pub(crate) enum VoucherTypeClassCode {
+        /// A row carries some of the class elements but not all, or lacks its type's GUID, name,
+        /// or reserved name.
+        ClassMissing = "voucher_type_class_missing",
+        /// A row's type GUID is empty or is not a master of the company read.
+        Unresolved = "voucher_type_unresolved",
+        /// A class element is neither `Yes` nor `No`, or a row's class is not a measured class.
+        ClassInvalid = "voucher_type_class_invalid",
+        /// A row answers `Yes` to more than one class, or its class disagrees with its type's
+        /// reserved name.
+        ClassContradictory = "voucher_type_class_contradictory",
+        /// The `voucher_class` argument is not a measured class.
+        ClassUnsupported = "voucher_class_unsupported",
+        /// The `voucher_type` argument is empty.
+        TypeInvalid = "voucher_type_invalid",
+        /// More than one of `voucher_class`, `voucher_type_guid` and `voucher_type` was given.
+        SelectorsConflict = "voucher_type_selectors_conflict",
+        /// One type GUID came back with two names, reserved names or classes in one window.
+        SnapshotInconsistent = "voucher_type_snapshot_inconsistent",
+        /// A type name is also a class or reserved name, and the types named it are not exactly
+        /// the types of that class or reserving that name.
+        Ambiguous = "voucher_type_ambiguous",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a summary over a `vouchers` window (`agent_voucher_summary.rs`) that its
+    /// arguments or its rows end in.
+    pub(crate) enum VoucherSummaryCode {
+        /// The `summarise_by` argument is not one of the groupings the summary admits.
+        SummariseByInvalid = "summarise_by_invalid",
+        /// An entry's cost-centre allocations under one category do not add up to its amount.
+        CostCentreAllocationMismatch = "summary_cost_centre_allocation_mismatch",
+        /// A row summarised by voucher type carries no voucher type.
+        VoucherTypeMissing = "voucher_type_missing",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the desktop's review of a selected Journal file
+    /// (`agent_desktop_journal.rs`, `agent_desktop_journal_review.rs`): a file that cannot be
+    /// read, is too large, or is not an exact copy of a batch this installation saved.
+    pub(crate) enum DesktopJournalCode {
+        /// The selected file is larger than the review reads.
+        SelectedFileTooLarge = "import_selected_file_too_large",
+        /// No saved batch has the selected file's digest.
+        SelectedFileNotFound = "import_selected_file_not_found",
+        /// The selected file's bytes are not the saved batch's persisted file.
+        SelectedFileNotExact = "import_selected_file_not_exact",
+        /// The selected file could not be opened, its size read, or its bytes read.
+        SelectedFileUnavailable = "import_selected_file_unavailable",
+        /// The native file picker's task failed.
+        FilePickerFailed = "file_picker_failed",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

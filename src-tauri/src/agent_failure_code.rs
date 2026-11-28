@@ -1234,16 +1234,16 @@ failure_codes! {
     /// The company tools' own codes (`agent_company.rs`): the reason `status` gives when the
     /// loaded-company list is not established, and the refusals of the company a read names.
     pub(crate) enum CompanyCode {
-        /// Not a refusal: the loaded-company list was not established, and the probe gave no
-        /// reason of its own.
+        /// Not a tool failure: `status` gives it as its `refusal_reason` and evidence reason when
+        /// the loaded-company list was not established and the probe gave no reason of its own.
         ListNotEstablished = "company_list_not_established",
         /// The company GUID is blank.
         GuidRequired = "company_guid_required",
-        /// No listed company carries the GUID.
+        /// No listed company carries the GUID, or none matches the identity read for it.
         IdentityNotFound = "company_identity_not_found",
-        /// More than one listed company carries the GUID.
+        /// More than one listed company carries the GUID, or matches the identity read for it.
         IdentityAmbiguous = "company_identity_ambiguous",
-        /// The GUID is not a native company GUID.
+        /// A company GUID, requested or listed, is not a native company GUID.
         GuidInvalid = "company_guid_invalid",
     }
 }
@@ -1280,7 +1280,8 @@ failure_codes! {
         BookPathInvalidJson = "book_path_invalid_json",
         /// The lab's target company is not the company GUID requested.
         TargetCompanyMismatch = "lab_target_company_mismatch",
-        /// A requested master already exists in the target company.
+        /// A requested master is the root group, has a blank name, or is in the target company
+        /// with a difference from the book that no Alter reconciles.
         MasterAlreadyExists = "lab_master_already_exists",
         /// Tally's answer to a lab import did not parse as an import outcome.
         ResponseInvalid = "lab_import_response_invalid",

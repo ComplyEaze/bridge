@@ -1,7 +1,10 @@
 //! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra,
 //! or one Sales invoice);
 //! subsequent calls only reconcile its identity.
-use super::super::failure_code::{ImportAckCode, ReadCode};
+use super::super::failure_code::{
+    ImportAckCode, ImportApprovalCode, ImportPostCode, ReadCode, StockItemCreateCode,
+    ToolRequestCode,
+};
 use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined, PreviewForm};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
@@ -49,8 +52,8 @@ impl PostScope {
 
     fn refusal(self) -> &'static str {
         match self {
-            Self::JournalOnly => "import_post_requires_one_journal",
-            Self::Vouchers => "import_post_requires_one_voucher",
+            Self::JournalOnly => ImportPostCode::RequiresOneJournal.as_str(),
+            Self::Vouchers => ImportPostCode::RequiresOneVoucher.as_str(),
         }
     }
 }
@@ -240,12 +243,12 @@ impl Server {
         let mut evidence =
             evidence_from_runtime_read(crate::tally::runtime::RuntimeReadEvidence::empty());
         evidence.state = "partial";
-        evidence.reason_code = Some("request_cancelled".into());
+        evidence.reason_code = Some(ToolRequestCode::RequestCancelled.as_str().into());
         Ok(ToolOutcome {
             payload: json!({"result":{
                 "batch_id":batch_id,"attempt_recorded":attempted,
                 "dispatch":{"state":if attempted == Some(false) { "not_dispatched" } else { "reconciliation_required" },"resent":false},
-                "error":{"code":"request_cancelled","message":if attempted == Some(false) {
+                "error":{"code":ToolRequestCode::RequestCancelled.as_str(),"message":if attempted == Some(false) {
                     "The request was cancelled. No posting attempt is recorded for this saved batch."
                 } else {
                     "The request was cancelled with an uncertain outcome. Reconcile this original batch with verify_import; never rebuild or resend it."
@@ -535,7 +538,12 @@ impl Server {
                 // (#852).
                 let answered_at_join = dialog.answered().is_some();
                 let waited = match wait_for_answer(dialog, call_budget(call_started)).await {
-                    Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                    Waited::Cancelled => {
+                        return Err(ToolRequestCode::RequestCancelled
+                            .as_str()
+                            .to_string()
+                            .into())
+                    }
                     Waited::Open(dialog) => Err(dialog),
                     Waited::Answered(answer) => Ok(*answer),
                 };
@@ -594,7 +602,10 @@ impl Server {
             vouchers,
         } = *target;
         match wait_for_answer(asked, call_budget(call_started)).await {
-            Waited::Cancelled => Err("request_cancelled".to_string().into()),
+            Waited::Cancelled => Err(ToolRequestCode::RequestCancelled
+                .as_str()
+                .to_string()
+                .into()),
             Waited::Open(dialog) => {
                 let remaining = dialog.remaining();
                 self.post_approvals
@@ -677,7 +688,9 @@ impl Server {
                 {
                     Pass::Done(outcome) => Ok(outcome),
                     // Unreachable: only a Join hands on a redeem.
-                    Pass::Redeem { .. } => Err("import_approval_revoked".to_string().into()),
+                    Pass::Redeem { .. } => {
+                        Err(ImportApprovalCode::Revoked.as_str().to_string().into())
+                    }
                 }
             }
         }
@@ -862,7 +875,7 @@ impl Server {
                 // dialog below, so it is refused before anything could ask
                 // (#725 slice 2.0).
                 PostScope::JournalOnly if redeem_only => {
-                    return Err("import_approval_revoked".to_string().into())
+                    return Err(ImportApprovalCode::Revoked.as_str().to_string().into())
                 }
                 PostScope::JournalOnly => (false, PreviewForm::Listed),
                 // Re-entered to redeem what its Join found: only that
@@ -897,7 +910,7 @@ impl Server {
                 self.import_remote_ids_recorded_while_admitted(remote_ids.as_slice())?
             };
             if recorded {
-                return Err("import_remote_id_reused".to_string().into());
+                return Err(ImportPostCode::RemoteIdReused.as_str().to_string().into());
             }
             // A row another batch already sent to Tally is refused here too,
             // before the person is asked to approve it (#876); the check that
@@ -907,7 +920,7 @@ impl Server {
                 self.import_rows_already_posted_while_admitted(&line)?
             };
             if row_posted.is_some() {
-                return Err("import_txn_already_posted".to_string().into());
+                return Err(ImportPostCode::TxnAlreadyPosted.as_str().to_string().into());
             }
             // The transfer view, as the build judged it, against the journal as it
             // is now: refused before the person is asked, with the build's code.
@@ -955,7 +968,7 @@ impl Server {
                     &line
                         .company
                         .as_ref()
-                        .ok_or_else(|| "import_post_company_missing".to_string())?
+                        .ok_or_else(|| ImportPostCode::CompanyMissing.as_str().to_string())?
                         .name,
                     &line.date_from,
                     &line.date_to,
@@ -976,7 +989,7 @@ impl Server {
                 .iter()
                 .any(|item| item["match_state"] != "exact")
             {
-                return Err("import_masters_changed".to_string().into());
+                return Err(ImportPostCode::MastersChanged.as_str().to_string().into());
             }
             // A ledger that now folds equal to another live ledger could be
             // taken for it by Tally's import lookup (bridge#626). Refused as the
@@ -1000,12 +1013,15 @@ impl Server {
             if line_break_twins.len() < twins.len()
                 || (scope == PostScope::JournalOnly && !twins.is_empty())
             {
-                return Err("ledger_has_folded_twin".to_string().into());
+                return Err(ImportPostCode::LedgerHasFoldedTwin
+                    .as_str()
+                    .to_string()
+                    .into());
             }
             let ledger_binding = catalogue_identities
                 .catalog()
                 .bind_selected(requested.clone())
-                .map_err(|_| "import_masters_changed".to_string())?;
+                .map_err(|_| ImportPostCode::MastersChanged.as_str().to_string())?;
             // The same ledgers must still carry the GUIDs the build bound them
             // to (#239): a name alone cannot tell a ledger renamed and replaced
             // under its old name between build and post.
@@ -1037,7 +1053,7 @@ impl Server {
                     catalogue_identities
                         .catalog()
                         .bind_selected(requested.iter().cloned().chain(others))
-                        .map_err(|_| "import_masters_changed".to_string())?,
+                        .map_err(|_| ImportPostCode::MastersChanged.as_str().to_string())?,
                     shown.text,
                     shown.lists_vouchers,
                 )
@@ -1051,7 +1067,7 @@ impl Server {
                 &super::bill_wise::named_ledgers(&payload),
                 line.on_account_approved.as_deref().unwrap_or_default(),
             ) {
-                return Err("import_bill_wise_changed".to_string().into());
+                return Err(ImportPostCode::BillWiseChanged.as_str().to_string().into());
             }
             // A Payment, Receipt or Contra is only the right type while every
             // leg classifies as its build found it. The build's own check is
@@ -1084,7 +1100,10 @@ impl Server {
                 let observed =
                     ObservedMasters::new(catalogue_identities.catalog().parents(), groups);
                 if cash_bank_refusals(&payload, &observed, RECHECK_REFUSAL_BUDGET).is_refused() {
-                    return Err("import_bank_classification_changed".to_string().into());
+                    return Err(ImportPostCode::BankClassificationChanged
+                        .as_str()
+                        .to_string()
+                        .into());
                 }
                 // A ledger a cash answer named as cash in hand must still be
                 // one: under Bank Accounts its Contra moves the cash bank to
@@ -1097,7 +1116,10 @@ impl Server {
                     RECHECK_REFUSAL_BUDGET,
                 ) {
                     cash_in_hand_refused = Some(refused);
-                    return Err("cash_ledger_not_cash_in_hand".to_string().into());
+                    return Err(ImportPostCode::CashLedgerNotCashInHand
+                        .as_str()
+                        .to_string()
+                        .into());
                 }
                 // The book the deposit was projected on must still be the book
                 // (#1761). This asks before the dialog; the read is repeated
@@ -1126,7 +1148,10 @@ impl Server {
                 // A cash-in-hand ledger rides only on a Contra out of cash,
                 // a bank voucher: one recorded without one would skip the
                 // check above, so the record is refused as inconsistent (#815).
-                return Err("import_post_admission_inconsistent".to_string().into());
+                return Err(ImportPostCode::AdmissionInconsistent
+                    .as_str()
+                    .to_string()
+                    .into());
             } else {
                 None
             };
@@ -1274,7 +1299,10 @@ impl Server {
                     // fault, refused as a changed binding with the approval
                     // unspent (the redemption lapses as this returns).
                     let HeldRequest::Vouchers(native) = held else {
-                        return Err("import_approval_binding_changed".to_string().into());
+                        return Err(ImportApprovalCode::BindingChanged
+                            .as_str()
+                            .to_string()
+                            .into());
                     };
                     (request.with_invoice(invoice_plan.clone()), native)
                 }
@@ -1834,11 +1862,11 @@ impl Server {
         }
         if !snapshot.dispatched {
             let origin = super::super::canonical_loopback_origin(&self.settings.endpoint)
-                .map_err(|_| "host_setting_invalid".to_string())?;
+                .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?;
             if snapshot.batch.endpoint_origin.as_deref() != Some(origin.as_str()) {
-                return Err("import_post_endpoint_mismatch".to_string().into());
+                return Err(ImportPostCode::EndpointMismatch.as_str().to_string().into());
             }
-            return Err("import_not_dispatched".to_string().into());
+            return Err(ImportPostCode::NotDispatched.as_str().to_string().into());
         }
         self.reconcile_dispatched_import(args, snapshot).await
     }
@@ -1975,21 +2003,21 @@ pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
             Some(ApprovedImportAdmissionError::PreexistingIdentity)
         )
     }) {
-        "import_preexisting_identity"
+        ImportPostCode::PreexistingIdentity.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
             Some(ApprovedImportAdmissionError::LedgerIdentityChanged)
         )
     }) {
-        "import_masters_changed"
+        ImportPostCode::MastersChanged.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
             Some(ApprovedImportAdmissionError::BankClassificationChanged)
         )
     }) {
-        "import_bank_classification_changed"
+        ImportPostCode::BankClassificationChanged.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -2003,7 +2031,7 @@ pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
             Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
         )
     }) {
-        "cash_ledger_not_cash_in_hand"
+        ImportPostCode::CashLedgerNotCashInHand.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -2024,21 +2052,21 @@ pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
             Some(ApprovedImportAdmissionError::BillWiseChanged)
         )
     }) {
-        "import_bill_wise_changed"
+        ImportPostCode::BillWiseChanged.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
             Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
         )
     }) {
-        "ledger_has_folded_twin"
+        ImportPostCode::LedgerHasFoldedTwin.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
             Some(ApprovedImportAdmissionError::AdmissionInconsistent)
         )
     }) {
-        "import_post_admission_inconsistent"
+        ImportPostCode::AdmissionInconsistent.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -2554,7 +2582,7 @@ fn require_absent_verification_result(result: &Value, voucher_count: usize) -> R
         || result["counts"]["not_found"].as_u64() != Some(voucher_count as u64)
         || result["vouchers"].as_array().map(Vec::len) != Some(voucher_count)
     {
-        return Err("import_preexisting_identity".into());
+        return Err(ImportPostCode::PreexistingIdentity.as_str().into());
     }
     Ok(())
 }
@@ -3098,7 +3126,7 @@ impl RemoteIds {
     /// discarded, and a run of repeats refuses rather than loop.
     pub(super) fn mint(count: usize) -> Result<Self, String> {
         if count == 0 {
-            return Err("import_post_requires_one_voucher".into());
+            return Err(ImportPostCode::RequiresOneVoucher.as_str().into());
         }
         #[cfg(test)]
         if let Ok(scripted) = SCRIPTED_REMOTE_IDS.try_with(Clone::clone) {
@@ -3109,7 +3137,7 @@ impl RemoteIds {
         // No more than the journal will admit on read, so an intent is never
         // written that the next journal read would refuse.
         if count > ledger::MAX_BATCH_POST_VOUCHERS {
-            return Err("import_post_batch_too_large".into());
+            return Err(ImportPostCode::BatchTooLarge.as_str().into());
         }
         let mut ids = Vec::with_capacity(count);
         let mut repeats = 0;
@@ -3118,7 +3146,7 @@ impl RemoteIds {
             if ids.contains(&id) {
                 repeats += 1;
                 if repeats > 3 {
-                    return Err("import_remote_id_reused".into());
+                    return Err(ImportPostCode::RemoteIdReused.as_str().into());
                 }
             } else {
                 ids.push(id);
@@ -3154,9 +3182,9 @@ pub(super) fn native_post_request(
     let company = line
         .company
         .as_ref()
-        .ok_or_else(|| "import_post_company_missing".to_string())?;
+        .ok_or_else(|| ImportPostCode::CompanyMissing.as_str().to_string())?;
     if remote_ids.as_slice().len() != line.vouchers.len() {
-        return Err("import_post_remote_ids_mismatch".into());
+        return Err(ImportPostCode::RemoteIdsMismatch.as_str().into());
     }
     let xml = render_native_vouchers_xml(
         &company.name,
@@ -3176,7 +3204,7 @@ pub(super) fn native_post_request(
 
 pub(super) fn require_native_numbering(voucher: &ImportVoucher) -> Result<(), String> {
     if voucher.voucher_number.is_some() {
-        return Err("import_post_numbered_journal_unsupported".into());
+        return Err(ImportPostCode::NumberedJournalUnsupported.as_str().into());
     }
     Ok(())
 }
@@ -3208,19 +3236,22 @@ pub(super) fn admit_saved_voucher_integrity(
         return Err(scope.refusal().into());
     }
     if line.vouchers.len() > max_vouchers.min(ledger::MAX_BATCH_POST_VOUCHERS) {
-        return Err("import_post_batch_too_large".into());
+        return Err(ImportPostCode::BatchTooLarge.as_str().into());
     }
     // A native post uses a fresh private REMOTEID, so it can only create. An
     // amendment exists to alter a voucher already in the book in place.
     if line.amends_batch_id.is_some() {
-        return Err("import_post_amendment_requires_file_import".into());
+        return Err(ImportPostCode::AmendmentRequiresFileImport.as_str().into());
     }
-    let origin =
-        super::super::canonical_loopback_origin(endpoint).map_err(|_| "host_setting_invalid")?;
+    let origin = super::super::canonical_loopback_origin(endpoint)
+        .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str())?;
     if line.endpoint_origin.as_deref() != Some(origin.as_str()) {
-        return Err("import_post_endpoint_mismatch".into());
+        return Err(ImportPostCode::EndpointMismatch.as_str().into());
     }
-    let company = line.company.as_ref().ok_or("import_post_company_missing")?;
+    let company = line
+        .company
+        .as_ref()
+        .ok_or(ImportPostCode::CompanyMissing.as_str())?;
     let payload = ImportPayload {
         company_guid: line.company_guid.clone(),
         vouchers: line.vouchers.clone(),
@@ -3237,7 +3268,7 @@ pub(super) fn admit_saved_voucher_integrity(
                 .and_then(|detail| detail.observed.as_ref())
                 .is_none()
     }) {
-        return Err("import_invoice_not_observed".into());
+        return Err(ImportPostCode::InvoiceNotObserved.as_str().into());
     }
     // A saved voucher of a type that is not qualified is never posted, however
     // it came to be saved: the same list the build refuses on.
@@ -3470,9 +3501,12 @@ fn review_text(
     footer: &[String],
     form: PreviewForm,
 ) -> Result<ReviewText, String> {
-    let company = line.company.as_ref().ok_or("import_post_company_missing")?;
-    let origin =
-        super::super::canonical_loopback_origin(endpoint).map_err(|_| "host_setting_invalid")?;
+    let company = line
+        .company
+        .as_ref()
+        .ok_or(ImportPostCode::CompanyMissing.as_str())?;
+    let origin = super::super::canonical_loopback_origin(endpoint)
+        .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str())?;
     let (debit, credit) = totals(&line.vouchers)?;
     if line.vouchers.len() > 1 {
         return batch_review_text(line, company, &origin, &debit, &credit, footer, form);
@@ -3566,7 +3600,7 @@ fn review_text(
         || preview.lines().count() > ONE_VOUCHER_MAX_LINES
         || preview.lines().any(|line| line.chars().count() > 100)
     {
-        return Err("import_review_too_large".into());
+        return Err(ImportPostCode::ReviewTooLarge.as_str().into());
     }
     marks.seal(line, preview)
 }
@@ -3618,36 +3652,36 @@ fn invoice_review_preview(
     let detail = voucher
         .invoice
         .as_ref()
-        .ok_or("import_invoice_not_observed")?;
+        .ok_or(ImportPostCode::InvoiceNotObserved.as_str())?;
     let observed = detail
         .observed
         .as_ref()
-        .ok_or("import_invoice_not_observed")?;
+        .ok_or(ImportPostCode::InvoiceNotObserved.as_str())?;
     let number = voucher
         .voucher_number
         .as_deref()
-        .ok_or("import_invoice_not_observed")?;
+        .ok_or(ImportPostCode::InvoiceNotObserved.as_str())?;
     let mut review_text = std::iter::once(company.name.as_str())
         .chain(std::iter::once(number))
         .chain(std::iter::once(detail.voucher_type_name.as_str()))
         .chain(voucher.narration.iter().map(String::as_str))
         .chain(voucher.entries.iter().map(|entry| entry.ledger.as_str()));
     if review_text.clone().any(has_unsafe_review_layout_character) {
-        return Err("import_review_layout_text".into());
+        return Err(StockItemCreateCode::ReviewLayoutText.as_str().into());
     }
     if review_text.any(has_unreviewable_format_character) {
-        return Err("import_review_format_text".into());
+        return Err(StockItemCreateCode::ReviewFormatText.as_str().into());
     }
     if super::invoice::InvoiceNumber::parse(number).is_none() {
-        return Err("import_review_layout_text".into());
+        return Err(StockItemCreateCode::ReviewLayoutText.as_str().into());
     }
     let marks = OnAccountMarks::of(line);
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let party = super::invoice::party_entry(voucher)
         .map(|entry| entry.ledger.as_str())
-        .ok_or("import_invoice_not_observed")?;
+        .ok_or(ImportPostCode::InvoiceNotObserved.as_str())?;
     if marks.marks(party) {
-        return Err("import_invoice_not_observed".into());
+        return Err(ImportPostCode::InvoiceNotObserved.as_str().into());
     }
     let registration = match observed.party_gstin.as_deref() {
         Some(gstin) => format!("Regular, GSTIN {gstin}"),
@@ -3736,7 +3770,7 @@ fn invoice_review_preview(
         || preview.lines().count() > ONE_VOUCHER_MAX_LINES
         || preview.lines().any(|line| line.chars().count() > 100)
     {
-        return Err("import_review_too_large".into());
+        return Err(ImportPostCode::ReviewTooLarge.as_str().into());
     }
     marks.seal(line, preview)
 }
@@ -3788,7 +3822,7 @@ pub(super) fn narration_lines(value: Option<&str>) -> Result<Vec<String>, Vouche
 /// [`narration_lines`] for the approval: a refusal as the import code.
 fn approval_narration_lines(value: Option<&str>) -> Result<Vec<String>, String> {
     narration_lines(value).map_err(|refusal| match refusal {
-        VoucherTextRefusal::DoesNotFit => "import_review_too_large".to_string(),
+        VoucherTextRefusal::DoesNotFit => ImportPostCode::ReviewTooLarge.as_str().to_string(),
         VoucherTextRefusal::Layout => ReviewTextRefusal::Layout.import_code(),
     })
 }
@@ -3982,7 +4016,7 @@ fn voucher_review_lines(
         {
             value = value
                 .checked_add(entry.amount.decimal())
-                .map_err(|_| "voucher_amount_overflow".to_string())?;
+                .map_err(|_| ImportPostCode::VoucherAmountOverflow.as_str().to_string())?;
         }
         let shown = |name: &str| {
             ReviewLedgerName::parse(name)
@@ -4103,7 +4137,7 @@ fn batch_review_text(
     let add = |total: &mut ExactDecimal, amount: &ImportAmount| -> Result<(), String> {
         *total = total
             .checked_add(amount.decimal())
-            .map_err(|_| "voucher_amount_overflow".to_string())?;
+            .map_err(|_| ImportPostCode::VoucherAmountOverflow.as_str().to_string())?;
         Ok(())
     };
     let mut by_type = BTreeMap::<&str, usize>::new();
@@ -4114,7 +4148,9 @@ fn batch_review_text(
     for voucher in &line.vouchers {
         *by_type.entry(voucher.voucher_type.as_str()).or_default() += 1;
         for entry in &voucher.entries {
-            let name = admitted.next().ok_or("import_review_layout_text")?;
+            let name = admitted
+                .next()
+                .ok_or(StockItemCreateCode::ReviewLayoutText.as_str())?;
             let totals = ledgers
                 .entry(name)
                 .or_insert_with(|| (ExactDecimal::zero(), ExactDecimal::zero(), 0));
@@ -4253,7 +4289,7 @@ fn batch_review_text(
     };
     let summary = whole(vec![reason.to_string()]);
     if !fits(&summary) {
-        return Err("import_review_too_large".into());
+        return Err(ImportPostCode::ReviewTooLarge.as_str().into());
     }
     marks.seal(line, summary.join("\n"))
 }
@@ -4280,8 +4316,8 @@ impl ReviewTextRefusal {
     /// The code an approval dialog refuses with.
     fn import_code(self) -> String {
         match self {
-            Self::Layout => "import_review_layout_text".into(),
-            Self::Format => "import_review_format_text".into(),
+            Self::Layout => StockItemCreateCode::ReviewLayoutText.as_str().into(),
+            Self::Format => StockItemCreateCode::ReviewFormatText.as_str().into(),
         }
     }
 }

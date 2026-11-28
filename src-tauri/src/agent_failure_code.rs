@@ -582,6 +582,25 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the locked append-only egress log (`agent_egress.rs`) and of the other local
+    /// records written and read the same way.
+    pub(crate) enum EgressCode {
+        /// The record is too long to be read back from the log's bounded tail.
+        RecordTooLarge = "egress_record_too_large",
+        /// A step of writing the record failed: building it, opening the log or setting its
+        /// permissions, locking, reading the end of, writing, syncing or unlocking it, or the line was
+        /// not one JSON object. A failed unlock after the append leaves the line written.
+        RecordWriteFailed = "egress_record_write_failed",
+        /// A failed write could not be taken back, so the log may end in part of it.
+        RecordRollbackFailed = "egress_record_rollback_failed",
+        /// The log could not be opened, locked, read or unlocked.
+        LogUnreadable = "egress_log_unreadable",
+        /// The log holds a part-written line that its torn-record markers do not vouch for exactly.
+        LogIncomplete = "egress_log_incomplete",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

@@ -1,5 +1,6 @@
 //! Prepared response commitments and confirmed stdio write completion.
 //! Completion confirms write_all and flush, never consumption by an MCP client.
+use super::failure_code::EgressCode;
 use super::*;
 
 #[derive(Serialize)]
@@ -339,7 +340,7 @@ impl Server {
             request_trail: context.request_trail,
         };
         let line = serde_json::to_string(&receipt)
-            .map_err(|_| "egress_record_write_failed".to_string())?;
+            .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?;
         append_egress_line(&path, &line)?;
         Ok(PreparedReceipt {
             receipt_id: receipt.receipt_id,
@@ -377,7 +378,7 @@ impl Server {
             request_trail: None,
         };
         let line = serde_json::to_string(&receipt)
-            .map_err(|_| "egress_record_write_failed".to_string())?;
+            .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?;
         append_egress_line(&self.settings.data_dir.join("agent-egress.jsonl"), &line)
     }
 

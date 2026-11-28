@@ -233,6 +233,22 @@ const IMPORT_ACK: &[(ImportAckCode, &str)] = &[
     ),
 ];
 
+const SEARCH: &[(SearchCode, &str)] = &[
+    (SearchCode::CriterionEmpty, "search_criterion_empty"),
+    (SearchCode::CriterionTooLong, "search_criterion_too_long"),
+    (SearchCode::NarrationRedacted, "search_narration_redacted"),
+    (SearchCode::NarrationTooShort, "search_narration_too_short"),
+    (
+        SearchCode::SuspenseTaggedInvalid,
+        "search_suspense_tagged_invalid",
+    ),
+    (
+        SearchCode::SuspenseTaggedNeedsLedger,
+        "search_suspense_tagged_needs_ledger",
+    ),
+    (SearchCode::AmountInvalid, "search_amount_invalid"),
+];
+
 const BANK_STATEMENT: &[(BankStatementCode, &str)] = &[
     (BankStatementCode::TaskFailed, "statement_task_failed"),
     (
@@ -708,6 +724,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(E_INVOICE_READBACK),
         of(IMPORT_ACK),
         of(BANK_STATEMENT),
+        of(SEARCH),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -749,6 +766,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
         of("ImportAckCode", ImportAckCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
+        of("SearchCode", SearchCode::ALL),
     ];
     #[cfg(feature = "lab-writes")]
     let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
@@ -796,7 +814,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        23,
+        24,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -825,6 +843,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
     assert_eq!(variants(BANK_STATEMENT), BankStatementCode::ALL);
+    assert_eq!(variants(SEARCH), SearchCode::ALL);
     assert_eq!(variants(IMPORT_LEDGER), ImportLedgerCode::ALL);
     assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
     assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
@@ -897,9 +916,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 19].iter().sum();
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 19, 7].iter().sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 19].iter().sum();
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 19, 7].iter().sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

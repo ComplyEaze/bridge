@@ -138,6 +138,27 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of a `vouchers` search's criteria.
+    pub(crate) enum SearchCode {
+        /// A search criterion is blank.
+        CriterionEmpty = "search_criterion_empty",
+        /// A search criterion is longer than a search term may be.
+        CriterionTooLong = "search_criterion_too_long",
+        /// A narration phrase, or the suspense-tag filter, where narrations are withheld from the
+        /// assistant.
+        NarrationRedacted = "search_narration_redacted",
+        /// A narration phrase whose search key is shorter than the shortest a search accepts.
+        NarrationTooShort = "search_narration_too_short",
+        /// `suspense_tagged` is given as anything but `true`.
+        SuspenseTaggedInvalid = "search_suspense_tagged_invalid",
+        /// `suspense_tagged` is given without a `ledger`.
+        SuspenseTaggedNeedsLedger = "search_suspense_tagged_needs_ledger",
+        /// The `amount` criterion is not a plain unsigned decimal.
+        AmountInvalid = "search_amount_invalid",
+    }
+}
+
+failure_codes! {
     /// Codes that several read tools write for the same failure, declared once.
     pub(crate) enum ReadCode {
         /// The window's `from` is after its `to`.

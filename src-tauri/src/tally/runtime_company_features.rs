@@ -53,7 +53,7 @@ impl TallyRuntime {
                     let extent = client.fetch_company_book_extent(&identity).await?;
 
                     let request = render_company_features_request(
-                        identity.display_name(),
+                        identity.company_name(),
                         identity.company_guid_value(),
                     );
                     let (xml, bytes, hash) = client

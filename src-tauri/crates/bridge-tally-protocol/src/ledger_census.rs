@@ -47,7 +47,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
+use crate::xml_read_profiles::ValidatedCompanyName;
 
 /// The name of the `SYSTEM` formula a census slice request adds.
 pub const CENSUS_FORMULA_NAME: &str = "BridgeSpan";
@@ -346,7 +346,10 @@ impl<C: Copy> Census<C> {
 /// 6.1's space hazard does not apply. Tally's row still carries the ledger's
 /// name twice whatever is fetched; the response's size is what the caller's
 /// `slice_width` bounds.
-pub fn render_ledger_census_slice_request(company: &str, slice: &LedgerCensusSlice) -> String {
+pub fn render_ledger_census_slice_request(
+    company: &ValidatedCompanyName,
+    slice: &LedgerCensusSlice,
+) -> String {
     format!(
         r#"<ENVELOPE>
     <HEADER>
@@ -371,8 +374,7 @@ pub fn render_ledger_census_slice_request(company: &str, slice: &LedgerCensusSli
         </DESC>
     </BODY>
 </ENVELOPE>"#,
-        static_variables = static_variables_for_unvalidated_company(
-            company,
+        static_variables = company.xml_static_variables(
             "\n                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>\n                ",
             "\n            ",
         ),
@@ -391,7 +393,7 @@ pub fn render_ledger_census_slice_request(company: &str, slice: &LedgerCensusSli
 /// Bridge once, on one real book. Like the ledger census, it has no period variables: AlterID
 /// is not period-scoped.
 pub fn render_stock_item_census_slice_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     slice: &CensusSlice<StockItems>,
 ) -> String {
     render_master_census_slice("BridgeStockItemCensus", "StockItem", company, slice)
@@ -402,7 +404,7 @@ pub fn render_stock_item_census_slice_request(
 /// book by a lab script and its answer captured (`STOCK_CAPTURE_PROVENANCE.md`); a read past the
 /// mark has run through Bridge once, on one real book.
 pub fn render_stock_group_census_slice_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     slice: &CensusSlice<StockGroups>,
 ) -> String {
     render_master_census_slice("BridgeStockGroupCensus", "StockGroup", company, slice)
@@ -413,16 +415,13 @@ pub fn render_stock_group_census_slice_request(
 fn render_master_census_slice<C>(
     collection: &str,
     master_type: &str,
-    company: &str,
+    company: &ValidatedCompanyName,
     slice: &CensusSlice<C>,
 ) -> String {
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="{formula}">$AlterID &gt; {after} AND $AlterID &lt;= {through}</SYSTEM><COLLECTION NAME="{collection}" ISMODIFY="No"><TYPE>{master_type}</TYPE><FETCH>GUID</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE><FILTERS>{formula}</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        static_variables = static_variables_for_unvalidated_company(
-            company,
-            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-            "",
-        ),
+        static_variables =
+            company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "",),
         formula = CENSUS_FORMULA_NAME,
         after = slice.after,
         through = slice.through,

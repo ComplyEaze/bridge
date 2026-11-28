@@ -242,6 +242,17 @@ impl StandardLedgerCatalog {
             .map(|entry| (entry.name.as_str(), entry.stored_name.as_deref()))
     }
 
+    /// Every name each ledger answers to, one list per ledger: its row
+    /// spelling, its stored name when it differs, then its aliases.
+    pub fn names_by_ledger(&self) -> impl Iterator<Item = Vec<&str>> {
+        self.entries.iter().map(|entry| {
+            std::iter::once(entry.name.as_str())
+                .chain(entry.stored_name.as_deref())
+                .chain(entry.aliases.iter().map(String::as_str))
+                .collect()
+        })
+    }
+
     /// Every alias of every ledger, each paired with the row spelling of the
     /// ledger that carries it. A ledger with no alias yields nothing.
     pub fn aliases(&self) -> impl Iterator<Item = (&str, &str)> {

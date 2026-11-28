@@ -73,7 +73,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         ),
         (
             "native_masters::render_native_masters_request",
-            render_native_masters_request(NativeMasterKind::VoucherTypes, NAME),
+            render_native_masters_request(NativeMasterKind::VoucherTypes, &company),
         ),
         (
             "native_outstandings::render_native_group_snapshot_request",
@@ -86,7 +86,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         (
             "native_stock_summary::render_company_inventory_flags_request",
             render_company_inventory_flags_request(
-                NAME,
+                &company,
                 &bridge_tally_primitives::company_guid::CompanyGuid::parse(
                     "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
                 )
@@ -103,7 +103,7 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         ),
         (
             "outstandings_shared::render_company_book_extent_v2",
-            render_company_book_extent_v2(NAME),
+            render_company_book_extent_v2(&company),
         ),
     ];
     for (label, request) in requests {

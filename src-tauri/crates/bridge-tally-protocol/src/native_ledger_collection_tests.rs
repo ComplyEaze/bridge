@@ -707,3 +707,85 @@ fn the_mailing_element_is_ignored_by_a_read_that_retains_no_master_fields() {
         "the ordinary ledger read consumes and drops it"
     );
 }
+
+// -- #683: the first-day opening export of a several-currency book (§8.2n) --------------------
+
+const FOREXGROUP_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+
+fn utf16(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The export at the book's first day after a dollar opening was keyed on a new ledger master
+/// (`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`, row 683-OP's `x1`).
+fn first_day_with_dollar_opening() -> String {
+    utf16(include_bytes!(
+        "../tests/fixtures/native/ledgers_native_forexgroup_usd_opening_first_day.utf16le.xml"
+    ))
+}
+
+const DOLLAR_OPENING: &str = "-$500.00 @ \u{20b9} 88/$ = -\u{20b9} 44000.00";
+
+/// The ordinary parse refuses the captured composite opening, as it always has; the parse the
+/// several-currency movement asks for keeps it as text, and only it.
+#[test]
+fn a_captured_composite_opening_is_kept_as_text_only_by_the_first_day_parse() {
+    let xml = first_day_with_dollar_opening();
+    let refused = parse_native_ledger_source_records_with_evidence(&xml, FOREXGROUP_GUID)
+        .expect_err("the ordinary parse refuses a composite opening");
+    assert_eq!(
+        refused.downcast_ref::<NativeLedgerAmountError>(),
+        Some(&NativeLedgerAmountError::ForeignCurrencyOpening)
+    );
+    let kept = parse_native_ledger_source_records_keeping_composite_openings(&xml, FOREXGROUP_GUID)
+        .expect("the first-day parse keeps it");
+    assert_eq!(kept.records.len(), 9);
+    let openings = kept
+        .records
+        .iter()
+        .map(|record| {
+            (
+                record.record.name.as_str(),
+                record.record.opening_balance.as_deref(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert!(openings.contains(&("BRIDGE USD Opening", Some(DOLLAR_OPENING))));
+    assert!(openings
+        .iter()
+        .filter(|(name, _)| *name != "BRIDGE USD Opening")
+        .all(|(_, opening)| *opening == Some("0.00")));
+}
+
+/// Without a composite, the two parses return the same records (the book as found, row 683-LM's
+/// `lx1`, byte-equal to row 683-OP's control `x0`).
+#[test]
+fn the_first_day_parse_of_an_export_with_no_composite_equals_the_ordinary_parse() {
+    let xml = utf16(include_bytes!(
+        "../tests/fixtures/native/ledgers_native_forexgroup_first_day.utf16le.xml"
+    ));
+    let ordinary = parse_native_ledger_source_records_with_evidence(&xml, FOREXGROUP_GUID).unwrap();
+    let kept = parse_native_ledger_source_records_keeping_composite_openings(&xml, FOREXGROUP_GUID)
+        .unwrap();
+    assert_eq!(ordinary.records.len(), 8);
+    assert_eq!(format!("{ordinary:?}"), format!("{kept:?}"));
+}
+
+/// Any other value that is not a decimal still refuses the first-day parse. DERIVED from the
+/// capture: the composite's `=` and base amount removed, which the shared classifier refuses.
+#[test]
+fn a_non_decimal_opening_that_is_not_a_composite_still_refuses_the_first_day_parse() {
+    let xml = first_day_with_dollar_opening();
+    assert_eq!(xml.matches(DOLLAR_OPENING).count(), 1);
+    let derived = xml.replace(DOLLAR_OPENING, "-$500.00 @ \u{20b9} 88/$");
+    assert!(
+        parse_native_ledger_source_records_keeping_composite_openings(&derived, FOREXGROUP_GUID)
+            .is_err()
+    );
+}

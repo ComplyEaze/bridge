@@ -16,6 +16,8 @@
 //!   path is a drop-in for the UI.
 //! - `party_bills` — one party's open bills through `Ledger Outstandings`,
 //!   tied to its ledger's closing (#2377).
+//! - `party_name` — the party name that report's `LedgerName` variable
+//!   admits: the marks, and the places of each, the lab read there (#2480).
 //! - `compute` — assembles the report and the unallocated residual
 //!   cross-check.
 
@@ -25,6 +27,7 @@ mod group_name_index;
 mod ledger_currency;
 mod model;
 mod party_bills;
+mod party_name;
 mod request;
 mod wire;
 
@@ -46,6 +49,11 @@ pub use model::{
 pub use party_bills::{
     parse_ledger_outstandings_answer, render_ledger_outstandings_request, PartyBill,
     PartyBillReference, PartyBillsAnswer, PartyBillsAnswerError, PartyBillsRead, PartyBillsRefusal,
+};
+pub use party_name::{
+    Combination, LedgerOutstandingsParty, LedgerOutstandingsPartyError, Neighbour, WordKind,
+    MARKED_NAME_MAX_CHARS, MEASURED_DEVANAGARI_WORD, MEASURED_FORMULA_WORDS, MEASURED_MARKS,
+    MEASURED_MARK_MOST, MEASURED_MARK_PLACES, MEASURED_WORD_PAIRS,
 };
 pub use request::{
     ledger_guid_filter_parts, parent_filter_parts, render_company_base_currency_request,

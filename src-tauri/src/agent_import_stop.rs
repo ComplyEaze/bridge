@@ -24,6 +24,7 @@
 //! included: a stop that lifted and came back is another stop than the one
 //! shown. The stop lives in this data folder's journal; another install
 //! posting into the same company is not stopped by it.
+use super::super::failure_code::{ImportAckCode, StopAckCode};
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount};
 
@@ -322,11 +323,11 @@ impl Server {
             ..
         } = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         // Refused before any read or dialog: nothing of this batch was sent,
         // or it holds no invoice, so it stops nothing.
         if !dispatched || !holds_an_invoice(&line) {
-            return Err("ack_stop_batch_not_sent".to_string().into());
+            return Err(StopAckCode::BatchNotSent.as_str().to_string().into());
         }
         // The company the caller names is the batch's own: a mismatch is the
         // caller's to correct, never a way onto the path taken for a read that
@@ -335,7 +336,10 @@ impl Server {
             .company_guid
             .eq_ignore_ascii_case(required_string(args, "company_guid")?)
         {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         self.require_stop(&line)?;
 
@@ -369,7 +373,8 @@ impl Server {
             return Ok(self.stop_outcome(&line, "not_held", None, evidence));
         };
         let preview = release_preview(&held.batch, &seen);
-        let count = VoucherCount::new(1).ok_or_else(|| "ack_stop_batch_not_sent".to_string())?;
+        let count =
+            VoucherCount::new(1).ok_or_else(|| StopAckCode::BatchNotSent.as_str().to_string())?;
         let _acknowledged = ReviewAcknowledged::confirm(ReviewKind::StopRelease, count, &preview)
             .await
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
@@ -381,7 +386,7 @@ impl Server {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
+            .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
         if current.generation != held.generation
             || current.batch.sha256 != line.sha256
             || !self
@@ -389,7 +394,7 @@ impl Server {
                 .contains(&line.batch_id)
         {
             return Err(
-                ToolFailure::from("ack_stop_changed_while_reviewing".to_string())
+                ToolFailure::from(StopAckCode::ChangedWhileReviewing.as_str().to_string())
                     .with_prior_evidence(evidence),
             );
         }
@@ -401,8 +406,10 @@ impl Server {
             .import_invoice_stops_while_admitted(&line.company_guid)?
             .contains(&line.batch_id)
         {
-            return Err(ToolFailure::from("ack_stop_not_recorded".to_string())
-                .with_prior_evidence(evidence));
+            return Err(
+                ToolFailure::from(StopAckCode::NotRecorded.as_str().to_string())
+                    .with_prior_evidence(evidence),
+            );
         }
         Ok(self.stop_outcome(&line, "stop_released", Some(&seen), evidence))
     }
@@ -412,7 +419,7 @@ impl Server {
     fn require_stop(&self, line: &ImportLedgerLine) -> Result<(), ToolFailure> {
         self.stop_held(line)?
             .map(|_| ())
-            .ok_or_else(|| "ack_stop_not_held".to_string().into())
+            .ok_or_else(|| StopAckCode::NotHeld.as_str().to_string().into())
     }
 
     /// The batch as the journal holds it now, with the generation of its

@@ -1200,6 +1200,21 @@ fn forex_leg(letter: char) -> (Option<&'static str>, &'static str) {
             Some("agent/forex-register/forex-register-marks"),
             "5b447d03d63414bb46753503faee9b105347e13c28cac548bfd51d6fdb9fb4b7",
         ),
+        // `ledger_movement` from the book's first day: its opening export at 1 April, the
+        // currency Trial Balance of 1 April and the window of 1 April, each answer the lab's
+        // (`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`) and each request the one the lab sent.
+        'X' => (
+            Some("native/ledgers_native_forexgroup_first_day"),
+            "de2c64d48e9538ab15bc4eefd8ab7e823e1f1cf031d9d62602e9fc21a3ffbac1",
+        ),
+        'T' => (
+            Some("native/trial_balance_currency_forexgroup_first_day"),
+            "1853d0dfbbe92bece1cef034ed4e91b13ff604ec4537e77ef9a2cf80bdd0ad1a",
+        ),
+        'V' => (
+            Some("agent/movement-forexgroup-book-20250401"),
+            "294ee078e9ae3cdbf7f406f5c0c236b15f05d630ec8995b7032a869d1431e70c",
+        ),
         other => panic!("unknown leg {other}"),
     }
 }
@@ -1405,4 +1420,131 @@ fn the_class_entry_window_refused_at_a_bill_allocation_and_now_reads_each_at_its
         );
         assert_eq!(allocation["foreign"]["currency"], "$", "{allocation}");
     }
+}
+
+/// The order `ledger_movement` sends for the day on that book from its first day, in
+/// [`forex_leg`]'s letters: identity, the opening read with the base Tally identifies among the
+/// masters, the currency Trial Balance, the window after its marks, the opening read
+/// again, and the window again.
+const FOREX_MOVEMENT: &str = "esesseebsbscscsCsCsksksXsXsbsbseseseebsbscscsCsCsksksTsTsbsbseseemsmseeVsVseseebsbscscsCsCsksksXsXsbsbseseeVsVse";
+
+/// #683: `ledger_movement` on this book from its first day, through the handler, on the book's
+/// own answers. The six ledgers the currency Trial Balance sets aside are named with no figure,
+/// the two plain rupee ledgers are returned with the movement Tally's own Trial Balance shows for
+/// them (`Cash` and `BRIDGE INR Customer` each close at 3,000.00 Dr from a zero opening), and the
+/// result is partial. Every request is the one the lab sent.
+#[tokio::test]
+async fn a_first_day_movement_on_a_book_with_several_currencies_returns_the_plain_ledgers_partial()
+{
+    let response = replay_forex(
+        "ledger_movement",
+        FOREX_MOVEMENT,
+        FOREX_MOVEMENT.chars().map(forex_plan).collect(),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{response}");
+    assert_eq!(result["partial_reason"], "base_currency_ledgers_only");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
+    assert_eq!(result["voucher_rows_observed"], 11, "{response}");
+    assert_eq!(result["ledgers_scope"], "base_currency_ledgers_only");
+    assert_eq!(result["foreign_currency_ledgers_excluded"]["count"], 0);
+    let mixed = &result["base_currency_ledgers_mixed_excluded"];
+    assert_eq!(mixed["count"], 6, "{mixed}");
+    assert_eq!(mixed["reason"], "mixed_currency_movement");
+    assert_eq!(
+        mixed["ledgers"],
+        json!([
+            "BRIDGE Export Sales",
+            "BRIDGE Import Purchases",
+            "BRIDGE Lab Bank",
+            "BRIDGE USD Customer",
+            "BRIDGE USD Supplier",
+            "Profit & Loss A/c"
+        ])
+    );
+    // The Trial Balance closes each of the two at -3000.00 from a zero opening.
+    let rows: Vec<Value> = result["ledgers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            json!([
+                row["ledger"],
+                row["opening"],
+                row["debit"],
+                row["credit"],
+                row["closing"],
+                row["vouchers_touching"]
+            ])
+        })
+        .collect();
+    assert_eq!(
+        rows,
+        vec![
+            json!(["BRIDGE INR Customer", "0.00", "-5000", "2000", "-3000", 2]),
+            json!(["Cash", "0.00", "-3000", "0", "-3000", 2]),
+        ],
+        "{response}"
+    );
+}
+
+/// The Trial Balance row 683-LD read with the same request, after two vouchers dated 30 April were
+/// saved and Tally's current date had moved to 30 April: every ledger plain
+/// (`FOREXGROUP_FIRST_DAY_CAPTURE_PROVENANCE.md`).
+const FOREX_ALL_PLAIN_TRIAL_BALANCE: &str =
+    "native/trial_balance_currency_forexgroup_first_day_all_plain";
+
+/// #683: the same call with that Trial Balance in place of the first. It sets nothing aside, so
+/// `Profit & Loss A/c`, which only the Trial Balance can set aside, would be read; the window's
+/// composite entries show the Trial Balance missed five ledgers, and the read refuses with no
+/// figure. Every request is the one the lab sent.
+#[tokio::test]
+async fn a_first_day_movement_refuses_when_the_trial_balance_reads_a_ledger_with_a_composite_entry_as_plain(
+) {
+    let plans = FOREX_MOVEMENT
+        .chars()
+        .map(|letter| match letter {
+            'T' => plan(
+                Kind::Window,
+                utf16(&recorded_file(
+                    FIXTURES,
+                    &format!("{FOREX_ALL_PLAIN_TRIAL_BALANCE}.utf16le.xml"),
+                )),
+            ),
+            other => forex_plan(other),
+        })
+        .collect();
+    let response = replay_forex("ledger_movement", FOREX_MOVEMENT, plans).await;
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "ledger_currency_scope_inconclusive",
+        "{response}"
+    );
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(
+        error["set_aside_reason"], "composite_entry_in_window",
+        "{error}"
+    );
+    assert!(
+        [
+            "BRIDGE Export Sales",
+            "BRIDGE Import Purchases",
+            "BRIDGE Lab Bank",
+            "BRIDGE USD Customer",
+            "BRIDGE USD Supplier"
+        ]
+        .contains(&error["ledger"].as_str().unwrap()),
+        "{error}"
+    );
+    assert!(
+        response["structuredContent"]["result"]["ledgers"].is_null(),
+        "{response}"
+    );
+    assert!(!response.to_string().contains("-3000"), "{response}");
 }

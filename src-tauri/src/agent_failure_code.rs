@@ -138,6 +138,28 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of a `vouchers` search's criteria.
+    pub(crate) enum SearchCode {
+        /// A search criterion is blank.
+        CriterionEmpty = "search_criterion_empty",
+        /// A search criterion is longer than a search term may be.
+        CriterionTooLong = "search_criterion_too_long",
+        /// A narration phrase, or the suspense-tag filter, where narrations are withheld from the
+        /// assistant.
+        NarrationRedacted = "search_narration_redacted",
+        /// A narration phrase whose search key is shorter than the shortest a search accepts.
+        NarrationTooShort = "search_narration_too_short",
+        /// `suspense_tagged` is given as anything but `true`.
+        SuspenseTaggedInvalid = "search_suspense_tagged_invalid",
+        /// `suspense_tagged` is given without a `ledger`, or with a blank one.
+        SuspenseTaggedNeedsLedger = "search_suspense_tagged_needs_ledger",
+        /// The `amount` criterion is not a plain unsigned decimal above zero, or does not read as
+        /// one exactly.
+        AmountInvalid = "search_amount_invalid",
+    }
+}
+
+failure_codes! {
     /// Codes that several read tools write for the same failure, declared once.
     pub(crate) enum ReadCode {
         /// The window's `from` is after its `to`.
@@ -185,6 +207,20 @@ failure_codes! {
         OpeningBalanceNotObserved = "opening_balance_not_observed",
         /// The ledger's movement read failed.
         ReadFailed = "ledger_movement_read_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusals `ledger_movement` adds for a book with several Currency masters, read from its
+    /// first day (#683). Its date range and drift refusals are [`ReadCode`]'s `InvalidDateRange`
+    /// and `LedgerSnapshotDrifted`, the same strings.
+    pub(crate) enum MovementCurrencyCode {
+        /// The currency-scoped Trial Balance and the movement's catalogue name different ledgers.
+        ScopeUnmatched = "ledger_currency_scope_unmatched",
+        /// A composite opening or window entry is on a ledger the Trial Balance reads as plain.
+        ScopeInconclusive = "ledger_currency_scope_inconclusive",
+        /// The ledger asked for is set aside, so no figure is given for it.
+        SetAside = "ledger_currency_set_aside",
     }
 }
 
@@ -428,10 +464,8 @@ failure_codes! {
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) enum MasterPostCode {
         BatchIdInvalid = "import_batch_identifier_invalid",
-        BatchNotFound = "master_batch_not_found",
         CompanyIdentityMismatch = "company_identity_mismatch",
         BatchChanged = "import_batch_changed",
-        ApprovalBindingChanged = "import_approval_binding_changed",
     }
 }
 
@@ -446,6 +480,190 @@ failure_codes! {
         /// A requested name shares one of master's name-index keys with a target master whose name
         /// has another canonical key (#2499).
         NameSharesKey = "lab_master_name_shares_a_key",
+    }
+}
+
+failure_codes! {
+    /// The refusals of an import review acknowledgement and the records it reads and writes.
+    pub(crate) enum ImportAckCode {
+        /// No doubt of the requested kind is observed.
+        NoObservedDoubt = "ack_no_observed_doubt",
+        /// A doubt's own record is unavailable, so it cannot be reviewed.
+        DoubtRecordUnavailable = "ack_doubt_record_unavailable",
+        /// More than one observed doubt needs the caller to name one.
+        DoubtAmbiguous = "ack_doubt_ambiguous",
+        /// The check whose doubt would be reviewed is still pending.
+        CheckPending = "ack_check_pending",
+        /// The masters doubt record cannot be read.
+        MastersRecordUnreadable = "ack_masters_record_unreadable",
+        /// The batch-step doubt record cannot be read.
+        StepRecordUnreadable = "ack_step_record_unreadable",
+        /// The import response was not clean.
+        ResponseNotClean = "ack_response_not_clean",
+        /// The review's voucher read-back did not match what it must bind.
+        ReadbackNotMatched = "ack_readback_not_matched",
+        /// The review text exceeds a native dialog cap.
+        ReviewTooLarge = "ack_review_too_large",
+        /// The review text's layout is invalid.
+        ReviewLayoutText = "ack_review_layout_text",
+        /// The review text's format is invalid.
+        ReviewFormatText = "ack_review_format_text",
+        /// The recorded review covers another doubt.
+        RecordedReviewStale = "ack_recorded_review_stale",
+        /// A review is already recorded.
+        AlreadyRecorded = "ack_already_recorded",
+        /// An import file could not be written: the acknowledgement record, a proof or
+        /// another of the import's own records.
+        ImportFileWriteFailed = "import_file_write_failed",
+        /// The import journal has no such batch.
+        ImportBatchNotFound = "import_batch_not_found",
+        /// The batch belongs to another company than the one the caller names.
+        BatchCompanyMismatch = "import_batch_company_mismatch",
+        /// The batch was not dispatched or has no vouchers.
+        BatchNotPosted = "ack_batch_not_posted",
+        /// The requested doubt name is invalid.
+        DoubtInvalid = "ack_doubt_invalid",
+        /// The observed review state changed while the dialog was open.
+        ChangedWhileReviewing = "ack_changed_while_reviewing",
+        /// An import record or proof, the acknowledgement record among them, could not be
+        /// serialized.
+        ProofSerializationFailed = "proof_serialization_failed",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a person's release of an invoice stop.
+    pub(crate) enum StopAckCode {
+        /// Nothing of the batch was sent, or it holds no invoice, so it stops nothing (also the
+        /// fallback should a count of one fail to build).
+        BatchNotSent = "ack_stop_batch_not_sent",
+        /// The batch or its stop changed while the dialog was open, so it is not the stop the
+        /// person was shown.
+        ChangedWhileReviewing = "ack_stop_changed_while_reviewing",
+        /// The release record was written, yet the batch still stops its company.
+        NotRecorded = "ack_stop_not_recorded",
+        /// The batch does not stop its company now.
+        NotHeld = "ack_stop_not_held",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the one held post approval: a post dialog that is open, or a person's
+    /// answer to one, kept for the call that redeems it.
+    pub(crate) enum ImportApprovalCode {
+        /// The approval ran out of time before a call redeemed it.
+        Expired = "import_approval_expired",
+        /// Another call is redeeming this batch's approval now.
+        InUse = "import_approval_in_use",
+        /// No approval for this batch is held: it was revoked, or another batch's is held.
+        Revoked = "import_approval_revoked",
+        /// What is to be posted is no longer what the person approved.
+        BindingChanged = "import_approval_binding_changed",
+        /// The one place for a post approval or its dialog is already taken.
+        Busy = "post_approval_busy",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the ledger-create master tool and its read-back (`agent_master_tools.rs`,
+    /// `agent_master_verify.rs`): an item the caller sent that is not an admitted ledger, and a
+    /// stored batch that is missing, no longer parses, or has no recorded intent.
+    pub(crate) enum MasterLedgerCode {
+        /// The item's `kind` is not `party`, `suspense` or `gst_duty`.
+        KindNotAdmitted = "master_kind_not_admitted",
+        /// The item carries a field its kind does not take.
+        FieldNotForKind = "ledger_field_not_for_kind",
+        /// A party item's `side` is neither `sundry_debtors` nor `sundry_creditors`.
+        PartySideInvalid = "party_side_invalid",
+        /// A party item has no `side`.
+        PartySideRequired = "party_side_required",
+        /// A GST duty item has no `duty_head`.
+        GstDutyHeadRequired = "gst_duty_head_required",
+        /// A GST duty item's `duty_head` is not one Bridge admits.
+        GstDutyHeadNotAdmitted = "gst_duty_head_not_admitted",
+        /// The call has neither `ledger` nor `ledgers`.
+        LedgerRequired = "ledger_required",
+        /// A stored batch's ledgers no longer parse as an admitted batch.
+        BatchInvalid = "master_batch_invalid",
+        /// No stored batch has this identifier.
+        BatchNotFound = "master_batch_not_found",
+        /// A stored batch has no recorded intent to verify against.
+        IntentMissing = "master_intent_missing",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the bank-statement parse and proposals-loading tools.
+    pub(crate) enum BankStatementCode {
+        /// The blocking statement parse task failed.
+        TaskFailed = "statement_task_failed",
+        /// A bank whose statements print control totals was not given both.
+        ControlTotalsRequired = "statement_control_totals_required",
+        /// The statement window's `from` is after its `to`.
+        ReversedDateWindow = "statement_reversed_date_window",
+        /// The password file could not be read.
+        PasswordFileUnreadable = "statement_password_file_unreadable",
+        /// The password file is not private to the user.
+        PasswordFilePermissions = "statement_password_file_permissions",
+        /// The password file exceeds the size bound.
+        PasswordFileTooLarge = "statement_password_file_too_large",
+        /// The password file is not UTF-8.
+        PasswordFileNotUtf8 = "statement_password_file_not_utf8",
+        /// The statement file could not be read.
+        FileUnreadable = "statement_file_unreadable",
+        /// The statement file exceeds the reader's size bound.
+        FileTooLarge = "statement_file_too_large",
+        /// The test-only PDF engine setting is not an absolute path.
+        #[cfg_attr(not(test), allow(dead_code))]
+        PdfEngineSettingInvalid = "statement_pdf_engine_setting_invalid",
+        /// The PDF engine's location could not be established.
+        PdfEngineUnavailable = "statement_pdf_engine_unavailable",
+        /// The private proposals directory could not be prepared.
+        ProposalsDirectoryUnavailable = "statement_proposals_directory_unavailable",
+        /// The proposals document could not be serialized.
+        ProposalsSerializationFailed = "statement_proposals_serialization_failed",
+        /// The private proposals file could not be written.
+        ProposalsWriteFailed = "statement_proposals_write_failed",
+        /// No proposals SHA-256 was given.
+        ProposalsSha256Required = "proposals_sha256_required",
+        /// No proposals file with the requested id exists.
+        ProposalsNotFound = "proposals_not_found",
+        /// The proposals file could not be read.
+        ProposalsFileUnreadable = "proposals_file_unreadable",
+        /// The proposals file exceeds the size bound.
+        ProposalsFileTooLarge = "proposals_file_too_large",
+        /// The proposals file's hash differs from the digest the parse returned.
+        ProposalsChanged = "proposals_changed",
+        /// The tool arguments are not an object.
+        ArgumentSchemaInvalid = "argument_schema_invalid",
+        /// Both a proposals id and inline vouchers were given.
+        ProposalsIdWithVouchers = "proposals_id_with_vouchers",
+        /// A cash line still needs an answer.
+        CashQuestionsOpen = "cash_questions_open",
+        /// The legacy proposals file lacks facts needed for its transfers.
+        ProposalsLegacy = "proposals_legacy",
+        /// Control figures were supplied although this file is their source.
+        ControlFiguresWithThisFile = "statement_control_figures_with_this_file",
+        /// The selected control source requires opening and closing figures.
+        ControlFiguresRequired = "statement_control_figures_required",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the import journal's readers and writers.
+    pub(crate) enum ImportLedgerCode {
+        /// A journal record or its place in the journal is invalid.
+        Invalid = "import_ledger_invalid",
+        /// One persisted request digest names more than one batch.
+        BatchDigestAmbiguous = "import_batch_digest_ambiguous",
+        /// The journal's bytes could not be read.
+        Unavailable = "import_ledger_unavailable",
+        /// A batch has more than one dispatch intent.
+        DuplicateDispatch = "import_ledger_duplicate_dispatch",
+        /// A journal record could not be serialized.
+        SerializationFailed = "import_ledger_serialization_failed",
+        /// A journal record exceeds the byte bound.
+        RecordTooLarge = "import_ledger_record_too_large",
     }
 }
 

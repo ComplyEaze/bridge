@@ -499,7 +499,7 @@ pub(crate) async fn selected_voucher_operation(
     let from = normalized_date(required_string(args, "from")?)?;
     let to = normalized_date(required_string(args, "to")?)?;
     if from > to {
-        return Err("invalid_date_range".to_string().into());
+        return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     let (company, identity, accumulated) = server.verified_company(guid).await?;
     selected_voucher_operation_for_verified(
@@ -783,7 +783,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     .read_group_placements(&identity, &company.name, &mut accumulated, None)
                     .await?;
                 if !first.same_ledgers(&second) {
-                    return Err("ledger_snapshot_drifted".to_string().into());
+                    return Err(super::failure_code::ReadCode::LedgerSnapshotDrifted.into());
                 }
                 if first != second {
                     return Err("group_snapshot_drifted".to_string().into());
@@ -819,7 +819,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 || rows.iter().flat_map(|row| row["amounts"].as_array().into_iter().flatten())
                     .any(|entry| !initial.contains(entry["ledger"].as_str().unwrap_or_default()))
             {
-                return Err("ledger_snapshot_drifted".to_string().into());
+                return Err(super::failure_code::ReadCode::LedgerSnapshotDrifted.into());
             }
             rows = filter_voucher_rows_for_ledger(rows, &row_spelling);
             ledger_match = Some(ledger_match_json(

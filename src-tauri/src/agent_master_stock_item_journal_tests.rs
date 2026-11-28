@@ -97,7 +97,7 @@ fn pre_image_of(read: &StockItemCatalogue) -> PreImage {
     PreImage::new(
         read.items()
             .iter()
-            .map(|item| (item.guid.clone(), item.alter_id)),
+            .map(|item| (item.guid().to_owned(), item.alter_id())),
     )
     .unwrap()
 }
@@ -838,7 +838,7 @@ mod judge {
         let extra = format!("{COMPANY_GUID}-000000ff");
         let before = catalogue(BEFORE);
         let rows = (before.items().iter())
-            .map(|item| (item.guid.clone(), item.alter_id))
+            .map(|item| (item.guid().to_string(), item.alter_id()))
             .chain([(extra, 1)]);
         let intent = intent_with(dir, &batch, &PreImage::new(rows).unwrap());
         let _recorded = append_kind_intent::<StockItemBatch>(dir, &lock(), intent).unwrap();

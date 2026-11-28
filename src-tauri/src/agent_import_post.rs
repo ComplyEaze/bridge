@@ -1,6 +1,7 @@
 //! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra,
 //! or one Sales invoice);
 //! subsequent calls only reconcile its identity.
+use super::super::failure_code::{ImportAckCode, ReadCode};
 use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined, PreviewForm};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
@@ -738,12 +739,15 @@ impl Server {
         let admitted: Result<_, ToolFailure> = (|| {
             let snapshot = self
                 .latest_import_snapshot(batch_id)?
-                .ok_or_else(|| "import_batch_not_found".to_string())?;
+                .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?;
             if expected_sha256.is_some_and(|expected| snapshot.batch.sha256 != expected) {
                 return Err("import_batch_changed".to_string().into());
             }
             if !batch_guid_matches(&snapshot.batch.company_guid, guid) {
-                return Err("import_batch_company_mismatch".to_string().into());
+                return Err(ImportAckCode::BatchCompanyMismatch
+                    .as_str()
+                    .to_string()
+                    .into());
             }
             Ok(snapshot)
         })();
@@ -1823,7 +1827,7 @@ impl Server {
             // admission. Observe it only while that dispatch lane is idle.
             let _lease = dispatch_lease::acquire_observation(&self.settings.endpoint)?;
             self.latest_import_snapshot(batch_id)?
-                .ok_or_else(|| "import_batch_not_found".to_string())?
+                .ok_or_else(|| ImportAckCode::ImportBatchNotFound.as_str().to_string())?
         };
         if snapshot.batch.sha256 != expected_sha256 {
             return Err("import_batch_changed".to_string().into());
@@ -1846,7 +1850,10 @@ impl Server {
     ) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
         if !batch_guid_matches(&snapshot.batch.company_guid, guid) {
-            return Err("import_batch_company_mismatch".to_string().into());
+            return Err(ImportAckCode::BatchCompanyMismatch
+                .as_str()
+                .to_string()
+                .into());
         }
         // Retain batch and endpoint integrity without applying approval-only
         // display restrictions or constructing an approval request.
@@ -2782,7 +2789,7 @@ fn recheck_import_admission(
     {
         let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today()).map_err(
             |_| ApprovedImportAdmissionError::InvoiceReadUnusable {
-                code: "current_date_invalid".to_string(),
+                code: ReadCode::CurrentDateInvalid.as_str().to_string(),
             },
         )?;
         super::invoice::admit_queued_invoice(

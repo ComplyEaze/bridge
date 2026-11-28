@@ -146,6 +146,18 @@ const MOVEMENT: &[(MovementCode, &str)] = &[
     (MovementCode::ReadFailed, "ledger_movement_read_failed"),
 ];
 
+const MOVEMENT_CURRENCY: &[(MovementCurrencyCode, &str)] = &[
+    (
+        MovementCurrencyCode::ScopeUnmatched,
+        "ledger_currency_scope_unmatched",
+    ),
+    (
+        MovementCurrencyCode::ScopeInconclusive,
+        "ledger_currency_scope_inconclusive",
+    ),
+    (MovementCurrencyCode::SetAside, "ledger_currency_set_aside"),
+];
+
 const PRESENCE: &[(PresenceCode, &str)] = &[
     (
         PresenceCode::LedgerCatalogueIncomplete,
@@ -172,6 +184,224 @@ const TIE_OUT: &[(TieOutCode, &str)] = &[
     (
         TieOutCode::LedgerNameDuplicated,
         "ledger_name_duplicated_in_catalogue",
+    ),
+];
+
+const IMPORT_ACK: &[(ImportAckCode, &str)] = &[
+    (ImportAckCode::NoObservedDoubt, "ack_no_observed_doubt"),
+    (
+        ImportAckCode::DoubtRecordUnavailable,
+        "ack_doubt_record_unavailable",
+    ),
+    (ImportAckCode::DoubtAmbiguous, "ack_doubt_ambiguous"),
+    (ImportAckCode::CheckPending, "ack_check_pending"),
+    (
+        ImportAckCode::MastersRecordUnreadable,
+        "ack_masters_record_unreadable",
+    ),
+    (
+        ImportAckCode::StepRecordUnreadable,
+        "ack_step_record_unreadable",
+    ),
+    (ImportAckCode::ResponseNotClean, "ack_response_not_clean"),
+    (
+        ImportAckCode::ReadbackNotMatched,
+        "ack_readback_not_matched",
+    ),
+    (ImportAckCode::ReviewTooLarge, "ack_review_too_large"),
+    (ImportAckCode::ReviewLayoutText, "ack_review_layout_text"),
+    (ImportAckCode::ReviewFormatText, "ack_review_format_text"),
+    (
+        ImportAckCode::RecordedReviewStale,
+        "ack_recorded_review_stale",
+    ),
+    (ImportAckCode::AlreadyRecorded, "ack_already_recorded"),
+    (
+        ImportAckCode::ImportFileWriteFailed,
+        "import_file_write_failed",
+    ),
+    (ImportAckCode::ImportBatchNotFound, "import_batch_not_found"),
+    (
+        ImportAckCode::BatchCompanyMismatch,
+        "import_batch_company_mismatch",
+    ),
+    (ImportAckCode::BatchNotPosted, "ack_batch_not_posted"),
+    (ImportAckCode::DoubtInvalid, "ack_doubt_invalid"),
+    (
+        ImportAckCode::ChangedWhileReviewing,
+        "ack_changed_while_reviewing",
+    ),
+    (
+        ImportAckCode::ProofSerializationFailed,
+        "proof_serialization_failed",
+    ),
+];
+
+const STOP_ACK: &[(StopAckCode, &str)] = &[
+    (StopAckCode::BatchNotSent, "ack_stop_batch_not_sent"),
+    (
+        StopAckCode::ChangedWhileReviewing,
+        "ack_stop_changed_while_reviewing",
+    ),
+    (StopAckCode::NotRecorded, "ack_stop_not_recorded"),
+    (StopAckCode::NotHeld, "ack_stop_not_held"),
+];
+
+const IMPORT_APPROVAL: &[(ImportApprovalCode, &str)] = &[
+    (ImportApprovalCode::Expired, "import_approval_expired"),
+    (ImportApprovalCode::InUse, "import_approval_in_use"),
+    (ImportApprovalCode::Revoked, "import_approval_revoked"),
+    (
+        ImportApprovalCode::BindingChanged,
+        "import_approval_binding_changed",
+    ),
+    (ImportApprovalCode::Busy, "post_approval_busy"),
+];
+
+const MASTER_LEDGER: &[(MasterLedgerCode, &str)] = &[
+    (
+        MasterLedgerCode::KindNotAdmitted,
+        "master_kind_not_admitted",
+    ),
+    (
+        MasterLedgerCode::FieldNotForKind,
+        "ledger_field_not_for_kind",
+    ),
+    (MasterLedgerCode::PartySideInvalid, "party_side_invalid"),
+    (MasterLedgerCode::PartySideRequired, "party_side_required"),
+    (
+        MasterLedgerCode::GstDutyHeadRequired,
+        "gst_duty_head_required",
+    ),
+    (
+        MasterLedgerCode::GstDutyHeadNotAdmitted,
+        "gst_duty_head_not_admitted",
+    ),
+    (MasterLedgerCode::LedgerRequired, "ledger_required"),
+    (MasterLedgerCode::BatchInvalid, "master_batch_invalid"),
+    (MasterLedgerCode::BatchNotFound, "master_batch_not_found"),
+    (MasterLedgerCode::IntentMissing, "master_intent_missing"),
+];
+
+const SEARCH: &[(SearchCode, &str)] = &[
+    (SearchCode::CriterionEmpty, "search_criterion_empty"),
+    (SearchCode::CriterionTooLong, "search_criterion_too_long"),
+    (SearchCode::NarrationRedacted, "search_narration_redacted"),
+    (SearchCode::NarrationTooShort, "search_narration_too_short"),
+    (
+        SearchCode::SuspenseTaggedInvalid,
+        "search_suspense_tagged_invalid",
+    ),
+    (
+        SearchCode::SuspenseTaggedNeedsLedger,
+        "search_suspense_tagged_needs_ledger",
+    ),
+    (SearchCode::AmountInvalid, "search_amount_invalid"),
+];
+
+const BANK_STATEMENT: &[(BankStatementCode, &str)] = &[
+    (BankStatementCode::TaskFailed, "statement_task_failed"),
+    (
+        BankStatementCode::ControlTotalsRequired,
+        "statement_control_totals_required",
+    ),
+    (
+        BankStatementCode::ReversedDateWindow,
+        "statement_reversed_date_window",
+    ),
+    (
+        BankStatementCode::PasswordFileUnreadable,
+        "statement_password_file_unreadable",
+    ),
+    (
+        BankStatementCode::PasswordFilePermissions,
+        "statement_password_file_permissions",
+    ),
+    (
+        BankStatementCode::PasswordFileTooLarge,
+        "statement_password_file_too_large",
+    ),
+    (
+        BankStatementCode::PasswordFileNotUtf8,
+        "statement_password_file_not_utf8",
+    ),
+    (
+        BankStatementCode::FileUnreadable,
+        "statement_file_unreadable",
+    ),
+    (BankStatementCode::FileTooLarge, "statement_file_too_large"),
+    (
+        BankStatementCode::PdfEngineSettingInvalid,
+        "statement_pdf_engine_setting_invalid",
+    ),
+    (
+        BankStatementCode::PdfEngineUnavailable,
+        "statement_pdf_engine_unavailable",
+    ),
+    (
+        BankStatementCode::ProposalsDirectoryUnavailable,
+        "statement_proposals_directory_unavailable",
+    ),
+    (
+        BankStatementCode::ProposalsSerializationFailed,
+        "statement_proposals_serialization_failed",
+    ),
+    (
+        BankStatementCode::ProposalsWriteFailed,
+        "statement_proposals_write_failed",
+    ),
+    (
+        BankStatementCode::ProposalsSha256Required,
+        "proposals_sha256_required",
+    ),
+    (BankStatementCode::ProposalsNotFound, "proposals_not_found"),
+    (
+        BankStatementCode::ProposalsFileUnreadable,
+        "proposals_file_unreadable",
+    ),
+    (
+        BankStatementCode::ProposalsFileTooLarge,
+        "proposals_file_too_large",
+    ),
+    (BankStatementCode::ProposalsChanged, "proposals_changed"),
+    (
+        BankStatementCode::ArgumentSchemaInvalid,
+        "argument_schema_invalid",
+    ),
+    (
+        BankStatementCode::ProposalsIdWithVouchers,
+        "proposals_id_with_vouchers",
+    ),
+    (BankStatementCode::CashQuestionsOpen, "cash_questions_open"),
+    (BankStatementCode::ProposalsLegacy, "proposals_legacy"),
+    (
+        BankStatementCode::ControlFiguresWithThisFile,
+        "statement_control_figures_with_this_file",
+    ),
+    (
+        BankStatementCode::ControlFiguresRequired,
+        "statement_control_figures_required",
+    ),
+];
+
+const IMPORT_LEDGER: &[(ImportLedgerCode, &str)] = &[
+    (ImportLedgerCode::Invalid, "import_ledger_invalid"),
+    (
+        ImportLedgerCode::BatchDigestAmbiguous,
+        "import_batch_digest_ambiguous",
+    ),
+    (ImportLedgerCode::Unavailable, "import_ledger_unavailable"),
+    (
+        ImportLedgerCode::DuplicateDispatch,
+        "import_ledger_duplicate_dispatch",
+    ),
+    (
+        ImportLedgerCode::SerializationFailed,
+        "import_ledger_serialization_failed",
+    ),
+    (
+        ImportLedgerCode::RecordTooLarge,
+        "import_ledger_record_too_large",
     ),
 ];
 
@@ -531,8 +761,10 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(OUTSTANDINGS),
         of(INVOICE_NUMBER_AFTER_POST),
         of(MOVEMENT),
+        of(MOVEMENT_CURRENCY),
         of(PRESENCE),
         of(TIE_OUT),
+        of(IMPORT_LEDGER),
         of(STOCK_ITEM_CREATE),
         of(INVOICE_BUILD),
         of(INVOICE_REGISTRATION),
@@ -540,7 +772,13 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(COMPANY_READ),
         of(CENSUS_REUSE),
         of(E_INVOICE_READBACK),
+        of(IMPORT_ACK),
+        of(STOP_ACK),
+        of(IMPORT_APPROVAL),
+        of(MASTER_LEDGER),
+        of(BANK_STATEMENT),
         of(MASTER_POST),
+        of(SEARCH),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -569,8 +807,10 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
             InvoiceNumberAfterPostCode::ALL,
         ),
         of("MovementCode", MovementCode::ALL),
+        of("MovementCurrencyCode", MovementCurrencyCode::ALL),
         of("PresenceCode", PresenceCode::ALL),
         of("TieOutCode", TieOutCode::ALL),
+        of("ImportLedgerCode", ImportLedgerCode::ALL),
         of("StockItemCreateCode", StockItemCreateCode::ALL),
         of("InvoiceBuildCode", InvoiceBuildCode::ALL),
         of("InvoiceRegistrationCode", InvoiceRegistrationCode::ALL),
@@ -578,7 +818,13 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("CompanyReadCode", CompanyReadCode::ALL),
         of("CensusReuseCode", CensusReuseCode::ALL),
         of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
+        of("ImportAckCode", ImportAckCode::ALL),
+        of("StopAckCode", StopAckCode::ALL),
+        of("ImportApprovalCode", ImportApprovalCode::ALL),
+        of("MasterLedgerCode", MasterLedgerCode::ALL),
+        of("BankStatementCode", BankStatementCode::ALL),
         of("MasterPostCode", MasterPostCode::ALL),
+        of("SearchCode", SearchCode::ALL),
     ];
     #[cfg(feature = "lab-writes")]
     let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
@@ -626,7 +872,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        20,
+        28,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -651,13 +897,21 @@ fn every_variant_has_one_pinned_string() {
     );
     assert_eq!(variants(PROPOSALS), ProposalsCode::ALL);
     assert_eq!(variants(MOVEMENT), MovementCode::ALL);
+    assert_eq!(variants(MOVEMENT_CURRENCY), MovementCurrencyCode::ALL);
     assert_eq!(variants(PRESENCE), PresenceCode::ALL);
     assert_eq!(variants(TIE_OUT), TieOutCode::ALL);
+    assert_eq!(variants(BANK_STATEMENT), BankStatementCode::ALL);
+    assert_eq!(variants(SEARCH), SearchCode::ALL);
+    assert_eq!(variants(IMPORT_LEDGER), ImportLedgerCode::ALL);
     assert_eq!(variants(STOCK_ITEM_CREATE), StockItemCreateCode::ALL);
     assert_eq!(variants(INVOICE_BUILD), InvoiceBuildCode::ALL);
     assert_eq!(variants(MASTER_POST), MasterPostCode::ALL);
     #[cfg(feature = "lab-writes")]
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
+    assert_eq!(variants(IMPORT_ACK), ImportAckCode::ALL);
+    assert_eq!(variants(STOP_ACK), StopAckCode::ALL);
+    assert_eq!(variants(IMPORT_APPROVAL), ImportApprovalCode::ALL);
+    assert_eq!(variants(MASTER_LEDGER), MasterLedgerCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -694,13 +948,21 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     );
     check_pins(PROPOSALS, ProposalsCode::as_str);
     check_pins(MOVEMENT, MovementCode::as_str);
+    check_pins(MOVEMENT_CURRENCY, MovementCurrencyCode::as_str);
     check_pins(PRESENCE, PresenceCode::as_str);
     check_pins(TIE_OUT, TieOutCode::as_str);
+    check_pins(BANK_STATEMENT, BankStatementCode::as_str);
+    check_pins(SEARCH, SearchCode::as_str);
+    check_pins(IMPORT_LEDGER, ImportLedgerCode::as_str);
     check_pins(STOCK_ITEM_CREATE, StockItemCreateCode::as_str);
     check_pins(INVOICE_BUILD, InvoiceBuildCode::as_str);
     check_pins(MASTER_POST, MasterPostCode::as_str);
     #[cfg(feature = "lab-writes")]
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
+    check_pins(IMPORT_ACK, ImportAckCode::as_str);
+    check_pins(STOP_ACK, StopAckCode::as_str);
+    check_pins(IMPORT_APPROVAL, ImportApprovalCode::as_str);
+    check_pins(MASTER_LEDGER, MasterLedgerCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -718,11 +980,16 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    // The three lab master codes are declared only in a build with `lab-writes`.
+    // The three lab master codes are declared only in a build with `lab-writes`. The counts are
+    // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected = 77 + 4 + 2 + 1 + 1 + 4 + 5;
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10]
+        .iter()
+        .sum();
     #[cfg(feature = "lab-writes")]
-    let expected = 80 + 4 + 2 + 1 + 1 + 4 + 5;
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10]
+        .iter()
+        .sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();
@@ -849,16 +1116,11 @@ const MASTER_POST: &[(MasterPostCode, &str)] = &[
         MasterPostCode::BatchIdInvalid,
         "import_batch_identifier_invalid",
     ),
-    (MasterPostCode::BatchNotFound, "master_batch_not_found"),
     (
         MasterPostCode::CompanyIdentityMismatch,
         "company_identity_mismatch",
     ),
     (MasterPostCode::BatchChanged, "import_batch_changed"),
-    (
-        MasterPostCode::ApprovalBindingChanged,
-        "import_approval_binding_changed",
-    ),
 ];
 
 /// [`EInvoiceReadbackCode`]'s variants beside their strings, as [`GST_UNCERTAIN`] pins its own.

@@ -57,6 +57,7 @@ impl MastersKind {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum MastersRows {
     /// The rows of one native kind other than voucher types.
     Native(NativeMasters),
@@ -67,6 +68,7 @@ pub(crate) enum MastersRows {
 }
 
 /// A completed observation of one kind of master.
+#[derive(Debug)]
 pub(crate) struct MastersRead {
     pub(crate) rows: MastersRows,
     pub(crate) evidence: RuntimeReadEvidence,
@@ -618,7 +620,7 @@ async fn read_native_rows(
         .then(|| admit_masters_size(native, mark))
         .transpose()?;
     let limit = limit_for(native, estimate);
-    let request = render_native_masters_request(native, identity.display_name());
+    let request = render_native_masters_request(native, identity.company_name());
     let (xml, bytes, hash) = if native == NativeMasterKind::VoucherTypes {
         // Voucher types only, and one more pair at most (protocol reference
         // section 12a.25): every other kind is one pair, as it was.
@@ -779,7 +781,7 @@ pub(super) async fn read_stock_item_admission(
         encoded_sha256,
     };
     let count_request = render_company_inventory_flags_request(
-        identity.display_name(),
+        identity.company_name(),
         identity.company_guid_value(),
     );
     let count_pair = client
@@ -789,14 +791,14 @@ pub(super) async fn read_stock_item_admission(
     let candidate =
         admit_candidate_stock_item_read(candidate_size, identity, candidate_pair, count_pair)?;
     let groups_request =
-        render_native_masters_request(NativeMasterKind::StockGroups, identity.display_name());
+        render_native_masters_request(NativeMasterKind::StockGroups, identity.company_name());
     let groups_pair = client
         .fetch_native_report_paired(groups_request.clone())
         .await?;
     add_pair_evidence(evidence, &groups_request, &groups_pair);
     let groups = admit_stock_groups(groups_size, identity, groups_pair)?;
     let units_request =
-        render_native_masters_request(NativeMasterKind::Units, identity.display_name());
+        render_native_masters_request(NativeMasterKind::Units, identity.company_name());
     let units_pair = client
         .fetch_native_report_paired(units_request.clone())
         .await?;

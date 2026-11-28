@@ -51,7 +51,7 @@
 //!   written as is the one measured exception (bridge#974): see
 //!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
-use super::failure_code::{LabMastersCode, ReadCode};
+use super::failure_code::{CompanyReadCode, LabMastersCode, ReadCode};
 use super::*;
 use bridge_tally_core::master_binding::canonical_master_key;
 use bridge_tally_core::master_name_index::{
@@ -419,7 +419,7 @@ pub(in crate::agent) fn render_master_collection_request(
     period: &NativeLedgerExportPeriod,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     let object_type = kind.tally_type();
     let name = format!("Bridge Lab Write {object_type}s");
     let static_variables = company.xml_static_variables(
@@ -2330,7 +2330,7 @@ pub(in crate::agent) fn render_voucher_window_request(
     to: &bridge_tally_core::TallyDate,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
@@ -2392,7 +2392,7 @@ fn parse_voucher_readback_nested(xml: &str) -> Result<Vec<ObservedVoucher>, Stri
                 let tag = event.name().as_ref().to_ascii_uppercase();
                 if path.len() == 4 && path == ["ENVELOPE", "BODY", "DATA", "COLLECTION"] {
                     if tag != "VOUCHER" {
-                        return Err("agent_read_protocol_invalid".to_string());
+                        return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                     }
                     voucher = Some(BTreeMap::new());
                     entries.clear();
@@ -2465,12 +2465,12 @@ fn parse_voucher_readback_nested(xml: &str) -> Result<Vec<ObservedVoucher>, Stri
                     }
                 }
                 if path.pop().as_deref() != Some(end.as_str()) {
-                    return Err("agent_read_protocol_invalid".to_string());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                 }
             }
             Ok(quick_xml::events::Event::Eof) => break,
             Ok(_) => {}
-            Err(_) => return Err("agent_read_protocol_invalid".to_string()),
+            Err(_) => return Err(ReadCode::ReadProtocolInvalid.as_str().to_string()),
         }
     }
     Ok(rows)
@@ -2754,7 +2754,7 @@ pub(in crate::agent) async fn lab_import_vouchers(
         let window_date = |voucher: Option<&BookVoucher>| {
             bridge_tally_core::TallyDate::parse(voucher.map(|v| v.date.clone()).unwrap_or_default())
                 .map_err(|_| {
-                    ToolFailure::from("invalid_date".to_string())
+                    ToolFailure::from(ReadCode::InvalidDate.as_str().to_string())
                         .with_prior_evidence(evidence.clone())
                 })
         };

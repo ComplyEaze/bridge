@@ -18,6 +18,7 @@ use std::path::Path;
 use chrono::{SecondsFormat, Utc};
 use serde::Deserialize;
 
+use super::failure_code::EgressCode;
 use super::sha256_hex;
 
 pub(super) const EGRESS_TAIL_CHUNK_BYTES: usize = 64 * 1024;
@@ -54,23 +55,23 @@ pub(super) fn append_egress_line_unless(
 ) -> Result<bool, String> {
     // Leave room for the preceding newline in a bounded reverse tail read.
     if line.len().saturating_add(1) >= MAX_EGRESS_TAIL_BYTES {
-        return Err("egress_record_too_large".to_string());
+        return Err(EgressCode::RecordTooLarge.as_str().to_string());
     }
     // Every record is one JSON object on one line, so it ends `}` and the torn tail is found.
     if !line.starts_with('{') || !line.ends_with('}') || line.contains('\n') {
-        return Err("egress_record_write_failed".to_string());
+        return Err(EgressCode::RecordWriteFailed.as_str().to_string());
     }
     let mut file = super::local_file::open_local_file(path, true)
-        .map_err(|_| "egress_record_write_failed".to_string())?;
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?;
     // Read/write access permits LockFileEx and rollback truncation on Windows.
     // Every append seeks to EOF while holding this exclusive lock.
     file.lock()
-        .map_err(|_| "egress_record_write_failed".to_string())?;
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?;
     #[cfg(unix)]
     let permission_result = {
         use std::os::unix::fs::PermissionsExt;
         file.set_permissions(fs::Permissions::from_mode(0o600))
-            .map_err(|_| "egress_record_write_failed".to_string())
+            .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())
     };
     #[cfg(not(unix))]
     let permission_result: Result<(), String> = Ok(());
@@ -90,7 +91,7 @@ pub(super) fn append_egress_line_unless(
     });
     let unlock_result = file
         .unlock()
-        .map_err(|_| "egress_record_write_failed".to_string());
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string());
     write_result.and_then(|appended| unlock_result.map(|()| appended))
 }
 
@@ -112,15 +113,15 @@ fn append_bytes_locked(
 ) -> Result<(), String> {
     let original_length = file
         .metadata()
-        .map_err(|_| "egress_record_write_failed".to_string())?
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?
         .len();
     file.seek(SeekFrom::Start(original_length))
-        .map_err(|_| "egress_record_write_failed".to_string())?;
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?;
     if append_and_sync(file, bytes).is_err() {
         file.set_len(original_length)
             .and_then(|_| file.sync_data())
-            .map_err(|_| "egress_record_rollback_failed".to_string())?;
-        return Err("egress_record_write_failed".to_string());
+            .map_err(|_| EgressCode::RecordRollbackFailed.as_str().to_string())?;
+        return Err(EgressCode::RecordWriteFailed.as_str().to_string());
     }
     Ok(())
 }
@@ -182,20 +183,20 @@ fn repair_locked(
 ) -> Result<(), String> {
     let length = file
         .metadata()
-        .map_err(|_| "egress_record_write_failed".to_string())?
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?
         .len();
     // Most appends find a record end: two bytes say so without reading the rest.
     let last = read_end(file, length, RECORD_END.len())
-        .map_err(|_| "egress_record_write_failed".to_string())?;
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?;
     if last.is_empty() || last == RECORD_END {
         return Ok(());
     }
     let bytes = read_end(file, length, MAX_TORN_BYTES + RECORD_END.len())
-        .map_err(|_| "egress_record_write_failed".to_string())?;
+        .map_err(|_| EgressCode::RecordWriteFailed.as_str().to_string())?;
     let from_file_start = bytes.len() as u64 == length;
     let start = match find_torn_tail(&bytes, from_file_start) {
         TornTail::None => return Ok(()),
-        TornTail::Unrecognised => return Err("egress_log_incomplete".to_string()),
+        TornTail::Unrecognised => return Err(EgressCode::LogIncomplete.as_str().to_string()),
         TornTail::From(start) => start,
     };
     let mut vouched = bytes[start..].to_vec();
@@ -273,14 +274,14 @@ pub(super) fn read_egress_tail(path: &Path, take: usize) -> Result<EgressTail, S
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             return Ok(EgressTail::default())
         }
-        Err(_) => return Err("egress_log_unreadable".to_string()),
+        Err(_) => return Err(EgressCode::LogUnreadable.as_str().to_string()),
     };
     file.lock_shared()
-        .map_err(|_| "egress_log_unreadable".to_string())?;
+        .map_err(|_| EgressCode::LogUnreadable.as_str().to_string())?;
     let tail = read_tail_locked(&mut file, take);
     let unlock = file
         .unlock()
-        .map_err(|_| "egress_log_unreadable".to_string());
+        .map_err(|_| EgressCode::LogUnreadable.as_str().to_string());
     tail.and_then(|tail| unlock.map(|()| tail))
 }
 
@@ -288,7 +289,7 @@ pub(super) fn read_egress_tail(path: &Path, take: usize) -> Result<EgressTail, S
 fn read_tail_locked(file: &mut File, take: usize) -> Result<EgressTail, String> {
     let file_len = file
         .metadata()
-        .map_err(|_| "egress_log_unreadable".to_string())?
+        .map_err(|_| EgressCode::LogUnreadable.as_str().to_string())?
         .len();
     let mut position = file_len;
     let mut scanned = 0_usize;
@@ -300,10 +301,10 @@ fn read_tail_locked(file: &mut File, take: usize) -> Result<EgressTail, String> 
             .min(position as usize);
         position -= chunk_size as u64;
         file.seek(SeekFrom::Start(position))
-            .map_err(|_| "egress_log_unreadable".to_string())?;
+            .map_err(|_| EgressCode::LogUnreadable.as_str().to_string())?;
         let mut chunk = vec![0_u8; chunk_size];
         file.read_exact(&mut chunk)
-            .map_err(|_| "egress_log_unreadable".to_string())?;
+            .map_err(|_| EgressCode::LogUnreadable.as_str().to_string())?;
         newlines += chunk.iter().filter(|byte| **byte == b'\n').count();
         scanned += chunk_size;
         chunks.push(chunk);
@@ -316,7 +317,7 @@ fn read_tail_locked(file: &mut File, take: usize) -> Result<EgressTail, String> 
     let (body_end, unrepaired_tail_bytes) = match find_torn_tail(&bytes, position == 0) {
         TornTail::None => (bytes.len(), None),
         TornTail::From(start) => (start, Some((bytes.len() - start) as u64)),
-        TornTail::Unrecognised => return Err("egress_log_incomplete".to_string()),
+        TornTail::Unrecognised => return Err(EgressCode::LogIncomplete.as_str().to_string()),
     };
     // The discarded leading row can begin inside a UTF-8 code point.
     let body_start = if position > 0 {
@@ -341,7 +342,7 @@ fn read_tail_locked(file: &mut File, take: usize) -> Result<EgressTail, String> 
         match classify(&bytes[cursor..end]) {
             Line::Record(text) => {
                 if pending.is_some() {
-                    return Err("egress_log_incomplete".to_string());
+                    return Err(EgressCode::LogIncomplete.as_str().to_string());
                 }
                 entries.push(Ok(text.to_string()));
             }
@@ -358,7 +359,7 @@ fn read_tail_locked(file: &mut File, take: usize) -> Result<EgressTail, String> 
         cursor = end + 1;
     }
     if pending.is_some() {
-        return Err("egress_log_incomplete".to_string());
+        return Err(EgressCode::LogIncomplete.as_str().to_string());
     }
     let mut newest = entries.into_iter().rev();
     let mut tail = EgressTail {
@@ -386,7 +387,7 @@ fn vouched(
     pending: Option<u64>,
     first_line: u64,
 ) -> Result<(), String> {
-    let refused = || "egress_log_incomplete".to_string();
+    let refused = || EgressCode::LogIncomplete.as_str().to_string();
     let length = usize::try_from(torn.bytes).map_err(|_| refused())?;
     if length == 0 || length > MAX_TORN_BYTES || torn.offset.checked_add(torn.bytes) != Some(at) {
         return Err(refused());
@@ -403,10 +404,10 @@ fn vouched(
         0
     };
     file.seek(SeekFrom::Start(torn.offset - before as u64))
-        .map_err(|_| "egress_log_unreadable".to_string())?;
+        .map_err(|_| EgressCode::LogUnreadable.as_str().to_string())?;
     let mut bytes = vec![0_u8; before + length];
     file.read_exact(&mut bytes)
-        .map_err(|_| "egress_log_unreadable".to_string())?;
+        .map_err(|_| EgressCode::LogUnreadable.as_str().to_string())?;
     let (previous, range) = bytes.split_at(before);
     let follows_a_record = torn.offset == 0 || previous == RECORD_END;
     if follows_a_record

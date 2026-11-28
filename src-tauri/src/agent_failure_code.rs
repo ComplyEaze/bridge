@@ -764,6 +764,7 @@ failure_codes! {
         /// another reparse point.
         DataDirUnavailable = "agent_data_dir_unavailable",
         /// The agent's data directory is not owned by this user, or its mode is not 0700 (Unix).
+        #[cfg_attr(not(unix), allow(dead_code))]
         DataDirPermissionsFailed = "agent_data_dir_permissions_failed",
         /// A retired setting is still present, so the post it governed is refused.
         SettingRetired = "setting_retired",

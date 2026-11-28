@@ -58,9 +58,8 @@ impl Server {
             .map(normalized_date)
         {
             Some(as_of) => as_of?,
-            None => {
-                TallyDate::parse(tally_host_today()).map_err(|_| "invalid_as_of".to_string())?
-            }
+            None => TallyDate::parse(tally_host_today())
+                .map_err(|_| super::failure_code::ReadCode::InvalidAsOf)?,
         };
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let late = |failure: ToolFailure, evidence: &Evidence| {

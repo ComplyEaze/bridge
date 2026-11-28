@@ -970,7 +970,7 @@ pub(super) async fn lab_read_inventory(
         let rows = parse_lab_inventory_vouchers(&voucher_xml)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         if !window_honoured(&rows, from.as_str(), to.as_str()) {
-            return Err(ToolFailure::from("window_not_honoured".to_string())
+            return Err(ToolFailure::from(super::failure_code::ReadCode::WindowNotHonoured)
                 .with_prior_evidence(evidence.clone()));
         }
         let offset = arg_usize(args, "offset", 0)?;
@@ -1146,7 +1146,7 @@ pub(super) async fn lab_read_purchase_identity(
             let parsed = parse_agent_rows(&xml, identity.company_guid());
             if let Ok(rows) = &parsed {
                 if !window_honoured(rows, from.as_str(), to.as_str()) {
-                    return Err(ToolFailure::from("window_not_honoured".to_string())
+                    return Err(ToolFailure::from(super::failure_code::ReadCode::WindowNotHonoured)
                         .with_prior_evidence(evidence.clone()));
                 }
             }

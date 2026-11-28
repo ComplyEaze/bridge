@@ -1,4 +1,5 @@
 //! Voucher parse for the local MCP adapter.
+use super::failure_code::ReadCode;
 use super::*;
 
 #[path = "agent_voucher_bank_allocations.rs"]
@@ -124,7 +125,7 @@ impl NativeCollectionScope {
     }
     pub(super) fn end(&mut self, name: &str) -> Result<(), String> {
         if self.path.pop().as_deref() != Some(name) {
-            return Err("agent_read_protocol_invalid".to_string());
+            return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
         }
         Ok(())
     }
@@ -132,7 +133,7 @@ impl NativeCollectionScope {
         if self.collection_seen && !self.repeated_collection && self.path.is_empty() {
             Ok(())
         } else {
-            Err("agent_read_protocol_invalid".to_string())
+            Err(ReadCode::ReadProtocolInvalid.as_str().to_string())
         }
     }
 }
@@ -736,7 +737,7 @@ fn refused_composites(rows: Vec<(Value, bool)>) -> Result<Vec<Value>, String> {
     rows.into_iter()
         .map(|(row, withheld)| {
             if withheld {
-                Err("agent_read_protocol_invalid".to_string())
+                Err(ReadCode::ReadProtocolInvalid.as_str().to_string())
             } else {
                 Ok(row)
             }
@@ -902,20 +903,22 @@ fn parse_voucher_rows(
             Ok(quick_xml::events::Event::Start(event)) => {
                 let tag = event.name().as_ref().to_ascii_uppercase();
                 if scope.voucher_scalar() || (scope.collection() && tag != "VOUCHER") {
-                    return Err("agent_read_protocol_invalid".into());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().into());
                 }
                 if tag == "VOUCHER" && scope.collection() {
                     let mut row = BTreeMap::new();
                     for attribute in event.attributes() {
-                        let attribute =
-                            attribute.map_err(|_| "agent_read_protocol_invalid".to_string())?;
+                        let attribute = attribute
+                            .map_err(|_| ReadCode::ReadProtocolInvalid.as_str().to_string())?;
                         if attribute.key.as_ref().eq_ignore_ascii_case("REMOTEID") {
                             claim_agent_scalar(&mut row, "REMOTEID")?;
                             row.insert(
                                 "REMOTEID".into(),
                                 attribute
                                     .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                                    .map_err(|_| "agent_read_protocol_invalid".to_string())?
+                                    .map_err(|_| {
+                                        ReadCode::ReadProtocolInvalid.as_str().to_string()
+                                    })?
                                     .into_owned(),
                             );
                         }
@@ -959,7 +962,7 @@ fn parse_voucher_rows(
                 )?;
                 scope.start(tag.clone());
                 if scope.repeated_collection {
-                    return Err("agent_read_protocol_invalid".into());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().into());
                 }
                 current_tag = tag;
             }
@@ -1200,7 +1203,7 @@ fn parse_voucher_rows(
                     }
                 } else if scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST") {
                     if allocation.is_some() {
-                        return Err("agent_read_protocol_invalid".to_string());
+                        return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                     }
                     // A Stock Journal moves inventory and has no accounting effect, so
                     // Tally returns an ALLLEDGERENTRIES.LIST with no children at all.
@@ -1216,11 +1219,11 @@ fn parse_voucher_rows(
                         let ledger = entry_row
                             .get("LEDGERNAME")
                             .filter(|value| !value.trim().is_empty())
-                            .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+                            .ok_or_else(|| ReadCode::ReadProtocolInvalid.as_str().to_string())?;
                         let amount = entry_row
                             .get("AMOUNT")
                             .filter(|value| !value.trim().is_empty())
-                            .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+                            .ok_or_else(|| ReadCode::ReadProtocolInvalid.as_str().to_string())?;
                         let mut entry_composite = false;
                         let parsed_amount =
                             match bridge_tally_core::ExactDecimal::parse(amount.clone()) {
@@ -1233,13 +1236,15 @@ fn parse_voucher_rows(
                                     entry_composite = true;
                                     None
                                 }
-                                Err(_) => return Err("voucher_amount_invalid".to_string()),
+                                Err(_) => {
+                                    return Err(ReadCode::VoucherAmountInvalid.as_str().to_string())
+                                }
                             };
 
                         let polarity = entry_row
                             .get("ISDEEMEDPOSITIVE")
                             .filter(|value| !value.trim().is_empty())
-                            .ok_or_else(|| "agent_read_protocol_invalid".to_string())?;
+                            .ok_or_else(|| ReadCode::ReadProtocolInvalid.as_str().to_string())?;
                         let is_deemed_positive = required_tally_bool(Some(polarity))?;
                         // AMOUNT carries the sign; ISDEEMEDPOSITIVE records the column the
                         // entry was made in, and the two legitimately disagree. A rounding
@@ -1318,7 +1323,7 @@ fn parse_voucher_rows(
                             return Err(if require_change_identity {
                                 "change_row_core_field_invalid"
                             } else {
-                                "agent_read_protocol_invalid"
+                                ReadCode::ReadProtocolInvalid.as_str()
                             }
                             .to_string());
                         }
@@ -1499,10 +1504,10 @@ fn parse_voucher_rows(
             Ok(quick_xml::events::Event::Empty(event)) => {
                 let name = event.name().as_ref().to_ascii_uppercase();
                 if scope.voucher_scalar() {
-                    return Err("agent_read_protocol_invalid".into());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().into());
                 }
                 if scope.collection() {
-                    return Err("agent_read_protocol_invalid".to_string());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().to_string());
                 }
                 if read_notes {
                     start_delivery_note_element(&scope, &name, &mut notes)?;
@@ -1525,7 +1530,7 @@ fn parse_voucher_rows(
                 }
                 scope.start(name.clone());
                 if scope.repeated_collection {
-                    return Err("agent_read_protocol_invalid".into());
+                    return Err(ReadCode::ReadProtocolInvalid.as_str().into());
                 }
                 if let Some(tail) = scope.entry_tail() {
                     cost.end(tail);
@@ -1542,7 +1547,7 @@ fn parse_voucher_rows(
                 scope.end(&name)?;
             }
             Ok(quick_xml::events::Event::Eof) => break,
-            Err(_) => return Err("agent_read_protocol_invalid".to_string()),
+            Err(_) => return Err(ReadCode::ReadProtocolInvalid.as_str().to_string()),
             _ => {}
         }
     }
@@ -1643,7 +1648,7 @@ pub(super) fn mark_agent_xml(xml: &str) -> std::borrow::Cow<'_, str> {
 pub(super) fn decoded_agent_text(text: quick_xml::events::BytesText<'_>) -> Result<String, String> {
     quick_xml::escape::unescape(&text)
         .map(|value| value.into_owned())
-        .map_err(|_| "agent_read_protocol_invalid".to_string())
+        .map_err(|_| ReadCode::ReadProtocolInvalid.as_str().to_string())
 }
 
 pub(super) fn decoded_agent_reference(
@@ -1651,7 +1656,7 @@ pub(super) fn decoded_agent_reference(
 ) -> Result<String, String> {
     quick_xml::escape::unescape(&format!("&{};", &*reference))
         .map(|value| value.into_owned())
-        .map_err(|_| "agent_read_protocol_invalid".to_string())
+        .map_err(|_| ReadCode::ReadProtocolInvalid.as_str().to_string())
 }
 
 pub(super) fn required_tally_bool(value: Option<&String>) -> Result<bool, String> {

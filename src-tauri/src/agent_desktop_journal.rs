@@ -1,4 +1,7 @@
 //! Desktop Journal service: persisted-record admission and shared runtime operations.
+use super::super::failure_code::{
+    AgentSettingCode, DesktopJournalCode, ImportPostCode, ToolRequestCode,
+};
 use super::super::{
     default_data_dir, ensure_private_directory, DirectoryAdmissionError, EvidenceStore, Redaction,
     Settings,
@@ -37,19 +40,21 @@ impl DesktopJournalService {
         selected: &[u8],
     ) -> Result<DesktopJournalReview, String> {
         if selected.len() > MAX_SELECTED_JOURNAL_BYTES {
-            return Err("import_selected_file_too_large".into());
+            return Err(DesktopJournalCode::SelectedFileTooLarge.as_str().into());
         }
         let selected_sha256 = sha256_hex(selected);
-        let snapshot = self
-            .snapshot_for_sha256(&selected_sha256)?
-            .ok_or_else(|| "import_selected_file_not_found".to_string())?;
+        let snapshot = self.snapshot_for_sha256(&selected_sha256)?.ok_or_else(|| {
+            DesktopJournalCode::SelectedFileNotFound
+                .as_str()
+                .to_string()
+        })?;
         if snapshot.batch.sha256 != selected_sha256 {
             return Err("import_batch_changed".into());
         }
         let review = self.review_snapshot(snapshot)?;
         let persisted = self.read_persisted_xml(&review.batch_id)?;
         if persisted != selected {
-            return Err("import_selected_file_not_exact".into());
+            return Err(DesktopJournalCode::SelectedFileNotExact.as_str().into());
         }
         Ok(review)
     }
@@ -91,7 +96,7 @@ impl DesktopJournalService {
         match self.server.reconcile_import(&args, sha256).await {
             Ok(outcome) => DesktopJournalOperation::from_outcome(outcome),
             Err(failure) => {
-                let no_attempt_recorded = failure.code == "import_not_dispatched";
+                let no_attempt_recorded = failure.code == ImportPostCode::NotDispatched.as_str();
                 let message = if no_attempt_recorded {
                     "No posting attempt is recorded for this original Journal."
                 } else if failure.code == super::post::DESKTOP_LEDGER_LINE_BREAK {
@@ -134,7 +139,7 @@ impl DesktopJournalService {
             .batch
             .vouchers
             .first()
-            .ok_or_else(|| "import_post_requires_one_journal".to_string())?;
+            .ok_or_else(|| ImportPostCode::RequiresOneJournal.as_str().to_string())?;
         let marks = OnAccountMarks::of(&snapshot.batch);
         let ledgers = || voucher.entries.iter().map(|entry| entry.ledger.as_str());
         let on_account_note = Some(marks.legend(ledgers()))
@@ -144,7 +149,7 @@ impl DesktopJournalService {
         let company = snapshot
             .batch
             .company
-            .ok_or_else(|| "import_post_company_missing".to_string())?;
+            .ok_or_else(|| ImportPostCode::CompanyMissing.as_str().to_string())?;
         let (total_debit, total_credit) = totals(&snapshot.batch.vouchers)?;
         let details = DesktopJournalDetails {
             date: voucher.date.as_str().to_owned(),
@@ -281,17 +286,22 @@ fn bounded_action_text(value: &Value, max_bytes: usize) -> Option<&str> {
 
 impl Settings {
     fn for_desktop_journal(endpoint: TallyConfig) -> Result<Self, String> {
-        canonical_loopback_origin(&endpoint).map_err(|_| "host_setting_invalid".to_string())?;
+        canonical_loopback_origin(&endpoint)
+            .map_err(|_| ToolRequestCode::HostSettingInvalid.as_str().to_string())?;
         let data_dir = env::var_os("BRIDGE_AGENT_DATA_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(default_data_dir);
         if data_dir.to_str().is_none() {
-            return Err("agent_data_dir_encoding_invalid".into());
+            return Err(AgentSettingCode::DataDirEncodingInvalid.as_str().into());
         }
         ensure_private_directory(&data_dir).map_err(|error| match error {
-            DirectoryAdmissionError::Unavailable => "agent_data_dir_unavailable".to_string(),
+            DirectoryAdmissionError::Unavailable => {
+                AgentSettingCode::DataDirUnavailable.as_str().to_string()
+            }
             #[cfg(unix)]
-            DirectoryAdmissionError::Permissions => "agent_data_dir_permissions_failed".to_string(),
+            DirectoryAdmissionError::Permissions => AgentSettingCode::DataDirPermissionsFailed
+                .as_str()
+                .to_string(),
         })?;
         Ok(Self {
             endpoint,

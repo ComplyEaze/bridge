@@ -945,6 +945,73 @@ const IMPORT_VERIFICATION: &[(ImportVerificationCode, &str)] = &[
     ),
 ];
 
+const VOUCHER_TYPE_CLASS: &[(VoucherTypeClassCode, &str)] = &[
+    (
+        VoucherTypeClassCode::ClassMissing,
+        "voucher_type_class_missing",
+    ),
+    (VoucherTypeClassCode::Unresolved, "voucher_type_unresolved"),
+    (
+        VoucherTypeClassCode::ClassInvalid,
+        "voucher_type_class_invalid",
+    ),
+    (
+        VoucherTypeClassCode::ClassContradictory,
+        "voucher_type_class_contradictory",
+    ),
+    (
+        VoucherTypeClassCode::ClassUnsupported,
+        "voucher_class_unsupported",
+    ),
+    (VoucherTypeClassCode::TypeInvalid, "voucher_type_invalid"),
+    (
+        VoucherTypeClassCode::SelectorsConflict,
+        "voucher_type_selectors_conflict",
+    ),
+    (
+        VoucherTypeClassCode::SnapshotInconsistent,
+        "voucher_type_snapshot_inconsistent",
+    ),
+    (VoucherTypeClassCode::Ambiguous, "voucher_type_ambiguous"),
+];
+
+/// A voucher summary's refusals from its arguments and its rows.
+const VOUCHER_SUMMARY: &[(VoucherSummaryCode, &str)] = &[
+    (
+        VoucherSummaryCode::SummariseByInvalid,
+        "summarise_by_invalid",
+    ),
+    (
+        VoucherSummaryCode::CostCentreAllocationMismatch,
+        "summary_cost_centre_allocation_mismatch",
+    ),
+    (
+        VoucherSummaryCode::VoucherTypeMissing,
+        "voucher_type_missing",
+    ),
+];
+
+/// The desktop Journal review's refusals of a selected file.
+const DESKTOP_JOURNAL: &[(DesktopJournalCode, &str)] = &[
+    (
+        DesktopJournalCode::SelectedFileTooLarge,
+        "import_selected_file_too_large",
+    ),
+    (
+        DesktopJournalCode::SelectedFileNotFound,
+        "import_selected_file_not_found",
+    ),
+    (
+        DesktopJournalCode::SelectedFileNotExact,
+        "import_selected_file_not_exact",
+    ),
+    (
+        DesktopJournalCode::SelectedFileUnavailable,
+        "import_selected_file_unavailable",
+    ),
+    (DesktopJournalCode::FilePickerFailed, "file_picker_failed"),
+];
+
 const SEARCH: &[(SearchCode, &str)] = &[
     (SearchCode::CriterionEmpty, "search_criterion_empty"),
     (SearchCode::CriterionTooLong, "search_criterion_too_long"),
@@ -1455,6 +1522,9 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(VOUCHER_LISTING),
         of(IMPORT_AMEND),
         of(IMPORT_VERIFICATION),
+        of(VOUCHER_TYPE_CLASS),
+        of(VOUCHER_SUMMARY),
+        of(DESKTOP_JOURNAL),
         of(BANK_STATEMENT),
         of(SEARCH),
     ]
@@ -1517,6 +1587,9 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("VoucherListingCode", VoucherListingCode::ALL),
         of("ImportAmendCode", ImportAmendCode::ALL),
         of("ImportVerificationCode", ImportVerificationCode::ALL),
+        of("VoucherTypeClassCode", VoucherTypeClassCode::ALL),
+        of("VoucherSummaryCode", VoucherSummaryCode::ALL),
+        of("DesktopJournalCode", DesktopJournalCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("SearchCode", SearchCode::ALL),
     ];
@@ -1575,7 +1648,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        45,
+        48,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1633,6 +1706,9 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(VOUCHER_LISTING), VoucherListingCode::ALL);
     assert_eq!(variants(IMPORT_AMEND), ImportAmendCode::ALL);
     assert_eq!(variants(IMPORT_VERIFICATION), ImportVerificationCode::ALL);
+    assert_eq!(variants(VOUCHER_TYPE_CLASS), VoucherTypeClassCode::ALL);
+    assert_eq!(variants(VOUCHER_SUMMARY), VoucherSummaryCode::ALL);
+    assert_eq!(variants(DESKTOP_JOURNAL), DesktopJournalCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -1702,6 +1778,9 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(VOUCHER_LISTING, VoucherListingCode::as_str);
     check_pins(IMPORT_AMEND, ImportAmendCode::as_str);
     check_pins(IMPORT_VERIFICATION, ImportVerificationCode::as_str);
+    check_pins(VOUCHER_TYPE_CLASS, VoucherTypeClassCode::as_str);
+    check_pins(VOUCHER_SUMMARY, VoucherSummaryCode::as_str);
+    check_pins(DESKTOP_JOURNAL, DesktopJournalCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -1725,14 +1804,14 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
         77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 19, 13, 4, 17, 8, 6,
-        2, 8, 8, 5,
+        2, 8, 8, 5, 9, 3, 5,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
         80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 21, 19, 13, 4, 17,
-        8, 6, 2, 8, 8, 5,
+        8, 6, 2, 8, 8, 5, 9, 3, 5,
     ]
     .iter()
     .sum();

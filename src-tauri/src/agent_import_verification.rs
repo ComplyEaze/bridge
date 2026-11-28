@@ -5,7 +5,9 @@
 //! classifies every expected voucher, finds duplicates, and renders the proof.
 //! Moved out of `agent_import.rs` with only visibility and `super::` paths changed;
 //! nothing here dispatches to Tally.
-use super::super::failure_code::{ImportVerificationCode, ReadCode, VoucherReadCode};
+use super::super::failure_code::{
+    ImportBuildCode, ImportVerificationCode, ImportVerifyCode, ReadCode, VoucherReadCode,
+};
 use super::*;
 
 pub(super) fn parse_import_vouchers(
@@ -45,7 +47,7 @@ pub(super) fn parse_import_voucher_rows(
                 }
                 "change_row_identity_invalid"
                 | "voucher_source_identity_invalid"
-                | "voucher_company_identity_invalid" => "import_verification_identity_invalid",
+                | "voucher_company_identity_invalid" => ImportVerifyCode::IdentityInvalid.as_str(),
                 "voucher_amount_invalid" => ImportVerificationCode::AmountInvalid.as_str(),
                 "voucher_master_id_invalid" => ImportVerificationCode::MasterIdInvalid.as_str(),
                 _ => return code,
@@ -1593,7 +1595,7 @@ pub(super) fn observed_voucher_identity(voucher: &ReadVoucher) -> Result<String,
                 .filter(|id| !id.trim().is_empty())
                 .map(|id| format!("master_id:{id}"))
         })
-        .ok_or_else(|| "import_verification_identity_invalid".to_string())
+        .ok_or_else(|| ImportVerifyCode::IdentityInvalid.as_str().to_string())
 }
 
 pub(super) fn duplicates(
@@ -1642,10 +1644,10 @@ pub(super) fn duplicates(
 pub(super) fn company_high_water_mark(high_water: &Value) -> Result<PreImportMark, String> {
     let voucher = high_water["altvchid"]
         .as_u64()
-        .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+        .ok_or_else(|| ImportBuildCode::MarkUnobserved.as_str().to_string())?;
     let master = high_water["altmstid"]
         .as_u64()
-        .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+        .ok_or_else(|| ImportBuildCode::MarkUnobserved.as_str().to_string())?;
     Ok(PreImportMark {
         kind: "company_high_water".to_string(),
         value: Some(voucher),

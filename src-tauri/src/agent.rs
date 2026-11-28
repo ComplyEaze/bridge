@@ -51,6 +51,7 @@ mod cash_flow;
 mod company_features;
 #[path = "agent_failure_code.rs"]
 mod failure_code;
+use failure_code::{AgentSettingCode, AgentToolCode};
 #[path = "agent_gst_status.rs"]
 mod gst_status;
 #[path = "agent_gst_uncertain.rs"]
@@ -488,7 +489,9 @@ impl Redaction {
         match env::var("BRIDGE_AGENT_REDACTION") {
             Ok(value) => Self::from_setting(Some(&value)),
             Err(env::VarError::NotPresent) => Self::from_setting(None),
-            Err(_) => Err("redaction_setting_invalid".to_string()),
+            Err(_) => Err(AgentSettingCode::RedactionSettingInvalid
+                .as_str()
+                .to_string()),
         }
     }
 
@@ -501,7 +504,9 @@ impl Redaction {
             "none" => Ok(Self::None),
             "mask_parties" => Ok(Self::MaskParties),
             "drop_narration" => Ok(Self::DropNarration),
-            _ => Err("redaction_setting_invalid".to_string()),
+            _ => Err(AgentSettingCode::RedactionSettingInvalid
+                .as_str()
+                .to_string()),
         }
     }
 
@@ -585,7 +590,7 @@ impl Settings {
         let port = tally_port(match env::var("BRIDGE_TALLY_PORT") {
             Ok(port) => Some(port),
             Err(env::VarError::NotPresent) => None,
-            Err(_) => return Err("port_setting_invalid".to_string()),
+            Err(_) => return Err(AgentSettingCode::PortSettingInvalid.as_str().to_string()),
         })?;
         let endpoint = TallyEndpointConfig { host, port };
         canonical_loopback_origin(&endpoint).map_err(|_| "host_setting_invalid".to_string())?;
@@ -600,12 +605,18 @@ impl Settings {
         // Published artifact paths must be representable in the JSON response.
         // Admit the resolved override or default before creating any local state.
         if data_dir.to_str().is_none() {
-            return Err("agent_data_dir_encoding_invalid".to_string());
+            return Err(AgentSettingCode::DataDirEncodingInvalid
+                .as_str()
+                .to_string());
         }
         ensure_private_directory(&data_dir).map_err(|error| match error {
-            DirectoryAdmissionError::Unavailable => "agent_data_dir_unavailable".to_string(),
+            DirectoryAdmissionError::Unavailable => {
+                AgentSettingCode::DataDirUnavailable.as_str().to_string()
+            }
             #[cfg(unix)]
-            DirectoryAdmissionError::Permissions => "agent_data_dir_permissions_failed".to_string(),
+            DirectoryAdmissionError::Permissions => AgentSettingCode::DataDirPermissionsFailed
+                .as_str()
+                .to_string(),
         })?;
         let posting = posting_from_env(process_variable)?;
         let writes_enabled = posting.enabled();
@@ -634,7 +645,9 @@ fn enabled_value(value: Result<String, env::VarError>) -> Result<bool, String> {
     match value {
         Err(env::VarError::NotPresent) => boolean_setting(None),
         Ok(value) => boolean_setting(Some(&value)),
-        Err(env::VarError::NotUnicode(_)) => Err("boolean_setting_invalid".into()),
+        Err(env::VarError::NotUnicode(_)) => {
+            Err(AgentSettingCode::BooleanSettingInvalid.as_str().into())
+        }
     }
 }
 
@@ -656,7 +669,7 @@ fn boolean_setting(value: Option<&str>) -> Result<bool, String> {
         None => Ok(false),
         Some("1" | "true") => Ok(true),
         Some("0" | "false") => Ok(false),
-        Some(_) => Err("boolean_setting_invalid".into()),
+        Some(_) => Err(AgentSettingCode::BooleanSettingInvalid.as_str().into()),
     }
 }
 
@@ -697,7 +710,7 @@ fn audit_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<bo
         .map(|value| {
             value
                 .into_string()
-                .map_err(|_| "boolean_setting_invalid".to_string())
+                .map_err(|_| AgentSettingCode::BooleanSettingInvalid.as_str().to_string())
         })
         .transpose()?;
     match value.as_deref() {
@@ -717,7 +730,7 @@ fn posting_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<
         .map(|value| {
             value
                 .into_string()
-                .map_err(|_| "boolean_setting_invalid".to_string())
+                .map_err(|_| AgentSettingCode::BooleanSettingInvalid.as_str().to_string())
         })
         .transpose()?;
     Ok(Posting::from_settings(
@@ -733,7 +746,7 @@ fn tally_port(value: Option<String>) -> Result<u16, String> {
             .parse::<u16>()
             .ok()
             .filter(|port| *port > 0)
-            .ok_or_else(|| "port_setting_invalid".to_string()),
+            .ok_or_else(|| AgentSettingCode::PortSettingInvalid.as_str().to_string()),
     }
 }
 
@@ -754,7 +767,8 @@ fn parse_bounded_limit(name: &str, value: &str, min: usize, max: usize) -> Resul
 }
 
 fn endpoint_origin(endpoint: &TallyEndpointConfig) -> Result<String, String> {
-    canonical_loopback_origin(endpoint).map_err(|_| "endpoint_invalid".to_string())
+    canonical_loopback_origin(endpoint)
+        .map_err(|_| AgentSettingCode::EndpointInvalid.as_str().to_string())
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -3627,18 +3641,24 @@ impl Server {
         if matches!(name, "post_import" | "acknowledge_post_review")
             && !self.settings.posting.enabled()
         {
-            return Err("import_posting_disabled".to_string().into());
+            return Err(AgentToolCode::ImportPostingDisabled
+                .as_str()
+                .to_string()
+                .into());
         }
         if name == "post_import" && self.settings.posting == Posting::RetiredSettingPresent {
-            return Err("setting_retired".to_string().into());
+            return Err(AgentSettingCode::SettingRetired.as_str().to_string().into());
         }
         if matches!(name, "post_ledger_creates" | "prepare_ledger_creates")
             && !self.settings.master_writes_enabled
         {
-            return Err("master_writes_disabled".to_string().into());
+            return Err(AgentToolCode::MasterWritesDisabled
+                .as_str()
+                .to_string()
+                .into());
         }
         if name == "audit_test_run" && !self.settings.audit_enabled {
-            return Err("audit_tool_disabled".to_string().into());
+            return Err(AgentToolCode::AuditToolDisabled.as_str().to_string().into());
         }
         #[cfg(feature = "lab-writes")]
         if matches!(
@@ -3739,15 +3759,16 @@ impl Server {
             "lab_import_masters" => in_own_frame(|| lab::lab_import_masters(self, args)).await,
             #[cfg(feature = "lab-writes")]
             "lab_import_vouchers" => in_own_frame(|| lab::lab_import_vouchers(self, args)).await,
-            _ => Err("tool_not_found".to_string().into()),
+            _ => Err(AgentToolCode::ToolNotFound.as_str().to_string().into()),
         }
     }
 
     fn import_enabled(&self) -> Result<(), String> {
-        self.settings
-            .import_enabled
-            .then_some(())
-            .ok_or_else(|| "import_unverified_on_live_tally".to_string())
+        self.settings.import_enabled.then_some(()).ok_or_else(|| {
+            AgentToolCode::ImportUnverifiedOnLiveTally
+                .as_str()
+                .to_string()
+        })
     }
 
     fn read_evidence(&self, args: &Value) -> Result<ToolOutcome, String> {
@@ -3757,7 +3778,7 @@ impl Server {
         let store = self
             .evidence
             .lock()
-            .map_err(|_| "evidence_store_unavailable".to_string())?;
+            .map_err(|_| AgentToolCode::EvidenceStoreUnavailable.as_str().to_string())?;
         let truncated = store.evicted || store.records.len() > take;
         let values = store
             .records
@@ -3980,7 +4001,7 @@ fn ensure_movement_window_within_books(
 ) -> Result<(), String> {
     (from >= books_from)
         .then_some(())
-        .ok_or_else(|| "window_precedes_books_from".to_string())
+        .ok_or_else(|| AgentToolCode::WindowPrecedesBooksFrom.as_str().to_string())
 }
 
 /// Letters and digits only, lower-cased. It never resolves a name (#1076): it
@@ -4197,7 +4218,7 @@ fn corroborate_empty_by_days(
     company_high_water: Option<u64>,
 ) -> Result<(bool, Option<&'static str>), String> {
     if any_in_window {
-        return Err("window_contradicted".to_string());
+        return Err(AgentToolCode::WindowContradicted.as_str().to_string());
     }
     if any_in_widened {
         // Boundary-day rows only prove that this wider read returned *some*
@@ -4210,7 +4231,7 @@ fn corroborate_empty_by_days(
     match company_high_water {
         Some(0) => Ok((false, Some("company_has_no_vouchers"))),
         Some(_) => Ok((true, Some("empty_uncorroborated"))),
-        None => Err("voucher_checkpoint_invalid".to_string()),
+        None => Err(AgentToolCode::VoucherCheckpointInvalid.as_str().to_string()),
     }
 }
 
@@ -4297,7 +4318,11 @@ fn negotiate_protocol(requested: &str) -> Result<&'static str, String> {
         .into_iter()
         .find(|version| *version == requested)
         .or_else(|| SUPPORTED_PROTOCOL_VERSIONS.first().copied())
-        .ok_or_else(|| "unsupported_protocol_version".to_string())
+        .ok_or_else(|| {
+            AgentToolCode::UnsupportedProtocolVersion
+                .as_str()
+                .to_string()
+        })
 }
 
 fn sha256_json<T: Serialize>(value: &T) -> String {
@@ -4331,15 +4356,15 @@ fn arg_usize(args: &Value, key: &str, default: usize) -> Result<usize, String> {
         Some(Value::Number(value)) => value
             .as_u64()
             .and_then(|value| usize::try_from(value).ok())
-            .ok_or_else(|| "pagination_invalid".to_string()),
-        Some(_) => Err("pagination_invalid".to_string()),
+            .ok_or_else(|| AgentToolCode::PaginationInvalid.as_str().to_string()),
+        Some(_) => Err(AgentToolCode::PaginationInvalid.as_str().to_string()),
     }
 }
 fn arg_positive_usize(args: &Value, key: &str, default: usize) -> Result<usize, String> {
     let value = arg_usize(args, key, default)?;
     (value > 0)
         .then_some(value)
-        .ok_or_else(|| "pagination_invalid".to_string())
+        .ok_or_else(|| AgentToolCode::PaginationInvalid.as_str().to_string())
 }
 /// A tool's date argument, parsed once at the boundary: every `-` is dropped, and
 /// the rest must be a valid `YYYYMMDD` date.

@@ -457,7 +457,67 @@ const IMPORT_POST: &[(ImportPostCode, &str)] = &[
     ),
 ];
 
-/// The import payload's own checks.
+const AGENT_SETTING: &[(AgentSettingCode, &str)] = &[
+    (
+        AgentSettingCode::RedactionSettingInvalid,
+        "redaction_setting_invalid",
+    ),
+    (AgentSettingCode::PortSettingInvalid, "port_setting_invalid"),
+    (
+        AgentSettingCode::BooleanSettingInvalid,
+        "boolean_setting_invalid",
+    ),
+    (AgentSettingCode::EndpointInvalid, "endpoint_invalid"),
+    (
+        AgentSettingCode::DataDirEncodingInvalid,
+        "agent_data_dir_encoding_invalid",
+    ),
+    (
+        AgentSettingCode::DataDirUnavailable,
+        "agent_data_dir_unavailable",
+    ),
+    (
+        AgentSettingCode::DataDirPermissionsFailed,
+        "agent_data_dir_permissions_failed",
+    ),
+    (AgentSettingCode::SettingRetired, "setting_retired"),
+];
+
+const AGENT_TOOL: &[(AgentToolCode, &str)] = &[
+    (
+        AgentToolCode::ImportPostingDisabled,
+        "import_posting_disabled",
+    ),
+    (
+        AgentToolCode::MasterWritesDisabled,
+        "master_writes_disabled",
+    ),
+    (AgentToolCode::AuditToolDisabled, "audit_tool_disabled"),
+    (
+        AgentToolCode::ImportUnverifiedOnLiveTally,
+        "import_unverified_on_live_tally",
+    ),
+    (AgentToolCode::ToolNotFound, "tool_not_found"),
+    (
+        AgentToolCode::EvidenceStoreUnavailable,
+        "evidence_store_unavailable",
+    ),
+    (
+        AgentToolCode::UnsupportedProtocolVersion,
+        "unsupported_protocol_version",
+    ),
+    (AgentToolCode::PaginationInvalid, "pagination_invalid"),
+    (
+        AgentToolCode::WindowPrecedesBooksFrom,
+        "window_precedes_books_from",
+    ),
+    (AgentToolCode::WindowContradicted, "window_contradicted"),
+    (
+        AgentToolCode::VoucherCheckpointInvalid,
+        "voucher_checkpoint_invalid",
+    ),
+];
+
 const IMPORT_PAYLOAD: &[(ImportPayloadCode, &str)] = &[
     (ImportPayloadCode::SchemaInvalid, "voucher_schema_invalid"),
     (
@@ -1177,13 +1237,15 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(VOUCHER_READ),
         of(TOOL_REQUEST),
         of(IMPORT_POST),
-        of(BANK_STATEMENT),
-        of(SEARCH),
+        of(AGENT_SETTING),
+        of(AGENT_TOOL),
         of(IMPORT_PAYLOAD),
         of(IMPORT_BUILD),
         of(IMPORT_MASTERS),
         of(IMPORT_VERIFY),
         of(IMPORT_FILE),
+        of(BANK_STATEMENT),
+        of(SEARCH),
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
@@ -1232,13 +1294,15 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("VoucherReadCode", VoucherReadCode::ALL),
         of("ToolRequestCode", ToolRequestCode::ALL),
         of("ImportPostCode", ImportPostCode::ALL),
-        of("BankStatementCode", BankStatementCode::ALL),
-        of("SearchCode", SearchCode::ALL),
+        of("AgentSettingCode", AgentSettingCode::ALL),
+        of("AgentToolCode", AgentToolCode::ALL),
         of("ImportPayloadCode", ImportPayloadCode::ALL),
         of("ImportBuildCode", ImportBuildCode::ALL),
         of("ImportMastersCode", ImportMastersCode::ALL),
         of("ImportVerifyCode", ImportVerifyCode::ALL),
         of("ImportFileCode", ImportFileCode::ALL),
+        of("BankStatementCode", BankStatementCode::ALL),
+        of("SearchCode", SearchCode::ALL),
     ];
     #[cfg(feature = "lab-writes")]
     let enums = [enums, vec![of("LabMastersCode", LabMastersCode::ALL)]].concat();
@@ -1286,7 +1350,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        37,
+        39,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1330,6 +1394,8 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(VOUCHER_READ), VoucherReadCode::ALL);
     assert_eq!(variants(TOOL_REQUEST), ToolRequestCode::ALL);
     assert_eq!(variants(IMPORT_POST), ImportPostCode::ALL);
+    assert_eq!(variants(AGENT_SETTING), AgentSettingCode::ALL);
+    assert_eq!(variants(AGENT_TOOL), AgentToolCode::ALL);
     assert_eq!(variants(IMPORT_PAYLOAD), ImportPayloadCode::ALL);
     assert_eq!(variants(IMPORT_BUILD), ImportBuildCode::ALL);
     assert_eq!(variants(IMPORT_MASTERS), ImportMastersCode::ALL);
@@ -1390,6 +1456,8 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(VOUCHER_READ, VoucherReadCode::as_str);
     check_pins(TOOL_REQUEST, ToolRequestCode::as_str);
     check_pins(IMPORT_POST, ImportPostCode::as_str);
+    check_pins(AGENT_SETTING, AgentSettingCode::as_str);
+    check_pins(AGENT_TOOL, AgentToolCode::as_str);
     check_pins(IMPORT_PAYLOAD, ImportPayloadCode::as_str);
     check_pins(IMPORT_BUILD, ImportBuildCode::as_str);
     check_pins(IMPORT_MASTERS, ImportMastersCode::as_str);
@@ -1416,13 +1484,13 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
-        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 19, 13, 4, 17, 8,
+        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 8, 11, 19, 13, 4, 17, 8,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
-        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 19, 13, 4, 17, 8,
+        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21, 8, 11, 19, 13, 4, 17, 8,
     ]
     .iter()
     .sum();

@@ -2455,7 +2455,7 @@ where
                     return Err(ReadCode::InvalidDateRange.into());
                 }
                 if part.from < *from || part.to > *to {
-                    return Err("window_not_honoured".to_string().into());
+                    return Err(ReadCode::WindowNotHonoured.into());
                 }
             }
             match witness {
@@ -2481,7 +2481,7 @@ where
                 #[cfg(test)]
                 WindowPlanSource::Counted(counted) => {
                     if !counted.within(first, last) {
-                        return Err("window_not_honoured".to_string().into());
+                        return Err(ReadCode::WindowNotHonoured.into());
                     }
                     whole_or_counted(counted, None, limits)
                 }

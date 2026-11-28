@@ -470,7 +470,9 @@ impl Server {
     ) -> Result<(EstablishedCashProjection, Evidence), CashProjectionFailure> {
         let dates = outflows.iter().map(|outflow| &outflow.date);
         let (Some(from), Some(last)) = (dates.clone().min(), dates.max()) else {
-            return Err(ToolFailure::from("proposals_file_invalid".to_string()).into());
+            return Err(
+                ToolFailure::from(super::super::failure_code::ProposalsCode::FileInvalid).into(),
+            );
         };
         let from = from.clone();
         let first_to = year_end(last).map_err(ToolFailure::from)?;

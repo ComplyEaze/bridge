@@ -641,6 +641,43 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs`), the voucher summary
+    /// and the import's read-back: a voucher, bill allocation or Delivery Note element Tally sent
+    /// that the read cannot admit.
+    pub(crate) enum VoucherReadCode {
+        /// A Delivery Note entry holds an element that is not one of its measured fields, a field
+        /// twice, or an element inside a field.
+        DeliveryNoteInvalid = "voucher_delivery_note_invalid",
+        /// A bill allocation with a bill type has no amount, or no name unless it is On Account; or
+        /// a named allocation has no bill type.
+        BillAllocationFieldMissing = "bill_allocation_field_missing",
+        /// A bill allocation's amount is neither a decimal nor a composite the read withholds.
+        BillAllocationAmountInvalid = "bill_allocation_amount_invalid",
+        /// An On Account bill allocation carries a bill name.
+        BillReferenceForbidden = "bill_reference_forbidden",
+        /// A bill allocation's bill date is present and is not a date.
+        BillAllocationDateInvalid = "bill_allocation_date_invalid",
+        /// A voucher's GUID is absent or does not belong to the company read.
+        CompanyIdentityInvalid = "voucher_company_identity_invalid",
+        /// A voucher's date is not a date, or, in the summary, is shorter than six characters or
+        /// holds a character that is not a digit.
+        DateInvalid = "voucher_date_invalid",
+        /// A voucher's effective date is present and is not a date.
+        EffectiveDateInvalid = "voucher_effective_date_invalid",
+        /// A voucher's post-dated flag is present and is neither Yes nor No.
+        PostDatedInvalid = "voucher_post_dated_invalid",
+        /// A voucher's reference date is present and is not a date.
+        ReferenceDateInvalid = "voucher_reference_date_invalid",
+        /// A voucher's invoice flag is present and is neither Yes nor No.
+        IsInvoiceInvalid = "voucher_is_invoice_invalid",
+        /// A voucher's cancelled or optional flag is absent or is neither Yes nor No, or an entry's
+        /// or a movement's deemed-positive flag is neither; or, in the read-back, a voucher's
+        /// cancelled and optional flags were not both observed.
+        AccountingStateNotObserved = "voucher_accounting_state_not_observed",
+    }
+}
+
+failure_codes! {
     /// The refusals of the agent's own settings and data directory, read when the server starts
     /// or a tool first needs them (`agent.rs`).
     pub(crate) enum AgentSettingCode {

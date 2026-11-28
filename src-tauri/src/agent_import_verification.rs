@@ -5,7 +5,7 @@
 //! classifies every expected voucher, finds duplicates, and renders the proof.
 //! Moved out of `agent_import.rs` with only visibility and `super::` paths changed;
 //! nothing here dispatches to Tally.
-use super::super::failure_code::ReadCode;
+use super::super::failure_code::{ReadCode, VoucherReadCode};
 use super::*;
 
 pub(super) fn parse_import_vouchers(
@@ -1196,7 +1196,9 @@ pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<b
     match (voucher.cancelled, voucher.optional) {
         (Some(false), Some(false)) => Ok(true),
         (Some(true), _) | (_, Some(true)) => Ok(false),
-        _ => Err("voucher_accounting_state_not_observed".to_string()),
+        _ => Err(VoucherReadCode::AccountingStateNotObserved
+            .as_str()
+            .to_string()),
     }
 }
 

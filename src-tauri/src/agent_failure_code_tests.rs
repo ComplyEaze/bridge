@@ -335,6 +335,54 @@ const INVOICE_INPUT: &[(InvoiceInputCode, &str)] = &[
     (InvoiceInputCode::DateInvalid, "invoice_date_invalid"),
 ];
 
+const VOUCHER_READ: &[(VoucherReadCode, &str)] = &[
+    (
+        VoucherReadCode::DeliveryNoteInvalid,
+        "voucher_delivery_note_invalid",
+    ),
+    (
+        VoucherReadCode::BillAllocationFieldMissing,
+        "bill_allocation_field_missing",
+    ),
+    (
+        VoucherReadCode::BillAllocationAmountInvalid,
+        "bill_allocation_amount_invalid",
+    ),
+    (
+        VoucherReadCode::BillReferenceForbidden,
+        "bill_reference_forbidden",
+    ),
+    (
+        VoucherReadCode::BillAllocationDateInvalid,
+        "bill_allocation_date_invalid",
+    ),
+    (
+        VoucherReadCode::CompanyIdentityInvalid,
+        "voucher_company_identity_invalid",
+    ),
+    (VoucherReadCode::DateInvalid, "voucher_date_invalid"),
+    (
+        VoucherReadCode::EffectiveDateInvalid,
+        "voucher_effective_date_invalid",
+    ),
+    (
+        VoucherReadCode::PostDatedInvalid,
+        "voucher_post_dated_invalid",
+    ),
+    (
+        VoucherReadCode::ReferenceDateInvalid,
+        "voucher_reference_date_invalid",
+    ),
+    (
+        VoucherReadCode::IsInvoiceInvalid,
+        "voucher_is_invoice_invalid",
+    ),
+    (
+        VoucherReadCode::AccountingStateNotObserved,
+        "voucher_accounting_state_not_observed",
+    ),
+];
+
 const TOOL_REQUEST: &[(ToolRequestCode, &str)] = &[
     (ToolRequestCode::RequestCancelled, "request_cancelled"),
     (ToolRequestCode::HostSettingInvalid, "host_setting_invalid"),
@@ -904,6 +952,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(MASTER_LEDGER),
         of(EGRESS),
         of(INVOICE_INPUT),
+        of(VOUCHER_READ),
         of(TOOL_REQUEST),
         of(IMPORT_POST),
         of(BANK_STATEMENT),
@@ -953,6 +1002,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("MasterLedgerCode", MasterLedgerCode::ALL),
         of("EgressCode", EgressCode::ALL),
         of("InvoiceInputCode", InvoiceInputCode::ALL),
+        of("VoucherReadCode", VoucherReadCode::ALL),
         of("ToolRequestCode", ToolRequestCode::ALL),
         of("ImportPostCode", ImportPostCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
@@ -1004,7 +1054,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        31,
+        32,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1045,6 +1095,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(MASTER_LEDGER), MasterLedgerCode::ALL);
     assert_eq!(variants(EGRESS), EgressCode::ALL);
     assert_eq!(variants(INVOICE_INPUT), InvoiceInputCode::ALL);
+    assert_eq!(variants(VOUCHER_READ), VoucherReadCode::ALL);
     assert_eq!(variants(TOOL_REQUEST), ToolRequestCode::ALL);
     assert_eq!(variants(IMPORT_POST), ImportPostCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -1099,6 +1150,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(MASTER_LEDGER, MasterLedgerCode::as_str);
     check_pins(EGRESS, EgressCode::as_str);
     check_pins(INVOICE_INPUT, InvoiceInputCode::as_str);
+    check_pins(VOUCHER_READ, VoucherReadCode::as_str);
     check_pins(TOOL_REQUEST, ToolRequestCode::as_str);
     check_pins(IMPORT_POST, ImportPostCode::as_str);
 }
@@ -1121,13 +1173,17 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 2, 21]
-        .iter()
-        .sum();
+    let expected: usize = [
+        77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21,
+    ]
+    .iter()
+    .sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 2, 21]
-        .iter()
-        .sum();
+    let expected: usize = [
+        80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 12, 2, 21,
+    ]
+    .iter()
+    .sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

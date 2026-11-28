@@ -17,6 +17,7 @@
 //! facts `transfer_pairing_view` takes. A fact it cannot establish is an error
 //! that fails the whole view, never a dropped row: losing one lineage's Contras
 //! could turn an ambiguous skip into a wrong unique pair.
+use super::super::failure_code::ImportLedgerCode;
 use super::*;
 use crate::agent::bank_statement::ResolvedStatement;
 use crate::agent::transfer_pairing::{
@@ -172,9 +173,12 @@ pub(super) fn read_skip_records(mut reader: impl BufRead) -> Result<Vec<SkipOnly
     let mut records = Vec::new();
     let mut line = Vec::new();
     while ledger::read_record(&mut reader, &mut line)? {
-        let text =
-            std::str::from_utf8(&line).map_err(|_| "import_ledger_unavailable".to_string())?;
-        records.push(serde_json::from_str(text).map_err(|_| "import_ledger_invalid".to_string())?);
+        let text = std::str::from_utf8(&line)
+            .map_err(|_| ImportLedgerCode::Unavailable.as_str().to_string())?;
+        records.push(
+            serde_json::from_str(text)
+                .map_err(|_| ImportLedgerCode::Invalid.as_str().to_string())?,
+        );
     }
     Ok(records)
 }

@@ -479,7 +479,8 @@ failure_codes! {
         RecordedReviewStale = "ack_recorded_review_stale",
         /// A review is already recorded.
         AlreadyRecorded = "ack_already_recorded",
-        /// The acknowledgement record could not be written.
+        /// An import file could not be written: the acknowledgement record, a proof or
+        /// another of the import's own records.
         ImportFileWriteFailed = "import_file_write_failed",
         /// The import journal has no such batch.
         ImportBatchNotFound = "import_batch_not_found",
@@ -489,7 +490,8 @@ failure_codes! {
         DoubtInvalid = "ack_doubt_invalid",
         /// The observed review state changed while the dialog was open.
         ChangedWhileReviewing = "ack_changed_while_reviewing",
-        /// The acknowledgement record could not be serialized.
+        /// An import record or proof, the acknowledgement record among them, could not be
+        /// serialized.
         ProofSerializationFailed = "proof_serialization_failed",
     }
 }

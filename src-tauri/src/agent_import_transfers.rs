@@ -9,6 +9,7 @@
 //! returns is the one it was admitted on. Every row is named by its
 //! `bridge_txn_id` and date: no amount, reference, instrument, party or ledger
 //! leaves this module.
+use super::super::failure_code::ImportLedgerCode;
 use super::*;
 use crate::agent::transfer_pairing::{
     transfer_pairing_view, with_days_read, BatchId, BatchStatus, ContraKey, DayReader,
@@ -741,7 +742,7 @@ impl Server {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 Ok(Box::new(std::io::empty()))
             }
-            Err(_) => Err("import_ledger_unavailable".to_string()),
+            Err(_) => Err(ImportLedgerCode::Unavailable.as_str().to_string()),
         }
     }
 

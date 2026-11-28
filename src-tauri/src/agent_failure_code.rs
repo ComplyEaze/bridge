@@ -537,6 +537,23 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the egress log, the local record of each send to Tally.
+    pub(crate) enum EgressCode {
+        /// The record is too long to be read back from the log's bounded tail.
+        RecordTooLarge = "egress_record_too_large",
+        /// A step of writing the record failed: building it, opening, locking, reading the end of,
+        /// writing, syncing or unlocking the log, or the line was not one JSON object.
+        RecordWriteFailed = "egress_record_write_failed",
+        /// A failed write could not be taken back, so the log may end in part of it.
+        RecordRollbackFailed = "egress_record_rollback_failed",
+        /// The log could not be opened, locked, read or unlocked.
+        LogUnreadable = "egress_log_unreadable",
+        /// The log holds a part-written line that no torn-record marker vouches for.
+        LogIncomplete = "egress_log_incomplete",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

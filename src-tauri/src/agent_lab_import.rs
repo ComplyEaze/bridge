@@ -51,7 +51,7 @@
 //!   written as is the one measured exception (bridge#974): see
 //!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
-use super::failure_code::{CompanyReadCode, LabMastersCode, ReadCode};
+use super::failure_code::{CompanyReadCode, LabImportCode, LabMastersCode, ReadCode};
 use super::*;
 use bridge_tally_core::master_binding::canonical_master_key;
 use bridge_tally_core::master_name_index::{
@@ -297,9 +297,9 @@ fn parse_book_value<T: for<'de> Deserialize<'de>>(
         .and_then(Value::as_str)
         .ok_or_else(|| ToolFailure::from(format!("{inline_key}_or_book_path_required")))?;
     let text = fs::read_to_string(path)
-        .map_err(|_| ToolFailure::from("book_path_unreadable".to_string()))?;
+        .map_err(|_| ToolFailure::from(LabImportCode::BookPathUnreadable.as_str().to_string()))?;
     let whole: Value = serde_json::from_str(&text)
-        .map_err(|_| ToolFailure::from("book_path_invalid_json".to_string()))?;
+        .map_err(|_| ToolFailure::from(LabImportCode::BookPathInvalidJson.as_str().to_string()))?;
     let section = whole.get(section_key).cloned().unwrap_or(whole);
     serde_json::from_value(section).map_err(|_| ToolFailure::from(format!("{inline_key}_invalid")))
 }
@@ -1246,8 +1246,10 @@ pub(in crate::agent) async fn lab_import_masters(
 
     let (_company, identity, evidence) = admit_lab_target(server).await?;
     if !identity_matches_requested_guid(&identity, guid) {
-        return Err(ToolFailure::from("lab_target_company_mismatch".to_string())
-            .with_prior_evidence(evidence));
+        return Err(
+            ToolFailure::from(LabImportCode::TargetCompanyMismatch.as_str().to_string())
+                .with_prior_evidence(evidence),
+        );
     }
     import_admitted_masters(server, masters, guid, identity, evidence).await
 }
@@ -1423,8 +1425,10 @@ async fn import_admitted_masters(
     }
     if !collisions.is_empty() {
         persist_lab_precheck_collisions(server, &collisions);
-        return Err(ToolFailure::from("lab_master_already_exists".to_string())
-            .with_prior_evidence(evidence));
+        return Err(
+            ToolFailure::from(LabImportCode::MasterAlreadyExists.as_str().to_string())
+                .with_prior_evidence(evidence),
+        );
     }
 
     // Masters actually sent as Create: every requested master minus the
@@ -1490,8 +1494,9 @@ async fn import_admitted_masters(
             let (response, post_evidence) =
                 post_lab_batch(server, &identity, "lab_import_masters.write", xml).await?;
             evidence = combine_evidence(evidence.clone(), post_evidence);
-            let outcome = bridge_tally_protocol::parse_import_outcome(&response)
-                .map_err(|_| ToolFailure::from("lab_import_response_invalid".to_string()))?;
+            let outcome = bridge_tally_protocol::parse_import_outcome(&response).map_err(|_| {
+                ToolFailure::from(LabImportCode::ResponseInvalid.as_str().to_string())
+            })?;
             let counters = outcome.counters();
 
             if tally_rejected(counters) {
@@ -1598,7 +1603,7 @@ async fn import_admitted_masters(
             post_lab_batch(server, &identity, "lab_import_masters.write.reconcile", xml).await?;
         evidence = combine_evidence(evidence.clone(), post_evidence);
         let outcome = bridge_tally_protocol::parse_import_outcome(&response)
-            .map_err(|_| ToolFailure::from("lab_import_response_invalid".to_string()))?;
+            .map_err(|_| ToolFailure::from(LabImportCode::ResponseInvalid.as_str().to_string()))?;
         let counters = outcome.counters();
         counts.insert("LedgerReconcileAlter".to_string(), json!(to_alter.len()));
         if tally_rejected(counters) {
@@ -2173,14 +2178,15 @@ fn render_accounting_voucher_xml(
 }
 
 fn render_inventory_entry_xml(line: &BookInventoryLine) -> Result<String, String> {
-    let stock_item = line
-        .stock_item
-        .as_deref()
-        .ok_or_else(|| "lab_inventory_stock_item_required".to_string())?;
+    let stock_item = line.stock_item.as_deref().ok_or_else(|| {
+        LabImportCode::InventoryStockItemRequired
+            .as_str()
+            .to_string()
+    })?;
     let amount = line
         .amount
         .as_deref()
-        .ok_or_else(|| "lab_inventory_amount_required".to_string())?;
+        .ok_or_else(|| LabImportCode::InventoryAmountRequired.as_str().to_string())?;
     // §9.12a note 2: a service line carries an amount and no quantity --
     // omit RATE/ACTUALQTY/BILLEDQTY entirely rather than send empties.
     let rate = line
@@ -2259,7 +2265,7 @@ fn render_invoice_voucher_xml(
     let party = voucher
         .party
         .as_deref()
-        .ok_or_else(|| "lab_invoice_party_required".to_string())?;
+        .ok_or_else(|| LabImportCode::InvoicePartyRequired.as_str().to_string())?;
     let voucher_number = voucher
         .voucher_number
         .as_deref()
@@ -2734,8 +2740,10 @@ pub(in crate::agent) async fn lab_import_vouchers(
 
     let (_company, identity, mut evidence) = admit_lab_target(server).await?;
     if !identity_matches_requested_guid(&identity, guid) {
-        return Err(ToolFailure::from("lab_target_company_mismatch".to_string())
-            .with_prior_evidence(evidence));
+        return Err(
+            ToolFailure::from(LabImportCode::TargetCompanyMismatch.as_str().to_string())
+                .with_prior_evidence(evidence),
+        );
     }
 
     let mut batch_reports = Vec::new();
@@ -2803,10 +2811,12 @@ pub(in crate::agent) async fn lab_import_vouchers(
                 "verified": verified_count, "posted": false,
                 "mismatch_details": mismatch_details,
             }));
-            return Err(
-                ToolFailure::from("lab_batch_partially_verified_uncertain".to_string())
-                    .with_prior_evidence(evidence),
-            );
+            return Err(ToolFailure::from(
+                LabImportCode::BatchPartiallyVerifiedUncertain
+                    .as_str()
+                    .to_string(),
+            )
+            .with_prior_evidence(evidence));
         }
 
         // Deterministic, not `Uuid::new_v4()`: the marker embedded here must
@@ -2822,7 +2832,7 @@ pub(in crate::agent) async fn lab_import_vouchers(
             post_lab_batch(server, &identity, "lab_import_vouchers.write", xml).await?;
         evidence = combine_evidence(evidence.clone(), post_evidence);
         let outcome = bridge_tally_protocol::parse_import_outcome(&response)
-            .map_err(|_| ToolFailure::from("lab_import_response_invalid".to_string()))?;
+            .map_err(|_| ToolFailure::from(LabImportCode::ResponseInvalid.as_str().to_string()))?;
         let counters = outcome.counters();
 
         if tally_rejected(counters) {

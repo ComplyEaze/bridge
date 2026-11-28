@@ -2,8 +2,8 @@
 //! or one Sales invoice);
 //! subsequent calls only reconcile its identity.
 use super::super::failure_code::{
-    ImportAckCode, ImportApprovalCode, ImportPostCode, ReadCode, StockItemCreateCode,
-    ToolRequestCode,
+    ImportAckCode, ImportApprovalCode, ImportMastersCode, ImportPayloadCode, ImportPostCode,
+    InvoiceMastersCode, ReadCode, StockItemCreateCode, ToolRequestCode,
 };
 use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined, PreviewForm};
 use super::*;
@@ -1996,7 +1996,7 @@ pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
             Some(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
         )
     }) {
-        "education_voucher_date_unsupported"
+        ImportPayloadCode::EducationDateUnsupported.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -2024,7 +2024,7 @@ pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
             Some(ApprovedImportAdmissionError::InvoiceMastersChanged { .. })
         )
     }) {
-        "import_invoice_masters_changed"
+        InvoiceMastersCode::Changed.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -2122,7 +2122,7 @@ pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
             Some(ApprovedImportAdmissionError::GroupExportInvalid { .. })
         )
     }) {
-        "group_export_invalid"
+        ImportMastersCode::GroupExportInvalid.as_str()
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),

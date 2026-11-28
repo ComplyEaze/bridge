@@ -7,6 +7,7 @@
 //! ledger, scores one, or turns a candidate into the resolution (ADR 0016: a
 //! near-miss is reported, never resolved). The names come from the catalogue the caller
 //! has already read, so no request is added.
+use super::failure_code::LedgerNameCode;
 use super::*;
 use bridge_tally_core::master_binding::{
     self, BindingStatus, Candidates as Found, MasterCatalog, MasterClass, SourceEntity,
@@ -259,7 +260,7 @@ fn settle_ledger_resolution<T>(
                 || (redaction == Redaction::MaskParties
                     && is_another_ledgers_masked_form(requested, Some(found.name()), names)) =>
         {
-            return Err("ledger_name_masked".to_string().into());
+            return Err(LedgerNameCode::Masked.as_str().to_string().into());
         }
         Ok(found) => return Ok(found),
         Err(_)
@@ -267,7 +268,7 @@ fn settle_ledger_resolution<T>(
                 || (redaction == Redaction::MaskParties
                     && is_another_ledgers_masked_form(requested, None, names)) =>
         {
-            return Err("ledger_name_masked".to_string().into())
+            return Err(LedgerNameCode::Masked.as_str().to_string().into())
         }
         Err(refusal) => refusal,
     };

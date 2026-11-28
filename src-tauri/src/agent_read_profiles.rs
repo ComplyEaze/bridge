@@ -1,4 +1,5 @@
 //! Read profiles for the local MCP adapter.
+use super::failure_code::CompanyReadCode;
 use super::*;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;
@@ -300,7 +301,7 @@ fn render_voucher_census(
     let (collection, type_element) =
         scope.collection("Bridge Agent Voucher Census", "Bridge Agent Ledger Census");
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     let span_filter = span.filter();
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
@@ -394,7 +395,7 @@ fn render_scoped_vouchers(
     let (collection, type_element) =
         scope.collection("Bridge Agent Vouchers", "Bridge Agent Ledger Vouchers");
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
@@ -554,7 +555,7 @@ fn render_status_window(
 ) -> Result<String, String> {
     let fetch_tail = fetch.tail();
     let company = ValidatedCompanyName::new(company.to_string())
-        .map_err(|_| "company_name_invalid".to_string())?;
+        .map_err(|_| CompanyReadCode::NameInvalid.as_str().to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
     let static_variables = company.xml_static_variables(

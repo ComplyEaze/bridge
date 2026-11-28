@@ -4,6 +4,7 @@
 //! the arithmetic over the rows that survive, with no I/O. Every bucket is a plain sum of the
 //! entries of the vouchers in it, so its total can be rebuilt from the vouchers `vouchers`
 //! lists for the same arguments, and the result says which vouchers it left out and why.
+use super::failure_code::ReadCode;
 use super::movement::movement_entry_effect;
 use super::voucher_groups::{Placement, Placements, Primary};
 use super::*;
@@ -265,14 +266,14 @@ struct EntryAmount<'a> {
 fn entry_amount(entry: &Value) -> Result<EntryAmount<'_>, String> {
     let ledger = entry["ledger"]
         .as_str()
-        .ok_or_else(|| "voucher_amount_invalid".to_string())?;
+        .ok_or_else(|| ReadCode::VoucherAmountInvalid.as_str().to_string())?;
     let amount = bridge_tally_core::ExactDecimal::parse(
         entry["amount"]
             .as_str()
-            .ok_or_else(|| "voucher_amount_invalid".to_string())?
+            .ok_or_else(|| ReadCode::VoucherAmountInvalid.as_str().to_string())?
             .to_string(),
     )
-    .map_err(|_| "voucher_amount_invalid".to_string())?;
+    .map_err(|_| ReadCode::VoucherAmountInvalid.as_str().to_string())?;
     let deemed_positive = entry["is_deemed_positive"].as_str() == Some("Yes");
     let (is_debit, magnitude) = movement_entry_effect(&amount, deemed_positive);
     Ok(if is_debit {
@@ -345,7 +346,7 @@ fn allocations_of(entry: &Value) -> Result<Option<Vec<Allocation<'_>>>, String> 
     else {
         return Ok(None);
     };
-    let invalid = || "voucher_amount_invalid".to_string();
+    let invalid = || ReadCode::VoucherAmountInvalid.as_str().to_string();
     let entry_amount = bridge_tally_core::ExactDecimal::parse(
         entry["amount"].as_str().ok_or_else(invalid)?.to_string(),
     )
@@ -476,10 +477,10 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             }
         }
         if !bridge_tally_core::ExactDecimal::parse(balance)
-            .map_err(|_| "voucher_amount_invalid".to_string())?
+            .map_err(|_| ReadCode::VoucherAmountInvalid.as_str().to_string())?
             .is_zero()
         {
-            return Err("voucher_entries_unbalanced".to_string());
+            return Err(ReadCode::VoucherEntriesUnbalanced.as_str().to_string());
         }
         vouchers_summarised += 1;
         match row["post_dated"].as_bool() {
@@ -643,7 +644,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             let gross = add_decimal(
                 &bucket.credit,
                 bridge_tally_core::ExactDecimal::parse(bucket.debit.clone())
-                    .map_err(|_| "voucher_amount_invalid".to_string())?
+                    .map_err(|_| ReadCode::VoucherAmountInvalid.as_str().to_string())?
                     .magnitude()
                     .as_str(),
             )?;
@@ -742,7 +743,7 @@ fn subtree_totals_shown(
             let gross = add_decimal(
                 &subtree.credit,
                 bridge_tally_core::ExactDecimal::parse(subtree.debit.clone())
-                    .map_err(|_| "voucher_amount_invalid".to_string())?
+                    .map_err(|_| ReadCode::VoucherAmountInvalid.as_str().to_string())?
                     .magnitude()
                     .as_str(),
             )?;
@@ -784,7 +785,7 @@ fn category_totals_shown(
             let gross = add_decimal(
                 &sums.credit,
                 bridge_tally_core::ExactDecimal::parse(sums.debit.clone())
-                    .map_err(|_| "voucher_amount_invalid".to_string())?
+                    .map_err(|_| ReadCode::VoucherAmountInvalid.as_str().to_string())?
                     .magnitude()
                     .as_str(),
             )?;
@@ -822,7 +823,7 @@ fn members_shown(members: BTreeMap<String, Member>) -> Result<Value, String> {
             let gross = add_decimal(
                 &member.credit,
                 bridge_tally_core::ExactDecimal::parse(member.debit.clone())
-                    .map_err(|_| "voucher_amount_invalid".to_string())?
+                    .map_err(|_| ReadCode::VoucherAmountInvalid.as_str().to_string())?
                     .magnitude()
                     .as_str(),
             )?;

@@ -3480,7 +3480,7 @@ pub(super) fn parse_voucher_census(
 ) -> Result<Vec<CensusRow>, String> {
     use quick_xml::events::Event;
     validate_agent_envelope(xml)?;
-    let invalid = || "agent_read_protocol_invalid".to_string();
+    let invalid = || ReadCode::ReadProtocolInvalid.as_str().to_string();
     let mut reader = quick_xml::Reader::from_str(xml);
     reader.config_mut().trim_text(false);
     let mut scope = NativeCollectionScope::default();
@@ -3556,7 +3556,7 @@ pub(super) fn parse_voucher_census(
                         .filter(|guid| !guid.is_empty())
                         .ok_or_else(invalid)?;
                     if day < first || day > last || span.is_some_and(|span| !span.holds(alter_id)) {
-                        return Err("window_not_honoured".to_string());
+                        return Err(ReadCode::WindowNotHonoured.as_str().to_string());
                     }
                     rows.push(CensusRow {
                         day,

@@ -63,7 +63,9 @@ pub(super) fn outflows_of(
                     .map(|entry| (voucher, entry))
             });
         let Some((voucher, entry)) = leg else {
-            return Err("proposals_file_invalid".to_string());
+            return Err(super::super::failure_code::ProposalsCode::FileInvalid
+                .as_str()
+                .to_string());
         };
         outflows.push(CashOutflow {
             ledger: need.ledger.clone(),
@@ -363,9 +365,11 @@ pub(super) fn established(
 /// names it.
 fn year_end(date: &TallyDate) -> Result<TallyDate, String> {
     let (year, month_day) = date.as_str().split_at(4);
-    let year = year
-        .parse::<u32>()
-        .map_err(|_| "invalid_date_range".to_string())?;
+    let year = year.parse::<u32>().map_err(|_| {
+        super::super::failure_code::ReadCode::InvalidDateRange
+            .as_str()
+            .to_string()
+    })?;
     let year = if month_day <= "0331" { year } else { year + 1 };
     normalized_date(&format!("{year}0331"))
 }

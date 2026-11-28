@@ -1372,10 +1372,25 @@ failure_codes! {
 
 failure_codes! {
     /// The refusals of a stock read's `as_of` before any request: a date that is not the last day
-    /// of a month. Only `stock_by_godown`'s refusal is declared here so far.
+    /// of a month. Only `stock_by_godown`'s and `stock_by_batch`'s refusals are declared here so
+    /// far.
     pub(crate) enum StockAsOfCode {
         /// `stock_by_godown`'s `as_of` is not the last day of a month.
         GodownNotMeasured = "stock_by_godown_as_of_not_measured",
+        /// `stock_by_batch`'s `as_of` is not the last day of a month.
+        BatchNotMeasured = "stock_by_batch_as_of_not_measured",
+    }
+}
+
+failure_codes! {
+    /// Two refusals of an `outstandings` party detail (`agent_outstandings.rs`,
+    /// `agent_bill_trail.rs`). The detail's other refusals are not declared here.
+    pub(crate) enum PartyDetailReadCode {
+        /// The company has no books-from date, so the detail's voucher window has no start.
+        TrailBooksFromMissing = "trail_books_from_missing",
+        /// The party detail needs a complete bills read, and that read is partial or has ledgers
+        /// set aside. The read's own partial reason is kept beside it.
+        RequiresCompleteRead = "detail_requires_a_complete_read",
     }
 }
 

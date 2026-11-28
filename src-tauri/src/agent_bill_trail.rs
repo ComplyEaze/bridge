@@ -1070,10 +1070,13 @@ impl Server {
             party_argument,
             self.settings.redaction,
         )?;
-        let books_from = company
-            .books_from
-            .clone()
-            .ok_or_else(|| ToolFailure::from("trail_books_from_missing".to_string()))?;
+        let books_from = company.books_from.clone().ok_or_else(|| {
+            ToolFailure::from(
+                super::failure_code::PartyDetailReadCode::TrailBooksFromMissing
+                    .as_str()
+                    .to_string(),
+            )
+        })?;
         let from = trail_window_start(kind, reference, &party, open_bills, &books_from);
         // A window that ends before it starts is refused by the window read
         // itself (`invalid_date_range`), before any request is sent.
@@ -1326,12 +1329,15 @@ pub(super) fn detail_requires_a_complete_read(
     partial_reason: String,
     partial_reasons: Vec<&'static str>,
 ) -> ToolFailure {
-    ToolFailure::from("detail_requires_a_complete_read".to_string()).with_incomplete_read(
-        IncompleteRead {
-            partial_reason,
-            partial_reasons,
-        },
+    ToolFailure::from(
+        super::failure_code::PartyDetailReadCode::RequiresCompleteRead
+            .as_str()
+            .to_string(),
     )
+    .with_incomplete_read(IncompleteRead {
+        partial_reason,
+        partial_reasons,
+    })
 }
 
 /// A refusal that follows the voucher read keeps that read's evidence, with

@@ -2910,7 +2910,10 @@ fn august_without_0010(august: &str) -> String {
 fn the_lab_month_reads_are_the_sent_ones_and_the_derived_august_drops_one_row() {
     for (from, to, pinned, _) in lab_number_months() {
         let rendered = invoice::render_invoice_window_numbers_request(
-            "BRIDGE PILOT LAB",
+            &bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+                "BRIDGE PILOT LAB",
+            )
+            .unwrap(),
             InvoiceClass::Sales,
             (&stored_date(from), &stored_date(to)),
         );

@@ -1284,6 +1284,40 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of an `outstandings` party detail before its bill report is read: a request
+    /// that does not pair a party with a detail, or a party name the `open_bills` detail does not
+    /// send (`agent_party_bills.rs`).
+    pub(crate) enum OutstandingsDetailCode {
+        /// The party's ledger name is not one the detail sends; the cause says why.
+        PartyNameNotAdmitted = "party_name_not_admitted",
+        /// A detail was asked for without a party.
+        DetailRequiresParty = "detail_requires_party",
+        /// A bill reference was given without the `bill_trail` detail.
+        ReferenceRequiresBillTrail = "reference_requires_bill_trail",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a voucher's scalar fields as a read admits them (`agent_voucher_scalars.rs`).
+    pub(crate) enum VoucherScalarCode {
+        /// A voucher's GUID is blank or repeats, or its master ID repeats, in one collection.
+        SourceIdentityInvalid = "voucher_source_identity_invalid",
+        /// A voucher's alter ID is present and is blank, holds a character that is not a digit, or
+        /// is too large to read.
+        AlterIdInvalid = "voucher_alter_id_invalid",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a stock read's `as_of` before any request: a date that is not the last day
+    /// of a month.
+    pub(crate) enum StockAsOfCode {
+        /// `stock_by_godown`'s `as_of` is not the last day of a month.
+        GodownNotMeasured = "stock_by_godown_as_of_not_measured",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.
@@ -1325,7 +1359,8 @@ failure_codes! {
         ProposalsFileTooLarge = "proposals_file_too_large",
         /// The proposals file's hash differs from the digest the parse returned.
         ProposalsChanged = "proposals_changed",
-        /// The tool arguments are not an object.
+        /// The tool arguments are not an object, or a build's `withdraw_skips` is not a list of
+        /// distinct statement row ids no longer than a build can hold.
         ArgumentSchemaInvalid = "argument_schema_invalid",
         /// Both a proposals id and inline vouchers were given.
         ProposalsIdWithVouchers = "proposals_id_with_vouchers",

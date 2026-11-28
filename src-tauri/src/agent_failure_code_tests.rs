@@ -1050,6 +1050,40 @@ const INVOICE_READBACK: &[(InvoiceReadbackCode, &str)] = &[
 /// A ledger name that reads as a masked one.
 const LEDGER_NAME: &[(LedgerNameCode, &str)] = &[(LedgerNameCode::Masked, "ledger_name_masked")];
 
+/// An `outstandings` party detail's request and the party name it sends.
+const OUTSTANDINGS_DETAIL: &[(OutstandingsDetailCode, &str)] = &[
+    (
+        OutstandingsDetailCode::PartyNameNotAdmitted,
+        "party_name_not_admitted",
+    ),
+    (
+        OutstandingsDetailCode::DetailRequiresParty,
+        "detail_requires_party",
+    ),
+    (
+        OutstandingsDetailCode::ReferenceRequiresBillTrail,
+        "reference_requires_bill_trail",
+    ),
+];
+
+/// A voucher's scalar fields as a read admits them.
+const VOUCHER_SCALAR: &[(VoucherScalarCode, &str)] = &[
+    (
+        VoucherScalarCode::SourceIdentityInvalid,
+        "voucher_source_identity_invalid",
+    ),
+    (
+        VoucherScalarCode::AlterIdInvalid,
+        "voucher_alter_id_invalid",
+    ),
+];
+
+/// A stock read's `as_of` that is not the last day of a month.
+const STOCK_AS_OF: &[(StockAsOfCode, &str)] = &[(
+    StockAsOfCode::GodownNotMeasured,
+    "stock_by_godown_as_of_not_measured",
+)];
+
 const SEARCH: &[(SearchCode, &str)] = &[
     (SearchCode::CriterionEmpty, "search_criterion_empty"),
     (SearchCode::CriterionTooLong, "search_criterion_too_long"),
@@ -1567,6 +1601,9 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(INVOICE_MASTERS),
         of(INVOICE_READBACK),
         of(LEDGER_NAME),
+        of(OUTSTANDINGS_DETAIL),
+        of(VOUCHER_SCALAR),
+        of(STOCK_AS_OF),
         of(BANK_STATEMENT),
         of(SEARCH),
     ]
@@ -1636,6 +1673,9 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("InvoiceMastersCode", InvoiceMastersCode::ALL),
         of("InvoiceReadbackCode", InvoiceReadbackCode::ALL),
         of("LedgerNameCode", LedgerNameCode::ALL),
+        of("OutstandingsDetailCode", OutstandingsDetailCode::ALL),
+        of("VoucherScalarCode", VoucherScalarCode::ALL),
+        of("StockAsOfCode", StockAsOfCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("SearchCode", SearchCode::ALL),
     ];
@@ -1694,7 +1734,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        52,
+        55,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1759,6 +1799,9 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(INVOICE_MASTERS), InvoiceMastersCode::ALL);
     assert_eq!(variants(INVOICE_READBACK), InvoiceReadbackCode::ALL);
     assert_eq!(variants(LEDGER_NAME), LedgerNameCode::ALL);
+    assert_eq!(variants(OUTSTANDINGS_DETAIL), OutstandingsDetailCode::ALL);
+    assert_eq!(variants(VOUCHER_SCALAR), VoucherScalarCode::ALL);
+    assert_eq!(variants(STOCK_AS_OF), StockAsOfCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -1835,6 +1878,9 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(INVOICE_MASTERS, InvoiceMastersCode::as_str);
     check_pins(INVOICE_READBACK, InvoiceReadbackCode::as_str);
     check_pins(LEDGER_NAME, LedgerNameCode::as_str);
+    check_pins(OUTSTANDINGS_DETAIL, OutstandingsDetailCode::as_str);
+    check_pins(VOUCHER_SCALAR, VoucherScalarCode::as_str);
+    check_pins(STOCK_AS_OF, StockAsOfCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -1858,14 +1904,14 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
         77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 19, 13, 4, 17, 8, 6,
-        2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1,
+        2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 3, 2, 1,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
         80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 21, 19, 13, 4, 17,
-        8, 6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1,
+        8, 6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 3, 2, 1,
     ]
     .iter()
     .sum();

@@ -1,5 +1,5 @@
 //! Shared scalar admission for native voucher readers.
-use super::super::failure_code::ReadCode;
+use super::super::failure_code::{ReadCode, VoucherScalarCode};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(in crate::agent) fn is_voucher_scalar(field: &str) -> bool {
@@ -97,7 +97,7 @@ pub(in crate::agent) fn tally_entry_polarity_agrees(
 pub(in crate::agent) fn parse_optional_tally_alter_id(
     value: Option<&str>,
 ) -> Result<Option<u64>, String> {
-    parse_optional_tally_u64(value, "voucher_alter_id_invalid")
+    parse_optional_tally_u64(value, VoucherScalarCode::AlterIdInvalid.as_str())
 }
 
 pub(in crate::agent) fn parse_optional_tally_u64(
@@ -132,11 +132,11 @@ impl VoucherSourceIdentities {
         if let Some(guid) = guid {
             let guid = guid.trim().to_ascii_lowercase();
             if guid.is_empty() || !self.guids.insert(guid) {
-                return Err("voucher_source_identity_invalid".into());
+                return Err(VoucherScalarCode::SourceIdentityInvalid.as_str().into());
             }
         }
         if master_id.is_some_and(|id| !self.master_ids.insert(id)) {
-            return Err("voucher_source_identity_invalid".into());
+            return Err(VoucherScalarCode::SourceIdentityInvalid.as_str().into());
         }
         Ok(())
     }

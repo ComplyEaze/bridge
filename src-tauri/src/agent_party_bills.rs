@@ -31,7 +31,11 @@ fn admitted_party(party: &str, ledgers: &[Vec<String>]) -> Result<OpenBillsParty
         ledgers.iter().map(|names| names.iter().map(String::as_str)),
     )
     .map_err(|refusal| {
-        let mut failure = ToolFailure::from("party_name_not_admitted".to_string());
+        let mut failure = ToolFailure::from(
+            super::failure_code::OutstandingsDetailCode::PartyNameNotAdmitted
+                .as_str()
+                .to_string(),
+        );
         failure.cause = Some(refusal.code());
         failure
     })
@@ -48,10 +52,20 @@ impl Server {
         party_argument: Option<&str>,
         reference: Option<&str>,
     ) -> Result<ToolOutcome, ToolFailure> {
-        let party_argument =
-            party_argument.ok_or_else(|| ToolFailure::from("detail_requires_party".to_string()))?;
+        let party_argument = party_argument.ok_or_else(|| {
+            ToolFailure::from(
+                super::failure_code::OutstandingsDetailCode::DetailRequiresParty
+                    .as_str()
+                    .to_string(),
+            )
+        })?;
         if reference.is_some() {
-            return Err("reference_requires_bill_trail".to_string().into());
+            return Err(
+                super::failure_code::OutstandingsDetailCode::ReferenceRequiresBillTrail
+                    .as_str()
+                    .to_string()
+                    .into(),
+            );
         }
         let to = match optional_string(args, "as_of")?
             .as_deref()

@@ -16,7 +16,7 @@
 //! on any Tally release/mode:
 //! every value this tool returns is exploratory, not a qualified claim.
 
-use super::failure_code::{CompanyReadCode, ReadCode};
+use super::failure_code::{CompanyReadCode, LabToolCode, ReadCode};
 use super::*;
 use bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
@@ -51,7 +51,7 @@ pub(super) fn env_lab_writes_enabled() -> bool {
 pub(super) fn require_lab_writes_env() -> Result<(), String> {
     env_lab_writes_enabled()
         .then_some(())
-        .ok_or_else(|| "lab_writes_disabled".to_string())
+        .ok_or_else(|| LabToolCode::WritesDisabled.as_str().to_string())
 }
 
 /// The lab guard configuration: the one company lab tools may touch, and the
@@ -66,7 +66,7 @@ struct LabGuardConfig {
 impl LabGuardConfig {
     fn from_env() -> Result<Self, String> {
         let target = env::var("BRIDGE_LAB_TARGET_GUID")
-            .map_err(|_| "lab_target_guid_required".to_string())?;
+            .map_err(|_| LabToolCode::TargetGuidRequired.as_str().to_string())?;
         // The deny list may be absent: a write is then admitted only while the target is the
         // only company loaded (#972, see `admit_lab_target`).
         let deny_raw = env::var("BRIDGE_LAB_DENY_GUIDS").unwrap_or_default();
@@ -79,7 +79,7 @@ impl LabGuardConfig {
     /// threads.
     fn from_values(target: &str, deny_raw: &str) -> Result<Self, String> {
         let target_guid = parse_native_company_guid(target.trim())
-            .map_err(|_| "lab_target_guid_invalid".to_string())?
+            .map_err(|_| LabToolCode::TargetGuidInvalid.as_str().to_string())?
             .as_str()
             .to_owned();
         let mut deny_guids = Vec::new();
@@ -89,7 +89,7 @@ impl LabGuardConfig {
                 continue;
             }
             let guid = parse_native_company_guid(candidate)
-                .map_err(|_| "lab_deny_guids_invalid".to_string())?
+                .map_err(|_| LabToolCode::DenyGuidsInvalid.as_str().to_string())?
                 .as_str()
                 .to_owned();
             deny_guids.push(guid);
@@ -98,7 +98,7 @@ impl LabGuardConfig {
             .iter()
             .any(|guid| guid.eq_ignore_ascii_case(&target_guid))
         {
-            return Err("lab_deny_guids_invalid".to_string());
+            return Err(LabToolCode::DenyGuidsInvalid.as_str().to_string());
         }
         Ok(Self {
             target_guid,
@@ -122,7 +122,7 @@ impl LabGuardConfig {
 fn require_lab_read_guards(server: &Server) -> Result<LabGuardConfig, ToolFailure> {
     require_lab_writes_env().map_err(ToolFailure::from)?;
     if server.settings.endpoint.port != 9001 {
-        return Err("lab_port_not_9001".to_string().into());
+        return Err(LabToolCode::PortNot9001.as_str().to_string().into());
     }
     LabGuardConfig::from_env().map_err(ToolFailure::from)
 }
@@ -177,7 +177,7 @@ fn loaded_set_refusal(config: &LabGuardConfig, loaded: &[Option<&str>]) -> Optio
     if config.deny_guids.is_empty()
         && !loaded_set_is_exactly_target(loaded.iter().copied(), &config.target_guid)
     {
-        return Some("lab_deny_guids_required");
+        return Some(LabToolCode::DenyGuidsRequired.as_str());
     }
     let denied = loaded.iter().flatten().any(|guid| {
         config
@@ -186,13 +186,13 @@ fn loaded_set_refusal(config: &LabGuardConfig, loaded: &[Option<&str>]) -> Optio
             .any(|deny| deny.eq_ignore_ascii_case(guid))
     });
     if denied {
-        return Some("lab_source_company_loaded");
+        return Some(LabToolCode::SourceCompanyLoaded.as_str());
     }
     let target_loaded = loaded
         .iter()
         .flatten()
         .any(|guid| guid.eq_ignore_ascii_case(&config.target_guid));
-    (!target_loaded).then_some("lab_target_not_loaded")
+    (!target_loaded).then_some(LabToolCode::TargetNotLoaded.as_str())
 }
 
 /// Whether the loaded companies are one company, the target: at least one is loaded, and every
@@ -218,9 +218,11 @@ fn loaded_set_is_exactly_target<'a>(
 fn lab_evidence_dir(server: &Server) -> Result<PathBuf, String> {
     let dir = server.settings.data_dir.join("lab");
     ensure_private_directory(&dir).map_err(|error| match error {
-        DirectoryAdmissionError::Unavailable => "lab_dir_unavailable".to_string(),
+        DirectoryAdmissionError::Unavailable => LabToolCode::DirUnavailable.as_str().to_string(),
         #[cfg(unix)]
-        DirectoryAdmissionError::Permissions => "lab_dir_permissions_failed".to_string(),
+        DirectoryAdmissionError::Permissions => {
+            LabToolCode::DirPermissionsFailed.as_str().to_string()
+        }
     })?;
     Ok(dir)
 }
@@ -278,7 +280,7 @@ fn capture_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Resul
     if company_guid.eq_ignore_ascii_case(&config.target_guid) {
         Ok(())
     } else {
-        Err("lab_audit_read_not_target".to_string())
+        Err(LabToolCode::AuditReadNotTarget.as_str().to_string())
     }
 }
 
@@ -333,7 +335,7 @@ pub(super) fn write_audit_read(
                     !name.is_empty() && *name != ".." && *name != "." && !name.contains(['/', '\\'])
                 })
                 .map(|name| (name, bytes))
-                .ok_or_else(|| "lab_evidence_write_failed".to_string())
+                .ok_or_else(|| LabToolCode::EvidenceWriteFailed.as_str().to_string())
         })
         .collect::<Result<Vec<_>, _>>()?;
     let dir = reads.join(&stored.manifest_sha256);
@@ -346,8 +348,8 @@ pub(super) fn write_audit_read(
         builder.mode(0o700);
     }
     builder.create(&dir).map_err(|error| match error.kind() {
-        std::io::ErrorKind::AlreadyExists => "lab_audit_read_exists".to_string(),
-        _ => "lab_evidence_write_failed".to_string(),
+        std::io::ErrorKind::AlreadyExists => LabToolCode::AuditReadExists.as_str().to_string(),
+        _ => LabToolCode::EvidenceWriteFailed.as_str().to_string(),
     })?;
     private_dir(&dir)?;
     private_dir(&dir.join("parts"))?;
@@ -360,15 +362,17 @@ pub(super) fn write_audit_read(
 
 fn private_dir(dir: &std::path::Path) -> Result<(), String> {
     ensure_private_directory(dir).map_err(|error| match error {
-        DirectoryAdmissionError::Unavailable => "lab_dir_unavailable".to_string(),
+        DirectoryAdmissionError::Unavailable => LabToolCode::DirUnavailable.as_str().to_string(),
         #[cfg(unix)]
-        DirectoryAdmissionError::Permissions => "lab_dir_permissions_failed".to_string(),
+        DirectoryAdmissionError::Permissions => {
+            LabToolCode::DirPermissionsFailed.as_str().to_string()
+        }
     })
 }
 
 fn write_private_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
     super::local_file::write_private_file(path, bytes)
-        .map_err(|_| "lab_evidence_write_failed".to_string())
+        .map_err(|_| LabToolCode::EvidenceWriteFailed.as_str().to_string())
 }
 
 /// A `post_read` that additionally persists the exchange (§ above) before
@@ -468,10 +472,12 @@ pub(super) async fn lab_dated_master_read(
         .map_err(|failure| failure.with_prior_evidence(evidence.clone()))?;
     evidence = combine_evidence(evidence, closing_evidence);
     if closing_boundary != opening_boundary {
-        return Err(
-            ToolFailure::from("lab_master_period_boundary_changed".to_string())
-                .with_prior_evidence(evidence),
-        );
+        return Err(ToolFailure::from(
+            LabToolCode::MasterPeriodBoundaryChanged
+                .as_str()
+                .to_string(),
+        )
+        .with_prior_evidence(evidence));
     }
     Ok((xml, evidence))
 }
@@ -485,11 +491,13 @@ async fn observe_lab_boundary(
         .runtime
         .probe_with_wire_evidence(server.tally_config())
         .await
-        .map_err(|error| ToolFailure::from_runtime("lab_master_period_unobserved", error))?;
+        .map_err(|error| {
+            ToolFailure::from_runtime(LabToolCode::MasterPeriodUnobserved.as_str(), error)
+        })?;
     let evidence = evidence_from_runtime_read(wire);
     let boundary =
         crate::tally::runtime::observed_opening_boundary(&probe.profile).map_err(|_| {
-            ToolFailure::from("lab_master_period_unobserved".to_string())
+            ToolFailure::from(LabToolCode::MasterPeriodUnobserved.as_str().to_string())
                 .with_prior_evidence(evidence.clone())
         })?;
     Ok((boundary, evidence))
@@ -501,9 +509,9 @@ fn book_start_period(
     books_from_yyyymmdd: &str,
 ) -> Result<NativeLedgerExportPeriod, String> {
     let books_from = bridge_tally_core::TallyDate::parse(books_from_yyyymmdd.to_string())
-        .map_err(|_| "lab_master_period_invalid".to_string())?;
+        .map_err(|_| LabToolCode::MasterPeriodInvalid.as_str().to_string())?;
     NativeLedgerExportPeriod::new(boundary, books_from.clone(), books_from)
-        .map_err(|_| "lab_master_period_unsupported".to_string())
+        .map_err(|_| LabToolCode::MasterPeriodUnsupported.as_str().to_string())
 }
 
 pub(super) fn render_lab_master_collection(
@@ -1125,7 +1133,10 @@ pub(super) async fn lab_read_purchase_identity(
         return Err(super::failure_code::ReadCode::InvalidDateRange.into());
     }
     if !identity_window_fits(&from, &to) {
-        return Err("lab_identity_window_too_wide".to_string().into());
+        return Err(LabToolCode::IdentityWindowTooWide
+            .as_str()
+            .to_string()
+            .into());
     }
     require_lab_read_guards(server)?;
     let (company, identity, mut evidence) = server.verified_company(guid).await?;
@@ -1216,7 +1227,7 @@ impl ProbeTerm {
         match value {
             "guid" => Ok(Self::Guid),
             "remote_id" => Ok(Self::RemoteId),
-            _ => Err("lab_probe_term_invalid".to_string()),
+            _ => Err(LabToolCode::ProbeTermInvalid.as_str().to_string()),
         }
     }
 
@@ -1249,7 +1260,7 @@ impl ProbeKey {
         let lengths: &[usize] = match groups.len() {
             5 => &[8, 4, 4, 4, 12],
             6 => &[8, 4, 4, 4, 12, 8],
-            _ => return Err("lab_probe_key_invalid".to_string()),
+            _ => return Err(LabToolCode::ProbeKeyInvalid.as_str().to_string()),
         };
         let admitted = groups.iter().zip(lengths).all(|(group, &length)| {
             group.len() == length
@@ -1259,7 +1270,7 @@ impl ProbeKey {
         });
         admitted
             .then(|| Self(value.to_string()))
-            .ok_or_else(|| "lab_probe_key_invalid".to_string())
+            .ok_or_else(|| LabToolCode::ProbeKeyInvalid.as_str().to_string())
     }
 
     fn as_str(&self) -> &str {
@@ -1346,7 +1357,7 @@ fn probe_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<
         .trim()
         .eq_ignore_ascii_case(&config.target_guid)
         .then_some(())
-        .ok_or_else(|| "lab_probe_company_not_target".to_string())
+        .ok_or_else(|| LabToolCode::ProbeCompanyNotTarget.as_str().to_string())
 }
 
 /// The vouchers a probe answer lists; the count covers them all.

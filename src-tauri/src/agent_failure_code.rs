@@ -472,6 +472,63 @@ failure_codes! {
     }
 }
 
+#[cfg(feature = "lab-writes")]
+failure_codes! {
+    /// The refusals of the lab tools' shared machinery (`agent_lab.rs`): the always-on lab guards
+    /// and a write batch's loaded-company check, the lab evidence store, the master read's period,
+    /// and the read tools' own arguments.
+    pub(crate) enum LabToolCode {
+        /// `BRIDGE_LAB_WRITES` is neither `1` nor `true`.
+        WritesDisabled = "lab_writes_disabled",
+        /// `BRIDGE_LAB_TARGET_GUID` is not set, or is not Unicode.
+        TargetGuidRequired = "lab_target_guid_required",
+        /// `BRIDGE_LAB_TARGET_GUID` is not a native company GUID.
+        TargetGuidInvalid = "lab_target_guid_invalid",
+        /// A `BRIDGE_LAB_DENY_GUIDS` entry is not a native company GUID, or the list holds the
+        /// target.
+        DenyGuidsInvalid = "lab_deny_guids_invalid",
+        /// The Tally endpoint is not on port 9001.
+        PortNot9001 = "lab_port_not_9001",
+        /// With no deny list, a write batch found loaded companies other than the target alone.
+        DenyGuidsRequired = "lab_deny_guids_required",
+        /// A write batch found a denied company loaded.
+        SourceCompanyLoaded = "lab_source_company_loaded",
+        /// A write batch did not find the target loaded.
+        TargetNotLoaded = "lab_target_not_loaded",
+        /// An audit read to be kept is not of the lab's target company.
+        AuditReadNotTarget = "lab_audit_read_not_target",
+        /// The voucher key probe was asked to read a company that is not the lab's target.
+        ProbeCompanyNotTarget = "lab_probe_company_not_target",
+        /// The lab evidence folder, or a folder under it, could not be prepared.
+        DirUnavailable = "lab_dir_unavailable",
+        /// The lab evidence folder, or a folder under it, is not private to this user (Unix).
+        #[cfg_attr(not(unix), allow(dead_code))]
+        DirPermissionsFailed = "lab_dir_permissions_failed",
+        /// A lab evidence file could not be written, a kept read's part name could leave its
+        /// folder, or its folder could not be made for a reason other than its existing.
+        EvidenceWriteFailed = "lab_evidence_write_failed",
+        /// A kept audit read's folder already exists.
+        AuditReadExists = "lab_audit_read_exists",
+        /// The endpoint's date-boundary profile changed between the reads before and after a
+        /// master read.
+        MasterPeriodBoundaryChanged = "lab_master_period_boundary_changed",
+        /// The endpoint could not be probed, or the probe did not observe its opening date
+        /// boundary.
+        MasterPeriodUnobserved = "lab_master_period_unobserved",
+        /// The company's books-from date is not a date.
+        MasterPeriodInvalid = "lab_master_period_invalid",
+        /// The books-from date is not a master read period the boundary admits.
+        MasterPeriodUnsupported = "lab_master_period_unsupported",
+        /// The purchase identity read's window spans more than 31 days.
+        IdentityWindowTooWide = "lab_identity_window_too_wide",
+        /// The voucher key probe's term is neither `guid` nor `remote_id`.
+        ProbeTermInvalid = "lab_probe_term_invalid",
+        /// The voucher key probe's key is not a lowercase UUID, optionally followed by eight hex
+        /// digits.
+        ProbeKeyInvalid = "lab_probe_key_invalid",
+    }
+}
+
 failure_codes! {
     /// The refusals of an import review acknowledgement and the records it reads and writes.
     pub(crate) enum ImportAckCode {

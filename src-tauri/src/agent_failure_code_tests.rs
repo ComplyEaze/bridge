@@ -335,6 +335,67 @@ const INVOICE_INPUT: &[(InvoiceInputCode, &str)] = &[
     (InvoiceInputCode::DateInvalid, "invoice_date_invalid"),
 ];
 
+const AGENT_SETTING: &[(AgentSettingCode, &str)] = &[
+    (
+        AgentSettingCode::RedactionSettingInvalid,
+        "redaction_setting_invalid",
+    ),
+    (AgentSettingCode::PortSettingInvalid, "port_setting_invalid"),
+    (
+        AgentSettingCode::BooleanSettingInvalid,
+        "boolean_setting_invalid",
+    ),
+    (AgentSettingCode::EndpointInvalid, "endpoint_invalid"),
+    (
+        AgentSettingCode::DataDirEncodingInvalid,
+        "agent_data_dir_encoding_invalid",
+    ),
+    (
+        AgentSettingCode::DataDirUnavailable,
+        "agent_data_dir_unavailable",
+    ),
+    (
+        AgentSettingCode::DataDirPermissionsFailed,
+        "agent_data_dir_permissions_failed",
+    ),
+    (AgentSettingCode::SettingRetired, "setting_retired"),
+];
+
+const AGENT_TOOL: &[(AgentToolCode, &str)] = &[
+    (
+        AgentToolCode::ImportPostingDisabled,
+        "import_posting_disabled",
+    ),
+    (
+        AgentToolCode::MasterWritesDisabled,
+        "master_writes_disabled",
+    ),
+    (AgentToolCode::AuditToolDisabled, "audit_tool_disabled"),
+    (
+        AgentToolCode::ImportUnverifiedOnLiveTally,
+        "import_unverified_on_live_tally",
+    ),
+    (AgentToolCode::ToolNotFound, "tool_not_found"),
+    (
+        AgentToolCode::EvidenceStoreUnavailable,
+        "evidence_store_unavailable",
+    ),
+    (
+        AgentToolCode::UnsupportedProtocolVersion,
+        "unsupported_protocol_version",
+    ),
+    (AgentToolCode::PaginationInvalid, "pagination_invalid"),
+    (
+        AgentToolCode::WindowPrecedesBooksFrom,
+        "window_precedes_books_from",
+    ),
+    (AgentToolCode::WindowContradicted, "window_contradicted"),
+    (
+        AgentToolCode::VoucherCheckpointInvalid,
+        "voucher_checkpoint_invalid",
+    ),
+];
+
 const SEARCH: &[(SearchCode, &str)] = &[
     (SearchCode::CriterionEmpty, "search_criterion_empty"),
     (SearchCode::CriterionTooLong, "search_criterion_too_long"),
@@ -830,6 +891,8 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(MASTER_LEDGER),
         of(EGRESS),
         of(INVOICE_INPUT),
+        of(AGENT_SETTING),
+        of(AGENT_TOOL),
         of(BANK_STATEMENT),
         of(SEARCH),
     ]
@@ -877,6 +940,8 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("MasterLedgerCode", MasterLedgerCode::ALL),
         of("EgressCode", EgressCode::ALL),
         of("InvoiceInputCode", InvoiceInputCode::ALL),
+        of("AgentSettingCode", AgentSettingCode::ALL),
+        of("AgentToolCode", AgentToolCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("SearchCode", SearchCode::ALL),
     ];
@@ -926,7 +991,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        29,
+        31,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -967,6 +1032,8 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(MASTER_LEDGER), MasterLedgerCode::ALL);
     assert_eq!(variants(EGRESS), EgressCode::ALL);
     assert_eq!(variants(INVOICE_INPUT), InvoiceInputCode::ALL);
+    assert_eq!(variants(AGENT_SETTING), AgentSettingCode::ALL);
+    assert_eq!(variants(AGENT_TOOL), AgentToolCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -1019,6 +1086,8 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(MASTER_LEDGER, MasterLedgerCode::as_str);
     check_pins(EGRESS, EgressCode::as_str);
     check_pins(INVOICE_INPUT, InvoiceInputCode::as_str);
+    check_pins(AGENT_SETTING, AgentSettingCode::as_str);
+    check_pins(AGENT_TOOL, AgentToolCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -1039,11 +1108,11 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14]
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 8, 11]
         .iter()
         .sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14]
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 8, 11]
         .iter()
         .sum();
     assert_eq!(codes.len(), expected, "the declared codes");

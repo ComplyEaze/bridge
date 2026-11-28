@@ -641,6 +641,59 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the agent's own settings and data directory, read when the server starts
+    /// or a tool first needs them (`agent.rs`).
+    pub(crate) enum AgentSettingCode {
+        /// The redaction setting is not one of the values it admits.
+        RedactionSettingInvalid = "redaction_setting_invalid",
+        /// The Tally port setting is not Unicode, or not a port number from 1 to 65535.
+        PortSettingInvalid = "port_setting_invalid",
+        /// A boolean setting is not one of the spellings it admits, or not Unicode.
+        BooleanSettingInvalid = "boolean_setting_invalid",
+        /// The configured Tally endpoint is not a loopback origin.
+        EndpointInvalid = "endpoint_invalid",
+        /// The agent's data directory path is not valid Unicode.
+        DataDirEncodingInvalid = "agent_data_dir_encoding_invalid",
+        /// The agent's data directory cannot be made, or is not a directory, or is a link.
+        DataDirUnavailable = "agent_data_dir_unavailable",
+        /// The agent's data directory is not owned by this user, or its mode is not 0700 (Unix).
+        DataDirPermissionsFailed = "agent_data_dir_permissions_failed",
+        /// A retired setting is still present, so the post it governed is refused.
+        SettingRetired = "setting_retired",
+    }
+}
+
+failure_codes! {
+    /// The refusals of the agent's tool dispatch and its shared argument and window checks
+    /// (`agent.rs`): a tool that is off, unknown or unsupported, an argument out of range, or a
+    /// window an empty read cannot be trusted for.
+    pub(crate) enum AgentToolCode {
+        /// The posting setting is off, so the post and its review acknowledgement are refused.
+        ImportPostingDisabled = "import_posting_disabled",
+        /// The master-writes setting is off, so the ledger-create tools are refused.
+        MasterWritesDisabled = "master_writes_disabled",
+        /// The audit setting is off, so the audit test run is refused.
+        AuditToolDisabled = "audit_tool_disabled",
+        /// Neither the import setting nor the posting setting is on, so the import tools are refused.
+        ImportUnverifiedOnLiveTally = "import_unverified_on_live_tally",
+        /// No tool has the requested name.
+        ToolNotFound = "tool_not_found",
+        /// The evidence store's lock is poisoned, so its records cannot be read.
+        EvidenceStoreUnavailable = "evidence_store_unavailable",
+        /// No protocol version is supported, so none can be negotiated.
+        UnsupportedProtocolVersion = "unsupported_protocol_version",
+        /// A count argument is not a whole number, too large, or zero where it must be positive.
+        PaginationInvalid = "pagination_invalid",
+        /// The window starts before the company's books begin.
+        WindowPrecedesBooksFrom = "window_precedes_books_from",
+        /// A read found nothing in the window, but the census found vouchers on its days.
+        WindowContradicted = "window_contradicted",
+        /// No company voucher checkpoint was read, so an empty window cannot be corroborated.
+        VoucherCheckpointInvalid = "voucher_checkpoint_invalid",
+    }
+}
+
+failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.

@@ -634,10 +634,6 @@ async fn a_click_after_revocation_approves_nothing() {
 /// A call withdrawn while it waits on the dialog stops waiting at once,
 /// answers `request_cancelled` rather than `pending`, and closes the dialog it
 /// had started.
-// current_thread, which the check that the dialog closed relies on: the
-// dialog's task finishes in the poll that closes it, before this task runs
-// again.
-//
 // The call waits on the dialog under a timer, which in tests is 300 ms from the
 // call's start and never less than 50 ms. Once slow reads had used the 300 ms, a
 // withdrawal made from this task on the dialog's open signal could come after
@@ -646,6 +642,13 @@ async fn a_click_after_revocation_approves_nothing() {
 // thread past the call's whole budget, as a slow runner would: the timer has
 // run out when the call looks at its wait again, and the withdrawal still
 // wins, since that wait is biased to it.
+//
+// current_thread, which that hold relies on: no other task, the call's
+// included, runs while the dialog's task holds the thread. The hold is a lower
+// bound, which a slow runner only lengthens, and the outcome is the same
+// without it: it only makes the timer ready beside the withdrawal. The close of
+// the dialog is awaited as its own event (#2551), not assumed from the order
+// in which the runtime polls the two tasks.
 #[tokio::test(flavor = "current_thread")]
 async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
@@ -676,7 +679,18 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     );
     assert_eq!(scripted.counts(), [1], "the post dialog opened once");
     assert!(scripted.reviews().is_empty(), "no other dialog was asked");
-    tokio::task::yield_now().await;
+    // Nothing answers this dialog, so only the withdrawn call's abort ends its
+    // wait; the bound only stops a hang.
+    tokio::time::timeout(HANG_GUARD, async {
+        scripted.opened().await;
+        scripted.closed().await;
+    })
+    .await
+    .unwrap_or_else(|_| {
+        panic!(
+            "the post dialog was not closed within {HANG_GUARD:?} of the call's answer: {response}"
+        )
+    });
     assert!(!scripted.is_waiting(), "the dialog was closed");
     assert!(!server.post_approvals.holds(&line.batch_id));
     assert_eq!(observed.len(), before_approval().len());
@@ -4098,6 +4112,11 @@ fn only_a_text_that_lists_the_vouchers_says_it_lists_them() {
 /// second asks the person for the totals only, and a later call posts what the
 /// person approved. The three calls run the whole path, so a form lost between
 /// the ask, the held approval and the redemption fails here.
+///
+/// Each step waits on an event (#2551): the totals dialog's opening before its
+/// preview is read, and the click's stamp before the third call. The third
+/// call decides to redeem before any Tally request, so how long its checks
+/// then take does not decide whether it posts.
 #[tokio::test]
 async fn a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call() {
     let mut plans = before_approval();
@@ -4143,6 +4162,10 @@ async fn a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_
         "pending",
         "{pending}"
     );
+    // The preview is recorded on the dialog's own task as it opens.
+    tokio::time::timeout(HANG_GUARD, held.opened())
+        .await
+        .unwrap_or_else(|_| panic!("the totals dialog did not open within {HANG_GUARD:?}"));
     let totals = held.previews();
     assert_eq!(totals.len(), 1);
     assert!(

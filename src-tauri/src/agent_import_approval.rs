@@ -22,6 +22,7 @@
 //! refused as before, and remembered in the same way: its next ask shows the
 //! totals only, as an ordinary ask of that text. Nothing is shown twice in one
 //! call, and no call chooses the form.
+use super::super::failure_code::ImportApprovalCode;
 use super::master_post::MasterPostRequest;
 use super::master_review::HeldStockItem;
 use super::post::NativePostRequest;
@@ -710,16 +711,16 @@ impl PostApprovals {
         );
         self.settle(&mut slot);
         if expired {
-            return Err("import_approval_expired".into());
+            return Err(ImportApprovalCode::Expired.as_str().into());
         }
         match slot.as_ref() {
             Some((held_batch, Held::Approved { binding, .. })) if held_batch == batch_id => {
                 Ok(binding.form)
             }
             Some((held_batch, Held::Redeeming { .. })) if held_batch == batch_id => {
-                Err("import_approval_in_use".into())
+                Err(ImportApprovalCode::InUse.as_str().into())
             }
-            _ => Err("import_approval_revoked".into()),
+            _ => Err(ImportApprovalCode::Revoked.as_str().into()),
         }
     }
 
@@ -749,7 +750,7 @@ impl PostApprovals {
             return Begin::Ask(self.form_to_ask(batch_id));
         };
         if *held_batch != batch_id {
-            return Begin::Busy("post_approval_busy");
+            return Begin::Busy(ImportApprovalCode::Busy.as_str());
         }
         match held {
             Held::Pending { dialog, .. } => match dialog.take() {
@@ -757,7 +758,7 @@ impl PostApprovals {
                 None => Begin::Waiting,
             },
             Held::Approved { binding, .. } => Begin::Redeem(binding.form),
-            Held::Redeeming { .. } => Begin::Busy("import_approval_in_use"),
+            Held::Redeeming { .. } => Begin::Busy(ImportApprovalCode::InUse.as_str()),
         }
     }
 
@@ -809,7 +810,7 @@ impl PostApprovals {
         }
         if slot.is_some() {
             // Dropping `dialog` closes it: nothing can hold two.
-            return Err("post_approval_busy".into());
+            return Err(ImportApprovalCode::Busy.as_str().into());
         }
         *slot = Some((
             batch_id.to_string(),
@@ -832,10 +833,10 @@ impl PostApprovals {
         let mut slot = self.slot();
         let Some((held_batch, Held::Pending { dialog, .. })) = slot.as_mut() else {
             // Revoked while this call waited: whatever was answered is dropped.
-            return Joined::Refused("import_approval_revoked".into());
+            return Joined::Refused(ImportApprovalCode::Revoked.as_str().into());
         };
         if *held_batch != batch_id {
-            return Joined::Refused("import_approval_revoked".into());
+            return Joined::Refused(ImportApprovalCode::Revoked.as_str().into());
         }
         match waited {
             Err(open) => {
@@ -854,7 +855,7 @@ impl PostApprovals {
                 let held = approved(binding, request, held, answered);
                 if self.expired(&answered) {
                     self.lapse(batch_id, held, "approval_expired");
-                    return Joined::Refused("import_approval_expired".into());
+                    return Joined::Refused(ImportApprovalCode::Expired.as_str().into());
                 }
                 *slot = Some((batch_id.to_string(), held));
                 Joined::Approved
@@ -877,7 +878,7 @@ impl PostApprovals {
             return Err("request_cancelled".into());
         }
         if slot.is_some() {
-            return Err("post_approval_busy".into());
+            return Err(ImportApprovalCode::Busy.as_str().into());
         }
         *slot = Some((
             batch_id.to_string(),
@@ -904,7 +905,7 @@ impl PostApprovals {
         );
         self.settle(&mut slot);
         if expired {
-            return Err("import_approval_expired".into());
+            return Err(ImportApprovalCode::Expired.as_str().into());
         }
         match slot.take() {
             Some((
@@ -930,7 +931,7 @@ impl PostApprovals {
                     || request.voucher_count() != fresh.voucher_count()
                 {
                     self.write_lapse_note(batch_id, answered, "approval_binding_changed");
-                    return Err("import_approval_binding_changed".into());
+                    return Err(ImportApprovalCode::BindingChanged.as_str().into());
                 }
                 *slot = Some((batch_id.to_string(), Held::Redeeming { id, answered }));
                 Ok((
@@ -951,10 +952,11 @@ impl PostApprovals {
                 );
                 *slot = other;
                 Err(if in_use {
-                    "import_approval_in_use"
+                    ImportApprovalCode::InUse
                 } else {
-                    "import_approval_revoked"
+                    ImportApprovalCode::Revoked
                 }
+                .as_str()
                 .into())
             }
         }

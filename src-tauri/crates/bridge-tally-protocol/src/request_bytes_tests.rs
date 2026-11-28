@@ -71,7 +71,7 @@ use crate::outstandings_shared::{
 };
 use crate::parent_partition::{ParentObservation, ParentPart, ParentPartition, PartitionLimits};
 use crate::xml_read_profiles::{
-    compatibility, ReadOnlyProfile, ReadOnlyProfileId, ValidatedCompanyName, ValidatedDateRange,
+    ReadOnlyProfile, ReadOnlyProfileId, ValidatedCompanyName, ValidatedDateRange,
 };
 
 /// Every variant of a fieldless enum, in the order named: the list the table
@@ -184,14 +184,6 @@ const TABLE: &[(&str, &str)] = &[
     (
         "ReadOnlyProfile::AuditStockItemsV1/render",
         "a445b9dd100809b3753c18a94a7594e82a268c70858e12d1e8854fc5adb1630e",
-    ),
-    (
-        "compatibility::standard_ledger_identity_request",
-        "06bc9e454e79ceaf55b61591496f47690e2cba8e27237931ee68cd614fd30e5f",
-    ),
-    (
-        "compatibility::standard_ledger_catalog_request",
-        "06bc9e454e79ceaf55b61591496f47690e2cba8e27237931ee68cd614fd30e5f",
     ),
     (
         "render_company_inventory_flags_request",
@@ -610,17 +602,6 @@ fn built_requests() -> Vec<(String, String)> {
         assert_eq!(profile.id(), id);
         row(format!("ReadOnlyProfile::{id:?}/render"), profile.render());
     }
-    // The two compatibility entry points reach the same request as the
-    // StandardLedgerIdentityV1 and StandardLedgerCatalogV1 rows.
-    row(
-        "compatibility::standard_ledger_identity_request".into(),
-        compatibility::standard_ledger_identity_request(COMPANY),
-    );
-    row(
-        "compatibility::standard_ledger_catalog_request".into(),
-        compatibility::standard_ledger_catalog_request(COMPANY),
-    );
-
     row(
         "render_company_inventory_flags_request".into(),
         render_company_inventory_flags_request(&company, &guid),

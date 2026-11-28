@@ -23,7 +23,7 @@ use super::super::verification::folded_number;
 use super::super::InvoiceClass;
 use super::InvoiceNumber;
 use bridge_tally_core::TallyDate;
-use bridge_tally_protocol::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
+use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
 use quick_xml::events::Event;
 use std::collections::BTreeMap;
 
@@ -281,12 +281,9 @@ pub(super) struct ResolvedVoucherType {
     pub(super) class: String,
 }
 
-pub(in crate::agent) fn render_voucher_types_request(company: &str) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
+pub(in crate::agent) fn render_voucher_types_request(company: &ValidatedCompanyName) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Voucher Types</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Voucher Types\" ISMODIFY=\"No\"><TYPE>VoucherType</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
@@ -453,15 +450,14 @@ impl VoucherTypeGuid {
 // the tests that pin the request the one-number captures answered.
 #[cfg(test)]
 pub(in crate::agent) fn render_invoice_number_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     number: &InvoiceNumber,
     (from, to): (&TallyDate, &TallyDate),
 ) -> String {
     let (number, from, to) = (number.as_str(), from.as_str(), to.as_str());
     // The one-number captures this request is pinned to were Sales.
     let compute = class_compute(InvoiceClass::Sales);
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
@@ -483,14 +479,13 @@ pub(in crate::agent) fn render_invoice_number_request(
 /// rows equal to the year's). The lab sent this request for each month of a
 /// year and for a whole year (`lab/2162-s7-sheet` at b63accd9).
 pub(in crate::agent) fn render_invoice_window_numbers_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     class: InvoiceClass,
     (from, to): (&TallyDate, &TallyDate),
 ) -> String {
     let (from, to) = (from.as_str(), to.as_str());
     let compute = class_compute(class);
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
@@ -748,15 +743,14 @@ pub(super) fn control_row_found(
 /// `GSTREGISTRATION` carries `TYPE="String"`, which `rows` does not keep, as
 /// it keeps no attribute of any fetched field.
 pub(in crate::agent) fn render_invoice_readback_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     type_guid: &VoucherTypeGuid,
     number: &InvoiceNumber,
     (from, to): (&TallyDate, &TallyDate),
 ) -> String {
     let (type_guid, number) = (type_guid.as_str(), number.as_str());
     let (from, to) = (from.as_str(), to.as_str());
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>"
@@ -1053,12 +1047,11 @@ pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
 /// registration whose dated rows carry the state, the registration type and
 /// whether it is inactive), and once from the same collection typed by hand
 /// and sent as UTF-8; the pilot-lab fixtures hold the first answer.
-pub(in crate::agent) fn render_company_registration_request(company: &str) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
+pub(in crate::agent) fn render_company_registration_request(
+    company: &ValidatedCompanyName,
+) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )
@@ -1211,7 +1204,10 @@ pub(super) fn parse_company_registration(
 /// measured carried them (a ledger's rate rows came back whole; whether the
 /// window changes them was not tried).
 #[cfg(test)]
-fn render_ledger_rates_request(company: &str, window: (&TallyDate, &TallyDate)) -> String {
+fn render_ledger_rates_request(
+    company: &ValidatedCompanyName,
+    window: (&TallyDate, &TallyDate),
+) -> String {
     render_ledger_rates(
         company,
         window,
@@ -1228,7 +1224,7 @@ fn render_ledger_rates_request(company: &str, window: (&TallyDate, &TallyDate)) 
 /// 18, 10,018 and 20,018 ledgers (`lab/1331-scoped-masters-answers`, 31 Oct
 /// 2026).
 pub(in crate::agent) fn render_ledger_rates_request_for_ledgers(
-    company: &str,
+    company: &ValidatedCompanyName,
     window: (&TallyDate, &TallyDate),
     part: &bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
 ) -> String {
@@ -1240,12 +1236,11 @@ pub(in crate::agent) fn render_ledger_rates_request_for_ledgers(
 }
 
 fn render_ledger_rates(
-    company: &str,
+    company: &ValidatedCompanyName,
     window: (&TallyDate, &TallyDate),
     (formula, filters): (String, String),
 ) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             "<SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE>",
@@ -1669,12 +1664,9 @@ pub(super) use hsn::{
 /// lab answered it on 12 Oct 2026 (lab request set W16, the
 /// `pilot-lab-groups-hsn` fixture: one `HSNDETAILS.LIST` per group, empty on a
 /// group with no code).
-pub(in crate::agent) fn render_group_hsn_request(company: &str) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
+pub(in crate::agent) fn render_group_hsn_request(company: &ValidatedCompanyName) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Groups</ID></HEADER><BODY><DESC>{static_variables}<TDL><TDLMESSAGE><COLLECTION NAME=\"List of Groups\" ISMODIFY=\"Yes\"><FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME, HSNDETAILS.LIST</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
     )

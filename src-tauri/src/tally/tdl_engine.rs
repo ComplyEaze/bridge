@@ -1,9 +1,3 @@
-pub fn standard_ledger_identity_request(company: &str) -> String {
-    bridge_tally_protocol::xml_read_profiles::compatibility::standard_ledger_identity_request(
-        company,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     /// The hazard gate records no builder that passes a spaced identifier to
@@ -13,7 +7,9 @@ mod tests {
     /// that keeps it from an Education responder.
     #[test]
     fn every_report_formula_hazard_is_kept_from_an_education_responder() {
-        use bridge_tally_protocol::xml_read_profiles::first_spaced_function_argument;
+        use bridge_tally_protocol::xml_read_profiles::{
+            first_spaced_function_argument, ReadOnlyProfile, ValidatedCompanyName,
+        };
         let script = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../scripts/check-tally-request-builder-hazards.mjs"),
@@ -30,9 +26,12 @@ mod tests {
         let guarded: [&str; 0] = [];
         assert_eq!(listed, guarded.into_iter().collect());
         assert_eq!(
-            first_spaced_function_argument(&super::standard_ledger_identity_request(
-                "BRIDGE SYNTHETIC BOOK"
-            )),
+            first_spaced_function_argument(
+                &ReadOnlyProfile::StandardLedgerIdentityV1 {
+                    company: &ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap(),
+                }
+                .render()
+            ),
             None
         );
     }

@@ -192,19 +192,6 @@ fn profile_ids_and_template_hashes_are_stable() {
     assert_eq!(observed, sealed);
 }
 
-#[test]
-fn compatibility_renderers_preserve_validated_profile_bytes() {
-    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
-    assert_eq!(
-        compatibility::standard_ledger_identity_request(company.as_str()),
-        ReadOnlyProfile::StandardLedgerIdentityV1 { company: &company }.render()
-    );
-    assert_eq!(
-        compatibility::standard_ledger_catalog_request(company.as_str()),
-        ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render()
-    );
-}
-
 /// Every element of `xml` as its slash-joined path and trimmed text, in
 /// document order. Attributes are recorded as `path/@NAME`.
 fn element_paths(xml: &str) -> Vec<(String, String)> {

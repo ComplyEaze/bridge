@@ -537,8 +537,8 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of the one held post approval: a person's answer to a post dialog, kept for
-    /// the call that redeems it.
+    /// The refusals of the one held post approval: a post dialog that is open, or a person's
+    /// answer to one, kept for the call that redeems it.
     pub(crate) enum ImportApprovalCode {
         /// The approval ran out of time before a call redeemed it.
         Expired = "import_approval_expired",
@@ -548,7 +548,7 @@ failure_codes! {
         Revoked = "import_approval_revoked",
         /// What is to be posted is no longer what the person approved.
         BindingChanged = "import_approval_binding_changed",
-        /// Another post approval already holds the one place there is for one.
+        /// The one place for a post approval or its dialog is already taken.
         Busy = "post_approval_busy",
     }
 }

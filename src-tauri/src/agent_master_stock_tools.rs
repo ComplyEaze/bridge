@@ -39,7 +39,8 @@ use super::super::master_review::{show_stock_item_draft, ShownStockItem};
 use super::*;
 use crate::agent::failure_code::{
     create_render_refusal_code, draft_refusal_code, item_name_refusal_code, not_goods_refusal_code,
-    sibling_refusal_code, stock_item_catalogue_refusal_code, MasterPostCode, StockItemCreateCode,
+    sibling_refusal_code, stock_item_catalogue_refusal_code, ImportApprovalCode, MasterPostCode,
+    StockItemCreateCode,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::approved_import::ApprovedImport;
@@ -266,10 +267,10 @@ impl Server {
             // Only the fresh item may come back, else the approval is left
             // unspent: what the person was shown is the stored item.
             let HeldRequest::StockItem(held) = held else {
-                return Err(MasterPostCode::ApprovalBindingChanged.into());
+                return Err(ImportApprovalCode::BindingChanged.into());
             };
             if held.prepared().company() != &identity || *held.prepared().writes() != stored {
-                return Err(MasterPostCode::ApprovalBindingChanged.into());
+                return Err(ImportApprovalCode::BindingChanged.into());
             }
             owed_digest(&approved, &batch)?;
             let _endpoint_dispatch_lease = dispatch_lease::acquire(&self.settings.endpoint)?;

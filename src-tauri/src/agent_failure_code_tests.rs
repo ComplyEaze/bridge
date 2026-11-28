@@ -1012,6 +1012,44 @@ const DESKTOP_JOURNAL: &[(DesktopJournalCode, &str)] = &[
     (DesktopJournalCode::FilePickerFailed, "file_picker_failed"),
 ];
 
+const IMPORT_PUBLICATION: &[(ImportPublicationCode, &str)] = &[
+    (
+        ImportPublicationCode::BuildRecoveryRequired,
+        "import_publication_recovery_required",
+    ),
+    (
+        ImportPublicationCode::ProofRecoveryRequired,
+        "proof_publication_recovery_required",
+    ),
+    (
+        ImportPublicationCode::ProofRollbackFailed,
+        "proof_publication_rollback_failed",
+    ),
+    (
+        ImportPublicationCode::ProofFailed,
+        "proof_publication_failed",
+    ),
+];
+
+/// An invoice post whose masters moved.
+const INVOICE_MASTERS: &[(InvoiceMastersCode, &str)] = &[(
+    InvoiceMastersCode::Changed,
+    "import_invoice_masters_changed",
+)];
+
+/// An invoice read-back's differences that are not one field.
+const INVOICE_READBACK: &[(InvoiceReadbackCode, &str)] = &[
+    (InvoiceReadbackCode::NotObserved, "invoice_not_observed"),
+    (InvoiceReadbackCode::LegsUnreadable, "legs_unreadable"),
+    (
+        InvoiceReadbackCode::LineHsnUnresolved,
+        "invoice_line_hsn_unresolved",
+    ),
+];
+
+/// A ledger name that reads as a masked one.
+const LEDGER_NAME: &[(LedgerNameCode, &str)] = &[(LedgerNameCode::Masked, "ledger_name_masked")];
+
 /// The company tools' own codes.
 const COMPANY: &[(CompanyCode, &str)] = &[
     (
@@ -1596,6 +1634,10 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(VOUCHER_TYPE_CLASS),
         of(VOUCHER_SUMMARY),
         of(DESKTOP_JOURNAL),
+        of(IMPORT_PUBLICATION),
+        of(INVOICE_MASTERS),
+        of(INVOICE_READBACK),
+        of(LEDGER_NAME),
         of(COMPANY),
         of(COMPANY_CHECKPOINT),
         of(AGENT_RESPONSE),
@@ -1664,6 +1706,10 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("VoucherTypeClassCode", VoucherTypeClassCode::ALL),
         of("VoucherSummaryCode", VoucherSummaryCode::ALL),
         of("DesktopJournalCode", DesktopJournalCode::ALL),
+        of("ImportPublicationCode", ImportPublicationCode::ALL),
+        of("InvoiceMastersCode", InvoiceMastersCode::ALL),
+        of("InvoiceReadbackCode", InvoiceReadbackCode::ALL),
+        of("LedgerNameCode", LedgerNameCode::ALL),
         of("CompanyCode", CompanyCode::ALL),
         of("CompanyCheckpointCode", CompanyCheckpointCode::ALL),
         of("AgentResponseCode", AgentResponseCode::ALL),
@@ -1728,7 +1774,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        52,
+        56,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1789,6 +1835,10 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(VOUCHER_TYPE_CLASS), VoucherTypeClassCode::ALL);
     assert_eq!(variants(VOUCHER_SUMMARY), VoucherSummaryCode::ALL);
     assert_eq!(variants(DESKTOP_JOURNAL), DesktopJournalCode::ALL);
+    assert_eq!(variants(IMPORT_PUBLICATION), ImportPublicationCode::ALL);
+    assert_eq!(variants(INVOICE_MASTERS), InvoiceMastersCode::ALL);
+    assert_eq!(variants(INVOICE_READBACK), InvoiceReadbackCode::ALL);
+    assert_eq!(variants(LEDGER_NAME), LedgerNameCode::ALL);
     assert_eq!(variants(COMPANY), CompanyCode::ALL);
     assert_eq!(variants(COMPANY_CHECKPOINT), CompanyCheckpointCode::ALL);
     assert_eq!(variants(AGENT_RESPONSE), AgentResponseCode::ALL);
@@ -1866,6 +1916,10 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(VOUCHER_TYPE_CLASS, VoucherTypeClassCode::as_str);
     check_pins(VOUCHER_SUMMARY, VoucherSummaryCode::as_str);
     check_pins(DESKTOP_JOURNAL, DesktopJournalCode::as_str);
+    check_pins(IMPORT_PUBLICATION, ImportPublicationCode::as_str);
+    check_pins(INVOICE_MASTERS, InvoiceMastersCode::as_str);
+    check_pins(INVOICE_READBACK, InvoiceReadbackCode::as_str);
+    check_pins(LEDGER_NAME, LedgerNameCode::as_str);
     check_pins(COMPANY, CompanyCode::as_str);
     check_pins(COMPANY_CHECKPOINT, CompanyCheckpointCode::as_str);
     check_pins(AGENT_RESPONSE, AgentResponseCode::as_str);
@@ -1894,14 +1948,14 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
         77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 19, 13, 4, 17, 8, 6,
-        2, 8, 8, 5, 9, 3, 5, 5, 4, 1,
+        2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
         80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 19, 2, 21, 8, 11, 21, 19, 13, 4, 17,
-        8, 6, 2, 8, 8, 5, 9, 3, 5, 5, 4, 1, 9,
+        8, 6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1, 9,
     ]
     .iter()
     .sum();

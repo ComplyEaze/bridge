@@ -489,7 +489,8 @@ failure_codes! {
         DenyGuidsInvalid = "lab_deny_guids_invalid",
         /// The Tally endpoint is not on port 9001.
         PortNot9001 = "lab_port_not_9001",
-        /// With no deny list, a write batch found loaded companies other than the target alone.
+        /// With no deny list, a write batch did not find the target to be the only company loaded:
+        /// another company, a company without a GUID, or none at all.
         DenyGuidsRequired = "lab_deny_guids_required",
         /// A write batch found a denied company loaded.
         SourceCompanyLoaded = "lab_source_company_loaded",

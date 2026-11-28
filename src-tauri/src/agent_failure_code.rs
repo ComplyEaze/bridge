@@ -600,8 +600,8 @@ failure_codes! {
         /// The desktop's journal-only post was given a batch it does not take: no voucher, more
         /// than one, one that is not a Journal, or no batch identity scheme.
         RequiresOneJournal = "import_post_requires_one_journal",
-        /// The agent's post was given a batch it does not take: no voucher, more than it admits,
-        /// a voucher type it does not post, or no batch identity scheme.
+        /// The agent's post was given a batch it does not take: no voucher, several where only one
+        /// is admitted, a voucher type it does not post, or no batch identity scheme.
         RequiresOneVoucher = "import_post_requires_one_voucher",
         /// The batch holds more vouchers than one post, or the journal, admits.
         BatchTooLarge = "import_post_batch_too_large",
@@ -619,9 +619,11 @@ failure_codes! {
         AdmissionInconsistent = "import_post_admission_inconsistent",
         /// The batch was never sent to Tally, so there is no post to read back.
         NotDispatched = "import_not_dispatched",
-        /// A remote id minted for this post is one the journal already records.
+        /// A remote id for this post is one the journal already records, or minting kept
+        /// repeating an id already taken in the batch.
         RemoteIdReused = "import_remote_id_reused",
-        /// A row of this batch is already recorded as posted.
+        /// Another batch of this company already sent, or was found to have posted, a row of this
+        /// batch.
         TxnAlreadyPosted = "import_txn_already_posted",
         /// A voucher of this batch is already in the book.
         PreexistingIdentity = "import_preexisting_identity",
@@ -634,11 +636,14 @@ failure_codes! {
         /// A ledger the batch treats as cash is not under Cash-in-Hand in the book.
         CashLedgerNotCashInHand = "cash_ledger_not_cash_in_hand",
         /// A ledger name the batch requests now folds equal to two or more live ledgers, so
-        /// Tally's import lookup could take one for the other.
+        /// Tally's import lookup could take one for the other. Only a pair that differs by a
+        /// trailing line break goes on, and only on the agent's post.
         LedgerHasFoldedTwin = "ledger_has_folded_twin",
-        /// An invoice voucher carries no observed invoice detail to post or review.
+        /// An invoice the post cannot review as observed: no invoice detail or none observed, no
+        /// voucher number, no party entry, or a party the batch marks On Account.
         InvoiceNotObserved = "import_invoice_not_observed",
-        /// The review text is longer, or has more or longer lines, than one review shows.
+        /// The review text, or a narration in it, is longer or has more or longer lines than one
+        /// review shows.
         ReviewTooLarge = "import_review_too_large",
         /// A voucher's amounts overflow when they are added up for its review text.
         VoucherAmountOverflow = "voucher_amount_overflow",

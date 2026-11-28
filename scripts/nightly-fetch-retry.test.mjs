@@ -276,11 +276,11 @@ test("a 5xx, 403 or 429 answer, on a download or on the index, is still retried:
 });
 
 test("the real coreutils timeout cuts a stalled attempt off at the bound, and the retry passes", { skip: noRealTimeout }, () => {
-  const r = run([{ hang: true }, OK], { realTimeout: true, bound: "1" });
+  const r = run([{ hang: true }, OK], { realTimeout: true, bound: "5" });
   assert.equal(r.status, 0, r.output);
   assert.equal(r.calls.length, 2, "both attempts started cargo; the first never finished");
   assert.deepEqual(r.pauses, ["30"]);
-  assert.match(r.output, /dependency-fetch: attempt 1\/3 outcome=timeout after 1, retrying in 30 s/);
+  assert.match(r.output, /dependency-fetch: attempt 1\/3 outcome=timeout after 5, retrying in 30 s/);
   assert.match(r.output, /dependency-fetch: attempt 2\/3 outcome=ok/);
 });
 

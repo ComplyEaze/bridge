@@ -247,6 +247,17 @@ const STOP_ACK: &[(StopAckCode, &str)] = &[
     (StopAckCode::NotHeld, "ack_stop_not_held"),
 ];
 
+const IMPORT_APPROVAL: &[(ImportApprovalCode, &str)] = &[
+    (ImportApprovalCode::Expired, "import_approval_expired"),
+    (ImportApprovalCode::InUse, "import_approval_in_use"),
+    (ImportApprovalCode::Revoked, "import_approval_revoked"),
+    (
+        ImportApprovalCode::BindingChanged,
+        "import_approval_binding_changed",
+    ),
+    (ImportApprovalCode::Busy, "post_approval_busy"),
+];
+
 const EGRESS: &[(EgressCode, &str)] = &[
     (EgressCode::RecordTooLarge, "egress_record_too_large"),
     (EgressCode::RecordWriteFailed, "egress_record_write_failed"),
@@ -749,6 +760,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(E_INVOICE_READBACK),
         of(IMPORT_ACK),
         of(STOP_ACK),
+        of(IMPORT_APPROVAL),
         of(EGRESS),
         of(BANK_STATEMENT),
         of(SEARCH),
@@ -793,6 +805,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("EInvoiceReadbackCode", EInvoiceReadbackCode::ALL),
         of("ImportAckCode", ImportAckCode::ALL),
         of("StopAckCode", StopAckCode::ALL),
+        of("ImportApprovalCode", ImportApprovalCode::ALL),
         of("EgressCode", EgressCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("SearchCode", SearchCode::ALL),
@@ -843,7 +856,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        26,
+        27,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -880,6 +893,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(LAB_MASTERS), LabMastersCode::ALL);
     assert_eq!(variants(IMPORT_ACK), ImportAckCode::ALL);
     assert_eq!(variants(STOP_ACK), StopAckCode::ALL);
+    assert_eq!(variants(IMPORT_APPROVAL), ImportApprovalCode::ALL);
     assert_eq!(variants(EGRESS), EgressCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
@@ -929,6 +943,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(LAB_MASTERS, LabMastersCode::as_str);
     check_pins(IMPORT_ACK, ImportAckCode::as_str);
     check_pins(STOP_ACK, StopAckCode::as_str);
+    check_pins(IMPORT_APPROVAL, ImportApprovalCode::as_str);
     check_pins(EGRESS, EgressCode::as_str);
 }
 
@@ -950,9 +965,9 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5].iter().sum();
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 5].iter().sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5].iter().sum();
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 5].iter().sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();

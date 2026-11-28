@@ -537,6 +537,23 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The refusals of the one held post approval: a post dialog that is open, or a person's
+    /// answer to one, kept for the call that redeems it.
+    pub(crate) enum ImportApprovalCode {
+        /// The approval ran out of time before a call redeemed it.
+        Expired = "import_approval_expired",
+        /// Another call is redeeming this batch's approval now.
+        InUse = "import_approval_in_use",
+        /// No approval for this batch is held: it was revoked, or another batch's is held.
+        Revoked = "import_approval_revoked",
+        /// What is to be posted is no longer what the person approved.
+        BindingChanged = "import_approval_binding_changed",
+        /// The one place for a post approval or its dialog is already taken.
+        Busy = "post_approval_busy",
+    }
+}
+
+failure_codes! {
     /// The refusals of the locked append-only egress log (`agent_egress.rs`) and of the other local
     /// records written and read the same way.
     pub(crate) enum EgressCode {

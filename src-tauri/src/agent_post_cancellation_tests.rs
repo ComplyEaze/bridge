@@ -58,7 +58,7 @@ fn server(path: &Path) -> Server {
 }
 
 fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
-    saved_batch_as(server, "bridge-00000000-0000-4000-8000-000000000001")
+    saved_batch_as(server, crate::synthetic_batch_id(0x5a00))
 }
 
 /// [`saved_batch`] under `batch_id`.

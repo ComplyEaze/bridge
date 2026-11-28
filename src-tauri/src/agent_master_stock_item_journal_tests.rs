@@ -682,9 +682,9 @@ mod judge {
     type Answers<'a> = (Marks<'a>, Marks<'a>);
 
     /// Another loaded company's GUID: synthetic.
-    const OTHER: &str = "0f0e0d0c-0b0a-4909-8807-060504030201";
+    const OTHER: &str = "00f0c618-b0df-43bd-bd69-b4c7b92c616f";
     /// A third loaded company's GUID: synthetic.
-    const THIRD: &str = "1a2b3c4d-5e6f-4a0b-9c1d-2e3f4a5b6c7d";
+    const THIRD: &str = "021bda0c-b1b1-44c8-8279-5212ce87c9c7";
 
     fn marks(pairs: &[(&str, u64)]) -> Vec<MasterMark> {
         (pairs.iter())

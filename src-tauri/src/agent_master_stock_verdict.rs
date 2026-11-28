@@ -1,6 +1,5 @@
 //! The verdict on one stock-item read-back (#1381): a pure judge over what one
-//! call holds, by the table the #1381 decision set (decision comment
-//! 7203323798), first match wins:
+//! call holds, by the table the #1381 decision set, first match wins:
 //!
 //! 1. The read-back failed in transport or parse, or its two marks answers
 //!    (binding and aim) give the batch company different marks:

@@ -31,8 +31,10 @@ const SEAM: &str = "static_variables_for_unvalidated_company";
 /// when the trial balance builders took `&ValidatedCompanyName`, to 26 when the built-in
 /// report envelope did, to 18 when the outstandings builders did, and to 14 when the census,
 /// inventory-flags and company-features builders did, to 11 when the masters, party-bills and
-/// company-book-extent builders did, and to 4 when the invoice reads did.
-const SEAM_CEILING: usize = 4;
+/// company-book-extent builders did, to 4 when the invoice reads did, and to 3 when the direct
+/// company bootstrap rendered the standard ledger identity profile and the compatibility pair
+/// that wrapped it was deleted.
+const SEAM_CEILING: usize = 3;
 
 /// The string literals of [`WRITER`] that open the block, exactly: the private writer's template
 /// and the company-list template, which names no company.
@@ -87,7 +89,7 @@ const WRITER_CALLS: &[(&str, usize)] = &[
         1,
     ),
     ("crates/bridge-tally-protocol/src/outstandings_shared.rs", 1),
-    ("crates/bridge-tally-protocol/src/xml_read_profiles.rs", 8),
+    ("crates/bridge-tally-protocol/src/xml_read_profiles.rs", 7),
     ("src/agent_import.rs", 1),
     ("src/agent_import_invoice_wire.rs", 7),
     ("src/agent_lab.rs", 2),

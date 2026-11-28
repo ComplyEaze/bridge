@@ -11,8 +11,7 @@ use super::{
     standard_ledger_catalog::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
     },
-    tdl_engine,
-    validators::{normalize_company_guid, validate_company_name},
+    validators::normalize_company_guid,
     xml_parser::{self, TallyCompany},
     VerifiedCompanyIdentity,
 };
@@ -2173,7 +2172,7 @@ impl TallyClient {
         &self,
         candidate_name: &str,
     ) -> anyhow::Result<TallyCompany> {
-        validate_company_name(candidate_name)
+        let candidate_company = ValidatedCompanyName::new(candidate_name)
             .map_err(|_| anyhow::anyhow!("Tally direct company candidate was invalid"))?;
         let discovered = self.fetch_companies().await?;
         let candidates = discovered
@@ -2184,9 +2183,12 @@ impl TallyClient {
             anyhow::bail!("Tally direct company candidate was absent or ambiguous");
         };
         let xml = self
-            .post_xml(tdl_engine::standard_ledger_identity_request(
-                &candidate.name,
-            ))
+            .post_xml(
+                ReadOnlyProfile::StandardLedgerIdentityV1 {
+                    company: &candidate_company,
+                }
+                .render(),
+            )
             .await?;
         let observed = parse_standard_ledger_identity_observation(&xml, &candidate.name)?;
         let guid = normalize_company_guid(&observed.company_guid)

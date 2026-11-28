@@ -5,7 +5,7 @@
 //! `docs/adr/0017-voucher-presence-authority.md`. This file owns only the two
 //! qualified reads that produce the evidence, the typed parse of the caller's
 //! proposals, and the response shape.
-use super::failure_code::{PresenceCode, ProposalsCode, ReadCode};
+use super::failure_code::{AgentToolCode, PresenceCode, ProposalsCode, ReadCode};
 use super::vouchers::VoucherComposites;
 use super::*;
 use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
@@ -55,7 +55,7 @@ fn enforce_published_schema(args: &Value) -> Result<(), String> {
         .as_array()
         .and_then(|tools| tools.iter().find(|tool| tool["name"] == "voucher_presence"))
         .map(|tool| tool["inputSchema"].clone())
-        .ok_or_else(|| "tool_not_found".to_string())?;
+        .ok_or_else(|| AgentToolCode::ToolNotFound.as_str().to_string())?;
     for key in ["numbering", "vouchers"] {
         if let Some(value) = args.get(key) {
             catalog::validate_against_schema(value, &schema["properties"][key], key)?;

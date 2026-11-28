@@ -39,8 +39,8 @@ use super::super::master_review::{show_stock_item_draft, ShownStockItem};
 use super::*;
 use crate::agent::failure_code::{
     create_render_refusal_code, draft_refusal_code, item_name_refusal_code, not_goods_refusal_code,
-    sibling_refusal_code, stock_item_catalogue_refusal_code, ImportApprovalCode, MasterPostCode,
-    StockItemCreateCode,
+    sibling_refusal_code, stock_item_catalogue_refusal_code, ImportApprovalCode, MasterLedgerCode,
+    MasterPostCode, StockItemCreateCode,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::approved_import::ApprovedImport;
@@ -179,7 +179,7 @@ impl Server {
         let state = (self.read_kind_journal_shared(read_stock_item_journal)?)
             .state(batch_id)
             .cloned()
-            .ok_or(MasterPostCode::BatchNotFound)?;
+            .ok_or(MasterLedgerCode::BatchNotFound)?;
         let batch = state.batch;
         let guid = batch.company().guid.clone();
         let mut accumulated = carried.unwrap_or_else(empty_evidence);

@@ -258,6 +258,31 @@ const IMPORT_APPROVAL: &[(ImportApprovalCode, &str)] = &[
     (ImportApprovalCode::Busy, "post_approval_busy"),
 ];
 
+const MASTER_LEDGER: &[(MasterLedgerCode, &str)] = &[
+    (
+        MasterLedgerCode::KindNotAdmitted,
+        "master_kind_not_admitted",
+    ),
+    (
+        MasterLedgerCode::FieldNotForKind,
+        "ledger_field_not_for_kind",
+    ),
+    (MasterLedgerCode::PartySideInvalid, "party_side_invalid"),
+    (MasterLedgerCode::PartySideRequired, "party_side_required"),
+    (
+        MasterLedgerCode::GstDutyHeadRequired,
+        "gst_duty_head_required",
+    ),
+    (
+        MasterLedgerCode::GstDutyHeadNotAdmitted,
+        "gst_duty_head_not_admitted",
+    ),
+    (MasterLedgerCode::LedgerRequired, "ledger_required"),
+    (MasterLedgerCode::BatchInvalid, "master_batch_invalid"),
+    (MasterLedgerCode::BatchNotFound, "master_batch_not_found"),
+    (MasterLedgerCode::IntentMissing, "master_intent_missing"),
+];
+
 const SEARCH: &[(SearchCode, &str)] = &[
     (SearchCode::CriterionEmpty, "search_criterion_empty"),
     (SearchCode::CriterionTooLong, "search_criterion_too_long"),
@@ -750,6 +775,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(IMPORT_ACK),
         of(STOP_ACK),
         of(IMPORT_APPROVAL),
+        of(MASTER_LEDGER),
         of(BANK_STATEMENT),
         of(MASTER_POST),
         of(SEARCH),
@@ -795,6 +821,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("ImportAckCode", ImportAckCode::ALL),
         of("StopAckCode", StopAckCode::ALL),
         of("ImportApprovalCode", ImportApprovalCode::ALL),
+        of("MasterLedgerCode", MasterLedgerCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
         of("MasterPostCode", MasterPostCode::ALL),
         of("SearchCode", SearchCode::ALL),
@@ -845,7 +872,7 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.sort();
     assert_eq!(
         found.len(),
-        27,
+        28,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -884,6 +911,7 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(IMPORT_ACK), ImportAckCode::ALL);
     assert_eq!(variants(STOP_ACK), StopAckCode::ALL);
     assert_eq!(variants(IMPORT_APPROVAL), ImportApprovalCode::ALL);
+    assert_eq!(variants(MASTER_LEDGER), MasterLedgerCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
     assert_eq!(pinned, declared());
 }
@@ -934,6 +962,7 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(IMPORT_ACK, ImportAckCode::as_str);
     check_pins(STOP_ACK, StopAckCode::as_str);
     check_pins(IMPORT_APPROVAL, ImportApprovalCode::as_str);
+    check_pins(MASTER_LEDGER, MasterLedgerCode::as_str);
 }
 
 /// A tool failure made from a declared code carries exactly that code's pinned string.
@@ -954,9 +983,13 @@ fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     // The three lab master codes are declared only in a build with `lab-writes`. The counts are
     // a list, not a sum, so the merge gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
-    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 4, 7, 4, 5].iter().sum();
+    let expected: usize = [77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10]
+        .iter()
+        .sum();
     #[cfg(feature = "lab-writes")]
-    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 4, 7, 4, 5].iter().sum();
+    let expected: usize = [80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 3, 7, 4, 5, 10]
+        .iter()
+        .sum();
     assert_eq!(codes.len(), expected, "the declared codes");
     for code in codes {
         let text = code.as_str();
@@ -1083,7 +1116,6 @@ const MASTER_POST: &[(MasterPostCode, &str)] = &[
         MasterPostCode::BatchIdInvalid,
         "import_batch_identifier_invalid",
     ),
-    (MasterPostCode::BatchNotFound, "master_batch_not_found"),
     (
         MasterPostCode::CompanyIdentityMismatch,
         "company_identity_mismatch",

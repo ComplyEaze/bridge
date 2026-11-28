@@ -9,7 +9,7 @@
 //! returns is the one it was admitted on. Every row is named by its
 //! `bridge_txn_id` and date: no amount, reference, instrument, party or ledger
 //! leaves this module.
-use super::super::failure_code::ImportLedgerCode;
+use super::super::failure_code::{BankStatementCode, ImportLedgerCode};
 use super::*;
 use crate::agent::transfer_pairing::{
     transfer_pairing_view, with_days_read, BatchId, BatchStatus, ContraKey, DayReader,
@@ -26,7 +26,11 @@ pub(super) const WITHDRAW_SKIPS_KEY: &str = "withdraw_skips";
 /// The `withdraw_skips` argument, taken out of the build's arguments. Each is a
 /// statement row id, once, and no more than a build can hold vouchers.
 pub(super) fn take_withdraw_skips(args: &mut Value) -> Result<BTreeSet<String>, String> {
-    let invalid = || "argument_schema_invalid".to_string();
+    let invalid = || {
+        BankStatementCode::ArgumentSchemaInvalid
+            .as_str()
+            .to_string()
+    };
     let Some(value) = args
         .as_object_mut()
         .and_then(|map| map.remove(WITHDRAW_SKIPS_KEY))

@@ -179,8 +179,11 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         // Before any read: an unmeasured date costs no Tally request.
         let as_of = normalized_date(required_string(args, "as_of")?)?;
-        let as_of = StockSummaryAsOf::new(as_of)
-            .map_err(|_| "stock_by_godown_as_of_not_measured".to_string())?;
+        let as_of = StockSummaryAsOf::new(as_of).map_err(|_| {
+            super::failure_code::StockAsOfCode::GodownNotMeasured
+                .as_str()
+                .to_string()
+        })?;
         let (company, identity, prior) = self.verified_company(guid).await?;
         let today = TallyDate::parse(tally_host_today())
             .map_err(|_| super::failure_code::ReadCode::CurrentDateInvalid)?;

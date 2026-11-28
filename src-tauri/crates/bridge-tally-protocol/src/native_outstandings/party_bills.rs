@@ -27,7 +27,7 @@ use bridge_tally_primitives::{ExactDecimal, TallyDate};
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
-use crate::xml_read_profiles::compatibility::static_variables_for_unvalidated_company;
+use crate::xml_read_profiles::ValidatedCompanyName;
 use crate::xml_text::escape_text as xml_escape;
 
 use super::date::{parse_native_bill_date, parse_native_due_date};
@@ -38,12 +38,11 @@ const ON_ACCOUNT_REFERENCE: &str = "On Account";
 
 /// The `Ledger Outstandings` request for one party at one to-date.
 pub fn render_ledger_outstandings_request(
-    company: &str,
+    company: &ValidatedCompanyName,
     party: &LedgerOutstandingsParty,
     to: &TallyDate,
 ) -> String {
-    let static_variables = static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "",
         &format!(
             r#"<LedgerName>{party}</LedgerName><SVTODATE TYPE="Date">{to}</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><EXPLODEFLAG>Yes</EXPLODEFLAG>"#,

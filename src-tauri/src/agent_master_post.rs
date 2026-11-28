@@ -175,7 +175,7 @@ pub(super) fn recheck_stock_item_for_dispatch(
     })?;
     let create_sha256 = sent_digest(stock.prepared(), stock.xml_sha256())?;
     let items = candidate.catalogue().items().iter();
-    let pre_image = PreImage::new(items.map(|item| (item.guid.clone(), item.alter_id)))
+    let pre_image = PreImage::new(items.map(|item| (item.guid().to_owned(), item.alter_id())))
         .map_err(StockItemRecheckError::PreImage)?;
     let marks = aim_master_marks(stock.company_marks())?;
     Ok(StockItemRecheckPassed {

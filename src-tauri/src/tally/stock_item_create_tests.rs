@@ -484,8 +484,8 @@ fn a_fold_two_items_share_is_refused_with_their_count_but_an_exact_name_is_not()
         marked
             .items()
             .iter()
-            .find(|item| item.name == "SC-Sibling Goods")
-            .map(|item| item.guid.as_str()),
+            .find(|item| item.name() == "SC-Sibling Goods")
+            .map(|item| item.guid()),
         Some(PLAIN_GUID)
     );
 }
@@ -789,7 +789,7 @@ fn a_list_present_with_no_entry_is_refused() {
     xml.replace_range(start..end, "");
     let before = catalogue(&xml);
     assert_eq!(
-        before.items()[0].gst,
+        *before.items()[0].gst(),
         GstDetailsObservation::Entries { entries: vec![] }
     );
     assert_eq!(
@@ -805,7 +805,7 @@ fn a_list_present_with_no_entry_is_refused() {
     xml.replace_range(start..end, "");
     let before = catalogue(&xml);
     assert_eq!(
-        before.items()[0].hsn,
+        *before.items()[0].hsn(),
         HsnDetailsObservation::Entries { entries: vec![] }
     );
     assert_eq!(

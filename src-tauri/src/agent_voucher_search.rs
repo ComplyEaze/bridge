@@ -4,6 +4,7 @@
 //! search is refused before the window is read. The search then runs on the rows after the window is labelled and
 //! after every other selector, exactly as the ledger and type selectors do, so a zero from a
 //! `complete` window is a checked zero. No new Tally request is made.
+use super::failure_code::SearchCode;
 use super::*;
 
 /// The shortest narration term a search accepts, in characters after folding: shorter terms
@@ -33,8 +34,8 @@ pub(super) struct VoucherSearch {
     suspense_tagged: bool,
 }
 
-fn search_failure(code: &str) -> ToolFailure {
-    ToolFailure::from(code.to_string())
+fn search_failure(code: SearchCode) -> ToolFailure {
+    ToolFailure::from(code)
 }
 
 /// One criterion's text: absent stays absent, a blank or over-long value is refused.
@@ -44,10 +45,10 @@ fn criterion(args: &Value, key: &str) -> Result<Option<String>, ToolFailure> {
     };
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(search_failure("search_criterion_empty"));
+        return Err(search_failure(SearchCode::CriterionEmpty));
     }
     if trimmed.chars().count() > MAX_SEARCH_TERM_CHARS {
-        return Err(search_failure("search_criterion_too_long"));
+        return Err(search_failure(SearchCode::CriterionTooLong));
     }
     Ok(Some(trimmed.to_string()))
 }
@@ -66,12 +67,12 @@ impl VoucherSearch {
         let reference = criterion(args, "reference")?;
         let narration = match criterion(args, "narration_contains")? {
             Some(_) if redaction == Redaction::DropNarration => {
-                return Err(search_failure("search_narration_redacted"));
+                return Err(search_failure(SearchCode::NarrationRedacted));
             }
             Some(term) => {
                 let key = bridge_tally_core::text_search::narration_search_key(&term);
                 if key.chars().count() < MIN_NARRATION_TERM_CHARS {
-                    return Err(search_failure("search_narration_too_short"));
+                    return Err(search_failure(SearchCode::NarrationTooShort));
                 }
                 Some(key)
             }
@@ -84,16 +85,16 @@ impl VoucherSearch {
         let suspense_tagged = match args.get("suspense_tagged") {
             None => false,
             Some(Value::Bool(true)) => true,
-            Some(_) => return Err(search_failure("search_suspense_tagged_invalid")),
+            Some(_) => return Err(search_failure(SearchCode::SuspenseTaggedInvalid)),
         };
         if suspense_tagged {
             // A tag alone cannot say what is still in suspense (a reallocated voucher keeps
             // its tag), and a narration filter under redaction would leak by probing.
             if optional_string(args, "ledger")?.is_none_or(|ledger| ledger.trim().is_empty()) {
-                return Err(search_failure("search_suspense_tagged_needs_ledger"));
+                return Err(search_failure(SearchCode::SuspenseTaggedNeedsLedger));
             }
             if redaction == Redaction::DropNarration {
-                return Err(search_failure("search_narration_redacted"));
+                return Err(search_failure(SearchCode::NarrationRedacted));
             }
         }
         if voucher_number.is_none()
@@ -228,7 +229,7 @@ fn without_trailing_marker(narration: &str) -> &str {
 
 /// An amount to search for: a plain unsigned decimal above zero, in canonical form.
 fn search_amount(text: &str) -> Result<bridge_tally_core::ExactDecimal, ToolFailure> {
-    let invalid = || search_failure("search_amount_invalid");
+    let invalid = || search_failure(SearchCode::AmountInvalid);
     if text.starts_with('-') {
         return Err(invalid());
     }

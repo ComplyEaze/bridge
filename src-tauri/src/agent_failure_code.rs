@@ -699,8 +699,8 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs`), the voucher summary
-    /// and the import's read-back: a voucher, bill allocation or Delivery Note element Tally sent
+    /// The refusals of a voucher read, in its parse (`agent_voucher_parse.rs` and
+    /// `agent_voucher_scalars.rs`), the voucher summary and the import's read-back: a voucher, bill allocation or Delivery Note element Tally sent
     /// that the read cannot admit. One of them is also the cause a voucher is withheld with.
     pub(crate) enum VoucherReadCode {
         /// A Delivery Note entry holds an element that is not one of its measured fields, a field
@@ -754,6 +754,12 @@ failure_codes! {
         /// company's currency: the cause a withheld voucher carries, and the refusal of a presence
         /// check that meets one.
         ForeignCurrencyAmountUnparsed = "foreign_currency_amount_unparsed",
+        /// A voucher's GUID is blank or repeats, or its master ID repeats, in one collection
+        /// (`agent_voucher_scalars.rs`).
+        SourceIdentityInvalid = "voucher_source_identity_invalid",
+        /// A voucher's alter ID is present and is blank, holds a character that is not a digit, or
+        /// is too large to read (`agent_voucher_scalars.rs`).
+        AlterIdInvalid = "voucher_alter_id_invalid",
     }
 }
 
@@ -1298,19 +1304,8 @@ failure_codes! {
 }
 
 failure_codes! {
-    /// The refusals of a voucher's scalar fields as a read admits them (`agent_voucher_scalars.rs`).
-    pub(crate) enum VoucherScalarCode {
-        /// A voucher's GUID is blank or repeats, or its master ID repeats, in one collection.
-        SourceIdentityInvalid = "voucher_source_identity_invalid",
-        /// A voucher's alter ID is present and is blank, holds a character that is not a digit, or
-        /// is too large to read.
-        AlterIdInvalid = "voucher_alter_id_invalid",
-    }
-}
-
-failure_codes! {
     /// The refusals of a stock read's `as_of` before any request: a date that is not the last day
-    /// of a month.
+    /// of a month. Only `stock_by_godown`'s refusal is declared here so far.
     pub(crate) enum StockAsOfCode {
         /// `stock_by_godown`'s `as_of` is not the last day of a month.
         GodownNotMeasured = "stock_by_godown_as_of_not_measured",
@@ -1319,6 +1314,7 @@ failure_codes! {
 
 failure_codes! {
     /// The refusals of the bank-statement parse and proposals-loading tools.
+    /// `build_import_xml` also refuses a malformed `withdraw_skips` with `ArgumentSchemaInvalid`.
     pub(crate) enum BankStatementCode {
         /// The blocking statement parse task failed.
         TaskFailed = "statement_task_failed",

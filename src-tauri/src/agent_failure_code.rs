@@ -680,9 +680,11 @@ failure_codes! {
         /// A voucher's date of the party's own note, read when GST details are asked, is present
         /// and is not a date.
         PartyNoteDateInvalid = "voucher_party_note_date_invalid",
-        /// A voucher's bill of lading date is present and is not a date.
+        /// A voucher's bill of lading date, read when dispatch details are asked, is present and
+        /// is not a date.
         LadingDateInvalid = "voucher_lading_date_invalid",
-        /// A Delivery Note entry's date is present and is not a date.
+        /// A Delivery Note entry's date, read when GST details are asked, is present and is not a
+        /// date.
         DeliveryNoteDateInvalid = "voucher_delivery_note_date_invalid",
         /// A voucher read for its change identity has no date or no voucher type name, or a blank
         /// one.

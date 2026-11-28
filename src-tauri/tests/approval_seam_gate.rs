@@ -5244,6 +5244,159 @@ fn a_stock_approval_is_spent_only_through_its_redemption_by_the_writer() {
     }
 }
 
+/// The stock post's one dispatch, its whitespace removed: the stock recheck
+/// as the queue's recheck, and the stock intent writer in `before_dispatch`,
+/// with the redemption the pass took.
+const STOCK_POST_CALL: &str = ".post_approved_import(self.tally_config(),&identity,approved,recheck_stock_item_for_dispatch,|passed|{letlock=ExclusiveAdmission::acquire_or_refuse(data_dir).map_err(|refusal|{BeforeDispatchError::Refused(UnderLockRefusal::Admission(refusal))})?;record_stock_item_intent(data_dir,&lock,&batch,passed,&taken).map_err(stock_intent_refusal)},)";
+
+/// The stock post's take: on the server's own approvals holder.
+const STOCK_POST_TAKE: &str =
+    "let(taken,approved,held)=self.post_approvals.take_for_dispatch(batch_id,&binding)?;";
+
+/// The owed check, its call and its comparison.
+const STOCK_OWED_CALL: &str = "owed_digest(&approved,&batch)?;";
+const STOCK_OWED_BODY: &str = "ifapproved.xml_sha256()!=batch.batch_sha256(){returnErr(";
+
+/// Problems with how the stock post dispatches (#1381): the stock intent
+/// writer has one caller, the stock post's `before_dispatch`, which hands it
+/// the redemption the same pass took on the server's approvals holder; the
+/// stock recheck has one use, as that dispatch's recheck; and the owed check
+/// that the approved bytes are the batch's runs after the take and before the
+/// lease and the dispatch. Each text is read as code only, without whitespace.
+/// `sources` is every non-test source, as [`other_sources`] gives them.
+fn stock_post_problems(sources: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let code: Vec<(String, String)> = (sources.iter())
+        .map(|(path, text)| (path.clone(), squashed(&code_only(text))))
+        .collect();
+    let count = |needle: &str| -> usize {
+        code.iter()
+            .map(|(_, text)| text.matches(needle).count())
+            .sum()
+    };
+    let raw = (sources.iter())
+        .find(|(path, _)| is_source(path, "src/agent_master_stock_tools.rs"))
+        .map_or(String::new(), |(_, text)| code_only(text));
+    let tools = squashed(&raw);
+    // The pass, to the brace that closes it at the impl's indent.
+    let pass = raw
+        .find("    async fn post_stock_item_pass(")
+        .map_or("", |start| {
+            let rest = &raw[start..];
+            &rest[..rest.find("\n    }\n").map_or(rest.len(), |end| end + 7)]
+        });
+    let pass = squashed(pass);
+    let at = |needle: &str| {
+        (pass.matches(needle).count() == 1)
+            .then(|| pass.find(needle))
+            .flatten()
+    };
+    let order = [
+        at(STOCK_POST_TAKE),
+        at(STOCK_OWED_CALL),
+        at("dispatch_lease::acquire("),
+        at(STOCK_POST_CALL),
+        at("drop(taken);"),
+    ];
+    let ordered =
+        order.iter().all(Option::is_some) && order.windows(2).all(|pair| pair[0] < pair[1]);
+    // `taken` is bound once, by the take, and used only by the writer's call
+    // and the drop after the dispatch; the three posts take once each.
+    if !ordered || pass.matches("taken").count() != 3 || count("take_for_dispatch(") != 3 {
+        problems.push(
+            "the stock post takes its approval on its own holder, checks the owed digest, \
+             then dispatches with that redemption"
+                .into(),
+        );
+    }
+    let writer = "record_stock_item_intent(";
+    if count(writer) - count(&format!("fn{writer}")) != 1 {
+        problems.push("the stock intent writer is called once, by the stock post".into());
+    }
+    // Its definition, the stock post's import of it, and the dispatch.
+    let recheck = "recheck_stock_item_for_dispatch";
+    if count(recheck) != 3
+        || count(&format!("fn{recheck}(")) != 1
+        || tools
+            .matches(&format!("{{{recheck},stock_company_marks}};"))
+            .count()
+            != 1
+    {
+        problems.push("the stock recheck is used once, as the stock post's recheck".into());
+    }
+    if tools.matches(STOCK_OWED_BODY).count() != 1 || count("owed_digest(") != 2 {
+        problems.push("the owed check compares the approved digest with the batch's".into());
+    }
+    problems
+}
+
+#[test]
+fn the_stock_post_dispatches_once_with_its_own_redemption_after_the_owed_check() {
+    let sources = other_sources();
+    assert_eq!(stock_post_problems(&sources), Vec::<String>::new());
+    let edit = |source: &str, from: &str, to: &str| {
+        let mut mutated = sources.clone();
+        let entry = (mutated.iter_mut())
+            .find(|(path, _)| is_source(path, source))
+            .expect("the source is scanned");
+        assert_eq!(
+            entry.1.matches(from).count(),
+            1,
+            "the edit starts once: {from}"
+        );
+        entry.1 = entry.1.replacen(from, to, 1);
+        mutated
+    };
+    let tools = "src/agent_master_stock_tools.rs";
+    let owed = "            owed_digest(&approved, &batch)?;\n";
+    let lease = "            let _endpoint_dispatch_lease";
+    let dropped = "            drop(taken);\n";
+    let mutations = [
+        // The owed check skipped, moved after the dispatch, or made to pass.
+        edit(tools, owed, ""),
+        edit(tools, dropped, &format!("{dropped}{owed}")),
+        edit(
+            tools,
+            "if approved.xml_sha256() != batch.batch_sha256() {",
+            "if approved.xml_sha256() != approved.xml_sha256() {",
+        ),
+        // The redemption taken on a second approvals holder, or another
+        // redemption handed to the writer.
+        edit(
+            tools,
+            "self.post_approvals.take_for_dispatch(batch_id, &binding)?;",
+            "PostApprovals::new(data_dir).take_for_dispatch(batch_id, &binding)?;",
+        ),
+        edit(
+            tools,
+            lease,
+            &format!("            let taken = self.post_approvals.take_for_dispatch(batch_id, &binding)?.0;\n{lease}"),
+        ),
+        edit(tools, "&batch, passed, &taken)", "&batch, passed, &other)"),
+        // The ledger recheck in place of the stock one.
+        edit(
+            tools,
+            "                    recheck_stock_item_for_dispatch,\n",
+            "                    recheck_master_for_dispatch,\n",
+        ),
+        // A second caller of the writer, or a second use of the recheck.
+        edit(
+            "src/agent_master_post.rs",
+            "\n/// The digest of `prepared`'s writes",
+            "\nfn again() { let _ = record_stock_item_intent(d, l, b, p, r); }\n/// The digest of `prepared`'s writes",
+        ),
+        edit(
+            "src/agent_master_post.rs",
+            "\n/// The digest of `prepared`'s writes",
+            "\nfn again() { let _ = recheck_stock_item_for_dispatch; }\n/// The digest of `prepared`'s writes",
+        ),
+    ];
+    for (at, mutated) in mutations.iter().enumerate() {
+        assert_ne!(mutated, &sources, "mutation {at} changed nothing");
+        assert!(!stock_post_problems(mutated).is_empty(), "mutation {at}");
+    }
+}
+
 /// Whether `path` from [`other_sources`] is the crate's `source`, whatever the
 /// separator.
 fn is_source(path: &str, source: &str) -> bool {

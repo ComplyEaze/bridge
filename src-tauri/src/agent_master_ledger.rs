@@ -1238,6 +1238,13 @@ pub(super) fn read_journal(data_dir: &Path) -> Result<MasterJournal, MasterLedge
     read_kind_journal(data_dir)
 }
 
+/// The admitted stock-item journal of `data_dir`; one not yet written is empty.
+pub(super) fn read_stock_item_journal(
+    data_dir: &Path,
+) -> Result<Journal<stock_item_journal::StockItemBatch>, MasterLedgerError> {
+    read_kind_journal(data_dir)
+}
+
 /// The admitted journal of kind `B` in `data_dir`; one not yet written is empty.
 fn read_kind_journal<B: JournalBatch>(data_dir: &Path) -> Result<Journal<B>, MasterLedgerError> {
     match local_file::open_local_file(&journal_path::<B>(data_dir), false) {

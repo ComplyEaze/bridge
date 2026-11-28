@@ -140,6 +140,18 @@ impl StockItemBatch {
             item: StoredStockItemCreate::of(writes.to_plain()),
         })
     }
+
+    /// The company the batch was prepared for.
+    pub(in crate::agent::agent_import) fn company(&self) -> &MasterCompany {
+        &self.company
+    }
+
+    /// The stored writes, through `StockItemWrites::rebuild`.
+    pub(in crate::agent::agent_import) fn stored_writes(
+        &self,
+    ) -> Result<StockItemWrites, WritesRebuildRefusal> {
+        self.item.rebuild()
+    }
 }
 
 impl JournalBatch for StockItemBatch {
@@ -301,7 +313,7 @@ impl StockItemReadBackBasis {
 /// file was placed or another sidecar was already in place (`ExistsDifferent`),
 /// and `Refused(PreImageRemoveFailed)`.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum StockIntentRefusal {
+pub(in crate::agent::agent_import) enum StockIntentRefusal {
     /// The recheck passed, or the approval was taken, for another batch than
     /// the one to record.
     OtherBatch,
@@ -317,9 +329,9 @@ pub(super) enum StockIntentRefusal {
 /// exclusive lock and in its order: the batch undispatched and unchanged, the
 /// token and the approval of that batch, the token of that digest, the
 /// journal's admission, then the spend of `redemption`, the sidecar and the
-/// intent. Nothing shipped calls it yet.
+/// intent. Its only caller is the stock post, which nothing registers.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(super) fn record_stock_item_intent(
+pub(in crate::agent::agent_import) fn record_stock_item_intent(
     data_dir: &Path,
     lock: &ExclusiveAdmission,
     batch: &StockItemBatch,

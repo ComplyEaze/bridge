@@ -2462,7 +2462,11 @@ fn other_unloaded_guid() -> &'static str {
 
 /// A batch of `name` prepared for the company `company_guid`, left as a call
 /// that sent it would leave it: its intent is recorded and it has no verdict.
-fn dispatched_batch_in(dir: &std::path::Path, name: &str, company_guid: &str) -> MasterBatch {
+pub(super) fn dispatched_batch_in(
+    dir: &std::path::Path,
+    name: &str,
+    company_guid: &str,
+) -> MasterBatch {
     let identity = identity();
     let item = item(name);
     let request = MasterPostRequest::render(item.clone(), &identity);

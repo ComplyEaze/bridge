@@ -993,14 +993,22 @@ async fn approved_stock_item(
 }
 
 /// [`approved_stock_item`], asked for `batch`.
-async fn approved_stock_item_for(
+pub(in crate::agent::agent_import) async fn approved_stock_item_for(
     new_name: &str,
     batch: String,
 ) -> (ApprovalBinding, HeldRequest, ApprovedImport, Answered) {
-    let shown = shown_stock_item(new_name);
+    approved_shown_for(shown_stock_item(new_name), stock_marks(), batch).await
+}
+
+/// `shown`, asked for `batch` with `marks` and approved by the scripted dialog.
+pub(in crate::agent::agent_import) async fn approved_shown_for(
+    shown: ShownStockItem,
+    marks: AgentReadRequest,
+    batch: String,
+) -> (ApprovalBinding, HeldRequest, ApprovedImport, Answered) {
     let asked = SCRIPTED_APPROVAL
         .scope(ScriptedApproval::approving(), async {
-            shown.ask(stock_marks(), batch)
+            shown.ask(marks, batch)
         })
         .await;
     let (binding, dialog, held) = asked.into_parts();

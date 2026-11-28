@@ -1055,6 +1055,77 @@ const INVOICE_READBACK: &[(InvoiceReadbackCode, &str)] = &[
 /// A ledger name that reads as a masked one.
 const LEDGER_NAME: &[(LedgerNameCode, &str)] = &[(LedgerNameCode::Masked, "ledger_name_masked")];
 
+/// The company tools' own codes.
+const COMPANY: &[(CompanyCode, &str)] = &[
+    (
+        CompanyCode::ListNotEstablished,
+        "company_list_not_established",
+    ),
+    (CompanyCode::GuidRequired, "company_guid_required"),
+    (CompanyCode::IdentityNotFound, "company_identity_not_found"),
+    (CompanyCode::IdentityAmbiguous, "company_identity_ambiguous"),
+    (CompanyCode::GuidInvalid, "company_guid_invalid"),
+];
+
+/// The company change-mark read's refusals.
+const COMPANY_CHECKPOINT: &[(CompanyCheckpointCode, &str)] = &[
+    (
+        CompanyCheckpointCode::HighWaterIdentityAmbiguous,
+        "company_high_water_identity_ambiguous",
+    ),
+    (
+        CompanyCheckpointCode::HighWaterIdentityAbsent,
+        "company_high_water_identity_absent",
+    ),
+    (
+        CompanyCheckpointCode::MarksNameAbsent,
+        "company_marks_name_absent",
+    ),
+    (
+        CompanyCheckpointCode::MarksGuidAbsent,
+        "company_marks_guid_absent",
+    ),
+];
+
+/// The response size refusal.
+const AGENT_RESPONSE: &[(AgentResponseCode, &str)] =
+    &[(AgentResponseCode::TooLarge, "agent_response_too_large")];
+
+/// The lab writer tools' refusals beyond their masters checks.
+#[cfg(feature = "lab-writes")]
+const LAB_IMPORT: &[(LabImportCode, &str)] = &[
+    (LabImportCode::BookPathUnreadable, "book_path_unreadable"),
+    (LabImportCode::BookPathInvalidJson, "book_path_invalid_json"),
+    (
+        LabImportCode::TargetCompanyMismatch,
+        "lab_target_company_mismatch",
+    ),
+    (
+        LabImportCode::MasterAlreadyExists,
+        "lab_master_already_exists",
+    ),
+    (
+        LabImportCode::ResponseInvalid,
+        "lab_import_response_invalid",
+    ),
+    (
+        LabImportCode::InventoryStockItemRequired,
+        "lab_inventory_stock_item_required",
+    ),
+    (
+        LabImportCode::InventoryAmountRequired,
+        "lab_inventory_amount_required",
+    ),
+    (
+        LabImportCode::InvoicePartyRequired,
+        "lab_invoice_party_required",
+    ),
+    (
+        LabImportCode::BatchPartiallyVerifiedUncertain,
+        "lab_batch_partially_verified_uncertain",
+    ),
+];
+
 /// An `outstandings` party detail's request and the party name it sends.
 const OUTSTANDINGS_DETAIL: &[(OutstandingsDetailCode, &str)] = &[
     (
@@ -1594,6 +1665,9 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
         of(INVOICE_MASTERS),
         of(INVOICE_READBACK),
         of(LEDGER_NAME),
+        of(COMPANY),
+        of(COMPANY_CHECKPOINT),
+        of(AGENT_RESPONSE),
         of(OUTSTANDINGS_DETAIL),
         of(STOCK_AS_OF),
         of(BANK_STATEMENT),
@@ -1601,7 +1675,7 @@ fn pinned() -> Vec<(FailureCode, &'static str)> {
     ]
     .concat();
     #[cfg(feature = "lab-writes")]
-    let pins = [pins, of(LAB_MASTERS), of(LAB_TOOL)].concat();
+    let pins = [pins, of(LAB_MASTERS), of(LAB_TOOL), of(LAB_IMPORT)].concat();
     pins
 }
 
@@ -1665,6 +1739,9 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         of("InvoiceMastersCode", InvoiceMastersCode::ALL),
         of("InvoiceReadbackCode", InvoiceReadbackCode::ALL),
         of("LedgerNameCode", LedgerNameCode::ALL),
+        of("CompanyCode", CompanyCode::ALL),
+        of("CompanyCheckpointCode", CompanyCheckpointCode::ALL),
+        of("AgentResponseCode", AgentResponseCode::ALL),
         of("OutstandingsDetailCode", OutstandingsDetailCode::ALL),
         of("StockAsOfCode", StockAsOfCode::ALL),
         of("BankStatementCode", BankStatementCode::ALL),
@@ -1676,6 +1753,7 @@ fn declared_by_enum() -> Vec<(&'static str, Vec<FailureCode>)> {
         vec![
             of("LabMastersCode", LabMastersCode::ALL),
             of("LabToolCode", LabToolCode::ALL),
+            of("LabImportCode", LabImportCode::ALL),
         ],
     ]
     .concat();
@@ -1721,11 +1799,13 @@ fn every_enum_the_macro_declares_is_walked_by_declared() {
     walked.push("LabMastersCode".to_string());
     #[cfg(not(feature = "lab-writes"))]
     walked.push("LabToolCode".to_string());
+    #[cfg(not(feature = "lab-writes"))]
+    walked.push("LabImportCode".to_string());
     found.sort();
     walked.sort();
     assert_eq!(
         found.len(),
-        54,
+        58,
         "the failure_codes! blocks found in the source"
     );
     assert_eq!(found, walked);
@@ -1790,6 +1870,11 @@ fn every_variant_has_one_pinned_string() {
     assert_eq!(variants(INVOICE_MASTERS), InvoiceMastersCode::ALL);
     assert_eq!(variants(INVOICE_READBACK), InvoiceReadbackCode::ALL);
     assert_eq!(variants(LEDGER_NAME), LedgerNameCode::ALL);
+    assert_eq!(variants(COMPANY), CompanyCode::ALL);
+    assert_eq!(variants(COMPANY_CHECKPOINT), CompanyCheckpointCode::ALL);
+    assert_eq!(variants(AGENT_RESPONSE), AgentResponseCode::ALL);
+    #[cfg(feature = "lab-writes")]
+    assert_eq!(variants(LAB_IMPORT), LabImportCode::ALL);
     assert_eq!(variants(OUTSTANDINGS_DETAIL), OutstandingsDetailCode::ALL);
     assert_eq!(variants(STOCK_AS_OF), StockAsOfCode::ALL);
     let pinned: Vec<FailureCode> = pinned().into_iter().map(|(code, _)| code).collect();
@@ -1868,6 +1953,11 @@ fn each_declared_code_is_the_string_its_site_wrote() {
     check_pins(INVOICE_MASTERS, InvoiceMastersCode::as_str);
     check_pins(INVOICE_READBACK, InvoiceReadbackCode::as_str);
     check_pins(LEDGER_NAME, LedgerNameCode::as_str);
+    check_pins(COMPANY, CompanyCode::as_str);
+    check_pins(COMPANY_CHECKPOINT, CompanyCheckpointCode::as_str);
+    check_pins(AGENT_RESPONSE, AgentResponseCode::as_str);
+    #[cfg(feature = "lab-writes")]
+    check_pins(LAB_IMPORT, LabImportCode::as_str);
     check_pins(OUTSTANDINGS_DETAIL, OutstandingsDetailCode::as_str);
     check_pins(STOCK_AS_OF, StockAsOfCode::as_str);
 }
@@ -1887,20 +1977,20 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
 fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
     let mut seen = std::collections::BTreeSet::new();
     let codes = declared();
-    // The three lab master codes and the twenty-one lab tool codes are declared only in a build
-    // with `lab-writes`. The counts are a list, not a sum, so the merge gate's phone-number scan
-    // does not read them as one number.
+    // The three lab master codes, the twenty-one lab tool codes and the nine lab import codes are
+    // declared only in a build with `lab-writes`. The counts are a list, not a sum, so the merge
+    // gate's phone-number scan does not read them as one number.
     #[cfg(not(feature = "lab-writes"))]
     let expected: usize = [
         77, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 21, 2, 21, 8, 11, 19, 13, 4, 17, 8, 6,
-        2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 3, 1,
+        2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1, 3, 1,
     ]
     .iter()
     .sum();
     #[cfg(feature = "lab-writes")]
     let expected: usize = [
         80, 4, 2, 1, 1, 4, 25, 6, 3, 20, 7, 4, 5, 10, 5, 14, 21, 2, 21, 8, 11, 21, 19, 13, 4, 17,
-        8, 6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 3, 1,
+        8, 6, 2, 8, 8, 5, 9, 3, 5, 4, 1, 3, 1, 5, 4, 1, 9, 3, 1,
     ]
     .iter()
     .sum();

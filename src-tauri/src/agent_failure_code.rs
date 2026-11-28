@@ -1290,6 +1290,72 @@ failure_codes! {
 }
 
 failure_codes! {
+    /// The company tools' own codes (`agent_company.rs`): the reason `status` gives when the
+    /// loaded-company list is not established, and the refusals of the company a read names.
+    pub(crate) enum CompanyCode {
+        /// Not a tool failure: `status` gives it as its `refusal_reason` and evidence reason when
+        /// the loaded-company list was not established and the probe gave no reason of its own.
+        ListNotEstablished = "company_list_not_established",
+        /// The company GUID is blank.
+        GuidRequired = "company_guid_required",
+        /// No listed company carries the GUID, or none matches the identity read for it.
+        IdentityNotFound = "company_identity_not_found",
+        /// More than one listed company carries the GUID, or matches the identity read for it.
+        IdentityAmbiguous = "company_identity_ambiguous",
+        /// A company GUID, requested or listed, is not a native company GUID.
+        GuidInvalid = "company_guid_invalid",
+    }
+}
+
+failure_codes! {
+    /// The refusals of a company's change-mark read (`agent_company_checkpoint.rs`).
+    pub(crate) enum CompanyCheckpointCode {
+        /// More than one row carries the requested company's GUID.
+        HighWaterIdentityAmbiguous = "company_high_water_identity_ambiguous",
+        /// No row carries the requested company's GUID.
+        HighWaterIdentityAbsent = "company_high_water_identity_absent",
+        /// A loaded company's row has no name.
+        MarksNameAbsent = "company_marks_name_absent",
+        /// A loaded company's row has no GUID.
+        MarksGuidAbsent = "company_marks_guid_absent",
+    }
+}
+
+failure_codes! {
+    /// The refusal of a response over its size limit (`agent_responses.rs`).
+    pub(crate) enum AgentResponseCode {
+        /// The response is over its size limit and could not be trimmed to fit.
+        TooLarge = "agent_response_too_large",
+    }
+}
+
+#[cfg(feature = "lab-writes")]
+failure_codes! {
+    /// The refusals of the lab writer tools (`agent_lab_import.rs`) beyond their masters checks.
+    pub(crate) enum LabImportCode {
+        /// The `book_path` file could not be read.
+        BookPathUnreadable = "book_path_unreadable",
+        /// The `book_path` file is not JSON.
+        BookPathInvalidJson = "book_path_invalid_json",
+        /// The lab's target company is not the company GUID requested.
+        TargetCompanyMismatch = "lab_target_company_mismatch",
+        /// A requested master is the root group, has a blank name, or is in the target company
+        /// with a difference from the book that no Alter reconciles.
+        MasterAlreadyExists = "lab_master_already_exists",
+        /// Tally's answer to a lab import did not parse as an import outcome.
+        ResponseInvalid = "lab_import_response_invalid",
+        /// An inventory line has no stock item.
+        InventoryStockItemRequired = "lab_inventory_stock_item_required",
+        /// An inventory line has no amount.
+        InventoryAmountRequired = "lab_inventory_amount_required",
+        /// An invoice has no party.
+        InvoicePartyRequired = "lab_invoice_party_required",
+        /// Some, but not all, of a batch's vouchers were found already in the target company.
+        BatchPartiallyVerifiedUncertain = "lab_batch_partially_verified_uncertain",
+    }
+}
+
+failure_codes! {
     /// The refusals of an `outstandings` party detail before its bill report is read: a request
     /// whose party, detail and reference do not go together, or a party name the `open_bills`
     /// detail does not send (`agent_party_bills.rs`).

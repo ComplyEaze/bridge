@@ -1,5 +1,6 @@
 //! Responses for the local MCP adapter.
 use super::agent_import::{check_not_run_section, counts_only_section, trim_section};
+use super::failure_code::AgentResponseCode;
 use super::*;
 
 #[derive(Clone, Copy)]
@@ -76,7 +77,7 @@ fn page_shape(response: &Value) -> Option<(PageShape, usize)> {
 
 fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Result<(), String> {
     if width == 0 {
-        return Err("agent_response_too_large".into());
+        return Err(AgentResponseCode::TooLarge.as_str().into());
     }
     let result = &mut response["result"];
     let offset = result["offset"]
@@ -345,7 +346,7 @@ fn fit_response(
                 return Ok(true);
             }
         }
-        return Err("agent_response_too_large".to_string());
+        return Err(AgentResponseCode::TooLarge.as_str().to_string());
     };
     let mut original = response.clone();
     if let Some(section) = &section {
@@ -371,7 +372,7 @@ fn fit_response(
         max_bytes,
         &mut encoded_len,
     )?;
-    *response = trimmed.ok_or_else(|| "agent_response_too_large".to_string())?;
+    *response = trimmed.ok_or_else(|| AgentResponseCode::TooLarge.as_str().to_string())?;
     if let Some(section) = &section {
         fit_section(
             response,

@@ -1,5 +1,5 @@
 //! Admit one company checkpoint without losing fragmented scalar content.
-use super::super::failure_code::ReadCode;
+use super::super::failure_code::{AgentToolCode, CompanyCheckpointCode, ReadCode};
 use super::*;
 use quick_xml::events::Event;
 
@@ -68,12 +68,18 @@ fn company_high_water_row(
             .is_some_and(|guid| guid.trim().eq_ignore_ascii_case(expected_guid))
         {
             if matched.is_some() {
-                return Err("company_high_water_identity_ambiguous".into());
+                return Err(CompanyCheckpointCode::HighWaterIdentityAmbiguous
+                    .as_str()
+                    .into());
             }
             matched = Some(row);
         }
     }
-    matched.ok_or_else(|| "company_high_water_identity_absent".to_string())
+    matched.ok_or_else(|| {
+        CompanyCheckpointCode::HighWaterIdentityAbsent
+            .as_str()
+            .to_string()
+    })
 }
 
 /// The key under which a row keeps its `NAME` attribute. It cannot collide
@@ -205,13 +211,13 @@ pub(in crate::agent) fn parse_all_company_marks(
             let name = row
                 .get(COMPANY_NAME_ATTRIBUTE)
                 .filter(|name| !name.trim().is_empty())
-                .ok_or_else(|| "company_marks_name_absent".to_string())?
+                .ok_or_else(|| CompanyCheckpointCode::MarksNameAbsent.as_str().to_string())?
                 .clone();
             let guid = row
                 .get("GUID")
                 .map(|guid| guid.trim().to_string())
                 .filter(|guid| !guid.is_empty())
-                .ok_or_else(|| "company_marks_guid_absent".to_string())?;
+                .ok_or_else(|| CompanyCheckpointCode::MarksGuidAbsent.as_str().to_string())?;
             let masters = observed_checkpoint(row.get("ALTMSTID"), "master")?;
             let vouchers = match row.get("ALTVCHID") {
                 None => 0,
@@ -252,7 +258,7 @@ pub(in crate::agent) fn company_voucher_mark(
         Ok(mark) => mark["altvchid"]
             .as_u64()
             .map(Some)
-            .ok_or_else(|| "voucher_checkpoint_invalid".to_string()),
+            .ok_or_else(|| AgentToolCode::VoucherCheckpointInvalid.as_str().to_string()),
         Err(code) if code == VOUCHER_CHECKPOINT_NOT_OBSERVED => Ok(None),
         Err(code) => Err(code),
     }
